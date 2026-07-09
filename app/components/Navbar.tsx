@@ -15,46 +15,41 @@ export default function Navbar() {
         top-0
         z-50
         border-b
-        border-white/30
-        bg-white/75
+        border-white/20
+        bg-white/80
         backdrop-blur-2xl
-        shadow-[0_8px_30px_rgba(0,0,0,0.06)]
+        shadow-lg
       "
     >
-      <div className="mx-auto flex h-20 max-w-[1600px] items-center justify-between px-4 md:px-8">
+      <div className="mx-auto flex h-20 max-w-[1700px] items-center px-5">
 
-        {/* Left */}
+        {/* Logo */}
 
-        <div className="flex items-center gap-10">
-
+        <div className="flex-shrink-0">
           <NavbarLogo />
-
-          <NavbarLinks />
-
         </div>
 
-        {/* Center */}
+        {/* Navigation */}
 
-        <div className="hidden flex-1 justify-center px-8 lg:flex">
+        <div className="hidden xl:flex ml-8 flex-shrink-0">
+          <NavbarLinks />
+        </div>
 
+        {/* Search */}
+
+        <div className="hidden lg:flex flex-1 justify-center px-6 min-w-0">
           <NavbarSearch />
-
         </div>
 
         {/* Right */}
 
-        <div className="flex items-center gap-4">
-
+        <div className="ml-auto flex flex-shrink-0 items-center gap-3">
           <NavbarActions />
-
           <NavbarProfile />
-
           <MobileMenu />
-
         </div>
 
       </div>
-
     </header>
   );
 }

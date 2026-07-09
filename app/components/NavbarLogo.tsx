@@ -4,13 +4,33 @@ import { useEffect, useState } from "react";
 
 export default function NavbarLogo() {
   const [loaded, setLoaded] = useState(false);
+  const [logo, setLogo] = useState("/logos/logo-day.png");
 
   useEffect(() => {
+    const updateLogo = () => {
+      const hour = new Date().getHours();
+
+      setLogo(
+        hour >= 6 && hour < 18
+          ? "/logos/logo-day.png"
+          : "/logos/logo-night.png"
+      );
+    };
+
+    updateLogo();
+
     const timer = setTimeout(() => {
       setLoaded(true);
     }, 150);
 
-    return () => clearTimeout(timer);
+    /* Check every minute for day/night change */
+
+    const interval = setInterval(updateLogo, 60000);
+
+    return () => {
+      clearTimeout(timer);
+      clearInterval(interval);
+    };
   }, []);
 
   return (
@@ -18,58 +38,55 @@ export default function NavbarLogo() {
       aria-label="INPLAYER Home"
       className="group relative flex items-center"
     >
-      <div className="relative">
-
-        {/* Glow */}
-
-        <div
-          className={`
-            absolute
-            inset-0
-            rounded-2xl
-            blur-xl
-            transition-all
-            duration-700
-            ${
-              loaded
-                ? "opacity-60 scale-100"
-                : "opacity-0 scale-75"
-            }
-            group-hover:opacity-100
-            group-hover:scale-110
-          `}
-          style={{
-            background:
-              "radial-gradient(circle, rgba(59,130,246,0.28), rgba(168,85,247,0.16), transparent 72%)",
-          }}
-        />
+      <div className="relative overflow-hidden">
 
         {/* Logo */}
 
         <img
-          src="/logos/logo-night.png"
+          src={logo}
           alt="INPLAYER"
+          draggable={false}
           className={`
             relative
-            h-14
-            md:h-16
-            lg:h-[72px]
+            h-12
+            md:h-14
+            lg:h-16
             w-auto
             object-contain
             select-none
             transition-all
-            duration-700
-            ease-out
+            duration-1000
+            ease-in-out
             ${
               loaded
-                ? "opacity-100 scale-100"
-                : "opacity-0 scale-90"
+                ? "opacity-100 scale-100 animate-logoFade"
+                : "opacity-0 scale-95"
             }
             group-hover:scale-105
-            animate-float
+            animate-logoFloat
           `}
-          draggable={false}
         />
+
+        {/* Light Sweep */}
+
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+
+          <div
+            className="
+              absolute
+              -left-20
+              top-0
+              h-full
+              w-10
+              -skew-x-12
+              bg-white/30
+              blur-md
+              animate-glassSweep
+            "
+          />
+
+        </div>
+
       </div>
     </button>
   );

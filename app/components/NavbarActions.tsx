@@ -3,12 +3,40 @@
 import {
   Bell,
   Crown,
-  Settings,
+  Plus,
 } from "lucide-react";
 
 export default function NavbarActions() {
   return (
-    <div className="hidden lg:flex items-center gap-3">
+    <div className="hidden lg:flex items-center gap-2">
+
+      {/* Create */}
+
+      <button
+        className="
+          flex
+          items-center
+          gap-2
+          rounded-full
+          bg-gradient-to-r
+          from-orange-500
+          via-amber-400
+          to-yellow-400
+          px-5
+          py-3
+          text-sm
+          font-bold
+          text-slate-900
+          shadow-lg
+          transition-all
+          duration-300
+          hover:-translate-y-1
+          hover:scale-105
+        "
+      >
+        <Plus size={18} />
+        Create
+      </button>
 
       {/* Premium */}
 
@@ -18,24 +46,20 @@ export default function NavbarActions() {
           items-center
           gap-2
           rounded-full
-          bg-gradient-to-r
-          from-amber-400
-          via-yellow-400
-          to-orange-400
-          px-6
+          border
+          border-amber-300/40
+          bg-white/80
+          backdrop-blur-xl
+          px-4
           py-3
-          text-[14px]
-          font-bold
-          text-slate-900
-          shadow-lg
+          text-sm
+          font-semibold
           transition-all
           duration-300
-          hover:-translate-y-0.5
-          hover:shadow-xl
+          hover:bg-amber-50
         "
       >
-        <Crown size={16} />
-
+        <Crown size={17} className="text-amber-500" />
         Premium
       </button>
 
@@ -45,99 +69,24 @@ export default function NavbarActions() {
         className="
           relative
           flex
-          h-11
-          w-11
+          h-10
+          w-10
           items-center
           justify-center
           rounded-full
           border
-          border-slate-200
-          bg-white/90
-          shadow-sm
+          border-white/40
+          bg-white/80
+          backdrop-blur-xl
           transition-all
           duration-300
           hover:-translate-y-1
           hover:shadow-lg
         "
       >
-        <Bell size={18} />
+        <Bell size={17} />
 
-        <span
-          className="
-            absolute
-            right-3
-            top-3
-            h-2
-            w-2
-            rounded-full
-            bg-red-500
-          "
-        />
-      </button>
-
-      {/* Settings */}
-
-      <button
-        className="
-          flex
-          h-11
-          w-11
-          items-center
-          justify-center
-          rounded-full
-          border
-          border-slate-200
-          bg-white/90
-          shadow-sm
-          transition-all
-          duration-300
-          hover:-translate-y-1
-          hover:rotate-45
-          hover:shadow-lg
-        "
-      >
-        <Settings size={18} />
-      </button>
-
-      {/* Login */}
-
-      <button
-        className="
-          rounded-full
-          border
-          border-slate-300
-          bg-white/90
-          px-6
-          py-3
-          font-semibold
-          text-slate-700
-          transition-all
-          duration-300
-          hover:border-orange-300
-          hover:text-orange-500
-        "
-      >
-        Login
-      </button>
-
-      {/* Sign Up */}
-
-      <button
-        className="
-          rounded-full
-          bg-[#0F172A]
-          px-6
-          py-3
-          font-semibold
-          text-white
-          transition-all
-          duration-300
-          hover:-translate-y-0.5
-          hover:bg-black
-          hover:shadow-xl
-        "
-      >
-        Sign Up
+        <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500" />
       </button>
 
     </div>

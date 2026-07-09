@@ -1,15 +1,15 @@
 "use client";
 
-import { Search } from "lucide-react";
+import { Search, Mic, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 
 const placeholders = [
   "Search movies...",
-  "Search TV shows...",
   "Search creators...",
-  "Search live TV...",
-  "Search gaming...",
-  "Search music...",
+  "Search AI prompts...",
+  "Search podcasts...",
+  "Search live events...",
+  "Search brands...",
 ];
 
 export default function NavbarSearch() {
@@ -21,45 +21,44 @@ export default function NavbarSearch() {
     const interval = setInterval(() => {
       index = (index + 1) % placeholders.length;
       setPlaceholder(placeholders[index]);
-    }, 2500);
+    }, 2800);
 
     return () => clearInterval(interval);
   }, []);
 
   return (
-    <div className="relative hidden lg:flex items-center">
-
-      {/* Left Search Icon */}
+    <div className="relative flex w-full max-w-[290px] min-w-[190px] items-center">
 
       <Search
-        size={18}
-        className="absolute left-5 text-slate-400 pointer-events-none"
+        size={15}
+        className="absolute left-3 text-slate-400 pointer-events-none"
       />
 
       <input
         type="text"
         placeholder={placeholder}
         className="
-          w-[240px]
-          xl:w-[320px]
+          w-full
           rounded-full
           border
-          border-white/50
-          bg-white/70
-          backdrop-blur-xl
-          py-3
-          pl-12
-          pr-12
-          text-[14px]
+          border-white/40
+          bg-white/75
+          backdrop-blur-2xl
+          py-2
+          pl-9
+          pr-14
+          text-[12px]
           text-slate-700
+          placeholder:text-[10px]
           placeholder:text-slate-400
+          placeholder:transition-opacity
+          placeholder:duration-300
           outline-none
           transition-all
           duration-500
-          shadow-[0_8px_30px_rgba(15,23,42,0.06)]
+          shadow-[0_12px_35px_rgba(15,23,42,0.08)]
           hover:bg-white/90
           hover:shadow-xl
-          focus:w-[360px]
           focus:bg-white
           focus:border-orange-300
           focus:ring-4
@@ -67,17 +66,33 @@ export default function NavbarSearch() {
         "
       />
 
-      {/* Right Search Icon */}
+      {/* AI */}
 
-      <Search
-        size={17}
+      <Sparkles
+        size={14}
         className="
           absolute
-          right-5
-          text-slate-400
-          pointer-events-none
-          transition
+          right-9
+          text-orange-500
+          transition-all
           duration-300
+          hover:rotate-12
+          cursor-pointer
+        "
+      />
+
+      {/* Voice */}
+
+      <Mic
+        size={14}
+        className="
+          absolute
+          right-3
+          cursor-pointer
+          text-slate-400
+          transition-all
+          duration-300
+          hover:text-orange-500
         "
       />
 

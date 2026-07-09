@@ -8,3 +8,339 @@ body {
   background: #F8FAFC;
   color: #0F172A;
 }
+
+/* ---------- Existing Animations ---------- */
+
+@keyframes shimmer {
+  0% {
+    transform: translateX(-120%);
+  }
+
+  100% {
+    transform: translateX(220%);
+  }
+}
+
+@keyframes badgeGlow {
+  0%,
+  100% {
+    box-shadow: 0 0 10px rgba(249,115,22,.15);
+  }
+
+  50% {
+    box-shadow: 0 0 28px rgba(249,115,22,.45);
+  }
+}
+
+@keyframes float {
+  0% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-6px);
+  }
+
+  100% {
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInUp {
+  0% {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes glowPulse {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 8px rgba(255,140,0,.18));
+  }
+
+  50% {
+    filter: drop-shadow(0 0 18px rgba(255,140,0,.45));
+  }
+}
+
+/* ---------- Logo ---------- */
+
+@keyframes logoFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-3px);
+  }
+}
+
+.animate-logoFloat {
+  animation: logoFloat 4s ease-in-out infinite;
+}
+
+@keyframes glassSweep {
+  0% {
+    transform: translateX(-180%) skewX(-18deg);
+    opacity: 0;
+  }
+
+  10% {
+    opacity: .6;
+  }
+
+  50% {
+    opacity: .9;
+  }
+
+  90% {
+    opacity: .6;
+  }
+
+  100% {
+    transform: translateX(650%) skewX(-18deg);
+    opacity: 0;
+  }
+}
+
+.animate-glassSweep {
+  animation: glassSweep 6s linear infinite;
+}
+
+@keyframes logoFade {
+  0% {
+    opacity: 0;
+    transform: scale(.96);
+  }
+
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-logoFade {
+  animation: logoFade 1s ease;
+}
+
+/* ---------- Hero ---------- */
+
+@keyframes cinematicZoom {
+  0% {
+    transform: scale(1);
+  }
+
+  50% {
+    transform: scale(1.04);
+  }
+
+  100% {
+    transform: scale(1);
+  }
+}
+
+.animate-cinematicZoom {
+  animation: cinematicZoom 18s ease-in-out infinite;
+}
+
+@keyframes ambientGlow {
+  0%,
+  100% {
+    opacity: .45;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: .8;
+    transform: scale(1.08);
+  }
+}
+
+.animate-ambientGlow {
+  animation: ambientGlow 8s ease-in-out infinite;
+}
+
+@keyframes playPulse {
+  0%,
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+
+  50% {
+    transform: translate(-50%, -50%) scale(1.08);
+  }
+}
+
+.animate-playPulse {
+  animation: playPulse 2.8s ease-in-out infinite;
+}
+
+@keyframes floatingCard {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-8px);
+  }
+}
+
+.animate-floatingCard {
+  animation: floatingCard 5s ease-in-out infinite;
+}
+
+/* ---------- Scrollbar ---------- */
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: linear-gradient(
+    180deg,
+    #fb923c,
+    #f97316
+  );
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(
+    180deg,
+    #fdba74,
+    #fb923c
+  );
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #f97316 transparent;
+}
+@keyframes aiPopup {
+  0% {
+    transform: translateY(80px) scale(0.7);
+  }
+
+  60% {
+    transform: translateY(-8px) scale(1.02);
+  }
+
+  100% {
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-aiPopup {
+  animation: aiPopup .45s cubic-bezier(.16,1,.3,1);
+  transform-origin: bottom right;
+}
+/* ---------- AI Floating Orb ---------- */
+
+@keyframes aiSparkle {
+  0%,
+  100% {
+    transform: scale(1) rotate(0deg);
+    filter:
+      drop-shadow(0 0 6px rgba(255,200,80,.35))
+      drop-shadow(0 0 16px rgba(255,170,0,.15));
+  }
+
+  15% {
+    transform: scale(1.18) rotate(10deg);
+    filter:
+      drop-shadow(0 0 10px rgba(255,220,120,.9))
+      drop-shadow(0 0 24px rgba(255,170,0,.45));
+  }
+
+  25% {
+    transform: scale(0.98) rotate(-6deg);
+  }
+
+  35% {
+    transform: scale(1.08);
+  }
+
+  45% {
+    transform: scale(1);
+  }
+}
+
+.animate-aiSparkle {
+  animation: aiSparkle 5s ease-in-out infinite;
+}
+
+@keyframes aiOrbFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.animate-aiOrbFloat {
+  animation: aiOrbFloat 4s ease-in-out infinite;
+}
+
+@keyframes aiGlow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 rgba(255,170,0,0),
+      0 10px 30px rgba(255,140,0,.25);
+  }
+
+  50% {
+    box-shadow:
+      0 0 22px rgba(255,190,60,.35),
+      0 18px 42px rgba(255,140,0,.45);
+  }
+}
+
+.animate-aiGlow {
+  animation: aiGlow 4s ease-in-out infinite;
+}
+/* ---------- AI Glass Sweep ---------- */
+
+@keyframes aiGlassSweep {
+  0% {
+    transform: translateX(-180%) rotate(25deg);
+    opacity: 0;
+  }
+
+  15% {
+    opacity: .15;
+  }
+
+  45% {
+    opacity: .45;
+  }
+
+  75% {
+    opacity: .15;
+  }
+
+  100% {
+    transform: translateX(260%) rotate(25deg);
+    opacity: 0;
+  }
+}
+
+.animate-aiGlassSweep {
+  animation: aiGlassSweep 5.5s linear infinite;
+}

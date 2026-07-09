@@ -22,7 +22,7 @@ export const featuredMovie = {
     description:
       "A brilliant scientist discovers a hidden technology capable of changing humanity forever. As governments and corporations race to control it, one impossible decision will determine the future of the world.",
   
-    poster: "/posters/beyond-limits.jpg",
+      poster: "/posters/poster1.jpg",
   
     imdb: "9.6",
   

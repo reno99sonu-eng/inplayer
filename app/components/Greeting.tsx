@@ -37,6 +37,7 @@ export default function Greeting() {
         hidden
         xl:flex
         flex-col
+        justify-center
         leading-none
         transition-all
         duration-700
@@ -47,13 +48,13 @@ export default function Greeting() {
         }
       `}
     >
-      <span className="flex items-center gap-1 text-[8px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+      <span className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-300">
 
-        <span className="animate-pulse text-[15px] leading-none">
+        <span className="text-[13px] leading-none">
           {icon}
         </span>
 
-        <span className="font-semibold">
+        <span className="whitespace-nowrap">
           Good {greeting}
         </span>
 
@@ -62,13 +63,11 @@ export default function Greeting() {
       <span
         className="
           mt-1
-          text-[13px]
-          font-black
-          tracking-[-0.02em]
-          text-slate-950
-          drop-shadow-[0_1px_2px_rgba(255,255,255,0.15)]
-          transition-colors
-          duration-300
+          text-[14px]
+          font-bold
+          tracking-tight
+          text-white
+          drop-shadow-[0_1px_6px_rgba(255,255,255,.18)]
         "
       >
         Ram

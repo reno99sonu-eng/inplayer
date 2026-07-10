@@ -6,10 +6,10 @@ import { useEffect, useState } from "react";
 const placeholders = [
   "Search movies...",
   "Search creators...",
-  "Search AI prompts...",
+  "Search AI...",
+  "Search live streams...",
   "Search podcasts...",
-  "Search live events...",
-  "Search brands...",
+  "Search music...",
 ];
 
 export default function NavbarSearch() {
@@ -21,80 +21,125 @@ export default function NavbarSearch() {
     const interval = setInterval(() => {
       index = (index + 1) % placeholders.length;
       setPlaceholder(placeholders[index]);
-    }, 2800);
+    }, 2600);
 
     return () => clearInterval(interval);
   }, []);
 
   return (
-    <div className="relative flex w-full max-w-[290px] min-w-[190px] items-center">
+    <div className="group relative w-full max-w-[500px] min-w-[260px]">
 
-      <Search
-        size={15}
-        className="absolute left-3 text-slate-400 pointer-events-none"
+      {/* Premium Glow */}
+      <div
+        className="
+          pointer-events-none
+          absolute
+          -inset-2
+          rounded-full
+          bg-gradient-to-r
+          from-orange-500/20
+          via-amber-400/15
+          to-orange-500/20
+          blur-2xl
+          opacity-50
+          transition-all
+          duration-500
+          group-hover:opacity-90
+          group-focus-within:opacity-100
+        "
       />
 
+      {/* Search Icon */}
+      <Search
+        size={18}
+        className="
+          pointer-events-none
+          absolute
+          left-5
+          top-1/2
+          -translate-y-1/2
+          text-slate-400
+          transition-colors
+          duration-300
+          group-focus-within:text-orange-400
+        "
+      />
+
+      {/* Search Input */}
       <input
         type="text"
         placeholder={placeholder}
         className="
+          relative
+          h-14
           w-full
           rounded-full
           border
-          border-white/40
-          bg-white/75
-          backdrop-blur-2xl
-          py-2
-          pl-9
-          pr-14
-          text-[12px]
-          text-slate-700
-          placeholder:text-[10px]
+          border-white/10
+          bg-white/[0.05]
+          backdrop-blur-[30px]
+          pl-14
+          pr-24
+          text-sm
+          font-medium
+          text-white
           placeholder:text-slate-400
-          placeholder:transition-opacity
-          placeholder:duration-300
           outline-none
           transition-all
           duration-500
-          shadow-[0_12px_35px_rgba(15,23,42,0.08)]
-          hover:bg-white/90
-          hover:shadow-xl
-          focus:bg-white
-          focus:border-orange-300
-          focus:ring-4
-          focus:ring-orange-100
+          shadow-[0_10px_35px_rgba(0,0,0,.22)]
+          hover:bg-white/[0.07]
+          hover:border-orange-400/40
+          hover:shadow-[0_0_35px_rgba(249,115,22,.18)]
+          focus:bg-white/[0.10]
+          focus:border-orange-400
+          focus:shadow-[0_0_60px_rgba(249,115,22,.35)]
         "
       />
 
-      {/* AI */}
-
-      <Sparkles
-        size={14}
+      {/* AI Button */}
+      <button
+        type="button"
         className="
           absolute
-          right-9
-          text-orange-500
+          right-12
+          top-1/2
+          -translate-y-1/2
+          rounded-full
+          p-1.5
           transition-all
           duration-300
-          hover:rotate-12
-          cursor-pointer
+          hover:scale-110
+          hover:bg-orange-500/10
         "
-      />
+      >
+        <Sparkles
+          size={18}
+          className="text-orange-400 animate-pulse"
+        />
+      </button>
 
-      {/* Voice */}
-
-      <Mic
-        size={14}
+      {/* Voice Button */}
+      <button
+        type="button"
         className="
           absolute
-          right-3
-          cursor-pointer
-          text-slate-400
+          right-4
+          top-1/2
+          -translate-y-1/2
+          rounded-full
+          p-1.5
           transition-all
           duration-300
-          hover:text-orange-500
+          hover:scale-110
+          hover:bg-white/10
         "
-      />
+      >
+        <Mic
+          size={18}
+          className="text-slate-300 transition-colors hover:text-orange-400"
+        />
+      </button>
 
     </div>
   );

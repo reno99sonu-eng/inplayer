@@ -53,34 +53,37 @@ export default function NavbarProfile() {
       <button
         onClick={() => setOpen(!open)}
         className="
-          flex
-          items-center
-          gap-2
-          rounded-full
-          border
-          border-white/70
-          bg-white/90
-          px-2.5
-          py-2
-          shadow-lg
-          backdrop-blur-xl
-          transition-all
-          duration-300
-          hover:-translate-y-0.5
-          hover:shadow-xl
-        "
+  group
+  flex
+  items-center
+  gap-3
+  rounded-full
+  border
+  border-white/10
+  bg-white/5
+  px-3
+  py-2.5
+  backdrop-blur-3xl
+  shadow-[0_10px_30px_rgba(0,0,0,.25)]
+  transition-all
+  duration-300
+  hover:-translate-y-1
+  hover:border-orange-400/40
+  hover:bg-white/[0.08]
+  hover:shadow-[0_0_35px_rgba(249,115,22,.18)]
+"
       >
         <img
           src="/avatars/avatar.png"
           alt="Profile"
-          className="h-10 w-10 rounded-full object-cover ring-2 ring-white"
+          className="h-11 w-11 rounded-full object-cover ring-2 ring-orange-400/40 transition-all duration-300 group-hover:ring-orange-300"
         />
 
         <Greeting />
 
         <ChevronDown
           size={16}
-          className={`transition duration-300 ${
+          className={`text-slate-300 transition-all duration-300 ${
             open ? "rotate-180" : ""
           }`}
         />
@@ -95,10 +98,10 @@ export default function NavbarProfile() {
           overflow-hidden
           rounded-3xl
           border
-          border-white/80
-          bg-white/95
+          border-white/10
+bg-[#08111F]/95
           backdrop-blur-3xl
-          shadow-[0_20px_60px_rgba(0,0,0,0.12)]
+          shadow-[0_30px_80px_rgba(0,0,0,.55)]
           transition-all
           duration-300
           origin-top-right
@@ -117,7 +120,7 @@ export default function NavbarProfile() {
             className="mx-auto h-12 w-12 rounded-full ring-2 ring-orange-200"
           />
 
-          <h3 className="mt-2 text-lg font-bold text-slate-900">
+          <h3 className="mt-3 text-lg font-black text-white">
             Ram
           </h3>
 
@@ -163,22 +166,22 @@ export default function NavbarProfile() {
                   text-left
                   transition-all
                   duration-200
-                  hover:bg-orange-50
+                  hover:bg-white/5 hover:translate-x-1
                 "
               >
                 <Icon
                   size={16}
-                  className="text-slate-500"
+                  className="text-orange-400"
                 />
 
-                <span className="text-[13px] font-medium text-slate-800">
+                <span className="text-[15px] font-bold text-white leading-none">
                   {item.title}
                 </span>
               </button>
             );
           })}
 
-          <div className="my-2 border-t border-slate-200" />
+          <div className="my-2 border-t border-white/10" />
 
           <button
             className="
@@ -194,7 +197,7 @@ export default function NavbarProfile() {
               text-red-500
               transition-all
               duration-200
-              hover:bg-red-50
+              hover:bg-red-500/10 hover:translate-x-1
             "
           >
             <LogOut size={16} />

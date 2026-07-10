@@ -1,94 +1,46 @@
 "use client";
 
-import { useState } from "react";
-import AIStudioModal from "./AIStudioModal";
+import { useEffect, useState } from "react";
 
 export default function FloatingAIButton() {
-  const [open, setOpen] = useState(false);
+  const [hidden, setHidden] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => {
+      const footer = document.querySelector("footer");
+
+      if (!footer) return;
+
+      const rect = footer.getBoundingClientRect();
+
+      // Hide when footer enters the viewport
+      setHidden(rect.top < window.innerHeight);
+    };
+
+    window.addEventListener("scroll", onScroll);
+    onScroll();
+
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
 
   return (
-    <>
-      <button
-  type="button"
-  onClick={() => setOpen(true)}
-  aria-label="Open AI Studio"
-  className="
-    group
-    fixed
-    bottom-8
-    right-8
-    z-[9998]
-    flex
-    h-16
-    w-16
-    items-center
-    justify-center
-    overflow-hidden
-    rounded-full
-    border
-    border-orange-400/20
-    bg-gradient-to-br
-    from-[#111C2D]
-    via-[#0C1626]
-    to-[#060C16]
-    backdrop-blur-xl
-    transition-all
-    duration-500
-    hover:scale-105
-    animate-aiOrbFloat
-    animate-aiGlow
-  "
->
-  {/* Static Glass Reflection */}
-
-<div
-  className="
-    pointer-events-none
-    absolute
-    inset-0
-    rounded-full
-    bg-[linear-gradient(135deg,rgba(255,255,255,.18),transparent_45%)]
-  "
-/>
-
-{/* Moving Glass Sweep */}
-
-<div
-  className="
-    pointer-events-none
-    absolute
-    -left-8
-    top-0
-    h-full
-    w-5
-    rotate-12
-    bg-white/25
-    blur-sm
-    animate-aiGlassSweep
-  "
-/>
-
-  {/* Premium AI Spark */}
-
-  <span
-    className="
-      relative
-      z-10
-      text-[26px]
-      text-[#FFD66B]
-      animate-aiSparkle
-      select-none
-    "
-  >
-    ✦
-  </span>
-
-</button>
-
-      <AIStudioModal
-        open={open}
-        onClose={() => setOpen(false)}
-      />
-    </>
+    <button
+      className={`
+        fixed bottom-6 right-6 z-50
+        h-16 w-16 rounded-full
+        bg-gradient-to-br from-[#1B2435] to-[#0B1020]
+        shadow-[0_0_40px_rgba(255,170,0,0.35)]
+        border border-orange-400/20
+        transition-all duration-500
+        hover:scale-110
+        ${
+          hidden
+            ? "translate-y-32 opacity-0 pointer-events-none"
+            : "translate-y-0 opacity-100"
+        }
+      `}
+    >
+      <span className="text-2xl text-amber-300">✦</span>
+    </button>
   );
 }

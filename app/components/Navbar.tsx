@@ -68,11 +68,11 @@ export default function Navbar() {
           </div>
 
           {/* Mobile / Tablet Search */}
-          <div className="lg:hidden flex flex-1 min-w-0 px-3 sm:px-4">
-            <div className="flex w-[150px] sm:w-[190px] md:w-[230px]">
-              <NavbarSearch />
-            </div>
-          </div>
+          <div className="lg:hidden flex flex-1 min-w-0 px-2 sm:px-3">
+  <div className="flex w-[130px] sm:w-[165px] md:w-[200px]">
+    <NavbarSearch />
+  </div>
+</div>
 
           {/* Right Side */}
           <div className="ml-auto mr-8 flex items-center gap-4">

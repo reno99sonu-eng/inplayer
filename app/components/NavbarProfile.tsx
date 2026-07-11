@@ -80,7 +80,9 @@ export default function NavbarProfile() {
         />
 
 <div className="hidden md:block">
+<div className="hidden xl:flex">
   <Greeting />
+</div>
 </div>
 
         <ChevronDown

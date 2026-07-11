@@ -3,7 +3,7 @@
 import { Search, Mic, Sparkles } from "lucide-react";
 import { useEffect, useState } from "react";
 
-const placeholders = [
+const desktopPlaceholders = [
   "Search movies...",
   "Search creators...",
   "Search AI...",
@@ -12,22 +12,38 @@ const placeholders = [
   "Search music...",
 ];
 
+const mobilePlaceholders = [
+  "Movies...",
+  "Creators...",
+  "AI...",
+  "Live...",
+  "Podcasts...",
+  "Music...",
+];
+
 export default function NavbarSearch() {
-  const [placeholder, setPlaceholder] = useState(placeholders[0]);
+  const isMobile =
+  typeof window !== "undefined" && window.innerWidth < 1024;
 
-  useEffect(() => {
-    let index = 0;
+const activePlaceholders = isMobile
+  ? mobilePlaceholders
+  : desktopPlaceholders;
 
-    const interval = setInterval(() => {
-      index = (index + 1) % placeholders.length;
-      setPlaceholder(placeholders[index]);
-    }, 2600);
+const [placeholder, setPlaceholder] = useState(activePlaceholders[0]);
 
-    return () => clearInterval(interval);
-  }, []);
+useEffect(() => {
+  let index = 0;
+
+  const interval = setInterval(() => {
+    index = (index + 1) % activePlaceholders.length;
+    setPlaceholder(activePlaceholders[index]);
+  }, 2600);
+
+  return () => clearInterval(interval);
+}, [activePlaceholders]);
 
   return (
-    <div className="group relative w-full max-w-[500px] min-w-[260px]">
+    <div className="group relative w-full max-w-[500px] min-w-[180px] sm:min-w-[220px] lg:min-w-[260px]">
 
       {/* Premium Glow */}
       <div

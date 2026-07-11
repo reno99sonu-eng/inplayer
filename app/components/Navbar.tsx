@@ -10,6 +10,7 @@ import NavbarActions from "./NavbarActions";
 import NavbarProfile from "./NavbarProfile";
 import MobileMenu from "./MobileMenu";
 import MobileNavbarProfile from "./MobileNavbarProfile";
+import MobileCreateButton from "./MobileCreateButton";
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -114,7 +115,7 @@ export default function Navbar() {
 </div>
           {/* Mobile / Tablet Search */}
           <div className="lg:hidden flex flex-1 min-w-0 px-2 sm:px-3">
-  <div className="flex w-[105px] sm:w-[140px] md:w-[175px]">
+          <div className="flex w-[220px] sm:w-[250px]">
     <NavbarSearch />
   </div>
 </div>
@@ -122,18 +123,24 @@ export default function Navbar() {
           {/* Right Side */}
 <div className="ml-auto mr-4 flex items-center gap-2">
 
-{/* Notification Bell (Desktop + Mobile) */}
-<div className="flex scale-[0.9] origin-right">
+{/* Desktop Notification (unchanged) */}
+<div className="hidden lg:flex scale-[0.9] origin-right">
   <NavbarActions />
 </div>
 
-{/* Desktop Profile */}
+{/* Desktop Profile (unchanged) */}
 <div className="hidden lg:flex scale-[0.82] origin-right">
   <NavbarProfile />
 </div>
 
-{/* Mobile Profile */}
-<div className="lg:hidden">
+{/* Mobile Create + Notification + Profile */}
+<div className="lg:hidden flex items-center gap-2">
+  <MobileCreateButton />
+
+  <div className="scale-[0.9]">
+    <NavbarActions />
+  </div>
+
   <MobileNavbarProfile />
 </div>
 

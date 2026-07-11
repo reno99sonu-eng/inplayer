@@ -60,33 +60,34 @@ export default function NavbarActions() {
   ];
 
   return (
-    <div className="relative hidden lg:flex items-center gap-3">
+    <div className="relative flex items-center gap-3">
 
       {/* Create */}
 
       <button
-        onClick={() => setOpen(!open)}
-        className="
-          flex
-          items-center
-          gap-2
-          rounded-full
-          bg-gradient-to-r
-          from-orange-500
-          via-amber-400
-          to-yellow-400
-          px-5
-          py-3
-          text-sm
-          font-bold
-          text-slate-900
-          shadow-xl
-          transition-all
-          duration-300
-          hover:-translate-y-1
-          hover:scale-105
-        "
-      >
+  onClick={() => setOpen(!open)}
+  className="
+    hidden lg:flex
+    items-center
+    gap-2
+    rounded-full
+    bg-gradient-to-r
+    from-orange-500
+    via-amber-400
+    to-yellow-400
+    px-5
+    py-3
+    text-sm
+    font-bold
+    text-slate-900
+    shadow-xl
+    transition-all
+    duration-300
+    hover:-translate-y-1
+    hover:scale-105
+  "
+>
+        
         <Plus size={18} />
         Create
       </button>

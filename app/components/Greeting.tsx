@@ -33,11 +33,10 @@ export default function Greeting() {
 
   return (
     <div
-      className={`
-        hidden
-        xl:flex
-        flex-col
-        justify-center
+  className={`
+    flex
+    flex-col
+    justify-center
         leading-none
         transition-all
         duration-700

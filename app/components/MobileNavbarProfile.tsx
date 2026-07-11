@@ -2,7 +2,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
-  ChevronDown,
   User,
   Heart,
   PlayCircle,
@@ -13,9 +12,7 @@ import {
   Crown,
 } from "lucide-react";
 
-import Greeting from "./Greeting";
-
-export default function NavbarProfile() {
+export default function MobileNavbarProfile() {
   const [open, setOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
 
@@ -46,48 +43,30 @@ export default function NavbarProfile() {
   ];
 
   return (
-    <div
-      ref={profileRef}
-      className="relative block"
-    >
+    <div ref={profileRef} className="relative">
       <button
         onClick={() => setOpen(!open)}
         className="
-  group
-  flex
-  items-center
-  gap-3
-  rounded-full
-  border
-  border-white/10
-  bg-white/5
-  px-3
-  py-2.5
-  backdrop-blur-3xl
-  shadow-[0_10px_30px_rgba(0,0,0,.25)]
-  transition-all
-  duration-300
-  hover:-translate-y-1
-  hover:border-orange-400/40
-  hover:bg-white/[0.08]
-  hover:shadow-[0_0_35px_rgba(249,115,22,.18)]
-"
+          flex
+          h-11
+          w-11
+          items-center
+          justify-center
+          rounded-full
+          border
+          border-white/10
+          bg-white/5
+          backdrop-blur-xl
+          transition-all
+          duration-300
+          hover:border-orange-400/40
+          hover:bg-white/[0.08]
+        "
       >
         <img
           src="/avatars/avatar.png"
           alt="Profile"
-          className="h-11 w-11 rounded-full object-cover ring-2 ring-orange-400/40 transition-all duration-300 group-hover:ring-orange-300"
-        />
-
-<div className="hidden md:block">
-  <Greeting />
-</div>
-
-        <ChevronDown
-          size={16}
-          className={`text-slate-300 transition-all duration-300 ${
-            open ? "rotate-180" : ""
-          }`}
+          className="h-9 w-9 rounded-full object-cover ring-2 ring-orange-400/40"
         />
       </button>
 
@@ -101,7 +80,7 @@ export default function NavbarProfile() {
           rounded-3xl
           border
           border-white/10
-bg-[#08111F]/95
+          bg-[#08111F]/95
           backdrop-blur-3xl
           shadow-[0_30px_80px_rgba(0,0,0,.55)]
           transition-all
@@ -115,68 +94,38 @@ bg-[#08111F]/95
         `}
       >
         <div className="p-4 text-center">
-
           <img
             src="/avatars/avatar.png"
             alt="Profile"
             className="mx-auto h-12 w-12 rounded-full ring-2 ring-orange-200"
           />
 
-          <h3 className="mt-3 text-lg font-black text-white">
+          <p className="mt-2 text-sm text-slate-400">
+            Good Afternoon
+          </p>
+
+          <h3 className="text-lg font-black text-white">
             Ram
           </h3>
 
-          <div
-            className="
-              mt-2
-              inline-flex
-              items-center
-              gap-1.5
-              rounded-full
-              bg-gradient-to-r
-              from-yellow-400
-              to-orange-500
-              px-3
-              py-1
-              text-[10px]
-              font-semibold
-              text-white
-            "
-          >
+          <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-yellow-400 to-orange-500 px-3 py-1 text-[10px] font-semibold text-white">
             <Crown size={12} />
             Premium
           </div>
-
         </div>
 
-        <div className="border-t border-slate-200 p-2">
-
+        <div className="border-t border-white/10 p-2">
           {menu.map((item) => {
             const Icon = item.icon;
 
             return (
               <button
                 key={item.title}
-                className="
-                  flex
-                  w-full
-                  items-center
-                  gap-3
-                  rounded-xl
-                  px-3
-                  py-2.5
-                  text-left
-                  transition-all
-                  duration-200
-                  hover:bg-white/5 hover:translate-x-1
-                "
+                className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-all duration-200 hover:bg-white/5 hover:translate-x-1"
               >
-                <Icon
-                  size={16}
-                  className="text-orange-400"
-                />
+                <Icon size={16} className="text-orange-400" />
 
-                <span className="text-[15px] font-bold text-white leading-none">
+                <span className="text-[15px] font-bold text-white">
                   {item.title}
                 </span>
               </button>
@@ -185,27 +134,10 @@ bg-[#08111F]/95
 
           <div className="my-2 border-t border-white/10" />
 
-          <button
-            className="
-              flex
-              w-full
-              items-center
-              gap-3
-              rounded-xl
-              px-3
-              py-2.5
-              text-[13px]
-              font-medium
-              text-red-500
-              transition-all
-              duration-200
-              hover:bg-red-500/10 hover:translate-x-1
-            "
-          >
+          <button className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-red-500 transition-all duration-200 hover:bg-red-500/10 hover:translate-x-1">
             <LogOut size={16} />
             Sign Out
           </button>
-
         </div>
       </div>
     </div>

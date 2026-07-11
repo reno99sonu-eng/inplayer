@@ -78,7 +78,7 @@ export default function NavbarSearch() {
           border-white/10
           bg-white/[0.05]
           backdrop-blur-[30px]
-          pl-14
+          pl-10
           pr-24
           text-sm
           font-medium

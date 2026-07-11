@@ -9,6 +9,7 @@ import NavbarSearch from "./NavbarSearch";
 import NavbarActions from "./NavbarActions";
 import NavbarProfile from "./NavbarProfile";
 import MobileMenu from "./MobileMenu";
+import MobileNavbarProfile from "./MobileNavbarProfile";
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -52,10 +53,10 @@ export default function Navbar() {
         "
       >
         <div className="mx-auto flex h-20 max-w-[1700px] items-center px-5">
-          {/* Logo */}
-          <div className="flex-shrink-0">
-            <NavbarLogo />
-          </div>
+          {/* Logo (Desktop only) */}
+<div className="hidden lg:flex flex-shrink-0">
+  <NavbarLogo />
+</div>
 
           {/* Desktop Navigation */}
           <div className="hidden xl:flex ml-8 flex-shrink-0">
@@ -66,63 +67,75 @@ export default function Navbar() {
           <div className="hidden lg:flex flex-1 justify-center px-10 min-w-0">
             <NavbarSearch />
           </div>
-
+{/* Mobile Hamburger */}
+<div className="lg:hidden mr-3 flex-shrink-0">
+  <button
+    onClick={() => setMenuOpen(!menuOpen)}
+    className="
+      flex
+      h-11
+      w-11
+      items-center
+      justify-center
+      rounded-2xl
+      border
+      border-white/10
+      bg-white/5
+      backdrop-blur-xl
+      transition-all
+      duration-300
+      hover:scale-105
+      hover:border-orange-400/50
+      hover:bg-orange-500/10
+      hover:shadow-[0_0_25px_rgba(249,115,22,.25)]
+    "
+  >
+    <div className="relative h-6 w-6">
+      <Menu
+        size={22}
+        strokeWidth={2.2}
+        className={`absolute transition-all duration-300 ${
+          menuOpen
+            ? "rotate-90 scale-0 opacity-0"
+            : "rotate-0 scale-100 opacity-100 text-white"
+        }`}
+      />
+      <X
+        size={22}
+        strokeWidth={2.2}
+        className={`absolute transition-all duration-300 ${
+          menuOpen
+            ? "rotate-0 scale-100 opacity-100 text-orange-300"
+            : "-rotate-90 scale-0 opacity-0"
+        }`}
+      />
+    </div>
+  </button>
+</div>
           {/* Mobile / Tablet Search */}
           <div className="lg:hidden flex flex-1 min-w-0 px-2 sm:px-3">
-  <div className="flex w-[130px] sm:w-[165px] md:w-[200px]">
+  <div className="flex w-[105px] sm:w-[140px] md:w-[175px]">
     <NavbarSearch />
   </div>
 </div>
 
           {/* Right Side */}
-          <div className="ml-auto mr-8 flex items-center gap-4">
-            <NavbarActions />
-            <NavbarProfile />
+<div className="ml-auto mr-4 flex items-center gap-2">
 
-            {/* Premium Menu Button */}
-            <button
-              onClick={() => setMenuOpen(!menuOpen)}
-              className="
-                ml-2
-                flex
-                h-11
-                w-11
-                items-center
-                justify-center
-                rounded-2xl
-                border
-                border-white/10
-                bg-white/5
-                backdrop-blur-xl
-                transition-all
-                duration-300
-                hover:scale-105
-                hover:border-orange-400/50
-                hover:bg-orange-500/10
-                hover:shadow-[0_0_25px_rgba(249,115,22,.25)]
-              "
-            >
-              <div className="relative h-6 w-6">
-                <Menu
-                  size={22}
-                  strokeWidth={2.2}
-                  className={`absolute transition-all duration-300 ${
-                    menuOpen
-                      ? "rotate-90 scale-0 opacity-0"
-                      : "rotate-0 scale-100 opacity-100 text-white"
-                  }`}
-                />
-                <X
-                  size={22}
-                  strokeWidth={2.2}
-                  className={`absolute transition-all duration-300 ${
-                    menuOpen
-                      ? "rotate-0 scale-100 opacity-100 text-orange-300"
-                      : "-rotate-90 scale-0 opacity-0"
-                  }`}
-                />
-              </div>
-            </button>
+{/* Notification Bell (Desktop + Mobile) */}
+<div className="flex scale-[0.9] origin-right">
+  <NavbarActions />
+</div>
+
+{/* Desktop Profile */}
+<div className="hidden lg:flex scale-[0.82] origin-right">
+  <NavbarProfile />
+</div>
+
+{/* Mobile Profile */}
+<div className="lg:hidden">
+  <MobileNavbarProfile />
+</div>
 
             {/* <MobileMenu /> */}
           </div>
@@ -142,9 +155,11 @@ export default function Navbar() {
       <aside
         ref={menuRef}
         className={`
-          fixed
-          right-0
-          top-0
+  fixed
+  left-0
+lg:left-auto
+lg:right-0
+  top-0
           z-[100]
           h-screen
           w-[380px]
@@ -155,7 +170,11 @@ export default function Navbar() {
           backdrop-blur-3xl
           transition-transform
           duration-300
-          ${menuOpen ? "translate-x-0" : "translate-x-full"}
+          ${
+  menuOpen
+    ? "translate-x-0"
+    : "lg:translate-x-full -translate-x-full"
+}
         `}
       >
         <div className="flex h-full flex-col">

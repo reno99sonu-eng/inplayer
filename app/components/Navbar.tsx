@@ -42,8 +42,9 @@ export default function Navbar() {
   return (
     <>
       <header
-        className="
-          sticky
+  className="
+    relative
+    sticky
           top-0
           z-50
           border-b
@@ -53,6 +54,35 @@ export default function Navbar() {
           shadow-[0_12px_40px_rgba(0,0,0,.35)]
         "
       >
+      {/* Mobile / Tablet Background Branding */}
+<div
+  className="
+    absolute
+    inset-0
+    lg:hidden
+    pointer-events-none
+    overflow-hidden
+    flex
+    items-center
+    justify-center
+  "
+>
+  <span
+    className="
+      select-none
+      whitespace-nowrap
+      font-black
+      uppercase
+      tracking-[0.35em]
+      text-[54px]
+      sm:text-[72px]
+      text-white/[0.03]
+      blur-[1.5px]
+    "
+  >
+    INPLAYER
+  </span>
+</div>
         <div className="mx-auto flex h-20 max-w-[1700px] items-center px-5">
           {/* Logo (Desktop only) */}
 <div className="hidden lg:flex flex-shrink-0">
@@ -135,7 +165,9 @@ export default function Navbar() {
 
 {/* Mobile Create + Notification + Profile */}
 <div className="lg:hidden flex items-center gap-2">
+<div className="-ml-2">
   <MobileCreateButton />
+</div>
 
   <div className="scale-[0.9]">
     <NavbarActions />

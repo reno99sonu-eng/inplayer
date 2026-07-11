@@ -144,14 +144,14 @@ export default function Navbar() {
   </button>
 </div>
           {/* Mobile / Tablet Search */}
-          <div className="lg:hidden flex flex-1 min-w-0 px-2 sm:px-3">
-          <div className="flex w-[220px] sm:w-[250px]">
+          <div className="lg:hidden flex flex-1 min-w-0 px-2">
+  <div className="flex flex-1 min-w-0 max-w-full">
     <NavbarSearch />
   </div>
 </div>
 
           {/* Right Side */}
-<div className="ml-auto mr-4 flex items-center gap-2">
+          <div className="ml-2 flex flex-shrink-0 items-center gap-2">
 
 {/* Desktop Notification (unchanged) */}
 <div className="hidden lg:flex scale-[0.9] origin-right">

@@ -1,131 +1,53 @@
 import Navbar from "./components/Navbar";
-
 import Hero from "./components/Hero";
-
-import Features from "./components/Features";
-
-import Marketplace from "./components/Marketplace";
-
-import DiscoverChannels from "./components/DiscoverChannels";
-
-import PremiumBanner from "./components/PremiumBanner";
-
+import DiscoverHub from "./components/DiscoverHub";
 import ContinueWatching from "./components/ContinueWatching";
-
+import TrendingNow from "./components/TrendingNow";
 import FloatingAIButton from "./components/FloatingAIButton";
-
 import Footer from "./components/Footer";
 
 export default function Home() {
-
-return (
-
-<main className="relative min-h-screen overflow-x-hidden bg-[#050816]">
-
-
-
-  {/* Premium Background */}
-
-  <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
-
-
-
-    {/* Dark Gradient */}
-
-    <div className="absolute inset-0 bg-gradient-to-br from-[#04060F] via-[#091224] to-[#04060F]" />
-
-
-
-    {/* Honeycomb Texture */}
-
-    <div
-
-      className="absolute inset-0 opacity-[0.06]"
-
-      style={{
-
-        backgroundImage:
-
-          "radial-gradient(circle at 24px 24px, rgba(255,176,59,0.18) 2px, transparent 2px)",
-
-        backgroundSize: "48px 48px",
-
-      }}
-
-    />
-
-
-
-    {/* Orange Ambient Glow */}
-
-    <div className="absolute -left-64 top-20 h-[600px] w-[600px] rounded-full bg-orange-500/10 blur-[180px]" />
-
-
-
-    {/* Blue Ambient Glow */}
-
-    <div className="absolute -right-64 bottom-0 h-[600px] w-[600px] rounded-full bg-cyan-500/10 blur-[180px]" />
-
-
-
-  </div>
-
-
-
-  <div className="relative z-10">
-
-
-
-    <Navbar />
-
-
-
-    <div className="space-y-6 lg:space-y-8">
-
-
-
-      <Hero />
-
-
-
-      <ContinueWatching />
-
-
-
-      <Features />
-
-
-
-      <Marketplace />
-
-
-
-      <DiscoverChannels />
-
-
-
-      <PremiumBanner />
-
-
-
-    </div>
-
-
-
-    <Footer />
-
-
-
-  </div>
-
-
-
-  <FloatingAIButton />
-
-
-
-</main>
-
-);
-
+  return (
+    <main className="relative min-h-screen overflow-x-hidden bg-[#050816]">
+      {/* Premium Background */}
+      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+        {/* Dark Gradient */}
+        <div className="absolute inset-0 bg-gradient-to-br from-[#04060F] via-[#091224] to-[#04060F]" />
+
+        {/* Honeycomb Texture */}
+        <div
+          className="absolute inset-0 opacity-[0.06]"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 24px 24px, rgba(255,176,59,0.18) 2px, transparent 2px)",
+            backgroundSize: "48px 48px",
+          }}
+        />
+
+        {/* Orange Ambient Glow */}
+        <div className="absolute -left-64 top-20 h-[600px] w-[600px] rounded-full bg-orange-500/10 blur-[180px]" />
+
+        {/* Blue Ambient Glow */}
+        <div className="absolute -right-64 bottom-0 h-[600px] w-[600px] rounded-full bg-cyan-500/10 blur-[180px]" />
+      </div>
+
+      <div className="relative z-10">
+        <Navbar />
+
+        <div className="space-y-6 lg:space-y-8">
+          <Hero />
+
+          <DiscoverHub />
+
+          <ContinueWatching />
+
+          <TrendingNow />
+        </div>
+
+        <Footer />
+      </div>
+
+      <FloatingAIButton />
+    </main>
+  );
 }

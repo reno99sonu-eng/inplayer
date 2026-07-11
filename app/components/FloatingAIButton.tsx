@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import AIStudioModal from "./AIStudioModal";
 
 export default function FloatingAIButton() {
   const [hidden, setHidden] = useState(false);
+  const [open, setOpen] = useState(false);
 
   useEffect(() => {
     const onScroll = () => {
@@ -13,7 +15,6 @@ export default function FloatingAIButton() {
 
       const rect = footer.getBoundingClientRect();
 
-      // Hide when footer enters the viewport
       setHidden(rect.top < window.innerHeight);
     };
 
@@ -24,23 +25,43 @@ export default function FloatingAIButton() {
   }, []);
 
   return (
-    <button
-      className={`
-        fixed bottom-6 right-6 z-50
-        h-16 w-16 rounded-full
-        bg-gradient-to-br from-[#1B2435] to-[#0B1020]
-        shadow-[0_0_40px_rgba(255,170,0,0.35)]
-        border border-orange-400/20
-        transition-all duration-500
-        hover:scale-110
-        ${
-          hidden
-            ? "translate-y-32 opacity-0 pointer-events-none"
-            : "translate-y-0 opacity-100"
-        }
-      `}
-    >
-      <span className="text-2xl text-amber-300">✦</span>
-    </button>
+    <>
+      <button
+        onClick={() => setOpen(true)}
+        className={`
+          fixed
+          bottom-6
+          right-6
+          z-50
+          flex
+          h-16
+          w-16
+          items-center
+          justify-center
+          rounded-full
+          border
+          border-orange-400/20
+          bg-gradient-to-br
+          from-[#1B2435]
+          to-[#0B1020]
+          shadow-[0_0_40px_rgba(255,170,0,0.35)]
+          transition-all
+          duration-500
+          hover:scale-110
+          ${
+            hidden
+              ? "translate-y-32 opacity-0 pointer-events-none"
+              : "translate-y-0 opacity-100"
+          }
+        `}
+      >
+        <span className="text-2xl text-amber-300">✦</span>
+      </button>
+
+      <AIStudioModal
+        open={open}
+        onClose={() => setOpen(false)}
+      />
+    </>
   );
 }

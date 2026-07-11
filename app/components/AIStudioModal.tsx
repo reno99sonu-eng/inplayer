@@ -56,22 +56,33 @@ export default function AIStudioModal({
       <div
   onClick={(e) => e.stopPropagation()}
   className="
-    absolute
-    right-6
-    bottom-24
-    w-[360px]
-    overflow-hidden
-    rounded-[30px]
-    border
-    border-orange-400/15
-    bg-gradient-to-br
-    from-[#07111F]/95
-    via-[#0B1728]/95
-    to-[#040A14]/95
-    p-4
-    backdrop-blur-3xl
-    shadow-[0_25px_90px_rgba(0,0,0,.55)]
-    animate-aiPopup
+  absolute
+  right-3
+  bottom-20
+
+  w-[300px]
+  md:w-[330px]
+  lg:right-6
+  lg:bottom-24
+  lg:w-[360px]
+
+  overflow-hidden
+  rounded-[22px]
+  lg:rounded-[30px]
+
+  border
+  border-orange-400/15
+  bg-gradient-to-br
+  from-[#07111F]/95
+  via-[#0B1728]/95
+  to-[#040A14]/95
+
+  p-3
+  lg:p-4
+
+  backdrop-blur-3xl
+  shadow-[0_25px_90px_rgba(0,0,0,.55)]
+  animate-aiPopup
 "
 >
 <div className="pointer-events-none absolute inset-0">
@@ -152,7 +163,7 @@ export default function AIStudioModal({
   </span>
 
 </div>
-  <h2 className="mt-3 text-[28px] font-black leading-none tracking-tight text-white">
+<h2 className="mt-3 text-[22px] md:text-[24px] lg:text-[28px] font-black leading-none tracking-tight text-white">
 
     Create
     <br />
@@ -160,7 +171,7 @@ export default function AIStudioModal({
 
   </h2>
 
-  <p className="mt-2 text-[12px] leading-6 text-slate-400">
+  <p className="mt-2 text-[11px] lg:text-[12px] leading-5 lg:leading-6 text-slate-400">
 
     Generate premium scripts, thumbnails,
     voiceovers and translations instantly.
@@ -193,11 +204,11 @@ export default function AIStudioModal({
       readOnly
       value={`${placeholder}|`}
       className="
-       h-12
+       h-10 lg:h-12
         w-full
         resize-none
         bg-transparent
-        text-[14px]
+        text-[12px] lg:text-[14px]
         leading-7
         text-white
         outline-none
@@ -216,7 +227,9 @@ export default function AIStudioModal({
       via-[#FF9A00]
       to-[#FFD54A]
       py-2
-      text-sm
+lg:py-2.5
+text-xs
+lg:text-sm
       font-bold
       tracking-wide
       text-white
@@ -237,7 +250,7 @@ export default function AIStudioModal({
             Quick Tools
           </p>
 
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-1.5 lg:gap-2">
 
             {[
               "Scripts",
@@ -248,19 +261,22 @@ export default function AIStudioModal({
               <button
                 key={tool}
                 className="
-                  rounded-xl
-                  border
-                  border-white/5
-                  bg-white/[0.04]
-                  py-2
-                  text-xs
-                  font-medium
-                  text-slate-300
-                  transition
-                  hover:border-orange-400/40
-                  hover:bg-orange-500/10
-                  hover:text-white
-                "
+  rounded-lg
+  lg:rounded-xl
+  border
+  border-white/5
+  bg-white/[0.04]
+  py-1.5
+  lg:py-2
+  text-[11px]
+  lg:text-xs
+  font-medium
+  text-slate-300
+  transition
+  hover:border-orange-400/40
+  hover:bg-orange-500/10
+  hover:text-white
+"
               >
                 {tool}
               </button>

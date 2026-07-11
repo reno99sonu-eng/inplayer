@@ -9,18 +9,15 @@ export default function HeroMedia() {
     <div className="relative flex items-center justify-center">
 
       {/* Orange Ambient */}
-
       <div className="absolute -left-12 top-20 h-[440px] w-[440px] rounded-full bg-orange-500/20 blur-[150px] animate-ambientGlow" />
 
       {/* Blue Ambient */}
-
       <div
         className="absolute right-0 top-0 h-[380px] w-[380px] rounded-full bg-cyan-500/15 blur-[150px] animate-ambientGlow"
         style={{ animationDelay: "2s" }}
       />
 
       {/* Poster */}
-
       <div
         className="
           group
@@ -29,7 +26,8 @@ export default function HeroMedia() {
           w-full
           max-w-[500px]
           overflow-hidden
-          rounded-[36px]
+          rounded-[28px]
+          lg:rounded-[36px]
           border
           border-white/10
           shadow-[0_50px_120px_rgba(0,0,0,.55)]
@@ -58,11 +56,9 @@ export default function HeroMedia() {
         />
 
         {/* Overlay */}
-
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
 
         {/* Glass Reflection */}
-
         <div
           className="
             pointer-events-none
@@ -80,33 +76,32 @@ export default function HeroMedia() {
         />
 
         {/* Streaming Badge */}
+        <div className="absolute left-3 top-3 flex items-center gap-1 rounded-full bg-red-500 px-2 py-1 text-[9px] font-bold tracking-wider text-white shadow-lg lg:left-5 lg:top-5 lg:gap-2 lg:px-3 lg:py-1.5 lg:text-[11px]">
 
-        <div className="absolute left-5 top-5 flex items-center gap-2 rounded-full bg-red-500 px-3 py-1.5 text-[11px] font-bold tracking-wider text-white shadow-lg">
-
-          <Radio size={12} className="animate-pulse" />
+          <Radio size={10} className="animate-pulse lg:h-3 lg:w-3" />
 
           NOW STREAMING
 
         </div>
 
         {/* HDR */}
-
-        <div className="absolute right-5 top-5 rounded-full bg-black/60 px-3 py-1 text-[11px] font-semibold text-white backdrop-blur-lg">
+        <div className="absolute right-3 top-3 rounded-full bg-black/60 px-2 py-1 text-[9px] font-semibold text-white backdrop-blur-lg lg:right-5 lg:top-5 lg:px-3 lg:text-[11px]">
 
           4K HDR
 
         </div>
 
         {/* Play Button */}
-
         <button
           className="
             absolute
             left-1/2
             top-1/2
             flex
-            h-16
-            w-16
+            h-12
+            w-12
+            lg:h-16
+            lg:w-16
             -translate-x-1/2
             -translate-y-1/2
             items-center
@@ -124,25 +119,31 @@ export default function HeroMedia() {
           "
         >
           <Play
-            size={28}
+            size={20}
+            className="ml-0.5 text-white lg:ml-1"
             fill="white"
-            className="ml-1 text-white"
           />
         </button>
 
       </div>
 
       {/* Floating Premium Card */}
-
       <div
         className="
           absolute
-          bottom-6
-          left-4
+          bottom-4
+          left-3
+          md:bottom-5
+          md:left-4
+          lg:bottom-6
+          lg:left-4
           z-20
-          w-60
+          w-44
+          md:w-52
+          lg:w-60
           overflow-hidden
-          rounded-[30px]
+          rounded-[22px]
+          lg:rounded-[30px]
           border
           border-white/15
           bg-white/5
@@ -156,20 +157,24 @@ export default function HeroMedia() {
 
         <div className="absolute inset-0 bg-gradient-to-br from-white/10 via-transparent to-transparent" />
 
-        <div className="relative p-5">
+        <div className="relative p-3 md:p-4 lg:p-5">
 
           <div
             className="
               inline-flex
               items-center
-              gap-2
+              gap-1
+              lg:gap-2
               rounded-full
               border
               border-emerald-400/20
               bg-emerald-500/10
-              px-3
-              py-1.5
-              text-[10px]
+              px-2
+              py-1
+              lg:px-3
+              lg:py-1.5
+              text-[8px]
+              lg:text-[10px]
               font-bold
               uppercase
               tracking-[0.18em]
@@ -177,7 +182,7 @@ export default function HeroMedia() {
             "
           >
 
-            <TrendingUp size={12} />
+            <TrendingUp size={10} className="lg:h-3 lg:w-3" />
 
             TOP 1 IN INDIA
 
@@ -185,8 +190,11 @@ export default function HeroMedia() {
 
           <h3
             className="
-              mt-5
-              text-2xl
+              mt-3
+              text-lg
+              md:text-xl
+              lg:mt-5
+              lg:text-2xl
               font-black
               tracking-[-0.04em]
               bg-gradient-to-r
@@ -200,14 +208,14 @@ export default function HeroMedia() {
             {featuredMovie.title}
           </h3>
 
-          <div className="mt-4 inline-flex items-center gap-2 rounded-full bg-yellow-500/10 px-3 py-2">
+          <div className="mt-3 inline-flex items-center gap-2 rounded-full bg-yellow-500/10 px-2 py-1.5 lg:mt-4 lg:px-3 lg:py-2">
 
             <Star
-              size={15}
-              className="fill-yellow-400 text-yellow-400"
+              size={12}
+              className="fill-yellow-400 text-yellow-400 lg:h-[15px] lg:w-[15px]"
             />
 
-            <span className="text-sm font-semibold text-white">
+            <span className="text-xs lg:text-sm font-semibold text-white">
 
               IMDb {featuredMovie.imdb}
 
@@ -215,16 +223,16 @@ export default function HeroMedia() {
 
           </div>
 
-          <div className="mt-5 flex justify-between">
+          <div className="mt-4 flex justify-between lg:mt-5">
 
-            <div className="flex items-center gap-2 rounded-full bg-white/5 px-3 py-2">
+            <div className="flex items-center gap-1 rounded-full bg-white/5 px-2 py-1.5 lg:gap-2 lg:px-3 lg:py-2">
 
               <Heart
-                size={14}
-                className="fill-pink-500 text-pink-500"
+                size={12}
+                className="fill-pink-500 text-pink-500 lg:h-[14px] lg:w-[14px]"
               />
 
-              <span className="text-xs text-white">
+              <span className="text-[10px] lg:text-xs text-white">
 
                 {featuredMovie.likes}
 
@@ -232,14 +240,14 @@ export default function HeroMedia() {
 
             </div>
 
-            <div className="flex items-center gap-2 rounded-full bg-white/5 px-3 py-2">
+            <div className="flex items-center gap-1 rounded-full bg-white/5 px-2 py-1.5 lg:gap-2 lg:px-3 lg:py-2">
 
               <Eye
-                size={14}
-                className="text-slate-200"
+                size={12}
+                className="text-slate-200 lg:h-[14px] lg:w-[14px]"
               />
 
-              <span className="text-xs text-white">
+              <span className="text-[10px] lg:text-xs text-white">
 
                 {featuredMovie.views}
 

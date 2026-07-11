@@ -52,15 +52,44 @@ export default function MobileMenu() {
       </button>
 
       {open && (
-        <div className="fixed inset-0 z-[999] bg-[#050811]/95 backdrop-blur-3xl">
-          <div className="flex items-center justify-between border-b border-white/10 px-6 py-6">
+        <div
+          className="
+            fixed
+            inset-0
+            z-[999]
+            bg-[#050811]/55
+            backdrop-blur-3xl
+          "
+        >
+          <div
+            className="
+              flex
+              items-center
+              justify-between
+              border-b
+              border-white/10
+              bg-white/[0.02]
+              px-6
+              py-6
+            "
+          >
             <h2 className="text-2xl font-black tracking-tight text-white">
               INPLAYER
             </h2>
 
             <button
               onClick={() => setOpen(false)}
-              className="rounded-full bg-white/10 p-2 text-white transition hover:bg-white/20"
+              className="
+                rounded-full
+                border
+                border-white/10
+                bg-white/5
+                p-2
+                text-white
+                transition-all
+                duration-300
+                hover:bg-white/15
+              "
             >
               <X size={22} />
             </button>
@@ -81,7 +110,10 @@ export default function MobileMenu() {
                     items-center
                     gap-4
                     rounded-2xl
-                    bg-white/5
+                    border
+                    border-white/10
+                    bg-white/[0.03]
+                    backdrop-blur-xl
                     px-5
                     py-4
                     text-left
@@ -89,6 +121,7 @@ export default function MobileMenu() {
                     transition-all
                     duration-300
                     hover:bg-orange-500/15
+                    hover:border-orange-400/30
                     hover:translate-x-2
                   "
                 >
@@ -101,7 +134,7 @@ export default function MobileMenu() {
               );
             })}
 
-            <div className="pt-8 space-y-3">
+            <div className="space-y-3 pt-8">
 
               <button
                 className="
@@ -109,9 +142,12 @@ export default function MobileMenu() {
                   rounded-full
                   border
                   border-white/20
+                  bg-white/[0.03]
                   py-3
                   font-semibold
                   text-white
+                  transition
+                  hover:bg-white/10
                 "
               >
                 Sign In
@@ -129,10 +165,11 @@ export default function MobileMenu() {
                   text-slate-900
                 "
               >
-                Upgrade to Premium
+                ✦ Premium
               </button>
 
             </div>
+
           </div>
         </div>
       )}

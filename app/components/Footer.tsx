@@ -1,6 +1,5 @@
 "use client";
 
-import Image from "next/image";
 import NavbarLogo from "./NavbarLogo";
 
 const browse = [
@@ -23,10 +22,11 @@ const company = [
 
 export default function Footer() {
   return (
-    <footer className="relative mt-10 overflow-hidden border-t border-orange-500/10 bg-[#050816] text-white">
+    <footer className="relative mt-6 overflow-hidden border-t border-orange-500/10 bg-[#050816] text-white">
 
+      {/* Background */}
       <div
-        className="absolute inset-0 opacity-[0.05]"
+        className="absolute inset-0 opacity-[0.04]"
         style={{
           backgroundImage:
             "radial-gradient(circle at 25px 25px,#f59e0b 2px,transparent 2px)",
@@ -34,43 +34,43 @@ export default function Footer() {
         }}
       />
 
-      <div className="absolute -left-32 top-0 h-80 w-80 rounded-full bg-orange-500/10 blur-[120px] animate-pulse" />
+      <div className="absolute -left-32 top-0 h-72 w-72 rounded-full bg-orange-500/10 blur-[110px]" />
+      <div className="absolute -right-32 bottom-0 h-72 w-72 rounded-full bg-cyan-500/10 blur-[110px]" />
 
-      <div className="absolute -right-32 bottom-0 h-80 w-80 rounded-full bg-cyan-500/10 blur-[120px] animate-pulse" />
+      <div className="relative mx-auto max-w-[1600px] px-4 py-3 lg:px-10 lg:py-5">
 
-      <div className="relative mx-auto max-w-[1600px] px-6 py-14 sm:px-8 lg:px-12">
+  <div className="grid grid-cols-2 gap-x-5 gap-y-4 xl:grid-cols-4 xl:gap-6">
 
-        <div className="grid grid-cols-1 gap-10 md:grid-cols-2 xl:grid-cols-5">
+          {/* Brand */}
+          <div className="col-span-2">
 
-          <div className="xl:col-span-2">
-
-            <div className="w-fit">
+          <div className="w-16 lg:w-fit">
               <NavbarLogo />
             </div>
 
-            <h3 className="mt-5 text-2xl font-black tracking-tight">
+            <h3 className="mt-2 text-lg font-black lg:text-xl">
               Entertainment Beyond Limits
             </h3>
 
-            <p className="mt-4 max-w-md text-sm leading-7 text-slate-400">
-              The future of entertainment begins here. Discover blockbuster
-              originals, premium creators, podcasts, live experiences and AI
-              powered entertainment in one seamless destination.
+            <p className="mt-2 max-w-xs text-xs leading-5 text-slate-400 lg:max-w-sm lg:text-sm lg:leading-6">
+              Discover blockbuster originals, premium creators, live channels,
+              podcasts and AI-powered entertainment in one destination.
             </p>
 
           </div>
 
+          {/* Browse */}
           <div>
 
-            <h4 className="text-sm font-bold uppercase tracking-[0.25em] text-orange-300">
+            <h4 className="text-xs font-bold uppercase tracking-[0.25em] text-orange-300">
               Browse
             </h4>
 
-            <ul className="mt-5 space-y-3">
-              {browse.map((i) => (
-                <li key={i}>
-                  <button className="text-slate-400 transition-all duration-300 hover:translate-x-1 hover:text-orange-300">
-                    {i}
+            <ul className="mt-2 space-y-1.5">
+              {browse.map((item) => (
+                <li key={item}>
+                  <button className="text-slate-400 transition hover:text-orange-300 hover:translate-x-1">
+                    {item}
                   </button>
                 </li>
               ))}
@@ -78,52 +78,39 @@ export default function Footer() {
 
           </div>
 
+          {/* Company */}
           <div>
 
-            <h4 className="text-sm font-bold uppercase tracking-[0.25em] text-orange-300">
+            <h4 className="text-xs font-bold uppercase tracking-[0.25em] text-orange-300">
               Company
             </h4>
 
-            <ul className="mt-5 space-y-3">
-              {company.map((i) => (
-                <li key={i}>
-                  <button className="text-slate-400 transition-all duration-300 hover:translate-x-1 hover:text-orange-300">
-                    {i}
+            <ul className="mt-3 space-y-2">
+              {company.map((item) => (
+                <li key={item}>
+                  <button className="text-slate-400 transition hover:text-orange-300 hover:translate-x-1">
+                    {item}
                   </button>
                 </li>
               ))}
             </ul>
 
-          </div>
+            <div className="mt-3 flex items-center gap-4">
 
-          <div>
-
-            <h4 className="text-sm font-bold uppercase tracking-[0.25em] text-orange-300">
-              Stay Updated
-            </h4>
-
-            <div className="mt-5 rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-xl">
-
-              <input
-                type="email"
-                placeholder="Email address"
-                className="w-full rounded-xl border border-white/10 bg-[#0B1220] px-4 py-3 text-sm outline-none focus:border-orange-400"
-              />
-
-              <button className="mt-4 w-full rounded-xl bg-gradient-to-r from-orange-500 to-amber-400 py-3 font-semibold transition hover:-translate-y-0.5">
-                Subscribe
+              <button className="transition-all duration-300 hover:scale-110 hover:drop-shadow-[0_0_12px_rgba(249,115,22,.8)]">
+                <img
+                  src="/icons/google-play.svg"
+                  alt="Google Play"
+                  className="h-6 w-6 brightness-0 invert lg:h-7 lg:w-7"
+                />
               </button>
 
-            </div>
-
-            <div className="mt-6 grid grid-cols-2 gap-3">
-
-              <button className="rounded-xl border border-white/10 bg-white/5 py-3 text-sm hover:border-orange-400">
-                Google Play
-              </button>
-
-              <button className="rounded-xl border border-white/10 bg-white/5 py-3 text-sm hover:border-orange-400">
-                App Store
+              <button className="transition-all duration-300 hover:scale-110 hover:drop-shadow-[0_0_12px_rgba(249,115,22,.8)]">
+                <img
+                  src="/icons/app-store.svg"
+                  alt="App Store"
+                  className="h-6 w-6 brightness-0 invert lg:h-7 lg:w-7"
+                />
               </button>
 
             </div>
@@ -132,19 +119,30 @@ export default function Footer() {
 
         </div>
 
-        <div className="mt-12 flex flex-col items-center justify-between gap-5 border-t border-white/10 pt-6 text-sm text-slate-500 md:flex-row">
+        {/* Bottom */}
+
+        <div className="mt-4 flex flex-col items-center justify-between gap-2 border-t border-white/10 pt-2 text-[11px] text-slate-500 md:flex-row">
 
           <p>© 2026 INPLAYER. All Rights Reserved.</p>
 
-          <div className="flex gap-6">
-            {["Instagram", "X"].map((s) => (
-              <button
-                key={s}
-                className="transition hover:text-orange-300"
-              >
-                {s}
-              </button>
-            ))}
+          <div className="flex items-center gap-5">
+
+            <button className="transition-all duration-300 hover:scale-110 hover:drop-shadow-[0_0_12px_rgba(249,115,22,.8)]">
+              <img
+                src="/icons/instagram.svg"
+                alt="Instagram"
+                className="h-4 w-4 brightness-0 invert lg:h-5 lg:w-5"
+              />
+            </button>
+
+            <button className="transition-all duration-300 hover:scale-110 hover:drop-shadow-[0_0_12px_rgba(249,115,22,.8)]">
+              <img
+                src="/icons/x.svg"
+                alt="X"
+                className="h-4 w-4 brightness-0 invert lg:h-5 lg:w-5"
+              />
+            </button>
+
           </div>
 
         </div>

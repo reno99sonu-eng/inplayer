@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import {
   ChevronDown,
@@ -39,7 +40,6 @@ export default function NavbarProfile() {
   const menu = [
     { icon: User, title: "My Profile" },
     { icon: Heart, title: "Watchlist" },
-    { icon: PlayCircle, title: "Continue Watching" },
     { icon: Download, title: "Downloads" },
     { icon: Settings, title: "Settings" },
     { icon: HelpCircle, title: "Help & Support" },

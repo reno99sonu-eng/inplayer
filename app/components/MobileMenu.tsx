@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import {
   Menu,
@@ -12,17 +13,21 @@ import {
   Sparkles,
   ShoppingBag,
   Crown,
+  History,
 } from "lucide-react";
 
 const links = [
-  { icon: Home, title: "Home" },
-  { icon: Compass, title: "Explore" },
-  { icon: PlaySquare, title: "Shorts" },
-  { icon: Radio, title: "Live" },
-  { icon: Users, title: "Creators" },
-  { icon: Sparkles, title: "AI Studio" },
-  { icon: ShoppingBag, title: "Marketplace" },
-  { icon: Crown, title: "Premium" },
+  { icon: Home, title: "Home", href: "/" },
+  { icon: Compass, title: "Explore", href: "/explore" },
+  { icon: PlaySquare, title: "Shorts", href: "/shorts" },
+  { icon: Radio, title: "Live", href: "/live" },
+  { icon: Users, title: "Creators", href: "/creators" },
+  { icon: Sparkles, title: "AI Studio", href: "/ai-studio" },
+  { icon: ShoppingBag, title: "Marketplace", href: "/marketplace" },
+  { icon: Crown, title: "Premium", href: "/premium" },
+
+  // NEW
+  { icon: History, title: "History", href: "/history" },
 ];
 
 export default function MobileMenu() {
@@ -101,8 +106,9 @@ export default function MobileMenu() {
               const Icon = item.icon;
 
               return (
-                <button
+                <Link
                   key={item.title}
+                  href={item.href}
                   onClick={() => setOpen(false)}
                   className="
                     flex
@@ -130,7 +136,7 @@ export default function MobileMenu() {
                   <span className="text-lg font-medium">
                     {item.title}
                   </span>
-                </button>
+                </Link>
               );
             })}
 

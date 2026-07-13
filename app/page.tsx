@@ -5,6 +5,8 @@ import ContinueWatching from "./components/ContinueWatching";
 import TrendingNow from "./components/TrendingNow";
 import FloatingAIButton from "./components/FloatingAIButton";
 import Footer from "./components/Footer";
+import FeaturedHero from "./components/featuredHero/FeaturedHero";
+import RecommendationFeed from "./components/RecommendationFeed";
 
 export default function Home() {
   return (
@@ -35,13 +37,15 @@ export default function Home() {
         <Navbar />
 
         <div className="space-y-6 lg:space-y-8">
-          <Hero />
+        <FeaturedHero />
 
-          <DiscoverHub />
+        <TrendingNow />
 
-          <ContinueWatching />
+        <DiscoverHub />
 
-          <TrendingNow />
+        <RecommendationFeed />
+
+        {/* <ContinueWatching /> */}
         </div>
 
         <Footer />

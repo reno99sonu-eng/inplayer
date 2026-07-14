@@ -1,5 +1,6 @@
 "use client";
 import Image from "next/image";
+import InfiniteCarousel from "./InfiniteCarousel";
 const categories = [
     {
       title: "Movies",
@@ -68,6 +69,7 @@ const categories = [
       image: "/posters/discover/podcasts.jpg",
     },
   ];
+  
 
 export default function DiscoverHub() {
   return (
@@ -108,26 +110,45 @@ export default function DiscoverHub() {
 
       </div>
 
-      <div
-  className="
-    flex
-    gap-5
-    overflow-x-auto
-    pb-2
-    snap-x
-    snap-mandatory
-    scrollbar-hide
+      <div className="relative">
 
-    lg:gap-6
-    lg:overflow-x-auto
-    lg:overflow-y-hidden
-    lg:scrollbar-hide
-  "
->
-        {categories.map((category) => (
+  {/* Left Fade */}
+  <div
+    className="
+      pointer-events-none
+      absolute
+      left-0
+      top-0
+      z-10
+      h-full
+      w-10
+      bg-gradient-to-r
+      from-[#050816]
+      to-transparent
+    "
+  />
+
+  {/* Right Fade */}
+  <div
+    className="
+      pointer-events-none
+      absolute
+      right-0
+      top-0
+      z-10
+      h-full
+      w-10
+      bg-gradient-to-l
+      from-[#050816]
+      to-transparent
+    "
+  />
+
+<InfiniteCarousel>
+{categories.map((category) => (
 
           <button
-            key={category.title}
+          key={category.title}
             className="
               w-[185px]
               sm:w-[220px]
@@ -198,9 +219,12 @@ group-hover:text-orange-300
 
           </button>
 
-        ))}
-      </div>
+))}
 
-    </section>
+</InfiniteCarousel>
+
+</div>
+
+</section>
   );
 }

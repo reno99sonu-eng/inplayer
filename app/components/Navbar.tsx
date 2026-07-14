@@ -297,51 +297,88 @@ lg:right-auto
               ✦ Premium
             </button>
 
-            <div className="space-y-2">
-              {[
-  "Movies",
-  "TV Shows",
-  "Shorts",
-  "Live",
-  "History",
-  "Creators",
-  "Gaming",
-  "Music",
-].map((item) => (
-  <button
-  key={item}
-  onClick={() => {
-    setMenuOpen(false);
+            <div className="space-y-1">
 
-    if (item === "History") {
-      router.push("/history");
-    }
-  }}
-  className="
-    flex
-    w-full
-    items-center
-    rounded-xl
-    px-4
-    py-3
-    text-left
-    text-slate-300
-    transition-all
-    duration-300
-    hover:bg-white/5
-    hover:translate-x-1
-    hover:text-orange-300
-  "
->
-                  {item}
-                </button>
-              ))}
-            </div>
+  <h3 className="mb-3 px-4 text-xs font-bold uppercase tracking-[0.25em] text-orange-300/80">
+    Library
+  </h3>
 
+  {[
+    "History",
+    "Watch Later",
+    "Liked Videos",
+    "Downloads",
+    "Creators",
+  ].map((item) => (
+    <button
+      key={item}
+      onClick={() => {
+        setMenuOpen(false);
+
+        if (item === "History") {
+          router.push("/history");
+        }
+      }}
+      className="
+        flex
+        w-full
+        items-center
+        rounded-2xl
+        px-4
+        py-3.5
+        text-left
+        text-slate-300
+        transition-all
+        duration-300
+        hover:bg-white/5
+        hover:translate-x-1
+        hover:text-orange-300
+      "
+    >
+      {item}
+    </button>
+  ))}
+
+  <div className="my-6 border-t border-white/10" />
+
+  <h3 className="mb-3 px-4 text-xs font-bold uppercase tracking-[0.25em] text-orange-300/80">
+    Explore
+  </h3>
+
+  {[
+    "Gaming",
+    "Music",
+    "Films",
+    "Shopping",
+  ].map((item) => (
+    <button
+      key={item}
+      onClick={() => setMenuOpen(false)}
+      className="
+        flex
+        w-full
+        items-center
+        rounded-2xl
+        px-4
+        py-3.5
+        text-left
+        text-slate-300
+        transition-all
+        duration-300
+        hover:bg-white/5
+        hover:translate-x-1
+        hover:text-orange-300
+      "
+    >
+      {item}
+    </button>
+  ))}
+
+</div>
             <div className="my-8 border-t border-white/10" />
 
             <div className="space-y-2">
-              {["Settings", "Sign In", "Create Account"].map((item) => (
+            {["Sign In", "Create Account"].map((item) => (
                 <button
                 key={item}
                 onClick={() => setMenuOpen(false)}

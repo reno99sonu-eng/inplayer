@@ -28,7 +28,7 @@ export default function TrendingRow() {
             >
 
               <Image
-                src={item.image}
+                src={item.thumbnail}
                 alt={item.title}
                 fill
                 className="object-cover transition-transform duration-700 group-hover:scale-110"
@@ -53,7 +53,7 @@ export default function TrendingRow() {
               <div className="absolute left-4 top-4">
 
                 <span className="rounded-full bg-orange-500 px-3 py-1 text-xs font-semibold text-white">
-                  {item.type}
+                Trending
                 </span>
 
               </div>

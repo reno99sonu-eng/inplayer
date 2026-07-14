@@ -9,11 +9,11 @@ export default function HeroMedia() {
     <div className="relative flex items-center justify-center">
 
       {/* Orange Ambient */}
-      <div className="absolute -left-12 top-20 h-[440px] w-[440px] rounded-full bg-orange-500/20 blur-[150px] animate-ambientGlow" />
+      <div className="absolute -left-12 top-20 h-[280px] w-[280px] rounded-full bg-orange-500/20 blur-[150px] animate-ambientGlow" />
 
       {/* Blue Ambient */}
       <div
-        className="absolute right-0 top-0 h-[380px] w-[380px] rounded-full bg-cyan-500/15 blur-[150px] animate-ambientGlow"
+        className="absolute right-0 top-0 h-[240px] w-[240px] rounded-full bg-cyan-500/15 blur-[150px] animate-ambientGlow"
         style={{ animationDelay: "2s" }}
       />
 
@@ -24,7 +24,9 @@ export default function HeroMedia() {
           relative
           z-10
           w-full
-          max-w-[500px]
+          max-w-[300px]
+          md:max-w-[340px]
+          lg:max-w-[360px]
           overflow-hidden
           rounded-[28px]
           lg:rounded-[36px]
@@ -37,8 +39,8 @@ export default function HeroMedia() {
         <Image
           src={featuredMovie.poster}
           alt={featuredMovie.title}
-          width={500}
-          height={750}
+          width={360}
+          height={540}
           priority
           sizes="(max-width:768px)100vw,500px"
           style={{
@@ -138,9 +140,9 @@ export default function HeroMedia() {
           lg:bottom-6
           lg:left-4
           z-20
-          w-44
-          md:w-52
-          lg:w-60
+          w-36
+          md:w-40
+          lg:w-44
           overflow-hidden
           rounded-[22px]
           lg:rounded-[30px]

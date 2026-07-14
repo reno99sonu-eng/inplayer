@@ -12,8 +12,9 @@ export default function Hero() {
         relative
         overflow-hidden
         bg-[#030712]
-        min-h-[72vh]
-        lg:min-h-[78vh]
+        min-h-[42vh]
+        md:min-h-[48vh]
+        lg:min-h-[50vh]
       "
     >
       <HeroBackground />
@@ -26,13 +27,13 @@ export default function Hero() {
           max-w-[1500px]
           grid
           items-center
-          gap-10
+          gap-6
           px-5
-          py-12
-          md:py-16
+          py-6
+          md:py-8
           lg:grid-cols-2
           lg:px-8
-          lg:py-20
+          lg:py-10
         "
       >
         <HeroContent />

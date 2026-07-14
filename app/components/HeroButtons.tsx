@@ -2,7 +2,7 @@
 
 export default function HeroButtons() {
   return (
-    <div className="mt-10 flex flex-wrap items-center gap-5">
+    <div className="mt-5 flex flex-wrap items-center gap-3">
 
       {/* Watch Now */}
 
@@ -16,17 +16,17 @@ export default function HeroButtons() {
           from-orange-500
           via-orange-400
           to-red-500
-          px-9
-          py-4
-          text-[17px]
+          px-6
+          py-2.5
+          text-sm
           font-bold
           text-white
-          shadow-[0_15px_40px_rgba(249,115,22,0.45)]
+          shadow-[0_10px_25px_rgba(249,115,22,0.35)]
           transition-all
           duration-300
           hover:-translate-y-1
           hover:scale-105
-          hover:shadow-[0_20px_55px_rgba(249,115,22,0.65)]
+          hover:shadow-[0_15px_35px_rgba(249,115,22,0.5)]
         "
       >
         <span
@@ -44,11 +44,10 @@ export default function HeroButtons() {
           "
         />
 
-        <span className="relative flex items-center gap-3">
+        <span className="relative flex items-center gap-2">
           ▶
           Watch Now
         </span>
-
       </button>
 
       {/* Trailer */}
@@ -61,9 +60,9 @@ export default function HeroButtons() {
           border-white/15
           bg-white/10
           backdrop-blur-xl
-          px-9
-          py-4
-          text-[17px]
+          px-6
+          py-2.5
+          text-sm
           font-semibold
           text-white
           shadow-lg
@@ -72,10 +71,10 @@ export default function HeroButtons() {
           hover:-translate-y-1
           hover:border-white/30
           hover:bg-white/20
-          hover:shadow-2xl
+          hover:shadow-xl
         "
       >
-        Watch Trailer
+        Trailer
       </button>
 
       {/* My List */}
@@ -87,9 +86,9 @@ export default function HeroButtons() {
           border
           border-white/15
           bg-transparent
-          px-9
-          py-4
-          text-[17px]
+          px-6
+          py-2.5
+          text-sm
           font-semibold
           text-white
           transition-all
@@ -98,7 +97,7 @@ export default function HeroButtons() {
           hover:border-orange-400
           hover:bg-orange-500/10
           hover:text-orange-300
-          hover:shadow-[0_0_25px_rgba(249,115,22,0.25)]
+          hover:shadow-[0_0_20px_rgba(249,115,22,0.2)]
         "
       >
         My List

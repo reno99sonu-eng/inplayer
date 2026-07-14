@@ -14,17 +14,17 @@ export default function FeaturedHero() {
         overflow-hidden
         bg-black
 
-        min-h-[620px]
+        min-h-[340px]
 
-        sm:min-h-[700px]
+        sm:min-h-[400px]
 
-        md:min-h-[760px]
+        md:min-h-[460px]
 
-        lg:h-[82vh]
+        lg:h-[50vh]
 
-        xl:h-[88vh]
+        xl:h-[55vh]
 
-        2xl:h-screen
+        2xl:h-[60vh]
       "
     >
       {/* Background */}
@@ -39,8 +39,7 @@ export default function FeaturedHero() {
       </FeaturedHeroLayout>
 
       {/* Desktop Only Stats */}
-      <div className="hidden lg:block">
-      </div>
+      <div className="hidden lg:block" />
 
       {/* Background Image / Video */}
       <FeaturedHeroVideo />

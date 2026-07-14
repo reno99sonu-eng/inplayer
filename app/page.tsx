@@ -1,6 +1,5 @@
 import Navbar from "./components/Navbar";
 import Hero from "./components/Hero";
-import DiscoverHub from "./components/DiscoverHub";
 import ContinueWatching from "./components/ContinueWatching";
 import TrendingNow from "./components/TrendingNow";
 import FloatingAIButton from "./components/FloatingAIButton";
@@ -36,14 +35,16 @@ export default function Home() {
       <div className="relative z-10">
         <Navbar />
 
-        <div className="space-y-6 lg:space-y-8">
+        <div className="space-y-10 lg:space-y-14">
         <FeaturedHero />
 
-        <TrendingNow />
+<div className="mx-auto h-px w-[92%] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
 
-        <DiscoverHub />
+<TrendingNow />
 
-        <RecommendationFeed />
+<div className="mx-auto h-px w-[92%] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+
+<RecommendationFeed />
 
         {/* <ContinueWatching /> */}
         </div>

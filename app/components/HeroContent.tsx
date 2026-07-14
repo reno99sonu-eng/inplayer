@@ -13,13 +13,13 @@ export default function HeroContent() {
         max-w-[650px]
         flex-col
         justify-center
-        py-10
-        lg:py-14
+        py-2
+        lg:py-4
       "
     >
       {/* Premium Badge */}
 
-      <div className="mb-7">
+      <div className="mb-3">
         <div
           className="
             group
@@ -34,8 +34,8 @@ export default function HeroContent() {
             from-[#321306]
             via-[#5f2509]
             to-[#321306]
-            px-6
-            py-2.5
+            px-4
+            py-1.5
             shadow-[0_0_30px_rgba(249,115,22,0.25)]
             transition-all
             duration-500
@@ -64,7 +64,7 @@ export default function HeroContent() {
 
           <span
             className="
-              text-xs
+              text-[10px]
               font-black
               uppercase
               tracking-[0.32em]
@@ -80,13 +80,13 @@ export default function HeroContent() {
 
       <h1
         className="
-          text-5xl
+          text-3xl
           font-black
           leading-[0.92]
           tracking-[-0.06em]
           text-white
           drop-shadow-[0_15px_40px_rgba(0,0,0,0.45)]
-          md:text-7xl
+          md:text-5xl
         "
       >
         {featuredMovie.title}
@@ -94,27 +94,27 @@ export default function HeroContent() {
 
       {/* Movie Meta */}
 
-      <div className="mt-7 flex flex-wrap items-center gap-4 text-[15px] font-medium">
+      <div className="mt-4 flex flex-wrap items-center gap-4 text-xs font-medium">
 
-        <span className="rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-slate-200 backdrop-blur-xl">
+        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-slate-200 backdrop-blur-xl">
           {featuredMovie.year}
         </span>
 
         <span className="h-1.5 w-1.5 rounded-full bg-orange-400 shadow-[0_0_12px_#fb923c]" />
 
-        <span className="rounded-full border border-white/10 bg-white/5 px-4 py-1.5 text-slate-200 backdrop-blur-xl">
+        <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-slate-200 backdrop-blur-xl">
           {featuredMovie.duration}
         </span>
 
         <span className="h-1.5 w-1.5 rounded-full bg-orange-400 shadow-[0_0_12px_#fb923c]" />
 
-        <span className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-4 py-1.5 font-semibold text-cyan-300">
+        <span className="rounded-full border border-cyan-400/20 bg-cyan-500/10 px-3 py-1 font-semibold text-cyan-300">
           4K HDR
         </span>
 
         <span className="h-1.5 w-1.5 rounded-full bg-orange-400 shadow-[0_0_12px_#fb923c]" />
 
-        <span className="rounded-full border border-red-400/20 bg-red-500/10 px-4 py-1.5 font-semibold text-red-300">
+        <span className="rounded-full border border-red-400/20 bg-red-500/10 px-3 py-1 font-semibold text-red-300">
           U/A 18+
         </span>
 
@@ -123,26 +123,23 @@ export default function HeroContent() {
       {/* Description */}
 
       <p
-        className="
-          mt-9
-          max-w-[640px]
-          text-[20px]
-          font-light
-          leading-[2.15rem]
-          tracking-[0.01em]
-          text-slate-200/95
-        "
-      >
-        {featuredMovie.description}
-      </p>
+  className="
+    mt-4
+    max-w-[520px]
+    text-sm
+    text-slate-300
+  "
+>
+  Unlimited streaming. Watch anytime, anywhere.
+</p>
 
       {/* Divider */}
 
-      <div className="mt-10 h-px w-28 rounded-full bg-gradient-to-r from-orange-500 via-orange-300 to-transparent opacity-70" />
+      <div className="mt-5 h-px w-28 rounded-full bg-gradient-to-r from-orange-500 via-orange-300 to-transparent opacity-70" />
 
       {/* Buttons */}
 
-      <div className="mt-8">
+      <div className="mt-5">
         <HeroButtons />
       </div>
     </div>

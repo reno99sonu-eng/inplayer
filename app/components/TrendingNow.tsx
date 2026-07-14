@@ -2,38 +2,7 @@
 
 import Image from "next/image";
 
-const trending = [
-  {
-    title: "AI Explained",
-    genre: "Technology • AI",
-    image: "/posters/trending/ai.jpg",
-  },
-  {
-    title: "Ultimate Drives",
-    genre: "Automotive",
-    image: "/posters/trending/automobile.jpg",
-  },
-  {
-    title: "Global Flavours",
-    genre: "Food • Travel",
-    image: "/posters/trending/food.jpg",
-  },
-  {
-    title: "Top Hits",
-    genre: "Music",
-    image: "/posters/trending/music.jpg",
-  },
-  {
-    title: "Beyond Earth",
-    genre: "Space • Science",
-    image: "/posters/trending/space.jpg",
-  },
-  {
-    title: "Incredible Places",
-    genre: "Travel",
-    image: "/posters/trending/travel.jpg",
-  },
-];
+import { trending } from "../data/trending";
 
 export default function TrendingNow() {
   return (
@@ -85,7 +54,7 @@ export default function TrendingNow() {
   className="
     flex
     gap-5
-    overflow-x-auto
+    overflow-x-auto scroll-smooth
     pt-3
     -mt-3
     pb-2
@@ -97,15 +66,15 @@ export default function TrendingNow() {
   "
 >
 
-        {trending.map((movie) => (
+        {trending.map((item) => (
 
           <button
-            key={movie.title}
+          key={item.id}
             className="
               group
               relative
-              h-[270px]
-              w-[220px]
+              h-[230px]
+              w-[190px]
               flex-shrink-0
               snap-start
               overflow-hidden
@@ -122,8 +91,8 @@ export default function TrendingNow() {
           >
 
 <Image
-  src={movie.image}
-  alt={movie.title}
+  src={item.thumbnail}
+  alt={item.title}
   fill
   className="object-cover object-top transition duration-500 group-hover:scale-105"
 />
@@ -132,12 +101,12 @@ export default function TrendingNow() {
 
             <div className="absolute bottom-0 w-full p-4">
 
-              <h3 className="text-base font-black text-white">
-                {movie.title}
-              </h3>
+            <h3 className="text-base font-black text-white">
+  {item.title}
+</h3>
 
               <p className="mt-1 text-xs text-slate-300">
-                {movie.genre}
+                {item.creator}
               </p>
 
             </div>

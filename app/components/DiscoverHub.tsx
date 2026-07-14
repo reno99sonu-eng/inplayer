@@ -1,6 +1,6 @@
 "use client";
 import Image from "next/image";
-import InfiniteCarousel from "./InfiniteCarousel";
+import AutoCarousel from "./AutoCarousel";
 const categories = [
     {
       title: "Movies",
@@ -144,7 +144,7 @@ export default function DiscoverHub() {
     "
   />
 
-<InfiniteCarousel>
+<AutoCarousel>
 {categories.map((category) => (
 
           <button
@@ -221,7 +221,7 @@ group-hover:text-orange-300
 
 ))}
 
-</InfiniteCarousel>
+</AutoCarousel>
 
 </div>
 

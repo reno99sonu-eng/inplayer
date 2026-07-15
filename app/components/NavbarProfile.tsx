@@ -6,7 +6,7 @@ import {
   ChevronDown,
   User,
   Heart,
-  PlayCircle,
+  MessageSquare,
   Download,
   Settings,
   HelpCircle,
@@ -40,6 +40,7 @@ export default function NavbarProfile() {
   const menu = [
     { icon: User, title: "My Profile" },
     { icon: Heart, title: "Watchlist" },
+    { icon: MessageSquare, title: "My Messages" },
     { icon: Download, title: "Downloads" },
     { icon: Settings, title: "Settings" },
     { icon: HelpCircle, title: "Help & Support" },

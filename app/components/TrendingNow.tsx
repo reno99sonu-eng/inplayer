@@ -21,7 +21,7 @@ export default function TrendingNow() {
 
     el.style.scrollBehavior = "auto";
 
-    const speed = 1.8;
+    const speed = 1.1;
 
     const step = () => {
       if (el && !isPausedRef.current && !isUserInteractingRef.current) {

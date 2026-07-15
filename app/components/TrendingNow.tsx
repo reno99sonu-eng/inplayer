@@ -51,10 +51,24 @@ export default function TrendingNow() {
 
     el.addEventListener("scroll", handleScroll, { passive: true });
 
+    // Mobile: a tap/touch on a card doesn't fire a scroll event, so
+    // handle touchstart directly. Only listens for touchstart (never
+    // touchend) so it can't get stuck if the matching end event is lost.
+    const handleTouchStart = () => {
+      isUserInteractingRef.current = true;
+      if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current);
+      resumeTimeoutRef.current = setTimeout(() => {
+        isUserInteractingRef.current = false;
+      }, 2000);
+    };
+
+    el.addEventListener("touchstart", handleTouchStart, { passive: true });
+
     return () => {
       if (rafRef.current) cancelAnimationFrame(rafRef.current);
       if (resumeTimeoutRef.current) clearTimeout(resumeTimeoutRef.current);
       el.removeEventListener("scroll", handleScroll);
+      el.removeEventListener("touchstart", handleTouchStart);
     };
   }, []);
 

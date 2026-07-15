@@ -551,3 +551,14 @@ animation: aiGlassSweep 5.5s linear infinite;
 
 }
 
+/* Hide scrollbar ONLY on mobile; desktop/tablet keep the orange thin scrollbar */
+@media (max-width: 767px) {
+  .scrollbar-hide-mobile {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide-mobile::-webkit-scrollbar {
+    display: none;
+  }
+}

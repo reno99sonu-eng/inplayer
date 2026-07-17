@@ -1,5 +1,17 @@
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
+:root {
+  --background: #F8FAFC;
+  --foreground: #0F172A;
+}
+
+html.dark {
+  --background: #05070D;
+  --foreground: #F8FAFC;
+}
+
 html {
 
 scroll-behavior: smooth;
@@ -7,12 +19,14 @@ scroll-behavior: smooth;
 }
 
 body {
-
-background: #F8FAFC;
-
-color: #0F172A;
-
+  background: var(--background);
+  color: var(--foreground);
+  transition:
+    background-color 0.3s ease,
+    color 0.3s ease;
 }
+
+
 
 /* ---------- Existing Animations ---------- */
 

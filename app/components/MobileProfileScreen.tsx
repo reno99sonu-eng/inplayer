@@ -1,10 +1,11 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import {
-  X,
+  ArrowLeft,
   User,
   Heart,
-  PlayCircle,
+  MessageSquare,
   Download,
   Settings,
   HelpCircle,
@@ -23,14 +24,23 @@ export default function MobileProfileScreen({
   open,
   onClose,
 }: MobileProfileScreenProps) {
+  const router = useRouter();
+
   const menu = [
-    { icon: User, title: "My Profile" },
-    { icon: Heart, title: "Watchlist" },
-    { icon: PlayCircle, title: "Continue Watching" },
-    { icon: Download, title: "Downloads" },
-    { icon: Settings, title: "Settings" },
-    { icon: HelpCircle, title: "Help & Support" },
+    { icon: User, title: "My Profile", href: "/profile" },
+    { icon: Heart, title: "Watchlist", href: "/watchlist" },
+    { icon: MessageSquare, title: "My Messages", href: "/messages" },
+    { icon: Download, title: "Downloads", href: "/downloads" },
+    { icon: Settings, title: "Settings", href: "/settings" },
+    { icon: HelpCircle, title: "Help & Support", href: "/help" },
   ];
+
+  const handleItemClick = (href: string | null) => {
+    if (href) {
+      onClose();
+      router.push(href);
+    }
+  };
 
   return (
     <div
@@ -50,9 +60,7 @@ export default function MobileProfileScreen({
       `}
     >
       <div className="flex h-full flex-col overflow-y-auto">
-        <div className="flex items-center justify-between border-b border-white/10 px-5 py-5">
-          <h2 className="text-lg font-black text-white">My Account</h2>
-
+        <div className="flex items-center gap-4 border-b border-white/10 px-5 py-5">
           <button
             onClick={onClose}
             className="
@@ -71,8 +79,10 @@ export default function MobileProfileScreen({
               hover:bg-white/15
             "
           >
-            <X size={20} />
+            <ArrowLeft size={20} />
           </button>
+
+          <h2 className="text-lg font-black text-white">My Account</h2>
         </div>
 
         <div className="p-6 text-center">
@@ -115,6 +125,7 @@ export default function MobileProfileScreen({
             return (
               <button
                 key={item.title}
+                onClick={() => handleItemClick(item.href)}
                 className="
                   flex
                   w-full

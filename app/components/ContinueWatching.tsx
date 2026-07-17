@@ -93,18 +93,25 @@ export default function ContinueWatching() {
                 {movie.title}
               </h3>
 
-              <div className="mt-2 flex items-center gap-2 text-xs text-slate-400">
+              <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-400">
 
-                <span className="rounded-full bg-white/5 px-2 py-1 backdrop-blur-sm">
-                  HD
-                </span>
+  <span className="rounded-full bg-white/5 px-2 py-1 backdrop-blur-sm">
+    HD
+  </span>
 
-                <span>•</span>
-                <span>{movie.duration}</span>
-                <span>•</span>
-                <span>Continue</span>
+  <span>•</span>
 
-              </div>
+  <span>{movie.duration}</span>
+
+  <span>•</span>
+
+  <span>{movie.remaining}</span>
+
+  <span>•</span>
+
+  <span>{movie.lastWatched}</span>
+
+</div>
 
               <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-slate-700 w-full max-w-[220px]">
 
@@ -115,6 +122,27 @@ export default function ContinueWatching() {
     }}
   />
 
+</div>
+<div className="mt-3 flex items-center justify-between">
+  <button
+    className="
+      rounded-full
+      bg-orange-500
+      px-4
+      py-2
+      text-xs
+      font-semibold
+      text-white
+      transition
+      hover:bg-orange-400
+    "
+  >
+    Resume
+  </button>
+
+  <span className="text-xs text-slate-500">
+    {movie.progress}% completed
+  </span>
 </div>
 
             </div>

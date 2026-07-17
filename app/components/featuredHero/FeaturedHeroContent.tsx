@@ -65,22 +65,22 @@ export default function FeaturedHeroContent() {
 
       <h1
         className="
-          text-3xl
+          text-2xl
           font-black
           leading-[0.9]
           tracking-[-0.05em]
           text-white
 
-          sm:text-4xl
+          sm:text-3xl
 
-          md:text-5xl
+          md:text-4xl
 
-          lg:text-6xl
+          lg:text-5xl
         "
       >
-        30 Days
+        No
         <br />
-        Without Limits
+        Limits
       </h1>
 
       {/* Description */}

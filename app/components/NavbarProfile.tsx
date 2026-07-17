@@ -19,6 +19,7 @@ import Greeting from "./Greeting";
 export default function NavbarProfile() {
   const [open, setOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -38,13 +39,20 @@ export default function NavbarProfile() {
   }, []);
 
   const menu = [
-    { icon: User, title: "My Profile" },
-    { icon: Heart, title: "Watchlist" },
-    { icon: MessageSquare, title: "My Messages" },
-    { icon: Download, title: "Downloads" },
-    { icon: Settings, title: "Settings" },
-    { icon: HelpCircle, title: "Help & Support" },
+    { icon: User, title: "My Profile", href: "/profile" },
+    { icon: Heart, title: "Watchlist", href: "/watchlist" },
+    { icon: MessageSquare, title: "My Messages", href: "/messages" },
+    { icon: Download, title: "Downloads", href: "/downloads" },
+    { icon: Settings, title: "Settings", href: "/settings" },
+    { icon: HelpCircle, title: "Help & Support", href: "/help" },
   ];
+
+  const handleItemClick = (href: string | null) => {
+    if (href) {
+      setOpen(false);
+      router.push(href);
+    }
+  };
 
   return (
     <div
@@ -160,6 +168,7 @@ bg-[#08111F]/95
             return (
               <button
                 key={item.title}
+                onClick={() => handleItemClick(item.href)}
                 className="
                   flex
                   w-full

@@ -1,9 +1,27 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Image from "next/image";
-import { shorts } from "../data/shorts";
+import { shorts, type Short } from "../data/shorts";
 
 export default function ShortsShelf() {
+  // Render in original order first (matches server output), then shuffle
+  // client-side only after mount. Shuffling during the initial render would
+  // make the server and client produce different random orders and trigger
+  // a hydration mismatch error, so this two-step approach avoids that.
+  const [items, setItems] = useState<Short[]>(shorts);
+
+  useEffect(() => {
+    const shuffled = [...shorts];
+
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+
+    setItems(shuffled);
+  }, []);
+
   return (
     <section className="mx-auto max-w-[1800px] px-4 py-8 lg:px-8">
       <div className="mb-6 flex items-center gap-3">
@@ -18,28 +36,30 @@ export default function ShortsShelf() {
       <div
         className="
           flex
-          gap-4
+          gap-3
           overflow-x-auto
           snap-x
           snap-mandatory
           pb-2
-          scrollbar-hide
+          scrollbar-hide-mobile
 
           sm:grid
-          sm:grid-cols-3
-          sm:gap-4
+          sm:grid-cols-4
+          sm:gap-3
 
-          md:grid-cols-4
+          md:grid-cols-6
 
-          lg:grid-cols-5
+          lg:grid-cols-7
+
+          xl:grid-cols-8
         "
       >
-        {shorts.map((short) => (
+        {items.map((short) => (
           <article
             key={short.id}
             className="
               group
-              w-[180px]
+              w-[130px]
               flex-shrink-0
               snap-start
 
@@ -49,9 +69,9 @@ export default function ShortsShelf() {
             <div className="relative aspect-[9/16] overflow-hidden rounded-2xl">
               <Image
                 src={short.poster}
-                alt={short.title}
+                alt={short.title || "InPlay short"}
                 fill
-                sizes="(max-width:640px)180px, 20vw"
+                sizes="(max-width:640px)130px, 13vw"
                 className="
                   object-cover
                   transition-transform
@@ -61,22 +81,35 @@ export default function ShortsShelf() {
               />
             </div>
 
-            <h3
-              className="
-                mt-3
-                line-clamp-2
-                text-sm
-                font-semibold
-                text-white
-              "
-            >
-              {short.title}
-            </h3>
+            {short.title && (
+              <h3
+                className="
+                  mt-2
+                  line-clamp-2
+                  text-xs
+                  font-semibold
+                  text-white
+                "
+              >
+                {short.title}
+              </h3>
+            )}
 
             <p
               className="
-                mt-1
-                text-sm
+                mt-2
+                text-[11px]
+                font-medium
+                text-orange-300
+              "
+            >
+              {short.creator}
+            </p>
+
+            <p
+              className="
+                mt-0.5
+                text-xs
                 text-slate-400
               "
             >

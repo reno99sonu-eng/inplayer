@@ -27,8 +27,14 @@ export default function CreatePopup({
       ref={popupRef}
       className={`
         absolute
-        z-50
-        ${mobile ? "right-0 top-14 w-[250px]" : "right-0 top-16 w-[320px]"}
+        z-40
+
+        ${
+          mobile
+            ? "bottom-[72px] left-1/2 w-[250px] -translate-x-1/2"
+            : "top-16 right-0 w-[320px]"
+        }
+
         overflow-hidden
         rounded-3xl
         border
@@ -36,11 +42,15 @@ export default function CreatePopup({
         bg-[#08111F]/95
         backdrop-blur-3xl
         shadow-[0_30px_80px_rgba(0,0,0,.55)]
+
         transition-all
         duration-300
+
         ${
           open
             ? "translate-y-0 opacity-100 pointer-events-auto"
+            : mobile
+            ? "translate-y-4 opacity-0 pointer-events-none"
             : "-translate-y-4 opacity-0 pointer-events-none"
         }
       `}
@@ -61,24 +71,24 @@ export default function CreatePopup({
             key={item.title}
             type="button"
             className={`
-                group
-                mb-2
-                flex
-                w-full
-                items-center
-                gap-4
-                rounded-2xl
-                border
-                border-transparent
-                ${mobile ? "p-3" : "p-4"}
-                text-left
-                transition-all
-                duration-300
-                hover:border-orange-400/20
-                hover:bg-white/5
-                hover:translate-x-1
-                hover:shadow-[0_0_30px_rgba(249,115,22,.18)]
-              `}
+              group
+              mb-2
+              flex
+              w-full
+              items-center
+              gap-4
+              rounded-2xl
+              border
+              border-transparent
+              ${mobile ? "p-3" : "p-4"}
+              text-left
+              transition-all
+              duration-300
+              hover:border-orange-400/20
+              hover:bg-white/5
+              hover:translate-x-1
+              hover:shadow-[0_0_30px_rgba(249,115,22,.18)]
+            `}
           >
             <div
               className={`

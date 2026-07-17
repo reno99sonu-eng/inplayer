@@ -2,35 +2,41 @@
 
 import { useEffect, useState } from "react";
 
+// Single logo for now — no night version exists yet.
+// Once a real night version is made, restore the day/night detection
+// logic (kept below, commented out) instead of this fixed constant.
+const LOGO_SRC = "/logos/logo.png";
+
+/*
+// Day/night version — restore this once a real night logo exists:
+//
+// const [logo, setLogo] = useState("/logos/logo-day.png");
+//
+// useEffect(() => {
+//   const updateLogo = () => {
+//     const hour = new Date().getHours();
+//     setLogo(
+//       hour >= 6 && hour < 18
+//         ? "/logos/logo-day.png"
+//         : "/logos/logo-night.png"
+//     );
+//   };
+//
+//   updateLogo();
+//   const interval = setInterval(updateLogo, 60000);
+//   return () => clearInterval(interval);
+// }, []);
+*/
+
 export default function NavbarLogo() {
   const [loaded, setLoaded] = useState(false);
-  const [logo, setLogo] = useState("/logos/logo-day.png");
 
   useEffect(() => {
-    const updateLogo = () => {
-      const hour = new Date().getHours();
-
-      setLogo(
-        hour >= 6 && hour < 18
-          ? "/logos/logo-day.png"
-          : "/logos/logo-night.png"
-      );
-    };
-
-    updateLogo();
-
     const timer = setTimeout(() => {
       setLoaded(true);
     }, 150);
 
-    /* Check every minute for day/night change */
-
-    const interval = setInterval(updateLogo, 60000);
-
-    return () => {
-      clearTimeout(timer);
-      clearInterval(interval);
-    };
+    return () => clearTimeout(timer);
   }, []);
 
   return (
@@ -43,14 +49,14 @@ export default function NavbarLogo() {
         {/* Logo */}
 
         <img
-          src={logo}
+          src={LOGO_SRC}
           alt="INPLAYER"
           draggable={false}
           className={`
             relative
-            h-12
-            md:h-14
-            lg:h-16
+            h-8
+            md:h-9
+            lg:h-10
             w-auto
             object-contain
             select-none

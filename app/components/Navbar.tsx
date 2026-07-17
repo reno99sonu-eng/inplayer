@@ -9,7 +9,6 @@ import NavbarSearch from "./NavbarSearch";
 import NavbarActions from "./NavbarActions";
 import NavbarProfile from "./NavbarProfile";
 import MobileMenu from "./MobileMenu";
-import MobileCreateButton from "./MobileCreateButton";
 import NavigationCategories from "./NavigationCategories";
 import MobileSearchOverlay from "./MobileSearchOverlay";
 import { useRouter } from "next/navigation";
@@ -222,16 +221,12 @@ export default function Navbar() {
   <NavbarProfile />
 </div>
 
-{/* Mobile Create + Notification (Profile moved to bottom nav) */}
+{/* Mobile Notification (Create + Profile moved to bottom nav) */}
 <div
   className={`lg:hidden items-center gap-2 ${
     mobileSearchOpen ? "hidden" : "flex"
   }`}
 >
-<div className="-ml-2">
-  <MobileCreateButton />
-</div>
-
   <div className="scale-[0.9]">
     <NavbarActions />
   </div>

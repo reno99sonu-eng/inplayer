@@ -35,7 +35,7 @@ export default function Home() {
       <div className="relative z-10">
         <Navbar />
 
-        <div className="space-y-10 lg:space-y-14">
+        <div className="space-y-1 lg:space-y-2">
         <FeaturedHero />
 
 <div className="mx-auto h-px w-[92%] bg-gradient-to-r from-transparent via-white/10 to-transparent" />

@@ -13,24 +13,32 @@ import CreatePopup from "./CreatePopup";
 
 export default function MobileCreateButton() {
   const [open, setOpen] = useState(false);
+
   const popupRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
+      const target = event.target as Node;
+
       if (
-        popupRef.current &&
-        !popupRef.current.contains(event.target as Node)
+        popupRef.current?.contains(target) ||
+        buttonRef.current?.contains(target)
       ) {
-        setOpen(false);
+        return;
       }
+
+      setOpen(false);
     }
 
     if (open) {
       document.addEventListener("mousedown", handleClickOutside);
+      document.addEventListener("touchstart", handleClickOutside);
     }
 
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("touchstart", handleClickOutside);
     };
   }, [open]);
 
@@ -64,7 +72,9 @@ export default function MobileCreateButton() {
   return (
     <div className="relative">
       <button
-        onClick={() => setOpen(!open)}
+        ref={buttonRef}
+        type="button"
+        onClick={() => setOpen((prev) => !prev)}
         className="
           flex
           h-11
@@ -83,15 +93,21 @@ export default function MobileCreateButton() {
           hover:scale-105
         "
       >
-        <Plus size={18} strokeWidth={2.8} />
+        <Plus
+          size={18}
+          strokeWidth={2.8}
+          className={`transition-transform duration-300 ${
+            open ? "rotate-45" : "rotate-0"
+          }`}
+        />
       </button>
 
       <CreatePopup
-        open={open}
-        popupRef={popupRef}
-        items={items}
-        mobile
-      />
+  open={open}
+  popupRef={popupRef}
+  items={items}
+  mobile={typeof window !== "undefined" && window.innerWidth < 1024}
+/>
     </div>
   );
 }

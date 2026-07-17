@@ -4,6 +4,7 @@ import { Plus_Jakarta_Sans } from "next/font/google";
 
 import "./globals.css";
 import MobileBottomNav from "./components/MobileBottomNav";
+import { ThemeProvider } from "./components/ThemeProvider";
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -22,9 +23,19 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${jakarta.className} bg-[#F8FAFC] text-slate-900`}>
-        <div className="pb-20 lg:pb-0">{children}</div>
-        <MobileBottomNav />
+      <body
+  className={`
+    ${jakarta.className}
+    bg-background
+    text-foreground
+    transition-colors
+    duration-300
+  `}
+>
+        <ThemeProvider>
+          <div className="pb-20 lg:pb-0">{children}</div>
+          <MobileBottomNav />
+        </ThemeProvider>
       </body>
     </html>
   );

@@ -1,15 +1,33 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import { MoreVertical, ChevronDown } from "lucide-react";
-import { recommendations } from "../data/recommendations";
+import { recommendations, type Recommendation } from "../data/recommendations";
 import ShortsShelf from "./ShortsShelf";
 
 export default function RecommendationFeed() {
-  const firstVideos = recommendations.slice(0, 10);
-  const remainingVideos = recommendations.slice(10);
+  // Render in original order first (matches server output), then shuffle
+  // client-side only after mount. Shuffling during the initial render would
+  // make the server and client produce different random orders and trigger
+  // a hydration mismatch error, so this two-step approach avoids that.
+  const [items, setItems] = useState<Recommendation[]>(recommendations);
 
-  const renderCard = (video: (typeof recommendations)[number]) => (
+  useEffect(() => {
+    const shuffled = [...recommendations];
+
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+
+    setItems(shuffled);
+  }, []);
+
+  const firstVideos = items.slice(0, 10);
+  const remainingVideos = items.slice(10);
+
+  const renderCard = (video: Recommendation) => (
     <article
       key={video.id}
       className="

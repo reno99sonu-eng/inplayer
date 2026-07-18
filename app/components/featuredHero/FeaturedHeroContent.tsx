@@ -1,8 +1,15 @@
 "use client";
 
 import FeaturedHeroButtons from "./FeaturedHeroButtons";
+import type { FeaturedSlide } from "../../data/featuredSlides";
 
-export default function FeaturedHeroContent() {
+interface FeaturedHeroContentProps {
+  slide: FeaturedSlide;
+}
+
+export default function FeaturedHeroContent({
+  slide,
+}: FeaturedHeroContentProps) {
   return (
     <div
       className="
@@ -61,85 +68,53 @@ export default function FeaturedHeroContent() {
         </span>
       </div>
 
-      {/* Title */}
+      {/* Title — re-animates in on every slide change */}
 
       <h1
+        key={slide.id}
         className="
-          text-2xl
+          animate-hero-fade-up
+          text-lg
           font-black
-          leading-[0.9]
-          tracking-[-0.05em]
+          leading-none
+          tracking-[-0.03em]
           text-white
 
-          sm:text-3xl
+          sm:text-xl
 
-          md:text-4xl
+          md:text-2xl
 
-          lg:text-5xl
+          lg:text-3xl
         "
       >
-        No
-        <br />
-        Limits
+        {slide.title}
       </h1>
 
-      {/* Description */}
-
-      <p
-        className="
-          mt-3
-          max-w-[480px]
-          text-sm
-          text-slate-300
-        "
-      >
-        Unlimited streaming. Watch anytime, anywhere.
-      </p>
-
-      <div className="mt-3 flex flex-col gap-0.5">
-        <span className="text-sm font-semibold text-white">
-          by @ArjunCreates
-        </span>
-
-        <span className="text-xs font-medium text-emerald-400">
-          ✓ Verified Creator
-        </span>
-      </div>
-
-      {/* Creator Information */}
+      {/* Creator */}
 
       <div
-        className="
-          mt-4
-          flex
-          flex-wrap
-          items-center
-          gap-x-2
-          gap-y-1
-          text-[11px]
-          text-slate-300
-        "
+        key={`${slide.id}-creator`}
+        className="animate-hero-fade-up mt-3 flex items-center gap-1.5"
       >
-        <span>👁 12.8M Views</span>
-
-        <span className="text-orange-400">•</span>
-
-        <span>18 min</span>
-
-        <span className="text-orange-400">•</span>
-
-        <span>🌍 7 Languages</span>
-
-        <span className="text-orange-400">•</span>
-
-        <span>💬 33 Subtitles</span>
-
-        <span className="text-orange-400">•</span>
-
-        <span className="font-semibold text-orange-300">
-          🔥 #1
+        <span className="text-sm font-semibold text-white">
+          by {slide.isHandle && "@"}
+          {slide.creator}
         </span>
+
+        {slide.verified && (
+          <span className="text-xs font-medium text-emerald-400">✓</span>
+        )}
       </div>
+
+      {/* Stats */}
+
+      <p
+        key={`${slide.id}-stats`}
+        className="animate-hero-fade-up mt-2 text-[11px] text-slate-300"
+      >
+        {slide.views} <span className="text-orange-400">•</span>{" "}
+        {slide.duration}
+      </p>
 
       {/* Buttons */}
 

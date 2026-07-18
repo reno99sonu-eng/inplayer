@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { MoreVertical, ChevronDown } from "lucide-react";
 import { recommendations, type Recommendation } from "../data/recommendations";
+import { shorts, type Short } from "../data/shorts";
 import ShortsShelf from "./ShortsShelf";
 
 export default function RecommendationFeed() {
@@ -12,20 +13,37 @@ export default function RecommendationFeed() {
   // make the server and client produce different random orders and trigger
   // a hydration mismatch error, so this two-step approach avoids that.
   const [items, setItems] = useState<Recommendation[]>(recommendations);
+  const [shuffledShorts, setShuffledShorts] = useState<Short[]>(shorts);
 
   useEffect(() => {
-    const shuffled = [...recommendations];
-
-    for (let i = shuffled.length - 1; i > 0; i--) {
+    const shuffledRecs = [...recommendations];
+    for (let i = shuffledRecs.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+      [shuffledRecs[i], shuffledRecs[j]] = [shuffledRecs[j], shuffledRecs[i]];
     }
+    setItems(shuffledRecs);
 
-    setItems(shuffled);
+    const shuffledShortsArr = [...shorts];
+    for (let i = shuffledShortsArr.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffledShortsArr[i], shuffledShortsArr[j]] = [
+        shuffledShortsArr[j],
+        shuffledShortsArr[i],
+      ];
+    }
+    setShuffledShorts(shuffledShortsArr);
   }, []);
 
+  // Recommendations split into three batches: two rows worth, then two more
+  // rows worth, then everything else
   const firstVideos = items.slice(0, 10);
-  const remainingVideos = items.slice(10);
+  const secondVideos = items.slice(10, 20);
+  const remainingVideos = items.slice(20);
+
+  // Shorts split across the two placements: a single compact row first,
+  // then the rest in the full grid further down
+  const shortsRowOne = shuffledShorts.slice(0, 8);
+  const shortsRowTwo = shuffledShorts.slice(8);
 
   const renderCard = (video: Recommendation) => (
     <article
@@ -149,8 +167,8 @@ export default function RecommendationFeed() {
 
   return (
     <>
-      {/* Top Recommendations */}
-      <section className="mx-auto max-w-[1800px] px-4 py-10 lg:px-8">
+      {/* First batch of recommendations */}
+      <section className="mx-auto max-w-[1800px] px-4 py-5 lg:py-10 lg:px-8">
         <div
           className="
             grid
@@ -168,8 +186,30 @@ export default function RecommendationFeed() {
         </div>
       </section>
 
-      {/* Shorts */}
-      <ShortsShelf />
+      {/* Shorts — first row */}
+      <ShortsShelf items={shortsRowOne} />
+
+      {/* Second batch of recommendations */}
+      <section className="mx-auto max-w-[1800px] px-4 py-3 lg:py-6 lg:px-8">
+        <div
+          className="
+            grid
+            grid-cols-1
+            gap-x-6
+            gap-y-10
+
+            sm:grid-cols-2
+            lg:grid-cols-3
+            xl:grid-cols-4
+            2xl:grid-cols-5
+          "
+        >
+          {secondVideos.map(renderCard)}
+        </div>
+      </section>
+
+      {/* Shorts — second row */}
+      <ShortsShelf items={shortsRowTwo} />
 
       {/* Remaining Recommendations */}
       <section className="mx-auto max-w-[1800px] px-4 pb-4 lg:px-8">

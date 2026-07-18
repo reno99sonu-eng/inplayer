@@ -7,7 +7,7 @@ interface AIStudioModalProps {
   onClose: () => void;
 }
 
-const prompts = [
+const examplePrompts = [
   "Create a cinematic travel documentary...",
   "Generate a YouTube gaming thumbnail...",
   "Write a podcast introduction...",
@@ -15,36 +15,97 @@ const prompts = [
   "Create a luxury movie trailer...",
 ];
 
+const quickToolPrompts: Record<string, string> = {
+  Scripts:
+    "Write a 60-second video script introducing a new streaming original series.",
+  Thumbnails:
+    "Describe a bold, high-contrast YouTube thumbnail concept for a travel vlog episode.",
+  Voice:
+    "Write a warm, energetic voiceover script for a 30-second app trailer.",
+  Translate:
+    "Translate the following into Hindi, Spanish, and French: 'Unlimited streaming. Watch anytime, anywhere.'",
+};
+
 export default function AIStudioModal({
   open,
   onClose,
 }: AIStudioModalProps) {
-  const [placeholder, setPlaceholder] = useState("");
-  const [index, setIndex] = useState(0);
+  const [placeholderText, setPlaceholderText] = useState("");
+  const [promptIndex, setPromptIndex] = useState(0);
+  const [prompt, setPrompt] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
+  // Animated example-prompt placeholder — only visible while the box is empty
   useEffect(() => {
     if (!open) return;
 
     let i = 0;
-    const text = prompts[index];
+    const text = examplePrompts[promptIndex];
 
     const typing = setInterval(() => {
       i++;
-
-      setPlaceholder(text.slice(0, i));
+      setPlaceholderText(text.slice(0, i));
 
       if (i >= text.length) {
         clearInterval(typing);
 
         setTimeout(() => {
-          setPlaceholder("");
-          setIndex((prev) => (prev + 1) % prompts.length);
+          setPlaceholderText("");
+          setPromptIndex((prev) => (prev + 1) % examplePrompts.length);
         }, 1800);
       }
     }, 35);
 
     return () => clearInterval(typing);
-  }, [index, open]);
+  }, [promptIndex, open]);
+
+  // Reset everything when the popup closes, so it's fresh next time it opens
+  useEffect(() => {
+    if (!open) {
+      setPrompt("");
+      setResult(null);
+      setError(null);
+      setLoading(false);
+    }
+  }, [open]);
+
+  const handleGenerate = async () => {
+    if (!prompt.trim() || loading) return;
+
+    setLoading(true);
+    setError(null);
+    setResult(null);
+
+    try {
+      const response = await fetch("/api/ai-generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        setError(data.error || "Something went wrong. Please try again.");
+      } else {
+        setResult(data.text);
+      }
+    } catch {
+      setError(
+        "Couldn't reach the AI service. Check your connection and try again."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleQuickTool = (tool: string) => {
+    setPrompt(quickToolPrompts[tool] || "");
+    setResult(null);
+    setError(null);
+  };
 
   if (!open) return null;
 
@@ -64,9 +125,13 @@ export default function AIStudioModal({
   md:w-[330px]
   lg:right-6
   lg:bottom-24
-  lg:w-[360px]
+  lg:w-[380px]
 
-  overflow-hidden
+  max-h-[80vh]
+  overflow-y-auto
+  [scrollbar-width:none]
+  [&::-webkit-scrollbar]:hidden
+
   rounded-[22px]
   lg:rounded-[30px]
 
@@ -200,24 +265,27 @@ export default function AIStudioModal({
   <div className="rounded-2xl border border-white/10 bg-[#07111F] p-3 shadow-inner">
 
     <textarea
-      rows={1}
-      readOnly
-      value={`${placeholder}|`}
+      rows={3}
+      value={prompt}
+      onChange={(e) => setPrompt(e.target.value)}
+      placeholder={placeholderText}
       className="
-       h-10 lg:h-12
         w-full
         resize-none
         bg-transparent
         text-[12px] lg:text-[14px]
-        leading-7
+        leading-6
         text-white
         outline-none
+        placeholder:text-slate-500
       "
     />
 
   </div>
 
   <button
+    onClick={handleGenerate}
+    disabled={loading || !prompt.trim()}
     className="
       mt-4
       w-full
@@ -237,11 +305,42 @@ lg:text-sm
       transition-all
       duration-300
       hover:-translate-y-0.5
-      ...hover:shadow-[0_20px_50px_rgba(255,153,0,.45)]
+      hover:shadow-[0_20px_50px_rgba(255,153,0,.45)]
+      disabled:cursor-not-allowed
+      disabled:opacity-50
+      disabled:hover:translate-y-0
     "
 >
-      Generate Content
+      {loading ? "Generating..." : "Generate Content"}
     </button>
+
+    {error && (
+      <p className="mt-3 rounded-xl border border-red-500/20 bg-red-500/10 p-2.5 text-[11px] text-red-300">
+        {error}
+      </p>
+    )}
+
+    {result && (
+      <div
+        className="
+          mt-3
+          max-h-[200px]
+          overflow-y-auto
+          rounded-2xl
+          border
+          border-white/10
+          bg-[#07111F]
+          p-3
+          text-[12px]
+          leading-6
+          text-slate-200
+          [scrollbar-width:none]
+          [&::-webkit-scrollbar]:hidden
+        "
+      >
+        <p className="whitespace-pre-wrap">{result}</p>
+      </div>
+    )}
 
 </div>
         <div className="mt-3">
@@ -252,14 +351,10 @@ lg:text-sm
 
           <div className="grid grid-cols-2 gap-1.5 lg:gap-2">
 
-            {[
-              "Scripts",
-              "Thumbnails",
-              "Voice",
-              "Translate",
-            ].map((tool) => (
+            {Object.keys(quickToolPrompts).map((tool) => (
               <button
                 key={tool}
+                onClick={() => handleQuickTool(tool)}
                 className="
   rounded-lg
   lg:rounded-xl

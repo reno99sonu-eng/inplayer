@@ -39,7 +39,7 @@ export default function WatchlistPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-[#06101D] text-white">
+    <div className="min-h-screen overflow-x-hidden bg-[#06101D] text-white">
       <div className="flex items-center gap-4 border-b border-white/10 px-5 py-5">
         <button
           onClick={() => router.back()}
@@ -88,48 +88,69 @@ export default function WatchlistPage() {
                 key={item.id}
                 className="
                   flex
-                  items-center
+                  flex-col
                   gap-4
                   rounded-3xl
                   border
                   border-white/10
                   bg-white/[0.03]
                   p-4
+
+                  sm:flex-row
+                  sm:items-center
                 "
               >
-                <Image
-                  src={item.thumbnail}
-                  alt={item.title}
-                  width={170}
-                  height={96}
-                  className="rounded-2xl object-cover"
-                />
+                {/* Thumbnail + text — always side by side, shrinks safely */}
+                <div className="flex min-w-0 items-center gap-4">
+                  <div
+                    className="
+                      relative
+                      h-16
+                      w-24
+                      flex-shrink-0
+                      overflow-hidden
+                      rounded-2xl
 
-                <div className="flex-1">
-                  <h2 className="font-bold">
-                    {item.title}
-                  </h2>
+                      sm:h-24
+                      sm:w-[170px]
+                    "
+                  >
+                    <Image
+                      src={item.thumbnail}
+                      alt={item.title}
+                      fill
+                      sizes="(max-width: 640px) 96px, 170px"
+                      className="object-cover"
+                    />
+                  </div>
 
-                  <p className="mt-1 text-sm text-slate-400">
-                    {item.creator}
-                  </p>
+                  <div className="min-w-0 flex-1">
+                    <h2 className="truncate font-bold">
+                      {item.title}
+                    </h2>
 
-                  <p className="mt-2 text-xs text-slate-500">
-                    {item.duration}
-                  </p>
+                    <p className="mt-1 truncate text-sm text-slate-400">
+                      {item.creator}
+                    </p>
+
+                    <p className="mt-2 text-xs text-slate-500">
+                      {item.duration}
+                    </p>
+                  </div>
                 </div>
 
-                <div className="flex gap-2">
-                  <button className="rounded-xl bg-orange-500 p-3 text-white">
-                    <Play size={18} />
+                {/* Action buttons — below on mobile, inline on larger screens */}
+                <div className="flex flex-shrink-0 justify-end gap-2 sm:justify-start">
+                  <button className="rounded-xl bg-orange-500 p-2.5 text-white">
+                    <Play size={17} />
                   </button>
 
-                  <button className="rounded-xl border border-white/10 p-3 text-slate-300">
-                    <Download size={18} />
+                  <button className="rounded-xl border border-white/10 p-2.5 text-slate-300">
+                    <Download size={17} />
                   </button>
 
-                  <button className="rounded-xl border border-red-500/20 p-3 text-red-400">
-                    <Trash2 size={18} />
+                  <button className="rounded-xl border border-red-500/20 p-2.5 text-red-400">
+                    <Trash2 size={17} />
                   </button>
                 </div>
               </div>

@@ -22,7 +22,7 @@ const company = [
 
 export default function Footer() {
   return (
-    <footer className="relative mt-6 overflow-hidden border-t border-orange-500/10 bg-[#050816] text-white">
+    <footer className="relative mt-2 overflow-hidden border-t border-orange-500/10 bg-[#050816] text-white lg:mt-6">
 
       {/* Background */}
       <div
@@ -37,9 +37,9 @@ export default function Footer() {
       <div className="absolute -left-32 top-0 h-72 w-72 rounded-full bg-orange-500/10 blur-[110px]" />
       <div className="absolute -right-32 bottom-0 h-72 w-72 rounded-full bg-cyan-500/10 blur-[110px]" />
 
-      <div className="relative mx-auto max-w-[1600px] px-4 py-3 lg:px-10 lg:py-5">
+      <div className="relative mx-auto max-w-[1600px] px-4 py-2 lg:px-10 lg:py-5">
 
-  <div className="grid grid-cols-2 gap-x-5 gap-y-4 xl:grid-cols-4 xl:gap-6">
+  <div className="grid grid-cols-2 gap-x-5 gap-y-2 lg:gap-y-4 xl:grid-cols-4 xl:gap-6">
 
           {/* Brand */}
           <div className="col-span-2">
@@ -48,11 +48,11 @@ export default function Footer() {
               <NavbarLogo />
             </div>
 
-            <h3 className="mt-2 text-lg font-black lg:text-xl">
+            <h3 className="mt-1 text-sm font-black lg:mt-2 lg:text-xl">
               Entertainment Beyond Limits
             </h3>
 
-            <p className="mt-2 max-w-xs text-xs leading-5 text-slate-400 lg:max-w-sm lg:text-sm lg:leading-6">
+            <p className="hidden max-w-sm text-sm leading-6 text-slate-400 lg:mt-2 lg:block">
               Discover blockbuster originals, premium creators, live channels,
               podcasts and AI-powered entertainment in one destination.
             </p>
@@ -62,14 +62,14 @@ export default function Footer() {
           {/* Browse */}
           <div>
 
-            <h4 className="text-xs font-bold uppercase tracking-[0.25em] text-orange-300">
+            <h4 className="text-[10px] font-bold uppercase tracking-[0.25em] text-orange-300 lg:text-xs">
               Browse
             </h4>
 
-            <ul className="mt-2 space-y-1.5">
+            <ul className="mt-1.5 space-y-1 lg:mt-2 lg:space-y-1.5">
               {browse.map((item) => (
                 <li key={item}>
-                  <button className="text-slate-400 transition hover:text-orange-300 hover:translate-x-1">
+                  <button className="text-xs text-slate-400 transition hover:text-orange-300 hover:translate-x-1 lg:text-base">
                     {item}
                   </button>
                 </li>
@@ -81,21 +81,21 @@ export default function Footer() {
           {/* Company */}
           <div>
 
-            <h4 className="text-xs font-bold uppercase tracking-[0.25em] text-orange-300">
+            <h4 className="text-[10px] font-bold uppercase tracking-[0.25em] text-orange-300 lg:text-xs">
               Company
             </h4>
 
-            <ul className="mt-3 space-y-2">
+            <ul className="mt-1.5 space-y-1 lg:mt-3 lg:space-y-2">
               {company.map((item) => (
                 <li key={item}>
-                  <button className="text-slate-400 transition hover:text-orange-300 hover:translate-x-1">
+                  <button className="text-xs text-slate-400 transition hover:text-orange-300 hover:translate-x-1 lg:text-base">
                     {item}
                   </button>
                 </li>
               ))}
             </ul>
 
-            <div className="mt-3 flex items-center gap-4">
+            <div className="mt-2 hidden items-center gap-4 lg:mt-3 lg:flex">
 
               <button className="transition-all duration-300 hover:scale-110 hover:drop-shadow-[0_0_12px_rgba(249,115,22,.8)]">
                 <img
@@ -121,7 +121,7 @@ export default function Footer() {
 
         {/* Bottom */}
 
-        <div className="mt-4 flex flex-col items-center justify-between gap-2 border-t border-white/10 pt-2 text-[11px] text-slate-500 md:flex-row">
+        <div className="mt-2 flex flex-col items-center justify-between gap-1.5 border-t border-white/10 pt-2 text-[10px] text-slate-500 md:flex-row lg:mt-4 lg:text-[11px]">
 
           <p>© 2026 INPLAYER. All Rights Reserved.</p>
 

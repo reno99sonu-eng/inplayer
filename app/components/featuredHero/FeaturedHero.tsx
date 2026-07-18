@@ -1,30 +1,53 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import FeaturedHeroBackground from "./FeaturedHeroBackground";
 import FeaturedHeroContent from "./FeaturedHeroContent";
 import FeaturedHeroVideo from "./FeaturedHeroVideo";
 import FeaturedHeroLayout from "./FeaturedHeroLayout";
+import { featuredSlides } from "../../data/featuredSlides";
+
+const SLIDE_DURATION = 4000;
 
 export default function FeaturedHero() {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+
+  useEffect(() => {
+    if (isPaused) return;
+
+    const timer = setTimeout(() => {
+      setActiveIndex((prev) => (prev + 1) % featuredSlides.length);
+    }, SLIDE_DURATION);
+
+    return () => clearTimeout(timer);
+  }, [activeIndex, isPaused]);
+
+  const activeSlide = featuredSlides[activeIndex];
+
   return (
     <section
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+      role="region"
+      aria-label="Featured content carousel"
       className="
         relative
         w-full
         overflow-hidden
         bg-black
 
-        min-h-[340px]
+        min-h-[260px]
 
-        sm:min-h-[400px]
+        sm:min-h-[300px]
 
-        md:min-h-[460px]
+        md:min-h-[340px]
 
-        lg:h-[50vh]
+        lg:h-[38vh]
 
-        xl:h-[55vh]
+        xl:h-[42vh]
 
-        2xl:h-[60vh]
+        2xl:h-[46vh]
       "
     >
       {/* Background */}
@@ -35,14 +58,59 @@ export default function FeaturedHero() {
 
       {/* Responsive Layout */}
       <FeaturedHeroLayout>
-        <FeaturedHeroContent />
+        <FeaturedHeroContent slide={activeSlide} />
       </FeaturedHeroLayout>
 
-      {/* Desktop Only Stats */}
-      <div className="hidden lg:block" />
+      {/* Background Image — crossfading carousel */}
+      <FeaturedHeroVideo slides={featuredSlides} activeIndex={activeIndex} />
 
-      {/* Background Image / Video */}
-      <FeaturedHeroVideo />
+      {/* Slide progress indicators */}
+      <div
+        className="
+          absolute
+          bottom-4
+          left-1/2
+          z-30
+          flex
+          -translate-x-1/2
+          gap-2
+
+          lg:bottom-6
+        "
+      >
+        {featuredSlides.map((slide, index) => (
+          <button
+            key={slide.id}
+            onClick={() => setActiveIndex(index)}
+            aria-label={`Go to slide ${index + 1}`}
+            className="
+              relative
+              h-1.5
+              w-6
+              overflow-hidden
+              rounded-full
+              bg-white/20
+              transition-colors
+              duration-300
+              hover:bg-white/30
+            "
+          >
+            {index === activeIndex && !isPaused && (
+              <div
+                key={`${slide.id}-fill`}
+                className="absolute inset-y-0 left-0 rounded-full bg-orange-400"
+                style={{
+                  animation: `heroProgressFill ${SLIDE_DURATION}ms linear forwards`,
+                }}
+              />
+            )}
+
+            {index === activeIndex && isPaused && (
+              <div className="absolute inset-y-0 left-0 w-full rounded-full bg-orange-400/50" />
+            )}
+          </button>
+        ))}
+      </div>
     </section>
   );
 }

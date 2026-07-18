@@ -386,4 +386,15 @@ export const recommendations: Recommendation[] = [
     duration: "27:41",
     verified: true,
   },
+  {
+    id: 35,
+    title: "World Cup Fever",
+    creator: "Stadium Diaries",
+    avatar: "/recommendations/avatars/35.jpg",
+    thumbnail: "/recommendations/thumbnails/35.jpg",
+    views: "7.6M views",
+    uploaded: "3 days ago",
+    duration: "16:42",
+    verified: true,
+  },
 ];

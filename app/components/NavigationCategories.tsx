@@ -23,21 +23,31 @@ export default function NavigationCategories() {
         sticky
         top-20
         z-40
+        overflow-hidden
         border-b
         border-white/5
         bg-[#06101D]/95
         backdrop-blur-2xl
       "
     >
+      {/* Extra 24px of bottom padding pushes any native scrollbar past the
+          visible area, and the matching negative margin pulls the box back
+          up — the parent's overflow-hidden clips that strip away entirely.
+          This hides scrollbars even where scrollbar-hiding CSS properties
+          have no effect (some Android browsers render a native overlay
+          scroll indicator that isn't part of the CSS scrollbar system). */}
       <div
         className="
           flex
           gap-3
           overflow-x-auto
-          px-5
-          py-3
-          scrollbar-hide
           whitespace-nowrap
+          px-5
+          pt-3
+          pb-9
+          -mb-6
+          [scrollbar-width:none]
+          [&::-webkit-scrollbar]:hidden
         "
       >
         {categories.map((category, index) => (

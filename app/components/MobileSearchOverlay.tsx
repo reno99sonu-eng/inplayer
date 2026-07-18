@@ -48,7 +48,7 @@ export default function MobileSearchOverlay({
       />
 
       {/* Search Panel */}
-      <div className="fixed inset-x-0 top-0 z-[130] border-b border-white/10 bg-[#07101F]/95 p-4 backdrop-blur-3xl">
+      <div className="fixed inset-x-0 top-0 z-[130] border-b border-white/10 light:border-black/10 bg-[#07101F]/95 light:bg-white/95 p-4 backdrop-blur-3xl">
         <div className="flex items-center gap-3">
 
           {/* Close Button */}
@@ -63,11 +63,15 @@ export default function MobileSearchOverlay({
               rounded-2xl
               border
               border-white/10
+              light:border-black/10
               bg-white/5
+              light:bg-black/5
               text-white
+              light:text-slate-900
               transition-all
               duration-300
               hover:bg-white/10
+              light:hover:bg-black/10
             "
           >
             <X size={24} />
@@ -79,7 +83,7 @@ export default function MobileSearchOverlay({
             {/* Search Icon */}
             <Search
               size={22}
-              className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-500"
+              className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-500 light:text-slate-400"
             />
 
             {/* Search Input */}
@@ -93,20 +97,27 @@ export default function MobileSearchOverlay({
                 rounded-full
                 border
                 border-white/10
+                light:border-black/10
                 bg-white/5
+                light:bg-black/[0.04]
                 backdrop-blur-xl
                 pl-14
                 pr-24
                 text-[17px]
                 font-medium
                 text-white
+                light:text-slate-900
+                caret-orange-400
                 outline-none
                 placeholder:text-slate-400
+                light:placeholder:text-slate-400
                 shadow-[0_10px_35px_rgba(0,0,0,.35)]
+                light:shadow-[0_10px_35px_rgba(0,0,0,.08)]
                 transition-all
                 duration-300
                 focus:border-orange-400/40
                 focus:bg-white/[0.07]
+                light:focus:bg-black/[0.06]
               "
             />
 
@@ -122,7 +133,7 @@ export default function MobileSearchOverlay({
 
               <button
                 type="button"
-                className="text-white transition-all duration-300 hover:scale-110"
+                className="text-white light:text-slate-700 transition-all duration-300 hover:scale-110"
               >
                 <Mic size={19} />
               </button>

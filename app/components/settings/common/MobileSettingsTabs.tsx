@@ -71,7 +71,7 @@ export default function MobileSettingsTabs({
                 ${
                   active === tab.id
                     ? "bg-gradient-to-r from-orange-500 to-amber-400 text-white shadow-lg shadow-orange-500/20"
-                    : "bg-white/[0.04] text-slate-300 hover:bg-white/[0.08]"
+                    : "bg-white/[0.04] text-slate-300 hover:bg-white/[0.08] light:bg-black/[0.04] light:text-slate-600 light:hover:bg-black/[0.08]"
                 }
               `}
             >

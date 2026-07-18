@@ -2,7 +2,11 @@
 
 import { useEffect, useState } from "react";
 
-export default function Greeting() {
+interface GreetingProps {
+  name?: string;
+}
+
+export default function Greeting({ name = "there" }: GreetingProps) {
   const [greeting, setGreeting] = useState("");
   const [icon, setIcon] = useState("☀️");
   const [loaded, setLoaded] = useState(false);
@@ -47,7 +51,7 @@ export default function Greeting() {
         }
       `}
     >
-      <span className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-300">
+      <span className="flex items-center gap-1 text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-300 light:text-slate-600">
 
         <span className="text-[13px] leading-none">
           {icon}
@@ -66,10 +70,12 @@ export default function Greeting() {
           font-bold
           tracking-tight
           text-white
+          light:text-slate-900
           drop-shadow-[0_1px_6px_rgba(255,255,255,.18)]
+          light:drop-shadow-none
         "
       >
-        Ram
+        {name}
       </span>
 
     </div>

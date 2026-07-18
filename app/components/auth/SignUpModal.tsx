@@ -1,0 +1,472 @@
+"use client";
+
+import { useEffect, useMemo, useState } from "react";
+import { User, Mail, Lock, X, Loader2, Check, CheckCircle2 } from "lucide-react";
+import { signUp } from "@/app/lib/auth";
+import { useAuthModal } from "./AuthProvider";
+
+interface SignUpModalProps {
+  open: boolean;
+  onClose: () => void;
+}
+
+function getPasswordStrength(password: string) {
+  if (!password) return { score: 0, label: "", color: "" };
+
+  let score = 0;
+  if (password.length >= 8) score++;
+  if (password.length >= 12) score++;
+  if (/[A-Z]/.test(password) && /[a-z]/.test(password)) score++;
+  if (/[0-9]/.test(password)) score++;
+  if (/[^A-Za-z0-9]/.test(password)) score++;
+
+  if (score <= 1) return { score: 1, label: "Weak", color: "bg-red-500" };
+  if (score <= 3) return { score: 2, label: "Fair", color: "bg-orange-400" };
+  if (score === 4) return { score: 3, label: "Good", color: "bg-amber-400" };
+  return { score: 4, label: "Strong", color: "bg-emerald-500" };
+}
+
+const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+
+export default function SignUpModal({ open, onClose }: SignUpModalProps) {
+  const { openSignIn, openVerifyEmail } = useAuthModal();
+
+  const [name, setName] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [shake, setShake] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  const strength = useMemo(() => getPasswordStrength(password), [password]);
+  const emailValid = email.length > 0 && isValidEmail(email);
+  const nameValid = name.trim().length > 1;
+  const passwordsMatch = confirmPassword.length > 0 && confirmPassword === password;
+  const passwordsMismatch = confirmPassword.length > 0 && confirmPassword !== password;
+
+  useEffect(() => {
+    if (!open) {
+      setName("");
+      setEmail("");
+      setPassword("");
+      setConfirmPassword("");
+      setAgreedToTerms(false);
+      setLoading(false);
+      setError(null);
+      setShake(false);
+      setSuccess(false);
+    }
+  }, [open]);
+
+  const triggerError = (message: string) => {
+    setError(message);
+    setShake(true);
+    setTimeout(() => setShake(false), 400);
+  };
+
+  const handleSignUp = async () => {
+    setError(null);
+
+    if (!name.trim() || !email.trim() || !password) {
+      triggerError("Please fill in your name, email, and password.");
+      return;
+    }
+
+    if (!isValidEmail(email)) {
+      triggerError("Please enter a valid email address.");
+      return;
+    }
+
+    if (password.length < 8) {
+      triggerError("Password must be at least 8 characters.");
+      return;
+    }
+
+    if (password !== confirmPassword) {
+      triggerError("Your passwords don't match.");
+      return;
+    }
+
+    if (!agreedToTerms) {
+      triggerError("Please agree to the Terms of Service to continue.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const result = await signUp({
+        username: email.trim(),
+        password,
+        options: {
+          userAttributes: {
+            email: email.trim(),
+            name: name.trim(),
+          },
+        },
+      });
+
+      setSuccess(true);
+
+      setTimeout(() => {
+        if (result.nextStep?.signUpStep === "CONFIRM_SIGN_UP") {
+          openVerifyEmail(email.trim());
+        } else {
+          openSignIn();
+        }
+      }, 900);
+    } catch (err: unknown) {
+      const name = (err as { name?: string })?.name;
+      const message =
+        err instanceof Error ? err.message : "Something went wrong creating your account.";
+
+      if (name === "UsernameExistsException") {
+        triggerError("An account with that email already exists.");
+      } else if (name === "InvalidPasswordException") {
+        triggerError("That password doesn't meet the requirements. Try a longer, stronger password.");
+      } else if (name === "InvalidParameterException") {
+        triggerError("Please check your details — something wasn't accepted by the server.");
+      } else {
+        triggerError(message);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!open) return null;
+
+  return (
+    <div
+      onClick={onClose}
+      className="
+        fixed inset-0 z-[9999] flex items-center justify-center
+        bg-black/70 light:bg-black/40 backdrop-blur-md p-4 sm:p-5
+      "
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className={`
+          relative w-full max-w-[440px]
+          max-h-[92vh] overflow-y-auto
+          [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
+          rounded-[28px] sm:rounded-[30px]
+          border border-orange-400/15 light:border-orange-400/25
+          bg-gradient-to-br from-[#07111F]/95 via-[#0B1728]/95 to-[#040A14]/95
+          light:from-white/98 light:via-slate-50/98 light:to-white/98
+          p-5 sm:p-7
+          shadow-[0_25px_90px_rgba(0,0,0,.55)]
+          light:shadow-[0_25px_90px_rgba(0,0,0,.18)]
+          animate-modal-pop
+          ${shake ? "animate-modal-shake" : ""}
+        `}
+      >
+        <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[28px] sm:rounded-[30px]">
+          <div className="absolute -left-16 -top-16 h-48 w-48 rounded-full bg-orange-500/10 blur-[80px] animate-pulse" />
+          <div className="absolute -right-16 bottom-0 h-40 w-40 rounded-full bg-cyan-500/10 blur-[80px]" />
+        </div>
+
+        {success ? (
+          <div className="relative z-10 flex flex-col items-center justify-center py-10 text-center">
+            <div className="animate-success-pop flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/15 border border-emerald-400/30">
+              <Check size={32} className="text-emerald-400" />
+            </div>
+            <h2 className="mt-5 text-xl font-black text-white light:text-slate-900">
+              Account Created!
+            </h2>
+            <p className="mt-1 text-sm text-slate-400 light:text-slate-500">
+              Just one more step...
+            </p>
+          </div>
+        ) : (
+          <>
+        <button
+          type="button"
+          onClick={onClose}
+          className="
+            absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center
+            rounded-full border border-white/10 light:border-black/10
+            bg-white/5 light:bg-black/5
+            text-slate-300 light:text-slate-600
+            transition-all duration-300
+            hover:rotate-90 hover:border-orange-400/40 hover:bg-orange-500/10 hover:text-white light:hover:text-slate-900
+          "
+        >
+          <X size={18} />
+        </button>
+
+        <div className="relative z-10">
+          <span
+            className="
+              inline-flex rounded-full border border-orange-400/30 light:border-orange-400/40
+              bg-orange-500/10 px-3 py-1 text-[10px] font-bold tracking-[0.35em]
+              text-orange-300 light:text-orange-700
+            "
+          >
+            INPLAYER
+          </span>
+
+          <h2 className="mt-4 text-[28px] sm:text-3xl font-black leading-none text-white light:text-slate-900">
+            Create Your
+            <br />
+            Account.
+          </h2>
+
+          <p className="mt-2 text-sm text-slate-400 light:text-slate-500">
+            Join InPlayer to save your favourites and get personalized recommendations.
+          </p>
+
+          <div className="mt-6 space-y-4">
+            <div>
+              <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-500">
+                Full Name
+              </label>
+              <div className="group relative">
+                <User
+                  size={17}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 light:text-slate-400 transition-colors duration-300 group-focus-within:text-orange-400"
+                />
+                <input
+                  type="text"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="
+                    w-full rounded-2xl border border-white/10 light:border-black/10
+                    bg-[#07111F] light:bg-black/[0.03]
+                    py-3 pl-11 pr-10
+                    text-white light:text-slate-900 caret-orange-400
+                    outline-none transition-all duration-300
+                    placeholder:text-slate-500 light:placeholder:text-slate-400
+                    focus:border-orange-400/50 focus:shadow-[0_0_0_3px_rgba(249,115,22,.1)]
+                  "
+                  placeholder="Ram Kumar"
+                />
+                {nameValid && (
+                  <CheckCircle2
+                    size={17}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-emerald-400"
+                  />
+                )}
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-500">
+                Email
+              </label>
+              <div className="group relative">
+                <Mail
+                  size={17}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 light:text-slate-400 transition-colors duration-300 group-focus-within:text-orange-400"
+                />
+                <input
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  className="
+                    w-full rounded-2xl border border-white/10 light:border-black/10
+                    bg-[#07111F] light:bg-black/[0.03]
+                    py-3 pl-11 pr-10
+                    text-white light:text-slate-900 caret-orange-400
+                    outline-none transition-all duration-300
+                    placeholder:text-slate-500 light:placeholder:text-slate-400
+                    focus:border-orange-400/50 focus:shadow-[0_0_0_3px_rgba(249,115,22,.1)]
+                  "
+                  placeholder="you@example.com"
+                />
+                {emailValid && (
+                  <CheckCircle2
+                    size={17}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-emerald-400"
+                  />
+                )}
+              </div>
+            </div>
+
+            <div>
+              <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-500">
+                Password
+              </label>
+              <div className="group relative">
+                <Lock
+                  size={17}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 light:text-slate-400 transition-colors duration-300 group-focus-within:text-orange-400"
+                />
+                <input
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleSignUp();
+                  }}
+                  className="
+                    w-full rounded-2xl border border-white/10 light:border-black/10
+                    bg-[#07111F] light:bg-black/[0.03]
+                    py-3 pl-11 pr-4
+                    text-white light:text-slate-900 caret-orange-400
+                    outline-none transition-all duration-300
+                    placeholder:text-slate-500 light:placeholder:text-slate-400
+                    focus:border-orange-400/50 focus:shadow-[0_0_0_3px_rgba(249,115,22,.1)]
+                  "
+                  placeholder="At least 8 characters"
+                />
+              </div>
+
+              {/* Live password strength meter */}
+              {password && (
+                <div className="mt-2">
+                  <div className="flex gap-1.5">
+                    {[1, 2, 3, 4].map((segment) => (
+                      <div
+                        key={segment}
+                        className={`h-1 flex-1 rounded-full transition-all duration-300 ${
+                          segment <= strength.score
+                            ? strength.color
+                            : "bg-white/10 light:bg-black/10"
+                        }`}
+                      />
+                    ))}
+                  </div>
+                  <p className="mt-1.5 text-[11px] text-slate-500">
+                    {strength.label && (
+                      <>
+                        Password strength:{" "}
+                        <span className="font-semibold">{strength.label}</span>
+                      </>
+                    )}
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-500">
+                Confirm Password
+              </label>
+              <div className="group relative">
+                <Lock
+                  size={17}
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 light:text-slate-400 transition-colors duration-300 group-focus-within:text-orange-400"
+                />
+                <input
+                  type="password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleSignUp();
+                  }}
+                  className={`
+                    w-full rounded-2xl border
+                    bg-[#07111F] light:bg-black/[0.03]
+                    py-3 pl-11 pr-10
+                    text-white light:text-slate-900 caret-orange-400
+                    outline-none transition-all duration-300
+                    placeholder:text-slate-500 light:placeholder:text-slate-400
+                    focus:shadow-[0_0_0_3px_rgba(249,115,22,.1)]
+                    ${
+                      passwordsMismatch
+                        ? "border-red-500/40 focus:border-red-500/50"
+                        : "border-white/10 light:border-black/10 focus:border-orange-400/50"
+                    }
+                  `}
+                  placeholder="Re-enter your password"
+                />
+                {passwordsMatch && (
+                  <CheckCircle2
+                    size={17}
+                    className="absolute right-4 top-1/2 -translate-y-1/2 text-emerald-400"
+                  />
+                )}
+              </div>
+              {passwordsMismatch && (
+                <p className="mt-1.5 text-[11px] text-red-400 light:text-red-600">
+                  Passwords don&apos;t match yet.
+                </p>
+              )}
+            </div>
+
+            <label className="flex items-start gap-2.5 text-xs text-slate-400 light:text-slate-500 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={agreedToTerms}
+                onChange={(e) => setAgreedToTerms(e.target.checked)}
+                className="mt-0.5 accent-orange-500"
+              />
+              <span>
+                I agree to InPlayer&apos;s{" "}
+                <span className="font-semibold text-orange-300 light:text-orange-600">
+                  Terms of Service
+                </span>{" "}
+                and{" "}
+                <span className="font-semibold text-orange-300 light:text-orange-600">
+                  Privacy Policy
+                </span>
+                .
+              </span>
+            </label>
+
+            {error && (
+              <p className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-300 light:text-red-700">
+                {error}
+              </p>
+            )}
+
+            <button
+              type="button"
+              onClick={handleSignUp}
+              disabled={loading}
+              className="
+                flex w-full items-center justify-center gap-2
+                rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A]
+                py-3.5 font-bold text-white
+                shadow-[0_15px_35px_rgba(255,153,0,.3)]
+                transition-all duration-300
+                hover:-translate-y-0.5 hover:shadow-[0_20px_45px_rgba(255,153,0,.4)]
+                active:scale-[0.98]
+                disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0
+              "
+            >
+              {loading && <Loader2 size={18} className="animate-spin" />}
+              {loading ? "Creating Account..." : "Create Account"}
+            </button>
+
+            <div className="flex items-center gap-3">
+              <div className="h-px flex-1 bg-white/10 light:bg-black/10" />
+              <span className="text-[10px] font-medium text-slate-500">OR</span>
+              <div className="h-px flex-1 bg-white/10 light:bg-black/10" />
+            </div>
+
+            <button
+              type="button"
+              className="
+                w-full rounded-2xl border border-white/10 light:border-black/10
+                py-3 text-sm font-semibold text-slate-200 light:text-slate-700
+                transition-all duration-300
+                hover:border-orange-400/30 hover:bg-white/5 light:hover:bg-black/5
+                active:scale-[0.98]
+              "
+            >
+              Continue with Google
+            </button>
+
+            <p className="text-center text-xs text-slate-400 light:text-slate-500">
+              Already have an account?{" "}
+              <button
+                type="button"
+                onClick={openSignIn}
+                className="font-semibold text-orange-300 light:text-orange-600 transition hover:text-orange-200 light:hover:text-orange-700"
+              >
+                Sign In
+              </button>
+            </p>
+          </div>
+        </div>
+        </>
+        )}
+      </div>
+    </div>
+  );
+}

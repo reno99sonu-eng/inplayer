@@ -22,7 +22,7 @@ const company = [
 
 export default function Footer() {
   return (
-    <footer className="relative mt-2 overflow-hidden border-t border-orange-500/10 bg-[#050816] text-white lg:mt-6">
+    <footer className="relative mt-2 overflow-hidden border-t border-orange-500/10 bg-[#050816] text-white lg:mt-6 light:border-orange-500/20 light:bg-white light:text-slate-900">
 
       {/* Background */}
       <div
@@ -48,11 +48,11 @@ export default function Footer() {
               <NavbarLogo />
             </div>
 
-            <h3 className="mt-1 text-sm font-black lg:mt-2 lg:text-xl">
+            <h3 className="mt-1 text-sm font-black lg:mt-2 lg:text-xl light:text-slate-900">
               Entertainment Beyond Limits
             </h3>
 
-            <p className="hidden max-w-sm text-sm leading-6 text-slate-400 lg:mt-2 lg:block">
+            <p className="hidden max-w-sm text-sm leading-6 text-slate-400 lg:mt-2 lg:block light:text-slate-500">
               Discover blockbuster originals, premium creators, live channels,
               podcasts and AI-powered entertainment in one destination.
             </p>
@@ -62,14 +62,14 @@ export default function Footer() {
           {/* Browse */}
           <div>
 
-            <h4 className="text-[10px] font-bold uppercase tracking-[0.25em] text-orange-300 lg:text-xs">
+            <h4 className="text-[10px] font-bold uppercase tracking-[0.25em] text-orange-300 lg:text-xs light:text-orange-600">
               Browse
             </h4>
 
             <ul className="mt-1.5 space-y-1 lg:mt-2 lg:space-y-1.5">
               {browse.map((item) => (
                 <li key={item}>
-                  <button className="text-xs text-slate-400 transition hover:text-orange-300 hover:translate-x-1 lg:text-base">
+                  <button className="text-xs text-slate-400 transition hover:text-orange-300 hover:translate-x-1 lg:text-base light:text-slate-500 light:hover:text-orange-600">
                     {item}
                   </button>
                 </li>
@@ -81,14 +81,14 @@ export default function Footer() {
           {/* Company */}
           <div>
 
-            <h4 className="text-[10px] font-bold uppercase tracking-[0.25em] text-orange-300 lg:text-xs">
+            <h4 className="text-[10px] font-bold uppercase tracking-[0.25em] text-orange-300 lg:text-xs light:text-orange-600">
               Company
             </h4>
 
             <ul className="mt-1.5 space-y-1 lg:mt-3 lg:space-y-2">
               {company.map((item) => (
                 <li key={item}>
-                  <button className="text-xs text-slate-400 transition hover:text-orange-300 hover:translate-x-1 lg:text-base">
+                  <button className="text-xs text-slate-400 transition hover:text-orange-300 hover:translate-x-1 lg:text-base light:text-slate-500 light:hover:text-orange-600">
                     {item}
                   </button>
                 </li>
@@ -101,7 +101,7 @@ export default function Footer() {
                 <img
                   src="/icons/google-play.svg"
                   alt="Google Play"
-                  className="h-6 w-6 brightness-0 invert lg:h-7 lg:w-7"
+                  className="h-6 w-6 brightness-0 invert lg:h-7 lg:w-7 light:invert-0 light:opacity-70"
                 />
               </button>
 
@@ -109,7 +109,7 @@ export default function Footer() {
                 <img
                   src="/icons/app-store.svg"
                   alt="App Store"
-                  className="h-6 w-6 brightness-0 invert lg:h-7 lg:w-7"
+                  className="h-6 w-6 brightness-0 invert lg:h-7 lg:w-7 light:invert-0 light:opacity-70"
                 />
               </button>
 
@@ -121,7 +121,7 @@ export default function Footer() {
 
         {/* Bottom */}
 
-        <div className="mt-2 flex flex-col items-center justify-between gap-1.5 border-t border-white/10 pt-2 text-[10px] text-slate-500 md:flex-row lg:mt-4 lg:text-[11px]">
+        <div className="mt-2 flex flex-col items-center justify-between gap-1.5 border-t border-white/10 pt-2 text-[10px] text-slate-500 md:flex-row lg:mt-4 lg:text-[11px] light:border-slate-200 light:text-slate-400">
 
           <p>© 2026 INPLAYER. All Rights Reserved.</p>
 
@@ -131,7 +131,7 @@ export default function Footer() {
               <img
                 src="/icons/instagram.svg"
                 alt="Instagram"
-                className="h-4 w-4 brightness-0 invert lg:h-5 lg:w-5"
+                className="h-4 w-4 brightness-0 invert lg:h-5 lg:w-5 light:invert-0 light:opacity-70"
               />
             </button>
 
@@ -139,7 +139,7 @@ export default function Footer() {
               <img
                 src="/icons/x.svg"
                 alt="X"
-                className="h-4 w-4 brightness-0 invert lg:h-5 lg:w-5"
+                className="h-4 w-4 brightness-0 invert lg:h-5 lg:w-5 light:invert-0 light:opacity-70"
               />
             </button>
 

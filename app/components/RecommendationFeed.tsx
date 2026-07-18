@@ -101,7 +101,7 @@ export default function RecommendationFeed() {
       {/* Information */}
       <div className="mt-4 flex items-start gap-3">
 
-        <div className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-full border border-white/10">
+        <div className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-full border border-white/10 light:border-black/10">
           <Image
             src={video.avatar}
             alt={video.creator}
@@ -120,18 +120,19 @@ export default function RecommendationFeed() {
               font-semibold
               leading-6
               text-white
+              light:text-slate-900
             "
           >
             {video.title}
           </h3>
 
-          <div className="mt-2 flex items-center gap-1 text-sm text-slate-400">
+          <div className="mt-2 flex items-center gap-1 text-sm text-slate-400 light:text-slate-500">
             <span className="truncate">
               {video.creator}
             </span>
 
             {video.verified && (
-              <span className="ml-1 text-xs font-bold text-slate-300">
+              <span className="ml-1 text-xs font-bold text-slate-300 light:text-slate-600">
                 ✓
               </span>
             )}
@@ -153,9 +154,12 @@ export default function RecommendationFeed() {
             justify-center
             rounded-full
             text-slate-400
+            light:text-slate-500
             transition-colors
             hover:bg-white/5
+            light:hover:bg-black/5
             hover:text-white
+            light:hover:text-slate-900
           "
         >
           <MoreVertical size={18} />
@@ -243,9 +247,13 @@ export default function RecommendationFeed() {
               from-[#111827]
               via-[#182234]
               to-[#111827]
+              light:from-slate-100
+              light:via-white
+              light:to-slate-100
               px-7
               py-3.5
               text-white
+              light:text-slate-900
               shadow-[0_0_30px_rgba(249,115,22,.12)]
               transition-all
               duration-300

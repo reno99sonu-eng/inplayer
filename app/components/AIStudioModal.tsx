@@ -141,12 +141,16 @@ export default function AIStudioModal({
   from-[#07111F]/95
   via-[#0B1728]/95
   to-[#040A14]/95
+  light:from-white/95
+  light:via-slate-50/95
+  light:to-white/95
 
   p-3
   lg:p-4
 
   backdrop-blur-3xl
   shadow-[0_25px_90px_rgba(0,0,0,.55)]
+  light:shadow-[0_25px_90px_rgba(0,0,0,.18)]
   animate-aiPopup
 "
 >
@@ -183,6 +187,7 @@ export default function AIStudioModal({
       absolute
       inset-0
       bg-[linear-gradient(to_bottom,rgba(255,255,255,.05),transparent)]
+      light:bg-[linear-gradient(to_bottom,rgba(0,0,0,.02),transparent)]
     "
   />
 
@@ -206,14 +211,18 @@ export default function AIStudioModal({
     rounded-full
     border
     border-white/10
+    light:border-black/10
     bg-[#131C2D]
+    light:bg-black/5
     text-slate-300
+    light:text-slate-700
     transition-all
     duration-300
     hover:rotate-90
     hover:border-orange-400/40
     hover:bg-orange-500/10
     hover:text-white
+    light:hover:text-slate-900
   "
 >
   ✕
@@ -228,7 +237,7 @@ export default function AIStudioModal({
   </span>
 
 </div>
-<h2 className="mt-3 text-[22px] md:text-[24px] lg:text-[28px] font-black leading-none tracking-tight text-white">
+<h2 className="mt-3 text-[22px] md:text-[24px] lg:text-[28px] font-black leading-none tracking-tight text-white light:text-slate-900">
 
     Create
     <br />
@@ -236,7 +245,7 @@ export default function AIStudioModal({
 
   </h2>
 
-  <p className="mt-2 text-[11px] lg:text-[12px] leading-5 lg:leading-6 text-slate-400">
+  <p className="mt-2 text-[11px] lg:text-[12px] leading-5 lg:leading-6 text-slate-400 light:text-slate-500">
 
     Generate premium scripts, thumbnails,
     voiceovers and translations instantly.
@@ -254,7 +263,7 @@ export default function AIStudioModal({
 
 </div>
 
-<div className="mt-3 rounded-[22px] border border-white/10 bg-white/[0.045] p-3 backdrop-blur-xl">
+<div className="mt-3 rounded-[22px] border border-white/10 light:border-black/10 bg-white/[0.045] light:bg-black/[0.03] p-3 backdrop-blur-xl">
 
   <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.35em] text-slate-500">
 
@@ -262,7 +271,7 @@ export default function AIStudioModal({
 
   </p>
 
-  <div className="rounded-2xl border border-white/10 bg-[#07111F] p-3 shadow-inner">
+  <div className="rounded-2xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-white p-3 shadow-inner">
 
     <textarea
       rows={3}
@@ -276,6 +285,8 @@ export default function AIStudioModal({
         text-[12px] lg:text-[14px]
         leading-6
         text-white
+        light:text-slate-900
+        caret-orange-400
         outline-none
         placeholder:text-slate-500
       "
@@ -329,11 +340,14 @@ lg:text-sm
           rounded-2xl
           border
           border-white/10
+          light:border-black/10
           bg-[#07111F]
+          light:bg-white
           p-3
           text-[12px]
           leading-6
           text-slate-200
+          light:text-slate-700
           [scrollbar-width:none]
           [&::-webkit-scrollbar]:hidden
         "
@@ -360,17 +374,21 @@ lg:text-sm
   lg:rounded-xl
   border
   border-white/5
+  light:border-black/10
   bg-white/[0.04]
+  light:bg-black/[0.03]
   py-1.5
   lg:py-2
   text-[11px]
   lg:text-xs
   font-medium
   text-slate-300
+  light:text-slate-700
   transition
   hover:border-orange-400/40
   hover:bg-orange-500/10
   hover:text-white
+  light:hover:text-slate-900
 "
               >
                 {tool}

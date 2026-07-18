@@ -13,7 +13,7 @@ export default function ShortsShelf({ items }: ShortsShelfProps) {
       <div className="mb-6 flex items-center gap-3">
         <span className="text-3xl">🔥</span>
 
-        <h2 className="text-3xl font-bold text-white">
+        <h2 className="text-3xl font-bold text-white light:text-slate-900">
           Shorts
         </h2>
       </div>

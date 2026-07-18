@@ -9,19 +9,30 @@ import RecommendationFeed from "./components/RecommendationFeed";
 
 export default function Home() {
   return (
-    <main className="relative min-h-screen overflow-x-hidden bg-[#050816]">
+    <main className="relative min-h-screen overflow-x-hidden bg-[#050816] light:bg-white">
       {/* Premium Background */}
       <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
         {/* Dark Gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-[#04060F] via-[#091224] to-[#04060F]" />
+        <div className="absolute inset-0 bg-gradient-to-br from-[#04060F] via-[#091224] to-[#04060F] light:from-white light:via-slate-50 light:to-white" />
 
-        {/* Honeycomb Texture */}
+        {/* Honeycomb Texture — Dark Mode */}
         <div
-          className="absolute inset-0 opacity-[0.06]"
+          className="absolute inset-0 opacity-[0.06] light:hidden"
           style={{
             backgroundImage:
               "radial-gradient(circle at 24px 24px, rgba(255,176,59,0.18) 2px, transparent 2px)",
             backgroundSize: "48px 48px",
+          }}
+        />
+
+        {/* Honeycomb Texture — Light Mode (tuned to actually be visible on white) */}
+        <div
+          className="absolute inset-0 hidden light:block"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 24px 24px, rgba(249,115,22,0.35) 2px, transparent 2px)",
+            backgroundSize: "48px 48px",
+            opacity: 0.12,
           }}
         />
 
@@ -38,11 +49,11 @@ export default function Home() {
         <div className="space-y-1 lg:space-y-2">
         <FeaturedHero />
 
-<div className="mx-auto h-px w-[92%] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+<div className="mx-auto h-px w-[92%] bg-gradient-to-r from-transparent via-white/10 to-transparent light:via-slate-200" />
 
 <TrendingNow />
 
-<div className="mx-auto h-px w-[92%] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+<div className="mx-auto h-px w-[92%] bg-gradient-to-r from-transparent via-white/10 to-transparent light:via-slate-200" />
 
 <RecommendationFeed />
 

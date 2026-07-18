@@ -1,0 +1,348 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import { Mail, Lock, X, Loader2, Check } from "lucide-react";
+import { signIn } from "@/app/lib/auth";
+import { useAuthModal } from "./AuthProvider";
+
+interface SignInModalProps {
+  open: boolean;
+  onClose: () => void;
+  onSuccess?: () => void;
+}
+
+export default function SignInModal({
+  open,
+  onClose,
+  onSuccess,
+}: SignInModalProps) {
+  const { openSignUp, openForgotPassword } = useAuthModal();
+
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [shake, setShake] = useState(false);
+  const [success, setSuccess] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      setEmail("");
+      setPassword("");
+      setRememberMe(false);
+      setShowPassword(false);
+      setLoading(false);
+      setError(null);
+      setShake(false);
+      setSuccess(false);
+    }
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [open, onClose]);
+
+  const triggerError = (message: string) => {
+    setError(message);
+    setShake(true);
+    setTimeout(() => setShake(false), 400);
+  };
+
+  const handleSignIn = async () => {
+    setError(null);
+
+    if (!email.trim() || !password) {
+      triggerError("Please enter both your email and password.");
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      const result = await signIn({
+        username: email.trim(),
+        password,
+      });
+
+      if (result.isSignedIn) {
+        // A brief success moment before closing feels more confirmed
+        // than instantly disappearing.
+        setSuccess(true);
+        onSuccess?.();
+        setTimeout(() => {
+          onClose();
+        }, 700);
+      } else {
+        const step = result.nextStep?.signInStep;
+
+        if (step === "CONFIRM_SIGN_UP") {
+          triggerError(
+            "Your account isn't verified yet. Please check your email for a verification code."
+          );
+        } else if (step === "CONFIRM_SIGN_IN_WITH_NEW_PASSWORD_REQUIRED") {
+          triggerError(
+            "A new password is required for this account. Please reset your password."
+          );
+        } else {
+          triggerError(`Additional sign-in step required: ${step}`);
+        }
+      }
+    } catch (err: unknown) {
+      const name = (err as { name?: string })?.name;
+      const message =
+        err instanceof Error ? err.message : "Something went wrong signing in.";
+
+      if (name === "UserNotFoundException") {
+        triggerError("No account found with that email address.");
+      } else if (name === "NotAuthorizedException") {
+        triggerError("Incorrect email or password.");
+      } else if (name === "UserNotConfirmedException") {
+        triggerError(
+          "Your account isn't verified yet. Please check your email for a verification code."
+        );
+      } else {
+        triggerError(message);
+      }
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (!open) return null;
+
+  return (
+    <div
+      onClick={onClose}
+      className="
+        fixed inset-0 z-[9999] flex items-center justify-center
+        bg-black/70 light:bg-black/40 backdrop-blur-md p-4 sm:p-5
+      "
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className={`
+          relative w-full max-w-[440px]
+          max-h-[92vh] overflow-y-auto
+          [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
+          rounded-[28px] sm:rounded-[30px]
+          border border-orange-400/15 light:border-orange-400/25
+          bg-gradient-to-br from-[#07111F]/95 via-[#0B1728]/95 to-[#040A14]/95
+          light:from-white/98 light:via-slate-50/98 light:to-white/98
+          p-5 sm:p-7
+          shadow-[0_25px_90px_rgba(0,0,0,.55)]
+          light:shadow-[0_25px_90px_rgba(0,0,0,.18)]
+          animate-modal-pop
+          ${shake ? "animate-modal-shake" : ""}
+        `}
+      >
+        {/* Ambient glow decorations */}
+        <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[28px] sm:rounded-[30px]">
+          <div className="absolute -left-16 -top-16 h-48 w-48 rounded-full bg-orange-500/10 blur-[80px] animate-pulse" />
+          <div className="absolute -right-16 bottom-0 h-40 w-40 rounded-full bg-cyan-500/10 blur-[80px]" />
+        </div>
+
+        {success ? (
+          <div className="relative z-10 flex flex-col items-center justify-center py-10 text-center">
+            <div className="animate-success-pop flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/15 border border-emerald-400/30">
+              <Check size={32} className="text-emerald-400" />
+            </div>
+            <h2 className="mt-5 text-xl font-black text-white light:text-slate-900">
+              Welcome back!
+            </h2>
+            <p className="mt-1 text-sm text-slate-400 light:text-slate-500">
+              Signing you in...
+            </p>
+          </div>
+        ) : (
+          <>
+            <button
+              type="button"
+              onClick={onClose}
+              className="
+                absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center
+                rounded-full border border-white/10 light:border-black/10
+                bg-white/5 light:bg-black/5
+                text-slate-300 light:text-slate-600
+                transition-all duration-300
+                hover:rotate-90 hover:border-orange-400/40 hover:bg-orange-500/10 hover:text-white light:hover:text-slate-900
+              "
+            >
+              <X size={18} />
+            </button>
+
+            <div className="relative z-10">
+              <span
+                className="
+                  inline-flex rounded-full border border-orange-400/30 light:border-orange-400/40
+                  bg-orange-500/10 light:bg-orange-500/10
+                  px-3 py-1 text-[10px] font-bold tracking-[0.35em]
+                  text-orange-300 light:text-orange-700
+                "
+              >
+                INPLAYER
+              </span>
+
+              <h2 className="mt-4 text-[28px] sm:text-3xl font-black leading-none text-white light:text-slate-900">
+                Welcome
+                <br />
+                Back.
+              </h2>
+
+              <p className="mt-2 text-sm text-slate-400 light:text-slate-500">
+                Sign in to continue watching your favourite creators and premium content.
+              </p>
+
+              <div className="mt-6 space-y-4">
+                <div>
+                  <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-500">
+                    Email
+                  </label>
+                  <div className="group relative">
+                    <Mail
+                      size={17}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 light:text-slate-400 transition-colors duration-300 group-focus-within:text-orange-400"
+                    />
+                    <input
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      className="
+                        w-full rounded-2xl border border-white/10 light:border-black/10
+                        bg-[#07111F] light:bg-black/[0.03]
+                        py-3 pl-11 pr-4
+                        text-white light:text-slate-900 caret-orange-400
+                        outline-none transition-all duration-300
+                        placeholder:text-slate-500 light:placeholder:text-slate-400
+                        focus:border-orange-400/50 focus:shadow-[0_0_0_3px_rgba(249,115,22,.1)]
+                      "
+                      placeholder="you@example.com"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-500">
+                    Password
+                  </label>
+                  <div className="group relative">
+                    <Lock
+                      size={17}
+                      className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 light:text-slate-400 transition-colors duration-300 group-focus-within:text-orange-400"
+                    />
+                    <input
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleSignIn();
+                      }}
+                      className="
+                        w-full rounded-2xl border border-white/10 light:border-black/10
+                        bg-[#07111F] light:bg-black/[0.03]
+                        py-3 pl-11 pr-16
+                        text-white light:text-slate-900 caret-orange-400
+                        outline-none transition-all duration-300
+                        placeholder:text-slate-500 light:placeholder:text-slate-400
+                        focus:border-orange-400/50 focus:shadow-[0_0_0_3px_rgba(249,115,22,.1)]
+                      "
+                      placeholder="••••••••"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword((v) => !v)}
+                      className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-orange-300 light:text-orange-600 transition hover:text-orange-200"
+                    >
+                      {showPassword ? "Hide" : "Show"}
+                    </button>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <label className="flex items-center gap-2 text-xs text-slate-400 light:text-slate-500 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={rememberMe}
+                      onChange={(e) => setRememberMe(e.target.checked)}
+                      className="accent-orange-500"
+                    />
+                    Remember me
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={openForgotPassword}
+                    className="text-xs font-semibold text-orange-300 light:text-orange-600 transition hover:text-orange-200 light:hover:text-orange-700"
+                  >
+                    Forgot Password?
+                  </button>
+                </div>
+
+                {error && (
+                  <p className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-300 light:text-red-700">
+                    {error}
+                  </p>
+                )}
+
+                <button
+                  type="button"
+                  onClick={handleSignIn}
+                  disabled={loading}
+                  className="
+                    flex w-full items-center justify-center gap-2
+                    rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A]
+                    py-3.5 font-bold text-white
+                    shadow-[0_15px_35px_rgba(255,153,0,.3)]
+                    transition-all duration-300
+                    hover:-translate-y-0.5 hover:shadow-[0_20px_45px_rgba(255,153,0,.4)]
+                    active:scale-[0.98]
+                    disabled:cursor-not-allowed disabled:opacity-70 disabled:hover:translate-y-0
+                  "
+                >
+                  {loading && <Loader2 size={18} className="animate-spin" />}
+                  {loading ? "Signing In..." : "Sign In"}
+                </button>
+
+                <div className="flex items-center gap-3">
+                  <div className="h-px flex-1 bg-white/10 light:bg-black/10" />
+                  <span className="text-[10px] font-medium text-slate-500">OR</span>
+                  <div className="h-px flex-1 bg-white/10 light:bg-black/10" />
+                </div>
+
+                <button
+                  type="button"
+                  className="
+                    w-full rounded-2xl border border-white/10 light:border-black/10
+                    py-3 text-sm font-semibold text-slate-200 light:text-slate-700
+                    transition-all duration-300
+                    hover:border-orange-400/30 hover:bg-white/5 light:hover:bg-black/5
+                    active:scale-[0.98]
+                  "
+                >
+                  Continue with Google
+                </button>
+
+                <p className="text-center text-xs text-slate-400 light:text-slate-500">
+                  Don&apos;t have an account?{" "}
+                  <button
+                    type="button"
+                    onClick={openSignUp}
+                    className="font-semibold text-orange-300 light:text-orange-600 transition hover:text-orange-200 light:hover:text-orange-700"
+                  >
+                    Create Account
+                  </button>
+                </p>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}

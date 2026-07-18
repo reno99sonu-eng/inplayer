@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
-
+import "./amplify-config";
 import { Plus_Jakarta_Sans } from "next/font/google";
-
 import "./globals.css";
 import MobileBottomNav from "./components/MobileBottomNav";
 import { ThemeProvider } from "./components/ThemeProvider";
+import AuthProvider from "./components/auth/AuthProvider";
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -32,10 +32,12 @@ export default function RootLayout({
     duration-300
   `}
 >
-        <ThemeProvider>
-          <div className="pb-20 lg:pb-0">{children}</div>
-          <MobileBottomNav />
-        </ThemeProvider>
+<AuthProvider>
+  <ThemeProvider>
+    <div className="pb-20 lg:pb-0">{children}</div>
+    <MobileBottomNav />
+  </ThemeProvider>
+</AuthProvider>
       </body>
     </html>
   );

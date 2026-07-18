@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 @custom-variant dark (&:where(.dark, .dark *));
+@custom-variant light (&:where(.light, .light *));
 
 html {
 
@@ -591,6 +592,45 @@ animation: aiGlassSweep 5.5s linear infinite;
   to {
     width: 100%;
   }
+}
+
+/* ---------- Auth Modals ---------- */
+
+@keyframes modalPopIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.92) translateY(8px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.animate-modal-pop {
+  animation: modalPopIn .35s cubic-bezier(.16,1,.3,1);
+}
+
+@keyframes modalShake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(6px); }
+  60% { transform: translateX(-4px); }
+  80% { transform: translateX(4px); }
+}
+
+.animate-modal-shake {
+  animation: modalShake .4s ease-in-out;
+}
+
+@keyframes successPop {
+  0% { transform: scale(0); opacity: 0; }
+  60% { transform: scale(1.15); opacity: 1; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.animate-success-pop {
+  animation: successPop .5s cubic-bezier(.16,1,.3,1);
 }
 
 /* Hide scrollbar ONLY on mobile; desktop/tablet keep the orange thin scrollbar */

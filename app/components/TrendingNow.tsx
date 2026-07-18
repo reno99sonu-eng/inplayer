@@ -93,6 +93,7 @@ export default function TrendingNow() {
             font-black
             tracking-[-0.08em]
             text-white/[0.025]
+            light:text-black/[0.025]
             lg:left-8
             lg:top-1
             lg:text-[90px]
@@ -104,22 +105,22 @@ export default function TrendingNow() {
 
       <div className="mb-3 flex items-center justify-between">
         <div>
-          <span className="rounded-full border border-red-500/20 bg-red-500/10 px-3 py-0.5 text-[10px] font-bold uppercase tracking-[0.2em] text-red-300 backdrop-blur-sm">
+          <span className="rounded-full border border-red-500/20 bg-red-500/10 px-3 py-0.5 text-[10px] font-bold uppercase tracking-[0.2em] text-red-300 light:text-red-600 backdrop-blur-sm">
             Trending
           </span>
-          <h2 className="mt-1 text-lg font-black text-white">
+          <h2 className="mt-1 text-lg font-black text-white light:text-slate-900">
             Trending Now
           </h2>
         </div>
 
-        <button className="hidden md:block rounded-full border border-white/10 bg-white/[0.02] px-3 py-1 text-xs font-semibold text-white backdrop-blur-sm transition hover:border-orange-400 hover:text-orange-300">
+        <button className="hidden md:block rounded-full border border-white/10 light:border-black/10 bg-white/[0.02] light:bg-black/[0.03] px-3 py-1 text-xs font-semibold text-white light:text-slate-900 backdrop-blur-sm transition hover:border-orange-400 hover:text-orange-300">
           View All →
         </button>
       </div>
 
       <div className="relative">
-        <div className="pointer-events-none absolute left-0 top-0 z-10 h-full w-10 bg-gradient-to-r from-[#0b1220] to-transparent lg:w-16" />
-        <div className="pointer-events-none absolute right-0 top-0 z-10 h-full w-10 bg-gradient-to-l from-[#0b1220] to-transparent lg:w-16" />
+        <div className="pointer-events-none absolute left-0 top-0 z-10 h-full w-10 bg-gradient-to-r from-[#0b1220] light:from-white to-transparent lg:w-16" />
+        <div className="pointer-events-none absolute right-0 top-0 z-10 h-full w-10 bg-gradient-to-l from-[#0b1220] light:from-white to-transparent lg:w-16" />
 
         <div
           ref={scrollRef}

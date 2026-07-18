@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
-
+import { useAuthModal } from "./auth/AuthProvider";
 import NavbarLogo from "./NavbarLogo";
 import NavbarLinks from "./NavbarLinks";
 import { Menu, X, Search, Home, PlaySquare, ChevronRight, ChevronDown } from "lucide-react";
@@ -41,6 +41,7 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showMoreChannels, setShowMoreChannels] = useState(false);
   const router = useRouter();
+  const { openSignIn, openSignUp } = useAuthModal();
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -82,9 +83,12 @@ export default function Navbar() {
           z-50
           border-b
           border-white/5
+          light:border-black/5
           bg-[#06101D]/70
+          light:bg-white/80
           backdrop-blur-[28px]
           shadow-[0_12px_40px_rgba(0,0,0,.35)]
+          light:shadow-[0_12px_40px_rgba(0,0,0,.08)]
         "
       >
       {/* Mobile / Tablet Background Branding */}
@@ -110,6 +114,7 @@ export default function Navbar() {
       text-[54px]
       sm:text-[72px]
       text-white/[0.03]
+      light:text-black/[0.03]
       blur-[1.5px]
     "
   >
@@ -133,7 +138,9 @@ export default function Navbar() {
       rounded-2xl
       border
       border-white/10
+      light:border-black/10
       bg-white/5
+      light:bg-black/5
       backdrop-blur-xl
       transition-all
       duration-300
@@ -150,7 +157,7 @@ export default function Navbar() {
         className={`absolute transition-all duration-300 ${
           menuOpen
             ? "rotate-90 scale-0 opacity-0"
-            : "rotate-0 scale-100 opacity-100 text-white"
+            : "rotate-0 scale-100 opacity-100 text-white light:text-slate-900"
         }`}
       />
       <X
@@ -192,7 +199,9 @@ export default function Navbar() {
         rounded-2xl
         border
         border-white/10
+        light:border-black/10
         bg-white/5
+        light:bg-black/5
         backdrop-blur-xl
       "
     >
@@ -202,7 +211,7 @@ export default function Navbar() {
           className={`absolute transition-all duration-300 ${
             menuOpen
               ? "rotate-90 scale-0 opacity-0"
-              : "rotate-0 scale-100 opacity-100 text-white"
+              : "rotate-0 scale-100 opacity-100 text-white light:text-slate-900"
           }`}
         />
         <X
@@ -229,8 +238,11 @@ export default function Navbar() {
       rounded-full
       border
       border-white/10
+      light:border-black/10
       bg-white/5
+      light:bg-black/5
       text-white
+      light:text-slate-900
     "
   >
     <Search size={22} />
@@ -295,7 +307,9 @@ lg:right-auto
           max-w-[88vw]
           border-l
           border-white/10
+          light:border-black/10
           bg-[#07101F]/95
+          light:bg-white/95
           backdrop-blur-3xl
           transition-transform
           duration-300
@@ -307,8 +321,8 @@ lg:right-auto
         `}
       >
         <div className="flex h-full flex-col">
-          <div className="border-b border-white/10 px-6 py-5">
-            <h2 className="text-xl font-black text-white">INPLAYER</h2>
+          <div className="border-b border-white/10 light:border-black/10 px-6 py-5">
+            <h2 className="text-xl font-black text-white light:text-slate-900">INPLAYER</h2>
           </div>
 
           <div className="flex-1 overflow-y-auto px-3 py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -331,11 +345,14 @@ lg:right-auto
                   py-2
                   text-left
                   text-slate-200
+                  light:text-slate-700
                   transition-all
                   duration-300
                   hover:bg-white/5
+                  light:hover:bg-black/5
                   hover:translate-x-1
                   hover:text-orange-300
+                  light:hover:text-orange-600
                 "
               >
                 <Home size={19} />
@@ -354,11 +371,14 @@ lg:right-auto
                   py-2
                   text-left
                   text-slate-200
+                  light:text-slate-700
                   transition-all
                   duration-300
                   hover:bg-white/5
+                  light:hover:bg-black/5
                   hover:translate-x-1
                   hover:text-orange-300
+                  light:hover:text-orange-600
                 "
               >
                 <PlaySquare size={19} />
@@ -366,7 +386,7 @@ lg:right-auto
               </button>
             </div>
 
-            <div className="my-3 border-t border-white/10" />
+            <div className="my-3 border-t border-white/10 light:border-black/10" />
 
             {/* Subscriptions */}
             <div>
@@ -384,8 +404,10 @@ lg:right-auto
                   uppercase
                   tracking-[0.25em]
                   text-orange-300/80
+                  light:text-orange-600/90
                   transition
                   hover:text-orange-300
+                  light:hover:text-orange-600
                 "
               >
                 Subscriptions
@@ -408,6 +430,7 @@ lg:right-auto
                       transition-all
                       duration-300
                       hover:bg-white/5
+                      light:hover:bg-black/5
                       hover:translate-x-1
                     "
                   >
@@ -421,7 +444,7 @@ lg:right-auto
                       />
                     </div>
 
-                    <span className="flex-1 truncate text-sm text-slate-200">
+                    <span className="flex-1 truncate text-sm text-slate-200 light:text-slate-700">
                       {channel.name}
                     </span>
 
@@ -447,6 +470,7 @@ lg:right-auto
                         transition-all
                         duration-300
                         hover:bg-white/5
+                        light:hover:bg-black/5
                         hover:translate-x-1
                       "
                     >
@@ -460,7 +484,7 @@ lg:right-auto
                         />
                       </div>
 
-                      <span className="flex-1 truncate text-sm text-slate-200">
+                      <span className="flex-1 truncate text-sm text-slate-200 light:text-slate-700">
                         {channel.name}
                       </span>
 
@@ -484,10 +508,13 @@ lg:right-auto
                   py-1.5
                   text-left
                   text-slate-400
+                  light:text-slate-500
                   transition-all
                   duration-300
                   hover:bg-white/5
+                  light:hover:bg-black/5
                   hover:text-orange-300
+                  light:hover:text-orange-600
                 "
               >
                 <ChevronDown
@@ -502,11 +529,11 @@ lg:right-auto
               </button>
             </div>
 
-            <div className="my-3 border-t border-white/10" />
+            <div className="my-3 border-t border-white/10 light:border-black/10" />
 
             {/* You */}
             <div>
-              <p className="mb-1 px-3 text-xs font-bold uppercase tracking-[0.25em] text-orange-300/80">
+              <p className="mb-1 px-3 text-xs font-bold uppercase tracking-[0.25em] text-orange-300/80 light:text-orange-600/90">
                 You
               </p>
 
@@ -525,11 +552,14 @@ lg:right-auto
                       text-left
                       text-sm
                       text-slate-300
+                      light:text-slate-700
                       transition-all
                       duration-300
                       hover:bg-white/5
+                      light:hover:bg-black/5
                       hover:translate-x-1
                       hover:text-orange-300
+                      light:hover:text-orange-600
                     "
                   >
                     {item.label}
@@ -538,13 +568,21 @@ lg:right-auto
               </div>
             </div>
 
-            <div className="my-4 border-t border-white/10" />
+            <div className="my-4 border-t border-white/10 light:border-black/10" />
 
             <div className="space-y-1">
               {["Sign In", "Create Account"].map((item) => (
                 <button
                   key={item}
-                  onClick={() => setMenuOpen(false)}
+                  onClick={() => {
+                    setMenuOpen(false);
+                  
+                    if (item === "Sign In") {
+                      openSignIn();
+                    } else {
+                      openSignUp();
+                    }
+                  }}
                   className="
                     flex
                     w-full
@@ -555,11 +593,14 @@ lg:right-auto
                     text-left
                     text-sm
                     text-slate-300
+                    light:text-slate-700
                     transition-all
                     duration-300
                     hover:bg-white/5
+                    light:hover:bg-black/5
                     hover:translate-x-1
                     hover:text-orange-300
+                    light:hover:text-orange-600
                   "
                 >
                   {item}

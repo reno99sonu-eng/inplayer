@@ -20,7 +20,9 @@ export default function MobileBottomNav() {
         justify-around
         border-t
         border-white/10
+        light:border-black/10
         bg-[#06101D]/95
+        light:bg-white/95
         backdrop-blur-2xl
         px-2
         py-2
@@ -37,9 +39,11 @@ export default function MobileBottomNav() {
           px-3
           py-1
           text-slate-300
+          light:text-slate-600
           transition-colors
           duration-200
           hover:text-orange-300
+          light:hover:text-orange-600
         "
       >
         <Home size={22} />
@@ -56,9 +60,11 @@ export default function MobileBottomNav() {
           px-3
           py-1
           text-slate-300
+          light:text-slate-600
           transition-colors
           duration-200
           hover:text-orange-300
+          light:hover:text-orange-600
         "
       >
         <PlaySquare size={22} />
@@ -79,9 +85,11 @@ export default function MobileBottomNav() {
           px-3
           py-1
           text-slate-300
+          light:text-slate-600
           transition-colors
           duration-200
           hover:text-orange-300
+          light:hover:text-orange-600
         "
       >
         <Rss size={22} />
@@ -98,9 +106,11 @@ export default function MobileBottomNav() {
           px-3
           py-1
           text-slate-300
+          light:text-slate-600
           transition-colors
           duration-200
           hover:text-orange-300
+          light:hover:text-orange-600
         "
       >
         <img

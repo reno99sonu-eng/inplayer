@@ -26,7 +26,9 @@ export default function NavigationCategories() {
         overflow-hidden
         border-b
         border-white/5
+        light:border-black/5
         bg-[#06101D]/95
+        light:bg-white/95
         backdrop-blur-2xl
       "
     >
@@ -65,8 +67,8 @@ export default function NavigationCategories() {
 
               ${
                 index === 0
-                  ? "bg-white text-black"
-                  : "bg-white/10 text-white hover:bg-white/20"
+                  ? "bg-white text-black light:bg-slate-900 light:text-white"
+                  : "bg-white/10 text-white hover:bg-white/20 light:bg-black/5 light:text-slate-700 light:hover:bg-black/10"
               }
             `}
           >

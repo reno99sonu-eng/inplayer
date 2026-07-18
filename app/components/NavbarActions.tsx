@@ -130,9 +130,12 @@ export default function NavbarActions() {
             rounded-full
             border
             border-white/20
+            light:border-black/15
             bg-white/10
+            light:bg-black/5
             backdrop-blur-2xl
             text-white
+            light:text-slate-900
             transition-all
             duration-300
             hover:-translate-y-1
@@ -157,9 +160,12 @@ export default function NavbarActions() {
             rounded-3xl
             border
             border-white/10
+            light:border-black/10
             bg-[#08111F]/95
+            light:bg-white/95
             backdrop-blur-3xl
             shadow-[0_30px_80px_rgba(0,0,0,.55)]
+            light:shadow-[0_30px_80px_rgba(0,0,0,.12)]
             transition-all
             duration-300
             origin-top-right
@@ -171,18 +177,18 @@ export default function NavbarActions() {
             }
           `}
         >
-          <div className="border-b border-white/10 px-5 py-4">
-            <h3 className="text-sm font-black text-white">Notifications</h3>
+          <div className="border-b border-white/10 light:border-black/10 px-5 py-4">
+            <h3 className="text-sm font-black text-white light:text-slate-900">Notifications</h3>
           </div>
 
           <div className="max-h-80 overflow-y-auto p-4">
             {notifications.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <Bell size={28} className="mb-3 text-slate-500" />
-                <p className="text-sm font-semibold text-white">
+                <p className="text-sm font-semibold text-white light:text-slate-900">
                   You&apos;re all caught up
                 </p>
-                <p className="mt-1 text-xs text-slate-400">
+                <p className="mt-1 text-xs text-slate-400 light:text-slate-500">
                   New notifications will show up here.
                 </p>
               </div>
@@ -191,9 +197,9 @@ export default function NavbarActions() {
                 {notifications.map((n) => (
                   <div
                     key={n.id}
-                    className="rounded-xl bg-white/5 px-3 py-2.5"
+                    className="rounded-xl bg-white/5 light:bg-black/5 px-3 py-2.5"
                   >
-                    <p className="text-sm text-white">{n.title}</p>
+                    <p className="text-sm text-white light:text-slate-900">{n.title}</p>
                     <p className="text-xs text-slate-500">{n.time}</p>
                   </div>
                 ))}

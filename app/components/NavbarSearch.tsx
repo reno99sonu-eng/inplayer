@@ -89,6 +89,7 @@ export default function NavbarSearch() {
           top-1/2
           -translate-y-1/2
           text-slate-400
+          light:text-slate-500
           group-focus-within:text-orange-400
         "
       />
@@ -105,7 +106,9 @@ export default function NavbarSearch() {
           rounded-full
           border
           border-white/10
-          bg-white/[0.05]
+          light:border-black/10
+          bg-white/[0.08]
+          light:bg-black/[0.045]
           backdrop-blur-[30px]
           pl-10
           pr-20
@@ -113,14 +116,20 @@ export default function NavbarSearch() {
           text-sm
           font-medium
           text-white
+          light:text-slate-900
+          caret-orange-400
           placeholder:text-slate-400
+          light:placeholder:text-slate-500
           outline-none
           transition-all
           duration-500
           shadow-[0_10px_35px_rgba(0,0,0,.22)]
-          hover:bg-white/[0.07]
+          light:shadow-[0_10px_35px_rgba(0,0,0,.08)]
+          hover:bg-white/[0.11]
+          light:hover:bg-black/[0.07]
           hover:border-orange-400/40
-          focus:bg-white/[0.10]
+          focus:bg-white/[0.14]
+          light:focus:bg-black/[0.09]
           focus:border-orange-400
         "
       />
@@ -158,7 +167,7 @@ export default function NavbarSearch() {
       >
         <Mic
           size={16}
-          className="text-slate-300 lg:h-[18px] lg:w-[18px]"
+          className="text-slate-300 light:text-slate-500 lg:h-[18px] lg:w-[18px]"
         />
       </button>
     </div>

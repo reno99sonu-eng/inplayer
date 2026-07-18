@@ -302,7 +302,7 @@ lg:left-0
 lg:right-auto
   top-0
           z-[100]
-          h-screen
+          h-dvh
           w-[340px]
           max-w-[88vw]
           border-l
@@ -320,12 +320,12 @@ lg:right-auto
           }
         `}
       >
-        <div className="flex h-full flex-col">
+        <div className="flex h-dvh flex-col">
           <div className="border-b border-white/10 light:border-black/10 px-6 py-5">
             <h2 className="text-xl font-black text-white light:text-slate-900">INPLAYER</h2>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-3 py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-4 pb-32 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 
             <button className="mb-3 w-full rounded-2xl bg-gradient-to-r from-orange-500 via-amber-400 to-yellow-300 py-2.5 font-bold text-white transition hover:scale-[1.02]">
               ✦ Premium

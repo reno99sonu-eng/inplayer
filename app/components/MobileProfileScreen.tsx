@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 
 import Greeting from "./Greeting";
+import { useAuthModal } from "./auth/AuthProvider";
 
 interface MobileProfileScreenProps {
   open: boolean;
@@ -25,7 +26,20 @@ export default function MobileProfileScreen({
   onClose,
 }: MobileProfileScreenProps) {
   const router = useRouter();
-
+  const {
+    user,
+    signedIn,
+    authLoading,
+    signOut,
+    openSignIn,
+  } = useAuthModal();
+  if (authLoading) {
+    return null;
+  }
+  console.log("PROFILE SCREEN", {
+    signedIn,
+    user,
+  });
   const menu = [
     { icon: User, title: "My Profile", href: "/profile" },
     { icon: Heart, title: "Watchlist", href: "/watchlist" },
@@ -93,7 +107,7 @@ export default function MobileProfileScreen({
           />
 
           <div className="mt-3 flex justify-center">
-            <Greeting />
+          <Greeting name={user?.name} />
           </div>
 
           <div
@@ -148,30 +162,61 @@ export default function MobileProfileScreen({
             );
           })}
 
-          <div className="my-3 border-t border-white/10" />
+<div className="my-3 border-t border-white/10" />
 
-          <button
-            onClick={onClose}
-            className="
-              flex
-              w-full
-              items-center
-              gap-4
-              rounded-2xl
-              px-4
-              py-3.5
-              text-left
-              text-red-500
-              transition-all
-              duration-200
-              hover:bg-red-500/10
-            "
-          >
-            <LogOut size={20} />
-            Sign Out
-          </button>
+{signedIn ? (
+  <button
+    onClick={async () => {
+      await signOut();
+      onClose();
+    }}
+    className="
+      flex
+      w-full
+      items-center
+      gap-4
+      rounded-2xl
+      px-4
+      py-3.5
+      text-left
+      text-red-500
+      transition-all
+      duration-200
+      hover:bg-red-500/10
+    "
+  >
+    <LogOut size={20} />
+    <span className="text-base font-bold">Sign Out</span>
+  </button>
+) : (
+  <button
+    onClick={() => {
+      openSignIn();
+      onClose();
+    }}
+    className="
+      flex
+      w-full
+      items-center
+      gap-4
+      rounded-2xl
+      px-4
+      py-3.5
+      text-left
+      text-orange-400
+      transition-all
+      duration-200
+      hover:bg-white/5
+    "
+  >
+    <User size={20} />
+    <span className="text-base font-bold">Sign In</span>
+  </button>
+)}
+
         </div>
       </div>
     </div>
   );
 }
+  

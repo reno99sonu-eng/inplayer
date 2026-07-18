@@ -213,7 +213,7 @@ export default function AIStudioModal({
     border-white/10
     light:border-black/10
     bg-[#131C2D]
-    light:bg-black/5
+    light:bg-slate-200
     text-slate-300
     light:text-slate-700
     transition-all
@@ -232,7 +232,7 @@ export default function AIStudioModal({
 
   <div className="flex items-center">
 
-  <span className="rounded-full border border-orange-400/30 bg-gradient-to-r from-orange-500/15 to-amber-400/10 px-3 py-1 text-[9px] font-bold uppercase tracking-[0.4em] text-orange-200 shadow-[0_0_20px_rgba(251,146,60,.15)]">
+  <span className="rounded-full border border-orange-400/60 light:border-orange-400 bg-gradient-to-r from-orange-500/15 to-amber-400/10 light:from-orange-100 light:to-amber-100 px-3 py-1 text-[9px] font-bold uppercase tracking-[0.4em] text-orange-200 light:text-orange-600 shadow-[0_0_20px_rgba(251,146,60,.15)]">
     INPLAYER AI
   </span>
 
@@ -245,17 +245,17 @@ export default function AIStudioModal({
 
   </h2>
 
-  <p className="mt-2 text-[11px] lg:text-[12px] leading-5 lg:leading-6 text-slate-400 light:text-slate-500">
+  <p className="mt-2 text-[11px] lg:text-[12px] leading-5 lg:leading-6 text-slate-400 light:text-slate-700">
 
     Generate premium scripts, thumbnails,
     voiceovers and translations instantly.
 
   </p>
-  <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-emerald-500/20 bg-emerald-500/10 px-3 py-1">
+  <div className="mt-3 inline-flex items-center gap-2 rounded-full border border-emerald-500/40 light:border-emerald-500/50 bg-emerald-500/10 light:bg-emerald-100 px-3 py-1">
 
   <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
 
-  <span className="text-[10px] font-medium uppercase tracking-[0.25em] text-emerald-300">
+  <span className="text-[10px] font-medium uppercase tracking-[0.25em] text-emerald-300 light:text-emerald-700">
     AI ONLINE
   </span>
 
@@ -263,15 +263,15 @@ export default function AIStudioModal({
 
 </div>
 
-<div className="mt-3 rounded-[22px] border border-white/10 light:border-black/10 bg-white/[0.045] light:bg-black/[0.03] p-3 backdrop-blur-xl">
+<div className="mt-3 rounded-[22px] border border-white/10 light:border-slate-300 bg-white/[0.045] light:bg-black/[0.03] p-3 backdrop-blur-xl">
 
-  <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.35em] text-slate-500">
+  <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.35em] text-slate-500 light:text-slate-700">
 
     AI PROMPT
 
   </p>
 
-  <div className="rounded-2xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-white p-3 shadow-inner">
+  <div className="rounded-2xl border border-white/10 light:border-slate-300 bg-[#07111F] light:bg-white p-3 shadow-inner">
 
     <textarea
       rows={3}
@@ -288,7 +288,7 @@ export default function AIStudioModal({
         light:text-slate-900
         caret-orange-400
         outline-none
-        placeholder:text-slate-500
+        placeholder:text-slate-500 light:placeholder:text-slate-600
       "
     />
 
@@ -347,7 +347,7 @@ lg:text-sm
           text-[12px]
           leading-6
           text-slate-200
-          light:text-slate-700
+          light:text-slate-800
           [scrollbar-width:none]
           [&::-webkit-scrollbar]:hidden
         "
@@ -359,7 +359,7 @@ lg:text-sm
 </div>
         <div className="mt-3">
 
-          <p className="mb-3 text-[10px] uppercase tracking-[0.3em] text-slate-500">
+          <p className="mb-3 text-[10px] uppercase tracking-[0.3em] text-slate-500 light:text-slate-700">
             Quick Tools
           </p>
 
@@ -374,16 +374,16 @@ lg:text-sm
   lg:rounded-xl
   border
   border-white/5
-  light:border-black/10
+  light:border-slate-300
   bg-white/[0.04]
-  light:bg-black/[0.03]
+  light:bg-white
   py-1.5
   lg:py-2
   text-[11px]
   lg:text-xs
   font-medium
   text-slate-300
-  light:text-slate-700
+  light:text-slate-800
   transition
   hover:border-orange-400/40
   hover:bg-orange-500/10

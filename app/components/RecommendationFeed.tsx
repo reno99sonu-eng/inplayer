@@ -138,9 +138,37 @@ export default function RecommendationFeed() {
             )}
           </div>
 
-          <p className="mt-1 text-sm text-slate-500">
-            {video.views} • {video.uploaded}
-          </p>
+          <div className="mt-2 flex items-center justify-between gap-3">
+  <p className="text-sm text-slate-500 light:text-slate-600 truncate">
+    {video.views} • {video.uploaded}
+  </p>
+
+  <button
+    type="button"
+    className="
+      flex-shrink-0
+      rounded-full
+      border
+      border-orange-400/30
+      bg-orange-500/10
+      light:bg-orange-100
+      px-3
+      py-1
+      text-[11px]
+      font-semibold
+      text-orange-300
+      light:text-orange-700
+      transition-all
+      duration-300
+      hover:border-orange-500
+      hover:bg-orange-500
+      hover:text-white
+      active:scale-95
+    "
+  >
+    Subscribe
+  </button>
+</div>
 
         </div>
 

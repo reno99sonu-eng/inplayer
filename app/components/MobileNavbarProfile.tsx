@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useAuthModal } from "./auth/AuthProvider";
 import {
   User,
   Heart,
@@ -16,6 +17,13 @@ import Greeting from "./Greeting";
 export default function MobileNavbarProfile() {
   const [open, setOpen] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
+  const {
+    user,
+    signedIn,
+    signOut,
+    openSignIn,
+  } = useAuthModal();
+  console.log("Mobile Profile:", { user, signedIn });
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -71,7 +79,7 @@ export default function MobileNavbarProfile() {
           />
 
           <div className="mt-2 flex justify-center">
-            <Greeting />
+          <Greeting name={user?.name} />
           </div>
 
           <div className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-yellow-400 to-orange-500 px-3 py-1 text-[10px] font-semibold text-white">
@@ -99,10 +107,29 @@ export default function MobileNavbarProfile() {
 
           <div className="my-2 border-t border-white/10" />
 
-          <button className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-red-500 transition-all duration-200 hover:bg-red-500/10 hover:translate-x-1">
-            <LogOut size={16} />
-            Sign Out
-          </button>
+          {signedIn ? (
+  <button
+    onClick={async () => {
+      await signOut();
+      setOpen(false);
+    }}
+    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-red-500 transition-all duration-200 hover:bg-red-500/10 hover:translate-x-1"
+  >
+    <LogOut size={16} />
+    Sign Out
+  </button>
+) : (
+  <button
+    onClick={() => {
+      openSignIn();
+      setOpen(false);
+    }}
+    className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-orange-400 transition-all duration-200 hover:bg-white/5 hover:translate-x-1"
+  >
+    <User size={16} />
+    Sign In
+  </button>
+)}
         </div>
       </div>
     </div>

@@ -1,6 +1,7 @@
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import VideoPlayer from "@/app/components/VideoPlayer";
+import BackButton from "@/app/components/BackButton";
 import Link from "next/link";
 
 // Always fetch fresh — a video's status/details can change (e.g. views
@@ -33,10 +34,10 @@ export default async function WatchPage({ params }: WatchPageProps) {
           This video doesn't exist or may have been removed.
         </p>
         <Link
-          href="/"
+          href="/videos"
           className="mt-6 rounded-2xl border border-white/10 light:border-black/10 px-6 py-2.5 text-sm font-semibold text-slate-200 light:text-slate-700 transition hover:border-orange-400/30 hover:bg-white/5 light:hover:bg-black/5"
         >
-          Back to Home
+          Back to Videos
         </Link>
       </div>
     );
@@ -45,6 +46,7 @@ export default async function WatchPage({ params }: WatchPageProps) {
   if (video.status === "processing") {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 text-center">
+        <BackButton />
         <h2 className="text-2xl font-black text-white light:text-slate-900">
           Still processing
         </h2>
@@ -58,6 +60,7 @@ export default async function WatchPage({ params }: WatchPageProps) {
   if (video.status === "error") {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 text-center">
+        <BackButton />
         <h2 className="text-2xl font-black text-white light:text-slate-900">
           Processing failed
         </h2>
@@ -70,6 +73,8 @@ export default async function WatchPage({ params }: WatchPageProps) {
 
   return (
     <div className="mx-auto max-w-[1000px] px-4 py-6 sm:py-10">
+      <BackButton />
+
       <VideoPlayer
         playbackId={video.muxPlaybackId}
         title={video.title}

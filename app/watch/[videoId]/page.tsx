@@ -106,7 +106,8 @@ export default async function WatchPage({ params }: WatchPageProps) {
     new UpdateCommand({
       TableName: "InPlayer-Videos",
       Key: { videoId },
-      UpdateExpression: "SET views = if_not_exists(views, :zero) + :inc",
+      UpdateExpression: "SET #views = if_not_exists(#views, :zero) + :inc",
+      ExpressionAttributeNames: { "#views": "views" },
       ExpressionAttributeValues: { ":inc": 1, ":zero": 0 },
     })
   );

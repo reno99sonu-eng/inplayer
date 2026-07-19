@@ -7,6 +7,7 @@ import LikeButton from "@/app/components/LikeButton";
 import WatchLaterButton from "@/app/components/WatchLaterButton";
 import ShareButton from "@/app/components/ShareButton";
 import WatchHistoryRecorder from "@/app/components/WatchHistoryRecorder";
+import ProcessingStatus from "@/app/components/ProcessingStatus";
 import { formatTimeAgo, formatViews } from "@/app/lib/formatters";
 import Link from "next/link";
 import Image from "next/image";
@@ -79,14 +80,9 @@ export default async function WatchPage({ params }: WatchPageProps) {
 
   if (video.status === "processing") {
     return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 text-center">
+      <div className="mx-auto max-w-[600px] px-6 py-8">
         <BackButton />
-        <h2 className="text-2xl font-black text-white light:text-slate-900">
-          Still processing
-        </h2>
-        <p className="mt-2 max-w-sm text-sm text-slate-400 light:text-slate-500">
-          "{video.title}" is still being processed. Check back in a few minutes.
-        </p>
+        <ProcessingStatus videoId={videoId} autoRefreshOnReady />
       </div>
     );
   }

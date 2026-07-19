@@ -7,10 +7,10 @@ import {
   UploadCloud,
   Film,
   Loader2,
-  CheckCircle2,
   X,
 } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
+import ProcessingStatus from "@/app/components/ProcessingStatus";
 
 const CATEGORIES = [
   "Movies",
@@ -49,6 +49,7 @@ export default function UploadPage() {
 
   const [stage, setStage] = useState<Stage>("picking");
   const [progress, setProgress] = useState(0);
+  const [uploadedVideoId, setUploadedVideoId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const handleFile = (selected: File | null) => {
@@ -118,7 +119,8 @@ export default function UploadPage() {
         return;
       }
 
-      const { uploadUrl } = createData;
+      const { uploadUrl, videoId: createdVideoId } = createData;
+      setUploadedVideoId(createdVideoId);
 
       await new Promise<void>((resolve, reject) => {
         const xhr = new XMLHttpRequest();
@@ -381,25 +383,17 @@ export default function UploadPage() {
           </div>
         )}
 
-        {stage === "processing" && (
-          <div className="flex flex-col items-center gap-5 py-12 text-center">
-            <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/15 border border-emerald-400/30">
-              <CheckCircle2 size={36} className="text-emerald-400" />
+        {stage === "processing" && uploadedVideoId && (
+          <div>
+            <ProcessingStatus videoId={uploadedVideoId} />
+            <div className="mt-2 flex justify-center">
+              <button
+                onClick={() => router.push("/")}
+                className="rounded-2xl border border-white/10 light:border-black/10 px-6 py-2.5 text-sm font-semibold text-slate-200 light:text-slate-700 transition hover:border-orange-400/30 hover:bg-white/5 light:hover:bg-black/5"
+              >
+                Back to Home
+              </button>
             </div>
-            <div>
-              <p className="font-semibold text-white light:text-slate-900">
-                Upload complete!
-              </p>
-              <p className="mt-1 max-w-sm text-sm text-slate-400 light:text-slate-500">
-                Your video is being processed now — this usually takes a few minutes. It'll appear on InPlayer automatically once it's ready.
-              </p>
-            </div>
-            <button
-              onClick={() => router.push("/")}
-              className="mt-2 rounded-2xl border border-white/10 light:border-black/10 px-6 py-2.5 text-sm font-semibold text-slate-200 light:text-slate-700 transition hover:border-orange-400/30 hover:bg-white/5 light:hover:bg-black/5"
-            >
-              Back to Home
-            </button>
           </div>
         )}
       </div>

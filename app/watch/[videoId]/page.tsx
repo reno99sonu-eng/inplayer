@@ -4,6 +4,8 @@ import VideoPlayer from "@/app/components/VideoPlayer";
 import BackButton from "@/app/components/BackButton";
 import SubscribeButton from "@/app/components/SubscribeButton";
 import LikeButton from "@/app/components/LikeButton";
+import WatchLaterButton from "@/app/components/WatchLaterButton";
+import ShareButton from "@/app/components/ShareButton";
 import { formatTimeAgo, formatViews } from "@/app/lib/formatters";
 import Link from "next/link";
 import Image from "next/image";
@@ -158,6 +160,8 @@ export default async function WatchPage({ params }: WatchPageProps) {
 
             <div className="flex items-center gap-2">
               <LikeButton videoId={videoId} />
+              <WatchLaterButton videoId={videoId} />
+              <ShareButton videoId={videoId} title={video.title} />
 
               <span className="rounded-full border border-orange-400/30 bg-orange-500/10 px-3 py-1.5 text-xs font-semibold text-orange-300 light:text-orange-700">
                 {video.category}

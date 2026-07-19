@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
 import Image from "next/image";
-import { useAuthModal } from "./auth/AuthProvider";
+
 import NavbarLogo from "./NavbarLogo";
 import NavbarLinks from "./NavbarLinks";
 import { Menu, X, Search, Home, PlaySquare, ChevronRight, ChevronDown } from "lucide-react";
@@ -41,12 +41,6 @@ export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showMoreChannels, setShowMoreChannels] = useState(false);
   const router = useRouter();
-  const {
-    openSignIn,
-    openSignUp,
-    signedIn,
-    signOut,
-  } = useAuthModal();
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -126,7 +120,7 @@ export default function Navbar() {
     INPLAYER
   </span>
 </div>
-<div className="mx-auto flex h-16 lg:h-20 max-w-[1700px] items-center px-4 lg:px-5">
+        <div className="mx-auto flex h-20 max-w-[1700px] items-center px-5">
 
 
         
@@ -136,8 +130,8 @@ export default function Navbar() {
     onClick={() => setMenuOpen(!menuOpen)}
     className="
       flex
-      h-10
-      w-10
+      h-11
+      w-11
       items-center
       justify-center
       rounded-2xl
@@ -236,8 +230,8 @@ export default function Navbar() {
     onClick={() => setMobileSearchOpen(true)}
     className="
       flex
-      h-10
-      w-10
+      h-11
+      w-11
       items-center
       justify-center
       rounded-full
@@ -274,7 +268,7 @@ export default function Navbar() {
     mobileSearchOpen ? "hidden" : "flex"
   }`}
 >
-<div className="scale-[0.82] lg:scale-[0.9]">
+  <div className="scale-[0.9]">
     <NavbarActions />
   </div>
 </div>
@@ -287,7 +281,9 @@ export default function Navbar() {
   open={mobileSearchOpen}
   onClose={() => setMobileSearchOpen(false)}
 />
-      <NavigationCategories />
+      <Suspense fallback={<div className="h-[68px] border-b border-white/5 light:border-black/5 bg-[#06101D]/95 light:bg-white/95" />}>
+        <NavigationCategories />
+      </Suspense>
       {/* Backdrop */}
       <div
         className={`fixed inset-0 z-[90] bg-black/50 backdrop-blur-md transition-all duration-300 ${
@@ -307,7 +303,7 @@ lg:left-0
 lg:right-auto
   top-0
           z-[100]
-          h-dvh
+          h-screen
           w-[340px]
           max-w-[88vw]
           border-l
@@ -325,12 +321,12 @@ lg:right-auto
           }
         `}
       >
-        <div className="flex h-dvh flex-col">
-          <div className="border-b border-white/10 light:border-black/10 px-5 py-2.5">
+        <div className="flex h-full flex-col">
+          <div className="border-b border-white/10 light:border-black/10 px-6 py-5">
             <h2 className="text-xl font-black text-white light:text-slate-900">INPLAYER</h2>
           </div>
 
-          <div className="flex-1 overflow-y-auto overscroll-contain px-3 py-2 lg:py-4 pb-32 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="flex-1 overflow-y-auto px-3 py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 
             <button className="mb-3 w-full rounded-2xl bg-gradient-to-r from-orange-500 via-amber-400 to-yellow-300 py-2.5 font-bold text-white transition hover:scale-[1.02]">
               ✦ Premium
@@ -576,90 +572,34 @@ lg:right-auto
             <div className="my-4 border-t border-white/10 light:border-black/10" />
 
             <div className="space-y-1">
-  {signedIn ? (
-    <button
-      onClick={async () => {
-        setMenuOpen(false);
-        await signOut();
-      }}
-      className="
-        flex
-        w-full
-        items-center
-        rounded-xl
-        px-3
-        py-2
-        text-left
-        text-sm
-        text-red-400
-        transition-all
-        duration-300
-        hover:bg-red-500/10
-        hover:translate-x-1
-      "
-    >
-      Sign Out
-    </button>
-  ) : (
-    <>
-      <button
-        onClick={() => {
-          setMenuOpen(false);
-          openSignIn();
-        }}
-        className="
-          flex
-          w-full
-          items-center
-          rounded-xl
-          px-3
-          py-2
-          text-left
-          text-sm
-          text-slate-300
-          light:text-slate-700
-          transition-all
-          duration-300
-          hover:bg-white/5
-          light:hover:bg-black/5
-          hover:translate-x-1
-          hover:text-orange-300
-          light:hover:text-orange-600
-        "
-      >
-        Sign In
-      </button>
-
-      <button
-        onClick={() => {
-          setMenuOpen(false);
-          openSignUp();
-        }}
-        className="
-          flex
-          w-full
-          items-center
-          rounded-xl
-          px-3
-          py-2
-          text-left
-          text-sm
-          text-slate-300
-          light:text-slate-700
-          transition-all
-          duration-300
-          hover:bg-white/5
-          light:hover:bg-black/5
-          hover:translate-x-1
-          hover:text-orange-300
-          light:hover:text-orange-600
-        "
-      >
-        Create Account
-      </button>
-    </>
-  )}
-</div>
+              {["Sign In", "Create Account"].map((item) => (
+                <button
+                  key={item}
+                  onClick={() => setMenuOpen(false)}
+                  className="
+                    flex
+                    w-full
+                    items-center
+                    rounded-xl
+                    px-3
+                    py-2
+                    text-left
+                    text-sm
+                    text-slate-300
+                    light:text-slate-700
+                    transition-all
+                    duration-300
+                    hover:bg-white/5
+                    light:hover:bg-black/5
+                    hover:translate-x-1
+                    hover:text-orange-300
+                    light:hover:text-orange-600
+                  "
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
       </aside>

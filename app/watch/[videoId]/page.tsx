@@ -1,15 +1,44 @@
-import { GetCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, UpdateCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import VideoPlayer from "@/app/components/VideoPlayer";
 import BackButton from "@/app/components/BackButton";
+import SubscribeButton from "@/app/components/SubscribeButton";
+import LikeButton from "@/app/components/LikeButton";
+import { formatTimeAgo, formatViews } from "@/app/lib/formatters";
 import Link from "next/link";
+import Image from "next/image";
 
-// Always fetch fresh — a video's status/details can change (e.g. views
-// incrementing), so this page shouldn't be statically cached forever.
 export const dynamic = "force-dynamic";
 
 interface WatchPageProps {
   params: Promise<{ videoId: string }>;
+}
+
+async function getRelatedVideos(currentVideoId: string, category: string) {
+  const result = await docClient.send(
+    new ScanCommand({
+      TableName: "InPlayer-Videos",
+      FilterExpression: "#status = :ready",
+      ExpressionAttributeNames: { "#status": "status" },
+      ExpressionAttributeValues: { ":ready": "ready" },
+    })
+  );
+
+  const items = (result.Items || []).filter(
+    (v) => v.videoId !== currentVideoId
+  );
+
+  // Same-category videos first, then everything else, newest first within each
+  const sameCategory = items.filter((v) => v.category === category);
+  const otherCategory = items.filter((v) => v.category !== category);
+
+  const sortByNewest = (a: any, b: any) =>
+    new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime();
+
+  return [...sameCategory.sort(sortByNewest), ...otherCategory.sort(sortByNewest)].slice(
+    0,
+    12
+  );
 }
 
 export default async function WatchPage({ params }: WatchPageProps) {
@@ -71,34 +100,120 @@ export default async function WatchPage({ params }: WatchPageProps) {
     );
   }
 
+  // Increment the view count. A simple "views += 1 on page load" — not
+  // unique-visitor tracking, but an honest, simple starting point.
+  await docClient.send(
+    new UpdateCommand({
+      TableName: "InPlayer-Videos",
+      Key: { videoId },
+      UpdateExpression: "SET views = if_not_exists(views, :zero) + :inc",
+      ExpressionAttributeValues: { ":inc": 1, ":zero": 0 },
+    })
+  );
+
+  const relatedVideos = await getRelatedVideos(videoId, video.category);
+
   return (
-    <div className="mx-auto max-w-[1000px] px-4 py-6 sm:py-10">
+    <div className="mx-auto max-w-[1600px] px-4 py-6 sm:py-8">
       <BackButton />
 
-      <VideoPlayer
-        playbackId={video.muxPlaybackId}
-        title={video.title}
-        videoId={videoId}
-      />
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_380px]">
+        {/* Left column — player + info */}
+        <div className="min-w-0">
+          <VideoPlayer
+            playbackId={video.muxPlaybackId}
+            title={video.title}
+            videoId={videoId}
+          />
 
-      <div className="mt-5">
-        <h1 className="text-xl sm:text-2xl font-black text-white light:text-slate-900">
-          {video.title}
-        </h1>
+          <h1 className="mt-4 text-xl sm:text-2xl font-black text-white light:text-slate-900">
+            {video.title}
+          </h1>
 
-        <div className="mt-2 flex items-center gap-3 text-sm text-slate-400 light:text-slate-500">
-          <span>{video.uploaderName}</span>
-          <span>•</span>
-          <span className="rounded-full border border-orange-400/30 bg-orange-500/10 px-2.5 py-0.5 text-xs font-semibold text-orange-300 light:text-orange-700">
-            {video.category}
-          </span>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-full border border-white/10 light:border-black/10">
+                <Image
+                  src="/avatars/avatar.png"
+                  alt={video.uploaderName}
+                  fill
+                  sizes="44px"
+                  className="object-cover"
+                />
+              </div>
+
+              <div>
+                <p className="font-semibold text-white light:text-slate-900">
+                  {video.uploaderName}
+                </p>
+                <p className="text-xs text-slate-400 light:text-slate-500">
+                  {formatViews(video.views || 0)} • {formatTimeAgo(video.uploadedAt)}
+                </p>
+              </div>
+
+              <SubscribeButton creatorId={video.uploaderId} />
+            </div>
+
+            <div className="flex items-center gap-2">
+              <LikeButton videoId={videoId} />
+
+              <span className="rounded-full border border-orange-400/30 bg-orange-500/10 px-3 py-1 text-xs font-semibold text-orange-300 light:text-orange-700">
+                {video.category}
+              </span>
+            </div>
+          </div>
+
+          {video.description && (
+            <div className="mt-4 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.02] light:bg-black/[0.02] p-4">
+              <p className="whitespace-pre-wrap text-sm leading-6 text-slate-300 light:text-slate-600">
+                {video.description}
+              </p>
+            </div>
+          )}
         </div>
 
-        {video.description && (
-          <p className="mt-4 whitespace-pre-wrap text-sm leading-6 text-slate-300 light:text-slate-600">
-            {video.description}
-          </p>
-        )}
+        {/* Right column — related videos */}
+        <div className="space-y-3">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400 light:text-slate-500">
+            Up Next
+          </h2>
+
+          {relatedVideos.length === 0 ? (
+            <p className="text-sm text-slate-500">No other videos yet.</p>
+          ) : (
+            relatedVideos.map((related) => (
+              <Link
+                key={related.videoId}
+                href={`/watch/${related.videoId}`}
+                className="group flex gap-3"
+              >
+                <div className="relative h-[80px] w-[140px] flex-shrink-0 overflow-hidden rounded-xl bg-white/5 light:bg-black/5">
+                  {related.thumbnailUrl && (
+                    <Image
+                      src={related.thumbnailUrl}
+                      alt={related.title}
+                      fill
+                      sizes="140px"
+                      className="object-cover transition-transform duration-300 group-hover:scale-105"
+                    />
+                  )}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <h3 className="line-clamp-2 text-sm font-semibold text-white light:text-slate-900">
+                    {related.title}
+                  </h3>
+                  <p className="mt-1 text-xs text-slate-400 light:text-slate-500">
+                    {related.uploaderName}
+                  </p>
+                  <p className="text-xs text-slate-500">
+                    {formatViews(related.views || 0)} • {formatTimeAgo(related.uploadedAt)}
+                  </p>
+                </div>
+              </Link>
+            ))
+          )}
+        </div>
       </div>
     </div>
   );

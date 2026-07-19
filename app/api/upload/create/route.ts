@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { title, description, category } = body;
+    const { title, description, category, contentType } = body;
 
     if (!title?.trim() || !category?.trim()) {
       return NextResponse.json(
@@ -50,6 +50,7 @@ export async function POST(request: NextRequest) {
           title: title.trim(),
           description: description?.trim() || "",
           category: category.trim(),
+          contentType: contentType === "short" ? "short" : "video",
           uploaderId: user.userId,
           uploaderName: user.name || "Unknown",
           uploadedAt: new Date().toISOString(),

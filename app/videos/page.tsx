@@ -1,0 +1,79 @@
+import { ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { docClient } from "@/app/lib/dynamodb";
+import Link from "next/link";
+import Image from "next/image";
+import { Film } from "lucide-react";
+
+export const dynamic = "force-dynamic";
+
+export default async function VideosPage() {
+  const result = await docClient.send(
+    new ScanCommand({
+      TableName: "InPlayer-Videos",
+      FilterExpression: "#status = :ready",
+      ExpressionAttributeNames: { "#status": "status" },
+      ExpressionAttributeValues: { ":ready": "ready" },
+    })
+  );
+
+  const videos = (result.Items || []).sort(
+    (a, b) =>
+      new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+  );
+
+  return (
+    <div className="mx-auto max-w-[1400px] px-4 py-8 sm:py-12">
+      <h1 className="text-2xl sm:text-3xl font-black text-white light:text-slate-900">
+        All Videos
+      </h1>
+      <p className="mt-1 text-sm text-slate-400 light:text-slate-500">
+        Everything actually uploaded to InPlayer so far.
+      </p>
+
+      {videos.length === 0 ? (
+        <div className="mt-16 flex flex-col items-center justify-center text-center">
+          <Film size={40} className="mb-4 text-slate-600" />
+          <p className="font-semibold text-white light:text-slate-900">
+            No videos yet
+          </p>
+          <p className="mt-1 text-sm text-slate-400 light:text-slate-500">
+            Upload one to see it appear here.
+          </p>
+        </div>
+      ) : (
+        <div className="mt-8 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
+          {videos.map((video) => (
+            <Link
+              key={video.videoId}
+              href={`/watch/${video.videoId}`}
+              className="group"
+            >
+              <div className="relative aspect-video overflow-hidden rounded-2xl bg-white/5 light:bg-black/5">
+                {video.thumbnailUrl && (
+                  <Image
+                    src={video.thumbnailUrl}
+                    alt={video.title}
+                    fill
+                    sizes="(max-width: 768px) 50vw, 25vw"
+                    className="object-cover transition-transform duration-300 group-hover:scale-105"
+                  />
+                )}
+                <div className="absolute bottom-2 right-2 rounded bg-black/70 px-1.5 py-0.5 text-[10px] font-semibold text-white">
+                  {video.category}
+                </div>
+              </div>
+
+              <h3 className="mt-2 line-clamp-2 text-sm font-semibold text-white light:text-slate-900">
+                {video.title}
+              </h3>
+
+              <p className="mt-0.5 text-xs text-slate-400 light:text-slate-500">
+                {video.uploaderName}
+              </p>
+            </Link>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

@@ -27,6 +27,11 @@ const CATEGORIES = [
   "Education",
 ];
 
+const CONTENT_TYPES = [
+  { value: "video", label: "Video" },
+  { value: "short", label: "Short" },
+] as const;
+
 type Stage = "picking" | "details" | "uploading" | "processing" | "error";
 
 export default function UploadPage() {
@@ -40,6 +45,7 @@ export default function UploadPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState(CATEGORIES[0]);
+  const [contentType, setContentType] = useState<"video" | "short">("video");
 
   const [stage, setStage] = useState<Stage>("picking");
   const [progress, setProgress] = useState(0);
@@ -100,6 +106,7 @@ export default function UploadPage() {
           title: title.trim(),
           description: description.trim(),
           category,
+          contentType,
         }),
       });
 
@@ -149,6 +156,7 @@ export default function UploadPage() {
     setTitle("");
     setDescription("");
     setCategory(CATEGORIES[0]);
+    setContentType("video");
     setStage("picking");
     setProgress(0);
     setError(null);
@@ -278,6 +286,28 @@ export default function UploadPage() {
                 className="w-full resize-none rounded-2xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-black/[0.03] px-4 py-3 text-white light:text-slate-900 caret-orange-400 outline-none focus:border-orange-400/50"
                 placeholder="Tell viewers about your video"
               />
+            </div>
+
+            <div>
+              <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-500">
+                Content Type
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                {CONTENT_TYPES.map((type) => (
+                  <button
+                    key={type.value}
+                    type="button"
+                    onClick={() => setContentType(type.value)}
+                    className={`rounded-2xl border py-3 text-sm font-semibold transition-all ${
+                      contentType === type.value
+                        ? "border-orange-400/50 bg-orange-500/10 text-orange-300 light:text-orange-700"
+                        : "border-white/10 light:border-black/10 text-slate-400 light:text-slate-500 hover:border-white/20 light:hover:border-black/20"
+                    }`}
+                  >
+                    {type.label}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div>

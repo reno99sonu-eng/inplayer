@@ -19,8 +19,8 @@ export default function ShortsPage() {
   const router = useRouter();
   const [activeIndex, setActiveIndex] = useState(0);
   const [muted, setMuted] = useState(true);
-  const [liked, setLiked] = useState<Record<number, boolean>>({});
-  const [saved, setSaved] = useState<Record<number, boolean>>({});
+  const [liked, setLiked] = useState<Record<number | string, boolean>>({});
+  const [saved, setSaved] = useState<Record<number | string, boolean>>({});
   const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
 
   useEffect(() => {
@@ -45,11 +45,11 @@ export default function ShortsPage() {
     return () => observer.disconnect();
   }, []);
 
-  const toggleLike = (id: number) => {
+  const toggleLike = (id: number | string) => {
     setLiked((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
-  const toggleSave = (id: number) => {
+  const toggleSave = (id: number | string) => {
     setSaved((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 

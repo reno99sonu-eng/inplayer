@@ -32,7 +32,7 @@ const moreChannels = [
 ];
 
 const youItems = [
-  { label: "Your Channel", href: "/profile" },
+  { label: "Your Channel", href: "/my-videos" },
   { label: "History", href: "/history" },
   { label: "Watchlist", href: "/watchlist" },
   { label: "Downloads", href: "/downloads" },

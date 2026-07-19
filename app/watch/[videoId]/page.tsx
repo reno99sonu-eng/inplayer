@@ -8,6 +8,7 @@ import { formatTimeAgo, formatViews } from "@/app/lib/formatters";
 import Link from "next/link";
 import Image from "next/image";
 import DescriptionBox from "@/app/components/DescriptionBox";
+import CommentSection from "@/app/components/CommentSection";
 
 export const dynamic = "force-dynamic";
 
@@ -165,6 +166,8 @@ export default async function WatchPage({ params }: WatchPageProps) {
           </div>
 
           {video.description && <DescriptionBox description={video.description} />}
+
+          <CommentSection videoId={videoId} />
         </div>
 
         {/* Right column — related videos */}

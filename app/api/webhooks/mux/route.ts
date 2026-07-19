@@ -1,28 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
-import { verifyWebhookSignature } from "@mux/mux-node";
+import mux from "@/app/lib/mux";
 import { docClient } from "@/app/lib/dynamodb";
 
 export async function POST(request: NextRequest) {
   const rawBody = await request.text();
-  const signature = request.headers.get("mux-signature") || "";
 
-  let isValid = false;
+  // unwrap() both verifies the signature AND parses the event in one
+  // step, using the webhookSecret already configured on the mux client.
+  // It throws if the signature is missing/invalid.
+  let event;
 
   try {
-    isValid = Boolean(
-      verifyWebhookSignature(rawBody, signature, process.env.MUX_WEBHOOK_SECRET!)
-    );
+    event = mux.webhooks.unwrap(rawBody, request.headers);
   } catch (err) {
-    console.error("Mux webhook signature check failed:", err);
-    isValid = false;
-  }
-
-  if (!isValid) {
+    console.error("Mux webhook verification failed:", err);
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });
   }
-
-  const event = JSON.parse(rawBody);
 
   if (event.type === "video.asset.ready") {
     const asset = event.data;

@@ -1,5 +1,5 @@
 export interface Recommendation {
-  id: number;
+  id: number | string;
   title: string;
   creator: string;
   avatar: string;
@@ -8,6 +8,7 @@ export interface Recommendation {
   uploaded: string;
   duration: string;
   verified?: boolean;
+  videoId?: string; // present only for real uploaded videos — used to link to /watch/[videoId]
 }
 
 export const recommendations: Recommendation[] = [

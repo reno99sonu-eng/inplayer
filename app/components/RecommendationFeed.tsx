@@ -1,18 +1,28 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import Image from "next/image";
 import { MoreVertical, ChevronDown } from "lucide-react";
 import { recommendations, type Recommendation } from "../data/recommendations";
 import { shorts, type Short } from "../data/shorts";
 import ShortsShelf from "./ShortsShelf";
 
-export default function RecommendationFeed() {
-  // Render in original order first (matches server output), then shuffle
-  // client-side only after mount. Shuffling during the initial render would
-  // make the server and client produce different random orders and trigger
-  // a hydration mismatch error, so this two-step approach avoids that.
-  const [items, setItems] = useState<Recommendation[]>(recommendations);
+interface RecommendationFeedProps {
+  realVideos?: Recommendation[];
+}
+
+export default function RecommendationFeed({
+  realVideos = [],
+}: RecommendationFeedProps) {
+  // Real uploaded videos always appear first, unshuffled — the example
+  // data behind them gets shuffled the same way as before. Render in
+  // original order first (matches server output), then shuffle
+  // client-side only after mount, to avoid a hydration mismatch.
+  const [items, setItems] = useState<Recommendation[]>([
+    ...realVideos,
+    ...recommendations,
+  ]);
   const [shuffledShorts, setShuffledShorts] = useState<Short[]>(shorts);
 
   useEffect(() => {
@@ -21,7 +31,7 @@ export default function RecommendationFeed() {
       const j = Math.floor(Math.random() * (i + 1));
       [shuffledRecs[i], shuffledRecs[j]] = [shuffledRecs[j], shuffledRecs[i]];
     }
-    setItems(shuffledRecs);
+    setItems([...realVideos, ...shuffledRecs]);
 
     const shuffledShortsArr = [...shorts];
     for (let i = shuffledShortsArr.length - 1; i > 0; i--) {
@@ -32,7 +42,7 @@ export default function RecommendationFeed() {
       ];
     }
     setShuffledShorts(shuffledShortsArr);
-  }, []);
+  }, [realVideos]);
 
   // Recommendations split into three batches: two rows worth, then two more
   // rows worth, then everything else
@@ -45,157 +55,173 @@ export default function RecommendationFeed() {
   const shortsRowOne = shuffledShorts.slice(0, 8);
   const shortsRowTwo = shuffledShorts.slice(8);
 
-  const renderCard = (video: Recommendation) => (
-    <article
-      key={video.id}
-      className="
-        group
-        transition-all
-        duration-300
-      "
-    >
-      {/* Thumbnail */}
-      <div
-        className="
-          relative
-          aspect-video
-          overflow-hidden
-          rounded-2xl
-          bg-[#111827]
-        "
-      >
-        <Image
-          src={video.thumbnail}
-          alt={video.title}
-          fill
-          sizes="(max-width:768px)100vw,(max-width:1280px)50vw,25vw"
+  const renderCard = (video: Recommendation) => {
+    const cardContent = (
+      <>
+        {/* Thumbnail */}
+        <div
           className="
-            object-cover
-            transition-transform
-            duration-500
-            group-hover:scale-[1.05]
-          "
-        />
-
-        <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
-
-        <span
-          className="
-            absolute
-            bottom-3
-            right-3
-            rounded-md
-            bg-black/85
-            px-2
-            py-1
-            text-xs
-            font-semibold
-            text-white
-            backdrop-blur-sm
+            relative
+            aspect-video
+            overflow-hidden
+            rounded-2xl
+            bg-[#111827]
           "
         >
-          {video.duration}
-        </span>
-      </div>
-
-      {/* Information */}
-      <div className="mt-4 flex items-start gap-3">
-
-        <div className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-full border border-white/10 light:border-black/10">
           <Image
-            src={video.avatar}
-            alt={video.creator}
+            src={video.thumbnail}
+            alt={video.title}
             fill
-            sizes="44px"
-            className="object-cover"
-          />
-        </div>
-
-        <div className="min-w-0 flex-1">
-
-          <h3
+            sizes="(max-width:768px)100vw,(max-width:1280px)50vw,25vw"
             className="
-              line-clamp-2
-              text-[16px]
+              object-cover
+              transition-transform
+              duration-500
+              group-hover:scale-[1.05]
+            "
+          />
+
+          <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
+
+          <span
+            className="
+              absolute
+              bottom-3
+              right-3
+              rounded-md
+              bg-black/85
+              px-2
+              py-1
+              text-xs
               font-semibold
-              leading-6
               text-white
-              light:text-slate-900
+              backdrop-blur-sm
             "
           >
-            {video.title}
-          </h3>
+            {video.duration}
+          </span>
 
-          <div className="mt-2 flex items-center gap-1 text-sm text-slate-400 light:text-slate-500">
-            <span className="truncate">
-              {video.creator}
+          {video.videoId && (
+            <span
+              className="
+                absolute
+                top-3
+                left-3
+                rounded-md
+                bg-orange-500/90
+                px-2
+                py-0.5
+                text-[10px]
+                font-bold
+                uppercase
+                tracking-wide
+                text-white
+              "
+            >
+              New
             </span>
-
-            {video.verified && (
-              <span className="ml-1 text-xs font-bold text-slate-300 light:text-slate-600">
-                ✓
-              </span>
-            )}
-          </div>
-
-          <div className="mt-2 flex items-center justify-between gap-3">
-  <p className="text-sm text-slate-500 light:text-slate-600 truncate">
-    {video.views} • {video.uploaded}
-  </p>
-
-  <button
-    type="button"
-    className="
-      flex-shrink-0
-      rounded-full
-      border
-      border-orange-400/30
-      bg-orange-500/10
-      light:bg-orange-100
-      px-3
-      py-1
-      text-[11px]
-      font-semibold
-      text-orange-300
-      light:text-orange-700
-      transition-all
-      duration-300
-      hover:border-orange-500
-      hover:bg-orange-500
-      hover:text-white
-      active:scale-95
-    "
-  >
-    Subscribe
-  </button>
-</div>
-
+          )}
         </div>
 
-        <button
-          className="
-            flex
-            h-9
-            w-9
-            flex-shrink-0
-            items-center
-            justify-center
-            rounded-full
-            text-slate-400
-            light:text-slate-500
-            transition-colors
-            hover:bg-white/5
-            light:hover:bg-black/5
-            hover:text-white
-            light:hover:text-slate-900
-          "
-        >
-          <MoreVertical size={18} />
-        </button>
+        {/* Information */}
+        <div className="mt-4 flex items-start gap-3">
 
-      </div>
-    </article>
-  );
+          <div className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-full border border-white/10 light:border-black/10">
+            <Image
+              src={video.avatar}
+              alt={video.creator}
+              fill
+              sizes="44px"
+              className="object-cover"
+            />
+          </div>
+
+          <div className="min-w-0 flex-1">
+
+            <h3
+              className="
+                line-clamp-2
+                text-[16px]
+                font-semibold
+                leading-6
+                text-white
+                light:text-slate-900
+              "
+            >
+              {video.title}
+            </h3>
+
+            <div className="mt-2 flex items-center gap-1 text-sm text-slate-400 light:text-slate-500">
+              <span className="truncate">
+                {video.creator}
+              </span>
+
+              {video.verified && (
+                <span className="ml-1 text-xs font-bold text-slate-300 light:text-slate-600">
+                  ✓
+                </span>
+              )}
+            </div>
+
+            <p className="mt-1 text-sm text-slate-500">
+              {video.views} • {video.uploaded}
+            </p>
+
+          </div>
+
+          <button
+            className="
+              flex
+              h-9
+              w-9
+              flex-shrink-0
+              items-center
+              justify-center
+              rounded-full
+              text-slate-400
+              light:text-slate-500
+              transition-colors
+              hover:bg-white/5
+              light:hover:bg-black/5
+              hover:text-white
+              light:hover:text-slate-900
+            "
+          >
+            <MoreVertical size={18} />
+          </button>
+
+        </div>
+      </>
+    );
+
+    // Real uploaded videos link to their actual watch page. Example
+    // (dummy) cards stay exactly as before — not clickable, since
+    // they don't point to anything real.
+    if (video.videoId) {
+      return (
+        <Link
+          key={video.id}
+          href={`/watch/${video.videoId}`}
+          className="group transition-all duration-300"
+        >
+          {cardContent}
+        </Link>
+      );
+    }
+
+    return (
+      <article
+        key={video.id}
+        className="
+          group
+          transition-all
+          duration-300
+        "
+      >
+        {cardContent}
+      </article>
+    );
+  };
 
   return (
     <>

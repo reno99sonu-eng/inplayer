@@ -134,7 +134,7 @@ export default function NavbarProfile() {
 "
       >
         <img
-          src="/avatars/avatar.png"
+          src={user?.avatarUrl || "/avatars/avatar.png"}
           alt="Profile"
           className="h-11 w-11 rounded-full object-cover ring-2 ring-orange-400/40 transition-all duration-300 group-hover:ring-orange-300"
         />
@@ -182,7 +182,7 @@ bg-[#08111F]/95
         <div className="p-4 text-center">
 
           <img
-            src="/avatars/avatar.png"
+            src={user?.avatarUrl || "/avatars/avatar.png"}
             alt="Profile"
             className="mx-auto h-12 w-12 rounded-full ring-2 ring-orange-200"
           />

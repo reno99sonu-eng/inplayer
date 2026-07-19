@@ -16,6 +16,7 @@ import {
 import {
   getCurrentUser,
   fetchUserAttributes,
+  fetchAuthSession,
   signOut as amplifySignOut,
 } from "aws-amplify/auth";
 
@@ -36,6 +37,7 @@ export interface AuthUser {
   username: string;
   name: string;
   email: string;
+  avatarUrl: string | null;
 }
 
 interface AuthContextType {
@@ -80,11 +82,32 @@ export default function AuthProvider({
       const currentUser = await getCurrentUser();
       const attributes = await fetchUserAttributes();
 
+      let avatarUrl: string | null = null;
+
+      try {
+        const session = await fetchAuthSession();
+        const idToken = session.tokens?.idToken?.toString();
+
+        if (idToken) {
+          const res = await fetch("/api/profile/avatar", {
+            headers: { Authorization: `Bearer ${idToken}` },
+          });
+
+          if (res.ok) {
+            const data = await res.json();
+            avatarUrl = data.avatarUrl;
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch avatar:", err);
+      }
+
       setUser({
         userId: currentUser.userId,
         username: currentUser.username,
         name: attributes.name || currentUser.username,
         email: attributes.email || "",
+        avatarUrl,
       });
     } catch {
       setUser(null);

@@ -4,8 +4,8 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   User,
+  Clock,
   Heart,
-  MessageSquare,
   Download,
   Settings,
   HelpCircle,
@@ -13,66 +13,119 @@ import {
   Crown,
 } from "lucide-react";
 
-import Greeting from "../components/Greeting";
 import { useAuthModal } from "../components/auth/AuthProvider";
 
 export default function AccountPage() {
   const router = useRouter();
-
-  const {
-    user,
-    signedIn,
-    authLoading,
-    signOut,
-    openSignIn,
-  } = useAuthModal();
-
-  if (authLoading) {
-    return null;
-  }
+  const { signedIn, authLoading, user, openSignIn, signOut } = useAuthModal();
 
   const menu = [
-    { icon: User, title: "My Profile", href: "/profile" },
+    { icon: User, title: "Your Channel", href: "/my-videos" },
+    { icon: Clock, title: "History", href: "/history" },
     { icon: Heart, title: "Watchlist", href: "/watchlist" },
-    { icon: MessageSquare, title: "My Messages", href: "/messages" },
     { icon: Download, title: "Downloads", href: "/downloads" },
     { icon: Settings, title: "Settings", href: "/settings" },
     { icon: HelpCircle, title: "Help & Support", href: "/help" },
   ];
 
+  const handleSignOut = async () => {
+    await signOut();
+    router.push("/");
+  };
+
+  if (authLoading) {
+    return (
+      <div className="lg:hidden flex min-h-screen items-center justify-center bg-[#06101D] light:bg-white" />
+    );
+  }
+
+  if (!signedIn) {
+    return (
+      <div className="lg:hidden min-h-screen bg-[#06101D] light:bg-white text-white light:text-slate-900">
+        <div className="flex items-center gap-4 border-b border-white/10 light:border-black/10 px-5 py-5">
+          <button
+            onClick={() => router.back()}
+            className="
+              flex h-10 w-10 items-center justify-center rounded-full
+              border border-white/10 light:border-black/10
+              bg-white/5 light:bg-black/5
+              transition-all duration-200
+              hover:bg-white/15 light:hover:bg-black/10
+            "
+          >
+            <ArrowLeft size={20} />
+          </button>
+
+          <h2 className="text-lg font-black">My Account</h2>
+        </div>
+
+        <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
+          <h3 className="text-xl font-black">Sign in to InPlayer</h3>
+          <p className="mt-2 text-sm text-slate-400 light:text-slate-500">
+            Access your channel, watchlist, history, and more.
+          </p>
+          <button
+            onClick={openSignIn}
+            className="mt-6 rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-8 py-3 font-bold text-white shadow-[0_15px_35px_rgba(255,153,0,.3)] transition-all hover:-translate-y-0.5"
+          >
+            Sign In
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="lg:hidden min-h-screen bg-[#06101D] text-white">
-      <div className="flex items-center gap-4 border-b border-white/10 px-5 py-5">
+    <div className="lg:hidden min-h-screen bg-[#06101D] light:bg-white text-white light:text-slate-900">
+      <div className="flex items-center gap-4 border-b border-white/10 light:border-black/10 px-5 py-5">
         <button
           onClick={() => router.back()}
-          className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/5 transition-all duration-200 hover:bg-white/15"
+          className="
+            flex h-10 w-10 items-center justify-center rounded-full
+            border border-white/10 light:border-black/10
+            bg-white/5 light:bg-black/5
+            transition-all duration-200
+            hover:bg-white/15 light:hover:bg-black/10
+          "
         >
           <ArrowLeft size={20} />
         </button>
 
-        <h2 className="text-lg font-black text-white">
-          My Account
-        </h2>
+        <h2 className="text-lg font-black">My Account</h2>
       </div>
 
       <div className="p-6 text-center">
         <img
-          src="/avatars/avatar.png"
+          src={user?.avatarUrl || "/avatars/avatar.png"}
           alt="Profile"
-          className="mx-auto h-16 w-16 rounded-full ring-2 ring-orange-400/40"
+          className="mx-auto h-16 w-16 rounded-full object-cover ring-2 ring-orange-400/40"
         />
 
-        <div className="mt-3 flex justify-center">
-          <Greeting name={user?.name} />
-        </div>
+        <h3 className="mt-3 text-lg font-black">{user?.name}</h3>
 
-        <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-yellow-400 to-orange-500 px-3 py-1 text-[10px] font-semibold text-white">
+        <div
+          className="
+            mt-3
+            inline-flex
+            items-center
+            gap-1.5
+            rounded-full
+            bg-gradient-to-r
+            from-yellow-400
+            to-orange-500
+            px-3
+            py-1
+            text-[10px]
+            font-semibold
+            text-white
+          "
+        >
           <Crown size={12} />
           Premium
         </div>
       </div>
 
-      <div className="border-t border-white/10 p-4">
+      <div className="border-t border-white/10 light:border-black/10 p-4">
         {menu.map((item) => {
           const Icon = item.icon;
 
@@ -80,38 +133,51 @@ export default function AccountPage() {
             <button
               key={item.title}
               onClick={() => router.push(item.href)}
-              className="flex w-full items-center gap-4 rounded-2xl px-4 py-3.5 text-left transition-all duration-200 hover:bg-white/5"
+              className="
+                flex
+                w-full
+                items-center
+                gap-4
+                rounded-2xl
+                px-4
+                py-3.5
+                text-left
+                transition-all
+                duration-200
+                hover:bg-white/5
+                light:hover:bg-black/5
+              "
             >
               <Icon size={20} className="text-orange-400" />
-              <span className="text-base font-bold text-white">
+              <span className="text-base font-bold text-white light:text-slate-900">
                 {item.title}
               </span>
             </button>
           );
         })}
 
-        <div className="my-3 border-t border-white/10" />
+        <div className="my-3 border-t border-white/10 light:border-black/10" />
 
-        {signedIn ? (
-          <button
-            onClick={async () => {
-              await signOut();
-              router.push("/");
-            }}
-            className="flex w-full items-center gap-4 rounded-2xl px-4 py-3.5 text-left text-red-500 transition-all duration-200 hover:bg-red-500/10"
-          >
-            <LogOut size={20} />
-            Sign Out
-          </button>
-        ) : (
-          <button
-            onClick={openSignIn}
-            className="flex w-full items-center gap-4 rounded-2xl px-4 py-3.5 text-left text-orange-400 transition-all duration-200 hover:bg-white/5"
-          >
-            <User size={20} />
-            Sign In
-          </button>
-        )}
+        <button
+          onClick={handleSignOut}
+          className="
+            flex
+            w-full
+            items-center
+            gap-4
+            rounded-2xl
+            px-4
+            py-3.5
+            text-left
+            text-red-500
+            transition-all
+            duration-200
+            hover:bg-red-500/10
+          "
+        >
+          <LogOut size={20} />
+          Sign Out
+        </button>
       </div>
     </div>
   );

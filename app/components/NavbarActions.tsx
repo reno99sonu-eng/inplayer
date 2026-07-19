@@ -2,6 +2,7 @@
 
 import CreatePopup from "./CreatePopup";
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   Bell,
   Plus,
@@ -12,6 +13,7 @@ import {
 } from "lucide-react";
 
 export default function NavbarActions() {
+  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const popupRef = useRef<HTMLDivElement>(null);
@@ -51,6 +53,10 @@ export default function NavbarActions() {
       title: "Upload Video",
       subtitle: "Movies • Shorts • Series",
       color: "from-red-500 to-orange-500",
+      onClick: () => {
+        setOpen(false);
+        router.push("/upload");
+      },
     },
     {
       icon: <Radio size={20} />,

@@ -10,7 +10,11 @@
   },
   "dependencies": {
     "@aws-amplify/ui-react": "^6.15.4",
+    "@aws-sdk/client-dynamodb": "^3.1090.0",
+    "@aws-sdk/lib-dynamodb": "^3.1090.0",
+    "@mux/mux-node": "^14.1.1",
     "aws-amplify": "^6.18.0",
+    "aws-jwt-verify": "^5.2.1",
     "lucide-react": "^1.23.0",
     "next": "16.2.10",
     "react": "19.2.4",

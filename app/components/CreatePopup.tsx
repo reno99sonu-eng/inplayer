@@ -7,6 +7,7 @@ type Item = {
   title: string;
   subtitle: string;
   color: string;
+  onClick?: () => void;
 };
 
 interface CreatePopupProps {
@@ -40,10 +41,10 @@ export default function CreatePopup({
         border
         border-orange-400/20
         bg-[#08111F]/95
-        light:bg-white/98
+        light:bg-white/95
         backdrop-blur-3xl
         shadow-[0_30px_80px_rgba(0,0,0,.55)]
-        light:shadow-[0_20px_50px_rgba(15,23,42,0.12)]
+        light:shadow-[0_30px_80px_rgba(0,0,0,.15)]
         transition-all
         duration-300
         ${
@@ -53,12 +54,12 @@ export default function CreatePopup({
         }
       `}
     >
-      <div className="border-b border-white/10 light:border-slate-200 p-4">
-        <h3 className="text-lg font-black text-white light:text-slate-950">
+      <div className="border-b border-white/10 light:border-black/10 p-4">
+        <h3 className="text-lg font-black text-white light:text-slate-900">
           Create
         </h3>
 
-        <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
+        <p className="mt-1 text-sm text-slate-400 light:text-slate-500">
           Start creating on InPlayer
         </p>
       </div>
@@ -68,28 +69,27 @@ export default function CreatePopup({
           <button
             key={item.title}
             type="button"
+            onClick={() => item.onClick?.()}
             className={`
-              group
-              mb-2
-              flex
-              w-full
-              items-center
-              gap-4
-              rounded-2xl
-              border
-              border-transparent
-              light:border-slate-200
-              ${mobile ? "p-3" : "p-4"}
-              text-left
-              transition-all
-              duration-300
-              hover:border-orange-400/20
-              hover:bg-white/5
-              light:hover:bg-slate-100
-              hover:translate-x-1
-              hover:shadow-[0_0_30px_rgba(249,115,22,.18)]
-              light:hover:shadow-md
-            `}
+                group
+                mb-2
+                flex
+                w-full
+                items-center
+                gap-4
+                rounded-2xl
+                border
+                border-transparent
+                ${mobile ? "p-3" : "p-4"}
+                text-left
+                transition-all
+                duration-300
+                hover:border-orange-400/20
+                hover:bg-white/5
+                light:hover:bg-black/5
+                hover:translate-x-1
+                hover:shadow-[0_0_30px_rgba(249,115,22,.18)]
+              `}
           >
             <div
               className={`
@@ -111,12 +111,12 @@ export default function CreatePopup({
               {item.icon}
             </div>
 
-            <div className="min-w-0">
+            <div>
               <div className="font-semibold text-white light:text-slate-900">
                 {item.title}
               </div>
 
-              <div className="text-xs text-slate-400 light:text-slate-600">
+              <div className="text-xs text-slate-400 light:text-slate-500">
                 {item.subtitle}
               </div>
             </div>

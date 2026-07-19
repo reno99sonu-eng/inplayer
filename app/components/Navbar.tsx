@@ -305,7 +305,7 @@ lg:left-0
 lg:right-auto
   top-0
           z-[100]
-          h-screen
+          h-[100dvh]
           w-[340px]
           max-w-[88vw]
           border-l
@@ -663,6 +663,65 @@ lg:right-auto
                 </button>
               </div>
             )}
+            <div className="my-4 border-t border-white/10 light:border-black/10" />
+
+            {/* Compact footer content — moved here from the page bottom */}
+            <div className="grid grid-cols-2 gap-4 px-3">
+              <div>
+                <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-300 light:text-orange-600">
+                  Browse
+                </h4>
+                <ul className="mt-2 space-y-1.5">
+                  {["Movies", "Series", "Originals", "Live TV", "Creators", "Podcasts"].map(
+                    (item) => (
+                      <li key={item}>
+                        <button className="text-xs text-slate-400 light:text-slate-500 transition hover:text-orange-300 light:hover:text-orange-600">
+                          {item}
+                        </button>
+                      </li>
+                    )
+                  )}
+                </ul>
+              </div>
+
+              <div>
+                <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-300 light:text-orange-600">
+                  Company
+                </h4>
+                <ul className="mt-2 space-y-1.5">
+                  {["About", "Careers", "Partners", "Support", "Privacy", "Terms"].map(
+                    (item) => (
+                      <li key={item}>
+                        <button className="text-xs text-slate-400 light:text-slate-500 transition hover:text-orange-300 light:hover:text-orange-600">
+                          {item}
+                        </button>
+                      </li>
+                    )
+                  )}
+                </ul>
+              </div>
+            </div>
+
+            <div className="mt-4 flex items-center justify-between border-t border-white/10 light:border-black/10 px-3 pt-3">
+              <p className="text-[10px] text-slate-500">© 2026 INPLAYER</p>
+
+              <div className="flex items-center gap-4">
+                <button className="transition hover:scale-110">
+                  <img
+                    src="/icons/instagram.svg"
+                    alt="Instagram"
+                    className="h-4 w-4 brightness-0 invert light:invert-0 light:opacity-60"
+                  />
+                </button>
+                <button className="transition hover:scale-110">
+                  <img
+                    src="/icons/x.svg"
+                    alt="X"
+                    className="h-4 w-4 brightness-0 invert light:invert-0 light:opacity-60"
+                  />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       </aside>

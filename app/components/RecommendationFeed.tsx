@@ -10,20 +10,26 @@ import ShortsShelf from "./ShortsShelf";
 
 interface RecommendationFeedProps {
   realVideos?: Recommendation[];
+  realShorts?: Short[];
 }
 
 export default function RecommendationFeed({
   realVideos = [],
+  realShorts = [],
 }: RecommendationFeedProps) {
-  // Real uploaded videos always appear first, unshuffled — the example
-  // data behind them gets shuffled the same way as before. Render in
+  // Real uploaded content always appears first, unshuffled — the example
+  // data behind it gets shuffled the same way as before. Render in
   // original order first (matches server output), then shuffle
   // client-side only after mount, to avoid a hydration mismatch.
   const [items, setItems] = useState<Recommendation[]>([
     ...realVideos,
     ...recommendations,
   ]);
-  const [shuffledShorts, setShuffledShorts] = useState<Short[]>(shorts);
+  const [shuffledShorts, setShuffledShorts] = useState<Short[]>([
+    ...realShorts,
+    ...shorts,
+  ]);
+  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     const shuffledRecs = [...recommendations];
@@ -41,8 +47,8 @@ export default function RecommendationFeed({
         shuffledShortsArr[i],
       ];
     }
-    setShuffledShorts(shuffledShortsArr);
-  }, [realVideos]);
+    setShuffledShorts([...realShorts, ...shuffledShortsArr]);
+  }, [realVideos, realShorts]);
 
   // Recommendations split into three batches: two rows worth, then two more
   // rows worth, then everything else
@@ -269,85 +275,90 @@ export default function RecommendationFeed({
       {/* Shorts — second row */}
       <ShortsShelf items={shortsRowTwo} />
 
-      {/* Remaining Recommendations */}
-      <section className="mx-auto max-w-[1800px] px-4 pb-4 lg:px-8">
-        <div
-          className="
-            grid
-            grid-cols-1
-            gap-x-6
-            gap-y-10
-
-            sm:grid-cols-2
-            lg:grid-cols-3
-            xl:grid-cols-4
-            2xl:grid-cols-5
-          "
-        >
-          {remainingVideos.map(renderCard)}
-        </div>
-
-        {/* Mobile Only Show More */}
-        <div className="mt-6 mb-4 flex justify-center lg:hidden">
-          <button
-            className="
-              group
-              relative
-              overflow-hidden
-              rounded-full
-              border
-              border-orange-400/30
-              bg-gradient-to-r
-              from-[#111827]
-              via-[#182234]
-              to-[#111827]
-              light:from-slate-100
-              light:via-white
-              light:to-slate-100
-              px-7
-              py-3.5
-              text-white
-              light:text-slate-900
-              shadow-[0_0_30px_rgba(249,115,22,.12)]
-              transition-all
-              duration-300
-              active:scale-95
-            "
-          >
-            {/* Animated Glow */}
-            <span
+      {/* Remaining Recommendations — only rendered once "Show More" is clicked */}
+      {remainingVideos.length > 0 && (
+        <section className="mx-auto max-w-[1800px] px-4 pb-4 lg:px-8">
+          {showAll && (
+            <div
               className="
-                absolute
-                inset-0
-                opacity-0
-                bg-gradient-to-r
-                from-orange-500/10
-                via-yellow-300/10
-                to-orange-500/10
-                transition-opacity
-                duration-300
-                group-hover:opacity-100
+                grid
+                grid-cols-1
+                gap-x-6
+                gap-y-10
+
+                sm:grid-cols-2
+                lg:grid-cols-3
+                xl:grid-cols-4
+                2xl:grid-cols-5
               "
-            />
+            >
+              {remainingVideos.map(renderCard)}
+            </div>
+          )}
 
-            <span className="relative flex items-center gap-2">
-              <span className="font-semibold tracking-wide">
-                Show More
-              </span>
-
-              <ChevronDown
-                size={18}
+          {!showAll && (
+            <div className="mt-2 mb-4 flex justify-center">
+              <button
+                onClick={() => setShowAll(true)}
                 className="
-                  transition-transform
+                  group
+                  relative
+                  overflow-hidden
+                  rounded-full
+                  border
+                  border-orange-400/30
+                  bg-gradient-to-r
+                  from-[#111827]
+                  via-[#182234]
+                  to-[#111827]
+                  light:from-slate-100
+                  light:via-white
+                  light:to-slate-100
+                  px-7
+                  py-3.5
+                  text-white
+                  light:text-slate-900
+                  shadow-[0_0_30px_rgba(249,115,22,.12)]
+                  transition-all
                   duration-300
-                  group-hover:translate-y-1
+                  active:scale-95
                 "
-              />
-            </span>
-          </button>
-        </div>
+              >
+                {/* Animated Glow */}
+                <span
+                  className="
+                    absolute
+                    inset-0
+                    opacity-0
+                    bg-gradient-to-r
+                    from-orange-500/10
+                    via-yellow-300/10
+                    to-orange-500/10
+                    transition-opacity
+                    duration-300
+                    group-hover:opacity-100
+                  "
+                />
 
-      </section>
+                <span className="relative flex items-center gap-2">
+                  <span className="font-semibold tracking-wide">
+                    Show More
+                  </span>
+
+                  <ChevronDown
+                    size={18}
+                    className="
+                      transition-transform
+                      duration-300
+                      group-hover:translate-y-1
+                    "
+                  />
+                </span>
+              </button>
+            </div>
+          )}
+        </section>
+      )}
     </>
   );
 }

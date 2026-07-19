@@ -2,12 +2,12 @@ import Hero from "./components/Hero";
 import ContinueWatching from "./components/ContinueWatching";
 import TrendingNow from "./components/TrendingNow";
 import FloatingAIButton from "./components/FloatingAIButton";
-import Footer from "./components/Footer";
 import FeaturedHero from "./components/featuredHero/FeaturedHero";
 import RecommendationFeed from "./components/RecommendationFeed";
 import { ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "./lib/dynamodb";
 import type { Recommendation } from "./data/recommendations";
+import type { Short } from "./data/shorts";
 
 function formatDuration(seconds: number): string {
   if (!seconds) return "0:00";
@@ -31,7 +31,12 @@ function formatTimeAgo(isoString: string): string {
   return `${days}d ago`;
 }
 
-async function getRealVideos(): Promise<Recommendation[]> {
+interface RealContent {
+  realVideos: Recommendation[];
+  realShorts: Short[];
+}
+
+async function getRealContent(): Promise<RealContent> {
   try {
     const result = await docClient.send(
       new ScanCommand({
@@ -50,28 +55,45 @@ async function getRealVideos(): Promise<Recommendation[]> {
         new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
     );
 
-    return items.map((video) => ({
-      id: video.videoId,
-      videoId: video.videoId,
-      title: video.title,
-      creator: video.uploaderName || "Unknown",
-      avatar: "/avatars/avatar.png",
-      thumbnail: video.thumbnailUrl || "/recommendations/thumbnails/1.jpg",
-      views: `${video.views || 0} views`,
-      uploaded: formatTimeAgo(video.uploadedAt),
-      duration: formatDuration(video.duration),
-      verified: false,
-    }));
+    const realVideos: Recommendation[] = items
+      .filter((video) => video.contentType !== "short")
+      .map((video) => ({
+        id: video.videoId,
+        videoId: video.videoId,
+        title: video.title,
+        creator: video.uploaderName || "Unknown",
+        avatar: "/avatars/avatar.png",
+        thumbnail: video.thumbnailUrl || "/recommendations/thumbnails/1.jpg",
+        views: `${video.views || 0} views`,
+        uploaded: formatTimeAgo(video.uploadedAt),
+        duration: formatDuration(video.duration),
+        verified: false,
+      }));
+
+    const realShorts: Short[] = items
+      .filter((video) => video.contentType === "short")
+      .map((video) => ({
+        id: video.videoId,
+        videoId: video.videoId,
+        title: video.title,
+        creator: video.uploaderName || "Unknown",
+        poster: video.thumbnailUrl || "/shorts/1.jpg",
+        views: `${video.views || 0} views`,
+        likes: "0",
+        comments: "0",
+      }));
+
+    return { realVideos, realShorts };
   } catch (err) {
     // If DynamoDB is briefly unreachable, fail gracefully rather than
     // breaking the whole homepage — just show the example data instead.
-    console.error("Failed to fetch real videos for homepage:", err);
-    return [];
+    console.error("Failed to fetch real content for homepage:", err);
+    return { realVideos: [], realShorts: [] };
   }
 }
 
 export default async function Home() {
-  const realVideos = await getRealVideos();
+  const { realVideos, realShorts } = await getRealContent();
 
   return (
     <main className="relative min-h-screen overflow-x-hidden bg-[#050816] light:bg-white">
@@ -118,12 +140,10 @@ export default async function Home() {
 
 <div className="mx-auto h-px w-[92%] bg-gradient-to-r from-transparent via-white/10 to-transparent light:via-slate-200" />
 
-<RecommendationFeed realVideos={realVideos} />
+<RecommendationFeed realVideos={realVideos} realShorts={realShorts} />
 
         {/* <ContinueWatching /> */}
         </div>
-
-        <Footer />
       </div>
 
       <FloatingAIButton />

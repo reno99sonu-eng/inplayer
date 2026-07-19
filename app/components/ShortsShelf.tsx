@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { type Short } from "../data/shorts";
 
 interface ShortsShelfProps {
@@ -41,17 +42,8 @@ export default function ShortsShelf({ items }: ShortsShelfProps) {
           lg:grid-cols-8
         "
       >
-        {items.map((short) => (
-          <article
-            key={short.id}
-            className="
-              group
-              w-[130px]
-              flex-shrink-0
-
-              sm:w-auto
-            "
-          >
+        {items.map((short) => {
+          const cardContent = (
             <div className="relative aspect-[9/16] overflow-hidden rounded-2xl">
               <Image
                 src={short.poster}
@@ -74,6 +66,27 @@ export default function ShortsShelf({ items }: ShortsShelfProps) {
                 </div>
               </div>
 
+              {short.videoId && (
+                <span
+                  className="
+                    absolute
+                    top-2
+                    left-2
+                    rounded-md
+                    bg-orange-500/90
+                    px-1.5
+                    py-0.5
+                    text-[9px]
+                    font-bold
+                    uppercase
+                    tracking-wide
+                    text-white
+                  "
+                >
+                  New
+                </span>
+              )}
+
               {/* Title, creator, and views live inside the image */}
               <div className="absolute bottom-0 w-full p-3">
                 {short.title && (
@@ -91,8 +104,26 @@ export default function ShortsShelf({ items }: ShortsShelfProps) {
                 </p>
               </div>
             </div>
-          </article>
-        ))}
+          );
+
+          const className = "group w-[130px] flex-shrink-0 sm:w-auto";
+
+          // Real uploaded shorts link to their actual watch page. Example
+          // (dummy) cards stay exactly as before — not clickable.
+          if (short.videoId) {
+            return (
+              <Link key={short.id} href={`/watch/${short.videoId}`} className={className}>
+                {cardContent}
+              </Link>
+            );
+          }
+
+          return (
+            <article key={short.id} className={className}>
+              {cardContent}
+            </article>
+          );
+        })}
       </div>
     </section>
   );

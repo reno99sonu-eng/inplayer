@@ -96,40 +96,40 @@ export default function LikeButton({ videoId }: LikeButtonProps) {
   }
 
   return (
-    <div className="flex items-center overflow-hidden rounded-full border border-white/15 light:border-black/15">
+    <div className="flex items-center overflow-hidden rounded-full border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02]">
       <button
         onClick={() => handleReact("like")}
         disabled={updating}
         className={`
-          flex items-center gap-2 px-4 py-2.5 text-sm font-bold
+          flex items-center gap-2 px-4 py-2.5 h-11 text-sm font-bold
           transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-60
           ${
             myReaction === "like"
-              ? "bg-orange-500/15 text-orange-300 light:text-orange-700"
+              ? "bg-gradient-to-br from-orange-500/25 to-amber-400/10 text-orange-300 light:text-orange-700 shadow-[inset_0_0_20px_-8px_rgba(249,115,22,.5)]"
               : "text-slate-200 light:text-slate-700 hover:bg-white/5 light:hover:bg-black/5"
           }
         `}
       >
-        <ThumbsUp size={16} className={myReaction === "like" ? "fill-current" : ""} />
+        <ThumbsUp size={17} className={myReaction === "like" ? "fill-current" : ""} />
         {likeCount}
       </button>
 
-      <div className="h-6 w-px bg-white/15 light:bg-black/15" />
+      <div className="h-6 w-px bg-white/10 light:bg-black/10" />
 
       <button
         onClick={() => handleReact("dislike")}
         disabled={updating}
         className={`
-          flex items-center gap-2 px-4 py-2.5 text-sm font-bold
+          flex items-center gap-2 px-4 py-2.5 h-11 text-sm font-bold
           transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-60
           ${
             myReaction === "dislike"
-              ? "bg-red-500/15 text-red-300 light:text-red-700"
+              ? "bg-gradient-to-br from-red-500/25 to-rose-400/10 text-red-300 light:text-red-700 shadow-[inset_0_0_20px_-8px_rgba(239,68,68,.5)]"
               : "text-slate-200 light:text-slate-700 hover:bg-white/5 light:hover:bg-black/5"
           }
         `}
       >
-        <ThumbsDown size={16} className={myReaction === "dislike" ? "fill-current" : ""} />
+        <ThumbsDown size={17} className={myReaction === "dislike" ? "fill-current" : ""} />
         {dislikeCount}
       </button>
     </div>

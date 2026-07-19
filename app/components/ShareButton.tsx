@@ -40,13 +40,15 @@ export default function ShareButton({ videoId, title }: ShareButtonProps) {
       onClick={handleShare}
       title="Share"
       className="
-        flex items-center gap-2 rounded-full border border-white/15 light:border-black/15
-        px-4 py-2.5 text-sm font-bold text-slate-200 light:text-slate-700
-        transition-all duration-300 hover:bg-white/5 light:hover:bg-black/5
+        flex h-11 w-11 items-center justify-center rounded-full
+        border border-white/10 light:border-black/10
+        bg-white/[0.03] light:bg-black/[0.02]
+        text-slate-300 light:text-slate-600
+        transition-all duration-300
+        hover:border-white/20 light:hover:border-black/20 hover:bg-white/[0.06]
       "
     >
-      {copied ? <Check size={16} className="text-emerald-400" /> : <Share2 size={16} />}
-      <span className="hidden sm:inline">{copied ? "Copied!" : "Share"}</span>
+      {copied ? <Check size={18} className="text-emerald-400" /> : <Share2 size={18} />}
     </button>
   );
 }

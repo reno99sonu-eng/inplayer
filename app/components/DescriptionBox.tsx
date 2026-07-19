@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { AlignLeft } from "lucide-react";
 
 interface DescriptionBoxProps {
   description: string;
@@ -18,8 +19,11 @@ export default function DescriptionBox({ description }: DescriptionBoxProps) {
       : description.slice(0, COLLAPSED_LENGTH) + "...";
 
   return (
-    <div className="mt-4 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.02] light:bg-black/[0.02] p-4">
-      <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+    <div className="relative mt-4 overflow-hidden rounded-2xl border border-white/[0.08] light:border-black/[0.08] bg-gradient-to-br from-white/[0.03] to-transparent light:from-black/[0.02] p-4 pl-5 backdrop-blur-xl">
+      <span className="absolute left-0 top-0 h-full w-1 bg-gradient-to-b from-orange-400 to-amber-300" />
+
+      <p className="mb-2 flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-slate-500">
+        <AlignLeft size={13} />
         Description
       </p>
       <p className="whitespace-pre-wrap text-sm leading-6 text-slate-300 light:text-slate-600">

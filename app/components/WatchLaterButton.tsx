@@ -83,17 +83,16 @@ export default function WatchLaterButton({ videoId }: WatchLaterButtonProps) {
       disabled={updating}
       title={saved ? "Remove from Watch Later" : "Save to Watch Later"}
       className={`
-        flex items-center gap-2 rounded-full border px-4 py-2.5 text-sm font-bold
-        transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-60
+        group relative flex h-11 w-11 items-center justify-center rounded-full
+        border transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-60
         ${
           saved
-            ? "border-orange-400/50 bg-orange-500/10 text-orange-300 light:text-orange-700"
-            : "border-white/15 light:border-black/15 text-slate-200 light:text-slate-700 hover:bg-white/5 light:hover:bg-black/5"
+            ? "border-orange-400/50 bg-gradient-to-br from-orange-500/20 to-amber-400/10 text-orange-300 light:text-orange-700 shadow-[0_0_20px_-5px_rgba(249,115,22,.4)]"
+            : "border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] text-slate-300 light:text-slate-600 hover:border-white/20 light:hover:border-black/20 hover:bg-white/[0.06]"
         }
       `}
     >
-      {saved ? <Check size={16} /> : <Clock size={16} />}
-      <span className="hidden sm:inline">{saved ? "Saved" : "Watch Later"}</span>
+      {saved ? <Check size={18} /> : <Clock size={18} />}
     </button>
   );
 }

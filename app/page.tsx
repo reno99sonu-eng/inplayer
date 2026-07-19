@@ -1,4 +1,3 @@
-import Navbar from "./components/Navbar";
 import Hero from "./components/Hero";
 import ContinueWatching from "./components/ContinueWatching";
 import TrendingNow from "./components/TrendingNow";
@@ -110,8 +109,6 @@ export default async function Home() {
       </div>
 
       <div className="relative z-10">
-        <Navbar />
-
         <div className="space-y-1 lg:space-y-2">
         <FeaturedHero />
 

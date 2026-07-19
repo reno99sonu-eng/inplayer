@@ -127,11 +127,15 @@ export default async function WatchPage({ params }: WatchPageProps) {
             videoId={videoId}
           />
 
-          <h1 className="mt-4 text-xl sm:text-2xl font-black text-white light:text-slate-900">
+          <h1 className="mt-4 text-xl sm:text-2xl font-black leading-tight text-white light:text-slate-900">
             {video.title}
           </h1>
 
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+          <p className="mt-1.5 text-sm text-slate-400 light:text-slate-500">
+            {formatViews(video.views || 0)} • {formatTimeAgo(video.uploadedAt)}
+          </p>
+
+          <div className="mt-4 flex flex-wrap items-center justify-between gap-4 border-y border-white/10 light:border-black/10 py-4">
             <div className="flex items-center gap-3">
               <div className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-full border border-white/10 light:border-black/10">
                 <Image
@@ -143,14 +147,9 @@ export default async function WatchPage({ params }: WatchPageProps) {
                 />
               </div>
 
-              <div>
-                <p className="font-semibold text-white light:text-slate-900">
-                  {video.uploaderName}
-                </p>
-                <p className="text-xs text-slate-400 light:text-slate-500">
-                  {formatViews(video.views || 0)} • {formatTimeAgo(video.uploadedAt)}
-                </p>
-              </div>
+              <p className="font-semibold text-white light:text-slate-900">
+                {video.uploaderName}
+              </p>
 
               <SubscribeButton creatorId={video.uploaderId} />
             </div>
@@ -158,7 +157,7 @@ export default async function WatchPage({ params }: WatchPageProps) {
             <div className="flex items-center gap-2">
               <LikeButton videoId={videoId} />
 
-              <span className="rounded-full border border-orange-400/30 bg-orange-500/10 px-3 py-1 text-xs font-semibold text-orange-300 light:text-orange-700">
+              <span className="rounded-full border border-orange-400/30 bg-orange-500/10 px-3 py-1.5 text-xs font-semibold text-orange-300 light:text-orange-700">
                 {video.category}
               </span>
             </div>
@@ -166,6 +165,9 @@ export default async function WatchPage({ params }: WatchPageProps) {
 
           {video.description && (
             <div className="mt-4 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.02] light:bg-black/[0.02] p-4">
+              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
+                Description
+              </p>
               <p className="whitespace-pre-wrap text-sm leading-6 text-slate-300 light:text-slate-600">
                 {video.description}
               </p>
@@ -174,46 +176,48 @@ export default async function WatchPage({ params }: WatchPageProps) {
         </div>
 
         {/* Right column — related videos */}
-        <div className="space-y-3">
-          <h2 className="text-sm font-bold uppercase tracking-wide text-slate-400 light:text-slate-500">
+        <div>
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wide text-slate-400 light:text-slate-500">
             Up Next
           </h2>
 
-          {relatedVideos.length === 0 ? (
-            <p className="text-sm text-slate-500">No other videos yet.</p>
-          ) : (
-            relatedVideos.map((related) => (
-              <Link
-                key={related.videoId}
-                href={`/watch/${related.videoId}`}
-                className="group flex gap-3"
-              >
-                <div className="relative h-[80px] w-[140px] flex-shrink-0 overflow-hidden rounded-xl bg-white/5 light:bg-black/5">
-                  {related.thumbnailUrl && (
-                    <Image
-                      src={related.thumbnailUrl}
-                      alt={related.title}
-                      fill
-                      sizes="140px"
-                      className="object-cover transition-transform duration-300 group-hover:scale-105"
-                    />
-                  )}
-                </div>
+          <div className="space-y-1">
+            {relatedVideos.length === 0 ? (
+              <p className="text-sm text-slate-500">No other videos yet.</p>
+            ) : (
+              relatedVideos.map((related) => (
+                <Link
+                  key={related.videoId}
+                  href={`/watch/${related.videoId}`}
+                  className="group flex gap-3 rounded-xl p-2 -mx-2 transition-colors hover:bg-white/5 light:hover:bg-black/5"
+                >
+                  <div className="relative h-[80px] w-[140px] flex-shrink-0 overflow-hidden rounded-xl bg-white/5 light:bg-black/5">
+                    {related.thumbnailUrl && (
+                      <Image
+                        src={related.thumbnailUrl}
+                        alt={related.title}
+                        fill
+                        sizes="140px"
+                        className="object-cover transition-transform duration-300 group-hover:scale-105"
+                      />
+                    )}
+                  </div>
 
-                <div className="min-w-0 flex-1">
-                  <h3 className="line-clamp-2 text-sm font-semibold text-white light:text-slate-900">
-                    {related.title}
-                  </h3>
-                  <p className="mt-1 text-xs text-slate-400 light:text-slate-500">
-                    {related.uploaderName}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    {formatViews(related.views || 0)} • {formatTimeAgo(related.uploadedAt)}
-                  </p>
-                </div>
-              </Link>
-            ))
-          )}
+                  <div className="min-w-0 flex-1">
+                    <h3 className="line-clamp-2 text-sm font-semibold text-white light:text-slate-900 group-hover:text-orange-300 light:group-hover:text-orange-600 transition-colors">
+                      {related.title}
+                    </h3>
+                    <p className="mt-1 text-xs text-slate-400 light:text-slate-500">
+                      {related.uploaderName}
+                    </p>
+                    <p className="text-xs text-slate-500">
+                      {formatViews(related.views || 0)} • {formatTimeAgo(related.uploadedAt)}
+                    </p>
+                  </div>
+                </Link>
+              ))
+            )}
+          </div>
         </div>
       </div>
     </div>

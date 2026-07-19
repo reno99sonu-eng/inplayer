@@ -10,6 +10,7 @@ import {
   useContext,
   useState,
   useEffect,
+  useMemo,
   ReactNode,
 } from "react";
 import {
@@ -31,6 +32,7 @@ type AuthModal =
   | "verify";
 
 export interface AuthUser {
+  userId: string;
   username: string;
   name: string;
   email: string;
@@ -79,6 +81,7 @@ export default function AuthProvider({
       const attributes = await fetchUserAttributes();
 
       setUser({
+        userId: currentUser.userId,
         username: currentUser.username,
         name: attributes.name || currentUser.username,
         email: attributes.email || "",

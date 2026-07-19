@@ -9,11 +9,13 @@ interface SubscribeButtonProps {
 }
 
 export default function SubscribeButton({ creatorId }: SubscribeButtonProps) {
-  const { signedIn, openSignIn } = useAuthModal();
+  const { signedIn, user, openSignIn } = useAuthModal();
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+
+  const isOwnChannel = signedIn && user?.userId === creatorId;
 
   useEffect(() => {
     async function load() {
@@ -78,6 +80,14 @@ export default function SubscribeButton({ creatorId }: SubscribeButtonProps) {
   if (loading) {
     return (
       <div className="h-11 w-32 animate-pulse rounded-full bg-white/10 light:bg-black/5" />
+    );
+  }
+
+  if (isOwnChannel) {
+    return (
+      <span className="rounded-full border border-white/10 light:border-black/10 px-4 py-2.5 text-xs font-semibold text-slate-500">
+        This is you
+      </span>
     );
   }
 

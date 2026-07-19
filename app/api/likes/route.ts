@@ -15,21 +15,23 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "videoId is required" }, { status: 400 });
   }
 
-  // Note: the Likes table is keyed by userId first (great for "everything
-  // I've liked"), so counting likes for one video means scanning rather
-  // than a fast indexed lookup. Perfectly fine at InPlayer's current
-  // scale — if this ever needs to handle serious traffic, adding a
-  // reverse GSI here (same pattern as Subscriptions) would fix it.
-  const countResult = await docClient.send(
+  // Note: the table is keyed by userId first (great for "everything I've
+  // liked"), so counting reactions for one video means scanning rather
+  // than a fast indexed lookup. Fine at InPlayer's current scale — a
+  // reverse GSI (same pattern as Subscriptions) would fix this later.
+  const result = await docClient.send(
     new ScanCommand({
       TableName: "InPlayer-Likes",
       FilterExpression: "videoId = :videoId",
       ExpressionAttributeValues: { ":videoId": videoId },
-      Select: "COUNT",
     })
   );
 
-  let isLiked = false;
+  const items = result.Items || [];
+  const likeCount = items.filter((i) => i.reaction === "like").length;
+  const dislikeCount = items.filter((i) => i.reaction === "dislike").length;
+
+  let myReaction: "like" | "dislike" | null = null;
 
   try {
     const user = await verifyAuth(request);
@@ -39,15 +41,12 @@ export async function GET(request: NextRequest) {
         Key: { userId: user.userId, videoId },
       })
     );
-    isLiked = !!existing.Item;
+    myReaction = (existing.Item?.reaction as "like" | "dislike") || null;
   } catch {
-    // Not signed in — fine, just report as not liked
+    // Not signed in — fine, just report as no reaction
   }
 
-  return NextResponse.json({
-    likeCount: countResult.Count || 0,
-    isLiked,
-  });
+  return NextResponse.json({ likeCount, dislikeCount, myReaction });
 }
 
 export async function POST(request: NextRequest) {
@@ -61,26 +60,27 @@ export async function POST(request: NextRequest) {
 
   const { videoId, action } = await request.json();
 
-  if (!videoId || !["like", "unlike"].includes(action)) {
+  if (!videoId || !["like", "dislike", "remove"].includes(action)) {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
 
-  if (action === "like") {
+  if (action === "remove") {
+    await docClient.send(
+      new DeleteCommand({
+        TableName: "InPlayer-Likes",
+        Key: { userId: user.userId, videoId },
+      })
+    );
+  } else {
     await docClient.send(
       new PutCommand({
         TableName: "InPlayer-Likes",
         Item: {
           userId: user.userId,
           videoId,
-          likedAt: new Date().toISOString(),
+          reaction: action,
+          reactedAt: new Date().toISOString(),
         },
-      })
-    );
-  } else {
-    await docClient.send(
-      new DeleteCommand({
-        TableName: "InPlayer-Likes",
-        Key: { userId: user.userId, videoId },
       })
     );
   }

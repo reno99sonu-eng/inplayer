@@ -5,7 +5,8 @@ import Image from "next/image";
 
 import NavbarLogo from "./NavbarLogo";
 import NavbarLinks from "./NavbarLinks";
-import { Menu, X, Search, Home, PlaySquare, ChevronRight, ChevronDown } from "lucide-react";
+import { Menu, X, Search, Home, PlaySquare, ChevronRight, ChevronDown, LogOut } from "lucide-react";
+import { useAuthModal } from "./auth/AuthProvider";
 import NavbarSearch from "./NavbarSearch";
 import NavbarActions from "./NavbarActions";
 import NavbarProfile from "./NavbarProfile";
@@ -43,6 +44,7 @@ export default function Navbar() {
   const router = useRouter();
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const { signedIn, user, signOut, openSignIn, openSignUp } = useAuthModal();
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -571,11 +573,45 @@ lg:right-auto
 
             <div className="my-4 border-t border-white/10 light:border-black/10" />
 
-            <div className="space-y-1">
-              {["Sign In", "Create Account"].map((item) => (
+            {signedIn ? (
+              <div className="space-y-1">
+                <p className="px-3 pb-1 text-xs text-slate-500">
+                  Signed in as {user?.name}
+                </p>
                 <button
-                  key={item}
-                  onClick={() => setMenuOpen(false)}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    signOut();
+                  }}
+                  className="
+                    flex
+                    w-full
+                    items-center
+                    gap-3
+                    rounded-xl
+                    px-3
+                    py-2
+                    text-left
+                    text-sm
+                    font-medium
+                    text-red-400
+                    transition-all
+                    duration-300
+                    hover:bg-red-500/10
+                    hover:translate-x-1
+                  "
+                >
+                  <LogOut size={16} />
+                  Sign Out
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    openSignIn();
+                  }}
                   className="
                     flex
                     w-full
@@ -596,10 +632,37 @@ lg:right-auto
                     light:hover:text-orange-600
                   "
                 >
-                  {item}
+                  Sign In
                 </button>
-              ))}
-            </div>
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    openSignUp();
+                  }}
+                  className="
+                    flex
+                    w-full
+                    items-center
+                    rounded-xl
+                    px-3
+                    py-2
+                    text-left
+                    text-sm
+                    text-slate-300
+                    light:text-slate-700
+                    transition-all
+                    duration-300
+                    hover:bg-white/5
+                    light:hover:bg-black/5
+                    hover:translate-x-1
+                    hover:text-orange-300
+                    light:hover:text-orange-600
+                  "
+                >
+                  Create Account
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </aside>

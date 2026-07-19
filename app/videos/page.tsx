@@ -3,6 +3,7 @@ import { docClient } from "@/app/lib/dynamodb";
 import Link from "next/link";
 import Image from "next/image";
 import { Film } from "lucide-react";
+import BackButton from "@/app/components/BackButton";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,8 @@ export default async function VideosPage({ searchParams }: VideosPageProps) {
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-8 sm:py-12">
+      <BackButton />
+
       <h1 className="text-2xl sm:text-3xl font-black text-white light:text-slate-900">
         {category ? category : "All Videos"}
       </h1>

@@ -7,6 +7,7 @@ import LikeButton from "@/app/components/LikeButton";
 import { formatTimeAgo, formatViews } from "@/app/lib/formatters";
 import Link from "next/link";
 import Image from "next/image";
+import DescriptionBox from "@/app/components/DescriptionBox";
 
 export const dynamic = "force-dynamic";
 
@@ -163,16 +164,7 @@ export default async function WatchPage({ params }: WatchPageProps) {
             </div>
           </div>
 
-          {video.description && (
-            <div className="mt-4 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.02] light:bg-black/[0.02] p-4">
-              <p className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-500">
-                Description
-              </p>
-              <p className="whitespace-pre-wrap text-sm leading-6 text-slate-300 light:text-slate-600">
-                {video.description}
-              </p>
-            </div>
-          )}
+          {video.description && <DescriptionBox description={video.description} />}
         </div>
 
         {/* Right column — related videos */}

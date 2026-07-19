@@ -8,17 +8,17 @@ import { Loader2 } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { formatTimeAgo } from "@/app/lib/formatters";
 
-interface WatchlistItem {
+interface HistoryItem {
   videoId: string;
   title: string;
   thumbnailUrl?: string;
   category: string;
-  addedAt: string;
+  watchedAt: string;
 }
 
-export default function WatchlistPage() {
+export default function HistoryPage() {
   const { signedIn, authLoading, openSignIn } = useAuthModal();
-  const [items, setItems] = useState<WatchlistItem[]>([]);
+  const [items, setItems] = useState<HistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -32,13 +32,13 @@ export default function WatchlistPage() {
         const session = await fetchAuthSession();
         const idToken = session.tokens?.idToken?.toString();
 
-        const res = await fetch("/api/watchlist", {
+        const res = await fetch("/api/history", {
           headers: { Authorization: `Bearer ${idToken}` },
         });
         const data = await res.json();
-        setItems(data.items || []);
+        setItems(data.history || []);
       } catch (err) {
-        console.error("Failed to load watchlist:", err);
+        console.error("Failed to load history:", err);
       } finally {
         setLoading(false);
       }
@@ -59,7 +59,7 @@ export default function WatchlistPage() {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 text-center">
         <h2 className="text-2xl font-black text-white light:text-slate-900">
-          Sign in to see your Watch Later list
+          Sign in to see your history
         </h2>
         <button
           onClick={openSignIn}
@@ -74,12 +74,12 @@ export default function WatchlistPage() {
   return (
     <div className="mx-auto max-w-[1000px] px-4 py-8 sm:py-12">
       <h1 className="text-2xl sm:text-3xl font-black text-white light:text-slate-900">
-        Watch Later
+        Watch History
       </h1>
 
       {items.length === 0 ? (
         <p className="mt-8 text-sm text-slate-400 light:text-slate-500">
-          Nothing saved yet — tap "Watch Later" on any video to add it here.
+          You haven't watched anything yet.
         </p>
       ) : (
         <div className="mt-8 space-y-3">
@@ -105,7 +105,7 @@ export default function WatchlistPage() {
                   {item.title}
                 </h3>
                 <p className="mt-1 text-xs text-slate-400 light:text-slate-500">
-                  Saved {formatTimeAgo(item.addedAt)}
+                  Watched {formatTimeAgo(item.watchedAt)}
                 </p>
               </div>
             </Link>

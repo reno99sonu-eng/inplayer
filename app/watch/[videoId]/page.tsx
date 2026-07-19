@@ -6,6 +6,7 @@ import SubscribeButton from "@/app/components/SubscribeButton";
 import LikeButton from "@/app/components/LikeButton";
 import WatchLaterButton from "@/app/components/WatchLaterButton";
 import ShareButton from "@/app/components/ShareButton";
+import WatchHistoryRecorder from "@/app/components/WatchHistoryRecorder";
 import { formatTimeAgo, formatViews } from "@/app/lib/formatters";
 import Link from "next/link";
 import Image from "next/image";
@@ -121,6 +122,7 @@ export default async function WatchPage({ params }: WatchPageProps) {
   return (
     <div className="mx-auto max-w-[1600px] px-4 py-6 sm:py-8">
       <BackButton />
+      <WatchHistoryRecorder videoId={videoId} />
 
       <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_380px]">
         {/* Left column — player + info */}

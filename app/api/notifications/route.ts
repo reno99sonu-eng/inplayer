@@ -42,9 +42,12 @@ export async function PATCH(request: NextRequest) {
     new QueryCommand({
       TableName: "InPlayer-Notifications",
       KeyConditionExpression: "userId = :userId",
-      ExpressionAttributeValues: { ":userId": user.userId },
-      FilterExpression: "#read = :false",
+      FilterExpression: "#read = :falseValue",
       ExpressionAttributeNames: { "#read": "read" },
+      ExpressionAttributeValues: {
+        ":userId": user.userId,
+        ":falseValue": false,
+      },
     })
   );
 

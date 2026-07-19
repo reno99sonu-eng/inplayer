@@ -12,7 +12,7 @@ export async function POST(request: NextRequest) {
   let event;
 
   try {
-    event = mux.webhooks.unwrap(rawBody, request.headers);
+    event = await mux.webhooks.unwrap(rawBody, request.headers);
   } catch (err) {
     console.error("Mux webhook verification failed:", err);
     return NextResponse.json({ error: "Invalid signature" }, { status: 401 });

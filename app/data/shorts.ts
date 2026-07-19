@@ -7,6 +7,7 @@ export interface Short {
   likes: string;
   comments: string;
   videoId?: string; // present only for real uploaded shorts — used to link to /watch/[videoId]
+  muxPlaybackId?: string; // present only for real uploaded shorts — used for actual playback
 }
 
 export const shorts: Short[] = [

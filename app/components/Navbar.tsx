@@ -389,15 +389,17 @@ lg:right-auto
               </button>
             </div>
 
-            <div className="my-3 border-t border-white/10 light:border-black/10" />
+            {signedIn && (
+              <>
+                <div className="my-3 border-t border-white/10 light:border-black/10" />
 
-            {/* Subscriptions */}
-            <div>
-              <button
-                onClick={() => goTo("/subscriptions")}
-                className="
-                  mb-1
-                  flex
+                {/* Subscriptions */}
+                <div>
+                  <button
+                    onClick={() => goTo("/subscriptions")}
+                    className="
+                      mb-1
+                      flex
                   w-full
                   items-center
                   justify-between
@@ -570,6 +572,8 @@ lg:right-auto
                 ))}
               </div>
             </div>
+              </>
+            )}
 
             <div className="my-4 border-t border-white/10 light:border-black/10" />
 

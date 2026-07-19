@@ -633,6 +633,43 @@ animation: aiGlassSweep 5.5s linear infinite;
   animation: successPop .5s cubic-bezier(.16,1,.3,1);
 }
 
+/* ---------- Premium Watch Page ---------- */
+
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp .7s cubic-bezier(.16,1,.3,1) both;
+}
+
+@keyframes ambientPulse {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 0.85; }
+}
+
+.animate-ambient-pulse {
+  animation: ambientPulse 8s ease-in-out infinite;
+}
+
+@keyframes heartBurst {
+  0% { transform: scale(0) rotate(-15deg); opacity: 0; }
+  35% { transform: scale(1.4) rotate(5deg); opacity: 1; }
+  65% { transform: scale(0.95) rotate(0deg); }
+  100% { transform: scale(1.1) rotate(0deg); opacity: 0; }
+}
+
+.animate-heart-burst {
+  animation: heartBurst .9s cubic-bezier(.16,1,.3,1);
+}
+
+/* ---------- Shorts Feed Player (hides Mux's default controls,
+   scoped so the regular watch page's player keeps full controls) ---------- */
+.shorts-player mux-player {
+  --controls: none;
+}
+
 /* Hide scrollbar ONLY on mobile; desktop/tablet keep the orange thin scrollbar */
 @media (max-width: 767px) {
   .scrollbar-hide-mobile {

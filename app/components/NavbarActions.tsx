@@ -3,6 +3,9 @@
 import CreatePopup from "./CreatePopup";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { fetchAuthSession } from "aws-amplify/auth";
+import { useAuthModal } from "./auth/AuthProvider";
+import { formatTimeAgo } from "@/app/lib/formatters";
 import {
   Bell,
   Plus,
@@ -12,15 +15,71 @@ import {
   Sparkles,
 } from "lucide-react";
 
+interface Notification {
+  notificationId: string;
+  type: "like" | "comment" | "subscribe";
+  message: string;
+  read: boolean;
+  createdAt: string;
+}
+
 export default function NavbarActions() {
   const router = useRouter();
+  const { signedIn } = useAuthModal();
   const [open, setOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const popupRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
 
-  // Placeholder: no notifications backend wired up yet
-  const notifications: { id: string; title: string; time: string }[] = [];
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    if (!signedIn) return;
+
+    async function loadNotifications() {
+      try {
+        const session = await fetchAuthSession();
+        const idToken = session.tokens?.idToken?.toString();
+
+        const res = await fetch("/api/notifications", {
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+        const data = await res.json();
+        const list: Notification[] = data.notifications || [];
+
+        setNotifications(list);
+        setUnreadCount(list.filter((n) => !n.read).length);
+      } catch (err) {
+        console.error("Failed to load notifications:", err);
+      }
+    }
+
+    loadNotifications();
+  }, [signedIn]);
+
+  // Mark everything as read the moment the panel is opened
+  useEffect(() => {
+    if (!notifOpen || !signedIn || unreadCount === 0) return;
+
+    async function markRead() {
+      try {
+        const session = await fetchAuthSession();
+        const idToken = session.tokens?.idToken?.toString();
+
+        await fetch("/api/notifications", {
+          method: "PATCH",
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+
+        setUnreadCount(0);
+      } catch (err) {
+        console.error("Failed to mark notifications as read:", err);
+      }
+    }
+
+    markRead();
+  }, [notifOpen, signedIn, unreadCount]);
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -151,7 +210,7 @@ export default function NavbarActions() {
         >
           <Bell size={17} />
 
-          {notifications.length > 0 && (
+          {unreadCount > 0 && (
             <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500" />
           )}
         </button>
@@ -202,11 +261,15 @@ export default function NavbarActions() {
               <div className="space-y-2">
                 {notifications.map((n) => (
                   <div
-                    key={n.id}
-                    className="rounded-xl bg-white/5 light:bg-black/5 px-3 py-2.5"
+                    key={n.notificationId}
+                    className={`rounded-xl px-3 py-2.5 ${
+                      n.read
+                        ? "bg-white/5 light:bg-black/5"
+                        : "bg-orange-500/10 border border-orange-400/20"
+                    }`}
                   >
-                    <p className="text-sm text-white light:text-slate-900">{n.title}</p>
-                    <p className="text-xs text-slate-500">{n.time}</p>
+                    <p className="text-sm text-white light:text-slate-900">{n.message}</p>
+                    <p className="text-xs text-slate-500">{formatTimeAgo(n.createdAt)}</p>
                   </div>
                 ))}
               </div>

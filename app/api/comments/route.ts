@@ -66,6 +66,36 @@ export async function POST(request: NextRequest) {
     })
   );
 
+  // Notify the video owner, unless they're commenting on their own video
+  try {
+    const videoResult = await docClient.send(
+      new GetCommand({ TableName: "InPlayer-Videos", Key: { videoId } })
+    );
+    const video = videoResult.Item;
+
+    if (video && video.uploaderId !== user.userId) {
+      const preview =
+        text.trim().length > 60 ? text.trim().slice(0, 60) + "..." : text.trim();
+
+      await docClient.send(
+        new PutCommand({
+          TableName: "InPlayer-Notifications",
+          Item: {
+            userId: video.uploaderId,
+            notificationId: randomUUID(),
+            type: "comment",
+            message: `${user.name || "Someone"} commented on your video "${video.title}": "${preview}"`,
+            videoId,
+            read: false,
+            createdAt: new Date().toISOString(),
+          },
+        })
+      );
+    }
+  } catch (err) {
+    console.error("Failed to write comment notification:", err);
+  }
+
   return NextResponse.json({ comment });
 }
 

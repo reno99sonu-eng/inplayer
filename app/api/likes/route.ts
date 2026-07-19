@@ -5,6 +5,7 @@ import {
   DeleteCommand,
   GetCommand,
 } from "@aws-sdk/lib-dynamodb";
+import { randomUUID } from "crypto";
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
 
@@ -83,6 +84,37 @@ export async function POST(request: NextRequest) {
         },
       })
     );
+
+    // Notify the video owner — but only for a genuine "like" (not
+    // dislike), and only if it's not their own video.
+    if (action === "like") {
+      try {
+        const videoResult = await docClient.send(
+          new GetCommand({ TableName: "InPlayer-Videos", Key: { videoId } })
+        );
+        const video = videoResult.Item;
+
+        if (video && video.uploaderId !== user.userId) {
+          await docClient.send(
+            new PutCommand({
+              TableName: "InPlayer-Notifications",
+              Item: {
+                userId: video.uploaderId,
+                notificationId: randomUUID(),
+                type: "like",
+                message: `${user.name || "Someone"} liked your video "${video.title}"`,
+                videoId,
+                read: false,
+                createdAt: new Date().toISOString(),
+              },
+            })
+          );
+        }
+      } catch (err) {
+        // A notification failing to write shouldn't break the like itself
+        console.error("Failed to write like notification:", err);
+      }
+    }
   }
 
   return NextResponse.json({ success: true });

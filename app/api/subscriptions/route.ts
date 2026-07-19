@@ -5,6 +5,7 @@ import {
   DeleteCommand,
   GetCommand,
 } from "@aws-sdk/lib-dynamodb";
+import { randomUUID } from "crypto";
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
 
@@ -82,6 +83,24 @@ export async function POST(request: NextRequest) {
         },
       })
     );
+
+    try {
+      await docClient.send(
+        new PutCommand({
+          TableName: "InPlayer-Notifications",
+          Item: {
+            userId: creatorId,
+            notificationId: randomUUID(),
+            type: "subscribe",
+            message: `${user.name || "Someone"} subscribed to your channel`,
+            read: false,
+            createdAt: new Date().toISOString(),
+          },
+        })
+      );
+    } catch (err) {
+      console.error("Failed to write subscribe notification:", err);
+    }
   } else {
     await docClient.send(
       new DeleteCommand({

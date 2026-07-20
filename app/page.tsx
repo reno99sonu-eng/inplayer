@@ -9,17 +9,6 @@ import { docClient } from "./lib/dynamodb";
 import type { Recommendation } from "./data/recommendations";
 import type { Short } from "./data/shorts";
 
-// Without this, Next.js has no reason to treat this page as dynamic (the
-// DynamoDB scan below isn't a `fetch()` call, so it doesn't trigger
-// Next's automatic dynamic-rendering detection on its own) — so the page
-// gets statically generated once at build time and the homepage feed
-// silently freezes as of that build. Newly uploaded videos/shorts land in
-// the table immediately and show up on /videos (which already forces
-// dynamic rendering) but never reach the homepage until the next deploy.
-// Forcing dynamic rendering here makes the homepage re-run this query on
-// every request, same as /videos already does.
-export const dynamic = "force-dynamic";
-
 function formatDuration(seconds: number): string {
   if (!seconds) return "0:00";
   const totalSeconds = Math.round(seconds);
@@ -73,7 +62,7 @@ async function getRealContent(): Promise<RealContent> {
         videoId: video.videoId,
         title: video.title,
         creator: video.uploaderName || "Unknown",
-        avatar: "/avatars/avatar.png",
+        avatar: video.uploaderAvatarUrl || "/avatars/avatar.png",
         thumbnail: video.thumbnailUrl || "/recommendations/thumbnails/1.jpg",
         views: `${video.views || 0} views`,
         uploaded: formatTimeAgo(video.uploadedAt),
@@ -89,6 +78,8 @@ async function getRealContent(): Promise<RealContent> {
         muxPlaybackId: video.muxPlaybackId,
         title: video.title,
         creator: video.uploaderName || "Unknown",
+        uploaderId: video.uploaderId,
+        uploaderAvatarUrl: video.uploaderAvatarUrl,
         poster: video.thumbnailUrl || "/shorts/1.jpg",
         views: `${video.views || 0} views`,
         likes: "0",

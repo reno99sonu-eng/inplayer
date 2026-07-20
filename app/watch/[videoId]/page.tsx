@@ -52,16 +52,16 @@ export default async function WatchPage({ params }: WatchPageProps) {
 
   if (!video) {
     return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 text-center">
+      <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 text-center lg:px-6">
         <h2 className="text-2xl font-black text-white light:text-slate-900">
           Video not found
         </h2>
-        <p className="mt-2 text-sm text-slate-400 light:text-slate-500">
+        <p className="mt-1.5 text-sm text-slate-400 light:text-slate-500 lg:mt-2">
           This video doesn't exist or may have been removed.
         </p>
         <Link
           href="/videos"
-          className="mt-6 rounded-2xl border border-white/10 light:border-black/10 px-6 py-2.5 text-sm font-semibold text-slate-200 light:text-slate-700 transition hover:border-orange-400/30 hover:bg-white/5 light:hover:bg-black/5"
+          className="mt-4 rounded-2xl border border-white/10 light:border-black/10 px-5 py-2 text-sm font-semibold text-slate-200 light:text-slate-700 transition hover:border-orange-400/30 hover:bg-white/5 light:hover:bg-black/5 lg:mt-6 lg:px-6 lg:py-2.5"
         >
           Back to Videos
         </Link>
@@ -71,7 +71,7 @@ export default async function WatchPage({ params }: WatchPageProps) {
 
   if (video.status === "processing") {
     return (
-      <div className="mx-auto max-w-[600px] px-6 py-8">
+      <div className="mx-auto max-w-[600px] px-4 py-5 lg:px-6 lg:py-8">
         <BackButton />
         <ProcessingStatus videoId={videoId} autoRefreshOnReady />
       </div>
@@ -80,12 +80,12 @@ export default async function WatchPage({ params }: WatchPageProps) {
 
   if (video.status === "error") {
     return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 text-center">
+      <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 text-center lg:px-6">
         <BackButton />
         <h2 className="text-2xl font-black text-white light:text-slate-900">
           Processing failed
         </h2>
-        <p className="mt-2 max-w-sm text-sm text-slate-400 light:text-slate-500">
+        <p className="mt-1.5 max-w-sm text-sm text-slate-400 light:text-slate-500 lg:mt-2">
           Something went wrong processing this video. Please try uploading again.
         </p>
       </div>
@@ -107,7 +107,7 @@ export default async function WatchPage({ params }: WatchPageProps) {
   const relatedVideos = await getRelatedVideos(videoId, video.category);
 
   return (
-    <div className="mx-auto max-w-[1600px] px-4 py-6 sm:py-8">
+    <div className="mx-auto max-w-[1600px] px-3 py-4 lg:px-4 lg:py-8">
       <BackButton />
       <WatchHistoryRecorder videoId={videoId} />
 
@@ -119,6 +119,7 @@ export default async function WatchPage({ params }: WatchPageProps) {
           category: video.category,
           uploaderId: video.uploaderId,
           uploaderName: video.uploaderName,
+          uploaderAvatarUrl: video.uploaderAvatarUrl,
           uploadedAt: video.uploadedAt,
           views: video.views || 0,
           muxPlaybackId: video.muxPlaybackId,
@@ -131,7 +132,6 @@ export default async function WatchPage({ params }: WatchPageProps) {
           views: v.views || 0,
           uploadedAt: v.uploadedAt,
           thumbnailUrl: v.thumbnailUrl,
-          duration: v.duration || 0,
         }))}
       />
     </div>

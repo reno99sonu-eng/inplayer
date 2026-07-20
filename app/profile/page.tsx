@@ -11,6 +11,24 @@ export default function ProfilePage() {
   const router = useRouter();
   const { signedIn, authLoading, user, openSignIn, refreshUser } = useAuthModal();
 
+  // A name/avatar change only lives on the user's own profile until this
+  // runs — every video, short, and comment they've already posted keeps a
+  // denormalized snapshot of their name/avatar (so feeds don't need an
+  // extra lookup per item), and that snapshot only gets refreshed here.
+  const syncProfileEverywhere = async () => {
+    try {
+      const session = await fetchAuthSession();
+      const idToken = session.tokens?.idToken?.toString();
+
+      await fetch("/api/profile/sync", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+    } catch (err) {
+      console.error("Failed to sync profile to existing content:", err);
+    }
+  };
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(user?.name || "");
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
@@ -59,6 +77,10 @@ export default function ProfilePage() {
       // Refresh the shared auth state so the new avatar shows up
       // everywhere immediately — navbar, comments, everywhere.
       await refreshUser();
+
+      // Also push it onto everything already posted (videos, shorts,
+      // comments) — otherwise old posts keep showing the old photo.
+      await syncProfileEverywhere();
     } catch (err) {
       console.error("Avatar upload failed:", err);
       setError("Something went wrong uploading your photo.");
@@ -82,7 +104,14 @@ export default function ProfilePage() {
         userAttributes: { name: name.trim() },
       });
 
+      // Server-side routes read the name from the ID token's claims, not
+      // a live Cognito lookup — force a refresh so the token actually
+      // carries the new name before we ask the server to sync it out.
+      await fetchAuthSession({ forceRefresh: true });
+
       await refreshUser();
+      await syncProfileEverywhere();
+
       setSaved(true);
       setTimeout(() => setSaved(false), 2000);
     } catch (err) {

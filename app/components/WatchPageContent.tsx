@@ -12,7 +12,7 @@ import ShareButton from "@/app/components/ShareButton";
 import DescriptionBox from "@/app/components/DescriptionBox";
 import CommentSection from "@/app/components/CommentSection";
 import AnimatedCounter from "@/app/components/AnimatedCounter";
-import { formatTimeAgo, formatViews, formatDuration } from "@/app/lib/formatters";
+import { formatTimeAgo, formatViews } from "@/app/lib/formatters";
 
 interface VideoData {
   videoId: string;
@@ -21,6 +21,7 @@ interface VideoData {
   category: string;
   uploaderId: string;
   uploaderName: string;
+  uploaderAvatarUrl?: string;
   uploadedAt: string;
   views: number;
   muxPlaybackId: string;
@@ -34,7 +35,6 @@ interface RelatedVideo {
   views: number;
   uploadedAt: string;
   thumbnailUrl?: string;
-  duration?: number;
 }
 
 interface WatchPageContentProps {
@@ -72,7 +72,7 @@ export default function WatchPageContent({
       </div>
 
       <div
-        className={`grid grid-cols-1 gap-8 transition-all duration-500 ${
+        className={`grid grid-cols-1 gap-5 lg:gap-8 transition-all duration-500 ${
           theaterMode
             ? "lg:grid-cols-1"
             : "lg:grid-cols-[minmax(0,1fr)_380px]"
@@ -100,12 +100,14 @@ export default function WatchPageContent({
               onClick={() => setTheaterMode(!theaterMode)}
               title={theaterMode ? "Exit theater mode" : "Theater mode"}
               className="
-                absolute right-4 top-4 z-10
-                flex h-10 w-10 items-center justify-center rounded-full
+                absolute right-3 top-3 z-10
+                flex h-9 w-9 items-center justify-center rounded-full
                 border border-white/10 bg-black/60 text-white backdrop-blur-md
                 opacity-0 transition-all duration-300
                 hover:scale-110 hover:border-orange-400/40 hover:bg-black/80
                 group-hover:opacity-100
+
+                lg:right-4 lg:top-4 lg:h-10 lg:w-10
               "
             >
               {theaterMode ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
@@ -114,14 +116,14 @@ export default function WatchPageContent({
 
           <div className={theaterMode ? "mx-auto max-w-[1100px]" : ""}>
             <h1
-              className="animate-fade-in-up mt-6 bg-gradient-to-r from-white to-white/70 light:from-slate-900 light:to-slate-900/70 bg-clip-text text-2xl sm:text-3xl lg:text-[34px] font-black leading-[1.1] tracking-tight text-transparent"
+              className="animate-fade-in-up mt-4 lg:mt-6 bg-gradient-to-r from-white to-white/70 light:from-slate-900 light:to-slate-900/70 bg-clip-text text-2xl sm:text-3xl lg:text-[34px] font-black leading-[1.1] tracking-tight text-transparent"
               style={{ animationDelay: "50ms" }}
             >
               {video.title}
             </h1>
 
             <div
-              className="animate-fade-in-up mt-3 flex flex-wrap items-center gap-x-4 gap-y-1.5 text-sm text-slate-400 light:text-slate-500"
+              className="animate-fade-in-up mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-400 light:text-slate-500 lg:mt-3 lg:gap-x-4 lg:gap-y-1.5"
               style={{ animationDelay: "100ms" }}
             >
               <span className="flex items-center gap-1.5">
@@ -147,24 +149,27 @@ export default function WatchPageContent({
             {/* Glass card — channel identity + actions */}
             <div
               className="
-                animate-fade-in-up mt-5 rounded-3xl border border-white/[0.08] light:border-black/[0.08]
+                animate-fade-in-up mt-4 rounded-3xl border border-white/[0.08] light:border-black/[0.08]
                 bg-gradient-to-br from-white/[0.05] to-white/[0.01] light:from-black/[0.03] light:to-transparent
-                p-4 sm:p-5 backdrop-blur-xl
+                p-3 backdrop-blur-xl
                 shadow-[0_25px_70px_-25px_rgba(0,0,0,.4)]
+
+                lg:mt-5 lg:p-5
               "
               style={{ animationDelay: "150ms" }}
             >
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 lg:gap-4">
+                <div className="flex items-center gap-2.5 lg:gap-3">
                   <div className="relative flex-shrink-0">
-                    <div className="absolute -inset-[3px] rounded-full bg-gradient-to-br from-orange-400 via-amber-300 to-orange-500 opacity-80 blur-[3px]" />
-                    <div className="relative h-12 w-12 overflow-hidden rounded-full ring-2 ring-[#050816] light:ring-white">
-                      <Image
-                        src="/avatars/avatar.png"
+                    <div className="absolute -inset-[2px] lg:-inset-[3px] rounded-full bg-gradient-to-br from-orange-400 via-amber-300 to-orange-500 opacity-80 blur-[3px]" />
+                    <div className="relative h-10 w-10 overflow-hidden rounded-full ring-2 ring-[#050816] light:ring-white lg:h-12 lg:w-12">
+                      {/* A plain <img>, not next/image — avatars are
+                          base64 data URLs (see app/lib/imageCompress.ts),
+                          which next/image doesn't optimize/serve cleanly. */}
+                      <img
+                        src={video.uploaderAvatarUrl || "/avatars/avatar.png"}
                         alt={video.uploaderName}
-                        fill
-                        sizes="48px"
-                        className="object-cover"
+                        className="h-full w-full object-cover"
                       />
                     </div>
                   </div>
@@ -181,7 +186,7 @@ export default function WatchPageContent({
                   <SubscribeButton creatorId={video.uploaderId} />
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-1.5 lg:gap-2">
                   <LikeButton videoId={video.videoId} />
                   <WatchLaterButton videoId={video.videoId} />
                   <ShareButton videoId={video.videoId} title={video.title} />
@@ -210,12 +215,12 @@ export default function WatchPageContent({
         {/* Right column — related videos (hidden in theater mode) */}
         {!theaterMode && (
           <div className="animate-fade-in-up" style={{ animationDelay: "150ms" }}>
-            <h2 className="mb-3 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-400 light:text-slate-500">
+            <h2 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-400 light:text-slate-500 lg:mb-3">
               <span className="h-4 w-1 rounded-full bg-gradient-to-b from-orange-400 to-amber-300" />
               Up Next
             </h2>
 
-            <div className="space-y-2">
+            <div className="space-y-1.5 lg:space-y-2">
               {relatedVideos.length === 0 ? (
                 <p className="text-sm text-slate-500">No other videos yet.</p>
               ) : (
@@ -224,16 +229,18 @@ export default function WatchPageContent({
                     key={related.videoId}
                     href={`/watch/${related.videoId}`}
                     className="
-                      animate-fade-in-up group flex gap-3 rounded-2xl
-                      border border-transparent p-2
+                      animate-fade-in-up group flex gap-2.5 rounded-2xl
+                      border border-transparent p-1.5
                       transition-all duration-300
                       hover:-translate-y-0.5 hover:border-white/[0.08] light:hover:border-black/[0.08]
                       hover:bg-white/[0.04] light:hover:bg-black/[0.03]
                       hover:shadow-[0_15px_40px_-20px_rgba(249,115,22,.25)]
+
+                      lg:gap-3 lg:p-2
                     "
                     style={{ animationDelay: `${200 + i * 40}ms` }}
                   >
-                    <div className="relative h-[80px] w-[140px] flex-shrink-0 overflow-hidden rounded-xl bg-white/5 light:bg-black/5">
+                    <div className="relative h-[64px] w-[112px] flex-shrink-0 overflow-hidden rounded-xl bg-white/5 light:bg-black/5 lg:h-[80px] lg:w-[140px]">
                       {related.thumbnailUrl && (
                         <Image
                           src={related.thumbnailUrl}
@@ -242,19 +249,6 @@ export default function WatchPageContent({
                           sizes="140px"
                           className="object-cover transition-transform duration-500 group-hover:scale-110"
                         />
-                      )}
-
-                      {!!related.duration && (
-                        <span
-                          className="
-                            absolute bottom-1.5 right-1.5 rounded-md
-                            bg-black/85 px-1.5 py-0.5
-                            text-[10px] font-semibold text-white
-                            backdrop-blur-sm
-                          "
-                        >
-                          {formatDuration(related.duration)}
-                        </span>
                       )}
                     </div>
 

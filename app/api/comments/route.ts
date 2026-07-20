@@ -50,11 +50,23 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Comment is too long." }, { status: 400 });
   }
 
+  // Snapshot the commenter's current avatar so the comment list can show
+  // it without an extra lookup per comment. app/api/profile/sync keeps
+  // this in sync if they change their photo later.
+  const profileResult = await docClient.send(
+    new GetCommand({
+      TableName: "InPlayer-Users",
+      Key: { userId: user.userId },
+    })
+  );
+  const userAvatarUrl = profileResult.Item?.avatarUrl || null;
+
   const comment = {
     videoId,
     commentId: randomUUID(),
     userId: user.userId,
     userName: user.name || "Anonymous",
+    userAvatarUrl,
     text: text.trim(),
     createdAt: new Date().toISOString(),
   };

@@ -40,12 +40,14 @@ export default function ShareButton({ videoId, title }: ShareButtonProps) {
       onClick={handleShare}
       title="Share"
       className="
-        flex h-11 w-11 items-center justify-center rounded-full
+        flex h-9 w-9 items-center justify-center rounded-full
         border border-white/10 light:border-black/10
         bg-white/[0.03] light:bg-black/[0.02]
         text-slate-300 light:text-slate-600
         transition-all duration-300
         hover:border-white/20 light:hover:border-black/20 hover:bg-white/[0.06]
+
+        lg:h-11 lg:w-11
       "
     >
       {copied ? <Check size={18} className="text-emerald-400" /> : <Share2 size={18} />}

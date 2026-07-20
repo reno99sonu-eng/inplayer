@@ -73,7 +73,7 @@ export default function WatchLaterButton({ videoId }: WatchLaterButtonProps) {
 
   if (loading) {
     return (
-      <div className="h-11 w-11 animate-pulse rounded-full bg-white/10 light:bg-black/5" />
+      <div className="h-9 w-9 animate-pulse rounded-full bg-white/10 light:bg-black/5 lg:h-11 lg:w-11" />
     );
   }
 
@@ -83,8 +83,10 @@ export default function WatchLaterButton({ videoId }: WatchLaterButtonProps) {
       disabled={updating}
       title={saved ? "Remove from Watch Later" : "Save to Watch Later"}
       className={`
-        group relative flex h-11 w-11 items-center justify-center rounded-full
+        group relative flex h-9 w-9 items-center justify-center rounded-full
         border transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-60
+
+        lg:h-11 lg:w-11
         ${
           saved
             ? "border-orange-400/50 bg-gradient-to-br from-orange-500/20 to-amber-400/10 text-orange-300 light:text-orange-700 shadow-[0_0_20px_-5px_rgba(249,115,22,.4)]"

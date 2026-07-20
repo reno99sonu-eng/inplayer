@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PutCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import mux from "@/app/lib/mux";
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
@@ -27,6 +27,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Snapshot the uploader's current avatar so video/short cards can show
+    // it without an extra lookup per item. app/api/profile/sync keeps this
+    // in sync if the uploader changes their photo later.
+    const profileResult = await docClient.send(
+      new GetCommand({
+        TableName: "InPlayer-Users",
+        Key: { userId: user.userId },
+      })
+    );
+    const uploaderAvatarUrl = profileResult.Item?.avatarUrl || null;
+
     // Ask Mux for a one-time direct upload URL. The browser uploads the
     // actual video file straight to this URL — it never passes through
     // our own server, which matters a lot for large video files.
@@ -53,6 +64,7 @@ export async function POST(request: NextRequest) {
           contentType: contentType === "short" ? "short" : "video",
           uploaderId: user.userId,
           uploaderName: user.name || "Unknown",
+          uploaderAvatarUrl,
           uploadedAt: new Date().toISOString(),
           views: 0,
         },

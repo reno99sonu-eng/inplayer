@@ -91,7 +91,7 @@ export default function LikeButton({ videoId }: LikeButtonProps) {
 
   if (loading) {
     return (
-      <div className="h-11 w-32 animate-pulse rounded-full bg-white/10 light:bg-black/5" />
+      <div className="h-9 w-28 animate-pulse rounded-full bg-white/10 light:bg-black/5 lg:h-11 lg:w-32" />
     );
   }
 
@@ -101,8 +101,10 @@ export default function LikeButton({ videoId }: LikeButtonProps) {
         onClick={() => handleReact("like")}
         disabled={updating}
         className={`
-          flex items-center gap-2 px-4 py-2.5 h-11 text-sm font-bold
+          flex items-center gap-1.5 px-3 py-2 h-9 text-sm font-bold
           transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-60
+
+          lg:gap-2 lg:px-4 lg:py-2.5 lg:h-11
           ${
             myReaction === "like"
               ? "bg-gradient-to-br from-orange-500/25 to-amber-400/10 text-orange-300 light:text-orange-700 shadow-[inset_0_0_20px_-8px_rgba(249,115,22,.5)]"
@@ -120,8 +122,10 @@ export default function LikeButton({ videoId }: LikeButtonProps) {
         onClick={() => handleReact("dislike")}
         disabled={updating}
         className={`
-          flex items-center gap-2 px-4 py-2.5 h-11 text-sm font-bold
+          flex items-center gap-1.5 px-3 py-2 h-9 text-sm font-bold
           transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-60
+
+          lg:gap-2 lg:px-4 lg:py-2.5 lg:h-11
           ${
             myReaction === "dislike"
               ? "bg-gradient-to-br from-red-500/25 to-rose-400/10 text-red-300 light:text-red-700 shadow-[inset_0_0_20px_-8px_rgba(239,68,68,.5)]"

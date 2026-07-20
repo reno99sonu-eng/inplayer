@@ -83,7 +83,7 @@ export default function WatchPageContent({
           <div className="group relative">
             <div
               className={`
-                animate-player-glow overflow-hidden rounded-3xl
+                overflow-hidden rounded-3xl
                 ring-1 ring-white/10 light:ring-black/10
                 transition-all duration-500
                 ${theaterMode ? "mx-auto max-w-[1100px]" : ""}
@@ -100,6 +100,7 @@ export default function WatchPageContent({
               onClick={() => setTheaterMode(!theaterMode)}
               title={theaterMode ? "Exit theater mode" : "Theater mode"}
               className="
+                theater-toggle-btn
                 absolute right-3 top-3 z-10
                 flex h-9 w-9 items-center justify-center rounded-full
                 border border-white/10 bg-black/60 text-white backdrop-blur-md

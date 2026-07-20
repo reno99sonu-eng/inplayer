@@ -1,5 +1,6 @@
 "use client";
 
+import { useRef } from "react";
 import MuxPlayer from "@mux/mux-player-react";
 import type { MuxCSSProperties } from "@mux/mux-player-react";
 
@@ -14,27 +15,43 @@ export default function VideoPlayer({
   title,
   videoId,
 }: VideoPlayerProps) {
+  const playerRef = useRef<any>(null);
+
+  const handlePlayerClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const player = playerRef.current;
+    if (!player) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickY = e.clientY - rect.top;
+    const controlBarZone = 64;
+
+    if (clickY > rect.height - controlBarZone) return;
+
+    if (player.paused) {
+      player.play();
+    } else {
+      player.pause();
+    }
+  };
+
   return (
-    // "premium-player" is targeted in globals.css to reskin the center
-    // play button into a neutral dark-glass circle (YouTube-style, no
-    // brand-color gradient). The bottom control bar's dark glass look
-    // comes from --controls-backdrop-color below, not a shadow-DOM
-    // ::part() override, to avoid interfering with the settings menu.
-    <div className="premium-player overflow-hidden rounded-2xl bg-black">
+    <div
+      className="premium-player overflow-hidden rounded-2xl bg-black"
+      onClick={handlePlayerClick}
+    >
       <MuxPlayer
+        ref={playerRef}
         playbackId={playbackId}
         metadata={{
           video_id: videoId,
           video_title: title,
         }}
         videoTitle={title}
-        // A single, deeper "sunset orange" accent (not the bright
-        // orange-to-yellow gradient) for the progress bar — enough brand
-        // identity without reading as loud/cartoonish on the player itself.
         accentColor="#EA580C"
         primaryColor="#FFFFFF"
         defaultHiddenCaptions={false}
         playbackRates={[0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]}
+        autoPlay="muted"
         style={
           {
             width: "100%",

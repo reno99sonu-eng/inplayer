@@ -664,35 +664,38 @@ animation: aiGlassSweep 5.5s linear infinite;
   animation: heartBurst .9s cubic-bezier(.16,1,.3,1);
 }
 
-@keyframes playerGlow {
-  0%, 100% {
-    box-shadow: 0 0 50px -10px rgba(249,115,22,.35), 0 0 100px -20px rgba(249,115,22,.15);
-  }
-  50% {
-    box-shadow: 0 0 70px -10px rgba(249,115,22,.5), 0 0 130px -20px rgba(251,191,36,.25);
-  }
-}
-
+/* Retired: this used to pulse a brand-orange halo around the whole
+   player at all times, which read as loud/cartoonish rather than
+   premium. .premium-player now uses a single static neutral shadow
+   instead (see "Premium Video Player Skin" below) — kept the old
+   .animate-player-glow class name mapped to nothing so we don't have to
+   touch every place it's referenced. */
 .animate-player-glow {
-  animation: playerGlow 5s ease-in-out infinite;
+  animation: none;
 }
 
-/* ---------- Shorts Feed Player (hides Mux's default controls,
-   scoped so the regular watch page's player keeps full controls) ---------- */
+/* ---------- Shorts Feed Player (hides Mux's default controls, and fills
+   the vertical frame edge-to-edge like every real shorts/reels feed
+   instead of letterboxing — scoped so the regular watch page's player
+   keeps its normal 16:9 "contain" behavior) ---------- */
 .shorts-player mux-player {
   --controls: none;
+  --media-object-fit: cover;
 }
 
-/* ---------- Premium Video Player Skin ----------
+/* ---------- Premium Video Player Skin (watch page) ----------
    Neutral, YouTube-style chrome (dark glass, white icons, no candy-colored
    gradients) instead of Mux's stock skin or a loud brand-gradient button.
-   Kept deliberately filter-free: an earlier version used
-   `backdrop-filter: blur(...)` on ::part(bottom), which creates a new CSS
-   stacking context inside Mux's shadow DOM and made the overflow/settings
-   menu (quality, speed) register taps unreliably on mobile. The bottom
-   bar's "glass" look now comes from Mux's own --controls-backdrop-color
-   custom property (set in VideoPlayer.tsx) instead of a hand-rolled
-   ::part(bottom) override, which is both safer and simpler. */
+   Kept deliberately filter-free: `backdrop-filter: blur(...)` on
+   ::part(bottom) creates a new CSS stacking context inside Mux's shadow
+   DOM and made the overflow/settings menu (quality, speed) register taps
+   unreliably on mobile. The bottom bar's "glass" look comes from Mux's
+   own --controls-backdrop-color custom property (set in VideoPlayer.tsx)
+   instead of a hand-rolled ::part(bottom) override. */
+.premium-player {
+  box-shadow: 0 25px 70px -25px rgba(0, 0, 0, .5);
+}
+
 .premium-player mux-player::part(center play button) {
   background: rgba(10, 10, 14, 0.6);
   border: 1px solid rgba(255, 255, 255, 0.18);
@@ -706,6 +709,49 @@ animation: aiGlassSweep 5.5s linear infinite;
   background: rgba(10, 10, 14, 0.8);
   border-color: rgba(255, 255, 255, 0.32);
   transform: scale(1.06);
+}
+
+/* Compact controls on mobile — smaller control bar/buttons/text, never
+   the video itself. Uses Media Chrome's documented sizing variables
+   (Mux Player is built on Media Chrome) instead of transform:scale(),
+   which would also shrink the control bar's width and misalign it. */
+@media (max-width: 1023px) {
+  .premium-player mux-player {
+    --media-control-height: 34px;
+    --media-button-icon-width: 16px;
+    --media-button-icon-height: 16px;
+    --media-font-size: 12px;
+    --media-range-thumb-height: 12px;
+    --media-range-thumb-width: 12px;
+    --media-range-track-height: 3px;
+  }
+}
+
+/* Landscape mobile: fill the whole screen instead of staying pinned to
+   its normal in-page 16:9 box (previously unsupported — rotating the
+   phone did nothing). Rotating back to portrait exits automatically
+   since the media query stops matching. The theater-mode toggle is
+   hidden here too since it's redundant once already full-screen. */
+@media (max-width: 1023px) and (orientation: landscape) {
+  .premium-player {
+    position: fixed !important;
+    inset: 0 !important;
+    z-index: 200;
+    border-radius: 0 !important;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .premium-player mux-player {
+    width: 100% !important;
+    height: 100% !important;
+    aspect-ratio: auto !important;
+  }
+
+  .theater-toggle-btn {
+    display: none;
+  }
 }
 
 /* Hide scrollbar ONLY on mobile; desktop/tablet keep the orange thin scrollbar */

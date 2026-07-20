@@ -77,6 +77,7 @@ async function getRealContent(): Promise<RealContent> {
         videoId: video.videoId,
         muxPlaybackId: video.muxPlaybackId,
         title: video.title,
+        description: video.description,
         creator: video.uploaderName || "Unknown",
         uploaderId: video.uploaderId,
         uploaderAvatarUrl: video.uploaderAvatarUrl,

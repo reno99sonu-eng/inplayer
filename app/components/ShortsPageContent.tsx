@@ -26,6 +26,20 @@ interface ShortsPageContentProps {
   initialShorts: Short[];
 }
 
+// Renders caption/description text with #hashtags highlighted, matching
+// the convention on every real shorts platform.
+function renderWithHashtags(text: string) {
+  return text.split(/(#[^\s#]+)/g).map((part, i) =>
+    part.startsWith("#") ? (
+      <span key={i} className="font-semibold text-sky-300">
+        {part}
+      </span>
+    ) : (
+      <span key={i}>{part}</span>
+    )
+  );
+}
+
 interface LikeState {
   liked: boolean;
   count: number;
@@ -333,7 +347,7 @@ export default function ShortsPageContent({
 
   if (shorts.length === 0) {
     return (
-      <div className="flex h-[calc(100dvh-5rem)] w-full flex-col items-center justify-center bg-black px-6 text-center lg:h-dvh">
+      <div className="fixed inset-0 z-[999] flex flex-col items-center justify-center bg-black px-6 text-center">
         <Clapperboard size={40} className="mb-4 text-slate-600" />
         <p className="font-semibold text-white">No Shorts yet</p>
         <p className="mt-1 text-sm text-slate-400">
@@ -344,17 +358,13 @@ export default function ShortsPageContent({
   }
 
   return (
-    <div
-      className="
-        relative
-        h-[calc(100dvh-5rem)]
-        w-full
-        overflow-hidden
-        bg-black
-
-        lg:h-dvh
-      "
-    >
+    // Fixed to the viewport (not relying on a calc() offset for the site's
+    // navbar/bottom-nav height) so Shorts is a true full-screen immersive
+    // view on every device — the old height-calc approach left the site's
+    // sticky navbar/category bar visible above the video and made this
+    // section fight the page's own scroll, which is what caused the
+    // "doesn't fit" and "not smooth" scrolling issues.
+    <div className="fixed inset-0 z-[999] overflow-hidden bg-black">
       {/* Pinned header — neutral/dark like YouTube's Shorts chrome */}
       <div
         className="
@@ -470,7 +480,11 @@ export default function ShortsPageContent({
         ))}
       </div>
 
-      {/* Vertical swipeable feed */}
+      {/* Vertical swipeable feed. scroll-behavior:smooth deliberately left
+          off — combined with scroll-snap it fights momentum/fling
+          scrolling on mobile and was the main cause of janky swipes.
+          overscroll-contain stops the rubber-band bounce from leaking to
+          the page behind this fixed overlay. */}
       <div
         className="
           mx-auto
@@ -480,7 +494,7 @@ export default function ShortsPageContent({
           snap-y
           snap-mandatory
           overflow-y-scroll
-          scroll-smooth
+          overscroll-contain
           lg:border-x
           lg:border-white/10
           [scrollbar-width:none]
@@ -589,6 +603,12 @@ export default function ShortsPageContent({
                     <h2 className="text-sm font-black leading-tight text-white lg:text-base">
                       {short.title}
                     </h2>
+                  )}
+
+                  {short.description && (
+                    <p className="mt-1 line-clamp-2 text-xs text-slate-200 lg:text-sm">
+                      {renderWithHashtags(short.description)}
+                    </p>
                   )}
 
                   <div className="mt-2 flex items-center gap-2">

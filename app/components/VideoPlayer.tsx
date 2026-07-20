@@ -1,7 +1,7 @@
 "use client";
 
 import MuxPlayer from "@mux/mux-player-react";
-import type { CSSProperties } from "react";
+import type { MuxCSSProperties } from "@mux/mux-player-react";
 
 interface VideoPlayerProps {
   playbackId: string;
@@ -39,7 +39,7 @@ export default function VideoPlayer({
             // only background behind the control bar, instead of layering
             // Mux's default backdrop underneath it.
             "--controls-backdrop-color": "transparent",
-          } as CSSProperties
+          } as MuxCSSProperties
         }
       />
     </div>

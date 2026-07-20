@@ -364,8 +364,11 @@ export default function ShortsPageContent({
     // sticky navbar/category bar visible above the video and made this
     // section fight the page's own scroll, which is what caused the
     // "doesn't fit" and "not smooth" scrolling issues.
-    <div className="fixed inset-0 z-[999] overflow-hidden bg-black">
-      {/* Pinned header — neutral/dark like YouTube's Shorts chrome */}
+    <div className="fixed inset-0 z-[999] overflow-hidden bg-black lg:flex lg:items-center lg:justify-center">
+      {/* Pinned header — neutral/dark like YouTube's Shorts chrome. Capped
+          to the same width as the video column on desktop (see the feed
+          container below) so it doesn't span the full, much-wider desktop
+          viewport disconnected from the actual video. */}
       <div
         className="
           absolute
@@ -382,6 +385,10 @@ export default function ShortsPageContent({
           px-3
           py-3
 
+          lg:left-1/2
+          lg:right-auto
+          lg:w-[480px]
+          lg:-translate-x-1/2
           lg:gap-3
           lg:px-4
           lg:py-4
@@ -495,6 +502,9 @@ export default function ShortsPageContent({
           snap-mandatory
           overflow-y-scroll
           overscroll-contain
+          lg:h-[85vh]
+          lg:max-h-[860px]
+          lg:rounded-2xl
           lg:border-x
           lg:border-white/10
           [scrollbar-width:none]
@@ -562,29 +572,40 @@ export default function ShortsPageContent({
                   </div>
                 )}
 
-                {hasRealVideo ? (
-                  <div className="shorts-player h-full w-full">
-                    <MuxPlayer
-                      ref={playerRef}
-                      playbackId={short.muxPlaybackId}
-                      streamType="on-demand"
-                      autoPlay="muted"
-                      loop
-                      muted={muted}
-                      thumbnailTime={0}
-                      style={{ height: "100%", width: "100%" }}
+                {/* Tapping anywhere on the video itself toggles sound —
+                    matches every real shorts/reels app (tap to
+                    mute/unmute). Scoped to just this video/poster block
+                    (a sibling of the icon-rail buttons below, not a
+                    parent), so tapping Like/Comment/Share/Save never also
+                    toggles mute. */}
+                <div
+                  className="absolute inset-0"
+                  onClick={() => setMuted(!muted)}
+                >
+                  {hasRealVideo ? (
+                    <div className="shorts-player h-full w-full">
+                      <MuxPlayer
+                        ref={playerRef}
+                        playbackId={short.muxPlaybackId}
+                        streamType="on-demand"
+                        autoPlay="muted"
+                        loop
+                        muted={muted}
+                        thumbnailTime={0}
+                        style={{ height: "100%", width: "100%" }}
+                      />
+                    </div>
+                  ) : (
+                    <Image
+                      src={short.poster}
+                      alt={short.title || "InPlay short"}
+                      fill
+                      sizes="100vw"
+                      priority={index === 0}
+                      className="object-cover"
                     />
-                  </div>
-                ) : (
-                  <Image
-                    src={short.poster}
-                    alt={short.title || "InPlay short"}
-                    fill
-                    sizes="100vw"
-                    priority={index === 0}
-                    className="object-cover"
-                  />
-                )}
+                  )}
+                </div>
 
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/10" />
 

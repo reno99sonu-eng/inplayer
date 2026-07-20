@@ -86,7 +86,7 @@ export default function WatchPageContent({
                 overflow-hidden rounded-3xl
                 ring-1 ring-white/10 light:ring-black/10
                 transition-all duration-500
-                ${theaterMode ? "mx-auto max-w-[1100px]" : ""}
+                ${theaterMode ? "mx-auto max-w-[1100px]" : "lg:max-w-[820px]"}
               `}
             >
               <VideoPlayer

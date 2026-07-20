@@ -60,6 +60,7 @@ async function getRealContent(): Promise<RealContent> {
       .map((video) => ({
         id: video.videoId,
         videoId: video.videoId,
+        muxPlaybackId: video.muxPlaybackId,
         title: video.title,
         creator: video.uploaderName || "Unknown",
         avatar: video.uploaderAvatarUrl || "/avatars/avatar.png",

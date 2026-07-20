@@ -17,7 +17,17 @@ export default function VideoPlayer({
 }: VideoPlayerProps) {
   const playerRef = useRef<any>(null);
 
-  const handlePlayerClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  // Mux Player has its own BUILT-IN click-to-toggle-play/pause gesture on
+  // the video surface (confirmed in Mux/media-chrome's own docs — this is
+  // why clicking did nothing on desktop: our handler ran on the normal
+  // bubble phase, AFTER Mux's own internal listener had already toggled
+  // the state, so our toggle just flipped it right back). Fix: run in the
+  // CAPTURE phase instead (fires on the way down, before Mux's own
+  // listener), and stopPropagation() there so Mux's built-in gesture never
+  // fires at all — but only for clicks on the video itself, never inside
+  // the bottom control-bar zone, so the real play/pause button, volume,
+  // scrubber, settings and fullscreen controls keep working normally.
+  const handlePlayerClickCapture = (e: React.MouseEvent<HTMLDivElement>) => {
     const player = playerRef.current;
     if (!player) return;
 
@@ -26,6 +36,8 @@ export default function VideoPlayer({
     const controlBarZone = 64;
 
     if (clickY > rect.height - controlBarZone) return;
+
+    e.stopPropagation();
 
     if (player.paused) {
       player.play();
@@ -37,7 +49,7 @@ export default function VideoPlayer({
   return (
     <div
       className="premium-player overflow-hidden rounded-2xl bg-black"
-      onClick={handlePlayerClick}
+      onClickCapture={handlePlayerClickCapture}
     >
       <MuxPlayer
         ref={playerRef}
@@ -51,7 +63,7 @@ export default function VideoPlayer({
         primaryColor="#FFFFFF"
         defaultHiddenCaptions={false}
         playbackRates={[0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]}
-        autoPlay="muted"
+        autoPlay={true}
         style={
           {
             width: "100%",

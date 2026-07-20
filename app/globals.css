@@ -683,6 +683,16 @@ animation: aiGlassSweep 5.5s linear infinite;
   --media-object-fit: cover;
 }
 
+/* ---------- Homepage Hover Preview (desktop) ----------
+   Silent, chrome-free preview clip shown over a video card's thumbnail on
+   hover — same idea as YouTube's own hover preview. No controls, and the
+   wrapper itself is pointer-events-none (see RecommendationFeed.tsx) so it
+   never blocks the card's click-through to the watch page. */
+.preview-player mux-player {
+  --controls: none;
+  --media-object-fit: cover;
+}
+
 /* ---------- Premium Video Player Skin (watch page) ----------
    Neutral, YouTube-style chrome (dark glass, white icons, no candy-colored
    gradients) instead of Mux's stock skin or a loud brand-gradient button.

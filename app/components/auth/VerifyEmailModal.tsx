@@ -105,39 +105,53 @@ export default function VerifyEmailModal({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="
-          relative w-full max-w-[440px]
-          max-h-[92vh] overflow-y-auto
-          [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
-          rounded-[28px] sm:rounded-[30px]
-          border border-orange-400/15 light:border-orange-400/25
-          bg-gradient-to-br from-[#07111F]/95 via-[#0B1728]/95 to-[#040A14]/95
-          light:from-white/98 light:via-slate-50/98 light:to-white/98
-          p-5 sm:p-7
-          shadow-[0_25px_90px_rgba(0,0,0,.55)]
-          light:shadow-[0_25px_90px_rgba(0,0,0,.18)]
-          animate-aiPopup
-        "
+        className="relative w-full max-w-[440px]"
       >
-        <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[28px] sm:rounded-[30px]">
-          <div className="absolute -left-16 -top-16 h-48 w-48 rounded-full bg-orange-500/10 blur-[80px]" />
-          <div className="absolute -right-16 bottom-0 h-40 w-40 rounded-full bg-cyan-500/10 blur-[80px]" />
-        </div>
-
+        {/* Deliberately OUTSIDE the scrollable card below (and given its
+            own higher z-index) so it always stays reachable at the same
+            spot even when the card's own content scrolls — e.g. the
+            mobile keyboard shrinking the viewport while a field is
+            focused used to push this out of view/out of tapping range
+            when it lived inside the scrolling area. stopPropagation here
+            too, defensively, so it can never depend on bubbling order. */}
         <button
           type="button"
-          onClick={onClose}
+          onClick={(e) => {
+            e.stopPropagation();
+            onClose();
+          }}
           className="
-            absolute right-4 top-4 z-10 flex h-9 w-9 items-center justify-center
+            absolute right-4 top-4 z-20 flex h-9 w-9 items-center justify-center
             rounded-full border border-white/10 light:border-black/10
             bg-white/5 light:bg-black/5
             text-slate-300 light:text-slate-600
+            backdrop-blur-xl
             transition-all duration-300
             hover:rotate-90 hover:border-orange-400/40 hover:bg-orange-500/10 hover:text-white light:hover:text-slate-900
           "
         >
           <X size={18} />
         </button>
+
+        <div
+          className="
+            relative
+            max-h-[92vh] overflow-y-auto
+            [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
+            rounded-[28px] sm:rounded-[30px]
+            border border-orange-400/15 light:border-orange-400/25
+            bg-gradient-to-br from-[#07111F]/95 via-[#0B1728]/95 to-[#040A14]/95
+            light:from-white/98 light:via-slate-50/98 light:to-white/98
+            p-5 sm:p-7
+            shadow-[0_25px_90px_rgba(0,0,0,.55)]
+            light:shadow-[0_25px_90px_rgba(0,0,0,.18)]
+            animate-aiPopup
+          "
+        >
+        <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[28px] sm:rounded-[30px]">
+          <div className="absolute -left-16 -top-16 h-48 w-48 rounded-full bg-orange-500/10 blur-[80px]" />
+          <div className="absolute -right-16 bottom-0 h-40 w-40 rounded-full bg-cyan-500/10 blur-[80px]" />
+        </div>
 
         <div className="relative z-10">
           <span
@@ -238,6 +252,7 @@ export default function VerifyEmailModal({
               {resending ? "Sending..." : "Resend Code"}
             </button>
           </div>
+        </div>
         </div>
       </div>
     </div>

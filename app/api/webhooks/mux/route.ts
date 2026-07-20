@@ -69,6 +69,58 @@ export async function POST(request: NextRequest) {
         },
       })
     );
+
+    // Kick off automatic caption generation on the asset's primary audio
+    // track (applies to both videos and Shorts — unlike Download, this is
+    // a universally-useful accessibility feature, not gated to one content
+    // type). Mux runs speech recognition against the track and, once
+    // done, adds a real subtitle text track to the asset. Mux Player
+    // already has defaultHiddenCaptions={false} set in VideoPlayer.tsx, so
+    // it picks the finished track up on its own straight from the
+    // playback manifest the moment it's ready — no DB column, no
+    // polling, no extra UI needed on our end. "auto" lets Mux detect
+    // whichever language is actually spoken instead of assuming every
+    // upload is English, since creators here aren't all speaking the same
+    // language. Silent videos (no audio track) simply have nothing to
+    // caption — that's an expected case, not an error.
+    const audioTrack = asset.tracks?.find(
+      (track: { type?: string; id?: string }) => track.type === "audio"
+    );
+
+    if (audioTrack?.id) {
+      try {
+        await mux.video.assets.generateSubtitles(asset.id, audioTrack.id, {
+          generated_subtitles: [
+            { language_code: "auto", name: "Auto-generated" },
+          ],
+        });
+      } catch (err) {
+        // Never let a captions failure affect the asset itself finishing
+        // up as "ready" above — the video is already fully playable
+        // without captions, and generating them is best-effort.
+        console.error("Caption generation request failed:", err);
+      }
+    }
+  }
+
+  // Fires once a generated subtitle track (or any text track) finishes
+  // processing. Nothing to persist here — see the comment above, Mux
+  // Player already surfaces the track on its own — this is just for
+  // server-side visibility into whether generation actually succeeded.
+  if (event.type === "video.asset.track.ready") {
+    const track = event.data;
+    if (track.text_source === "generated_vod") {
+      console.log(
+        `Captions ready — asset ${event.object.id}, track ${track.id}`
+      );
+    }
+  }
+
+  if (event.type === "video.asset.track.errored") {
+    console.error(
+      `Track generation failed — asset ${event.object.id}:`,
+      event.data
+    );
   }
 
   // Fires once the downloadable "highest" MP4 we requested at upload time

@@ -737,31 +737,36 @@ animation: aiGlassSweep 5.5s linear infinite;
   }
 }
 
-/* Landscape mobile: fill the whole screen instead of staying pinned to
-   its normal in-page 16:9 box (previously unsupported — rotating the
-   phone did nothing). Rotating back to portrait exits automatically
-   since the media query stops matching. The theater-mode toggle is
-   hidden here too since it's redundant once already full-screen. */
-@media (max-width: 1023px) and (orientation: landscape) {
-  .premium-player {
-    position: fixed !important;
-    inset: 0 !important;
-    z-index: 200;
-    border-radius: 0 !important;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
+/* Real fullscreen (via the Fullscreen API — triggered by VideoPlayer's own
+   mobile Expand button, Mux's built-in fullscreen control, or the
+   browser's native controls) fills the whole screen and centers the
+   video, regardless of which control was used to enter it. Replaces the
+   old `@media (orientation: landscape)` hack, which faked "fullscreen"
+   purely from device orientation with no connection to the browser's
+   actual fullscreen state — that mismatch is what made the video size
+   and position itself inconsistently after rotating, especially when
+   Mux's own fullscreen button (rather than ours) was the one used.
+   :-webkit-full-screen covers older WebKit/Safari, which doesn't resolve
+   the standard :fullscreen pseudo-class on the target element. No
+   `.theater-toggle-btn { display: none }` rule is needed here anymore —
+   that button lives outside this element in the DOM, so the browser
+   simply doesn't paint it while this element is the fullscreen target. */
+.premium-player:fullscreen,
+.premium-player:-webkit-full-screen {
+  width: 100vw;
+  height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  border-radius: 0 !important;
+}
 
-  .premium-player mux-player {
-    width: 100% !important;
-    height: 100% !important;
-    aspect-ratio: auto !important;
-  }
-
-  .theater-toggle-btn {
-    display: none;
-  }
+.premium-player:fullscreen mux-player,
+.premium-player:-webkit-full-screen mux-player {
+  width: 100%;
+  max-height: 100%;
+  aspect-ratio: auto !important;
 }
 
 /* Hide scrollbar ONLY on mobile; desktop/tablet keep the orange thin scrollbar */

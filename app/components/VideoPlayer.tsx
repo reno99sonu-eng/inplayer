@@ -15,10 +15,11 @@ export default function VideoPlayer({
   videoId,
 }: VideoPlayerProps) {
   return (
-    // "premium-player" is targeted in globals.css to reskin Mux's default
-    // control bar (glass gradient + blur) and center play button (brand
-    // gradient orb) — Mux Player's built-in props only take color theming
-    // so far, the rest is done via ::part() selectors on the custom element.
+    // "premium-player" is targeted in globals.css to reskin the center
+    // play button into a neutral dark-glass circle (YouTube-style, no
+    // brand-color gradient). The bottom control bar's dark glass look
+    // comes from --controls-backdrop-color below, not a shadow-DOM
+    // ::part() override, to avoid interfering with the settings menu.
     <div className="premium-player overflow-hidden rounded-2xl bg-black">
       <MuxPlayer
         playbackId={playbackId}
@@ -27,7 +28,10 @@ export default function VideoPlayer({
           video_title: title,
         }}
         videoTitle={title}
-        accentColor="#FF9A00"
+        // A single, deeper "sunset orange" accent (not the bright
+        // orange-to-yellow gradient) for the progress bar — enough brand
+        // identity without reading as loud/cartoonish on the player itself.
+        accentColor="#EA580C"
         primaryColor="#FFFFFF"
         defaultHiddenCaptions={false}
         playbackRates={[0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]}
@@ -35,10 +39,7 @@ export default function VideoPlayer({
           {
             width: "100%",
             aspectRatio: "16 / 9",
-            // Let our own ::part(bottom) gradient in globals.css be the
-            // only background behind the control bar, instead of layering
-            // Mux's default backdrop underneath it.
-            "--controls-backdrop-color": "transparent",
+            "--controls-backdrop-color": "rgba(0, 0, 0, 0.7)",
           } as MuxCSSProperties
         }
       />

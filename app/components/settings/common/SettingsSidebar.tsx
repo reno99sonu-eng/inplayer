@@ -1,80 +1,11 @@
 "use client";
 
-import {
-  Palette,
-  Settings,
-  PlayCircle,
-  Shield,
-  CreditCard,
-  BarChart3,
-  HardDrive,
-  Bell,
-  Info,
-} from "lucide-react";
-
-type Section =
-  | "appearance"
-  | "general"
-  | "playback"
-  | "privacy"
-  | "payments"
-  | "analytics"
-  | "storage"
-  | "notifications"
-  | "about";
+import { SETTINGS_SECTIONS, type Section } from "./settingsConfig";
 
 interface SettingsSidebarProps {
   active: Section;
   onChange: (section: Section) => void;
 }
-
-const items = [
-  {
-    id: "appearance",
-    label: "Appearance",
-    icon: Palette,
-  },
-  {
-    id: "general",
-    label: "General",
-    icon: Settings,
-  },
-  {
-    id: "playback",
-    label: "Playback",
-    icon: PlayCircle,
-  },
-  {
-    id: "privacy",
-    label: "Account & Privacy",
-    icon: Shield,
-  },
-  {
-    id: "payments",
-    label: "Plans & Purchases",
-    icon: CreditCard,
-  },
-  {
-    id: "analytics",
-    label: "User Analytics",
-    icon: BarChart3,
-  },
-  {
-    id: "storage",
-    label: "Storage",
-    icon: HardDrive,
-  },
-  {
-    id: "notifications",
-    label: "Notifications",
-    icon: Bell,
-  },
-  {
-    id: "about",
-    label: "About",
-    icon: Info,
-  },
-] as const;
 
 export default function SettingsSidebar({
   active,
@@ -85,7 +16,7 @@ export default function SettingsSidebar({
       className="
         hidden
         lg:block
-        w-[280px]
+        w-[272px]
         shrink-0
       "
     >
@@ -96,12 +27,12 @@ export default function SettingsSidebar({
           rounded-[28px]
           border
           border-white/10
-          bg-white/[0.03]
-          p-3
+          bg-white/[0.025]
+          p-2.5
           backdrop-blur-xl
         "
       >
-        {items.map((item) => {
+        {SETTINGS_SECTIONS.map((item) => {
           const Icon = item.icon;
 
           const selected = active === item.id;
@@ -112,38 +43,64 @@ export default function SettingsSidebar({
               type="button"
               onClick={() => onChange(item.id)}
               className={`
-                mb-2
+                group
+                relative
+                mb-1
                 flex
                 w-full
                 items-center
                 gap-3
+                overflow-hidden
                 rounded-2xl
                 px-4
                 py-3
                 text-left
                 transition-all
                 duration-300
+                ease-out
                 ${
                   selected
-                    ? "bg-gradient-to-r from-orange-500/20 to-amber-400/10 border border-orange-400/30"
-                    : "hover:bg-white/5"
+                    ? "bg-white/[0.06]"
+                    : "hover:bg-white/[0.035]"
                 }
               `}
             >
+              {/* A slim accent bar is the only brand-color signal here —
+                  deliberately restrained rather than a full gradient
+                  fill, per the "keep it premium, not gold-heavy" brief. */}
+              <span
+                className={`
+                  absolute
+                  left-0
+                  top-1/2
+                  h-5
+                  w-[3px]
+                  -translate-y-1/2
+                  rounded-full
+                  bg-gradient-to-b
+                  from-orange-400
+                  to-amber-300
+                  transition-opacity
+                  duration-300
+                  ease-out
+                  ${selected ? "opacity-100" : "opacity-0"}
+                `}
+              />
+
               <Icon
-                size={20}
+                size={19}
                 className={
                   selected
-                    ? "text-orange-300"
-                    : "text-slate-400"
+                    ? "text-white"
+                    : "text-slate-400 transition-colors duration-300 ease-out group-hover:text-slate-200"
                 }
               />
 
               <span
                 className={
                   selected
-                    ? "font-bold text-white"
-                    : "font-medium text-slate-300"
+                    ? "font-semibold text-white"
+                    : "font-medium text-slate-400 transition-colors duration-300 ease-out group-hover:text-slate-200"
                 }
               >
                 {item.label}

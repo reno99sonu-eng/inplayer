@@ -33,8 +33,9 @@ export default function SettingsSelect({
           outline-none
           transition-all
           duration-300
-          hover:border-orange-400/40
-          focus:border-orange-400
+          ease-out
+          hover:border-white/25
+          focus:border-white/40
           focus:bg-white/[0.06]
           cursor-pointer
         "

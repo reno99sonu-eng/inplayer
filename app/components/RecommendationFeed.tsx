@@ -8,6 +8,7 @@ import { MoreVertical, ChevronDown } from "lucide-react";
 import { recommendations, type Recommendation } from "../data/recommendations";
 import { shorts, type Short } from "../data/shorts";
 import ShortsShelf from "./ShortsShelf";
+import { useSettings } from "./settings/SettingsProvider";
 
 // Hover-preview delay — don't start streaming a preview for every card the
 // mouse passes over while scrolling, only once the user actually pauses on
@@ -27,6 +28,7 @@ function VideoCard({ video }: { video: Recommendation }) {
   const [canHover, setCanHover] = useState(false);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cardRef = useRef<HTMLDivElement | null>(null);
+  const { playback } = useSettings();
 
   // Only real devices with an actual mouse get the hover preview — on
   // touch devices "hover" is either unsupported or fires unreliably on
@@ -43,9 +45,11 @@ function VideoCard({ video }: { video: Recommendation }) {
   // preview once the card is significantly scrolled into view, same as
   // Instagram/Facebook video feeds do. Only wired up when the device
   // genuinely can't hover, so this and the mouse-hover behavior above
-  // never both fire for the same card.
+  // never both fire for the same card. Skipped entirely when Data Saver
+  // is on (Settings → Playback) — that's the real, working effect of the
+  // toggle: no autoplaying preview clips burning mobile data.
   useEffect(() => {
-    if (canHover || !video.muxPlaybackId || !cardRef.current) return;
+    if (canHover || !video.muxPlaybackId || !cardRef.current || playback.dataSaver) return;
 
     const el = cardRef.current;
     const observer = new IntersectionObserver(
@@ -54,10 +58,10 @@ function VideoCard({ video }: { video: Recommendation }) {
     );
     observer.observe(el);
     return () => observer.disconnect();
-  }, [canHover, video.muxPlaybackId]);
+  }, [canHover, video.muxPlaybackId, playback.dataSaver]);
 
   const startPreview = () => {
-    if (!canHover || !video.muxPlaybackId) return;
+    if (!canHover || !video.muxPlaybackId || playback.dataSaver) return;
     hoverTimer.current = setTimeout(() => setPreviewing(true), HOVER_PREVIEW_DELAY);
   };
 

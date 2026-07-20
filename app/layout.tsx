@@ -5,6 +5,7 @@ import "./globals.css";
 import Navbar from "./components/Navbar";
 import MobileBottomNav from "./components/MobileBottomNav";
 import { ThemeProvider } from "./components/ThemeProvider";
+import { SettingsProvider } from "./components/settings/SettingsProvider";
 import AuthProvider from "./components/auth/AuthProvider";
 
 const jakarta = Plus_Jakarta_Sans({
@@ -34,11 +35,13 @@ export default function RootLayout({
   `}
 >
 <AuthProvider>
-  <ThemeProvider>
-    <Navbar />
-    <div className="pb-20 lg:pb-0">{children}</div>
-    <MobileBottomNav />
-  </ThemeProvider>
+  <SettingsProvider>
+    <ThemeProvider>
+      <Navbar />
+      <div className="pb-20 lg:pb-0">{children}</div>
+      <MobileBottomNav />
+    </ThemeProvider>
+  </SettingsProvider>
 </AuthProvider>
       </body>
     </html>

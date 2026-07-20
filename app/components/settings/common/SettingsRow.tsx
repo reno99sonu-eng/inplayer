@@ -40,8 +40,9 @@ export default function SettingsRow({
         text-left
         transition-all
         duration-300
-        hover:border-orange-400/20
-        hover:bg-white/[0.04]
+        ease-out
+        hover:border-white/10
+        hover:bg-white/[0.035]
         hover:-translate-y-0.5
       "
     >
@@ -57,10 +58,11 @@ export default function SettingsRow({
             rounded-xl
             transition-all
             duration-300
+            ease-out
             ${
               active
-                ? "bg-orange-500/20 text-orange-300"
-                : "bg-white/5 text-slate-300 group-hover:bg-orange-500/10 group-hover:text-orange-300"
+                ? "bg-white/10 text-white"
+                : "bg-white/5 text-slate-400 group-hover:bg-white/10 group-hover:text-white"
             }
           `}
         >
@@ -88,18 +90,22 @@ export default function SettingsRow({
         {children}
 
         {value && (
-          <span className="text-sm font-medium text-orange-300">
+          <span className="flex items-center gap-1.5 text-sm font-medium text-slate-300">
+            {active && (
+              <span className="h-1.5 w-1.5 rounded-full bg-orange-400" />
+            )}
             {value}
           </span>
         )}
 
-        {!children && (
+        {!children && !value && (
           <ChevronRight
             size={18}
             className="
               text-slate-500
               transition-transform
               duration-300
+              ease-out
               group-hover:translate-x-1
             "
           />

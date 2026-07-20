@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import {
   Shield,
   Eye,
@@ -12,12 +11,10 @@ import {
 import SettingsCard from "../common/SettingsCard";
 import SettingsRow from "../common/SettingsRow";
 import SettingsToggle from "../common/SettingsToggle";
+import { useSettings } from "../SettingsProvider";
 
 export default function PrivacySection() {
-  const [privateAccount, setPrivateAccount] = useState(false);
-  const [watchHistory, setWatchHistory] = useState(true);
-  const [personalizedAds, setPersonalizedAds] = useState(true);
-  const [biometricLogin, setBiometricLogin] = useState(true);
+  const { privacy, updatePrivacy } = useSettings();
 
   return (
     <SettingsCard
@@ -33,8 +30,8 @@ export default function PrivacySection() {
           description="Only approved followers can view your profile."
         >
           <SettingsToggle
-            checked={privateAccount}
-            onChange={setPrivateAccount}
+            checked={privacy.privateAccount}
+            onChange={(checked) => updatePrivacy({ privateAccount: checked })}
           />
         </SettingsRow>
 
@@ -44,8 +41,8 @@ export default function PrivacySection() {
           description="Save your viewing history across devices."
         >
           <SettingsToggle
-            checked={watchHistory}
-            onChange={setWatchHistory}
+            checked={privacy.watchHistory}
+            onChange={(checked) => updatePrivacy({ watchHistory: checked })}
           />
         </SettingsRow>
 
@@ -55,8 +52,8 @@ export default function PrivacySection() {
           description="Use your activity to improve recommendations."
         >
           <SettingsToggle
-            checked={personalizedAds}
-            onChange={setPersonalizedAds}
+            checked={privacy.personalizedAds}
+            onChange={(checked) => updatePrivacy({ personalizedAds: checked })}
           />
         </SettingsRow>
 
@@ -66,8 +63,8 @@ export default function PrivacySection() {
           description="Use Face ID or fingerprint when available."
         >
           <SettingsToggle
-            checked={biometricLogin}
-            onChange={setBiometricLogin}
+            checked={privacy.biometricLogin}
+            onChange={(checked) => updatePrivacy({ biometricLogin: checked })}
           />
         </SettingsRow>
 

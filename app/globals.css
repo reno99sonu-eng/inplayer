@@ -775,3 +775,22 @@ animation: aiGlassSweep 5.5s linear infinite;
     display: none;
   }
 }
+/* ---------- Settings (Premium Redesign) ----------
+   A restrained fade+rise used only when switching between Settings
+   tabs/sections — keyed remount in SettingsContent.tsx replays this each
+   time, giving the page switch a smooth, deliberate feel instead of an
+   abrupt swap. */
+@keyframes settingsFadeIn {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-settings-fade {
+  animation: settingsFadeIn .45s cubic-bezier(.16,1,.3,1) both;
+}

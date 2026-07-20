@@ -28,7 +28,7 @@ export default function NavigationCategories() {
     <div
       className="
         sticky
-        top-16
+        top-14
         lg:top-20
         z-40
         overflow-hidden
@@ -55,10 +55,10 @@ export default function NavigationCategories() {
           whitespace-nowrap
           px-4
           lg:px-5
-          pt-2.5
+          pt-2
           lg:pt-3
-          pb-9
-          -mb-6
+          pb-7
+          -mb-4
           [scrollbar-width:none]
           [&::-webkit-scrollbar]:hidden
         "
@@ -80,8 +80,8 @@ export default function NavigationCategories() {
                 flex-shrink-0
                 rounded-lg
                 lg:rounded-xl
-                px-3
-                py-1.5
+                px-2.5
+                py-1
                 lg:px-5
                 lg:py-2.5
                 text-xs

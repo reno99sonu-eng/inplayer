@@ -63,7 +63,19 @@ export default function VideoPlayer({
         primaryColor="#FFFFFF"
         defaultHiddenCaptions={false}
         playbackRates={[0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]}
-        autoPlay={true}
+        // "any": try to autoplay WITH sound first; if the browser blocks
+        // that (very common on mobile, especially iOS Safari, far more
+        // aggressive about this than desktop), Mux automatically retries
+        // muted instead of just giving up. Plain `autoPlay={true}` doesn't
+        // fall back at all — on mobile that meant the video just sat there
+        // un-played until a manual tap, which combined with no poster
+        // frame (fixed below) is exactly what read as "a lot of empty
+        // black space" on the watch page.
+        autoPlay="any"
+        // Gives Mux a real poster frame (auto-generated from the video
+        // itself) to show before playback starts and whenever it's
+        // paused/ended, instead of a flat black rectangle.
+        thumbnailTime={0}
         style={
           {
             width: "100%",

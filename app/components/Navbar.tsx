@@ -122,7 +122,7 @@ export default function Navbar() {
     INPLAYER
   </span>
 </div>
-        <div className="mx-auto flex h-16 lg:h-20 max-w-[1700px] items-center px-4 lg:px-5">
+        <div className="mx-auto flex h-14 lg:h-20 max-w-[1700px] items-center px-3 lg:px-5">
 
 
         
@@ -285,7 +285,7 @@ export default function Navbar() {
   open={mobileSearchOpen}
   onClose={() => setMobileSearchOpen(false)}
 />
-      <Suspense fallback={<div className="h-[68px] border-b border-white/5 light:border-black/5 bg-[#06101D]/95 light:bg-white/95" />}>
+      <Suspense fallback={<div className="h-[48px] border-b border-white/5 light:border-black/5 bg-[#06101D]/95 light:bg-white/95" />}>
         <NavigationCategories />
       </Suspense>
       {/* Backdrop */}
@@ -326,13 +326,13 @@ lg:right-auto
         `}
       >
         <div className="flex h-full flex-col">
-          <div className="border-b border-white/10 light:border-black/10 px-6 py-5">
-            <h2 className="text-xl font-black text-white light:text-slate-900">INPLAYER</h2>
+          <div className="border-b border-white/10 light:border-black/10 px-5 py-3.5">
+            <h2 className="text-lg font-black text-white light:text-slate-900">INPLAYER</h2>
           </div>
 
-          <div className="flex-1 overflow-y-auto px-3 py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div className="flex-1 overflow-y-auto px-3 py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
 
-            <button className="mb-3 w-full rounded-2xl bg-gradient-to-r from-orange-500 via-amber-400 to-yellow-300 py-2.5 font-bold text-white transition hover:scale-[1.02]">
+            <button className="mb-3 w-full rounded-2xl bg-gradient-to-r from-orange-500 via-amber-400 to-yellow-300 py-2 text-sm font-bold text-white transition hover:scale-[1.02]">
               ✦ Premium
             </button>
 

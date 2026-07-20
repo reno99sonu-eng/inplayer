@@ -10,16 +10,31 @@ import { docClient } from "@/app/lib/dynamodb";
 // this follows the same Scan-based lookup pattern already used elsewhere
 // in this codebase (app/api/my-videos, app/shorts, etc.) rather than
 // introducing a new indexing strategy just for this.
+//
+// DynamoDB caps a single Scan response at ~1MB, and silently returns only
+// that page — it does NOT automatically follow the rest of the table.
+// A one-shot Scan (no LastEvaluatedKey loop) can therefore miss a
+// genuinely-matching item once the table outgrows that page, with no
+// error raised — it just looks like "no video found". Looping here
+// guarantees the whole table gets checked no matter how large it gets.
 async function findVideoByAssetId(assetId: string) {
-  const result = await docClient.send(
-    new ScanCommand({
-      TableName: "InPlayer-Videos",
-      FilterExpression: "muxAssetId = :assetId",
-      ExpressionAttributeValues: { ":assetId": assetId },
-    })
-  );
+  let exclusiveStartKey: Record<string, unknown> | undefined;
 
-  return result.Items?.[0];
+  do {
+    const result = await docClient.send(
+      new ScanCommand({
+        TableName: "InPlayer-Videos",
+        FilterExpression: "muxAssetId = :assetId",
+        ExpressionAttributeValues: { ":assetId": assetId },
+        ExclusiveStartKey: exclusiveStartKey,
+      })
+    );
+
+    if (result.Items?.[0]) return result.Items[0];
+    exclusiveStartKey = result.LastEvaluatedKey;
+  } while (exclusiveStartKey);
+
+  return undefined;
 }
 
 export async function POST(request: NextRequest) {
@@ -146,7 +161,19 @@ export async function POST(request: NextRequest) {
           })
         );
       } else {
+        // Returning 200 here would tell Mux this event was delivered
+        // successfully — Mux never sends it again after that, which
+        // would leave the matching video's download permanently stuck in
+        // "preparing" with no way to recover (this is exactly what
+        // happened before this fix). Returning a non-2xx instead makes
+        // Mux retry this same delivery on its own backoff schedule, so a
+        // transient lookup issue gets a real chance to resolve instead of
+        // silently stranding the video.
         console.error("static_rendition.ready: no video found for asset", assetId);
+        return NextResponse.json(
+          { error: "No matching video found, will retry" },
+          { status: 500 }
+        );
       }
     }
   }

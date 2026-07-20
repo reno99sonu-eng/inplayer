@@ -81,6 +81,12 @@ export async function POST(request: NextRequest) {
           // videos (the static rendition requested above is already in
           // flight), flips to "ready" once Mux's webhook confirms it.
           downloadStatus: isShort ? "unavailable" : "preparing",
+          // Timestamps when the rendition was requested, so prepare-download
+          // can tell a genuinely in-flight request apart from one stuck
+          // because its webhook got silently lost (see prepare-download's
+          // STUCK_THRESHOLD_MS). Only meaningful alongside downloadStatus
+          // "preparing", so only set for videos, matching that field above.
+          ...(!isShort && { downloadRequestedAt: new Date().toISOString() }),
         },
       })
     );

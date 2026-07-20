@@ -13,6 +13,12 @@ interface DownloadButtonProps {
 }
 
 const POLL_INTERVAL_MS = 4000;
+// Comfortably longer than prepare-download's own STUCK_THRESHOLD_MS
+// (3 minutes) so that by the time this gives up and the viewer clicks
+// Download again, the server is already willing to kick off a fresh
+// rendition request rather than just repeating "preparing" — see
+// app/api/videos/[videoId]/prepare-download/route.ts.
+const POLL_GIVE_UP_MS = 4 * 60 * 1000;
 
 // Videos only — never rendered for Shorts (see WatchPageContent.tsx). A
 // video with no static rendition requested yet (anything uploaded before
@@ -37,7 +43,22 @@ export default function DownloadButton({
 
   const startPolling = () => {
     stopPolling();
+    const startedAt = Date.now();
+
     pollRef.current = setInterval(async () => {
+      // A rendition normally finishes in well under this window. Taking
+      // this long almost always means the webhook that would flip this
+      // to "ready" got lost — polling /status forever would just spin
+      // silently in that case (exactly what used to happen). Give up and
+      // switch to a retryable "errored" state instead — clicking Download
+      // again calls prepare-download, which by now is past its own
+      // stuck-detection threshold and will request a fresh rendition.
+      if (Date.now() - startedAt > POLL_GIVE_UP_MS) {
+        setStatus("errored");
+        stopPolling();
+        return;
+      }
+
       try {
         const res = await fetch(`/api/videos/${videoId}/status`);
         const data = await res.json();

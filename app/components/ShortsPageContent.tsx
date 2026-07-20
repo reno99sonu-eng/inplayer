@@ -59,15 +59,15 @@ export default function ShortsPageContent({
   const shorts = initialShorts;
 
   const [activeIndex, setActiveIndex] = useState(0);
-  // Starts muted — every browser (mobile especially) silently keeps
-  // audio suppressed at the hardware level until a real, direct user
-  // gesture explicitly unmutes it, no matter what this starts as. Defaulting
-  // to "false" here made the FIRST tap look like it was muting (since the
-  // icon already showed "unmuted"), so it took two taps to actually hear
-  // anything. Starting honestly muted, with one reliable tap to unmute
-  // (see unmute() below), fixes that — same convention every real
-  // short-video app uses.
-  const [muted, setMuted] = useState(true);
+  // Try for sound from the very first frame (matches the watch page) —
+  // paired with autoPlay="any" below, which attempts unmuted playback
+  // first and only falls back to muted if the browser actually blocks it
+  // (mobile browsers do this far more often than desktop). The
+  // volumechange listener further down keeps this state truthful if that
+  // silent fallback happens, so the speaker icon never lies about
+  // whether sound is really playing — and a single tap always reliably
+  // fixes it either way (see toggleMuted below).
+  const [muted, setMuted] = useState(false);
   const [burstIndex, setBurstIndex] = useState<number | null>(null);
   const [progress, setProgress] = useState(0);
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
@@ -134,6 +134,27 @@ export default function ShortsPageContent({
 
     player.addEventListener("timeupdate", handleTimeUpdate);
     return () => player.removeEventListener("timeupdate", handleTimeUpdate);
+  }, [activeIndex]);
+
+  // Keeps the speaker icon truthful. autoPlay="any" tries unmuted
+  // playback first and silently falls back to muted if the browser
+  // blocks it (common on mobile) — without this, the icon could keep
+  // showing "sound on" even though playback quietly fell back to muted,
+  // which is exactly the "no sound but the icon looks fine" confusion
+  // reported before. This syncs React state to whatever the player is
+  // ACTUALLY doing, whenever that changes for any reason (autoplay
+  // fallback, a tap, anything else).
+  useEffect(() => {
+    const player = playerRef.current;
+    if (!player) return;
+
+    function syncMuted() {
+      setMuted(player.muted);
+    }
+
+    syncMuted();
+    player.addEventListener("volumechange", syncMuted);
+    return () => player.removeEventListener("volumechange", syncMuted);
   }, [activeIndex]);
 
   // Lazy-load real like / subscribe / save / comment-count status for
@@ -668,7 +689,7 @@ export default function ShortsPageContent({
                         ref={playerRef}
                         playbackId={short.muxPlaybackId}
                         streamType="on-demand"
-                        autoPlay="muted"
+                        autoPlay="any"
                         loop
                         muted={muted}
                         thumbnailTime={0}

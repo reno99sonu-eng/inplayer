@@ -20,7 +20,9 @@ interface Params {
 const STUCK_THRESHOLD_MS = 3 * 60 * 1000;
 
 // The download qualities we offer (must match app/api/upload/create).
-const DOWNLOAD_RESOLUTIONS = ["1080p", "720p", "480p"];
+// `as const` keeps these as literal types so they satisfy Mux's
+// createStaticRendition resolution union (not just `string`).
+const DOWNLOAD_RESOLUTIONS = ["1080p", "720p", "480p"] as const;
 
 const QUALITY_PREFERENCE = [
   "highest",

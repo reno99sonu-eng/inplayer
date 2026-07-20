@@ -23,10 +23,14 @@ export default async function VideosPage({ searchParams }: VideosPageProps) {
     })
   );
 
-  let videos = (result.Items || []).sort(
-    (a, b) =>
-      new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
-  );
+  let videos = (result.Items || [])
+    // Only public videos appear in listings (unlisted stays link-only,
+    // private stays hidden from discovery).
+    .filter((v) => !v.visibility || v.visibility === "public")
+    .sort(
+      (a, b) =>
+        new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+    );
 
   if (category) {
     videos = videos.filter((v) => v.category === category);
@@ -39,7 +43,7 @@ export default async function VideosPage({ searchParams }: VideosPageProps) {
       <h1 className="text-2xl sm:text-3xl font-black text-white light:text-slate-900">
         {category ? category : "All Videos"}
       </h1>
-      <p className="mt-1 text-sm text-slate-400 light:text-slate-500">
+      <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
         {category
           ? `Everything uploaded under ${category}.`
           : "Everything actually uploaded to InPlayer so far."}
@@ -51,7 +55,7 @@ export default async function VideosPage({ searchParams }: VideosPageProps) {
           <p className="font-semibold text-white light:text-slate-900">
             {category ? `No videos in ${category} yet` : "No videos yet"}
           </p>
-          <p className="mt-1 text-sm text-slate-400 light:text-slate-500">
+          <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
             {category
               ? "Try a different category, or check back later."
               : "Upload one to see it appear here."}
@@ -84,7 +88,7 @@ export default async function VideosPage({ searchParams }: VideosPageProps) {
                 {video.title}
               </h3>
 
-              <p className="mt-0.5 text-xs text-slate-400 light:text-slate-500">
+              <p className="mt-0.5 text-xs text-slate-400 light:text-slate-600">
                 {video.uploaderName}
               </p>
             </Link>

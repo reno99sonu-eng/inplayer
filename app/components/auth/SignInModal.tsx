@@ -165,7 +165,7 @@ export default function SignInModal({
             rounded-[28px] sm:rounded-[30px]
             border border-orange-400/15 light:border-orange-400/25
             bg-gradient-to-br from-[#07111F]/95 via-[#0B1728]/95 to-[#040A14]/95
-            light:from-white/98 light:via-slate-50/98 light:to-white/98
+            light:from-[#FBF6EA]/98 light:via-[#EDE2C9]/98 light:to-[#FBF6EA]/98
             p-5 sm:p-7
             shadow-[0_25px_90px_rgba(0,0,0,.55)]
             light:shadow-[0_25px_90px_rgba(0,0,0,.18)]
@@ -187,7 +187,7 @@ export default function SignInModal({
             <h2 className="mt-5 text-xl font-black text-white light:text-slate-900">
               Welcome back!
             </h2>
-            <p className="mt-1 text-sm text-slate-400 light:text-slate-500">
+            <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
               Signing you in...
             </p>
           </div>
@@ -210,19 +210,19 @@ export default function SignInModal({
                 Back.
               </h2>
 
-              <p className="mt-2 text-sm text-slate-400 light:text-slate-500">
+              <p className="mt-2 text-sm text-slate-400 light:text-slate-600">
                 Sign in to continue watching your favourite creators and premium content.
               </p>
 
               <div className="mt-6 space-y-4">
                 <div>
-                  <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-500">
+                  <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-600">
                     Email
                   </label>
                   <div className="group relative">
                     <Mail
                       size={17}
-                      className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 light:text-slate-400 transition-colors duration-300 group-focus-within:text-orange-400"
+                      className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 light:text-slate-600 transition-colors duration-300 group-focus-within:text-orange-400"
                     />
                     <input
                       type="email"
@@ -243,13 +243,13 @@ export default function SignInModal({
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-500">
+                  <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-600">
                     Password
                   </label>
                   <div className="group relative">
                     <Lock
                       size={17}
-                      className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 light:text-slate-400 transition-colors duration-300 group-focus-within:text-orange-400"
+                      className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 light:text-slate-600 transition-colors duration-300 group-focus-within:text-orange-400"
                     />
                     <input
                       type={showPassword ? "text" : "password"}
@@ -280,7 +280,7 @@ export default function SignInModal({
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <label className="flex items-center gap-2 text-xs text-slate-400 light:text-slate-500 cursor-pointer">
+                  <label className="flex items-center gap-2 text-xs text-slate-400 light:text-slate-600 cursor-pointer">
                     <input
                       type="checkbox"
                       checked={rememberMe}
@@ -343,7 +343,7 @@ export default function SignInModal({
                   Continue with Google
                 </button>
 
-                <p className="text-center text-xs text-slate-400 light:text-slate-500">
+                <p className="text-center text-xs text-slate-400 light:text-slate-600">
                   Don&apos;t have an account?{" "}
                   <button
                     type="button"

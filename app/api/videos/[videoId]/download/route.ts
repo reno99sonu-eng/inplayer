@@ -27,18 +27,25 @@ export async function GET(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Not available." }, { status: 404 });
   }
 
-  if (
-    video.downloadStatus !== "ready" ||
-    !video.muxPlaybackId ||
-    !video.downloadFileName
-  ) {
+  const renditions: Record<string, string> = video.downloadRenditions || {};
+
+  // The viewer picks a quality (?quality=720p). Fall back to the stored
+  // default filename, then to any available rendition, so a request always
+  // resolves to a real file when the download is ready.
+  const requestedQuality = request.nextUrl.searchParams.get("quality") || "";
+  const fileName =
+    renditions[requestedQuality] ||
+    video.downloadFileName ||
+    Object.values(renditions)[0];
+
+  if (video.downloadStatus !== "ready" || !video.muxPlaybackId || !fileName) {
     return NextResponse.json(
       { error: "Download not ready yet." },
       { status: 409 }
     );
   }
 
-  const muxUrl = `https://stream.mux.com/${video.muxPlaybackId}/${video.downloadFileName}`;
+  const muxUrl = `https://stream.mux.com/${video.muxPlaybackId}/${fileName}`;
 
   let muxRes: Response;
 
@@ -67,9 +74,15 @@ export async function GET(request: NextRequest, { params }: Params) {
       .replace(/\s+/g, "-")
       .slice(0, 80) || "video";
 
+  // Reflect the actual quality in the downloaded filename (e.g. Title-720p.mp4).
+  const qualityLabel = fileName.replace(/\.(mp4|m4a)$/, "");
+  const downloadName = qualityLabel
+    ? `${safeTitle}-${qualityLabel}.mp4`
+    : `${safeTitle}.mp4`;
+
   const headers = new Headers();
   headers.set("Content-Type", "video/mp4");
-  headers.set("Content-Disposition", `attachment; filename="${safeTitle}.mp4"`);
+  headers.set("Content-Disposition", `attachment; filename="${downloadName}"`);
 
   const contentLength = muxRes.headers.get("content-length");
   if (contentLength) headers.set("Content-Length", contentLength);

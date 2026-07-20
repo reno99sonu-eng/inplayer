@@ -22,7 +22,7 @@ const company = [
 
 export default function Footer() {
   return (
-    <footer className="relative mt-2 overflow-hidden border-t border-orange-500/10 bg-[#050816] text-white lg:mt-6 light:border-orange-500/20 light:bg-white light:text-slate-900">
+    <footer className="relative mt-2 overflow-hidden border-t border-orange-500/10 bg-[#050816] text-white lg:mt-6 light:border-orange-500/20 light:bg-[#FAF5E9] light:text-slate-900">
 
       {/* Background */}
       <div
@@ -52,7 +52,7 @@ export default function Footer() {
               Entertainment Beyond Limits
             </h3>
 
-            <p className="hidden max-w-sm text-sm leading-6 text-slate-400 lg:mt-2 lg:block light:text-slate-500">
+            <p className="hidden max-w-sm text-sm leading-6 text-slate-400 lg:mt-2 lg:block light:text-slate-600">
               Discover blockbuster originals, premium creators, live channels,
               podcasts and AI-powered entertainment in one destination.
             </p>
@@ -69,7 +69,7 @@ export default function Footer() {
             <ul className="mt-1.5 space-y-1 lg:mt-2 lg:space-y-1.5">
               {browse.map((item) => (
                 <li key={item}>
-                  <button className="text-xs text-slate-400 transition hover:text-orange-300 hover:translate-x-1 lg:text-base light:text-slate-500 light:hover:text-orange-600">
+                  <button className="text-xs text-slate-400 transition hover:text-orange-300 hover:translate-x-1 lg:text-base light:text-slate-600 light:hover:text-orange-600">
                     {item}
                   </button>
                 </li>
@@ -88,7 +88,7 @@ export default function Footer() {
             <ul className="mt-1.5 space-y-1 lg:mt-3 lg:space-y-2">
               {company.map((item) => (
                 <li key={item}>
-                  <button className="text-xs text-slate-400 transition hover:text-orange-300 hover:translate-x-1 lg:text-base light:text-slate-500 light:hover:text-orange-600">
+                  <button className="text-xs text-slate-400 transition hover:text-orange-300 hover:translate-x-1 lg:text-base light:text-slate-600 light:hover:text-orange-600">
                     {item}
                   </button>
                 </li>
@@ -121,7 +121,7 @@ export default function Footer() {
 
         {/* Bottom */}
 
-        <div className="mt-2 flex flex-col items-center justify-between gap-1.5 border-t border-white/10 pt-2 text-[10px] text-slate-500 md:flex-row lg:mt-4 lg:text-[11px] light:border-slate-200 light:text-slate-400">
+        <div className="mt-2 flex flex-col items-center justify-between gap-1.5 border-t border-white/10 pt-2 text-[10px] text-slate-500 md:flex-row lg:mt-4 lg:text-[11px] light:border-slate-200 light:text-slate-600">
 
           <p>© 2026 INPLAYER. All Rights Reserved.</p>
 

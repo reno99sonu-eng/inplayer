@@ -25,7 +25,7 @@ export default function MobileBottomNav() {
         border-white/10
         light:border-black/10
         bg-[#06101D]/95
-        light:bg-white/95
+        light:bg-[#F5EEDC]/95
         backdrop-blur-2xl
         px-2
         py-2
@@ -96,7 +96,7 @@ export default function MobileBottomNav() {
         "
       >
         <Rss size={22} />
-        <span className="text-[11px] font-medium">Subscriptions</span>
+        <span className="text-[11px] font-medium">In-House</span>
       </Link>
 
       <Link

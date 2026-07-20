@@ -227,7 +227,7 @@ export default function NavbarActions() {
             border-white/10
             light:border-black/10
             bg-[#08111F]/95
-            light:bg-white/95
+            light:bg-[#F5EEDC]/95
             backdrop-blur-3xl
             shadow-[0_30px_80px_rgba(0,0,0,.55)]
             light:shadow-[0_30px_80px_rgba(0,0,0,.12)]
@@ -253,7 +253,7 @@ export default function NavbarActions() {
                 <p className="text-sm font-semibold text-white light:text-slate-900">
                   You&apos;re all caught up
                 </p>
-                <p className="mt-1 text-xs text-slate-400 light:text-slate-500">
+                <p className="mt-1 text-xs text-slate-400 light:text-slate-600">
                   New notifications will show up here.
                 </p>
               </div>

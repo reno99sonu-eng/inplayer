@@ -37,13 +37,13 @@ export default function AccountPage() {
 
   if (authLoading) {
     return (
-      <div className="lg:hidden flex min-h-screen items-center justify-center bg-[#06101D] light:bg-white" />
+      <div className="lg:hidden flex min-h-screen items-center justify-center bg-[#06101D] light:bg-[#FAF5E9]" />
     );
   }
 
   if (!signedIn) {
     return (
-      <div className="lg:hidden min-h-screen bg-[#06101D] light:bg-white text-white light:text-slate-900">
+      <div className="lg:hidden min-h-screen bg-[#06101D] light:bg-[#FAF5E9] text-white light:text-slate-900">
         <div className="flex items-center gap-4 border-b border-white/10 light:border-black/10 px-5 py-5">
           <button
             onClick={() => router.back()}
@@ -63,7 +63,7 @@ export default function AccountPage() {
 
         <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
           <h3 className="text-xl font-black">Sign in to InPlayer</h3>
-          <p className="mt-2 text-sm text-slate-400 light:text-slate-500">
+          <p className="mt-2 text-sm text-slate-400 light:text-slate-600">
             Access your channel, watchlist, history, and more.
           </p>
           <button
@@ -78,7 +78,7 @@ export default function AccountPage() {
   }
 
   return (
-    <div className="lg:hidden min-h-screen bg-[#06101D] light:bg-white text-white light:text-slate-900">
+    <div className="lg:hidden min-h-screen bg-[#06101D] light:bg-[#FAF5E9] text-white light:text-slate-900">
       <div className="flex items-center gap-4 border-b border-white/10 light:border-black/10 px-5 py-5">
         <button
           onClick={() => router.back()}

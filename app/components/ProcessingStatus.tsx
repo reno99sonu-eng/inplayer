@@ -73,7 +73,7 @@ export default function ProcessingStatus({
           <p className="font-semibold text-white light:text-slate-900">
             Your video is ready!
           </p>
-          <p className="mt-1 text-sm text-slate-400 light:text-slate-500">
+          <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
             It's now live on InPlayer.
           </p>
         </div>
@@ -93,7 +93,7 @@ export default function ProcessingStatus({
         <p className="font-semibold text-white light:text-slate-900">
           Something went wrong processing this video
         </p>
-        <p className="text-sm text-slate-400 light:text-slate-500">
+        <p className="text-sm text-slate-400 light:text-slate-600">
           Please try uploading again.
         </p>
       </div>
@@ -107,7 +107,7 @@ export default function ProcessingStatus({
         <p className="font-semibold text-white light:text-slate-900">
           Processing your video...
         </p>
-        <p className="mt-1 text-sm text-slate-400 light:text-slate-500">
+        <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
           Elapsed: {minutes}:{seconds.toString().padStart(2, "0")} — this
           updates automatically once it's ready, no need to check manually.
         </p>

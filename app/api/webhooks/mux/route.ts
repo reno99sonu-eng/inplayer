@@ -3,6 +3,28 @@ import { ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import mux from "@/app/lib/mux";
 import { docClient } from "@/app/lib/dynamodb";
 
+// Best-to-worst download quality order. Used to pick a sensible default
+// (`downloadFileName`) from whichever renditions have finished so far.
+const QUALITY_PREFERENCE = [
+  "highest",
+  "2160p",
+  "1440p",
+  "1080p",
+  "720p",
+  "540p",
+  "480p",
+  "360p",
+  "270p",
+];
+
+function pickBestName(renditions: Record<string, string>): string {
+  for (const q of QUALITY_PREFERENCE) {
+    if (renditions[q]) return renditions[q];
+  }
+  const values = Object.values(renditions);
+  return values[0] || "";
+}
+
 // Static-rendition webhook events identify the asset only via the Mux
 // Asset ID (event.object.id) — never our own videoId — so unlike the
 // other handlers below (which get to key straight off upload_id), this
@@ -138,9 +160,12 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // Fires once the downloadable "highest" MP4 we requested at upload time
-  // (or via the on-demand backfill in app/api/videos/[videoId]/prepare-download)
-  // has actually finished encoding and is ready to be fetched.
+  // Fires once one of the downloadable static MP4 renditions we requested
+  // (1080p / 720p / 480p, at upload time or via the on-demand backfill in
+  // app/api/videos/[videoId]/prepare-download) finishes encoding. Each
+  // quality fires its own event, so we accumulate them into a per-quality
+  // map (resolution -> filename) and keep downloadFileName pointing at the
+  // best available as the default.
   if (event.type === "video.asset.static_rendition.ready") {
     const rendition = event.data;
     const assetId = event.object.id;
@@ -149,14 +174,24 @@ export async function POST(request: NextRequest) {
       const match = await findVideoByAssetId(assetId);
 
       if (match) {
+        const resolution = String(
+          rendition.resolution || rendition.name
+        ).replace(/\.(mp4|m4a)$/, "");
+        const mergedRenditions: Record<string, string> = {
+          ...((match.downloadRenditions || {}) as Record<string, string>),
+          [resolution]: rendition.name,
+        };
+
         await docClient.send(
           new UpdateCommand({
             TableName: "InPlayer-Videos",
             Key: { videoId: match.videoId },
-            UpdateExpression: "SET downloadStatus = :status, downloadFileName = :fileName",
+            UpdateExpression:
+              "SET downloadStatus = :status, downloadRenditions = :renditions, downloadFileName = :best",
             ExpressionAttributeValues: {
               ":status": "ready",
-              ":fileName": rendition.name,
+              ":renditions": mergedRenditions,
+              ":best": pickBestName(mergedRenditions),
             },
           })
         );
@@ -178,22 +213,29 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // The MP4 failed to generate — reset so a viewer's next Download click
-  // (via prepare-download) retries instead of getting stuck "preparing"
-  // forever.
+  // A rendition failed to generate. With three qualities requested, one
+  // erroring (or being skipped because it's higher than the source) must
+  // NOT knock the whole download offline if another quality already
+  // succeeded — only mark the download errored when nothing is ready yet,
+  // so a viewer's next Download click (via prepare-download) retries.
   if (event.type === "video.asset.static_rendition.errored") {
     const assetId = event.object.id;
     const match = await findVideoByAssetId(assetId);
 
     if (match) {
-      await docClient.send(
-        new UpdateCommand({
-          TableName: "InPlayer-Videos",
-          Key: { videoId: match.videoId },
-          UpdateExpression: "SET downloadStatus = :status",
-          ExpressionAttributeValues: { ":status": "errored" },
-        })
-      );
+      const hasReady =
+        Object.keys(match.downloadRenditions || {}).length > 0;
+
+      if (!hasReady) {
+        await docClient.send(
+          new UpdateCommand({
+            TableName: "InPlayer-Videos",
+            Key: { videoId: match.videoId },
+            UpdateExpression: "SET downloadStatus = :status",
+            ExpressionAttributeValues: { ":status": "errored" },
+          })
+        );
+      }
     }
   }
 

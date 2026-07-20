@@ -3,13 +3,22 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Maximize2, Minimize2, Eye, Calendar, Tag } from "lucide-react";
+import {
+  Maximize2,
+  Minimize2,
+  Eye,
+  Calendar,
+  Tag,
+  ShieldAlert,
+  MessageSquareOff,
+} from "lucide-react";
 import VideoPlayer from "@/app/components/VideoPlayer";
 import SubscribeButton from "@/app/components/SubscribeButton";
 import LikeButton from "@/app/components/LikeButton";
 import WatchLaterButton from "@/app/components/WatchLaterButton";
 import ShareButton from "@/app/components/ShareButton";
 import DownloadButton from "@/app/components/DownloadButton";
+import AddToPlaylistButton from "@/app/components/AddToPlaylistButton";
 import DescriptionBox from "@/app/components/DescriptionBox";
 import CommentSection from "@/app/components/CommentSection";
 import AnimatedCounter from "@/app/components/AnimatedCounter";
@@ -29,6 +38,12 @@ interface VideoData {
   thumbnailUrl?: string;
   contentType?: string;
   downloadStatus?: "unavailable" | "preparing" | "ready" | "errored";
+  downloadRenditions?: Record<string, string>;
+  // Upload options (all optional so older videos without them behave as
+  // sensible defaults: public, comments on, not age-restricted).
+  tags?: string[];
+  commentsEnabled?: boolean;
+  ageRestricted?: boolean;
 }
 
 interface RelatedVideo {
@@ -50,6 +65,10 @@ export default function WatchPageContent({
   relatedVideos,
 }: WatchPageContentProps) {
   const [theaterMode, setTheaterMode] = useState(false);
+  const [ageConfirmed, setAgeConfirmed] = useState(false);
+
+  const commentsOn = video.commentsEnabled !== false;
+  const showPlayer = !video.ageRestricted || ageConfirmed;
 
   return (
     <div className="relative">
@@ -71,7 +90,7 @@ export default function WatchPageContent({
         )}
         <div className="absolute -left-40 top-0 h-[500px] w-[500px] rounded-full bg-orange-500/10 blur-[160px]" />
         <div className="absolute -right-40 bottom-0 h-[500px] w-[500px] rounded-full bg-amber-400/10 blur-[160px]" />
-        <div className="absolute inset-0 bg-[#050816]/88 light:bg-white/92" />
+        <div className="absolute inset-0 bg-[#050816]/88 light:bg-[#F4ECDA]/92" />
       </div>
 
       <div
@@ -92,11 +111,35 @@ export default function WatchPageContent({
                 ${theaterMode ? "mx-auto max-w-[1100px]" : ""}
               `}
             >
-              <VideoPlayer
-                playbackId={video.muxPlaybackId}
-                title={video.title}
-                videoId={video.videoId}
-              />
+              {showPlayer ? (
+                <VideoPlayer
+                  playbackId={video.muxPlaybackId}
+                  title={video.title}
+                  videoId={video.videoId}
+                />
+              ) : (
+                /* Age-restriction gate — a lightweight confirm (matching the
+                   spec's intent), not identity verification. */
+                <div className="flex aspect-video w-full flex-col items-center justify-center gap-4 bg-black px-6 text-center">
+                  <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-500/15 text-red-400">
+                    <ShieldAlert size={26} />
+                  </div>
+                  <div>
+                    <p className="text-base font-bold text-white">
+                      Age-restricted video
+                    </p>
+                    <p className="mt-1 max-w-sm text-sm text-slate-400">
+                      This video is intended for viewers 18 and older.
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setAgeConfirmed(true)}
+                    className="rounded-full bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-6 py-2.5 text-sm font-bold text-white shadow-[0_10px_25px_rgba(255,153,0,.3)] transition hover:-translate-y-0.5"
+                  >
+                    I&apos;m 18 or older — continue
+                  </button>
+                </div>
+              )}
             </div>
 
             <button
@@ -105,7 +148,7 @@ export default function WatchPageContent({
               className="
                 theater-toggle-btn
                 absolute right-3 top-3 z-10
-                flex h-9 w-9 items-center justify-center rounded-full
+                hidden lg:flex h-9 w-9 items-center justify-center rounded-full
                 border border-white/10 bg-black/60 text-white backdrop-blur-md
                 opacity-0 transition-all duration-300
                 hover:scale-110 hover:border-orange-400/40 hover:bg-black/80
@@ -119,15 +162,17 @@ export default function WatchPageContent({
           </div>
 
           <div className={theaterMode ? "mx-auto max-w-[1100px]" : ""}>
+            {/* Title */}
             <h1
-              className="animate-fade-in-up mt-3 lg:mt-4 bg-gradient-to-r from-white to-white/70 light:from-slate-900 light:to-slate-900/70 bg-clip-text text-lg lg:text-xl font-bold leading-[1.2] tracking-tight text-transparent"
+              className="animate-fade-in-up mt-3 lg:mt-4 bg-gradient-to-r from-white to-white/70 light:from-slate-900 light:to-slate-900/80 bg-clip-text text-lg lg:text-2xl font-bold leading-[1.25] tracking-tight text-transparent"
               style={{ animationDelay: "50ms" }}
             >
               {video.title}
             </h1>
 
+            {/* Meta row — Views • uploaded time • category (+ 18+ badge) */}
             <div
-              className="animate-fade-in-up mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-400 light:text-slate-500 lg:mt-3 lg:gap-x-4 lg:gap-y-1.5"
+              className="animate-fade-in-up mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-sm text-slate-400 light:text-slate-600 lg:mt-3 lg:gap-x-4 lg:gap-y-1.5"
               style={{ animationDelay: "100ms" }}
             >
               <span className="flex items-center gap-1.5">
@@ -148,28 +193,33 @@ export default function WatchPageContent({
                 <Tag size={14} className="text-orange-400" />
                 {video.category}
               </span>
+
+              {video.ageRestricted && (
+                <span className="rounded-md border border-red-500/30 bg-red-500/10 px-1.5 py-0.5 text-[11px] font-bold text-red-300 light:text-red-700">
+                  18+
+                </span>
+              )}
             </div>
 
-            {/* Glass card — channel identity + actions */}
+            {/* Channel identity + actions */}
             <div
               className="
-                animate-fade-in-up mt-4 rounded-3xl border border-white/[0.08] light:border-black/[0.08]
-                bg-gradient-to-br from-white/[0.05] to-white/[0.01] light:from-black/[0.03] light:to-transparent
+                animate-fade-in-up mt-4 rounded-3xl border border-white/[0.08] light:border-black/[0.10]
+                bg-gradient-to-br from-white/[0.05] to-white/[0.01] light:from-black/[0.04] light:to-transparent
                 p-3 backdrop-blur-xl
                 shadow-[0_25px_70px_-25px_rgba(0,0,0,.4)]
-
                 lg:mt-4
               "
               style={{ animationDelay: "150ms" }}
             >
-              <div className="flex flex-wrap items-center justify-between gap-3 lg:gap-4">
-                <div className="flex items-center gap-2.5 lg:gap-3">
+              <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-4">
+                {/* Left: avatar + name + In-House */}
+                <div className="flex min-w-0 items-center gap-2.5 lg:gap-3">
                   <div className="relative flex-shrink-0">
                     <div className="absolute -inset-[2px] rounded-full bg-gradient-to-br from-orange-400 via-amber-300 to-orange-500 opacity-80 blur-[3px]" />
-                    <div className="relative h-9 w-9 overflow-hidden rounded-full ring-2 ring-[#050816] light:ring-white">
-                      {/* A plain <img>, not next/image — avatars are
-                          base64 data URLs (see app/lib/imageCompress.ts),
-                          which next/image doesn't optimize/serve cleanly. */}
+                    <div className="relative h-9 w-9 overflow-hidden rounded-full ring-2 ring-[#050816] light:ring-[#F4ECDA]">
+                      {/* A plain <img>, not next/image — avatars are base64
+                          data URLs (see app/lib/imageCompress.ts). */}
                       <img
                         src={video.uploaderAvatarUrl || "/avatars/avatar.png"}
                         alt={video.uploaderName}
@@ -178,34 +228,54 @@ export default function WatchPageContent({
                     </div>
                   </div>
 
-                  <div>
-                    <p className="font-bold leading-tight text-white light:text-slate-900">
+                  <div className="min-w-0">
+                    <p className="truncate font-bold leading-tight text-white light:text-slate-900">
                       {video.uploaderName}
                     </p>
-                    <p className="text-xs text-slate-400 light:text-slate-500">
+                    <p className="text-xs text-slate-400 light:text-slate-600">
                       Creator
                     </p>
                   </div>
 
-                  <SubscribeButton creatorId={video.uploaderId} />
+                  <div className="ml-1 flex-shrink-0">
+                    <SubscribeButton creatorId={video.uploaderId} />
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-1.5 lg:gap-2">
+                {/* Right: action pills (wrap on small screens) */}
+                <div className="flex flex-wrap items-center gap-1.5 lg:gap-2">
                   <LikeButton videoId={video.videoId} />
-                  <WatchLaterButton videoId={video.videoId} />
                   <ShareButton videoId={video.videoId} title={video.title} />
-                  {/* Videos only — Shorts never get a Download button
-                      (see ShortsPageContent.tsx, which doesn't render
-                      this component at all). */}
+                  <WatchLaterButton videoId={video.videoId} />
+                  <AddToPlaylistButton videoId={video.videoId} />
+                  {/* Videos only — Shorts never get a Download button. */}
                   {video.contentType !== "short" && (
                     <DownloadButton
                       videoId={video.videoId}
                       initialStatus={video.downloadStatus || "unavailable"}
+                      initialRenditions={video.downloadRenditions || {}}
                     />
                   )}
                 </div>
               </div>
             </div>
+
+            {/* Tags */}
+            {video.tags && video.tags.length > 0 && (
+              <div
+                className="animate-fade-in-up mt-3 flex flex-wrap gap-2"
+                style={{ animationDelay: "180ms" }}
+              >
+                {video.tags.map((t) => (
+                  <span
+                    key={t}
+                    className="rounded-full border border-white/10 light:border-black/10 bg-white/[0.04] light:bg-black/[0.03] px-3 py-1 text-xs font-medium text-slate-300 light:text-slate-700"
+                  >
+                    #{t}
+                  </span>
+                ))}
+              </div>
+            )}
 
             {video.description && (
               <div
@@ -220,7 +290,14 @@ export default function WatchPageContent({
               className="animate-fade-in-up"
               style={{ animationDelay: "250ms" }}
             >
-              <CommentSection videoId={video.videoId} />
+              {commentsOn ? (
+                <CommentSection videoId={video.videoId} />
+              ) : (
+                <div className="mt-6 flex items-center gap-2 rounded-2xl border border-white/[0.08] light:border-black/[0.08] bg-white/[0.02] light:bg-black/[0.02] px-4 py-3 text-sm text-slate-400 light:text-slate-600">
+                  <MessageSquareOff size={16} />
+                  Comments are turned off for this video.
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -228,7 +305,7 @@ export default function WatchPageContent({
         {/* Right column — related videos (hidden in theater mode) */}
         {!theaterMode && (
           <div className="animate-fade-in-up" style={{ animationDelay: "150ms" }}>
-            <h2 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-400 light:text-slate-500 lg:mb-3">
+            <h2 className="mb-2 flex items-center gap-2 text-sm font-bold uppercase tracking-wide text-slate-400 light:text-slate-600 lg:mb-3">
               <span className="h-4 w-1 rounded-full bg-gradient-to-b from-orange-400 to-amber-300" />
               Up Next
             </h2>
@@ -269,7 +346,7 @@ export default function WatchPageContent({
                       <h3 className="line-clamp-2 text-sm font-semibold text-white light:text-slate-900 group-hover:text-orange-300 light:group-hover:text-orange-600 transition-colors">
                         {related.title}
                       </h3>
-                      <p className="mt-1 text-xs text-slate-400 light:text-slate-500">
+                      <p className="mt-1 text-xs text-slate-400 light:text-slate-600">
                         {related.uploaderName}
                       </p>
                       <p className="text-xs text-slate-500">

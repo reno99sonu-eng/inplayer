@@ -4,6 +4,7 @@ import {
   PutCommand,
   DeleteCommand,
   GetCommand,
+  UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { randomUUID } from "crypto";
 import { docClient } from "@/app/lib/dynamodb";
@@ -27,6 +28,10 @@ export async function GET(request: NextRequest) {
   );
 
   let isSubscribed = false;
+  // Whether this subscriber wants notifications from the creator (the bell
+  // toggle on the In-House button). Defaults to true when subscribed, since
+  // subscribing opts you into notifications unless you turn the bell off.
+  let notifyEnabled = true;
 
   // Checking subscription status requires knowing who's asking — but
   // viewing the count doesn't. So we try to verify auth, and simply
@@ -40,6 +45,9 @@ export async function GET(request: NextRequest) {
       })
     );
     isSubscribed = !!existing.Item;
+    // Treat a missing flag on an existing subscription as "on" (older
+    // subscriptions predate the bell toggle).
+    notifyEnabled = existing.Item?.notifyEnabled !== false;
   } catch {
     // Not signed in — fine, just report as not subscribed
   }
@@ -47,6 +55,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     subscriberCount: countResult.Count || 0,
     isSubscribed,
+    notifyEnabled,
   });
 }
 
@@ -59,9 +68,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Please sign in." }, { status: 401 });
   }
 
-  const { creatorId, action } = await request.json();
+  const { creatorId, action, notifyEnabled } = await request.json();
 
-  if (!creatorId || !["subscribe", "unsubscribe"].includes(action)) {
+  if (
+    !creatorId ||
+    !["subscribe", "unsubscribe", "notify"].includes(action)
+  ) {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
 
@@ -72,6 +84,28 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Bell toggle — only updates the notification preference on an existing
+  // subscription, never creates or removes the subscription itself.
+  if (action === "notify") {
+    await docClient.send(
+      new UpdateCommand({
+        TableName: "InPlayer-Subscriptions",
+        Key: { subscriberId: user.userId, creatorId },
+        UpdateExpression: "SET notifyEnabled = :n",
+        // Only apply if the subscription actually exists, so a stray toggle
+        // can't create a half-formed record.
+        ConditionExpression: "attribute_exists(subscriberId)",
+        ExpressionAttributeValues: { ":n": notifyEnabled !== false },
+      })
+    ).catch((err) => {
+      // ConditionalCheckFailed just means "not subscribed" — not a real
+      // error worth 500-ing over.
+      console.error("Failed to update notify preference:", err?.name || err);
+    });
+
+    return NextResponse.json({ success: true });
+  }
+
   if (action === "subscribe") {
     await docClient.send(
       new PutCommand({
@@ -80,6 +114,7 @@ export async function POST(request: NextRequest) {
           subscriberId: user.userId,
           creatorId,
           subscribedAt: new Date().toISOString(),
+          notifyEnabled: true,
         },
       })
     );

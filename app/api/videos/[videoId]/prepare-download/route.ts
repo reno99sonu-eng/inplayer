@@ -19,6 +19,28 @@ interface Params {
 // delivery and a fresh chance to succeed.
 const STUCK_THRESHOLD_MS = 3 * 60 * 1000;
 
+// The download qualities we offer (must match app/api/upload/create).
+const DOWNLOAD_RESOLUTIONS = ["1080p", "720p", "480p"];
+
+const QUALITY_PREFERENCE = [
+  "highest",
+  "2160p",
+  "1440p",
+  "1080p",
+  "720p",
+  "540p",
+  "480p",
+  "360p",
+  "270p",
+];
+
+function pickBestName(renditions: Record<string, string>): string {
+  for (const q of QUALITY_PREFERENCE) {
+    if (renditions[q]) return renditions[q];
+  }
+  return Object.values(renditions)[0] || "";
+}
+
 // Called the first time a viewer hits Download on a video that never got
 // a downloadable MP4 requested at upload time (any video uploaded before
 // this feature shipped). Idempotent — safe to call repeatedly while
@@ -86,35 +108,43 @@ export async function POST(request: NextRequest, { params }: Params) {
     // full render cycle for work that's already done.
     try {
       const asset = await mux.video.assets.retrieve(video.muxAssetId);
-      const readyFile = asset.static_renditions?.files?.find(
-        (file) => file.resolution === "highest" && file.status === "ready"
+      const readyFiles = (asset.static_renditions?.files || []).filter(
+        (file) => file.status === "ready" && file.name && file.resolution
       );
 
-      if (readyFile?.name) {
+      if (readyFiles.length > 0) {
+        const renditions: Record<string, string> = {
+          ...((video.downloadRenditions || {}) as Record<string, string>),
+        };
+        for (const file of readyFiles) {
+          renditions[file.resolution as string] = file.name as string;
+        }
+
         await docClient.send(
           new UpdateCommand({
             TableName: "InPlayer-Videos",
             Key: { videoId },
             UpdateExpression:
-              "SET downloadStatus = :status, downloadFileName = :fileName",
+              "SET downloadStatus = :status, downloadRenditions = :renditions, downloadFileName = :best",
             ExpressionAttributeValues: {
               ":status": "ready",
-              ":fileName": readyFile.name,
+              ":renditions": renditions,
+              ":best": pickBestName(renditions),
             },
           })
         );
 
-        return NextResponse.json({ status: "ready", fileName: readyFile.name });
+        return NextResponse.json({ status: "ready", renditions });
       }
     } catch (err) {
       console.error(
         `Failed to check asset state for ${video.muxAssetId}:`,
         err
       );
-      // Fall through and try requesting a fresh rendition instead.
+      // Fall through and try requesting fresh renditions instead.
     }
-    // Not already ready on Mux's side — fall through and request a fresh
-    // rendition below, same as a video that's never been requested at all.
+    // Not already ready on Mux's side — fall through and request fresh
+    // renditions below, same as a video that's never been requested at all.
   }
 
   if (!video.muxAssetId) {
@@ -124,32 +154,51 @@ export async function POST(request: NextRequest, { params }: Params) {
     );
   }
 
-  try {
-    // "highest" — same quality tier requested for every new upload, so
-    // videos backfilled this way end up identical to freshly-uploaded
-    // ones once ready.
-    await mux.video.assets.createStaticRendition(video.muxAssetId, {
-      resolution: "highest",
-    });
-  } catch (err) {
-    console.error(
-      `Failed to request static rendition for asset ${video.muxAssetId}:`,
-      err
+  // Request all three qualities — same set every new upload gets, so
+  // backfilled videos end up identical once ready. Each is requested
+  // independently: one already existing or being skipped (higher than the
+  // source) throws for just that resolution without stopping the others.
+  const results = await Promise.allSettled(
+    DOWNLOAD_RESOLUTIONS.map((resolution) =>
+      mux.video.assets.createStaticRendition(video.muxAssetId, { resolution })
+    )
+  );
+
+  const anyStarted = results.some((r) => r.status === "fulfilled");
+  const allFailed = results.every((r) => r.status === "rejected");
+
+  // Only treat it as a hard failure if EVERY resolution request was
+  // rejected for a reason other than "already exists" — otherwise the ones
+  // that did start (or already exist) will still deliver via the webhook.
+  if (allFailed && !anyStarted) {
+    const alreadyExists = results.some(
+      (r) =>
+        r.status === "rejected" &&
+        (r.reason?.status === 409 ||
+          /exist/i.test(r.reason?.message || ""))
     );
-    return NextResponse.json(
-      { error: "Couldn't start preparing this download. Please try again." },
-      { status: 502 }
-    );
+    if (!alreadyExists) {
+      console.error(
+        `Failed to request static renditions for asset ${video.muxAssetId}:`,
+        results
+      );
+      return NextResponse.json(
+        { error: "Couldn't start preparing this download. Please try again." },
+        { status: 502 }
+      );
+    }
   }
 
   await docClient.send(
     new UpdateCommand({
       TableName: "InPlayer-Videos",
       Key: { videoId },
-      UpdateExpression: "SET downloadStatus = :status, downloadRequestedAt = :requestedAt",
+      UpdateExpression:
+        "SET downloadStatus = :status, downloadRequestedAt = :requestedAt, downloadRenditions = if_not_exists(downloadRenditions, :empty)",
       ExpressionAttributeValues: {
         ":status": "preparing",
         ":requestedAt": new Date().toISOString(),
+        ":empty": {},
       },
     })
   );

@@ -4,22 +4,39 @@
 @custom-variant light (&:where(.light, .light *));
 
 html {
-
-scroll-behavior: smooth;
-
+  scroll-behavior: smooth;
 }
 
+/* Never let a stray wide element make the page scroll/pan sideways on
+   mobile — a common cause of content appearing to "extend off the edge"
+   across phones and tablets. */
+html,
 body {
-
-background: #F8FAFC;
-
-color: #0F172A;
-
+  overflow-x: hidden;
+  max-width: 100%;
 }
 
+/* Dark-first: the app's default (unprefixed) styling is the dark theme, so
+   the base background stays dark until ThemeProvider resolves the choice.
+   This avoids a bright flash before hydration for the common dark case. */
+body {
+  background: #05070D;
+  color: #F8FAFC;
+}
+
+/* Light mode = warm off-white "cream" (not stark white) with a subtly
+   visible honeycomb texture on EVERY page — applied at the html.light
+   level so all screens, panels and modals inherit it — plus richer,
+   higher-contrast default text. */
 html.light body {
-  background: #F8FAFC;
-  color: #0F172A;
+  background-color: #F1E7D0;
+  background-image: radial-gradient(
+    circle at 24px 24px,
+    rgba(200, 130, 35, 0.16) 2px,
+    transparent 2px
+  );
+  background-size: 46px 46px;
+  color: #2A2015;
 }
 
 html.dark body {

@@ -124,7 +124,7 @@ export default function ProfilePage() {
 
   if (authLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#06101D] light:bg-white">
+      <div className="flex min-h-screen items-center justify-center bg-[#06101D] light:bg-[#FAF5E9]">
         <Loader2 size={28} className="animate-spin text-orange-400" />
       </div>
     );
@@ -132,7 +132,7 @@ export default function ProfilePage() {
 
   if (!signedIn) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[#06101D] light:bg-white px-6 text-center text-white light:text-slate-900">
+      <div className="flex min-h-screen flex-col items-center justify-center bg-[#06101D] light:bg-[#FAF5E9] px-6 text-center text-white light:text-slate-900">
         <h2 className="text-2xl font-black">Sign in to view your profile</h2>
         <button
           onClick={openSignIn}
@@ -145,7 +145,7 @@ export default function ProfilePage() {
   }
 
   return (
-    <div className="min-h-screen bg-[#06101D] light:bg-white text-white light:text-slate-900">
+    <div className="min-h-screen bg-[#06101D] light:bg-[#FAF5E9] text-white light:text-slate-900">
       <div className="flex items-center gap-4 border-b border-white/10 light:border-black/10 px-5 py-5">
         <button
           onClick={() => router.back()}
@@ -206,7 +206,7 @@ export default function ProfilePage() {
                 border
                 border-white/10
                 bg-[#0B1524]
-                light:bg-white
+                light:bg-[#FAF5E9]
                 light:border-black/10
                 text-orange-300
                 light:text-orange-600
@@ -265,7 +265,7 @@ export default function ProfilePage() {
             <label className="mb-2 block text-xs font-bold uppercase tracking-[0.2em] text-orange-300/80 light:text-orange-600/90">
               Email
             </label>
-            <p className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.02] light:bg-black/[0.02] px-4 py-3 text-slate-400 light:text-slate-500">
+            <p className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.02] light:bg-black/[0.02] px-4 py-3 text-slate-400 light:text-slate-600">
               {user?.email}
             </p>
           </div>

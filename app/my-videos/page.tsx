@@ -191,7 +191,7 @@ export default function MyVideosPage() {
       <h1 className="text-2xl sm:text-3xl font-black text-white light:text-slate-900">
         Your Channel
       </h1>
-      <p className="mt-1 text-sm text-slate-400 light:text-slate-500">
+      <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
         Manage everything you've uploaded to InPlayer.
       </p>
 
@@ -220,20 +220,20 @@ export default function MyVideosPage() {
                     type="text"
                     value={editTitle}
                     onChange={(e) => setEditTitle(e.target.value)}
-                    className="w-full rounded-xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-white px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-orange-400/50"
+                    className="w-full rounded-xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-[#FAF5E9] px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-orange-400/50"
                     placeholder="Title"
                   />
                   <textarea
                     rows={2}
                     value={editDescription}
                     onChange={(e) => setEditDescription(e.target.value)}
-                    className="w-full resize-none rounded-xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-white px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-orange-400/50"
+                    className="w-full resize-none rounded-xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-[#FAF5E9] px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-orange-400/50"
                     placeholder="Description"
                   />
                   <select
                     value={editCategory}
                     onChange={(e) => setEditCategory(e.target.value)}
-                    className="w-full rounded-xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-white px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-orange-400/50"
+                    className="w-full rounded-xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-[#FAF5E9] px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-orange-400/50"
                   >
                     {CATEGORIES.map((c) => (
                       <option key={c} value={c}>
@@ -280,7 +280,7 @@ export default function MyVideosPage() {
                     <h3 className="truncate font-semibold text-white light:text-slate-900">
                       {video.title}
                     </h3>
-                    <p className="text-xs text-slate-400 light:text-slate-500">
+                    <p className="text-xs text-slate-400 light:text-slate-600">
                       {video.category} • {formatViews(video.views || 0)} •{" "}
                       {formatTimeAgo(video.uploadedAt)}
                     </p>

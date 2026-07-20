@@ -84,9 +84,9 @@ export default function Navbar() {
           z-50
           border-b
           border-white/5
-          light:border-black/5
+          light:border-black/10
           bg-[#06101D]/70
-          light:bg-white/80
+          light:bg-[#F5EEDC]/85
           backdrop-blur-[28px]
           shadow-[0_12px_40px_rgba(0,0,0,.35)]
           light:shadow-[0_12px_40px_rgba(0,0,0,.08)]
@@ -285,7 +285,7 @@ export default function Navbar() {
   open={mobileSearchOpen}
   onClose={() => setMobileSearchOpen(false)}
 />
-      <Suspense fallback={<div className="h-[48px] border-b border-white/5 light:border-black/5 bg-[#06101D]/95 light:bg-white/95" />}>
+      <Suspense fallback={<div className="h-[48px] border-b border-white/5 light:border-black/10 bg-[#06101D]/95 light:bg-[#F5EEDC]/95" />}>
         <NavigationCategories />
       </Suspense>
       {/* Backdrop */}
@@ -314,7 +314,7 @@ lg:right-auto
           border-white/10
           light:border-black/10
           bg-[#07101F]/95
-          light:bg-white/95
+          light:bg-[#F5EEDC]/95
           backdrop-blur-3xl
           transition-transform
           duration-300
@@ -417,7 +417,7 @@ lg:right-auto
                   light:hover:text-orange-600
                 "
               >
-                Subscriptions
+                In-House
                 <ChevronRight size={14} />
               </button>
 
@@ -515,7 +515,7 @@ lg:right-auto
                   py-1.5
                   text-left
                   text-slate-400
-                  light:text-slate-500
+                  light:text-slate-600
                   transition-all
                   duration-300
                   hover:bg-white/5
@@ -681,7 +681,7 @@ lg:right-auto
                   {["Movies", "Series", "Originals", "Live TV", "Creators", "Podcasts"].map(
                     (item) => (
                       <li key={item}>
-                        <button className="text-xs text-slate-400 light:text-slate-500 transition hover:text-orange-300 light:hover:text-orange-600">
+                        <button className="text-xs text-slate-400 light:text-slate-600 transition hover:text-orange-300 light:hover:text-orange-600">
                           {item}
                         </button>
                       </li>
@@ -698,7 +698,7 @@ lg:right-auto
                   {["About", "Careers", "Partners", "Support", "Privacy", "Terms"].map(
                     (item) => (
                       <li key={item}>
-                        <button className="text-xs text-slate-400 light:text-slate-500 transition hover:text-orange-300 light:hover:text-orange-600">
+                        <button className="text-xs text-slate-400 light:text-slate-600 transition hover:text-orange-300 light:hover:text-orange-600">
                           {item}
                         </button>
                       </li>

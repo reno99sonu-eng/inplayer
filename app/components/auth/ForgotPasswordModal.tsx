@@ -152,7 +152,7 @@ export default function ForgotPasswordModal({
             rounded-[28px] sm:rounded-[30px]
             border border-orange-400/15 light:border-orange-400/25
             bg-gradient-to-br from-[#07111F]/95 via-[#0B1728]/95 to-[#040A14]/95
-            light:from-white/98 light:via-slate-50/98 light:to-white/98
+            light:from-[#FBF6EA]/98 light:via-[#EDE2C9]/98 light:to-[#FBF6EA]/98
             p-5 sm:p-7
             shadow-[0_25px_90px_rgba(0,0,0,.55)]
             light:shadow-[0_25px_90px_rgba(0,0,0,.18)]
@@ -180,7 +180,7 @@ export default function ForgotPasswordModal({
               <h2 className="mt-4 text-[26px] sm:text-3xl font-black leading-tight text-white light:text-slate-900">
                 Password Reset.
               </h2>
-              <p className="mt-2 text-sm text-slate-400 light:text-slate-500">
+              <p className="mt-2 text-sm text-slate-400 light:text-slate-600">
                 Your password has been changed. You can now sign in with your new password.
               </p>
 
@@ -203,19 +203,19 @@ export default function ForgotPasswordModal({
               <h2 className="mt-4 text-[26px] sm:text-3xl font-black leading-tight text-white light:text-slate-900">
                 Forgot Password?
               </h2>
-              <p className="mt-2 text-sm text-slate-400 light:text-slate-500">
+              <p className="mt-2 text-sm text-slate-400 light:text-slate-600">
                 Enter your email and we&apos;ll send you a code to reset your password.
               </p>
 
               <div className="mt-6 space-y-4">
                 <div>
-                  <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-500">
+                  <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-600">
                     Email
                   </label>
                   <div className="relative">
                     <Mail
                       size={17}
-                      className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 light:text-slate-400"
+                      className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 light:text-slate-600"
                     />
                     <input
                       type="email"
@@ -260,7 +260,7 @@ export default function ForgotPasswordModal({
                   {loading ? "Sending Code..." : "Send Reset Code"}
                 </button>
 
-                <p className="text-center text-xs text-slate-400 light:text-slate-500">
+                <p className="text-center text-xs text-slate-400 light:text-slate-600">
                   Remembered your password?{" "}
                   <button
                     type="button"
@@ -277,19 +277,19 @@ export default function ForgotPasswordModal({
               <h2 className="mt-4 text-[26px] sm:text-3xl font-black leading-tight text-white light:text-slate-900">
                 Enter Reset Code.
               </h2>
-              <p className="mt-2 text-sm text-slate-400 light:text-slate-500">
+              <p className="mt-2 text-sm text-slate-400 light:text-slate-600">
                 We sent a code to <span className="text-orange-300 light:text-orange-600">{email}</span>. Enter it below with your new password.
               </p>
 
               <div className="mt-6 space-y-4">
                 <div>
-                  <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-500">
+                  <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-600">
                     Verification Code
                   </label>
                   <div className="relative">
                     <KeyRound
                       size={17}
-                      className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 light:text-slate-400"
+                      className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 light:text-slate-600"
                     />
                     <input
                       type="text"
@@ -310,13 +310,13 @@ export default function ForgotPasswordModal({
                 </div>
 
                 <div>
-                  <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-500">
+                  <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-600">
                     New Password
                   </label>
                   <div className="relative">
                     <Lock
                       size={17}
-                      className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 light:text-slate-400"
+                      className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 light:text-slate-600"
                     />
                     <input
                       type="password"

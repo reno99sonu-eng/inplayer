@@ -141,7 +141,7 @@ export default function VerifyEmailModal({
             rounded-[28px] sm:rounded-[30px]
             border border-orange-400/15 light:border-orange-400/25
             bg-gradient-to-br from-[#07111F]/95 via-[#0B1728]/95 to-[#040A14]/95
-            light:from-white/98 light:via-slate-50/98 light:to-white/98
+            light:from-[#FBF6EA]/98 light:via-[#EDE2C9]/98 light:to-[#FBF6EA]/98
             p-5 sm:p-7
             shadow-[0_25px_90px_rgba(0,0,0,.55)]
             light:shadow-[0_25px_90px_rgba(0,0,0,.18)]
@@ -168,7 +168,7 @@ export default function VerifyEmailModal({
             Verify Your Email.
           </h2>
 
-          <p className="mt-2 text-sm text-slate-400 light:text-slate-500">
+          <p className="mt-2 text-sm text-slate-400 light:text-slate-600">
             We sent a verification code to{" "}
             {email ? (
               <span className="text-orange-300 light:text-orange-600">{email}</span>
@@ -180,13 +180,13 @@ export default function VerifyEmailModal({
 
           <div className="mt-6 space-y-4">
             <div>
-              <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-500">
+              <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-600">
                 Verification Code
               </label>
               <div className="relative">
                 <KeyRound
                   size={17}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 light:text-slate-400"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 light:text-slate-600"
                 />
                 <input
                   type="text"

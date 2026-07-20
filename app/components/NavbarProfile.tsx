@@ -165,7 +165,7 @@ export default function NavbarProfile() {
           border-white/10
           light:border-black/10
 bg-[#08111F]/95
-          light:bg-white/95
+          light:bg-[#F5EEDC]/95
           backdrop-blur-3xl
           shadow-[0_30px_80px_rgba(0,0,0,.55)]
           light:shadow-[0_30px_80px_rgba(0,0,0,.15)]

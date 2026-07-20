@@ -47,7 +47,12 @@ async function getRealContent(): Promise<RealContent> {
       })
     );
 
-    const items = result.Items || [];
+    // Only public videos surface in discovery feeds. Unlisted (link-only)
+    // and private videos are filtered out here; unlisted stays reachable by
+    // direct /watch link.
+    const items = (result.Items || []).filter(
+      (v) => !v.visibility || v.visibility === "public"
+    );
 
     // Newest uploads first
     items.sort(
@@ -97,15 +102,26 @@ async function getRealContent(): Promise<RealContent> {
   }
 }
 
-export default async function Home() {
+interface HomeProps {
+  searchParams: Promise<{ view?: string }>;
+}
+
+export default async function Home({ searchParams }: HomeProps) {
   const { realVideos, realShorts } = await getRealContent();
 
+  // "horizontal" (default) shows normal 16:9 videos; "vertical" swaps the
+  // whole feed to Shorts. Driven by the Horizontal/Vertical chips in the
+  // category bar (see NavigationCategories.tsx).
+  const { view } = await searchParams;
+  const activeView = view === "vertical" ? "vertical" : "horizontal";
+  const isVertical = activeView === "vertical";
+
   return (
-    <main className="relative min-h-screen overflow-x-hidden bg-[#050816] light:bg-white">
+    <main className="relative min-h-screen overflow-x-hidden bg-[#050816] light:bg-[#F4ECDA]">
       {/* Premium Background */}
       <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
         {/* Dark Gradient */}
-        <div className="absolute inset-0 bg-gradient-to-br from-[#04060F] via-[#091224] to-[#04060F] light:from-white light:via-slate-50 light:to-white" />
+        <div className="absolute inset-0 bg-gradient-to-br from-[#04060F] via-[#091224] to-[#04060F] light:from-[#F4ECDA] light:via-[#EFE6D0] light:to-[#F4ECDA]" />
 
         {/* Honeycomb Texture — Dark Mode */}
         <div
@@ -117,14 +133,14 @@ export default async function Home() {
           }}
         />
 
-        {/* Honeycomb Texture — Light Mode (tuned to actually be visible on white) */}
+        {/* Honeycomb Texture — Light Mode (warm amber dots on cream) */}
         <div
           className="absolute inset-0 hidden light:block"
           style={{
             backgroundImage:
-              "radial-gradient(circle at 24px 24px, rgba(249,115,22,0.35) 2px, transparent 2px)",
-            backgroundSize: "48px 48px",
-            opacity: 0.12,
+              "radial-gradient(circle at 24px 24px, rgba(210,140,40,0.30) 2px, transparent 2px)",
+            backgroundSize: "46px 46px",
+            opacity: 0.5,
           }}
         />
 
@@ -132,22 +148,33 @@ export default async function Home() {
         <div className="absolute -left-64 top-20 h-[600px] w-[600px] rounded-full bg-orange-500/10 blur-[180px]" />
 
         {/* Blue Ambient Glow */}
-        <div className="absolute -right-64 bottom-0 h-[600px] w-[600px] rounded-full bg-cyan-500/10 blur-[180px]" />
+        <div className="absolute -right-64 bottom-0 h-[600px] w-[600px] rounded-full bg-cyan-500/10 blur-[180px] light:bg-amber-300/10" />
       </div>
 
       <div className="relative z-10">
         <div className="space-y-1 lg:space-y-2">
-        <FeaturedHero />
+          {/* The cinematic hero + trending row are horizontal-video showcases,
+              so they only make sense in the Horizontal view. Vertical view is
+              a pure Shorts feed. */}
+          {!isVertical && (
+            <>
+              <FeaturedHero />
 
-<div className="mx-auto h-px w-[92%] bg-gradient-to-r from-transparent via-white/10 to-transparent light:via-slate-200" />
+              <div className="mx-auto h-px w-[92%] bg-gradient-to-r from-transparent via-white/10 to-transparent light:via-black/10" />
 
-<TrendingNow />
+              <TrendingNow />
 
-<div className="mx-auto h-px w-[92%] bg-gradient-to-r from-transparent via-white/10 to-transparent light:via-slate-200" />
+              <div className="mx-auto h-px w-[92%] bg-gradient-to-r from-transparent via-white/10 to-transparent light:via-black/10" />
+            </>
+          )}
 
-<RecommendationFeed realVideos={realVideos} realShorts={realShorts} />
+          <RecommendationFeed
+            realVideos={realVideos}
+            realShorts={realShorts}
+            view={activeView}
+          />
 
-        {/* <ContinueWatching /> */}
+          {/* <ContinueWatching /> */}
         </div>
       </div>
 

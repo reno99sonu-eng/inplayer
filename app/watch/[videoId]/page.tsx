@@ -23,7 +23,9 @@ async function getRelatedVideos(currentVideoId: string, category: string) {
   );
 
   const items = (result.Items || []).filter(
-    (v) => v.videoId !== currentVideoId
+    (v) =>
+      v.videoId !== currentVideoId &&
+      (!v.visibility || v.visibility === "public")
   );
 
   const sameCategory = items.filter((v) => v.category === category);
@@ -56,7 +58,7 @@ export default async function WatchPage({ params }: WatchPageProps) {
         <h2 className="text-2xl font-black text-white light:text-slate-900">
           Video not found
         </h2>
-        <p className="mt-1.5 text-sm text-slate-400 light:text-slate-500 lg:mt-2">
+        <p className="mt-1.5 text-sm text-slate-400 light:text-slate-600 lg:mt-2">
           This video doesn't exist or may have been removed.
         </p>
         <Link
@@ -85,7 +87,7 @@ export default async function WatchPage({ params }: WatchPageProps) {
         <h2 className="text-2xl font-black text-white light:text-slate-900">
           Processing failed
         </h2>
-        <p className="mt-1.5 max-w-sm text-sm text-slate-400 light:text-slate-500 lg:mt-2">
+        <p className="mt-1.5 max-w-sm text-sm text-slate-400 light:text-slate-600 lg:mt-2">
           Something went wrong processing this video. Please try uploading again.
         </p>
       </div>
@@ -126,6 +128,10 @@ export default async function WatchPage({ params }: WatchPageProps) {
           thumbnailUrl: video.thumbnailUrl,
           contentType: video.contentType,
           downloadStatus: video.downloadStatus || "unavailable",
+          downloadRenditions: video.downloadRenditions || {},
+          tags: video.tags || [],
+          commentsEnabled: video.commentsEnabled,
+          ageRestricted: video.ageRestricted,
         }}
         relatedVideos={relatedVideos.map((v) => ({
           videoId: v.videoId,

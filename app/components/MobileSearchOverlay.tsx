@@ -48,7 +48,7 @@ export default function MobileSearchOverlay({
       />
 
       {/* Search Panel */}
-      <div className="fixed inset-x-0 top-0 z-[130] border-b border-white/10 light:border-black/10 bg-[#07101F]/95 light:bg-white/95 p-4 backdrop-blur-3xl">
+      <div className="fixed inset-x-0 top-0 z-[130] border-b border-white/10 light:border-black/10 bg-[#07101F]/95 light:bg-[#F5EEDC]/95 p-4 backdrop-blur-3xl">
         <div className="flex items-center gap-3">
 
           {/* Close Button */}
@@ -83,7 +83,7 @@ export default function MobileSearchOverlay({
             {/* Search Icon */}
             <Search
               size={22}
-              className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-500 light:text-slate-400"
+              className="absolute left-5 top-1/2 -translate-y-1/2 text-slate-500 light:text-slate-600"
             />
 
             {/* Search Input */}

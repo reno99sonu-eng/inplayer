@@ -89,7 +89,7 @@ export default function NavbarSearch() {
           top-1/2
           -translate-y-1/2
           text-slate-400
-          light:text-slate-500
+          light:text-slate-600
           group-focus-within:text-orange-400
         "
       />
@@ -167,7 +167,7 @@ export default function NavbarSearch() {
       >
         <Mic
           size={16}
-          className="text-slate-300 light:text-slate-500 lg:h-[18px] lg:w-[18px]"
+          className="text-slate-300 light:text-slate-600 lg:h-[18px] lg:w-[18px]"
         />
       </button>
     </div>

@@ -24,5 +24,8 @@ export async function GET(request: NextRequest, { params }: Params) {
     status: result.Item.status,
     downloadStatus: result.Item.downloadStatus || "unavailable",
     downloadFileName: result.Item.downloadFileName,
+    // Map of ready qualities: { "1080p": "1080p.mp4", ... }. Powers the
+    // Download button's quality picker.
+    downloadRenditions: result.Item.downloadRenditions || {},
   });
 }

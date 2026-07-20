@@ -7,7 +7,6 @@ import MuxPlayer from "@mux/mux-player-react";
 import { MoreVertical, ChevronDown } from "lucide-react";
 import { recommendations, type Recommendation } from "../data/recommendations";
 import { shorts, type Short } from "../data/shorts";
-import ShortsShelf from "./ShortsShelf";
 import { useSettings } from "./settings/SettingsProvider";
 
 // Hover-preview delay — don't start streaming a preview for every card the
@@ -18,6 +17,57 @@ const HOVER_PREVIEW_DELAY = 400;
 interface RecommendationFeedProps {
   realVideos?: Recommendation[];
   realShorts?: Short[];
+  // "horizontal" (default) renders the normal 16:9 video grid; "vertical"
+  // renders a Shorts-only grid. Driven by the Horizontal/Vertical chips in
+  // the category bar (see NavigationCategories.tsx / page.tsx).
+  view?: "horizontal" | "vertical";
+}
+
+// A single vertical (9:16) Shorts card for the Vertical home view. Mirrors
+// the ShortsShelf card visual but lays out in a multi-row responsive grid
+// instead of a single scrolling row.
+function ShortCard({ short }: { short: Short }) {
+  const cardContent = (
+    <div className="relative aspect-[9/16] overflow-hidden rounded-2xl bg-[#111827] light:bg-black/5">
+      <Image
+        src={short.poster}
+        alt={short.title || "InPlay short"}
+        fill
+        sizes="(max-width:640px)45vw,(max-width:1024px)30vw,18vw"
+        className="object-cover transition-transform duration-500 group-hover:scale-105"
+      />
+
+      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/25 to-transparent" />
+
+      {short.videoId && (
+        <span className="absolute top-2 left-2 rounded-md bg-orange-500/90 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
+          New
+        </span>
+      )}
+
+      <div className="absolute bottom-0 w-full p-3">
+        {short.title && (
+          <h3 className="line-clamp-2 text-xs font-bold leading-tight text-white">
+            {short.title}
+          </h3>
+        )}
+        <p className="mt-1 text-[10px] font-semibold text-orange-300">
+          {short.creator}
+        </p>
+        <p className="text-[10px] text-slate-300">{short.views}</p>
+      </div>
+    </div>
+  );
+
+  if (short.videoId) {
+    return (
+      <Link href={`/shorts?v=${short.videoId}`} className="group">
+        {cardContent}
+      </Link>
+    );
+  }
+
+  return <article className="group">{cardContent}</article>;
 }
 
 // A single homepage video card. Owns its own hover-preview state so each
@@ -192,7 +242,7 @@ function VideoCard({ video }: { video: Recommendation }) {
             {video.title}
           </h3>
 
-          <div className="mt-2 flex items-center gap-1 text-sm text-slate-400 light:text-slate-500">
+          <div className="mt-2 flex items-center gap-1 text-sm text-slate-400 light:text-slate-600">
             <span className="truncate">
               {video.creator}
             </span>
@@ -220,7 +270,7 @@ function VideoCard({ video }: { video: Recommendation }) {
             justify-center
             rounded-full
             text-slate-400
-            light:text-slate-500
+            light:text-slate-600
             transition-colors
             hover:bg-white/5
             light:hover:bg-black/5
@@ -265,6 +315,7 @@ function VideoCard({ video }: { video: Recommendation }) {
 export default function RecommendationFeed({
   realVideos = [],
   realShorts = [],
+  view = "horizontal",
 }: RecommendationFeedProps) {
   // Real uploaded content always appears first, unshuffled — the example
   // data behind it gets shuffled the same way as before. Render in
@@ -305,15 +356,39 @@ export default function RecommendationFeed({
   const secondVideos = items.slice(10, 20);
   const remainingVideos = items.slice(20);
 
-  // Shorts split across the two placements: a single compact row first,
-  // then the rest in the full grid further down
-  const shortsRowOne = shuffledShorts.slice(0, 8);
-  const shortsRowTwo = shuffledShorts.slice(8);
-
   const renderCard = (video: Recommendation) => (
     <VideoCard key={video.id} video={video} />
   );
 
+  // Vertical view: a Shorts-only responsive grid (fills every device width,
+  // 2 columns on the smallest phones up to 6 on wide desktops/TVs).
+  if (view === "vertical") {
+    return (
+      <section className="mx-auto max-w-[1800px] px-4 py-6 lg:py-10 lg:px-8">
+        <div className="mb-4 flex items-center gap-2 lg:mb-6 lg:gap-3">
+          <span className="text-2xl lg:text-3xl">🔥</span>
+          <h2 className="text-2xl lg:text-3xl font-bold text-white light:text-slate-900">
+            Vertical
+          </h2>
+        </div>
+
+        {shuffledShorts.length === 0 ? (
+          <p className="text-sm text-slate-400 light:text-slate-600">
+            No vertical videos yet.
+          </p>
+        ) : (
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 lg:gap-4">
+            {shuffledShorts.map((short) => (
+              <ShortCard key={short.id} short={short} />
+            ))}
+          </div>
+        )}
+      </section>
+    );
+  }
+
+  // Horizontal view: the normal 16:9 video grid. Shorts no longer interleave
+  // here — vertical content lives under the Vertical tab now.
   return (
     <>
       {/* First batch of recommendations */}
@@ -335,9 +410,6 @@ export default function RecommendationFeed({
         </div>
       </section>
 
-      {/* Shorts — first row */}
-      <ShortsShelf items={shortsRowOne} />
-
       {/* Second batch of recommendations */}
       <section className="mx-auto max-w-[1800px] px-4 py-3 lg:py-6 lg:px-8">
         <div
@@ -356,9 +428,6 @@ export default function RecommendationFeed({
           {secondVideos.map(renderCard)}
         </div>
       </section>
-
-      {/* Shorts — second row */}
-      <ShortsShelf items={shortsRowTwo} />
 
       {/* Remaining Recommendations — only rendered once "Show More" is clicked */}
       {remainingVideos.length > 0 && (
@@ -396,9 +465,9 @@ export default function RecommendationFeed({
                   from-[#111827]
                   via-[#182234]
                   to-[#111827]
-                  light:from-slate-100
-                  light:via-white
-                  light:to-slate-100
+                  light:from-[#EFE4CC]
+                  light:via-[#F3EAD6]
+                  light:to-[#EFE4CC]
                   px-7
                   py-3.5
                   text-white

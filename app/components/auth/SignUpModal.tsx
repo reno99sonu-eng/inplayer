@@ -187,7 +187,7 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
             rounded-[28px] sm:rounded-[30px]
             border border-orange-400/15 light:border-orange-400/25
             bg-gradient-to-br from-[#07111F]/95 via-[#0B1728]/95 to-[#040A14]/95
-            light:from-white/98 light:via-slate-50/98 light:to-white/98
+            light:from-[#FBF6EA]/98 light:via-[#EDE2C9]/98 light:to-[#FBF6EA]/98
             p-5 sm:p-7
             shadow-[0_25px_90px_rgba(0,0,0,.55)]
             light:shadow-[0_25px_90px_rgba(0,0,0,.18)]
@@ -208,7 +208,7 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
             <h2 className="mt-5 text-xl font-black text-white light:text-slate-900">
               Account Created!
             </h2>
-            <p className="mt-1 text-sm text-slate-400 light:text-slate-500">
+            <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
               Just one more step...
             </p>
           </div>
@@ -230,19 +230,19 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
             Account.
           </h2>
 
-          <p className="mt-2 text-sm text-slate-400 light:text-slate-500">
+          <p className="mt-2 text-sm text-slate-400 light:text-slate-600">
             Join InPlayer to save your favourites and get personalized recommendations.
           </p>
 
           <div className="mt-6 space-y-4">
             <div>
-              <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-500">
+              <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-600">
                 Full Name
               </label>
               <div className="group relative">
                 <User
                   size={17}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 light:text-slate-400 transition-colors duration-300 group-focus-within:text-orange-400"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 light:text-slate-600 transition-colors duration-300 group-focus-within:text-orange-400"
                 />
                 <input
                   type="text"
@@ -269,13 +269,13 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
             </div>
 
             <div>
-              <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-500">
+              <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-600">
                 Email
               </label>
               <div className="group relative">
                 <Mail
                   size={17}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 light:text-slate-400 transition-colors duration-300 group-focus-within:text-orange-400"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 light:text-slate-600 transition-colors duration-300 group-focus-within:text-orange-400"
                 />
                 <input
                   type="email"
@@ -302,13 +302,13 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
             </div>
 
             <div>
-              <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-500">
+              <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-600">
                 Password
               </label>
               <div className="group relative">
                 <Lock
                   size={17}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 light:text-slate-400 transition-colors duration-300 group-focus-within:text-orange-400"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 light:text-slate-600 transition-colors duration-300 group-focus-within:text-orange-400"
                 />
                 <input
                   type="password"
@@ -358,13 +358,13 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
             </div>
 
             <div>
-              <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-500">
+              <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-600">
                 Confirm Password
               </label>
               <div className="group relative">
                 <Lock
                   size={17}
-                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 light:text-slate-400 transition-colors duration-300 group-focus-within:text-orange-400"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 light:text-slate-600 transition-colors duration-300 group-focus-within:text-orange-400"
                 />
                 <input
                   type="password"
@@ -403,7 +403,7 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
               )}
             </div>
 
-            <label className="flex items-start gap-2.5 text-xs text-slate-400 light:text-slate-500 cursor-pointer">
+            <label className="flex items-start gap-2.5 text-xs text-slate-400 light:text-slate-600 cursor-pointer">
               <input
                 type="checkbox"
                 checked={agreedToTerms}
@@ -467,7 +467,7 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
               Continue with Google
             </button>
 
-            <p className="text-center text-xs text-slate-400 light:text-slate-500">
+            <p className="text-center text-xs text-slate-400 light:text-slate-600">
               Already have an account?{" "}
               <button
                 type="button"

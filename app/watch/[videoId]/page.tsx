@@ -131,6 +131,7 @@ export default async function WatchPage({ params }: WatchPageProps) {
           views: v.views || 0,
           uploadedAt: v.uploadedAt,
           thumbnailUrl: v.thumbnailUrl,
+          duration: v.duration || 0,
         }))}
       />
     </div>

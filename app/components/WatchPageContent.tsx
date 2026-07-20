@@ -12,7 +12,7 @@ import ShareButton from "@/app/components/ShareButton";
 import DescriptionBox from "@/app/components/DescriptionBox";
 import CommentSection from "@/app/components/CommentSection";
 import AnimatedCounter from "@/app/components/AnimatedCounter";
-import { formatTimeAgo, formatViews } from "@/app/lib/formatters";
+import { formatTimeAgo, formatViews, formatDuration } from "@/app/lib/formatters";
 
 interface VideoData {
   videoId: string;
@@ -34,6 +34,7 @@ interface RelatedVideo {
   views: number;
   uploadedAt: string;
   thumbnailUrl?: string;
+  duration?: number;
 }
 
 interface WatchPageContentProps {
@@ -241,6 +242,19 @@ export default function WatchPageContent({
                           sizes="140px"
                           className="object-cover transition-transform duration-500 group-hover:scale-110"
                         />
+                      )}
+
+                      {!!related.duration && (
+                        <span
+                          className="
+                            absolute bottom-1.5 right-1.5 rounded-md
+                            bg-black/85 px-1.5 py-0.5
+                            text-[10px] font-semibold text-white
+                            backdrop-blur-sm
+                          "
+                        >
+                          {formatDuration(related.duration)}
+                        </span>
                       )}
                     </div>
 

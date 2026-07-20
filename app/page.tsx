@@ -9,6 +9,17 @@ import { docClient } from "./lib/dynamodb";
 import type { Recommendation } from "./data/recommendations";
 import type { Short } from "./data/shorts";
 
+// Without this, Next.js has no reason to treat this page as dynamic (the
+// DynamoDB scan below isn't a `fetch()` call, so it doesn't trigger
+// Next's automatic dynamic-rendering detection on its own) — so the page
+// gets statically generated once at build time and the homepage feed
+// silently freezes as of that build. Newly uploaded videos/shorts land in
+// the table immediately and show up on /videos (which already forces
+// dynamic rendering) but never reach the homepage until the next deploy.
+// Forcing dynamic rendering here makes the homepage re-run this query on
+// every request, same as /videos already does.
+export const dynamic = "force-dynamic";
+
 function formatDuration(seconds: number): string {
   if (!seconds) return "0:00";
   const totalSeconds = Math.round(seconds);

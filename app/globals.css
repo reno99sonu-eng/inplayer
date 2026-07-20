@@ -683,6 +683,36 @@ animation: aiGlassSweep 5.5s linear infinite;
   --controls: none;
 }
 
+/* ---------- Premium Video Player Skin ----------
+   Mux Player's built-in props (accentColor/primaryColor) only cover so
+   much theming — these ::part() selectors reach into its shadow DOM to
+   restyle the two most visible pieces: the big center play button and
+   the bottom control bar, so the player reads as InPlayer-branded
+   rather than Mux's stock skin. */
+.premium-player mux-player::part(center play button) {
+  background: linear-gradient(135deg, #FF7A18, #FF9A00, #FFD54A);
+  border-radius: 9999px;
+  box-shadow: 0 10px 40px -8px rgba(249, 115, 22, 0.55);
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.3s ease;
+}
+
+.premium-player mux-player::part(center play button):hover {
+  transform: scale(1.08);
+  box-shadow: 0 14px 50px -6px rgba(249, 115, 22, 0.7);
+}
+
+.premium-player mux-player::part(bottom) {
+  background: linear-gradient(
+    to top,
+    rgba(5, 8, 22, 0.92),
+    rgba(5, 8, 22, 0.55) 60%,
+    transparent
+  );
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  transition: opacity 0.3s ease;
+}
+
 /* Hide scrollbar ONLY on mobile; desktop/tablet keep the orange thin scrollbar */
 @media (max-width: 767px) {
   .scrollbar-hide-mobile {

@@ -106,21 +106,41 @@ export default function CommentSection({ videoId }: CommentSectionProps) {
   };
 
   return (
-    <div className="mt-6">
-      <h2 className="mb-4 text-sm font-bold text-white light:text-slate-900">
+    <div
+      className="
+        mt-5 rounded-3xl border border-white/[0.08] light:border-black/[0.08]
+        bg-gradient-to-br from-white/[0.05] to-white/[0.01] light:from-black/[0.03] light:to-transparent
+        p-4 sm:p-5 backdrop-blur-xl
+        shadow-[0_25px_70px_-25px_rgba(0,0,0,.4)]
+      "
+    >
+      <h2 className="mb-4 flex items-center gap-2 text-sm font-bold text-white light:text-slate-900">
+        <span className="h-4 w-1 rounded-full bg-gradient-to-b from-orange-400 to-amber-300" />
         {comments.length} {comments.length === 1 ? "Comment" : "Comments"}
       </h2>
 
       <div className="mb-6 flex gap-3">
-        <div className="relative h-9 w-9 flex-shrink-0 overflow-hidden rounded-full border border-white/10 light:border-black/10">
-          <img
-            src="/avatars/avatar.png"
-            alt="You"
-            className="h-full w-full object-cover"
-          />
+        <div className="relative flex-shrink-0">
+          <div className="absolute -inset-[2px] rounded-full bg-gradient-to-br from-orange-400 via-amber-300 to-orange-500 opacity-70 blur-[2px]" />
+          <div className="relative h-9 w-9 overflow-hidden rounded-full ring-2 ring-[#050816] light:ring-white">
+            <img
+              src="/avatars/avatar.png"
+              alt="You"
+              className="h-full w-full object-cover"
+            />
+          </div>
         </div>
 
-        <div className="flex-1">
+        <div className="group relative flex-1">
+          <div
+            className="
+              pointer-events-none absolute -inset-1 rounded-2xl
+              bg-gradient-to-r from-orange-500/15 via-amber-400/10 to-orange-500/15
+              opacity-0 blur-xl transition-opacity duration-500
+              group-focus-within:opacity-100
+            "
+          />
+
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
@@ -129,7 +149,16 @@ export default function CommentSection({ videoId }: CommentSectionProps) {
             onFocus={() => {
               if (!signedIn) openSignIn();
             }}
-            className="w-full resize-none rounded-xl border border-white/10 light:border-black/10 bg-transparent px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-orange-400/50"
+            className="
+              relative w-full resize-none rounded-2xl border
+              border-white/10 light:border-black/10
+              bg-white/[0.03] light:bg-black/[0.02]
+              px-3.5 py-2.5 text-sm text-white light:text-slate-900
+              outline-none backdrop-blur-xl
+              transition-colors duration-300
+              placeholder:text-slate-500
+              focus:border-orange-400/50
+            "
           />
 
           {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
@@ -141,14 +170,21 @@ export default function CommentSection({ videoId }: CommentSectionProps) {
                   setText("");
                   setError(null);
                 }}
-                className="rounded-full px-4 py-1.5 text-xs font-semibold text-slate-400 hover:bg-white/5 light:hover:bg-black/5"
+                className="rounded-full px-4 py-1.5 text-xs font-semibold text-slate-400 transition-colors duration-300 hover:bg-white/5 light:hover:bg-black/5"
               >
                 Cancel
               </button>
               <button
                 onClick={handlePost}
                 disabled={posting}
-                className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-4 py-1.5 text-xs font-bold text-white disabled:opacity-60"
+                className="
+                  flex items-center gap-1.5 rounded-full
+                  bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A]
+                  px-4 py-1.5 text-xs font-bold text-white
+                  shadow-[0_8px_20px_-6px_rgba(255,153,0,.5)]
+                  transition-all duration-300
+                  hover:-translate-y-0.5 disabled:opacity-60 disabled:hover:translate-y-0
+                "
               >
                 {posting ? "Posting..." : "Comment"}
               </button>
@@ -162,7 +198,7 @@ export default function CommentSection({ videoId }: CommentSectionProps) {
           {[1, 2, 3].map((i) => (
             <div
               key={i}
-              className="h-16 animate-pulse rounded-xl bg-white/5 light:bg-black/5"
+              className="h-16 animate-pulse rounded-2xl bg-white/5 light:bg-black/5"
             />
           ))}
         </div>
@@ -171,9 +207,16 @@ export default function CommentSection({ videoId }: CommentSectionProps) {
           No comments yet. Be the first to say something.
         </p>
       ) : (
-        <div className="space-y-5">
+        <div className="space-y-1">
           {comments.map((comment) => (
-            <div key={comment.commentId} className="flex gap-3">
+            <div
+              key={comment.commentId}
+              className="
+                group/comment flex gap-3 rounded-2xl p-2
+                transition-colors duration-300
+                hover:bg-white/[0.03] light:hover:bg-black/[0.02]
+              "
+            >
               <div className="relative h-9 w-9 flex-shrink-0 overflow-hidden rounded-full border border-white/10 light:border-black/10">
                 <img
                   src="/avatars/avatar.png"
@@ -200,7 +243,12 @@ export default function CommentSection({ videoId }: CommentSectionProps) {
               {user?.userId === comment.userId && (
                 <button
                   onClick={() => handleDelete(comment.commentId)}
-                  className="flex-shrink-0 text-slate-500 transition hover:text-red-400"
+                  className="
+                    flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full
+                    text-slate-500 opacity-0 transition-all duration-300
+                    hover:bg-red-500/10 hover:text-red-400
+                    group-hover/comment:opacity-100
+                  "
                 >
                   <Trash2 size={15} />
                 </button>

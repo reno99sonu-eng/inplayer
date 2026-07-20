@@ -81,7 +81,7 @@ export default function TrendingNow() {
   };
 
   return (
-    <section className="relative mx-auto max-w-[1700px] px-5 pt-3 pb-2">
+    <section className="relative mx-auto max-w-[1700px] px-4 lg:px-5 pt-2 lg:pt-3 pb-1.5 lg:pb-2">
       <div className="pointer-events-none absolute inset-0">
         <h1
           className="
@@ -103,9 +103,9 @@ export default function TrendingNow() {
         </h1>
       </div>
 
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-2 lg:mb-3 flex items-center justify-between">
         <div>
-          <span className="rounded-full border border-red-500/20 bg-red-500/10 px-3 py-0.5 text-[10px] font-bold uppercase tracking-[0.2em] text-red-300 light:text-red-600 backdrop-blur-sm">
+          <span className="rounded-full border border-red-500/20 bg-red-500/10 px-2.5 lg:px-3 py-0.5 text-[10px] font-bold uppercase tracking-[0.2em] text-red-300 light:text-red-600 backdrop-blur-sm">
             Trending
           </span>
           <h2 className="mt-1 text-lg font-black text-white light:text-slate-900">
@@ -128,12 +128,16 @@ export default function TrendingNow() {
           onMouseLeave={resume}
           className="
             flex
-            gap-5
+            gap-3
+            lg:gap-5
             overflow-x-auto
-            pt-3
-            -mt-3
-            pb-2
-            pl-8
+            pt-2
+            -mt-2
+            lg:pt-3
+            lg:-mt-3
+            pb-1.5
+            lg:pb-2
+            pl-5
             lg:pl-10
             scrollbar-hide-mobile
           "
@@ -144,8 +148,10 @@ export default function TrendingNow() {
               className="
                 group
                 relative
-                h-[230px]
-                w-[190px]
+                h-[190px]
+                w-[155px]
+                lg:h-[230px]
+                lg:w-[190px]
                 flex-shrink-0
                 overflow-hidden
                 rounded-[28px]
@@ -169,7 +175,7 @@ export default function TrendingNow() {
 
               <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
 
-              <div className="absolute bottom-0 w-full p-4">
+              <div className="absolute bottom-0 w-full p-3 lg:p-4">
                 <h3 className="text-base font-black text-white">
                   {item.title}
                 </h3>

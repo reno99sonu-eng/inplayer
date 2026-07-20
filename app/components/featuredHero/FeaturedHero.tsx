@@ -37,11 +37,11 @@ export default function FeaturedHero() {
         overflow-hidden
         bg-black
 
-        min-h-[260px]
+        min-h-[210px]
 
-        sm:min-h-[300px]
+        sm:min-h-[240px]
 
-        md:min-h-[340px]
+        md:min-h-[300px]
 
         lg:h-[38vh]
 
@@ -68,14 +68,15 @@ export default function FeaturedHero() {
       <div
         className="
           absolute
-          bottom-4
+          bottom-2.5
           left-1/2
           z-30
           flex
           -translate-x-1/2
-          gap-2
+          gap-1.5
 
           lg:bottom-6
+          lg:gap-2
         "
       >
         {featuredSlides.map((slide, index) => (
@@ -85,8 +86,11 @@ export default function FeaturedHero() {
             aria-label={`Go to slide ${index + 1}`}
             className="
               relative
-              h-1.5
-              w-6
+              h-1
+              w-5
+
+              lg:h-1.5
+              lg:w-6
               overflow-hidden
               rounded-full
               bg-white/20

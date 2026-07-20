@@ -10,8 +10,8 @@ interface ShortsShelfProps {
 
 export default function ShortsShelf({ items }: ShortsShelfProps) {
   return (
-    <section className="mx-auto max-w-[1800px] px-4 py-4 lg:py-8 lg:px-8">
-      <div className="mb-6 flex items-center gap-3">
+    <section className="mx-auto max-w-[1800px] px-3 lg:px-8 py-3 lg:py-8">
+      <div className="mb-3 lg:mb-6 flex items-center gap-2 lg:gap-3">
         <span className="text-3xl">🔥</span>
 
         <h2 className="text-3xl font-bold text-white light:text-slate-900">
@@ -26,15 +26,16 @@ export default function ShortsShelf({ items }: ShortsShelfProps) {
       <div
         className="
           flex
-          gap-3
+          gap-2
           overflow-x-auto
-          pb-2
+          pb-1.5
           [scrollbar-width:none]
           [&::-webkit-scrollbar]:hidden
 
           sm:grid
           sm:grid-cols-4
           sm:gap-3
+          sm:pb-2
           sm:overflow-visible
 
           md:grid-cols-6
@@ -49,7 +50,7 @@ export default function ShortsShelf({ items }: ShortsShelfProps) {
                 src={short.poster}
                 alt={short.title || "InPlay short"}
                 fill
-                sizes="(max-width:640px)130px, 13vw"
+                sizes="(max-width:640px)108px, 13vw"
                 className="
                   object-cover
                   transition-transform
@@ -106,7 +107,7 @@ export default function ShortsShelf({ items }: ShortsShelfProps) {
             </div>
           );
 
-          const className = "group w-[130px] flex-shrink-0 sm:w-auto";
+          const className = "group w-[108px] flex-shrink-0 sm:w-auto";
 
           // Real uploaded shorts link to their actual watch page. Example
           // (dummy) cards stay exactly as before — not clickable.

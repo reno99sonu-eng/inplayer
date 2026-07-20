@@ -17,8 +17,8 @@ export default function FeaturedHeroLayout({ children }: Props) {
           flex
           h-full
           items-end
-          px-6
-          pb-10
+          px-4
+          pb-6
 
           lg:hidden
         "

@@ -30,14 +30,16 @@ export default function FloatingAIButton() {
         onClick={() => setOpen(true)}
         className={`
           fixed
-          bottom-24
-          right-5
+          bottom-20
+          right-4
           z-[96]
           lg:bottom-6
           lg:right-6
           flex
-          h-16
-          w-16
+          h-14
+          w-14
+          lg:h-16
+          lg:w-16
           items-center
           justify-center
           rounded-full

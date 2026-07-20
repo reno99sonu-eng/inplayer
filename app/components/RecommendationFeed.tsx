@@ -130,9 +130,9 @@ export default function RecommendationFeed({
         </div>
 
         {/* Information */}
-        <div className="mt-4 flex items-start gap-3">
+        <div className="mt-3 lg:mt-4 flex items-start gap-3">
 
-          <div className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-full border border-white/10 light:border-black/10">
+          <div className="relative h-9 w-9 lg:h-11 lg:w-11 flex-shrink-0 overflow-hidden rounded-full border border-white/10 light:border-black/10">
             <Image
               src={video.avatar}
               alt={video.creator}
@@ -178,8 +178,10 @@ export default function RecommendationFeed({
           <button
             className="
               flex
-              h-9
-              w-9
+              h-8
+              w-8
+              lg:h-9
+              lg:w-9
               flex-shrink-0
               items-center
               justify-center
@@ -232,13 +234,15 @@ export default function RecommendationFeed({
   return (
     <>
       {/* First batch of recommendations */}
-      <section className="mx-auto max-w-[1800px] px-4 py-5 lg:py-10 lg:px-8">
+      <section className="mx-auto max-w-[1800px] px-3 lg:px-8 py-4 lg:py-10">
         <div
           className="
             grid
             grid-cols-1
-            gap-x-6
-            gap-y-10
+            gap-x-4
+            gap-y-5
+            lg:gap-x-6
+            lg:gap-y-10
 
             sm:grid-cols-2
             lg:grid-cols-3
@@ -254,13 +258,15 @@ export default function RecommendationFeed({
       <ShortsShelf items={shortsRowOne} />
 
       {/* Second batch of recommendations */}
-      <section className="mx-auto max-w-[1800px] px-4 py-3 lg:py-6 lg:px-8">
+      <section className="mx-auto max-w-[1800px] px-3 lg:px-8 py-2 lg:py-6">
         <div
           className="
             grid
             grid-cols-1
-            gap-x-6
-            gap-y-10
+            gap-x-4
+            gap-y-5
+            lg:gap-x-6
+            lg:gap-y-10
 
             sm:grid-cols-2
             lg:grid-cols-3
@@ -277,14 +283,16 @@ export default function RecommendationFeed({
 
       {/* Remaining Recommendations — only rendered once "Show More" is clicked */}
       {remainingVideos.length > 0 && (
-        <section className="mx-auto max-w-[1800px] px-4 pb-4 lg:px-8">
+        <section className="mx-auto max-w-[1800px] px-3 lg:px-8 pb-3 lg:pb-4">
           {showAll && (
             <div
               className="
                 grid
                 grid-cols-1
-                gap-x-6
-                gap-y-10
+                gap-x-4
+                gap-y-5
+                lg:gap-x-6
+                lg:gap-y-10
 
                 sm:grid-cols-2
                 lg:grid-cols-3
@@ -297,7 +305,7 @@ export default function RecommendationFeed({
           )}
 
           {!showAll && (
-            <div className="mt-2 mb-4 flex justify-center">
+            <div className="mt-1 mb-3 lg:mt-2 lg:mb-4 flex justify-center">
               <button
                 onClick={() => setShowAll(true)}
                 className="
@@ -314,8 +322,10 @@ export default function RecommendationFeed({
                   light:from-slate-100
                   light:via-white
                   light:to-slate-100
-                  px-7
-                  py-3.5
+                  px-5
+                  py-2.5
+                  lg:px-7
+                  lg:py-3.5
                   text-white
                   light:text-slate-900
                   shadow-[0_0_30px_rgba(249,115,22,.12)]

@@ -26,11 +26,11 @@ function VideoCard({ video }: { video: Recommendation }) {
   const [previewing, setPreviewing] = useState(false);
   const [canHover, setCanHover] = useState(false);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const cardRef = useRef<HTMLDivElement | null>(null);
 
   // Only real devices with an actual mouse get the hover preview — on
   // touch devices "hover" is either unsupported or fires unreliably on
-  // first tap, which would make thumbnails flicker/misbehave. Tapping a
-  // card on mobile just goes straight to the video, same as before.
+  // first tap, which would make thumbnails flicker/misbehave.
   useEffect(() => {
     setCanHover(
       typeof window !== "undefined" &&
@@ -38,12 +38,31 @@ function VideoCard({ video }: { video: Recommendation }) {
     );
   }, []);
 
+  // Touch devices have no hover state at all, so the preview never had a
+  // way to trigger on mobile. The mobile equivalent: autoplay the muted
+  // preview once the card is significantly scrolled into view, same as
+  // Instagram/Facebook video feeds do. Only wired up when the device
+  // genuinely can't hover, so this and the mouse-hover behavior above
+  // never both fire for the same card.
+  useEffect(() => {
+    if (canHover || !video.muxPlaybackId || !cardRef.current) return;
+
+    const el = cardRef.current;
+    const observer = new IntersectionObserver(
+      ([entry]) => setPreviewing(entry.isIntersecting),
+      { threshold: 0.6 }
+    );
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [canHover, video.muxPlaybackId]);
+
   const startPreview = () => {
     if (!canHover || !video.muxPlaybackId) return;
     hoverTimer.current = setTimeout(() => setPreviewing(true), HOVER_PREVIEW_DELAY);
   };
 
   const stopPreview = () => {
+    if (!canHover) return;
     if (hoverTimer.current) {
       clearTimeout(hoverTimer.current);
       hoverTimer.current = null;
@@ -55,6 +74,7 @@ function VideoCard({ video }: { video: Recommendation }) {
     <>
       {/* Thumbnail */}
       <div
+        ref={cardRef}
         className="
           relative
           aspect-video

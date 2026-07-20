@@ -59,10 +59,15 @@ export default function ShortsPageContent({
   const shorts = initialShorts;
 
   const [activeIndex, setActiveIndex] = useState(0);
-  // Sound on by default — matches the watch page (click a video, it plays
-  // with sound). The small speaker icon in the header still lets people
-  // mute manually if they want to.
-  const [muted, setMuted] = useState(false);
+  // Starts muted — every browser (mobile especially) silently keeps
+  // audio suppressed at the hardware level until a real, direct user
+  // gesture explicitly unmutes it, no matter what this starts as. Defaulting
+  // to "false" here made the FIRST tap look like it was muting (since the
+  // icon already showed "unmuted"), so it took two taps to actually hear
+  // anything. Starting honestly muted, with one reliable tap to unmute
+  // (see unmute() below), fixes that — same convention every real
+  // short-video app uses.
+  const [muted, setMuted] = useState(true);
   const [burstIndex, setBurstIndex] = useState<number | null>(null);
   const [progress, setProgress] = useState(0);
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
@@ -262,12 +267,39 @@ export default function ShortsPageContent({
     setTimeout(() => setBurstIndex(null), 800);
   };
 
-  // A tap on the video: if a second tap follows quickly, treat it as a
-  // double-tap (like), same as Instagram/TikTok. Otherwise, once the
-  // window passes with no second tap, treat it as a single tap (toggle
-  // mute). Works identically for mouse clicks and touch taps since it's
-  // driven by the ordinary "click" event, not dblclick.
+  // Toggles mute AND imperatively sets it directly on the live player,
+  // synchronously, right inside whatever click handler calls this. That's
+  // the important part: browsers only actually unlock audible playback
+  // when the unmute happens inside a real, direct user gesture. Going
+  // through React state alone (setMuted → re-render → prop update on the
+  // next tick) is enough of a delay that some browsers keep audio
+  // silently suppressed even though the muted prop/icon says "off" —
+  // which is exactly the bug where sound only ever worked after clicking
+  // mute then unmute (only that second click landed as a genuine
+  // in-the-moment gesture).
+  const toggleMuted = () => {
+    setMuted((m) => {
+      const next = !m;
+      const player = playerRef.current;
+      if (player) {
+        player.muted = next;
+        if (!next) {
+          player.play?.().catch(() => {});
+        }
+      }
+      return next;
+    });
+  };
+
+  // A tap on the video: always toggles mute immediately (synchronously,
+  // see toggleMuted above). If a second tap follows quickly, ALSO treat
+  // it as a double-tap (like), same as Instagram/TikTok — mute getting
+  // toggled twice during a double-tap is harmless, it just ends back
+  // where it started. Works identically for mouse clicks and touch taps
+  // since it's driven by the ordinary "click" event, not dblclick.
   const handleVideoTap = (short: Short, index: number) => {
+    toggleMuted();
+
     if (tapTimerRef.current) {
       clearTimeout(tapTimerRef.current);
       tapTimerRef.current = null;
@@ -277,8 +309,7 @@ export default function ShortsPageContent({
 
     tapTimerRef.current = setTimeout(() => {
       tapTimerRef.current = null;
-      setMuted((m) => !m);
-    }, 250);
+    }, 300);
   };
 
   const handleToggleSubscribe = async (short: Short) => {
@@ -476,7 +507,7 @@ export default function ShortsPageContent({
         </h1>
 
         <button
-          onClick={() => setMuted(!muted)}
+          onClick={toggleMuted}
           className="
             ml-auto
             flex

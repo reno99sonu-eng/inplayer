@@ -122,7 +122,7 @@ export default function Navbar() {
     INPLAYER
   </span>
 </div>
-        <div className="mx-auto flex h-14 lg:h-20 max-w-[1700px] items-center px-3 lg:px-5">
+        <div className="mx-auto flex h-12 lg:h-16 max-w-[1700px] items-center px-3 lg:px-5">
 
 
         

@@ -109,11 +109,18 @@ export default function ShortsShelf({ items }: ShortsShelfProps) {
 
           const className = "group w-[108px] flex-shrink-0 sm:w-auto";
 
-          // Real uploaded shorts link to their actual watch page. Example
-          // (dummy) cards stay exactly as before — not clickable.
+          // Real uploaded shorts open the SAME full-screen vertical Shorts
+          // feed as the bottom-nav Shorts button — not the regular
+          // horizontal watch page — deep-linked to start on this specific
+          // short (see app/shorts/page.tsx). Example (dummy) cards stay
+          // exactly as before — not clickable.
           if (short.videoId) {
             return (
-              <Link key={short.id} href={`/watch/${short.videoId}`} className={className}>
+              <Link
+                key={short.id}
+                href={`/shorts?v=${short.videoId}`}
+                className={className}
+              >
                 {cardContent}
               </Link>
             );

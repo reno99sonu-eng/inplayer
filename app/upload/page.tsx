@@ -13,6 +13,8 @@ import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import ProcessingStatus from "@/app/components/ProcessingStatus";
 
 const CATEGORIES = [
+  "InPlayer Originals",
+  "Verticals",
   "Movies",
   "Trending",
   "Music",

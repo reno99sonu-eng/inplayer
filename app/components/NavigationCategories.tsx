@@ -5,6 +5,8 @@ import { useSearchParams, usePathname } from "next/navigation";
 
 const categories = [
   "All",
+  "InPlayer Originals",
+  "Verticals",
   "Movies",
   "Trending",
   "Music",
@@ -28,8 +30,8 @@ export default function NavigationCategories() {
     <div
       className="
         sticky
-        top-14
-        lg:top-20
+        top-12
+        lg:top-16
         z-40
         overflow-hidden
         border-b

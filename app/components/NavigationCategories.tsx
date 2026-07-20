@@ -28,7 +28,8 @@ export default function NavigationCategories() {
     <div
       className="
         sticky
-        top-20
+        top-16
+        lg:top-20
         z-40
         overflow-hidden
         border-b
@@ -48,11 +49,14 @@ export default function NavigationCategories() {
       <div
         className="
           flex
-          gap-3
+          gap-2
+          lg:gap-3
           overflow-x-auto
           whitespace-nowrap
-          px-5
-          pt-3
+          px-4
+          lg:px-5
+          pt-2.5
+          lg:pt-3
           pb-9
           -mb-6
           [scrollbar-width:none]
@@ -74,10 +78,14 @@ export default function NavigationCategories() {
               href={href}
               className={`
                 flex-shrink-0
-                rounded-xl
-                px-5
-                py-2.5
-                text-sm
+                rounded-lg
+                lg:rounded-xl
+                px-3
+                py-1.5
+                lg:px-5
+                lg:py-2.5
+                text-xs
+                lg:text-sm
                 font-semibold
                 transition-all
                 duration-300

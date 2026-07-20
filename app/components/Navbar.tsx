@@ -122,7 +122,7 @@ export default function Navbar() {
     INPLAYER
   </span>
 </div>
-        <div className="mx-auto flex h-20 max-w-[1700px] items-center px-5">
+        <div className="mx-auto flex h-16 lg:h-20 max-w-[1700px] items-center px-4 lg:px-5">
 
 
         
@@ -188,16 +188,16 @@ export default function Navbar() {
 <div className="lg:hidden flex items-center flex-1 min-w-0">
 
   {/* Hamburger */}
-  <div className="mr-3 flex-shrink-0">
+  <div className="flex-shrink-0">
     <button
       onClick={() => setMenuOpen(!menuOpen)}
       className="
         flex
-        h-11
-        w-11
+        h-9
+        w-9
         items-center
         justify-center
-        rounded-2xl
+        rounded-xl
         border
         border-white/10
         light:border-black/10
@@ -206,9 +206,9 @@ export default function Navbar() {
         backdrop-blur-xl
       "
     >
-      <div className="relative h-6 w-6">
+      <div className="relative h-5 w-5">
         <Menu
-          size={22}
+          size={18}
           className={`absolute transition-all duration-300 ${
             menuOpen
               ? "rotate-90 scale-0 opacity-0"
@@ -216,7 +216,7 @@ export default function Navbar() {
           }`}
         />
         <X
-          size={22}
+          size={18}
           className={`absolute transition-all duration-300 ${
             menuOpen
               ? "rotate-0 scale-100 opacity-100 text-orange-300"
@@ -226,28 +226,6 @@ export default function Navbar() {
       </div>
     </button>
   </div>
-
-  {/* Search Icon */}
-  <button
-    onClick={() => setMobileSearchOpen(true)}
-    className="
-      flex
-      h-11
-      w-11
-      items-center
-      justify-center
-      rounded-full
-      border
-      border-white/10
-      light:border-black/10
-      bg-white/5
-      light:bg-black/5
-      text-white
-      light:text-slate-900
-    "
-  >
-    <Search size={22} />
-  </button>
 
 </div>
 
@@ -264,13 +242,37 @@ export default function Navbar() {
   <NavbarProfile />
 </div>
 
-{/* Mobile Notification (Create + Profile moved to bottom nav) */}
+{/* Mobile Search + Notification (Create + Profile moved to bottom nav) */}
 <div
-  className={`lg:hidden items-center gap-2 ${
+  className={`lg:hidden items-center gap-1.5 ${
     mobileSearchOpen ? "hidden" : "flex"
   }`}
 >
-  <div className="scale-[0.9]">
+  {/* Search Icon — moved beside the notification bell */}
+  <button
+    onClick={() => setMobileSearchOpen(true)}
+    aria-label="Search"
+    className="
+      flex
+      h-9
+      w-9
+      flex-shrink-0
+      items-center
+      justify-center
+      rounded-full
+      border
+      border-white/10
+      light:border-black/10
+      bg-white/5
+      light:bg-black/5
+      text-white
+      light:text-slate-900
+    "
+  >
+    <Search size={18} />
+  </button>
+
+  <div className="scale-[0.85] origin-right">
     <NavbarActions />
   </div>
 </div>

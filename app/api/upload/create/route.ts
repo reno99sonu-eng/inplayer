@@ -37,14 +37,24 @@ export async function POST(request: NextRequest) {
       })
     );
     const uploaderAvatarUrl = profileResult.Item?.avatarUrl || null;
+    const isShort = contentType === "short";
 
     // Ask Mux for a one-time direct upload URL. The browser uploads the
     // actual video file straight to this URL — it never passes through
     // our own server, which matters a lot for large video files.
+    //
+    // Videos (not Shorts) also request a downloadable "highest" quality
+    // static MP4 rendition up front, so it's already being generated in
+    // the background by the time anyone hits Download — see
+    // app/api/webhooks/mux/route.ts for the "ready" callback and
+    // app/components/DownloadButton.tsx for the viewer-facing side.
     const upload = await mux.video.uploads.create({
       cors_origin: "*", // Tighten this to your real domain before going fully live
       new_asset_settings: {
         playback_policy: ["public"],
+        ...(!isShort && {
+          static_renditions: [{ resolution: "highest" }],
+        }),
       },
     });
 
@@ -61,12 +71,16 @@ export async function POST(request: NextRequest) {
           title: title.trim(),
           description: description?.trim() || "",
           category: category.trim(),
-          contentType: contentType === "short" ? "short" : "video",
+          contentType: isShort ? "short" : "video",
           uploaderId: user.userId,
           uploaderName: user.name || "Unknown",
           uploaderAvatarUrl,
           uploadedAt: new Date().toISOString(),
           views: 0,
+          // "unavailable" for Shorts (never offered), "preparing" for
+          // videos (the static rendition requested above is already in
+          // flight), flips to "ready" once Mux's webhook confirms it.
+          downloadStatus: isShort ? "unavailable" : "preparing",
         },
       })
     );

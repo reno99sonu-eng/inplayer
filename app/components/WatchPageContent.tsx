@@ -9,6 +9,7 @@ import SubscribeButton from "@/app/components/SubscribeButton";
 import LikeButton from "@/app/components/LikeButton";
 import WatchLaterButton from "@/app/components/WatchLaterButton";
 import ShareButton from "@/app/components/ShareButton";
+import DownloadButton from "@/app/components/DownloadButton";
 import DescriptionBox from "@/app/components/DescriptionBox";
 import CommentSection from "@/app/components/CommentSection";
 import AnimatedCounter from "@/app/components/AnimatedCounter";
@@ -26,6 +27,8 @@ interface VideoData {
   views: number;
   muxPlaybackId: string;
   thumbnailUrl?: string;
+  contentType?: string;
+  downloadStatus?: "unavailable" | "preparing" | "ready" | "errored";
 }
 
 interface RelatedVideo {
@@ -191,6 +194,15 @@ export default function WatchPageContent({
                   <LikeButton videoId={video.videoId} />
                   <WatchLaterButton videoId={video.videoId} />
                   <ShareButton videoId={video.videoId} title={video.title} />
+                  {/* Videos only — Shorts never get a Download button
+                      (see ShortsPageContent.tsx, which doesn't render
+                      this component at all). */}
+                  {video.contentType !== "short" && (
+                    <DownloadButton
+                      videoId={video.videoId}
+                      initialStatus={video.downloadStatus || "unavailable"}
+                    />
+                  )}
                 </div>
               </div>
             </div>

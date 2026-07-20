@@ -20,5 +20,9 @@ export async function GET(request: NextRequest, { params }: Params) {
     return NextResponse.json({ status: "not_found" });
   }
 
-  return NextResponse.json({ status: result.Item.status });
+  return NextResponse.json({
+    status: result.Item.status,
+    downloadStatus: result.Item.downloadStatus || "unavailable",
+    downloadFileName: result.Item.downloadFileName,
+  });
 }

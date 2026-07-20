@@ -124,6 +124,8 @@ export default async function WatchPage({ params }: WatchPageProps) {
           views: video.views || 0,
           muxPlaybackId: video.muxPlaybackId,
           thumbnailUrl: video.thumbnailUrl,
+          contentType: video.contentType,
+          downloadStatus: video.downloadStatus || "unavailable",
         }}
         relatedVideos={relatedVideos.map((v) => ({
           videoId: v.videoId,

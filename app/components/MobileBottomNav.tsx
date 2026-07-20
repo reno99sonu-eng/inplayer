@@ -4,8 +4,11 @@ import Link from "next/link";
 import { Home, PlaySquare, Rss } from "lucide-react";
 
 import MobileCreateButton from "./MobileCreateButton";
+import { useAuthModal } from "./auth/AuthProvider";
 
 export default function MobileBottomNav() {
+  const { user } = useAuthModal();
+
   return (
     <nav
       className="
@@ -25,8 +28,8 @@ export default function MobileBottomNav() {
         light:bg-white/95
         backdrop-blur-2xl
         px-2
-        py-1.5
-        pb-[calc(0.375rem+env(safe-area-inset-bottom))]
+        py-2
+        pb-[calc(0.5rem+env(safe-area-inset-bottom))]
       "
     >
       <Link
@@ -35,9 +38,9 @@ export default function MobileBottomNav() {
           flex
           flex-col
           items-center
-          gap-0.5
-          px-2.5
-          py-0.5
+          gap-1
+          px-3
+          py-1
           text-slate-300
           light:text-slate-600
           transition-colors
@@ -46,7 +49,7 @@ export default function MobileBottomNav() {
           light:hover:text-orange-600
         "
       >
-        <Home size={20} />
+        <Home size={22} />
         <span className="text-[11px] font-medium">Home</span>
       </Link>
 
@@ -56,9 +59,9 @@ export default function MobileBottomNav() {
           flex
           flex-col
           items-center
-          gap-0.5
-          px-2.5
-          py-0.5
+          gap-1
+          px-3
+          py-1
           text-slate-300
           light:text-slate-600
           transition-colors
@@ -67,7 +70,7 @@ export default function MobileBottomNav() {
           light:hover:text-orange-600
         "
       >
-        <PlaySquare size={20} />
+        <PlaySquare size={22} />
         <span className="text-[11px] font-medium">Shorts</span>
       </Link>
 
@@ -81,9 +84,9 @@ export default function MobileBottomNav() {
           flex
           flex-col
           items-center
-          gap-0.5
-          px-2.5
-          py-0.5
+          gap-1
+          px-3
+          py-1
           text-slate-300
           light:text-slate-600
           transition-colors
@@ -92,7 +95,7 @@ export default function MobileBottomNav() {
           light:hover:text-orange-600
         "
       >
-        <Rss size={20} />
+        <Rss size={22} />
         <span className="text-[11px] font-medium">Subscriptions</span>
       </Link>
 
@@ -102,9 +105,9 @@ export default function MobileBottomNav() {
           flex
           flex-col
           items-center
-          gap-0.5
-          px-2.5
-          py-0.5
+          gap-1
+          px-3
+          py-1
           text-slate-300
           light:text-slate-600
           transition-colors
@@ -114,9 +117,9 @@ export default function MobileBottomNav() {
         "
       >
         <img
-          src="/avatars/avatar.png"
+          src={user?.avatarUrl || "/avatars/avatar.png"}
           alt="Profile"
-          className="h-5 w-5 rounded-full object-cover ring-1 ring-orange-400/50"
+          className="h-6 w-6 rounded-full object-cover ring-1 ring-orange-400/50"
         />
         <span className="text-[11px] font-medium">You</span>
       </Link>

@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
+  UserCog,
   User,
   Clock,
   Heart,
@@ -20,6 +21,7 @@ export default function AccountPage() {
   const { signedIn, authLoading, user, openSignIn, signOut } = useAuthModal();
 
   const menu = [
+    { icon: UserCog, title: "Edit Profile", href: "/profile" },
     { icon: User, title: "Your Channel", href: "/my-videos" },
     { icon: Clock, title: "History", href: "/history" },
     { icon: Heart, title: "Watchlist", href: "/watchlist" },
@@ -94,7 +96,10 @@ export default function AccountPage() {
         <h2 className="text-lg font-black">My Account</h2>
       </div>
 
-      <div className="p-6 text-center">
+      <button
+        onClick={() => router.push("/profile")}
+        className="w-full p-6 text-center transition-colors duration-200 active:bg-white/5 light:active:bg-black/5"
+      >
         <img
           src={user?.avatarUrl || "/avatars/avatar.png"}
           alt="Profile"
@@ -123,7 +128,7 @@ export default function AccountPage() {
           <Crown size={12} />
           Premium
         </div>
-      </div>
+      </button>
 
       <div className="border-t border-white/10 light:border-black/10 p-4">
         {menu.map((item) => {

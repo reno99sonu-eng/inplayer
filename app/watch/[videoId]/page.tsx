@@ -107,7 +107,7 @@ export default async function WatchPage({ params }: WatchPageProps) {
   const relatedVideos = await getRelatedVideos(videoId, video.category);
 
   return (
-    <div className="mx-auto max-w-[1600px] px-3 py-4 lg:px-4 lg:py-8">
+    <div className="mx-auto max-w-[1400px] px-3 py-4 lg:px-4 lg:py-8">
       <BackButton />
       <WatchHistoryRecorder videoId={videoId} />
 

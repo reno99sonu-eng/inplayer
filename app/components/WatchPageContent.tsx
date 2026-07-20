@@ -86,7 +86,7 @@ export default function WatchPageContent({
                 overflow-hidden rounded-3xl
                 ring-1 ring-white/10 light:ring-black/10
                 transition-all duration-500
-                ${theaterMode ? "mx-auto max-w-[1100px]" : "lg:max-w-[820px]"}
+                ${theaterMode ? "mx-auto max-w-[1100px]" : ""}
               `}
             >
               <VideoPlayer
@@ -117,7 +117,7 @@ export default function WatchPageContent({
 
           <div className={theaterMode ? "mx-auto max-w-[1100px]" : ""}>
             <h1
-              className="animate-fade-in-up mt-4 lg:mt-6 bg-gradient-to-r from-white to-white/70 light:from-slate-900 light:to-slate-900/70 bg-clip-text text-2xl sm:text-3xl lg:text-[34px] font-black leading-[1.1] tracking-tight text-transparent"
+              className="animate-fade-in-up mt-3 lg:mt-4 bg-gradient-to-r from-white to-white/70 light:from-slate-900 light:to-slate-900/70 bg-clip-text text-lg lg:text-xl font-bold leading-[1.2] tracking-tight text-transparent"
               style={{ animationDelay: "50ms" }}
             >
               {video.title}
@@ -155,15 +155,15 @@ export default function WatchPageContent({
                 p-3 backdrop-blur-xl
                 shadow-[0_25px_70px_-25px_rgba(0,0,0,.4)]
 
-                lg:mt-5 lg:p-5
+                lg:mt-4
               "
               style={{ animationDelay: "150ms" }}
             >
               <div className="flex flex-wrap items-center justify-between gap-3 lg:gap-4">
                 <div className="flex items-center gap-2.5 lg:gap-3">
                   <div className="relative flex-shrink-0">
-                    <div className="absolute -inset-[2px] lg:-inset-[3px] rounded-full bg-gradient-to-br from-orange-400 via-amber-300 to-orange-500 opacity-80 blur-[3px]" />
-                    <div className="relative h-10 w-10 overflow-hidden rounded-full ring-2 ring-[#050816] light:ring-white lg:h-12 lg:w-12">
+                    <div className="absolute -inset-[2px] rounded-full bg-gradient-to-br from-orange-400 via-amber-300 to-orange-500 opacity-80 blur-[3px]" />
+                    <div className="relative h-9 w-9 overflow-hidden rounded-full ring-2 ring-[#050816] light:ring-white">
                       {/* A plain <img>, not next/image — avatars are
                           base64 data URLs (see app/lib/imageCompress.ts),
                           which next/image doesn't optimize/serve cleanly. */}

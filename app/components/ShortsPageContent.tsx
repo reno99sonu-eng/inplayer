@@ -59,11 +59,17 @@ export default function ShortsPageContent({
   const shorts = initialShorts;
 
   const [activeIndex, setActiveIndex] = useState(0);
-  const [muted, setMuted] = useState(true);
+  // Sound on by default — matches the watch page (click a video, it plays
+  // with sound). The small speaker icon in the header still lets people
+  // mute manually if they want to.
+  const [muted, setMuted] = useState(false);
   const [burstIndex, setBurstIndex] = useState<number | null>(null);
   const [progress, setProgress] = useState(0);
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
   const [copiedId, setCopiedId] = useState<string | number | null>(null);
+  const [expandedCaption, setExpandedCaption] = useState<string | number | null>(
+    null
+  );
 
   const [likeStatus, setLikeStatus] = useState<
     Record<string | number, LikeState>
@@ -78,6 +84,12 @@ export default function ShortsPageContent({
 
   const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
   const playerRef = useRef<any>(null);
+  // Single/double-tap disambiguation on the video itself, done manually
+  // rather than relying on the browser's native "dblclick" event — dblclick
+  // is a desktop mouse concept and doesn't fire reliably from two quick
+  // taps on real touch devices, which is why double-tap-to-like needs its
+  // own timer-based detector to work consistently on mobile too.
+  const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -250,6 +262,25 @@ export default function ShortsPageContent({
     setTimeout(() => setBurstIndex(null), 800);
   };
 
+  // A tap on the video: if a second tap follows quickly, treat it as a
+  // double-tap (like), same as Instagram/TikTok. Otherwise, once the
+  // window passes with no second tap, treat it as a single tap (toggle
+  // mute). Works identically for mouse clicks and touch taps since it's
+  // driven by the ordinary "click" event, not dblclick.
+  const handleVideoTap = (short: Short, index: number) => {
+    if (tapTimerRef.current) {
+      clearTimeout(tapTimerRef.current);
+      tapTimerRef.current = null;
+      handleDoubleTap(short, index);
+      return;
+    }
+
+    tapTimerRef.current = setTimeout(() => {
+      tapTimerRef.current = null;
+      setMuted((m) => !m);
+    }, 250);
+  };
+
   const handleToggleSubscribe = async (short: Short) => {
     if (!signedIn) {
       openSignIn();
@@ -365,6 +396,26 @@ export default function ShortsPageContent({
     // section fight the page's own scroll, which is what caused the
     // "doesn't fit" and "not smooth" scrolling issues.
     <div className="fixed inset-0 z-[999] overflow-hidden bg-black lg:flex lg:items-center lg:justify-center">
+      {/* Ambient blurred backdrop — on wide desktop windows the vertical
+          feed column doesn't fill the whole screen (it shouldn't; a
+          9:16 video stretched edge-to-edge on a wide monitor would look
+          wrong). Rather than leave that space flat black, fill it with a
+          heavily blurred wash of the current short's own poster, same
+          technique as the watch page's ambient glow — reads as an
+          intentional, premium layout instead of empty space. */}
+      {shorts[activeIndex]?.poster && (
+        <div
+          className="pointer-events-none absolute inset-0 hidden lg:block"
+          style={{
+            backgroundImage: `url(${shorts[activeIndex].poster})`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            filter: "blur(60px) saturate(1.4) brightness(0.5)",
+            opacity: 0.5,
+          }}
+        />
+      )}
+
       {/* Pinned header — neutral/dark like YouTube's Shorts chrome. Capped
           to the same width as the video column on desktop (see the feed
           container below) so it doesn't span the full, much-wider desktop
@@ -560,7 +611,6 @@ export default function ShortsPageContent({
                       : "scale-[0.94] opacity-60"
                   }
                 `}
-                onDoubleClick={() => handleDoubleTap(short, index)}
               >
                 {/* Real, synced progress bar */}
                 {isActive && (
@@ -572,15 +622,14 @@ export default function ShortsPageContent({
                   </div>
                 )}
 
-                {/* Tapping anywhere on the video itself toggles sound —
-                    matches every real shorts/reels app (tap to
-                    mute/unmute). Scoped to just this video/poster block
-                    (a sibling of the icon-rail buttons below, not a
+                {/* Single tap toggles mute, a quick second tap likes —
+                    see handleVideoTap. Scoped to just this video/poster
+                    block (a sibling of the icon-rail buttons below, not a
                     parent), so tapping Like/Comment/Share/Save never also
-                    toggles mute. */}
+                    triggers this. */}
                 <div
                   className="absolute inset-0"
-                  onClick={() => setMuted(!muted)}
+                  onClick={() => handleVideoTap(short, index)}
                 >
                   {hasRealVideo ? (
                     <div className="shorts-player h-full w-full">
@@ -620,20 +669,43 @@ export default function ShortsPageContent({
                 )}
 
                 <div className="pointer-events-none absolute bottom-6 left-4 right-16 lg:bottom-6">
-                  {short.title && (
-                    <h2 className="text-sm font-black leading-tight text-white lg:text-base">
-                      {short.title}
-                    </h2>
-                  )}
+                  {/* Compact by default — one line each, tap to expand the
+                      full title/caption. Only this text block opts back
+                      into pointer-events (the outer wrapper stays
+                      pointer-events-none so it never blocks the tap/like
+                      handling on the video above it). */}
+                  <div
+                    className="pointer-events-auto cursor-pointer"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setExpandedCaption(
+                        expandedCaption === short.id ? null : short.id
+                      );
+                    }}
+                  >
+                    {short.title && (
+                      <h2
+                        className={`text-xs font-black leading-tight text-white lg:text-sm ${
+                          expandedCaption === short.id ? "" : "line-clamp-1"
+                        }`}
+                      >
+                        {short.title}
+                      </h2>
+                    )}
 
-                  {short.description && (
-                    <p className="mt-1 line-clamp-2 text-xs text-slate-200 lg:text-sm">
-                      {renderWithHashtags(short.description)}
-                    </p>
-                  )}
+                    {short.description && (
+                      <p
+                        className={`mt-0.5 text-[11px] text-slate-200 lg:text-xs ${
+                          expandedCaption === short.id ? "" : "line-clamp-1"
+                        }`}
+                      >
+                        {renderWithHashtags(short.description)}
+                      </p>
+                    )}
+                  </div>
 
-                  <div className="mt-2 flex items-center gap-2">
-                    <div className="relative h-7 w-7 overflow-hidden rounded-full ring-2 ring-white/25 lg:h-8 lg:w-8">
+                  <div className="mt-1.5 flex items-center gap-1.5">
+                    <div className="relative h-6 w-6 overflow-hidden rounded-full ring-2 ring-white/25 lg:h-7 lg:w-7">
                       {/* A plain <img>, not next/image — avatars are
                           base64 data URLs (see app/lib/imageCompress.ts),
                           which next/image doesn't optimize/serve cleanly. */}

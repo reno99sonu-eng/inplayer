@@ -79,13 +79,13 @@ export default function SubscribeButton({ creatorId }: SubscribeButtonProps) {
 
   if (loading) {
     return (
-      <div className="h-9 w-28 animate-pulse rounded-full bg-white/10 light:bg-black/5 lg:h-11 lg:w-32" />
+      <div className="h-9 w-28 animate-pulse rounded-full bg-white/10 light:bg-black/5" />
     );
   }
 
   if (isOwnChannel) {
     return (
-      <span className="rounded-full border border-white/10 light:border-black/10 px-3 py-2 text-xs font-semibold text-slate-500 lg:px-4 lg:py-2.5">
+      <span className="rounded-full border border-white/10 light:border-black/10 px-3 py-2 text-xs font-semibold text-slate-500">
         This is you
       </span>
     );
@@ -98,8 +98,6 @@ export default function SubscribeButton({ creatorId }: SubscribeButtonProps) {
       className={`
         flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-bold
         transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-60
-
-        lg:gap-2 lg:px-5 lg:py-2.5
         ${
           isSubscribed
             ? "border border-white/15 light:border-black/15 text-slate-200 light:text-slate-700 hover:bg-white/5 light:hover:bg-black/5"

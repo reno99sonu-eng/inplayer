@@ -46,8 +46,6 @@ export default function ShareButton({ videoId, title }: ShareButtonProps) {
         text-slate-300 light:text-slate-600
         transition-all duration-300
         hover:border-white/20 light:hover:border-black/20 hover:bg-white/[0.06]
-
-        lg:h-11 lg:w-11
       "
     >
       {copied ? <Check size={18} className="text-emerald-400" /> : <Share2 size={18} />}

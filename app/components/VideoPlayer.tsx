@@ -247,6 +247,29 @@ export default function VideoPlayer({
   // swallow while locked. Clicks in the bottom control-bar zone are never
   // touched, so Mux's real controls keep working.
   const handlePlayerClickCapture = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Let taps that land on a real interactive control through untouched:
+    // our own overlay buttons (Expand, Lock/Unlock) AND every one of Mux
+    // Player's own controls/flyout menus (Media Chrome — what Mux Player
+    // is built on — tags all of its elements media-*, e.g.
+    // <media-captions-menu>, <media-rendition-menu>). e.target alone can't
+    // tell these apart: a tap anywhere inside <mux-player>'s shadow DOM
+    // gets retargeted to report <mux-player> itself as the target, no
+    // matter what was actually pressed. composedPath() sees the real,
+    // un-retargeted chain instead — including flyout menus, which render
+    // well above the bottom control-bar strip the old check alone
+    // guarded, so picking a caption language or a playback quality was
+    // silently swallowed and turned into a play/pause toggle instead.
+    // Checked before the lock branch below, deliberately, so the Unlock
+    // button keeps working even while locked.
+    const path = e.nativeEvent.composedPath?.() || [];
+    for (const node of path) {
+      if (node === e.currentTarget) break;
+      const tag = (node as HTMLElement).tagName;
+      if (!tag) continue;
+      const lower = tag.toLowerCase();
+      if (lower.startsWith("media-") || lower === "button") return;
+    }
+
     if (locked) {
       e.stopPropagation();
       return;

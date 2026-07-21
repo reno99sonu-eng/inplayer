@@ -23,25 +23,26 @@ export default function CreatePopup({
   items,
   mobile = false,
 }: CreatePopupProps) {
-  const closedTransform = mobile ? "translate-y-4" : "-translate-y-4";
+  const closedTransform = mobile ? "translate-y-6" : "-translate-y-4";
 
   return (
     <div
       ref={popupRef}
       className={`
-        absolute
-        z-50
         ${
           mobile
-            ? "right-0 bottom-14 w-[250px]"
-            : "right-0 top-16 w-[320px]"
+            ? // Fixed to the viewport and horizontally centered, sitting just
+              // above the mobile bottom nav (z above it). Width is bounded to
+              // the screen so it can never overflow on any phone.
+              "fixed bottom-[78px] left-1/2 -translate-x-1/2 z-[100] w-[calc(100vw-1.5rem)] max-w-[360px]"
+            : "absolute right-0 top-16 z-50 w-[320px]"
         }
         overflow-hidden
         rounded-3xl
         border
         border-orange-400/20
         bg-[#08111F]/95
-        light:bg-white/95
+        light:bg-[#F5EEDC]/95
         backdrop-blur-3xl
         shadow-[0_30px_80px_rgba(0,0,0,.55)]
         light:shadow-[0_30px_80px_rgba(0,0,0,.15)]
@@ -59,7 +60,7 @@ export default function CreatePopup({
           Create
         </h3>
 
-        <p className="mt-1 text-sm text-slate-400 light:text-slate-500">
+        <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
           Start creating on InPlayer
         </p>
       </div>
@@ -116,7 +117,7 @@ export default function CreatePopup({
                 {item.title}
               </div>
 
-              <div className="text-xs text-slate-400 light:text-slate-500">
+              <div className="text-xs text-slate-400 light:text-slate-600">
                 {item.subtitle}
               </div>
             </div>

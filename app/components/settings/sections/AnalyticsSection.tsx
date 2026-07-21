@@ -24,12 +24,12 @@ function StatCard({
   value: string | number;
 }) {
   return (
-    <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-4">
-      <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.06] text-slate-300">
+    <div className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.03] p-4">
+      <div className="mb-2 flex h-8 w-8 items-center justify-center rounded-lg bg-white/[0.06] light:bg-black/[0.05] text-slate-300 light:text-slate-700">
         {icon}
       </div>
-      <p className="text-xl font-black text-white">{value}</p>
-      <p className="mt-0.5 text-[11px] font-medium text-slate-500">{label}</p>
+      <p className="text-xl font-black text-white light:text-slate-900">{value}</p>
+      <p className="mt-0.5 text-[11px] font-medium text-slate-500 light:text-slate-500">{label}</p>
     </div>
   );
 }
@@ -83,20 +83,20 @@ export default function AnalyticsSection() {
       description="Performance across everything you've uploaded."
     >
       {!signedIn && !authLoading && (
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-slate-400 light:text-slate-600">
           Sign in to see analytics for your uploads.
         </p>
       )}
 
       {loading && signedIn && (
-        <div className="flex items-center gap-2 text-sm text-slate-400">
+        <div className="flex items-center gap-2 text-sm text-slate-400 light:text-slate-600">
           <Loader2 size={16} className="animate-spin" />
           Loading your analytics…
         </div>
       )}
 
       {!loading && signedIn && videos.length === 0 && (
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-slate-400 light:text-slate-600">
           You haven&apos;t uploaded anything yet — once you do, your views and
           performance will show up here.
         </p>
@@ -128,14 +128,14 @@ export default function AnalyticsSection() {
           </div>
 
           {topVideo && (
-            <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.03] p-5">
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
+            <div className="mt-6 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.03] p-5">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 light:text-slate-500">
                 Top Performer
               </p>
-              <p className="mt-2 line-clamp-1 text-lg font-bold text-white">
+              <p className="mt-2 line-clamp-1 text-lg font-bold text-white light:text-slate-900">
                 {topVideo.title}
               </p>
-              <p className="mt-1 text-sm text-slate-400">
+              <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
                 {formatViews(topVideo.views || 0)}
               </p>
             </div>

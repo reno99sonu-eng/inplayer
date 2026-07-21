@@ -22,14 +22,13 @@ export default function SettingsCard({
         overflow-hidden
         rounded-[30px]
         border
-        border-white/10
-        bg-white/[0.03]
+        border-white/10 light:border-black/10
+        bg-white/[0.035] light:bg-black/[0.035]
         backdrop-blur-xl
         transition-all
-        duration-500
-        ease-out
-        hover:border-white/20
-        hover:shadow-[0_0_50px_rgba(255,255,255,.04)]
+        duration-300
+        hover:border-orange-400/30
+        hover:shadow-[0_0_40px_rgba(249,115,22,.12)]
       "
     >
       <div className="p-6">
@@ -44,21 +43,23 @@ export default function SettingsCard({
               items-center
               justify-center
               rounded-2xl
-              bg-white/[0.06]
-              text-white
+              bg-gradient-to-br
+              from-orange-500/20
+              to-amber-400/20
+              text-orange-300
               ring-1
-              ring-white/10
+              ring-orange-400/20
             "
           >
             {icon}
           </div>
 
           <div>
-            <h2 className="text-xl font-black tracking-[-0.02em] text-white">
+            <h2 className="text-xl font-black tracking-[-0.02em] text-white light:text-slate-900">
               {title}
             </h2>
 
-            <p className="mt-1 text-sm text-slate-400">
+            <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
               {description}
             </p>
           </div>

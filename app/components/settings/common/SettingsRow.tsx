@@ -40,9 +40,8 @@ export default function SettingsRow({
         text-left
         transition-all
         duration-300
-        ease-out
-        hover:border-white/10
-        hover:bg-white/[0.035]
+        hover:border-orange-400/20
+        hover:bg-white/[0.04] light:hover:bg-black/[0.04]
         hover:-translate-y-0.5
       "
     >
@@ -58,11 +57,10 @@ export default function SettingsRow({
             rounded-xl
             transition-all
             duration-300
-            ease-out
             ${
               active
-                ? "bg-white/10 text-white"
-                : "bg-white/5 text-slate-400 group-hover:bg-white/10 group-hover:text-white"
+                ? "bg-orange-500/20 text-orange-300"
+                : "bg-white/5 light:bg-black/5 text-slate-300 light:text-slate-700 group-hover:bg-orange-500/10 group-hover:text-orange-300"
             }
           `}
         >
@@ -71,12 +69,12 @@ export default function SettingsRow({
 
         <div>
 
-          <h3 className="text-[16px] font-bold text-white">
+          <h3 className="text-[16px] font-bold text-white light:text-slate-900">
             {title}
           </h3>
 
           {description && (
-            <p className="mt-1 text-sm text-slate-400">
+            <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
               {description}
             </p>
           )}
@@ -90,22 +88,18 @@ export default function SettingsRow({
         {children}
 
         {value && (
-          <span className="flex items-center gap-1.5 text-sm font-medium text-slate-300">
-            {active && (
-              <span className="h-1.5 w-1.5 rounded-full bg-orange-400" />
-            )}
+          <span className="text-sm font-medium text-orange-300">
             {value}
           </span>
         )}
 
-        {!children && !value && (
+        {!children && (
           <ChevronRight
             size={18}
             className="
-              text-slate-500
+              text-slate-500 light:text-slate-500
               transition-transform
               duration-300
-              ease-out
               group-hover:translate-x-1
             "
           />

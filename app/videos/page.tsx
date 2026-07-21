@@ -8,11 +8,11 @@ import BackButton from "@/app/components/BackButton";
 export const dynamic = "force-dynamic";
 
 interface VideosPageProps {
-  searchParams: Promise<{ category?: string }>;
+  searchParams: Promise<{ category?: string; search?: string }>;
 }
 
 export default async function VideosPage({ searchParams }: VideosPageProps) {
-  const { category } = await searchParams;
+  const { category, search } = await searchParams;
 
   const result = await docClient.send(
     new ScanCommand({
@@ -36,29 +36,54 @@ export default async function VideosPage({ searchParams }: VideosPageProps) {
     videos = videos.filter((v) => v.category === category);
   }
 
+  // Free-text / voice search across title, uploader, and category.
+  if (search) {
+    const q = search.toLowerCase();
+    videos = videos.filter(
+      (v) =>
+        (v.title || "").toLowerCase().includes(q) ||
+        (v.uploaderName || "").toLowerCase().includes(q) ||
+        (v.category || "").toLowerCase().includes(q)
+    );
+  }
+
+  const heading = search
+    ? `Results for “${search}”`
+    : category
+      ? category
+      : "All Videos";
+
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-8 sm:py-12">
       <BackButton />
 
       <h1 className="text-2xl sm:text-3xl font-black text-white light:text-slate-900">
-        {category ? category : "All Videos"}
+        {heading}
       </h1>
       <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
-        {category
-          ? `Everything uploaded under ${category}.`
-          : "Everything actually uploaded to InPlayer so far."}
+        {search
+          ? `Videos matching “${search}”.`
+          : category
+            ? `Everything uploaded under ${category}.`
+            : "Everything actually uploaded to InPlayer so far."}
       </p>
 
       {videos.length === 0 ? (
         <div className="mt-16 flex flex-col items-center justify-center text-center">
           <Film size={40} className="mb-4 text-slate-600" />
           <p className="font-semibold text-white light:text-slate-900">
-            {category ? `No videos in ${category} yet` : "No videos yet"}
+            {search
+              ? `No results for “${search}”`
+              : category
+                ? `No videos in ${category} yet`
+                : "No videos yet"}
           </p>
           <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
-            {category
-              ? "Try a different category, or check back later."
-              : "Upload one to see it appear here."}
+            {search
+              ? "Try a different search."
+              : category
+                ? "Try a different category, or check back later."
+                : "Upload one to see it appear here."}
           </p>
         </div>
       ) : (

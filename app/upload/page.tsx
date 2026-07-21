@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { fetchAuthSession } from "aws-amplify/auth";
 import {
@@ -106,6 +106,20 @@ export default function UploadPage() {
   };
 
   const removeTag = (t: string) => setTags((prev) => prev.filter((x) => x !== t));
+
+  // Honor a preset from the Create menu (e.g. "Podcast" preselects the
+  // Podcasts category). Read once on mount, then clear it.
+  useEffect(() => {
+    try {
+      const preset = sessionStorage.getItem("inplayer-upload-preset");
+      if (preset === "podcast" && CATEGORIES.includes("Podcasts")) {
+        setCategory("Podcasts");
+      }
+      if (preset) sessionStorage.removeItem("inplayer-upload-preset");
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   const [stage, setStage] = useState<Stage>("picking");
   const [progress, setProgress] = useState(0);

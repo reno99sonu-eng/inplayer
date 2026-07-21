@@ -1,6 +1,7 @@
 "use client";
 
 import CreatePopup from "./CreatePopup";
+import AIStudioModal from "./AIStudioModal";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { fetchAuthSession } from "aws-amplify/auth";
@@ -27,6 +28,7 @@ export default function NavbarActions() {
   const router = useRouter();
   const { signedIn } = useAuthModal();
   const [open, setOpen] = useState(false);
+  const [aiOpen, setAiOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const popupRef = useRef<HTMLDivElement>(null);
   const notifRef = useRef<HTMLDivElement>(null);
@@ -122,18 +124,35 @@ export default function NavbarActions() {
       title: "Go Live",
       subtitle: "Streaming & Events",
       color: "from-orange-500 to-amber-400",
+      onClick: () => {
+        setOpen(false);
+        router.push("/live");
+      },
     },
     {
       icon: <Mic2 size={20} />,
       title: "Podcast",
       subtitle: "Voice & Audio Shows",
       color: "from-cyan-500 to-sky-400",
+      onClick: () => {
+        setOpen(false);
+        try {
+          sessionStorage.setItem("inplayer-upload-preset", "podcast");
+        } catch {
+          /* ignore */
+        }
+        router.push("/upload");
+      },
     },
     {
       icon: <Sparkles size={20} />,
       title: "AI Studio",
       subtitle: "Generate with AI",
       color: "from-violet-500 to-fuchsia-500",
+      onClick: () => {
+        setOpen(false);
+        setAiOpen(true);
+      },
     },
   ];
 
@@ -278,6 +297,7 @@ export default function NavbarActions() {
         </div>
       </div>
 
+      <AIStudioModal open={aiOpen} onClose={() => setAiOpen(false)} />
     </div>
   );
 }

@@ -1,11 +1,32 @@
 "use client";
 
-import { SETTINGS_SECTIONS, type Section } from "./settingsConfig";
+type Section =
+  | "appearance"
+  | "general"
+  | "playback"
+  | "privacy"
+  | "payments"
+  | "analytics"
+  | "storage"
+  | "notifications"
+  | "about";
 
 interface MobileSettingsTabsProps {
   active: Section;
   onChange: (section: Section) => void;
 }
+
+const tabs = [
+  { id: "appearance", label: "Appearance" },
+  { id: "general", label: "General" },
+  { id: "playback", label: "Playback" },
+  { id: "privacy", label: "Privacy" },
+  { id: "payments", label: "Plans" },
+  { id: "analytics", label: "Analytics" },
+  { id: "storage", label: "Storage" },
+  { id: "notifications", label: "Alerts" },
+  { id: "about", label: "About" },
+] as const;
 
 export default function MobileSettingsTabs({
   active,
@@ -31,31 +52,30 @@ export default function MobileSettingsTabs({
           [&::-webkit-scrollbar]:hidden
         "
       >
-        <div className="flex min-w-max gap-2 px-1 pb-1">
-          {SETTINGS_SECTIONS.map((item) => (
+        <div className="flex min-w-max gap-3 px-1 pb-1">
+          {tabs.map((tab) => (
             <button
-              key={item.id}
+              key={tab.id}
               type="button"
-              onClick={() => onChange(item.id)}
+              onClick={() => onChange(tab.id)}
               className={`
                 shrink-0
                 whitespace-nowrap
                 rounded-full
-                px-4
+                px-5
                 py-2.5
                 text-sm
                 font-semibold
                 transition-all
                 duration-300
-                ease-out
                 ${
-                  active === item.id
-                    ? "bg-white text-[#06101D] shadow-lg shadow-black/20 light:bg-slate-900 light:text-white"
-                    : "bg-white/[0.05] text-slate-300 hover:bg-white/[0.09] light:bg-black/[0.04] light:text-slate-600 light:hover:bg-black/[0.08]"
+                  active === tab.id
+                    ? "bg-gradient-to-r from-orange-500 to-amber-400 text-white light:text-slate-900 shadow-lg shadow-orange-500/20"
+                    : "bg-white/[0.04] light:bg-black/[0.04] text-slate-300 light:text-slate-700 hover:bg-white/[0.08] light:hover:bg-black/[0.08] light:bg-black/[0.04] light:text-slate-600 light:hover:bg-black/[0.08]"
                 }
               `}
             >
-              {item.mobileLabel || item.label}
+              {tab.label}
             </button>
           ))}
         </div>

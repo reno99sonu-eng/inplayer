@@ -26,18 +26,18 @@ export default function PlansSection() {
         title="Plans & Purchases"
         description="Manage your InPlayer membership."
       >
-        <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-5">
+        <div className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.03] p-5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 light:text-slate-500">
                 Current Plan
               </p>
-              <p className="mt-1 text-2xl font-black text-white">
+              <p className="mt-1 text-2xl font-black text-white light:text-slate-900">
                 InPlayer Free
               </p>
             </div>
 
-            <span className="rounded-full border border-white/15 bg-white/[0.05] px-3 py-1 text-xs font-semibold text-slate-300">
+            <span className="rounded-full border border-white/15 light:border-black/15 bg-white/[0.05] light:bg-black/[0.04] px-3 py-1 text-xs font-semibold text-slate-300 light:text-slate-700">
               Active
             </span>
           </div>
@@ -46,9 +46,9 @@ export default function PlansSection() {
             {FREE_FEATURES.map((feature) => (
               <li
                 key={feature}
-                className="flex items-center gap-3 text-sm text-slate-300"
+                className="flex items-center gap-3 text-sm text-slate-300 light:text-slate-700"
               >
-                <Check size={16} className="shrink-0 text-slate-400" />
+                <Check size={16} className="shrink-0 text-slate-400 light:text-slate-600" />
                 {feature}
               </li>
             ))}
@@ -66,7 +66,7 @@ export default function PlansSection() {
             {PREMIUM_FEATURES.map((feature) => (
               <li
                 key={feature}
-                className="flex items-center gap-3 text-sm text-slate-200"
+                className="flex items-center gap-3 text-sm text-slate-200 light:text-slate-800"
               >
                 <Check size={16} className="shrink-0 text-orange-300" />
                 {feature}
@@ -83,18 +83,18 @@ export default function PlansSection() {
               cursor-not-allowed
               rounded-xl
               border
-              border-white/10
-              bg-white/[0.04]
+              border-white/10 light:border-black/10
+              bg-white/[0.04] light:bg-black/[0.04]
               py-3
               text-sm
               font-semibold
-              text-slate-400
+              text-slate-400 light:text-slate-600
             "
           >
             Premium billing launches soon
           </button>
 
-          <p className="mt-3 text-center text-xs text-slate-500">
+          <p className="mt-3 text-center text-xs text-slate-500 light:text-slate-500">
             We&apos;ll let you know the moment it&apos;s ready — no action
             needed from you.
           </p>

@@ -7,7 +7,7 @@ export default function SettingsHeader() {
   const router = useRouter();
 
   return (
-    <header className="relative overflow-hidden border-b border-white/10">
+    <header className="relative overflow-hidden border-b border-white/10 light:border-black/10">
       {/* Background Text */}
       <h1
         className="
@@ -19,7 +19,7 @@ export default function SettingsHeader() {
           text-[90px]
           font-black
           tracking-[-0.08em]
-          text-white/[0.025]
+          text-white/[0.025] light:text-black/[0.04]
           lg:left-8
           lg:text-[150px]
         "
@@ -38,12 +38,12 @@ export default function SettingsHeader() {
             justify-center
             rounded-full
             border
-            border-white/10
-            bg-white/5
+            border-white/10 light:border-black/10
+            bg-white/5 light:bg-black/5
             transition-all
             duration-300
             hover:border-orange-400/40
-            hover:bg-white/10
+            hover:bg-white/10 light:hover:bg-black/10
             hover:scale-105
           "
         >
@@ -56,13 +56,13 @@ export default function SettingsHeader() {
               text-3xl
               font-black
               tracking-[-0.03em]
-              text-white
+              text-white light:text-slate-900
             "
           >
             Settings
           </h1>
 
-          <p className="mt-1 text-sm text-slate-400">
+          <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
             Personalize your InPlayer experience.
           </p>
         </div>

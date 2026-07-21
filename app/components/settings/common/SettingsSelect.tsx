@@ -22,21 +22,20 @@ export default function SettingsSelect({
           appearance-none
           rounded-xl
           border
-          border-white/10
-          bg-white/[0.04]
+          border-white/10 light:border-black/10
+          bg-white/[0.04] light:bg-black/[0.04]
           py-2
           pl-4
           pr-10
           text-sm
           font-medium
-          text-white
+          text-white light:text-slate-900
           outline-none
           transition-all
           duration-300
-          ease-out
-          hover:border-white/25
-          focus:border-white/40
-          focus:bg-white/[0.06]
+          hover:border-orange-400/40
+          focus:border-orange-400
+          focus:bg-white/[0.06] light:focus:bg-black/[0.06]
           cursor-pointer
         "
       >
@@ -44,7 +43,7 @@ export default function SettingsSelect({
           <option
             key={option}
             value={option}
-            className="bg-[#0B1322] text-white"
+            className="bg-[#0B1322] light:bg-[#FBF6EA] text-white light:text-slate-900"
           >
             {option}
           </option>
@@ -59,7 +58,7 @@ export default function SettingsSelect({
           right-3
           top-1/2
           -translate-y-1/2
-          text-slate-400
+          text-slate-400 light:text-slate-600
         "
       />
     </div>

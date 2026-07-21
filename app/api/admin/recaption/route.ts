@@ -2,19 +2,31 @@ import { NextRequest, NextResponse } from "next/server";
 import { ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import mux from "@/app/lib/mux";
 import { docClient } from "@/app/lib/dynamodb";
+import {
+  CAPTION_TARGETS,
+  resolveSourceLang,
+  buildCaptionSet,
+} from "@/app/lib/captions";
 
-// One-off maintenance endpoint: brings every ALREADY-PUBLISHED video and
-// Short in line with the caption pipeline fixed in app/api/webhooks/mux
-// (see that file's comments for the full root-cause writeup — in short,
-// Mux has no ASR model for Hindi/Bengali, its "auto" detection regularly
-// mistagged Hindi as Urdu, and Shorts were never supposed to get captions
-// at all). That fix only changes behavior for NEW uploads; this endpoint
-// is what reaches back and applies it to everything already on the site.
+// One-time maintenance endpoint: brings every ALREADY-PUBLISHED video and
+// Short in line with the fixed caption pipeline (see app/lib/captions and
+// app/api/webhooks/mux). The webhook only changes NEW uploads; this is what
+// reaches back and repairs everything already on the site.
 //
-// Not a product feature — meant to be triggered once (by hand, with curl)
-// by whoever holds ADMIN_MAINTENANCE_KEY. Safe to re-run: every step is a
-// no-op, or harmlessly repeats, on anything that already went through it.
+// Triggered by hand (whoever holds ADMIN_MAINTENANCE_KEY). Designed to be
+// run repeatedly with no harm:
+//   - Each item is marked `captionsBackfilled` once handled and skipped on
+//     later runs, so re-running simply resumes where a previous run stopped.
+//   - It self-limits to a time budget well under the function ceiling and
+//     reports how many items remain, so a large library is drained across a
+//     few calls instead of one call that dies half-done.
 export const maxDuration = 300;
+
+// Stop STARTING new (slow, Gemini-backed) video items once this much wall
+// time has passed, so we always return cleanly before the function ceiling
+// rather than being killed mid-item. Shorts are near-instant and always
+// finish. Tuned to leave generous margin under maxDuration.
+const TIME_BUDGET_MS = 230_000;
 
 function errMsg(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -38,45 +50,41 @@ async function scanAllVideos(): Promise<Record<string, unknown>[]> {
   return items;
 }
 
-// Deletes every text (subtitle) track currently on the asset — both any
-// leftover raw "Auto-generated" track and any previously-created
-// translated tracks — so whatever runs next starts from a clean slate
-// instead of piling up duplicate/conflicting menu entries.
-async function deleteAllTextTracks(assetId: string): Promise<string[]> {
+// Deletes every text (subtitle) track on the asset — the raw auto-generated
+// one plus any previously-created translated tracks — so the asset starts
+// clean. Returns the list of text tracks that existed (so callers can find
+// the source transcript first if they need it). Best-effort per track.
+async function retrieveTextTracks(assetId: string) {
+  const asset = await mux.video.assets.retrieve(assetId);
+  return (asset.tracks || []).filter((t) => t.type === "text");
+}
+
+async function deleteTracks(
+  assetId: string,
+  trackIds: string[]
+): Promise<string[]> {
   const errors: string[] = [];
-
-  try {
-    const asset = await mux.video.assets.retrieve(assetId);
-    const textTracks = (asset.tracks || []).filter((t) => t.type === "text");
-
-    for (const t of textTracks) {
-      if (!t.id) continue;
-      try {
-        await mux.video.assets.deleteTrack(assetId, t.id);
-      } catch (err) {
-        errors.push(`delete track ${t.id}: ${errMsg(err)}`);
-      }
+  for (const id of trackIds) {
+    try {
+      await mux.video.assets.deleteTrack(assetId, id);
+    } catch (err) {
+      errors.push(`delete track ${id}: ${errMsg(err)}`);
     }
-  } catch (err) {
-    errors.push(`retrieve asset: ${errMsg(err)}`);
   }
-
   return errors;
 }
 
-async function clearCaptionState(videoId: string): Promise<string | null> {
-  try {
-    await docClient.send(
-      new UpdateCommand({
-        TableName: "InPlayer-Videos",
-        Key: { videoId },
-        UpdateExpression: "REMOVE captionsVtt, captionsTranslated",
-      })
-    );
-    return null;
-  } catch (err) {
-    return `clear DB caption fields: ${errMsg(err)}`;
-  }
+async function markBackfilled(videoId: string, clearCaptions: boolean) {
+  await docClient.send(
+    new UpdateCommand({
+      TableName: "InPlayer-Videos",
+      Key: { videoId },
+      UpdateExpression: clearCaptions
+        ? "SET captionsBackfilled = :t REMOVE captionsVtt, captionsTranslated"
+        : "SET captionsBackfilled = :t",
+      ExpressionAttributeValues: { ":t": true },
+    })
+  );
 }
 
 export async function POST(request: NextRequest) {
@@ -87,69 +95,183 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const startedAt = Date.now();
   const allItems = await scanAllVideos();
 
-  const shorts = { processed: 0, errors: [] as string[] };
-  const videos = { processed: 0, requeued: 0, errors: [] as string[] };
+  const shorts = { processed: 0, skipped: 0, errors: [] as string[] };
+  const videos = {
+    processed: 0,
+    skipped: 0,
+    partial: 0,
+    errors: [] as string[],
+  };
+  let remainingVideos = 0;
 
+  // Shorts first: they're fast (no Gemini), so a run always fully clears
+  // them even if the slower video work later runs out of time budget.
   for (const item of allItems) {
+    if (item.contentType !== "short") continue;
+
     const videoId = item.videoId as string;
     const assetId = item.muxAssetId as string | undefined;
     if (!videoId || !assetId) continue;
 
-    if (item.contentType === "short") {
-      // Shorts should never have captions — strip whatever they ended up
-      // with (including any stray mislabeled-language track) and clear the
-      // stored translation state so nothing stale lingers.
-      shorts.processed++;
-      const trackErrors = await deleteAllTextTracks(assetId);
-      trackErrors.forEach((e) => shorts.errors.push(`${videoId}: ${e}`));
-
-      if (item.captionsVtt || item.captionsTranslated) {
-        const clearErr = await clearCaptionState(videoId);
-        if (clearErr) shorts.errors.push(`${videoId}: ${clearErr}`);
-      }
+    if (item.captionsBackfilled === true) {
+      shorts.skipped++;
       continue;
     }
 
-    // Everything else is a Video (including older records saved before
-    // contentType existed, which default to "video" everywhere else in
-    // this codebase too).
-    videos.processed++;
-
-    const trackErrors = await deleteAllTextTracks(assetId);
-    trackErrors.forEach((e) => videos.errors.push(`${videoId}: ${e}`));
-
-    const clearErr = await clearCaptionState(videoId);
-    if (clearErr) {
-      videos.errors.push(`${videoId}: ${clearErr}`);
-      continue; // don't requeue on top of a DB state we couldn't reset
-    }
-
     try {
-      const asset = await mux.video.assets.retrieve(assetId);
-      const audioTrack = (asset.tracks || []).find((t) => t.type === "audio");
-
-      if (audioTrack?.id) {
-        // Same hinting rule as app/api/webhooks/mux: English gets an
-        // explicit hint (Mux supports it), Hindi/Bengali/unset fall back to
-        // "auto" because Mux has no explicit hint option for them at all —
-        // the normalization + Gemini cleanup pass in the webhook is what
-        // makes that safe now.
-        const hintLang: "en" | "auto" =
-          item.spokenLanguage === "en" ? "en" : "auto";
-
-        await mux.video.assets.generateSubtitles(assetId, audioTrack.id, {
-          generated_subtitles: [
-            { language_code: hintLang, name: "Auto-generated" },
-          ],
-        });
-        videos.requeued++;
-      }
+      const textTracks = await retrieveTextTracks(assetId);
+      const ids = textTracks.map((t) => t.id).filter(Boolean) as string[];
+      const delErrors = await deleteTracks(assetId, ids);
+      delErrors.forEach((e) => shorts.errors.push(`${videoId}: ${e}`));
+      // Shorts must never carry captions — clear any stored translation
+      // state too, and mark handled.
+      await markBackfilled(videoId, true);
+      shorts.processed++;
     } catch (err) {
-      videos.errors.push(`${videoId}: requeue captions: ${errMsg(err)}`);
+      shorts.errors.push(`${videoId}: ${errMsg(err)}`);
     }
   }
 
-  return NextResponse.json({ shorts, videos });
+  // Videos: rebuild the clean multi-language set from each video's EXISTING
+  // transcript — no re-transcription (Mux would just reproduce the same
+  // bad Hindi/Bengali output; the fix lives entirely in the Gemini layer).
+  const origin = request.nextUrl.origin;
+
+  for (const item of allItems) {
+    if (item.contentType === "short") continue;
+
+    const videoId = item.videoId as string;
+    const assetId = item.muxAssetId as string | undefined;
+    const playbackId = item.muxPlaybackId as string | undefined;
+    if (!videoId || !assetId) continue;
+
+    if (item.captionsBackfilled === true) {
+      videos.skipped++;
+      continue;
+    }
+
+    // Out of time budget — leave the rest for the next invocation.
+    if (Date.now() - startedAt > TIME_BUDGET_MS) {
+      remainingVideos++;
+      continue;
+    }
+
+    try {
+      const textTracks = await retrieveTextTracks(assetId);
+      const source =
+        textTracks.find((t) => t.text_source === "generated_vod") ||
+        textTracks[0];
+
+      // No transcript to work from (silent video, or captions never
+      // generated). Kick off a fresh transcription — the fixed webhook will
+      // finish it when the track becomes ready — and mark handled so we
+      // don't re-trigger it every run.
+      if (!source?.id || !playbackId) {
+        const audioTrackId = (await mux.video.assets.retrieve(assetId)).tracks?.find(
+          (t) => t.type === "audio"
+        )?.id;
+        if (audioTrackId) {
+          await mux.video.assets.generateSubtitles(assetId, audioTrackId, {
+            generated_subtitles: [
+              { language_code: item.spokenLanguage === "en" ? "en" : "auto", name: "Auto-generated" },
+            ],
+          });
+        }
+        await markBackfilled(videoId, false);
+        videos.processed++;
+        continue;
+      }
+
+      const vttRes = await fetch(
+        `https://stream.mux.com/${playbackId}/text/${source.id}.vtt`
+      );
+      if (!vttRes.ok) {
+        videos.errors.push(`${videoId}: fetch VTT ${vttRes.status}`);
+        continue;
+      }
+      const rawVtt = await vttRes.text();
+      if (!rawVtt.startsWith("WEBVTT")) {
+        videos.errors.push(`${videoId}: source track not valid VTT`);
+        continue;
+      }
+
+      const sourceLang = resolveSourceLang(
+        item.spokenLanguage,
+        source.language_code
+      );
+      const captionsVtt = await buildCaptionSet(rawVtt, sourceLang);
+      const languages = Object.keys(captionsVtt);
+
+      // Nothing came back (Gemini fully unavailable). Don't touch the
+      // asset's existing tracks — leave it for a later run to retry.
+      if (languages.length === 0) {
+        videos.errors.push(`${videoId}: translation produced nothing`);
+        continue;
+      }
+
+      const totalSize = languages.reduce(
+        (sum, lang) => sum + captionsVtt[lang].length,
+        0
+      );
+      if (totalSize > 300_000) {
+        videos.errors.push(`${videoId}: captions too large`);
+        continue;
+      }
+
+      // Store the new set first so the captions route can serve it.
+      await docClient.send(
+        new UpdateCommand({
+          TableName: "InPlayer-Videos",
+          Key: { videoId },
+          UpdateExpression:
+            "SET captionsVtt = :vtt, captionsTranslated = :done",
+          ExpressionAttributeValues: { ":vtt": captionsVtt, ":done": true },
+        })
+      );
+
+      // Remove ALL old text tracks (raw auto + any earlier translations),
+      // then register the clean, properly-labeled set.
+      const oldIds = textTracks.map((t) => t.id).filter(Boolean) as string[];
+      const delErrors = await deleteTracks(assetId, oldIds);
+      delErrors.forEach((e) => videos.errors.push(`${videoId}: ${e}`));
+
+      for (const target of CAPTION_TARGETS) {
+        if (!captionsVtt[target.code]) continue;
+        try {
+          await mux.video.assets.createTrack(assetId, {
+            url: `${origin}/api/videos/${videoId}/captions/${target.code}`,
+            type: "text",
+            text_type: "subtitles",
+            language_code: target.code,
+            name: target.label,
+            passthrough: "auto-translated",
+          });
+        } catch (err) {
+          videos.errors.push(`${videoId}: create ${target.code}: ${errMsg(err)}`);
+        }
+      }
+
+      await markBackfilled(videoId, false);
+      videos.processed++;
+      // A full run has all three languages; note anything short of that.
+      if (languages.length < CAPTION_TARGETS.length) videos.partial++;
+    } catch (err) {
+      videos.errors.push(`${videoId}: ${errMsg(err)}`);
+    }
+  }
+
+  const done = remainingVideos === 0;
+  return NextResponse.json({
+    done,
+    remainingVideos,
+    elapsedMs: Date.now() - startedAt,
+    shorts,
+    videos,
+    hint: done
+      ? "All items processed. Re-running is safe (already-done items are skipped)."
+      : "Time budget reached — call this endpoint again to continue.",
+  });
 }

@@ -26,17 +26,25 @@ async function geminiGenerate(prompt: string): Promise<string | null> {
         const data = await response.json();
         const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
         if (typeof text === "string" && text.trim()) return text;
+        // A 200 with no usable text (e.g. safety-blocked) won't get better
+        // on another model — give up rather than burn the whole list.
         return null;
       }
 
-      // Model retired/unknown — try the next candidate.
-      if (response.status === 404) continue;
-
-      console.error(`Gemini error (${model}):`, response.status);
-      return null;
+      // ANY non-OK status falls through to the next candidate model. This
+      // is the important fix: the previous version returned null on
+      // anything that wasn't a 404, so a single transient 503/429 (Gemini
+      // servers briefly overloaded — which happens routinely) killed the
+      // entire translation even though the very next model in the list
+      // would have answered. Retired models (404), rate limits (429), and
+      // server blips (5xx) are now all just "try the next one".
+      console.error(`Gemini error (${model}): ${response.status} — trying next model`);
+      continue;
     } catch (err) {
+      // Network-level failure on this model — try the next one rather than
+      // abandoning the whole translation.
       console.error(`Gemini request failed (${model}):`, err);
-      return null;
+      continue;
     }
   }
 

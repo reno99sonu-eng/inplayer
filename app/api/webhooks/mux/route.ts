@@ -5,35 +5,21 @@ import { ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import mux from "@/app/lib/mux";
 import { docClient } from "@/app/lib/dynamodb";
 import { READY_VIDEOS_TAG } from "@/app/lib/videoStore";
-import { translateVtt, cleanupVtt } from "@/app/lib/translate";
+import {
+  CAPTION_TARGETS,
+  resolveSourceLang,
+  buildCaptionSet,
+} from "@/app/lib/captions";
 
 // Caption translation (below) runs after the webhook response via after(),
-// but still needs the function alive long enough to finish 2–3 Gemini
-// calls — the default timeout is too tight for that.
-export const maxDuration = 60;
-
-// The caption languages every video should end up with. Whichever of these
-// matches the video's actual spoken language gets its own cleaned-up track
-// instead of a translated one; Mux's raw auto-generated track (labeled
-// whatever language Mux's "auto" detection guessed) is deleted once this
-// set is live — see video.asset.track.ready below.
-const CAPTION_TARGETS: Array<{ code: string; name: string; label: string }> = [
-  { code: "en", name: "English", label: "English" },
-  { code: "hi", name: "Hindi", label: "हिन्दी" },
-  { code: "bn", name: "Bengali", label: "বাংলা" },
-];
-
-// Collapses a Mux-detected BCP-47 code down to its base language, folding
-// in known ASR mix-ups. Mux's speech-to-text has no Hindi model, so "auto"
-// detection on Hindi audio very often comes back tagged "ur" (Urdu) — the
-// closest-sounding language Mux's detector actually knows — even though
-// this app has never offered, and doesn't want, Urdu captions. Collapse
-// that back to Hindi so it never surfaces as a caption-menu entry.
-function normalizeLangCode(code: unknown): string {
-  const base = String(code || "").split("-")[0].toLowerCase();
-  if (base === "ur") return "hi";
-  return base;
-}
+// but still needs the function alive long enough to finish the Gemini
+// calls. buildCaptionSet now runs those translations concurrently so it
+// comfortably fits, but we give generous headroom anyway — a caption run
+// that gets killed mid-way leaves a video stuck on its raw auto track
+// (which is exactly the bug this whole change is fixing), so the extra
+// ceiling is cheap insurance. (Plans that cap function duration lower will
+// simply cap this; the backfill endpoint is the safety net either way.)
+export const maxDuration = 300;
 
 // Best-to-worst download quality order. Used to pick a sensible default
 // (`downloadFileName`) from whichever renditions have finished so far.
@@ -209,26 +195,24 @@ export async function POST(request: NextRequest) {
       if (match && !match.captionsTranslated && match.muxPlaybackId) {
         const origin = request.nextUrl.origin;
         const trackId = track.id;
+        const playbackId = match.muxPlaybackId;
+        const videoId = match.videoId;
 
-        // A creator's own declared spoken language (set at upload, see
-        // app/upload/page.tsx) is always trusted over Mux's "auto" guess
-        // when we have it — Mux has no ASR model for Hindi/Bengali at all,
-        // so its guess for those is regularly wrong (see
-        // normalizeLangCode). Mux's detected code is only a fallback for
-        // videos uploaded before that field existed.
-        const detectedLang = normalizeLangCode(track.language_code);
-        const sourceLang =
-          match.spokenLanguage && match.spokenLanguage !== "auto"
-            ? match.spokenLanguage
-            : detectedLang;
-        const sourceTarget = CAPTION_TARGETS.find((t) => t.code === sourceLang);
+        // Trust the creator's declared spoken language over Mux's "auto"
+        // guess (Mux has no Hindi/Bengali ASR model, so its guess for those
+        // is unreliable); fall back to Mux's detected code for videos
+        // uploaded before the upload-time field existed.
+        const sourceLang = resolveSourceLang(
+          match.spokenLanguage,
+          track.language_code
+        );
 
         // Translation takes multiple model calls — run it AFTER responding
         // 200 to Mux (webhooks must answer fast or Mux marks them failed).
         after(async () => {
           try {
             const vttRes = await fetch(
-              `https://stream.mux.com/${match.muxPlaybackId}/text/${trackId}.vtt`
+              `https://stream.mux.com/${playbackId}/text/${trackId}.vtt`
             );
             if (!vttRes.ok) {
               console.error(`Couldn't fetch generated VTT (${vttRes.status})`);
@@ -237,34 +221,7 @@ export async function POST(request: NextRequest) {
             const rawSourceVtt = await vttRes.text();
             if (!rawSourceVtt.startsWith("WEBVTT")) return;
 
-            // Mux's "auto" transcription for Hindi/Bengali is prone to
-            // script slips and mixed-language cues (no dedicated ASR model
-            // — see cleanupVtt). Proofread it back into clean, consistent
-            // text before it becomes either the source-language track
-            // itself or the basis every other translation is built from.
-            // English transcription is native/reliable, so it skips this.
-            let sourceVtt = rawSourceVtt;
-            if (sourceTarget && (sourceLang === "hi" || sourceLang === "bn")) {
-              const cleaned = await cleanupVtt(rawSourceVtt, sourceTarget.name);
-              if (cleaned) sourceVtt = cleaned;
-            }
-
-            const targets = CAPTION_TARGETS.filter(
-              (t) => t.code !== sourceLang
-            );
-            const captionsVtt: Record<string, string> = {};
-
-            // The spoken language gets its own (now-cleaned) track too,
-            // instead of leaving Mux's raw "Auto-generated" entry as its
-            // only representation on the asset — that raw entry is what
-            // was surfacing mislabeled (e.g. as Urdu). It's deleted below
-            // once this full replacement set is live.
-            if (sourceTarget) captionsVtt[sourceTarget.code] = sourceVtt;
-
-            for (const target of targets) {
-              const translated = await translateVtt(sourceVtt, target.name);
-              if (translated) captionsVtt[target.code] = translated;
-            }
+            const captionsVtt = await buildCaptionSet(rawSourceVtt, sourceLang);
 
             const languages = Object.keys(captionsVtt);
             if (languages.length === 0) {
@@ -287,7 +244,7 @@ export async function POST(request: NextRequest) {
             await docClient.send(
               new UpdateCommand({
                 TableName: "InPlayer-Videos",
-                Key: { videoId: match.videoId },
+                Key: { videoId },
                 UpdateExpression:
                   "SET captionsVtt = :vtt, captionsTranslated = :done",
                 ExpressionAttributeValues: {
@@ -301,7 +258,7 @@ export async function POST(request: NextRequest) {
               if (!captionsVtt[target.code]) continue;
               try {
                 await mux.video.assets.createTrack(assetId, {
-                  url: `${origin}/api/videos/${match.videoId}/captions/${target.code}`,
+                  url: `${origin}/api/videos/${videoId}/captions/${target.code}`,
                   type: "text",
                   text_type: "subtitles",
                   language_code: target.code,
@@ -320,7 +277,7 @@ export async function POST(request: NextRequest) {
             // properly-labeled set just created above — remove it so
             // viewers never see the ambiguous "Auto-generated" entry (or a
             // misdetected language like Urdu) in the caption menu. Non-fatal
-            // if this fails: worse case is the old entry lingers alongside
+            // if this fails: worst case is the old entry lingers alongside
             // the clean ones, not that captions go missing.
             try {
               await mux.video.assets.deleteTrack(assetId, trackId);
@@ -332,7 +289,7 @@ export async function POST(request: NextRequest) {
             }
 
             console.log(
-              `Captions ready for ${match.videoId}: ${languages.join(", ")}`
+              `Captions ready for ${videoId}: ${languages.join(", ")}`
             );
           } catch (err) {
             console.error("Caption translation pipeline failed:", err);

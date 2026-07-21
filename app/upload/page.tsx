@@ -24,6 +24,20 @@ const CONTENT_TYPES = [
   { value: "short", label: "Short" },
 ] as const;
 
+// Matches the CAPTION_TARGETS list in app/api/webhooks/mux/route.ts. Mux's
+// own speech-recognition has no dedicated model for Hindi or Bengali, so
+// its "auto" language detection is unreliable for them (it regularly
+// mistakes Hindi for Urdu). Telling us the real spoken language up front
+// lets the caption pipeline skip that guesswork entirely.
+const SPOKEN_LANGUAGES = [
+  { value: "auto", label: "Auto-detect" },
+  { value: "en", label: "English" },
+  { value: "hi", label: "Hindi" },
+  { value: "bn", label: "Bengali" },
+] as const;
+
+type SpokenLanguage = (typeof SPOKEN_LANGUAGES)[number]["value"];
+
 const VISIBILITY_OPTIONS = [
   { value: "public", label: "Public", icon: <Globe size={15} />, hint: "Anyone can find and watch" },
   { value: "unlisted", label: "Unlisted", icon: <Link2 size={15} />, hint: "Only people with the link" },
@@ -86,6 +100,7 @@ export default function UploadPage() {
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [contentType, setContentType] = useState<"video" | "short">("video");
+  const [spokenLanguage, setSpokenLanguage] = useState<SpokenLanguage>("auto");
 
   // YouTube-style upload options.
   const [visibility, setVisibility] = useState<Visibility>("public");
@@ -182,6 +197,7 @@ export default function UploadPage() {
           description: description.trim(),
           category,
           contentType,
+          spokenLanguage,
           visibility,
           tags,
           madeForKids,
@@ -238,6 +254,7 @@ export default function UploadPage() {
     setDescription("");
     setCategory(CATEGORIES[0]);
     setContentType("video");
+    setSpokenLanguage("auto");
     setVisibility("public");
     setMadeForKids(false);
     setAgeRestricted(false);
@@ -396,6 +413,38 @@ export default function UploadPage() {
                 ))}
               </div>
             </div>
+
+            {/* Shorts never get captions, so this only matters — and only
+                shows — for Videos. */}
+            {contentType === "video" && (
+              <div>
+                <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-600">
+                  Spoken Language
+                </label>
+                <select
+                  value={spokenLanguage}
+                  onChange={(e) =>
+                    setSpokenLanguage(e.target.value as SpokenLanguage)
+                  }
+                  className="w-full rounded-2xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-black/[0.03] px-4 py-3 text-white light:text-slate-900 outline-none focus:border-orange-400/50"
+                >
+                  {SPOKEN_LANGUAGES.map((l) => (
+                    <option
+                      key={l.value}
+                      value={l.value}
+                      className="bg-[#07111F] text-white"
+                    >
+                      {l.label}
+                    </option>
+                  ))}
+                </select>
+                <p className="mt-1.5 text-xs text-slate-500">
+                  Helps us generate accurate captions. Auto-detect works well
+                  for English, but can misidentify Hindi or Bengali — pick it
+                  directly if that&apos;s what&apos;s spoken.
+                </p>
+              </div>
+            )}
 
             <div>
               <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-600">

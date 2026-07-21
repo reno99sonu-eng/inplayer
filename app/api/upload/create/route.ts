@@ -28,6 +28,7 @@ export async function POST(request: NextRequest) {
       madeForKids,
       ageRestricted,
       commentsEnabled,
+      spokenLanguage,
     } = body;
 
     if (!title?.trim() || !category?.trim()) {
@@ -48,6 +49,14 @@ export async function POST(request: NextRequest) {
     );
     const uploaderAvatarUrl = profileResult.Item?.avatarUrl || null;
     const isShort = contentType === "short";
+    // Ground truth for which language the video is spoken in — trusted
+    // over Mux's own "auto" detection by the caption pipeline (see
+    // app/api/webhooks/mux), since Mux has no ASR model for Hindi/Bengali
+    // and its guess for those is unreliable. Defaults to "auto" for
+    // Shorts (which never get captions anyway) and any unrecognized value.
+    const spokenLang = ["en", "hi", "bn"].includes(spokenLanguage)
+      ? spokenLanguage
+      : "auto";
 
     // Ask Mux for a one-time direct upload URL. The browser uploads the
     // actual video file straight to this URL — it never passes through
@@ -89,6 +98,7 @@ export async function POST(request: NextRequest) {
           description: description?.trim() || "",
           category: category.trim(),
           contentType: isShort ? "short" : "video",
+          spokenLanguage: spokenLang,
           uploaderId: user.userId,
           uploaderName: user.name || "Unknown",
           uploaderAvatarUrl,

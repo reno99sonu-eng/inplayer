@@ -43,10 +43,31 @@ async function geminiGenerate(prompt: string): Promise<string | null> {
   return null;
 }
 
+// Shared tail end of both translateVtt and cleanupVtt: sends the prompt,
+// strips any stray code fences the model adds despite instructions, and
+// sanity-checks the result still looks like a VTT file before handing it
+// back. Returns null on any failure — both callers are always best-effort
+// and must never break the webhook that calls them.
+async function runVttTransform(prompt: string): Promise<string | null> {
+  const result = await geminiGenerate(prompt);
+  if (!result) return null;
+
+  // Models occasionally wrap output in code fences despite instructions —
+  // strip them so the file stays valid VTT.
+  let cleaned = result.trim();
+  cleaned = cleaned.replace(/^```[a-z]*\n?/i, "").replace(/\n?```$/, "");
+
+  // Sanity check: must still look like a VTT file with timestamps.
+  if (!cleaned.startsWith("WEBVTT") || !cleaned.includes("-->")) {
+    console.error("Gemini VTT output doesn't look valid — skipping.");
+    return null;
+  }
+
+  return cleaned;
+}
+
 // Translates a WebVTT subtitle file into the target language, preserving
-// every timestamp and cue exactly. Returns null on any failure — caption
-// translation is always best-effort and must never break the webhook that
-// calls it.
+// every timestamp and cue exactly.
 export async function translateVtt(
   vtt: string,
   targetLanguageName: string
@@ -62,19 +83,35 @@ STRICT RULES:
 VTT FILE:
 ${vtt}`;
 
-  const result = await geminiGenerate(prompt);
-  if (!result) return null;
+  return runVttTransform(prompt);
+}
 
-  // Models occasionally wrap output in code fences despite instructions —
-  // strip them so the file stays valid VTT.
-  let cleaned = result.trim();
-  cleaned = cleaned.replace(/^```[a-z]*\n?/i, "").replace(/\n?```$/, "");
+// Mux's speech-to-text has no dedicated model for Hindi or Bengali (its
+// explicit language hint only covers a fixed list of mostly-European
+// languages), so videos spoken in those languages are always transcribed
+// via "auto" detection — a mode that regularly misidentifies South Asian
+// speech (most often tagging Hindi as Urdu) and can produce cue text that
+// slips into the wrong script or mixes languages mid-sentence. This
+// proofreads the raw transcript back into clean, consistent text in the
+// language it's actually supposed to be, without touching timing. Meant
+// to run once, on the source-language transcript, before it's stored as
+// its own track or used as the basis for translation into the others.
+export async function cleanupVtt(
+  vtt: string,
+  languageName: string
+): Promise<string | null> {
+  const prompt = `You are proofreading an automatically-generated WebVTT subtitle file. The audio is spoken in ${languageName}, but the speech-recognition system that produced this file does not fully support ${languageName} and may have output text in the wrong script, the wrong language, or a garbled mix of languages.
 
-  // Sanity check: must still look like a VTT file with timestamps.
-  if (!cleaned.startsWith("WEBVTT") || !cleaned.includes("-->")) {
-    console.error("Translated output doesn't look like valid VTT — skipping.");
-    return null;
-  }
+Rewrite ONLY the subtitle text lines so the whole file reads as natural, correct ${languageName} — EXCEPT for words the speaker genuinely said in another language (e.g. English brand names, loanwords, or intentionally code-switched phrases), which should stay as spoken.
 
-  return cleaned;
+STRICT RULES:
+- Keep the exact same VTT structure: the "WEBVTT" header, every timestamp line (e.g. "00:00:01.000 --> 00:00:04.000"), cue ordering, and blank lines must remain EXACTLY as they are.
+- Only rewrite the subtitle text lines themselves.
+- Do not add any commentary, notes, numbering, or markdown/code fences.
+- Output the complete corrected VTT file and nothing else.
+
+VTT FILE:
+${vtt}`;
+
+  return runVttTransform(prompt);
 }

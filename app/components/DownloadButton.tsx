@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { fetchAuthSession } from "aws-amplify/auth";
 import { Download, Loader2, AlertCircle } from "lucide-react";
 import { useAuthModal } from "./auth/AuthProvider";
@@ -57,7 +58,6 @@ export default function DownloadButton({
   const [requesting, setRequesting] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const wrapRef = useRef<HTMLDivElement>(null);
 
   const stopPolling = () => {
     if (pollRef.current) {
@@ -107,18 +107,6 @@ export default function DownloadButton({
     return stopPolling;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // Close the quality menu on outside click.
-  useEffect(() => {
-    if (!menuOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
-        setMenuOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [menuOpen]);
 
   const qualities = orderedQualities(renditions);
 
@@ -191,7 +179,7 @@ export default function DownloadButton({
           : "Download video";
 
   return (
-    <div ref={wrapRef} className="relative">
+    <div className="relative">
       <button
         onClick={handleClick}
         disabled={status === "preparing" || requesting}
@@ -216,30 +204,47 @@ export default function DownloadButton({
         )}
       </button>
 
-      {menuOpen && status === "ready" && qualities.length > 0 && (
-        <div
-          className="
-            absolute right-0 z-50 mt-2 w-44 max-w-[calc(100vw-2rem)]
-            rounded-2xl border border-white/10 light:border-black/10
-            bg-[#0A1424] light:bg-[#FBF6EA]
-            p-2 shadow-[0_25px_70px_-20px_rgba(0,0,0,.6)] backdrop-blur-xl
-          "
-        >
-          <p className="px-2 pb-1 pt-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 light:text-slate-600">
-            Download quality
-          </p>
-          {qualities.map((q) => (
-            <button
-              key={q}
-              onClick={() => startDownload(q)}
-              className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-sm font-semibold text-slate-200 light:text-slate-800 transition hover:bg-white/5 light:hover:bg-black/5"
+      {/* Portaled to <body> as a bottom sheet (centered on larger
+          screens) — same fix as the playlist panel: rendered inline it
+          could be painted over by sibling sections on the watch page. */}
+      {menuOpen &&
+        status === "ready" &&
+        qualities.length > 0 &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            onClick={() => setMenuOpen(false)}
+            className="fixed inset-0 z-[9990] flex items-end justify-center bg-black/50 p-4 pb-24 backdrop-blur-[2px] sm:items-center sm:pb-4"
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="
+                w-full max-w-[280px]
+                rounded-2xl border border-white/10 light:border-black/10
+                bg-[#0A1424] light:bg-[#FBF6EA]
+                p-2 shadow-[0_25px_70px_-20px_rgba(0,0,0,.6)]
+              "
             >
-              <span>{q === "highest" ? "Highest" : q}</span>
-              <Download size={14} className="text-slate-400 light:text-slate-600" />
-            </button>
-          ))}
-        </div>
-      )}
+              <p className="px-2 pb-1 pt-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 light:text-slate-600">
+                Download quality
+              </p>
+              {qualities.map((q) => (
+                <button
+                  key={q}
+                  onClick={() => startDownload(q)}
+                  className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-sm font-semibold text-slate-200 light:text-slate-800 transition hover:bg-white/5 light:hover:bg-black/5"
+                >
+                  <span>{q === "highest" ? "Highest" : q}</span>
+                  <Download
+                    size={14}
+                    className="text-slate-400 light:text-slate-600"
+                  />
+                </button>
+              ))}
+            </div>
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

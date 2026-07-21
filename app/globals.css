@@ -782,8 +782,67 @@ animation: aiGlassSweep 5.5s linear infinite;
 .premium-player:fullscreen mux-player,
 .premium-player:-webkit-full-screen mux-player {
   width: 100%;
-  max-height: 100%;
+  height: 100%;
   aspect-ratio: auto !important;
+}
+
+/* CSS "fake" fullscreen — applied by VideoPlayer wherever the real
+   Fullscreen API is unavailable (iPhone Safari) or refuses without a
+   fresh user gesture (rotating the phone). Visually identical: pinned
+   over the whole viewport, above the navbar/bottom-nav (z-[100]/z-[95]).
+   100dvh (not vh) so mobile browser toolbars showing/hiding never leave
+   a gap. */
+.premium-player.fake-fullscreen {
+  position: fixed !important;
+  inset: 0 !important;
+  z-index: 400;
+  width: 100vw;
+  height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #000;
+  border-radius: 0 !important;
+}
+
+.premium-player.fake-fullscreen mux-player {
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto !important;
+}
+
+/* On touch devices, fullscreen video COVERS the whole screen (slight
+   crop) instead of letterboxing with black side bars — requested
+   behavior: "it should cover the entire screen properly on every
+   device". Desktop keeps the standard fit since monitors match 16:9. */
+@media (pointer: coarse) {
+  .premium-player:fullscreen mux-player,
+  .premium-player:-webkit-full-screen mux-player,
+  .premium-player.fake-fullscreen mux-player {
+    --media-object-fit: cover;
+  }
+}
+
+/* Double/triple-tap seek feedback pill — quick pop in, fade out. */
+@keyframes seekFlash {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  25% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.animate-seek-flash {
+  animation: seekFlash 0.8s ease-out both;
 }
 
 /* Hide scrollbar ONLY on mobile; desktop/tablet keep the orange thin scrollbar */

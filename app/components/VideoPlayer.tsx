@@ -11,6 +11,15 @@ interface VideoPlayerProps {
   videoId: string;
 }
 
+// Multi-tap seek tuning (touch devices): taps on the left/right third of
+// the video within this window chain together — 2 taps = 10s, 3 = 20s,
+// each further tap +10s, YouTube-style.
+const TAP_CHAIN_MS = 400;
+// How long a lone touch-tap waits before toggling play/pause — long enough
+// to know no second tap (seek) is coming.
+const SINGLE_TAP_TOGGLE_MS = 330;
+const SEEK_STEP_SECONDS = 10;
+
 export default function VideoPlayer({
   playbackId,
   title,
@@ -19,34 +28,44 @@ export default function VideoPlayer({
   const playerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [realFullscreen, setRealFullscreen] = useState(false);
+  // CSS "fake" fullscreen — used wherever the real Fullscreen API is
+  // unavailable (iPhone Safari has none for custom players) or refuses to
+  // engage (browsers reject requestFullscreen without a fresh user
+  // gesture, which is exactly the rotate-the-phone case). The container
+  // gets position:fixed inset-0 instead — visually identical.
+  const [cssFullscreen, setCssFullscreen] = useState(false);
   const [locked, setLocked] = useState(false);
 
-  // The browser's real fullscreen state is the single source of truth for
-  // isFullscreen — it stays correct no matter which control was used to
-  // enter (our own Expand button below, Mux's own built-in fullscreen
-  // button in its control bar, the browser's native controls, or the OS
-  // back-gesture / Esc to leave). The previous implementation faked
-  // "fullscreen" purely from a `(orientation: landscape)` CSS media query,
-  // completely independent of what the browser actually considered
-  // fullscreen — that mismatch is what made the video size/position itself
-  // inconsistently after rotating, especially when Mux's own fullscreen
-  // control (rather than ours) was the one tapped.
+  const isFullscreen = realFullscreen || cssFullscreen;
+
+  // What kind of pointer produced the current click — lets the click
+  // handler behave differently for touch (delayed toggle + tap-seek) vs
+  // mouse (instant toggle), without brittle user-agent sniffing.
+  const lastPointerTypeRef = useRef<string>("mouse");
+
+  // Multi-tap seek state.
+  const tapSeqRef = useRef<{
+    side: "left" | "right" | null;
+    count: number;
+    lastTime: number;
+  }>({ side: null, count: 0, lastTime: 0 });
+  const toggleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const indicatorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [seekIndicator, setSeekIndicator] = useState<{
+    side: "left" | "right";
+    total: number;
+    key: number;
+  } | null>(null);
+
+  // Track the browser's REAL fullscreen state.
   useEffect(() => {
     const handleFullscreenChange = () => {
       const fsElement =
         document.fullscreenElement ||
         (document as any).webkitFullscreenElement ||
         null;
-      const isNowFullscreen = fsElement === containerRef.current;
-      setIsFullscreen(isNowFullscreen);
-      if (!isNowFullscreen) {
-        // Lock mode only makes sense while fullscreen (it exists to stop
-        // accidental taps while holding the phone in landscape) — never
-        // leave the player stuck locked once fullscreen is gone, since
-        // there'd otherwise be no way to reach the Unlock button again.
-        setLocked(false);
-      }
+      setRealFullscreen(fsElement === containerRef.current);
     };
 
     document.addEventListener("fullscreenchange", handleFullscreenChange);
@@ -66,51 +85,80 @@ export default function VideoPlayer({
     };
   }, []);
 
+  // Lock mode only makes sense while fullscreen — never leave the player
+  // stuck locked once fullscreen (either kind) is gone.
+  useEffect(() => {
+    if (!isFullscreen) setLocked(false);
+  }, [isFullscreen]);
+
+  // While CSS-fullscreen: freeze page scroll behind the player, and let
+  // Esc exit (parity with real fullscreen).
+  useEffect(() => {
+    if (!cssFullscreen) return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+
+    const handleKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setCssFullscreen(false);
+    };
+    window.addEventListener("keydown", handleKey);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener("keydown", handleKey);
+    };
+  }, [cssFullscreen]);
+
   const enterFullscreen = async () => {
     const el = containerRef.current as any;
     if (!el) return;
 
+    // Try the real Fullscreen API first — it's the best experience where
+    // it works (hides browser chrome entirely).
     try {
       if (el.requestFullscreen) {
         await el.requestFullscreen();
-      } else if (el.webkitRequestFullscreen) {
-        // Older WebKit / iOS Safari.
+        // Best-effort orientation lock (Android only; iOS rejects).
+        try {
+          await (screen.orientation as any)?.lock?.("landscape");
+        } catch {
+          /* fine — viewer can rotate manually */
+        }
+        return;
+      }
+      if (el.webkitRequestFullscreen) {
         el.webkitRequestFullscreen();
+        return;
       }
     } catch {
-      // Fullscreen can be silently denied (no user-gesture context, or the
-      // browser just doesn't support it here) — never let that break
-      // playback, which keeps working fine without it.
-      return;
+      // Rejected (usually: no fresh user gesture, e.g. auto-rotate) —
+      // fall through to the CSS fallback below.
     }
 
-    // Best-effort only: the Screen Orientation Lock API isn't part of
-    // TypeScript's DOM lib (hence the `as any`), isn't supported at all on
-    // iOS Safari, and can reject even on Android if the browser decides
-    // the context doesn't qualify. None of that should ever block or
-    // break entering fullscreen.
-    try {
-      await (screen.orientation as any)?.lock?.("landscape");
-    } catch {
-      // Landscape just won't be forced — the viewer can still rotate
-      // their phone manually, which is what most people do anyway.
-    }
+    // No API, or it refused — CSS fullscreen works unconditionally.
+    setCssFullscreen(true);
   };
 
   const exitFullscreen = async () => {
+    if (cssFullscreen) setCssFullscreen(false);
+
     try {
-      if (document.exitFullscreen) {
+      if (document.fullscreenElement && document.exitFullscreen) {
         await document.exitFullscreen();
-      } else if ((document as any).webkitExitFullscreen) {
+      } else if (
+        (document as any).webkitFullscreenElement &&
+        (document as any).webkitExitFullscreen
+      ) {
         (document as any).webkitExitFullscreen();
       }
     } catch {
-      // ignore
+      /* ignore */
     }
     try {
       (screen.orientation as any)?.unlock?.();
     } catch {
-      // ignore
+      /* ignore */
     }
   };
 
@@ -122,16 +170,10 @@ export default function VideoPlayer({
     }
   };
 
-  // Best-effort auto-fullscreen when the phone is physically rotated to
-  // landscape while this player is on screen and playing. This can
-  // silently fail — browsers generally require a direct user gesture
-  // (a tap/click) to grant fullscreen, and an orientation change doesn't
-  // reliably count as one — so it's a nice-to-have layered on top of the
-  // Expand button, never something else depends on it. Auto-EXIT back to
-  // normal layout on rotate-back-to-portrait is reliable by contrast
-  // (programmatically exiting fullscreen has no user-gesture requirement),
-  // and is what actually fixes "the video doesn't fit after rotating"
-  // even on browsers where the auto-entry above doesn't fire.
+  // Rotate-to-landscape → fullscreen, rotate-back → exit. The real
+  // Fullscreen API usually refuses here (no user gesture), which is
+  // exactly why enterFullscreen falls back to CSS fullscreen — so this
+  // now genuinely works on phones and tablets.
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return;
 
@@ -141,16 +183,18 @@ export default function VideoPlayer({
       const container = containerRef.current;
       if (!container) return;
 
+      // Only react on touch devices — desktop windows "rotate" when
+      // resized, which must never hijack the page.
+      const isTouch = window.matchMedia("(pointer: coarse)").matches;
+      if (!isTouch) return;
+
       if (e.matches) {
-        // Only auto-enter if this player is actually the one playing —
-        // otherwise every VideoPlayer on a page (e.g. a grid of previews)
-        // would fight to grab fullscreen on every rotation.
         const player = playerRef.current;
         const isPlaying = player && !player.paused;
         if (isPlaying && !document.fullscreenElement) {
           enterFullscreen();
         }
-      } else if (document.fullscreenElement === container) {
+      } else {
         exitFullscreen();
       }
     };
@@ -158,23 +202,52 @@ export default function VideoPlayer({
     mql.addEventListener("change", handleOrientationChange);
     return () => mql.removeEventListener("change", handleOrientationChange);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [cssFullscreen]);
 
-  // Mux Player has its own BUILT-IN click-to-toggle-play/pause gesture on
-  // the video surface (confirmed in Mux/media-chrome's own docs — this is
-  // why clicking did nothing on desktop: our handler ran on the normal
-  // bubble phase, AFTER Mux's own internal listener had already toggled
-  // the state, so our toggle just flipped it right back). Fix: run in the
-  // CAPTURE phase instead (fires on the way down, before Mux's own
-  // listener), and stopPropagation() there so Mux's built-in gesture never
-  // fires at all — but only for clicks on the video itself, never inside
-  // the bottom control-bar zone, so the real play/pause button, volume,
-  // scrubber, settings and fullscreen controls keep working normally.
+  const clearToggleTimer = () => {
+    if (toggleTimerRef.current) {
+      clearTimeout(toggleTimerRef.current);
+      toggleTimerRef.current = null;
+    }
+  };
+
+  const togglePlayPause = () => {
+    const player = playerRef.current;
+    if (!player) return;
+    if (player.paused) {
+      player.play();
+    } else {
+      player.pause();
+    }
+  };
+
+  const applySeek = (side: "left" | "right", chainCount: number) => {
+    const player = playerRef.current;
+    if (!player) return;
+
+    const delta = side === "right" ? SEEK_STEP_SECONDS : -SEEK_STEP_SECONDS;
+    const duration = Number.isFinite(player.duration) ? player.duration : Infinity;
+    player.currentTime = Math.max(
+      0,
+      Math.min(duration, player.currentTime + delta)
+    );
+
+    // Cumulative label: 2 taps → 10s, 3 taps → 20s, ...
+    const total = (chainCount - 1) * SEEK_STEP_SECONDS;
+    setSeekIndicator({ side, total, key: Date.now() });
+
+    if (indicatorTimerRef.current) clearTimeout(indicatorTimerRef.current);
+    indicatorTimerRef.current = setTimeout(() => setSeekIndicator(null), 800);
+  };
+
+  // Mux Player has its own BUILT-IN click-to-toggle gesture on the video
+  // surface — this capture-phase handler intercepts taps first (and
+  // stopPropagation()s) so all gesture behavior is ours: instant toggle
+  // for mouse; delayed toggle + double/triple-tap seek for touch; total
+  // swallow while locked. Clicks in the bottom control-bar zone are never
+  // touched, so Mux's real controls keep working.
   const handlePlayerClickCapture = (e: React.MouseEvent<HTMLDivElement>) => {
     if (locked) {
-      // Lock mode swallows every tap on the player surface — only the
-      // Unlock button (outside this capture zone, see below) stays
-      // reachable, matching the standard mobile video-player lock pattern.
       e.stopPropagation();
       return;
     }
@@ -190,18 +263,68 @@ export default function VideoPlayer({
 
     e.stopPropagation();
 
-    if (player.paused) {
-      player.play();
-    } else {
-      player.pause();
+    // Mouse / pen: exactly the old behavior — instant play/pause.
+    if (lastPointerTypeRef.current !== "touch") {
+      togglePlayPause();
+      return;
     }
+
+    // Touch: figure out which zone was tapped.
+    const clickX = e.clientX - rect.left;
+    const side: "left" | "right" | null =
+      clickX < rect.width * 0.35
+        ? "left"
+        : clickX > rect.width * 0.65
+          ? "right"
+          : null;
+
+    const now = Date.now();
+    const seq = tapSeqRef.current;
+
+    if (
+      side &&
+      seq.side === side &&
+      now - seq.lastTime < TAP_CHAIN_MS &&
+      seq.count >= 1
+    ) {
+      // Chained tap on the same side → seek instead of toggling.
+      seq.count += 1;
+      seq.lastTime = now;
+      clearToggleTimer();
+      applySeek(side, seq.count);
+      return;
+    }
+
+    // Fresh tap (any zone).
+    seq.side = side;
+    seq.count = 1;
+    seq.lastTime = now;
+
+    if (side === null) {
+      // Middle of the screen — plain play/pause, no seek chaining.
+      togglePlayPause();
+      return;
+    }
+
+    // A side tap MIGHT become a double-tap seek — wait briefly before
+    // treating it as play/pause.
+    clearToggleTimer();
+    toggleTimerRef.current = setTimeout(() => {
+      toggleTimerRef.current = null;
+      togglePlayPause();
+    }, SINGLE_TAP_TOGGLE_MS);
   };
 
   return (
     <div
       ref={containerRef}
-      className="premium-player relative overflow-hidden rounded-2xl bg-black"
+      className={`premium-player relative overflow-hidden rounded-2xl bg-black ${
+        cssFullscreen ? "fake-fullscreen" : ""
+      }`}
       onClickCapture={handlePlayerClickCapture}
+      onPointerDownCapture={(e) => {
+        lastPointerTypeRef.current = e.pointerType || "mouse";
+      }}
     >
       <MuxPlayer
         ref={playerRef}
@@ -216,38 +339,42 @@ export default function VideoPlayer({
         defaultHiddenCaptions={false}
         playbackRates={[0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]}
         // "any": try to autoplay WITH sound first; if the browser blocks
-        // that (very common on mobile, especially iOS Safari, far more
-        // aggressive about this than desktop), Mux automatically retries
-        // muted instead of just giving up. Plain `autoPlay={true}` doesn't
-        // fall back at all — on mobile that meant the video just sat there
-        // un-played until a manual tap, which combined with no poster
-        // frame (fixed below) is exactly what read as "a lot of empty
-        // black space" on the watch page.
+        // that, Mux automatically retries muted instead of giving up.
         autoPlay="any"
-        // Gives Mux a real poster frame (auto-generated from the video
-        // itself) to show before playback starts and whenever it's
-        // paused/ended, instead of a flat black rectangle.
+        // Real poster frame instead of a flat black rectangle.
         thumbnailTime={0}
         style={
           {
             width: "100%",
             aspectRatio: "16 / 9",
             "--controls-backdrop-color": "rgba(0, 0, 0, 0.7)",
-            // Hides Mux's own control bar entirely while locked, so a
-            // locked viewer can't reach play/pause, scrubber, volume, etc.
-            // through it either — the tap-swallowing overlay below is a
-            // second layer of defense on top of this.
+            // Hide Mux's control bar entirely while locked.
             ...(locked ? { "--controls": "none" } : {}),
           } as MuxCSSProperties
         }
       />
 
-      {/* Mobile-only Expand/Collapse button. Desktop viewers already have
-          Mux's own built-in fullscreen control in the bar, but on mobile
-          that control is small and easy to miss — this was exactly the
-          "no button to expand the video" gap reported. Hidden while
-          locked, since lock mode intentionally blocks every control
-          except Unlock. */}
+      {/* Double/triple-tap seek feedback (touch) */}
+      {seekIndicator && (
+        <div
+          key={seekIndicator.key}
+          className={`pointer-events-none absolute top-1/2 z-20 -translate-y-1/2 ${
+            seekIndicator.side === "right" ? "right-6" : "left-6"
+          }`}
+        >
+          <div className="animate-seek-flash flex flex-col items-center gap-1 rounded-full bg-black/60 px-4 py-3 text-white backdrop-blur-sm">
+            <span className="text-lg font-black leading-none">
+              {seekIndicator.side === "right" ? "»" : "«"}
+            </span>
+            <span className="text-xs font-bold">
+              {seekIndicator.total} sec
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Mobile-only Expand/Collapse button (desktop has Mux's own
+          fullscreen control in the bar). Hidden while locked. */}
       {!locked && (
         <button
           type="button"
@@ -267,14 +394,7 @@ export default function VideoPlayer({
         </button>
       )}
 
-      {/* Lock mode toggle — only shown while actually fullscreen, matching
-          the standard mobile video-player pattern (YouTube etc.) where
-          "lock" exists to stop accidental taps while holding the phone in
-          landscape. Placed at the opposite corner from Expand so the two
-          never collide, and safely reuses the same top-right spot the
-          page's desktop-oriented theater-mode button sits at elsewhere —
-          that button lives outside this fullscreened element, so the
-          browser doesn't paint it at all while we're truly fullscreen. */}
+      {/* Lock mode toggle — only while fullscreen (real or CSS). */}
       {isFullscreen && (
         <button
           type="button"
@@ -294,12 +414,7 @@ export default function VideoPlayer({
         </button>
       )}
 
-      {/* Full-cover transparent tap-swallowing overlay while locked. Sits
-          above Mux's control bar (already hidden via --controls: none
-          above — this is a second layer of defense in case any control
-          ignores that custom property) and below the Unlock button itself
-          (z-20 < z-30), so the only thing a locked viewer can tap is
-          Unlock. */}
+      {/* Tap-swallowing overlay while locked — only Unlock stays tappable. */}
       {locked && (
         <div
           className="absolute inset-0 z-20"

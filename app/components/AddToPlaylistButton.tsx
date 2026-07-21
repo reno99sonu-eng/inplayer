@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 import { ListPlus, Plus, Check, X } from "lucide-react";
 
 interface AddToPlaylistButtonProps {
@@ -40,23 +41,10 @@ export default function AddToPlaylistButton({
   const [playlists, setPlaylists] = useState<Playlists>({});
   const [newName, setNewName] = useState("");
   const [justAdded, setJustAdded] = useState(false);
-  const wrapRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setPlaylists(readPlaylists());
   }, []);
-
-  // Close the popover when clicking outside it.
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
-        setOpen(false);
-      }
-    };
-    document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [open]);
 
   const persist = (next: Playlists) => {
     setPlaylists(next);
@@ -94,7 +82,7 @@ export default function AddToPlaylistButton({
   const names = Object.keys(playlists);
 
   return (
-    <div ref={wrapRef} className="relative">
+    <div className="relative">
       <button
         onClick={() => setOpen((v) => !v)}
         title="Add to playlist"
@@ -112,13 +100,25 @@ export default function AddToPlaylistButton({
         {justAdded ? <Check size={18} /> : <ListPlus size={18} />}
       </button>
 
-      {open && (
+      {/* Portaled to <body> as a bottom sheet (centered on larger
+          screens): rendered inline it sat inside the action card's
+          stacking context, where the tags/description sections painted
+          right through it. On body with a backdrop it always sits above
+          everything, on every device. */}
+      {open &&
+        typeof document !== "undefined" &&
+        createPortal(
+          <div
+            onClick={() => setOpen(false)}
+            className="fixed inset-0 z-[9990] flex items-end justify-center bg-black/50 p-4 pb-24 backdrop-blur-[2px] sm:items-center sm:pb-4"
+          >
         <div
+          onClick={(e) => e.stopPropagation()}
           className="
-            absolute right-0 z-50 mt-2 w-60 max-w-[calc(100vw-2rem)]
+            w-full max-w-[320px]
             rounded-2xl border border-white/10 light:border-black/10
             bg-[#0A1424] light:bg-[#FBF6EA]
-            p-3 shadow-[0_25px_70px_-20px_rgba(0,0,0,.6)] backdrop-blur-xl
+            p-3 shadow-[0_25px_70px_-20px_rgba(0,0,0,.6)]
           "
         >
           <div className="mb-2 flex items-center justify-between">
@@ -184,7 +184,9 @@ export default function AddToPlaylistButton({
             </button>
           </div>
         </div>
-      )}
+          </div>,
+          document.body
+        )}
     </div>
   );
 }

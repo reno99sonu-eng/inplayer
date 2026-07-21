@@ -1,9 +1,25 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
+import { after } from "next/server";
 import { ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import mux from "@/app/lib/mux";
 import { docClient } from "@/app/lib/dynamodb";
 import { READY_VIDEOS_TAG } from "@/app/lib/videoStore";
+import { translateVtt } from "@/app/lib/translate";
+
+// Caption translation (below) runs after the webhook response via after(),
+// but still needs the function alive long enough to finish 2–3 Gemini
+// calls — the default timeout is too tight for that.
+export const maxDuration = 60;
+
+// The caption languages every video should end up with. A video whose
+// spoken language matches one of these skips that entry (the auto-generated
+// track already covers it).
+const CAPTION_TARGETS: Array<{ code: string; name: string; label: string }> = [
+  { code: "en", name: "English", label: "English" },
+  { code: "hi", name: "Hindi", label: "हिन्दी" },
+  { code: "bn", name: "Bengali", label: "বাংলা" },
+];
 
 // Best-to-worst download quality order. Used to pick a sensible default
 // (`downloadFileName`) from whichever renditions have finished so far.
@@ -149,22 +165,118 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Fires once a generated subtitle track (or any text track) finishes
-  // processing. Nothing to persist here — see the comment above, Mux
-  // Player already surfaces the track on its own — this is just for
-  // server-side visibility into whether generation actually succeeded.
+  // Fires once Mux's auto-generated captions finish. That single track is
+  // in the video's SPOKEN language only — this pipeline turns it into the
+  // full multi-language set: fetch the generated VTT, translate it via
+  // Gemini into each remaining target language (English/Hindi/Bengali),
+  // store the translations, and register them with Mux as real subtitle
+  // tracks. Once registered they live in the playback manifest itself, so
+  // every device's player shows the language menu natively.
   if (event.type === "video.asset.track.ready") {
     const track = event.data;
-    if (track.text_source === "generated_vod") {
-      console.log(
-        `Captions ready — asset ${event.object.id}, track ${track.id}`
-      );
+    // IMPORTANT: event.object.id is the TRACK's id for track events (the
+    // logs proved it — object.id printed identical to track.id). The
+    // parent asset lives in data.asset_id.
+    const assetId = track.asset_id || event.object.id;
+
+    if (track.text_source === "generated_vod" && track.id) {
+      const match = await findVideoByAssetId(assetId);
+
+      if (match && !match.captionsTranslated && match.muxPlaybackId) {
+        const origin = request.nextUrl.origin;
+        const trackId = track.id;
+        const sourceLang = String(track.language_code || "")
+          .split("-")[0]
+          .toLowerCase();
+
+        // Translation takes multiple model calls — run it AFTER responding
+        // 200 to Mux (webhooks must answer fast or Mux marks them failed).
+        after(async () => {
+          try {
+            const vttRes = await fetch(
+              `https://stream.mux.com/${match.muxPlaybackId}/text/${trackId}.vtt`
+            );
+            if (!vttRes.ok) {
+              console.error(`Couldn't fetch generated VTT (${vttRes.status})`);
+              return;
+            }
+            const sourceVtt = await vttRes.text();
+            if (!sourceVtt.startsWith("WEBVTT")) return;
+
+            const targets = CAPTION_TARGETS.filter(
+              (t) => t.code !== sourceLang
+            );
+            const captionsVtt: Record<string, string> = {};
+
+            for (const target of targets) {
+              const translated = await translateVtt(sourceVtt, target.name);
+              if (translated) captionsVtt[target.code] = translated;
+            }
+
+            const languages = Object.keys(captionsVtt);
+            if (languages.length === 0) {
+              console.error("Caption translation produced no output");
+              return;
+            }
+
+            // Keep well under DynamoDB's 400KB item limit.
+            const totalSize = languages.reduce(
+              (sum, lang) => sum + captionsVtt[lang].length,
+              0
+            );
+            if (totalSize > 300_000) {
+              console.error("Translated captions too large to store, skipping");
+              return;
+            }
+
+            // Store FIRST so the captions route can serve the files, then
+            // point Mux at them.
+            await docClient.send(
+              new UpdateCommand({
+                TableName: "InPlayer-Videos",
+                Key: { videoId: match.videoId },
+                UpdateExpression:
+                  "SET captionsVtt = :vtt, captionsTranslated = :done",
+                ExpressionAttributeValues: {
+                  ":vtt": captionsVtt,
+                  ":done": true,
+                },
+              })
+            );
+
+            for (const target of targets) {
+              if (!captionsVtt[target.code]) continue;
+              try {
+                await mux.video.assets.createTrack(assetId, {
+                  url: `${origin}/api/videos/${match.videoId}/captions/${target.code}`,
+                  type: "text",
+                  text_type: "subtitles",
+                  language_code: target.code,
+                  name: target.label,
+                  passthrough: "auto-translated",
+                });
+              } catch (err) {
+                console.error(
+                  `Failed to add ${target.code} track to asset ${assetId}:`,
+                  err
+                );
+              }
+            }
+
+            console.log(
+              `Captions translated for ${match.videoId}: ${languages.join(", ")}`
+            );
+          } catch (err) {
+            console.error("Caption translation pipeline failed:", err);
+          }
+        });
+      }
     }
   }
 
   if (event.type === "video.asset.track.errored") {
     console.error(
-      `Track generation failed — asset ${event.object.id}:`,
+      `Track generation failed — asset ${event.data.asset_id || event.object.id}:`,
       event.data
     );
   }
@@ -177,7 +289,12 @@ export async function POST(request: NextRequest) {
   // best available as the default.
   if (event.type === "video.asset.static_rendition.ready") {
     const rendition = event.data;
-    const assetId = event.object.id;
+    // Same object.id trap as track events: for static_rendition events,
+    // event.object.id is the RENDITION's id — the parent asset id lives
+    // in data.asset_id. Using object.id here was why webhook lookups kept
+    // logging "no video found for asset ..." while downloads only
+    // recovered through prepare-download's self-heal path.
+    const assetId = rendition.asset_id || event.object.id;
 
     if (rendition.status === "ready" && rendition.name) {
       const match = await findVideoByAssetId(assetId);
@@ -228,7 +345,7 @@ export async function POST(request: NextRequest) {
   // succeeded — only mark the download errored when nothing is ready yet,
   // so a viewer's next Download click (via prepare-download) retries.
   if (event.type === "video.asset.static_rendition.errored") {
-    const assetId = event.object.id;
+    const assetId = event.data.asset_id || event.object.id;
     const match = await findVideoByAssetId(assetId);
 
     if (match) {

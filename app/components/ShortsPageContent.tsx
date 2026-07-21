@@ -96,6 +96,49 @@ export default function ShortsPageContent({
   // own timer-based detector to work consistently on mobile too.
   const tapTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Hold-to-fast-forward (press and hold the video → 2× speed, release →
+  // back to normal), like YouTube/TikTok. Driven by pointer events so it
+  // works with touch on phones/tablets AND with a held mouse button on
+  // desktop. The click fired when the finger lifts after a hold is
+  // swallowed via suppressClickRef so a hold never also toggles
+  // mute/like.
+  const [speedBoost, setSpeedBoost] = useState(false);
+  const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const holdPlayerRef = useRef<any>(null);
+  const suppressClickRef = useRef(false);
+
+  const startHold = (e: React.PointerEvent<HTMLDivElement>) => {
+    // The overlay div wraps exactly this slide's player — find ITS
+    // mux-player element rather than trusting a shared ref.
+    const container = e.currentTarget;
+
+    if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
+    holdTimerRef.current = setTimeout(() => {
+      holdTimerRef.current = null;
+      const playerEl = container.querySelector("mux-player") as any;
+      if (playerEl) {
+        holdPlayerRef.current = playerEl;
+        playerEl.playbackRate = 2;
+        setSpeedBoost(true);
+      }
+    }, 300);
+  };
+
+  const endHold = () => {
+    if (holdTimerRef.current) {
+      clearTimeout(holdTimerRef.current);
+      holdTimerRef.current = null;
+    }
+    if (holdPlayerRef.current) {
+      holdPlayerRef.current.playbackRate = 1;
+      holdPlayerRef.current = null;
+      setSpeedBoost(false);
+      // The pointer release that ends a hold also fires a click — swallow
+      // it so ending the boost never toggles mute or likes.
+      suppressClickRef.current = true;
+    }
+  };
+
   useEffect(() => {
     const observer = new IntersectionObserver(
       (entries) => {
@@ -680,8 +723,18 @@ export default function ShortsPageContent({
                     parent), so tapping Like/Comment/Share/Save never also
                     triggers this. */}
                 <div
-                  className="absolute inset-0"
-                  onClick={() => handleVideoTap(short, index)}
+                  className="absolute inset-0 select-none [-webkit-touch-callout:none]"
+                  onClick={() => {
+                    if (suppressClickRef.current) {
+                      suppressClickRef.current = false;
+                      return;
+                    }
+                    handleVideoTap(short, index);
+                  }}
+                  onPointerDown={startHold}
+                  onPointerUp={endHold}
+                  onPointerCancel={endHold}
+                  onPointerLeave={endHold}
                 >
                   {hasRealVideo ? (
                     <div className="shorts-player h-full w-full">
@@ -709,6 +762,16 @@ export default function ShortsPageContent({
                 </div>
 
                 <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/10" />
+
+                {/* Hold-to-fast-forward badge */}
+                {speedBoost && activeIndex === index && (
+                  <div className="pointer-events-none absolute left-1/2 top-6 z-20 flex -translate-x-1/2 items-center gap-1.5 rounded-full bg-black/60 px-3.5 py-1.5 text-white backdrop-blur-sm">
+                    <span className="text-sm font-black leading-none">2×</span>
+                    <span className="text-[10px] font-semibold uppercase tracking-widest">
+                      Speed
+                    </span>
+                  </div>
+                )}
 
                 {/* Double-tap heart burst — red, YouTube/Instagram-style */}
                 {burstIndex === index && (

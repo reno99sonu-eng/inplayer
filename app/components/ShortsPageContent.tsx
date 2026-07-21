@@ -736,6 +736,18 @@ export default function ShortsPageContent({
                     }
                     handleVideoTap(short, index);
                   }}
+                  // Chrome's native long-press menu on the <video> inside
+                  // Mux's shadow DOM ("Copy video frame" / "Picture-in-
+                  // Picture") was firing around the same ~500ms mark as our
+                  // own 300ms hold-to-2x timer, and the pointercancel it
+                  // sends when it takes over was immediately reverting the
+                  // speed boost — so the hold appeared to do nothing except
+                  // pop up that menu. -webkit-touch-callout above only
+                  // covers Safari's own callout; this is what actually
+                  // suppresses Chrome's native menu (contextmenu bubbles out
+                  // through the shadow boundary, so this catches it
+                  // regardless of what was actually long-pressed).
+                  onContextMenu={(e) => e.preventDefault()}
                   onPointerDown={startHold}
                   onPointerUp={endHold}
                   onPointerCancel={endHold}

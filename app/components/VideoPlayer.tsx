@@ -216,33 +216,53 @@ export default function VideoPlayer({
   // Fullscreen API usually refuses here (no user gesture), which is
   // exactly why enterFullscreen falls back to CSS fullscreen — so this
   // now genuinely works on phones and tablets.
+  //
+  // Two independent rotation signals are wired to the same handler —
+  // matchMedia AND the dedicated Screen Orientation API — because not
+  // every mobile browser fires both equally reliably; whichever fires
+  // first wins, and calling enter/exit twice for one physical rotation
+  // is harmless (both are idempotent). Previously this also required
+  // the video to already be playing, which silently did nothing if you
+  // rotated a paused/just-loaded video — dropped so rotation always
+  // reacts, matching YouTube/Netflix.
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return;
 
-    const mql = window.matchMedia("(orientation: landscape)");
+    const isTouchDevice = () => window.matchMedia("(pointer: coarse)").matches;
 
-    const handleOrientationChange = (e: MediaQueryListEvent) => {
-      const container = containerRef.current;
-      if (!container) return;
-
+    const applyRotation = (isLandscape: boolean) => {
       // Only react on touch devices — desktop windows "rotate" when
       // resized, which must never hijack the page.
-      const isTouch = window.matchMedia("(pointer: coarse)").matches;
-      if (!isTouch) return;
+      if (!isTouchDevice()) return;
 
-      if (e.matches) {
-        const player = playerRef.current;
-        const isPlaying = player && !player.paused;
-        if (isPlaying && !document.fullscreenElement) {
-          enterFullscreen();
-        }
+      if (isLandscape) {
+        if (!document.fullscreenElement) enterFullscreen();
       } else {
         exitFullscreen();
       }
     };
 
-    mql.addEventListener("change", handleOrientationChange);
-    return () => mql.removeEventListener("change", handleOrientationChange);
+    const mql = window.matchMedia("(orientation: landscape)");
+    const handleMqlChange = (e: MediaQueryListEvent) => applyRotation(e.matches);
+    mql.addEventListener("change", handleMqlChange);
+
+    const screenOrientation = (window.screen as any)?.orientation;
+    const handleScreenOrientationChange = () => {
+      const type: string = screenOrientation?.type || "";
+      applyRotation(type.startsWith("landscape"));
+    };
+    screenOrientation?.addEventListener?.(
+      "change",
+      handleScreenOrientationChange
+    );
+
+    return () => {
+      mql.removeEventListener("change", handleMqlChange);
+      screenOrientation?.removeEventListener?.(
+        "change",
+        handleScreenOrientationChange
+      );
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cssFullscreen]);
 
@@ -468,10 +488,26 @@ export default function VideoPlayer({
   return (
     <div
       ref={containerRef}
-      className={`premium-player relative overflow-hidden rounded-2xl bg-black ${
+      // touch-none (touch-action: none) is the actual fix for the tap-seek
+      // and brightness/volume swipe gestures below: without it, a mobile
+      // browser's OWN native gesture recognizer races ours on every touch —
+      // a fast double/triple tap gets eaten by native double-tap-to-zoom,
+      // and a sustained vertical drag gets hijacked into a native page
+      // scroll/bounce (which fires pointercancel and starves our
+      // pointermove handler) before our JS ever sees a clean gesture.
+      // Single taps on Mux's own menus/buttons are untouched by this —
+      // touch-action only suppresses the browser's native gesture handling,
+      // never JS event delivery, so click/pointer events still reach both
+      // our handlers and Mux's own shadow-DOM controls exactly as before.
+      className={`premium-player relative touch-none overflow-hidden rounded-2xl bg-black ${
         cssFullscreen ? "fake-fullscreen" : ""
       }`}
       onClickCapture={handlePlayerClickCapture}
+      // Suppresses Chrome's native long-press "Copy video frame /
+      // Picture-in-Picture" menu on the <video> inside Mux's shadow DOM —
+      // contextmenu bubbles out through the shadow boundary, so a listener
+      // here catches it regardless of what was actually long-pressed.
+      onContextMenu={(e) => e.preventDefault()}
       onPointerDownCapture={(e) => {
         lastPointerTypeRef.current = e.pointerType || "mouse";
       }}

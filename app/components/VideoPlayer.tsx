@@ -100,14 +100,48 @@ export default function VideoPlayer({
   // change the drag already made.
   const suppressNextClickRef = useRef(false);
 
-  // Track the browser's REAL fullscreen state.
+  // Track the browser's REAL fullscreen state — and bounce any "wrong
+  // element" fullscreen into our own CSS fullscreen so custom gestures live.
   useEffect(() => {
     const handleFullscreenChange = () => {
       const fsElement =
         document.fullscreenElement ||
         (document as any).webkitFullscreenElement ||
         null;
-      setRealFullscreen(fsElement === containerRef.current);
+      const container = containerRef.current;
+
+      // If our <mux-player> (or its inner <video>) entered fullscreen on its
+      // OWN element instead of our container — which is exactly what Mux's
+      // built-in fullscreen button does — the fullscreen "top layer" becomes
+      // just that element, pushing our tap-seek / brightness overlays
+      // (siblings of <mux-player>, not descendants) out of view so every
+      // gesture looks dead. On touch, bounce out of it and raise our own CSS
+      // fullscreen on the container instead, which keeps the whole player —
+      // overlays included — intact and interactive.
+      const isTouch =
+        typeof window !== "undefined" &&
+        !!window.matchMedia?.("(pointer: coarse)").matches;
+      const tag = ((fsElement as HTMLElement)?.tagName || "").toLowerCase();
+      const isOwnPlayerFs =
+        !!fsElement &&
+        !!container &&
+        fsElement !== container &&
+        (container.contains(fsElement as Node) ||
+          tag.startsWith("mux-") ||
+          tag.startsWith("media-") ||
+          tag === "video");
+
+      if (isTouch && isOwnPlayerFs) {
+        const exited =
+          document.exitFullscreen?.() ??
+          (document as any).webkitExitFullscreen?.();
+        Promise.resolve(exited)
+          .catch(() => {})
+          .finally(() => setCssFullscreen(true));
+        return;
+      }
+
+      setRealFullscreen(fsElement === container);
     };
 
     document.addEventListener("fullscreenchange", handleFullscreenChange);
@@ -212,34 +246,35 @@ export default function VideoPlayer({
     }
   };
 
-  // Rotate-to-landscape → fullscreen, rotate-back → exit. The real
-  // Fullscreen API usually refuses here (no user gesture), which is
-  // exactly why enterFullscreen falls back to CSS fullscreen — so this
-  // now genuinely works on phones and tablets.
+  // Rotate the phone to landscape → fullscreen; rotate back → exit.
   //
-  // Two independent rotation signals are wired to the same handler —
-  // matchMedia AND the dedicated Screen Orientation API — because not
-  // every mobile browser fires both equally reliably; whichever fires
-  // first wins, and calling enter/exit twice for one physical rotation
-  // is harmless (both are idempotent). Previously this also required
-  // the video to already be playing, which silently did nothing if you
-  // rotated a paused/just-loaded video — dropped so rotation always
-  // reacts, matching YouTube/Netflix.
+  // This deliberately raises OUR css fullscreen (not the real Fullscreen
+  // API): a device rotation is not a "user gesture", so requestFullscreen
+  // is rejected/ignored by mobile browsers here — the previous version
+  // leaned on it, so on some phones it silently did nothing at all. CSS
+  // fullscreen has no gesture requirement, always engages, and (because it
+  // pins our own container) keeps every tap-seek / brightness gesture alive
+  // in the rotated view. Three signals are wired for browser-coverage
+  // breadth; whichever fires first wins and re-applying the same state is a
+  // no-op.
+  //
+  // Hard limit worth knowing: this can only fire when the phone's system
+  // auto-rotate is ON. With it off, the browser viewport never rotates, so
+  // NO orientation signal is emitted for any web page to react to — no
+  // amount of JS can override an OS rotation lock from inside a browser.
   useEffect(() => {
     if (typeof window === "undefined" || !window.matchMedia) return;
 
     const isTouchDevice = () => window.matchMedia("(pointer: coarse)").matches;
+    const readLandscape = () =>
+      window.matchMedia("(orientation: landscape)").matches;
 
     const applyRotation = (isLandscape: boolean) => {
-      // Only react on touch devices — desktop windows "rotate" when
-      // resized, which must never hijack the page.
       if (!isTouchDevice()) return;
-
-      if (isLandscape) {
-        if (!document.fullscreenElement) enterFullscreen();
-      } else {
-        exitFullscreen();
-      }
+      // Leave a real (API) fullscreen the viewer explicitly opened alone —
+      // only drive our own CSS fullscreen from rotation.
+      if (document.fullscreenElement) return;
+      setCssFullscreen(isLandscape);
     };
 
     const mql = window.matchMedia("(orientation: landscape)");
@@ -247,14 +282,19 @@ export default function VideoPlayer({
     mql.addEventListener("change", handleMqlChange);
 
     const screenOrientation = (window.screen as any)?.orientation;
-    const handleScreenOrientationChange = () => {
-      const type: string = screenOrientation?.type || "";
-      applyRotation(type.startsWith("landscape"));
-    };
+    const handleScreenOrientationChange = () =>
+      applyRotation((screenOrientation?.type || "").startsWith("landscape"));
     screenOrientation?.addEventListener?.(
       "change",
       handleScreenOrientationChange
     );
+
+    // Legacy global event — some Android builds fire this more reliably than
+    // the media-query 'change'. Re-sampled after a tick so orientation has
+    // settled by the time we read it.
+    const handleWindowOrientation = () =>
+      window.setTimeout(() => applyRotation(readLandscape()), 60);
+    window.addEventListener("orientationchange", handleWindowOrientation);
 
     return () => {
       mql.removeEventListener("change", handleMqlChange);
@@ -262,9 +302,10 @@ export default function VideoPlayer({
         "change",
         handleScreenOrientationChange
       );
+      window.removeEventListener("orientationchange", handleWindowOrientation);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [cssFullscreen]);
+  }, []);
 
   const clearToggleTimer = () => {
     if (toggleTimerRef.current) {
@@ -411,10 +452,12 @@ export default function VideoPlayer({
 
     // Touch: figure out which zone was tapped.
     const clickX = e.clientX - rect.left;
+    // Slightly wider side zones (40% each, 20% middle) make the
+    // double/triple-tap seek easier to land than a narrow 35/30/35 split.
     const side: "left" | "right" | null =
-      clickX < rect.width * 0.35
+      clickX < rect.width * 0.4
         ? "left"
-        : clickX > rect.width * 0.65
+        : clickX > rect.width * 0.6
           ? "right"
           : null;
 
@@ -618,18 +661,18 @@ export default function VideoPlayer({
           Netflix/YouTube-style vertical swipe. */}
       {dragIndicator && (
         <div
-          className={`pointer-events-none absolute top-1/2 z-20 -translate-y-1/2 flex flex-col items-center gap-2 rounded-2xl bg-black/60 px-3 py-4 text-white backdrop-blur-sm ${
-            dragIndicator.kind === "brightness" ? "left-6" : "right-6"
+          className={`pointer-events-none absolute top-1/2 z-20 flex max-h-[85%] -translate-y-1/2 flex-col items-center gap-1.5 rounded-2xl bg-black/60 px-2.5 py-2.5 text-white backdrop-blur-sm ${
+            dragIndicator.kind === "brightness" ? "left-4" : "right-4"
           }`}
         >
           {dragIndicator.kind === "brightness" ? (
-            <Sun size={16} />
+            <Sun size={15} />
           ) : dragIndicator.percent <= 0 ? (
-            <VolumeX size={16} />
+            <VolumeX size={15} />
           ) : (
-            <Volume2 size={16} />
+            <Volume2 size={15} />
           )}
-          <div className="flex h-20 w-1.5 flex-col-reverse overflow-hidden rounded-full bg-white/25">
+          <div className="flex h-14 w-1.5 flex-col-reverse overflow-hidden rounded-full bg-white/25">
             <div
               className="w-full rounded-full bg-white"
               style={{

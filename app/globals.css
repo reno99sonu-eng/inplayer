@@ -751,6 +751,16 @@ animation: aiGlassSweep 5.5s linear infinite;
     --media-range-thumb-height: 12px;
     --media-range-thumb-width: 12px;
     --media-range-track-height: 3px;
+
+    /* Hide Mux's OWN fullscreen button on mobile. It fullscreens the
+       <mux-player> element itself, which drops our custom tap-seek /
+       brightness overlays out of the fullscreen top layer (they are
+       siblings of <mux-player>, not descendants) and makes every gesture
+       look dead in fullscreen. On mobile, fullscreen is driven solely by
+       our own Expand button (which fullscreens the whole container) and by
+       device rotation — both keep the overlays intact. Desktop keeps Mux's
+       button, since our Expand button is hidden there. */
+    --fullscreen-button: none;
   }
 }
 

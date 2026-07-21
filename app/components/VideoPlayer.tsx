@@ -303,11 +303,28 @@ export default function VideoPlayer({
   };
 
   // Shared by the click-capture gesture handler below AND the drag-start
-  // handler for the brightness/volume swipe: true when the event's REAL
-  // target — not e.target, which shadow-DOM retargeting reports as just
-  // <mux-player> no matter what was actually pressed inside it — is one
-  // of Mux Player's own controls/flyout menus (Media Chrome tags every
-  // element it owns media-*) or one of our own overlay buttons.
+  // handler for the brightness/volume swipe: true ONLY when the tap landed
+  // on one of Mux Player's actual controls (a button, slider, menu or the
+  // control bar) or one of our own overlay buttons — NOT on the bare video
+  // surface.
+  //
+  // This uses composedPath() (not e.target, which shadow-DOM retargeting
+  // reports as just <mux-player> no matter what was pressed inside it) to
+  // see the real, un-retargeted path. The critical subtlety that broke
+  // EVERY custom gesture until now: Media Chrome wraps the <video> in
+  // <media-controller> and lays a <media-gesture-receiver> over it — both
+  // are `media-*` elements, so the previous blanket "tag starts with
+  // media-" test counted a tap on the plain video as a control tap and
+  // bailed out. Result: tap-seek and the brightness/volume swipe silently
+  // did nothing, even though captions/quality (which are SUPPOSED to be
+  // let through) kept working — which is exactly the symptom seen.
+  //
+  // Fix: walk outward from the tap and decide at the FIRST element that
+  // settles it. A genuine control (…-button / …-range / …-menu / …-dialog
+  // / media-control-bar, or a native button/input/a/select) → it's a
+  // control. Reaching the video / gesture layer / core controller first
+  // → it was the bare video surface. Deciding at these stable core names
+  // means we also never depend on the (theme-specific) wrapper tag name.
   const isOnRealControl = (
     nativeEvent: { composedPath?: () => EventTarget[] },
     boundary: EventTarget
@@ -318,7 +335,34 @@ export default function VideoPlayer({
       const tag = (node as HTMLElement).tagName;
       if (!tag) continue;
       const lower = tag.toLowerCase();
-      if (lower.startsWith("media-") || lower === "button") return true;
+
+      // Bare video surface / its gesture layer / the core controller,
+      // reached without passing a control first → NOT a control.
+      if (
+        lower === "video" ||
+        lower === "mux-video" ||
+        lower === "media-gesture-receiver" ||
+        lower === "media-controller" ||
+        lower === "media-container"
+      ) {
+        return false;
+      }
+
+      // A genuine interactive control / flyout menu / slider / dialog, the
+      // control bar itself, or one of our own overlay <button>s.
+      if (
+        lower === "button" ||
+        lower === "input" ||
+        lower === "a" ||
+        lower === "select" ||
+        lower === "media-control-bar" ||
+        lower.includes("button") ||
+        lower.includes("range") ||
+        lower.includes("menu") ||
+        lower.includes("dialog")
+      ) {
+        return true;
+      }
     }
     return false;
   };

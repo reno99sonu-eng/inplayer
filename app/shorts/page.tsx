@@ -1,5 +1,4 @@
-import { ScanCommand } from "@aws-sdk/lib-dynamodb";
-import { docClient } from "@/app/lib/dynamodb";
+import { getReadyVideos } from "@/app/lib/videoStore";
 import type { Short } from "@/app/data/shorts";
 import ShortsPageContent from "@/app/components/ShortsPageContent";
 
@@ -15,21 +14,13 @@ interface ShortsPageProps {
 
 async function getShorts(startVideoId?: string): Promise<Short[]> {
   try {
-    const result = await docClient.send(
-      new ScanCommand({
-        TableName: "InPlayer-Videos",
-        FilterExpression: "#status = :ready",
-        ExpressionAttributeNames: { "#status": "status" },
-        ExpressionAttributeValues: { ":ready": "ready" },
-      })
+    // Shared 30-second cached list (see lib/videoStore) — no per-request
+    // table Scan. Already sorted newest-first.
+    const items = (await getReadyVideos()).filter(
+      (video) =>
+        video.contentType === "short" &&
+        (!video.visibility || video.visibility === "public")
     );
-
-    const items = (result.Items || [])
-      .filter((video) => video.contentType === "short")
-      .sort(
-        (a, b) =>
-          new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
-      );
 
     const mapped = items.map((video) => ({
       id: video.videoId,

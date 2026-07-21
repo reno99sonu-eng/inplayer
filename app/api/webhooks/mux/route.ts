@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
+import { revalidateTag } from "next/cache";
 import { ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import mux from "@/app/lib/mux";
 import { docClient } from "@/app/lib/dynamodb";
+import { READY_VIDEOS_TAG } from "@/app/lib/videoStore";
 
 // Best-to-worst download quality order. Used to pick a sensible default
 // (`downloadFileName`) from whichever renditions have finished so far.
@@ -106,6 +108,11 @@ export async function POST(request: NextRequest) {
         },
       })
     );
+
+    // The listing pages read a 30-second cached video list (see
+    // lib/videoStore) — bust it now so this freshly-ready video shows up
+    // on the homepage immediately instead of waiting out the cache.
+    revalidateTag(READY_VIDEOS_TAG);
 
     // Kick off automatic caption generation on the asset's primary audio
     // track (applies to both videos and Shorts — unlike Download, this is

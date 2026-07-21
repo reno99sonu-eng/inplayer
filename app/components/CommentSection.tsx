@@ -179,6 +179,8 @@ export default function CommentSection({ videoId }: CommentSectionProps) {
                 <img
                   src={comment.userAvatarUrl || "/avatars/avatar.png"}
                   alt={comment.userName}
+                  loading="lazy"
+                  decoding="async"
                   className="h-full w-full object-cover"
                 />
               </div>

@@ -3,8 +3,18 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import MuxPlayer from "@mux/mux-player-react";
+import nextDynamic from "next/dynamic";
 import { MoreVertical, ChevronDown } from "lucide-react";
+
+// The Mux player (with its whole HLS streaming engine) is one of the
+// heaviest pieces of JavaScript in the app. It's only needed here for
+// hover/scroll previews — so it's loaded on demand the first time a
+// preview actually starts, instead of being bundled into the homepage's
+// initial JavaScript. This alone cuts hundreds of KB from what every
+// visitor downloads before the homepage becomes interactive.
+const MuxPlayer = nextDynamic(() => import("@mux/mux-player-react"), {
+  ssr: false,
+});
 import { recommendations, type Recommendation } from "../data/recommendations";
 import { shorts, type Short } from "../data/shorts";
 import { useSettings } from "./settings/SettingsProvider";
@@ -219,10 +229,14 @@ function VideoCard({ video }: { video: Recommendation }) {
         <div className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-full border border-white/10 light:border-black/10">
           {/* A plain <img>, not next/image — real uploaders' avatars are
               base64 data URLs (see app/lib/imageCompress.ts), which
-              next/image doesn't optimize/serve cleanly. */}
+              next/image doesn't optimize/serve cleanly. lazy + async so
+              below-the-fold avatars never compete with the visible cards
+              for decode/paint time. */}
           <img
             src={video.avatar}
             alt={video.creator}
+            loading="lazy"
+            decoding="async"
             className="h-full w-full object-cover"
           />
         </div>

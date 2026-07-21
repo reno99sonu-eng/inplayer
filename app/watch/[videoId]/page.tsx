@@ -1,5 +1,7 @@
-import { GetCommand, UpdateCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { after } from "next/server";
 import { docClient } from "@/app/lib/dynamodb";
+import { getReadyVideos } from "@/app/lib/videoStore";
 import BackButton from "@/app/components/BackButton";
 import WatchHistoryRecorder from "@/app/components/WatchHistoryRecorder";
 import ProcessingStatus from "@/app/components/ProcessingStatus";
@@ -13,16 +15,10 @@ interface WatchPageProps {
 }
 
 async function getRelatedVideos(currentVideoId: string, category: string) {
-  const result = await docClient.send(
-    new ScanCommand({
-      TableName: "InPlayer-Videos",
-      FilterExpression: "#status = :ready",
-      ExpressionAttributeNames: { "#status": "status" },
-      ExpressionAttributeValues: { ":ready": "ready" },
-    })
-  );
-
-  const items = (result.Items || []).filter(
+  // Shared 30-second cached list (see lib/videoStore) — no per-request
+  // table Scan, and it arrives pre-sorted newest-first, so same-category
+  // and other-category groups keep their newest-first order for free.
+  const items = (await getReadyVideos()).filter(
     (v) =>
       v.videoId !== currentVideoId &&
       (!v.visibility || v.visibility === "public")
@@ -31,13 +27,7 @@ async function getRelatedVideos(currentVideoId: string, category: string) {
   const sameCategory = items.filter((v) => v.category === category);
   const otherCategory = items.filter((v) => v.category !== category);
 
-  const sortByNewest = (a: any, b: any) =>
-    new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime();
-
-  return [...sameCategory.sort(sortByNewest), ...otherCategory.sort(sortByNewest)].slice(
-    0,
-    12
-  );
+  return [...sameCategory, ...otherCategory].slice(0, 12);
 }
 
 export default async function WatchPage({ params }: WatchPageProps) {
@@ -96,15 +86,25 @@ export default async function WatchPage({ params }: WatchPageProps) {
 
   // Increment the view count. A simple "views += 1 on page load" — not
   // unique-visitor tracking, but an honest, simple starting point.
-  await docClient.send(
-    new UpdateCommand({
-      TableName: "InPlayer-Videos",
-      Key: { videoId },
-      UpdateExpression: "SET #views = if_not_exists(#views, :zero) + :inc",
-      ExpressionAttributeNames: { "#views": "views" },
-      ExpressionAttributeValues: { ":inc": 1, ":zero": 0 },
-    })
-  );
+  // Runs AFTER the response is sent (next/server's after) — the viewer
+  // shouldn't wait on a database write that has nothing to do with
+  // rendering their page. Shaves a full DynamoDB round trip off every
+  // watch-page load.
+  after(async () => {
+    try {
+      await docClient.send(
+        new UpdateCommand({
+          TableName: "InPlayer-Videos",
+          Key: { videoId },
+          UpdateExpression: "SET #views = if_not_exists(#views, :zero) + :inc",
+          ExpressionAttributeNames: { "#views": "views" },
+          ExpressionAttributeValues: { ":inc": 1, ":zero": 0 },
+        })
+      );
+    } catch (err) {
+      console.error("Failed to record view:", err);
+    }
+  });
 
   const relatedVideos = await getRelatedVideos(videoId, video.category);
 

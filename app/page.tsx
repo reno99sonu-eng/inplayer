@@ -4,8 +4,7 @@ import TrendingNow from "./components/TrendingNow";
 import FloatingAIButton from "./components/FloatingAIButton";
 import FeaturedHero from "./components/featuredHero/FeaturedHero";
 import RecommendationFeed from "./components/RecommendationFeed";
-import { ScanCommand } from "@aws-sdk/lib-dynamodb";
-import { docClient } from "./lib/dynamodb";
+import { getReadyVideos } from "./lib/videoStore";
 import type { Recommendation } from "./data/recommendations";
 import type { Short } from "./data/shorts";
 
@@ -38,26 +37,15 @@ interface RealContent {
 
 async function getRealContent(): Promise<RealContent> {
   try {
-    const result = await docClient.send(
-      new ScanCommand({
-        TableName: "InPlayer-Videos",
-        FilterExpression: "#status = :ready",
-        ExpressionAttributeNames: { "#status": "status" },
-        ExpressionAttributeValues: { ":ready": "ready" },
-      })
-    );
+    // Shared 30-second cached list (see lib/videoStore) — no per-request
+    // table Scan. Already sorted newest-first.
+    const allReady = await getReadyVideos();
 
     // Only public videos surface in discovery feeds. Unlisted (link-only)
     // and private videos are filtered out here; unlisted stays reachable by
     // direct /watch link.
-    const items = (result.Items || []).filter(
+    const items = allReady.filter(
       (v) => !v.visibility || v.visibility === "public"
-    );
-
-    // Newest uploads first
-    items.sort(
-      (a, b) =>
-        new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
     );
 
     const realVideos: Recommendation[] = items

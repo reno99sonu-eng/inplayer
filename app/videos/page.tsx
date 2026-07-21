@@ -1,5 +1,4 @@
-import { ScanCommand } from "@aws-sdk/lib-dynamodb";
-import { docClient } from "@/app/lib/dynamodb";
+import { getReadyVideos } from "@/app/lib/videoStore";
 import Link from "next/link";
 import Image from "next/image";
 import { Film } from "lucide-react";
@@ -14,23 +13,12 @@ interface VideosPageProps {
 export default async function VideosPage({ searchParams }: VideosPageProps) {
   const { category, search } = await searchParams;
 
-  const result = await docClient.send(
-    new ScanCommand({
-      TableName: "InPlayer-Videos",
-      FilterExpression: "#status = :ready",
-      ExpressionAttributeNames: { "#status": "status" },
-      ExpressionAttributeValues: { ":ready": "ready" },
-    })
-  );
-
-  let videos = (result.Items || [])
+  // Shared 30-second cached list (see lib/videoStore) — no per-request
+  // table Scan. Already sorted newest-first.
+  let videos = (await getReadyVideos())
     // Only public videos appear in listings (unlisted stays link-only,
     // private stays hidden from discovery).
-    .filter((v) => !v.visibility || v.visibility === "public")
-    .sort(
-      (a, b) =>
-        new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
-    );
+    .filter((v) => !v.visibility || v.visibility === "public");
 
   if (category) {
     videos = videos.filter((v) => v.category === category);

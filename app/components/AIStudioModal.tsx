@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
 
 interface AIStudioModalProps {
   open: boolean;
@@ -108,8 +109,19 @@ export default function AIStudioModal({
   };
 
   if (!open) return null;
+  if (typeof document === "undefined") return null;
 
-  return (
+  // Rendered through a PORTAL onto <body>, never inline where the opener
+  // sits. This matters: the navbar wraps its buttons in `scale-[0.9]`
+  // wrappers and the header/bottom-nav use backdrop-blur — both of which
+  // turn an ancestor into the containing block for `position: fixed`
+  // descendants. Rendered inline there, this "fullscreen" overlay was
+  // being sized/positioned against a tiny scaled navbar box instead of
+  // the viewport: the panel ended up invisible, the overlay blurred just
+  // the Create button, and the page underneath looked frozen because an
+  // invisible click-catcher was floating in the wrong place. On body,
+  // fixed means the real viewport, always.
+  return createPortal(
     <div
       onClick={onClose}
       className="fixed inset-0 z-[9999] bg-black/10 backdrop-blur-[2px]"
@@ -400,6 +412,7 @@ lg:text-sm
         </div>
 
       </div>
-    </div>
+    </div>,
+    document.body
   );
 }

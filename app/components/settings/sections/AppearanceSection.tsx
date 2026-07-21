@@ -13,8 +13,8 @@ export default function AppearanceSection() {
   const options = [
     {
       value: "system" as const,
-      title: "System Default",
-      description: "Follow your device appearance automatically.",
+      title: "Auto (Time of Day)",
+      description: "Light during the day, dark at night — switches automatically.",
       icon: <Monitor size={20} />,
     },
     {

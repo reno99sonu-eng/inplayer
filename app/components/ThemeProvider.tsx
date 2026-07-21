@@ -19,11 +19,20 @@ const ThemeContext = createContext<ThemeContextValue | undefined>(undefined);
 
 const STORAGE_KEY = "inplayer-theme";
 
+// Daytime window for the automatic theme: light from 6:00 to 17:59 local
+// time, dark otherwise. Must stay in sync with the pre-hydration script in
+// app/layout.tsx, which applies the same rule before first paint.
+const DAY_START_HOUR = 6;
+const DAY_END_HOUR = 18;
+
 function resolveTheme(theme: ThemeChoice): "light" | "dark" {
   if (theme === "system") {
-    return window.matchMedia("(prefers-color-scheme: dark)").matches
-      ? "dark"
-      : "light";
+    // "Auto" follows the local TIME OF DAY (light by day, dark at night),
+    // not the OS appearance — so a first-time visitor with no saved
+    // preference gets a theme matching when they're visiting, signed in
+    // or not.
+    const hour = new Date().getHours();
+    return hour >= DAY_START_HOUR && hour < DAY_END_HOUR ? "light" : "dark";
   }
 
   return theme;
@@ -45,37 +54,24 @@ export function ThemeProvider({
 
   useEffect(() => {
     const saved =
-      (localStorage.getItem(STORAGE_KEY) as ThemeChoice | null) ??
-      "system";
+      (localStorage.getItem(STORAGE_KEY) as ThemeChoice | null) ?? "system";
 
     setThemeState(saved);
     applyTheme(saved);
 
-    const media = window.matchMedia("(prefers-color-scheme: dark)");
-
-    const handleThemeChange = () => {
+    // While in Auto mode, re-check every minute so the theme flips on its
+    // own when the local time crosses the day/night boundary — even if the
+    // tab has been open for hours.
+    const interval = setInterval(() => {
       const current =
-        (localStorage.getItem(STORAGE_KEY) as ThemeChoice | null) ??
-        "system";
+        (localStorage.getItem(STORAGE_KEY) as ThemeChoice | null) ?? "system";
 
       if (current === "system") {
         applyTheme("system");
       }
-    };
+    }, 60 * 1000);
 
-    if (media.addEventListener) {
-      media.addEventListener("change", handleThemeChange);
-    } else {
-      media.addListener(handleThemeChange);
-    }
-
-    return () => {
-      if (media.removeEventListener) {
-        media.removeEventListener("change", handleThemeChange);
-      } else {
-        media.removeListener(handleThemeChange);
-      }
-    };
+    return () => clearInterval(interval);
   }, []);
 
   const setTheme = (newTheme: ThemeChoice) => {

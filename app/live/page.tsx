@@ -10,6 +10,7 @@ interface LiveCreds {
   streamKey: string;
   playbackId: string | null;
   rtmpUrl: string;
+  isTest?: boolean;
 }
 
 function CopyField({
@@ -183,6 +184,18 @@ export default function LivePage() {
         </div>
       ) : (
         <div className="mt-8 space-y-6">
+          {creds.isTest && (
+            <div className="flex items-start gap-2 rounded-2xl border border-amber-400/30 bg-amber-500/10 p-3 text-xs leading-5 text-amber-200 light:text-amber-800">
+              <Info size={15} className="mt-0.5 flex-shrink-0" />
+              <span>
+                Your Mux account is on the free plan, so this is a{" "}
+                <strong>test stream</strong> — watermarked and limited to
+                about 5 minutes. Add a payment method to your Mux account to
+                unlock full live streaming.
+              </span>
+            </div>
+          )}
+
           {/* Live preview */}
           <div className="overflow-hidden rounded-3xl border border-white/10 light:border-black/10 bg-black">
             {creds.playbackId ? (

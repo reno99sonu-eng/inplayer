@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
-import mux from "@/app/lib/mux";
+import mux, { muxErrorMessages } from "@/app/lib/mux";
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
 
@@ -133,9 +133,19 @@ export async function POST(request: NextRequest) {
     });
   } catch (err: unknown) {
     console.error("Upload creation error:", err);
+
+    // Surface Mux's own reason when there is one — e.g. "Free plan is
+    // limited to 10 assets..." — so the uploader sees exactly what to fix
+    // (delete old videos or upgrade the Mux plan) instead of a mystery
+    // failure.
+    const muxMsg = muxErrorMessages(err);
+
     return NextResponse.json(
-      { error: "Something went wrong starting the upload. Please try again." },
-      { status: 500 }
+      {
+        error:
+          muxMsg || "Something went wrong starting the upload. Please try again.",
+      },
+      { status: muxMsg ? 400 : 500 }
     );
   }
 }

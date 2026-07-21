@@ -3,6 +3,12 @@
 import { useEffect, useState } from "react";
 import { Mail, Lock, X, Loader2, Check } from "lucide-react";
 import { signIn } from "@/app/lib/auth";
+import { signInWithRedirect } from "aws-amplify/auth";
+import { cognitoUserPoolsTokenProvider } from "aws-amplify/auth/cognito";
+import {
+  defaultStorage,
+  sessionStorage as amplifySessionStorage,
+} from "aws-amplify/utils";
 import { useAuthModal } from "./AuthProvider";
 
 interface SignInModalProps {
@@ -20,7 +26,9 @@ export default function SignInModal({
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(false);
+  // Checked by default — most viewers expect to stay signed in. Unchecking
+  // it makes the session end when the browser closes (see handleSignIn).
+  const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -31,7 +39,7 @@ export default function SignInModal({
     if (!open) {
       setEmail("");
       setPassword("");
-      setRememberMe(false);
+      setRememberMe(true);
       setShowPassword(false);
       setLoading(false);
       setError(null);
@@ -66,6 +74,21 @@ export default function SignInModal({
     setLoading(true);
 
     try {
+      // "Remember me" decides where Cognito keeps the session tokens:
+      // checked → localStorage (survives closing the browser), unchecked →
+      // sessionStorage (signed out once the browser closes). The choice is
+      // also saved so amplify-config.ts re-applies it on the next page
+      // load — without that, a reload mid-session would look for tokens
+      // in the wrong storage and appear signed out.
+      try {
+        localStorage.setItem("inplayer-remember-me", rememberMe ? "1" : "0");
+      } catch {
+        /* private mode — fall through with default storage */
+      }
+      cognitoUserPoolsTokenProvider.setKeyValueStorage(
+        rememberMe ? defaultStorage : amplifySessionStorage
+      );
+
       const result = await signIn({
         username: email.trim(),
         password,
@@ -112,6 +135,23 @@ export default function SignInModal({
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogle = async () => {
+    setError(null);
+    try {
+      // Redirects to Cognito's Hosted UI → Google → back here. Amplify
+      // finishes the exchange on return and AuthProvider's Hub listener
+      // picks the session up.
+      await signInWithRedirect({ provider: "Google" });
+    } catch (err) {
+      console.error("Google sign-in failed:", err);
+      // Most common cause: no Cognito Hosted UI domain / Google provider
+      // configured yet (NEXT_PUBLIC_COGNITO_DOMAIN unset).
+      triggerError(
+        "Google sign-in isn't set up for this site yet. Please sign in with your email and password."
+      );
     }
   };
 
@@ -332,6 +372,7 @@ export default function SignInModal({
 
                 <button
                   type="button"
+                  onClick={handleGoogle}
                   className="
                     w-full rounded-2xl border border-white/10 light:border-black/10
                     py-3 text-sm font-semibold text-slate-200 light:text-slate-700

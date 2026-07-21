@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { User, Mail, Lock, X, Loader2, Check, CheckCircle2 } from "lucide-react";
 import { signUp } from "@/app/lib/auth";
+import { signInWithRedirect } from "aws-amplify/auth";
 import { useAuthModal } from "./AuthProvider";
 
 interface SignUpModalProps {
@@ -134,6 +135,20 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGoogle = async () => {
+    setError(null);
+    try {
+      // With Google there's no separate "sign up" — the first Google
+      // sign-in creates the account automatically via Cognito.
+      await signInWithRedirect({ provider: "Google" });
+    } catch (err) {
+      console.error("Google sign-in failed:", err);
+      triggerError(
+        "Google sign-in isn't set up for this site yet. Please create an account with your email instead."
+      );
     }
   };
 
@@ -456,6 +471,7 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
 
             <button
               type="button"
+              onClick={handleGoogle}
               className="
                 w-full rounded-2xl border border-white/10 light:border-black/10
                 py-3 text-sm font-semibold text-slate-200 light:text-slate-700

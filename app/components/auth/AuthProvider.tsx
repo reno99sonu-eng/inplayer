@@ -19,6 +19,7 @@ import {
   fetchAuthSession,
   signOut as amplifySignOut,
 } from "aws-amplify/auth";
+import { Hub } from "aws-amplify/utils";
 
 import SignInModal from "./SignInModal";
 import SignUpModal from "./SignUpModal";
@@ -120,6 +121,29 @@ export default function AuthProvider({
   // visitor who signed in previously and never signed out)
   useEffect(() => {
     refreshUser();
+  }, []);
+
+  // OAuth redirect flows (Continue with Google) come back via a full page
+  // navigation, and Amplify finishes exchanging the auth code slightly
+  // AFTER our first refreshUser() above runs — this Hub listener catches
+  // that moment so the freshly-signed-in Google user appears without a
+  // manual refresh.
+  useEffect(() => {
+    const unsubscribe = Hub.listen("auth", ({ payload }) => {
+      if (
+        payload.event === "signInWithRedirect" ||
+        payload.event === "signedIn"
+      ) {
+        refreshUser();
+        setActiveModal(null);
+      }
+      if (payload.event === "signedOut") {
+        setUser(null);
+      }
+    });
+
+    return unsubscribe;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function handleSignOut() {

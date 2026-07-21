@@ -45,10 +45,14 @@ export default function FloatingAIButton() {
           rounded-full
           border
           border-orange-400/20
+          light:border-orange-400/50
           bg-gradient-to-br
           from-[#1B2435]
           to-[#0B1020]
+          light:from-[#FDF8EC]
+          light:to-[#F0E3C6]
           shadow-[0_0_40px_rgba(255,170,0,0.35)]
+          light:shadow-[0_0_35px_rgba(234,88,12,0.25)]
           transition-all
           duration-500
           hover:scale-110
@@ -59,7 +63,7 @@ export default function FloatingAIButton() {
           }
         `}
       >
-        <span className="text-2xl text-amber-300">✦</span>
+        <span className="text-2xl text-amber-300 light:text-orange-500">✦</span>
       </button>
 
       <AIStudioModal

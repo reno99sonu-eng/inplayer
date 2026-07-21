@@ -112,7 +112,9 @@ export async function POST(request: NextRequest) {
     // The listing pages read a 30-second cached video list (see
     // lib/videoStore) — bust it now so this freshly-ready video shows up
     // on the homepage immediately instead of waiting out the cache.
-    revalidateTag(READY_VIDEOS_TAG);
+    // ("max" is the profile Next 16 requires as the second argument —
+    // it's what Next's own upgrade codemod inserts for plain tag busts.)
+    revalidateTag(READY_VIDEOS_TAG, "max");
 
     // Kick off automatic caption generation on the asset's primary audio
     // track (applies to both videos and Shorts — unlike Download, this is

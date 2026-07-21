@@ -108,6 +108,11 @@ export default function ShortsPageContent({
   const suppressClickRef = useRef(false);
 
   const startHold = (e: React.PointerEvent<HTMLDivElement>) => {
+    // Touch only, per spec ("only for mobile browser version") — matches
+    // every other custom gesture on this player; mouse/desktop users
+    // already have Mux's own speed control in the settings menu.
+    if (e.pointerType !== "touch") return;
+
     // The overlay div wraps exactly this slide's player — find ITS
     // mux-player element rather than trusting a shared ref.
     const container = e.currentTarget;

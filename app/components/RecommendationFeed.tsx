@@ -17,6 +17,7 @@ const MuxPlayer = nextDynamic(() => import("@mux/mux-player-react"), {
 });
 import { recommendations, type Recommendation } from "../data/recommendations";
 import { shorts, type Short } from "../data/shorts";
+import ShortsShelf from "./ShortsShelf";
 import { useSettings } from "./settings/SettingsProvider";
 
 // Hover-preview delay — don't start streaming a preview for every card the
@@ -423,6 +424,15 @@ export default function RecommendationFeed({
           {firstVideos.map(renderCard)}
         </div>
       </section>
+
+      {/* Shorts shelf — a horizontal row of vertical Shorts sitting between
+          the first and second rows of videos, exactly like YouTube's home
+          feed. Tapping a card opens the full-screen Shorts feed deep-linked
+          to that short. Only shown when there's at least one short to fill
+          it. */}
+      {shuffledShorts.length > 0 && (
+        <ShortsShelf items={shuffledShorts.slice(0, 8)} />
+      )}
 
       {/* Second batch of recommendations */}
       <section className="mx-auto max-w-[1800px] px-4 py-3 lg:py-6 lg:px-8">

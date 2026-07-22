@@ -495,14 +495,16 @@ export default function ShortsPageContent({
     // sticky navbar/category bar visible above the video and made this
     // section fight the page's own scroll, which is what caused the
     // "doesn't fit" and "not smooth" scrolling issues.
-    <div className="fixed inset-0 z-[999] overflow-hidden bg-black lg:flex lg:items-center lg:justify-center">
+    <div className="fixed inset-0 z-[999] overflow-hidden bg-[#0b0b0d] lg:flex lg:items-center lg:justify-center">
       {/* Ambient blurred backdrop — on wide desktop windows the vertical
           feed column doesn't fill the whole screen (it shouldn't; a
           9:16 video stretched edge-to-edge on a wide monitor would look
           wrong). Rather than leave that space flat black, fill it with a
-          heavily blurred wash of the current short's own poster, same
-          technique as the watch page's ambient glow — reads as an
-          intentional, premium layout instead of empty space. */}
+          heavily blurred wash of the current short's own poster. Kept
+          deliberately dark and low-opacity (not the old bright, saturated
+          wash that made the whole desktop view look muddy/dull) so it reads
+          as a clean, near-solid dark stage — like YouTube's Shorts — with
+          just a hint of the video's own color, not a distracting smear. */}
       {shorts[activeIndex]?.poster && (
         <div
           className="pointer-events-none absolute inset-0 hidden lg:block"
@@ -510,8 +512,8 @@ export default function ShortsPageContent({
             backgroundImage: `url(${shorts[activeIndex].poster})`,
             backgroundSize: "cover",
             backgroundPosition: "center",
-            filter: "blur(60px) saturate(1.4) brightness(0.5)",
-            opacity: 0.5,
+            filter: "blur(100px) saturate(1.05) brightness(0.28)",
+            opacity: 0.35,
           }}
         />
       )}
@@ -653,11 +655,12 @@ export default function ShortsPageContent({
           snap-mandatory
           overflow-y-scroll
           overscroll-contain
-          lg:h-[85vh]
-          lg:max-h-[860px]
-          lg:rounded-2xl
-          lg:border-x
+          lg:h-[94vh]
+          lg:max-h-[960px]
+          lg:rounded-[22px]
+          lg:border
           lg:border-white/10
+          lg:shadow-[0_40px_100px_-20px_rgba(0,0,0,0.8)]
           [scrollbar-width:none]
           [&::-webkit-scrollbar]:hidden
         "

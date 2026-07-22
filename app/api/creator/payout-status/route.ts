@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
-import { PAYOUTS_TABLE } from "@/app/lib/creatorPayouts";
+import { PAYOUTS_TABLE, MIN_PAYOUT_AMOUNT_DEFAULT } from "@/app/lib/creatorPayouts";
 
 export async function GET(request: NextRequest) {
   let user;
@@ -17,6 +17,7 @@ export async function GET(request: NextRequest) {
     payoutFrequency: null as string | null,
     legalName: null as string | null,
     submittedAt: null as string | null,
+    minPayoutAmount: MIN_PAYOUT_AMOUNT_DEFAULT,
   };
 
   try {
@@ -36,6 +37,7 @@ export async function GET(request: NextRequest) {
       payoutFrequency: result.Item.payoutFrequency || null,
       legalName: result.Item.legalName || null,
       submittedAt: result.Item.submittedAt || null,
+      minPayoutAmount: result.Item.minPayoutAmount || MIN_PAYOUT_AMOUNT_DEFAULT,
     });
   } catch (err) {
     // The InPlayer-Creator-Payouts table needs to exist in DynamoDB (userId

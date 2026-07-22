@@ -11,6 +11,8 @@ import {
   Sun,
   Volume2,
   VolumeX,
+  Play,
+  Pause,
 } from "lucide-react";
 
 interface VideoPlayerProps {
@@ -80,6 +82,23 @@ export default function VideoPlayer({
     total: number;
     key: number;
   } | null>(null);
+
+  // Center play/pause flash — driven by MuxPlayer's own native play/pause
+  // EVENTS (wired below), not by our custom togglePlayPause() directly, so
+  // it fires accurately no matter how playback was toggled: our tap/click
+  // gesture, Mux's own control-bar button, a keyboard shortcut, or
+  // autoplay starting. All devices, matching the seek/brightness feedback
+  // pattern already used elsewhere in this file.
+  const [pulse, setPulse] = useState<{ icon: "play" | "pause"; key: number } | null>(
+    null
+  );
+  const pulseTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const flashPulse = (icon: "play" | "pause") => {
+    if (pulseTimerRef.current) clearTimeout(pulseTimerRef.current);
+    setPulse({ icon, key: Date.now() });
+    pulseTimerRef.current = setTimeout(() => setPulse(null), 700);
+  };
 
   // Brightness/volume vertical-drag state.
   const [brightness, setBrightness] = useState(1);
@@ -621,6 +640,8 @@ export default function VideoPlayer({
         autoPlay="any"
         // Real poster frame instead of a flat black rectangle.
         thumbnailTime={0}
+        onPlay={() => flashPulse("play")}
+        onPause={() => flashPulse("pause")}
         style={
           {
             width: "100%",
@@ -683,6 +704,23 @@ export default function VideoPlayer({
           <span className="text-[10px] font-bold">
             {Math.round(dragIndicator.percent * 100)}%
           </span>
+        </div>
+      )}
+
+      {/* Center play/pause flash — all devices. Purely decorative feedback,
+          so it's pointer-events-none and never blocks the gestures above. */}
+      {pulse && (
+        <div
+          key={pulse.key}
+          className="pointer-events-none absolute left-1/2 top-1/2 z-20"
+        >
+          <div className="animate-play-pause-flash flex h-16 w-16 items-center justify-center rounded-full bg-black/55 text-white backdrop-blur-sm">
+            {pulse.icon === "play" ? (
+              <Play size={28} className="ml-1 fill-current" />
+            ) : (
+              <Pause size={28} className="fill-current" />
+            )}
+          </div>
         </div>
       )}
 

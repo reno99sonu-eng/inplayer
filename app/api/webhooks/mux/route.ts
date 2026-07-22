@@ -107,8 +107,14 @@ export async function POST(request: NextRequest) {
       new UpdateCommand({
         TableName: "InPlayer-Videos",
         Key: { videoId: uploadId },
+        // thumbnailUrl uses if_not_exists() against customThumbnailUrl (set
+        // at upload time when the creator picked their own thumbnail) so a
+        // creator-supplied thumbnail always wins and is never overwritten
+        // by Mux's auto-generated one once processing finishes. Videos
+        // without a custom thumbnail simply have no customThumbnailUrl
+        // attribute, so if_not_exists() falls through to Mux's own image.
         UpdateExpression:
-          "SET #status = :status, muxAssetId = :assetId, muxPlaybackId = :playbackId, #duration = :duration, thumbnailUrl = :thumbnailUrl",
+          "SET #status = :status, muxAssetId = :assetId, muxPlaybackId = :playbackId, #duration = :duration, thumbnailUrl = if_not_exists(customThumbnailUrl, :thumbnailUrl)",
         ExpressionAttributeNames: {
           "#status": "status",
           "#duration": "duration",

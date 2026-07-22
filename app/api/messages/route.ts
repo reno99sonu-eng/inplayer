@@ -1,0 +1,245 @@
+import { NextRequest, NextResponse } from "next/server";
+import { GetCommand, PutCommand, UpdateCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { randomUUID } from "crypto";
+import { docClient } from "@/app/lib/dynamodb";
+import { verifyAuth } from "@/app/lib/verifyAuth";
+import { areUsersConnected } from "@/app/lib/connections";
+import { createNotification } from "@/app/lib/notifications";
+import { makeConversationId } from "@/app/lib/conversationId";
+
+const CONVERSATIONS_TABLE = "InPlayer-Conversations";
+const MESSAGES_TABLE = "InPlayer-Messages";
+const MAX_MESSAGE_LENGTH = 4000;
+
+// One row per (user, conversation) — the same "denormalized per-user
+// index" convention this codebase already uses for Watchlist/History/
+// Downloads (PK userId, SK a thing-id), rather than a single shared
+// conversation row plus a GSI. Every "list my conversations" read is then
+// a plain Query on the partition key, and actions that affect both sides
+// (accept/block/mute/disappearing) just write both rows.
+export async function GET(request: NextRequest) {
+  let user;
+
+  try {
+    user = await verifyAuth(request);
+  } catch {
+    return NextResponse.json({ error: "Please sign in." }, { status: 401 });
+  }
+
+  try {
+    const result = await docClient.send(
+      new QueryCommand({
+        TableName: CONVERSATIONS_TABLE,
+        KeyConditionExpression: "userId = :userId",
+        ExpressionAttributeValues: { ":userId": user.userId },
+      })
+    );
+
+    const rows = (result.Items || []).sort(
+      (a, b) =>
+        new Date(b.lastMessageAt || b.createdAt || 0).getTime() -
+        new Date(a.lastMessageAt || a.createdAt || 0).getTime()
+    );
+
+    // Only conversations someone ELSE started land in Requests — my own
+    // still-pending outgoing ones behave like normal conversations in my
+    // own list (I already know I sent them).
+    const requests = rows.filter(
+      (r) => r.requestStatus === "pending" && r.initiatedBy !== user.userId
+    );
+    const conversations = rows.filter(
+      (r) => !(r.requestStatus === "pending" && r.initiatedBy !== user.userId)
+    );
+
+    return NextResponse.json({ conversations, requests });
+  } catch (err) {
+    // Almost certainly means InPlayer-Conversations doesn't exist yet in
+    // DynamoDB (userId as partition key, conversationId as sort key).
+    console.error("Conversations unavailable:", err);
+    return NextResponse.json({ conversations: [], requests: [] });
+  }
+}
+
+// Starts a new conversation OR sends the next message in an existing one
+// — same endpoint either way, since both need the exact same
+// denormalization/notification logic and hand-duplicating it across two
+// routes is exactly the kind of thing that drifts.
+export async function POST(request: NextRequest) {
+  let user;
+
+  try {
+    user = await verifyAuth(request);
+  } catch {
+    return NextResponse.json({ error: "Please sign in." }, { status: 401 });
+  }
+
+  const { otherUserId, text } = await request.json();
+
+  if (!otherUserId || typeof otherUserId !== "string") {
+    return NextResponse.json({ error: "Missing recipient." }, { status: 400 });
+  }
+  if (otherUserId === user.userId) {
+    return NextResponse.json({ error: "You can't message yourself." }, { status: 400 });
+  }
+
+  const trimmedText = typeof text === "string" ? text.trim() : "";
+  if (!trimmedText) {
+    return NextResponse.json({ error: "Message can't be empty." }, { status: 400 });
+  }
+  if (trimmedText.length > MAX_MESSAGE_LENGTH) {
+    return NextResponse.json(
+      { error: "That message is too long (4,000 characters max)." },
+      { status: 400 }
+    );
+  }
+
+  const conversationId = makeConversationId(user.userId, otherUserId);
+
+  try {
+    const [myRow, otherUserRecord, myUserRecord, connected] = await Promise.all([
+      docClient.send(
+        new GetCommand({ TableName: CONVERSATIONS_TABLE, Key: { userId: user.userId, conversationId } })
+      ),
+      docClient.send(new GetCommand({ TableName: "InPlayer-Users", Key: { userId: otherUserId } })),
+      docClient.send(new GetCommand({ TableName: "InPlayer-Users", Key: { userId: user.userId } })),
+      areUsersConnected(user.userId, otherUserId),
+    ]);
+
+    if (myRow.Item?.blocked || myRow.Item?.blockedByOther) {
+      return NextResponse.json({ error: "You can't message this user." }, { status: 403 });
+    }
+
+    const isNewConversation = !myRow.Item;
+
+    // A reply from the ORIGINAL RECIPIENT of a still-pending request
+    // implicitly accepts it — no separate "Accept" click required,
+    // mirroring how most DM-request inboxes behave.
+    const isAcceptingByReply =
+      !isNewConversation &&
+      myRow.Item?.requestStatus === "pending" &&
+      myRow.Item?.initiatedBy !== user.userId;
+
+    const requestStatus: "pending" | "accepted" = isNewConversation
+      ? connected
+        ? "accepted"
+        : "pending"
+      : isAcceptingByReply || myRow.Item?.requestStatus === "accepted"
+        ? "accepted"
+        : "pending";
+
+    const now = new Date().toISOString();
+    const messageId = `${now}#${randomUUID()}`;
+
+    const disappearingEnabled = !isNewConversation && !!myRow.Item?.disappearingEnabled;
+    const disappearingSeconds = myRow.Item?.disappearingSeconds;
+    const expiresAt =
+      disappearingEnabled && disappearingSeconds
+        ? new Date(Date.now() + disappearingSeconds * 1000).toISOString()
+        : undefined;
+
+    await docClient.send(
+      new PutCommand({
+        TableName: MESSAGES_TABLE,
+        Item: {
+          conversationId,
+          messageId,
+          senderId: user.userId,
+          text: trimmedText,
+          createdAt: now,
+          ...(expiresAt && { expiresAt }),
+        },
+      })
+    );
+
+    const myUsername = (myUserRecord.Item?.username as string) || null;
+    const myAvatarUrl = (myUserRecord.Item?.avatarUrl as string) || null;
+    const otherUsername = (otherUserRecord.Item?.username as string) || null;
+    const otherAvatarUrl = (otherUserRecord.Item?.avatarUrl as string) || null;
+    const initiatedBy = isNewConversation ? user.userId : myRow.Item?.initiatedBy || user.userId;
+
+    await Promise.all([
+      // My own row — I'm reading this conversation right now (I just sent
+      // to it), so my own unread count stays 0.
+      docClient.send(
+        new UpdateCommand({
+          TableName: CONVERSATIONS_TABLE,
+          Key: { userId: user.userId, conversationId },
+          UpdateExpression:
+            "SET otherUserId = :otherUserId, otherUsername = :otherUsername, otherAvatarUrl = :otherAvatarUrl, " +
+            "requestStatus = :requestStatus, initiatedBy = :initiatedBy, lastMessageText = :text, " +
+            "lastMessageSenderId = :sender, lastMessageAt = :now, unreadCount = :zero, " +
+            "createdAt = if_not_exists(createdAt, :now), blocked = if_not_exists(blocked, :false), " +
+            "blockedByOther = if_not_exists(blockedByOther, :false), muted = if_not_exists(muted, :false), " +
+            "disappearingEnabled = if_not_exists(disappearingEnabled, :false), " +
+            "disappearingSeconds = if_not_exists(disappearingSeconds, :null)",
+          ExpressionAttributeValues: {
+            ":otherUserId": otherUserId,
+            ":otherUsername": otherUsername,
+            ":otherAvatarUrl": otherAvatarUrl,
+            ":requestStatus": requestStatus,
+            ":initiatedBy": initiatedBy,
+            ":text": trimmedText,
+            ":sender": user.userId,
+            ":now": now,
+            ":zero": 0,
+            ":false": false,
+            ":null": null,
+          },
+        })
+      ),
+      // Their row — increments their unread count.
+      docClient.send(
+        new UpdateCommand({
+          TableName: CONVERSATIONS_TABLE,
+          Key: { userId: otherUserId, conversationId },
+          UpdateExpression:
+            "SET otherUserId = :myId, otherUsername = :myUsername, otherAvatarUrl = :myAvatarUrl, " +
+            "requestStatus = :requestStatus, initiatedBy = :initiatedBy, lastMessageText = :text, " +
+            "lastMessageSenderId = :sender, lastMessageAt = :now, " +
+            "createdAt = if_not_exists(createdAt, :now), unreadCount = if_not_exists(unreadCount, :zero) + :one, " +
+            "blocked = if_not_exists(blocked, :false), blockedByOther = if_not_exists(blockedByOther, :false), " +
+            "muted = if_not_exists(muted, :false), disappearingEnabled = if_not_exists(disappearingEnabled, :false), " +
+            "disappearingSeconds = if_not_exists(disappearingSeconds, :null)",
+          ExpressionAttributeValues: {
+            ":myId": user.userId,
+            ":myUsername": myUsername,
+            ":myAvatarUrl": myAvatarUrl,
+            ":requestStatus": requestStatus,
+            ":initiatedBy": initiatedBy,
+            ":text": trimmedText,
+            ":sender": user.userId,
+            ":now": now,
+            ":zero": 0,
+            ":one": 1,
+            ":false": false,
+            ":null": null,
+          },
+        })
+      ),
+    ]);
+
+    // "request" only the moment a brand-new pending conversation is
+    // created; every other send (including further ones inside an
+    // already-pending thread) is a normal "message" ping — the recipient
+    // already got the one-time request alert.
+    const isFirstRequestPing = isNewConversation && requestStatus === "pending";
+    await createNotification({
+      userId: otherUserId,
+      type: isFirstRequestPing ? "message_request" : "message",
+      message: isFirstRequestPing
+        ? `@${myUsername || "Someone"} sent you a message request`
+        : `@${myUsername || "Someone"} sent you a message`,
+      conversationId,
+    });
+
+    return NextResponse.json({ success: true, conversationId, requestStatus });
+  } catch (err) {
+    // Almost certainly means InPlayer-Conversations or InPlayer-Messages
+    // doesn't exist yet in DynamoDB.
+    console.error("Failed to send message:", err);
+    return NextResponse.json(
+      { error: "Messaging isn't available right now. Please try again shortly." },
+      { status: 503 }
+    );
+  }
+}

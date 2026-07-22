@@ -3,90 +3,22 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { fetchAuthSession } from "aws-amplify/auth";
-import {
-  UploadCloud,
-  Film,
-  Loader2,
-  X,
-  Globe,
-  Link2,
-  Lock,
-} from "lucide-react";
+import { UploadCloud, Film, Loader2, X } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import ProcessingStatus from "@/app/components/ProcessingStatus";
+import BackButton from "@/app/components/BackButton";
 import { CONTENT_CATEGORIES } from "@/app/data/categories";
+import { compressImageToThumbnail } from "@/app/lib/imageCompress";
+import VideoMetadataFields, {
+  VideoMetadataValue,
+  SpokenLanguage,
+  Visibility,
+} from "@/app/components/VideoMetadataFields";
 
 // Same categories as the nav bar's category chips (shared source).
 const CATEGORIES = CONTENT_CATEGORIES;
 
-const CONTENT_TYPES = [
-  { value: "video", label: "Video" },
-  { value: "short", label: "Short" },
-] as const;
-
-// Matches the CAPTION_TARGETS list in app/api/webhooks/mux/route.ts. Mux's
-// own speech-recognition has no dedicated model for Hindi or Bengali, so
-// its "auto" language detection is unreliable for them (it regularly
-// mistakes Hindi for Urdu). Telling us the real spoken language up front
-// lets the caption pipeline skip that guesswork entirely.
-const SPOKEN_LANGUAGES = [
-  { value: "auto", label: "Auto-detect" },
-  { value: "en", label: "English" },
-  { value: "hi", label: "Hindi" },
-  { value: "bn", label: "Bengali" },
-] as const;
-
-type SpokenLanguage = (typeof SPOKEN_LANGUAGES)[number]["value"];
-
-const VISIBILITY_OPTIONS = [
-  { value: "public", label: "Public", icon: <Globe size={15} />, hint: "Anyone can find and watch" },
-  { value: "unlisted", label: "Unlisted", icon: <Link2 size={15} />, hint: "Only people with the link" },
-  { value: "private", label: "Private", icon: <Lock size={15} />, hint: "Hidden from the site" },
-] as const;
-
-type Visibility = (typeof VISIBILITY_OPTIONS)[number]["value"];
-
 type Stage = "picking" | "details" | "uploading" | "processing" | "error";
-
-// A small on/off switch row used for the age-restriction and comments
-// options.
-function ToggleRow({
-  label,
-  desc,
-  on,
-  onChange,
-}: {
-  label: string;
-  desc: string;
-  on: boolean;
-  onChange: () => void;
-}) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-black/[0.03] px-4 py-3">
-      <div className="min-w-0">
-        <p className="text-sm font-semibold text-white light:text-slate-900">
-          {label}
-        </p>
-        <p className="text-xs text-slate-400 light:text-slate-600">{desc}</p>
-      </div>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={on}
-        onClick={onChange}
-        className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors ${
-          on ? "bg-orange-500" : "bg-white/15 light:bg-black/15"
-        }`}
-      >
-        <span
-          className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${
-            on ? "left-[22px]" : "left-0.5"
-          }`}
-        />
-      </button>
-    </div>
-  );
-}
 
 export default function UploadPage() {
   const router = useRouter();
@@ -110,17 +42,86 @@ export default function UploadPage() {
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
 
-  const addTag = () => {
-    const t = tagInput.trim().replace(/^#/, "");
-    if (!t) return;
-    if (tags.length >= 15) return;
-    if (!tags.some((existing) => existing.toLowerCase() === t.toLowerCase())) {
-      setTags((prev) => [...prev, t]);
+  // Creator-picked thumbnail. Compressed to a data URL client-side (see
+  // compressImageToThumbnail) and sent along with the rest of the form on
+  // publish; a null preview means "let Mux use its auto-generated frame."
+  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+  const [thumbnailBusy, setThumbnailBusy] = useState(false);
+  const [thumbnailError, setThumbnailError] = useState<string | null>(null);
+
+  const handleThumbnailSelected = async (selected: File) => {
+    if (!selected.type.startsWith("image/")) {
+      setThumbnailError("Please choose an image file.");
+      return;
     }
-    setTagInput("");
+    setThumbnailError(null);
+    setThumbnailBusy(true);
+    try {
+      const dataUrl = await compressImageToThumbnail(selected);
+      setThumbnailPreview(dataUrl);
+    } catch (err) {
+      console.error("Thumbnail processing failed:", err);
+      setThumbnailError("Couldn't process that image. Please try a different one.");
+    } finally {
+      setThumbnailBusy(false);
+    }
   };
 
-  const removeTag = (t: string) => setTags((prev) => prev.filter((x) => x !== t));
+  // Single view of all the metadata fields for VideoMetadataFields (shared
+  // with the My Channel edit panel — see that component for why). The page
+  // keeps its state as individual hooks (simplest given how many other
+  // handlers below already reference them directly) and just assembles/
+  // dispatches through this pair.
+  const metadataValue: VideoMetadataValue = {
+    title,
+    description,
+    category,
+    contentType,
+    spokenLanguage,
+    visibility,
+    madeForKids,
+    ageRestricted,
+    commentsEnabled,
+    tags,
+  };
+
+  const handleMetadataChange = <K extends keyof VideoMetadataValue>(
+    field: K,
+    val: VideoMetadataValue[K]
+  ) => {
+    switch (field) {
+      case "title":
+        setTitle(val as string);
+        break;
+      case "description":
+        setDescription(val as string);
+        break;
+      case "category":
+        setCategory(val as string);
+        break;
+      case "contentType":
+        setContentType(val as "video" | "short");
+        break;
+      case "spokenLanguage":
+        setSpokenLanguage(val as SpokenLanguage);
+        break;
+      case "visibility":
+        setVisibility(val as Visibility);
+        break;
+      case "madeForKids":
+        setMadeForKids(val as boolean);
+        break;
+      case "ageRestricted":
+        setAgeRestricted(val as boolean);
+        break;
+      case "commentsEnabled":
+        setCommentsEnabled(val as boolean);
+        break;
+      case "tags":
+        setTags(val as string[]);
+        break;
+    }
+  };
 
   // Honor a preset from the Create menu (e.g. "Podcast" preselects the
   // Podcasts category). Read once on mount, then clear it.
@@ -203,6 +204,7 @@ export default function UploadPage() {
           madeForKids,
           ageRestricted,
           commentsEnabled,
+          thumbnailDataUrl: thumbnailPreview || undefined,
         }),
       });
 
@@ -261,6 +263,9 @@ export default function UploadPage() {
     setCommentsEnabled(true);
     setTags([]);
     setTagInput("");
+    setThumbnailPreview(null);
+    setThumbnailBusy(false);
+    setThumbnailError(null);
     setStage("picking");
     setProgress(0);
     setError(null);
@@ -295,6 +300,12 @@ export default function UploadPage() {
 
   return (
     <div className="mx-auto max-w-[720px] px-4 py-8 sm:py-12">
+      {/* Desktop/tablet only — mobile relies on the device's own back
+          gesture/nav, matching the rest of the app's mobile conventions. */}
+      <div className="hidden sm:block">
+        <BackButton />
+      </div>
+
       <h1 className="text-2xl sm:text-3xl font-black text-white light:text-slate-900">
         Upload Video
       </h1>
@@ -366,221 +377,19 @@ export default function UploadPage() {
               </button>
             </div>
 
-            <div>
-              <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-600">
-                Title
-              </label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="w-full rounded-2xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-black/[0.03] px-4 py-3 text-white light:text-slate-900 caret-orange-400 outline-none focus:border-orange-400/50"
-                placeholder="Give your video a title"
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-600">
-                Description
-              </label>
-              <textarea
-                rows={4}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                className="w-full resize-none rounded-2xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-black/[0.03] px-4 py-3 text-white light:text-slate-900 caret-orange-400 outline-none focus:border-orange-400/50"
-                placeholder="Tell viewers about your video"
-              />
-            </div>
-
-            <div>
-              <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-600">
-                Content Type
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                {CONTENT_TYPES.map((type) => (
-                  <button
-                    key={type.value}
-                    type="button"
-                    onClick={() => setContentType(type.value)}
-                    className={`rounded-2xl border py-3 text-sm font-semibold transition-all ${
-                      contentType === type.value
-                        ? "border-orange-400/50 bg-orange-500/10 text-orange-300 light:text-orange-700"
-                        : "border-white/10 light:border-black/10 text-slate-400 light:text-slate-600 hover:border-white/20 light:hover:border-black/20"
-                    }`}
-                  >
-                    {type.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Shorts never get captions, so this only matters — and only
-                shows — for Videos. */}
-            {contentType === "video" && (
-              <div>
-                <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-600">
-                  Spoken Language
-                </label>
-                <select
-                  value={spokenLanguage}
-                  onChange={(e) =>
-                    setSpokenLanguage(e.target.value as SpokenLanguage)
-                  }
-                  className="w-full rounded-2xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-black/[0.03] px-4 py-3 text-white light:text-slate-900 outline-none focus:border-orange-400/50"
-                >
-                  {SPOKEN_LANGUAGES.map((l) => (
-                    <option
-                      key={l.value}
-                      value={l.value}
-                      className="bg-[#07111F] text-white"
-                    >
-                      {l.label}
-                    </option>
-                  ))}
-                </select>
-                <p className="mt-1.5 text-xs text-slate-500">
-                  Helps us generate accurate captions. Auto-detect works well
-                  for English, but can misidentify Hindi or Bengali — pick it
-                  directly if that&apos;s what&apos;s spoken.
-                </p>
-              </div>
-            )}
-
-            <div>
-              <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-600">
-                Category
-              </label>
-              <select
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-                className="w-full rounded-2xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-black/[0.03] px-4 py-3 text-white light:text-slate-900 outline-none focus:border-orange-400/50"
-              >
-                {CATEGORIES.map((c) => (
-                  <option key={c} value={c} className="bg-[#07111F] text-white">
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Tags */}
-            <div>
-              <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-600">
-                Tags{" "}
-                <span className="text-slate-500">(optional, up to 15)</span>
-              </label>
-              <div className="flex flex-wrap gap-2 rounded-2xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-black/[0.03] p-2.5">
-                {tags.map((t) => (
-                  <span
-                    key={t}
-                    className="flex items-center gap-1 rounded-full bg-orange-500/15 px-2.5 py-1 text-xs font-semibold text-orange-300 light:text-orange-700"
-                  >
-                    #{t}
-                    <button
-                      type="button"
-                      onClick={() => removeTag(t)}
-                      aria-label={`Remove ${t}`}
-                      className="text-orange-300/70 transition hover:text-orange-200 light:text-orange-700/70"
-                    >
-                      <X size={12} />
-                    </button>
-                  </span>
-                ))}
-                <input
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" || e.key === ",") {
-                      e.preventDefault();
-                      addTag();
-                    } else if (
-                      e.key === "Backspace" &&
-                      !tagInput &&
-                      tags.length > 0
-                    ) {
-                      removeTag(tags[tags.length - 1]);
-                    }
-                  }}
-                  onBlur={addTag}
-                  placeholder={tags.length === 0 ? "Add a tag and press Enter" : ""}
-                  className="min-w-[120px] flex-1 bg-transparent px-1 py-1 text-sm text-white light:text-slate-900 caret-orange-400 outline-none placeholder:text-slate-500"
-                />
-              </div>
-            </div>
-
-            {/* Visibility */}
-            <div>
-              <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-600">
-                Visibility
-              </label>
-              <div className="grid grid-cols-3 gap-2 sm:gap-3">
-                {VISIBILITY_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => setVisibility(opt.value)}
-                    className={`flex flex-col items-center gap-1.5 rounded-2xl border py-3 text-xs font-semibold transition-all ${
-                      visibility === opt.value
-                        ? "border-orange-400/50 bg-orange-500/10 text-orange-300 light:text-orange-700"
-                        : "border-white/10 light:border-black/10 text-slate-400 light:text-slate-600 hover:border-white/20 light:hover:border-black/20"
-                    }`}
-                  >
-                    {opt.icon}
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-              <p className="mt-1.5 text-xs text-slate-500">
-                {VISIBILITY_OPTIONS.find((o) => o.value === visibility)?.hint}
-              </p>
-            </div>
-
-            {/* Audience */}
-            <div>
-              <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-600">
-                Audience
-              </label>
-              <div className="grid grid-cols-2 gap-3">
-                <button
-                  type="button"
-                  onClick={() => setMadeForKids(false)}
-                  className={`rounded-2xl border py-3 text-sm font-semibold transition-all ${
-                    !madeForKids
-                      ? "border-orange-400/50 bg-orange-500/10 text-orange-300 light:text-orange-700"
-                      : "border-white/10 light:border-black/10 text-slate-400 light:text-slate-600 hover:border-white/20 light:hover:border-black/20"
-                  }`}
-                >
-                  Not made for kids
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setMadeForKids(true)}
-                  className={`rounded-2xl border py-3 text-sm font-semibold transition-all ${
-                    madeForKids
-                      ? "border-orange-400/50 bg-orange-500/10 text-orange-300 light:text-orange-700"
-                      : "border-white/10 light:border-black/10 text-slate-400 light:text-slate-600 hover:border-white/20 light:hover:border-black/20"
-                  }`}
-                >
-                  Made for kids
-                </button>
-              </div>
-            </div>
-
-            {/* Age restriction + comments toggles */}
-            <div className="space-y-2.5">
-              <ToggleRow
-                label="Restrict to viewers 18+"
-                desc="Adds an age-confirmation gate before playback."
-                on={ageRestricted}
-                onChange={() => setAgeRestricted((v) => !v)}
-              />
-              <ToggleRow
-                label="Allow comments"
-                desc="Let viewers comment on this video."
-                on={commentsEnabled}
-                onChange={() => setCommentsEnabled((v) => !v)}
-              />
-            </div>
+            <VideoMetadataFields
+              value={metadataValue}
+              onChange={handleMetadataChange}
+              categories={CATEGORIES}
+              thumbnail={{
+                previewUrl: thumbnailPreview,
+                onFileSelected: handleThumbnailSelected,
+                busy: thumbnailBusy,
+                error: thumbnailError,
+              }}
+              tagInput={tagInput}
+              onTagInputChange={setTagInput}
+            />
 
             {error && (
               <p className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-300 light:text-red-700">

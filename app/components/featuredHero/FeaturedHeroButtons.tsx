@@ -4,7 +4,7 @@ import { Play, Plus, Info } from "lucide-react";
 
 export default function FeaturedHeroButtons() {
   return (
-    <div className="flex flex-wrap items-center gap-2 lg:gap-3">
+    <div className="flex flex-wrap items-center gap-3">
 
       {/* Watch Now */}
       <button
@@ -17,10 +17,8 @@ export default function FeaturedHeroButtons() {
           from-orange-500
           via-amber-400
           to-yellow-300
-          px-4
-          py-2
-          lg:px-5
-          lg:py-2.5
+          px-5
+          py-2.5
           text-sm
           font-bold
           text-slate-900
@@ -44,10 +42,8 @@ export default function FeaturedHeroButtons() {
           border
           border-white/10
           bg-white/5
-          px-4
-          py-2
-          lg:px-5
-          lg:py-2.5
+          px-5
+          py-2.5
           text-sm
           font-semibold
           text-white
@@ -72,10 +68,8 @@ export default function FeaturedHeroButtons() {
           border
           border-white/10
           bg-white/5
-          px-4
-          py-2
-          lg:px-5
-          lg:py-2.5
+          px-5
+          py-2.5
           text-sm
           font-semibold
           text-white

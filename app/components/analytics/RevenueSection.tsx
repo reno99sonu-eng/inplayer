@@ -10,8 +10,15 @@ import {
   Clock,
   Loader2,
   Landmark,
+  Check,
 } from "lucide-react";
-import { ELIGIBILITY_THRESHOLD, PAYOUT_FREQUENCIES, PayoutFrequency } from "@/app/lib/creatorPayouts";
+import {
+  ELIGIBILITY_THRESHOLD,
+  PAYOUT_FREQUENCIES,
+  PayoutFrequency,
+  MIN_PAYOUT_AMOUNT_DEFAULT,
+  MIN_PAYOUT_AMOUNT_BOUNDS,
+} from "@/app/lib/creatorPayouts";
 import KycForm from "./KycForm";
 
 export interface PayoutStatus {
@@ -19,6 +26,7 @@ export interface PayoutStatus {
   payoutFrequency: string | null;
   legalName: string | null;
   submittedAt: string | null;
+  minPayoutAmount?: number;
 }
 
 function ProgressBar({ value, max }: { value: number; max: number }) {
@@ -50,6 +58,12 @@ export default function RevenueSection({
 }) {
   const [showKycForm, setShowKycForm] = useState(false);
   const [updatingFrequency, setUpdatingFrequency] = useState(false);
+  const [amountDraft, setAmountDraft] = useState(
+    String(payoutStatus?.minPayoutAmount || MIN_PAYOUT_AMOUNT_DEFAULT)
+  );
+  const [savingAmount, setSavingAmount] = useState(false);
+  const [amountError, setAmountError] = useState<string | null>(null);
+  const [amountSaved, setAmountSaved] = useState(false);
 
   const meetsThreshold =
     subscriberCount >= ELIGIBILITY_THRESHOLD.subscribers &&
@@ -67,7 +81,7 @@ export default function RevenueSection({
           "Content-Type": "application/json",
           Authorization: `Bearer ${idToken}`,
         },
-        body: JSON.stringify({ action: "update_frequency", payoutFrequency: freq }),
+        body: JSON.stringify({ action: "update_payout_prefs", payoutFrequency: freq }),
       });
       if (res.ok) {
         onStatusChange({ ...payoutStatus, payoutFrequency: freq });
@@ -76,6 +90,50 @@ export default function RevenueSection({
       console.error("Failed to update payout frequency:", err);
     } finally {
       setUpdatingFrequency(false);
+    }
+  };
+
+  const handleAmountSave = async () => {
+    if (!payoutStatus) return;
+    const amount = Number(amountDraft);
+
+    if (
+      !Number.isFinite(amount) ||
+      amount < MIN_PAYOUT_AMOUNT_BOUNDS.min ||
+      amount > MIN_PAYOUT_AMOUNT_BOUNDS.max
+    ) {
+      setAmountError(
+        `Enter an amount between ₹${MIN_PAYOUT_AMOUNT_BOUNDS.min} and ₹${MIN_PAYOUT_AMOUNT_BOUNDS.max.toLocaleString()}.`
+      );
+      return;
+    }
+
+    setAmountError(null);
+    setSavingAmount(true);
+    try {
+      const session = await fetchAuthSession();
+      const idToken = session.tokens?.idToken?.toString();
+      const res = await fetch("/api/creator/kyc", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ action: "update_payout_prefs", minPayoutAmount: amount }),
+      });
+      if (res.ok) {
+        onStatusChange({ ...payoutStatus, minPayoutAmount: amount });
+        setAmountSaved(true);
+        setTimeout(() => setAmountSaved(false), 2000);
+      } else {
+        const data = await res.json().catch(() => ({}));
+        setAmountError(data.error || "Couldn't save that right now.");
+      }
+    } catch (err) {
+      console.error("Failed to update minimum payout amount:", err);
+      setAmountError("Couldn't save that right now.");
+    } finally {
+      setSavingAmount(false);
     }
   };
 
@@ -92,7 +150,7 @@ export default function RevenueSection({
           <IndianRupee size={16} />
         </div>
         <h3 className="text-sm font-bold text-white light:text-slate-900">
-          {contentLabel} revenue
+          {contentLabel} revenue &amp; KYC
         </h3>
       </div>
 
@@ -121,8 +179,8 @@ export default function RevenueSection({
           </div>
 
           <div>
-            <p className={`mb-1.5 text-xs font-semibold text-slate-400 light:text-slate-600`}>
-              Payout frequency
+            <p className="mb-1.5 text-xs font-semibold text-slate-400 light:text-slate-600">
+              Payout frequency — how often
             </p>
             <div className="grid grid-cols-4 gap-1.5">
               {PAYOUT_FREQUENCIES.map((f) => (
@@ -143,6 +201,47 @@ export default function RevenueSection({
                 </button>
               ))}
             </div>
+          </div>
+
+          <div>
+            <p className="mb-1.5 text-xs font-semibold text-slate-400 light:text-slate-600">
+              Minimum payout amount — how much
+            </p>
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">
+                  ₹
+                </span>
+                <input
+                  type="number"
+                  inputMode="numeric"
+                  min={MIN_PAYOUT_AMOUNT_BOUNDS.min}
+                  max={MIN_PAYOUT_AMOUNT_BOUNDS.max}
+                  value={amountDraft}
+                  onChange={(e) => setAmountDraft(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-[#FAF5E9] py-2.5 pl-7 pr-3 text-sm text-white light:text-slate-900 outline-none transition focus:border-orange-400/50"
+                />
+              </div>
+              <button
+                onClick={handleAmountSave}
+                disabled={savingAmount}
+                className="flex flex-shrink-0 items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-4 py-2.5 text-xs font-bold text-white transition disabled:opacity-60"
+              >
+                {savingAmount ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : amountSaved ? (
+                  <Check size={14} />
+                ) : null}
+                {savingAmount ? "Saving" : amountSaved ? "Saved" : "Save"}
+              </button>
+            </div>
+            {amountError && (
+              <p className="mt-1.5 text-[11px] text-red-400">{amountError}</p>
+            )}
+            <p className="mt-1.5 text-[11px] text-slate-500">
+              We'll hold your balance until it reaches this amount, then pay
+              it out on your chosen frequency above.
+            </p>
           </div>
 
           <button
@@ -197,9 +296,11 @@ export default function RevenueSection({
       ) : (
         <div className="mt-4 space-y-4">
           <p className="text-xs text-slate-500 light:text-slate-500">
-            Reach {ELIGIBILITY_THRESHOLD.subscribers} In-Family members and{" "}
-            {ELIGIBILITY_THRESHOLD.views.toLocaleString()} views to unlock
-            monetization for {contentLabel.toLowerCase()}.
+            The KYC form (and your revenue balance) unlocks right here once
+            you reach {ELIGIBILITY_THRESHOLD.subscribers} In-Family members
+            and {ELIGIBILITY_THRESHOLD.views.toLocaleString()} views on{" "}
+            {contentLabel.toLowerCase()} — this isn't hidden or broken, you're
+            just not there yet:
           </p>
 
           <div>

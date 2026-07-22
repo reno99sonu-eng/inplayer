@@ -885,3 +885,67 @@ animation: aiGlassSweep 5.5s linear infinite;
 .animate-settings-fade {
   animation: settingsFadeIn .45s cubic-bezier(.16,1,.3,1) both;
 }
+
+/* One-shot center play/pause icon flash — mirrors seekFlash's timing/easing
+   for visual consistency. Fired from MuxPlayer's own play/pause EVENTS (see
+   VideoPlayer.tsx), not just our custom tap handler, so it appears no matter
+   how playback was toggled: our gesture, Mux's own control-bar button, or a
+   keyboard shortcut. */
+@keyframes playPauseFlash {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.7);
+  }
+  25% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  75% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(1.08);
+  }
+}
+
+.animate-play-pause-flash {
+  animation: playPauseFlash 0.7s ease-out both;
+}
+
+/* ---------- Video player settings menu (quality / captions) theming ----------
+   The quality picker and the captions/language picker are both the SAME
+   underlying <media-settings-menu> — a media-chrome web component living in
+   a shadow root, unreachable by ordinary class selectors. These are its
+   real CSS custom properties, verified against the installed media-chrome
+   package (node_modules/media-chrome) rather than guessed, so the popup
+   actually reflects InPlayer's premium look in both themes instead of
+   Mux's cramped, unstyled default. Dark is the app's base theme; .light
+   mirrors every other light-mode surface. */
+.premium-player {
+  --media-menu-background: rgba(9, 17, 31, 0.98);
+  --media-control-background: rgba(9, 17, 31, 0.98);
+  --media-menu-border: 1px solid rgba(255, 255, 255, 0.12);
+  --media-menu-border-radius: 18px;
+  --media-settings-menu-background: rgba(9, 17, 31, 0.98);
+  --media-settings-menu-min-width: 230px;
+  --media-menu-item-hover-background: rgba(255, 154, 0, 0.16);
+  --media-menu-item-checked-background: rgba(255, 154, 0, 0.24);
+  --media-primary-color: #ffffff;
+  --media-secondary-color: #ffb454;
+  --media-text-color: #f1f5f9;
+  --media-icon-color: #f1f5f9;
+}
+
+.light .premium-player {
+  --media-menu-background: rgba(251, 246, 234, 0.98);
+  --media-control-background: rgba(251, 246, 234, 0.98);
+  --media-menu-border: 1px solid rgba(0, 0, 0, 0.12);
+  --media-settings-menu-background: rgba(251, 246, 234, 0.98);
+  --media-menu-item-hover-background: rgba(194, 65, 12, 0.1);
+  --media-menu-item-checked-background: rgba(194, 65, 12, 0.16);
+  --media-primary-color: #0f172a;
+  --media-secondary-color: #c2410c;
+  --media-text-color: #1e293b;
+  --media-icon-color: #1e293b;
+}

@@ -14,14 +14,18 @@ import {
   Radio,
   Mic2,
   Sparkles,
+  MessageSquare,
+  MessageSquarePlus,
 } from "lucide-react";
 
 interface Notification {
   notificationId: string;
-  type: "like" | "comment" | "subscribe";
+  type: "like" | "comment" | "subscribe" | "message" | "message_request";
   message: string;
   read: boolean;
   createdAt: string;
+  videoId?: string;
+  conversationId?: string;
 }
 
 export default function NavbarActions() {
@@ -278,19 +282,55 @@ export default function NavbarActions() {
               </div>
             ) : (
               <div className="space-y-2">
-                {notifications.map((n) => (
-                  <div
-                    key={n.notificationId}
-                    className={`rounded-xl px-3 py-2.5 ${
-                      n.read
-                        ? "bg-white/5 light:bg-black/5"
-                        : "bg-orange-500/10 border border-orange-400/20"
-                    }`}
-                  >
-                    <p className="text-sm text-white light:text-slate-900">{n.message}</p>
-                    <p className="text-xs text-slate-500">{formatTimeAgo(n.createdAt)}</p>
-                  </div>
-                ))}
+                {notifications.map((n) => {
+                  const isMessageType = n.type === "message" || n.type === "message_request";
+                  const content = (
+                    <>
+                      <div className="flex items-start gap-2">
+                        {isMessageType &&
+                          (n.type === "message_request" ? (
+                            <MessageSquarePlus size={14} className="mt-0.5 flex-shrink-0 text-orange-400" />
+                          ) : (
+                            <MessageSquare size={14} className="mt-0.5 flex-shrink-0 text-orange-400" />
+                          ))}
+                        <p className="text-sm text-white light:text-slate-900">{n.message}</p>
+                      </div>
+                      <p className={isMessageType ? "mt-0.5 pl-[22px] text-xs text-slate-500" : "text-xs text-slate-500"}>
+                        {formatTimeAgo(n.createdAt)}
+                      </p>
+                    </>
+                  );
+
+                  const className = `rounded-xl px-3 py-2.5 ${
+                    n.read
+                      ? "bg-white/5 light:bg-black/5"
+                      : "bg-orange-500/10 border border-orange-400/20"
+                  }`;
+
+                  // Only the new message-related types navigate anywhere
+                  // — like/comment/subscribe notifications keep their
+                  // existing (purely display) behavior untouched.
+                  if (isMessageType && n.conversationId) {
+                    return (
+                      <button
+                        key={n.notificationId}
+                        onClick={() => {
+                          setNotifOpen(false);
+                          router.push(`/messages/${n.conversationId}`);
+                        }}
+                        className={`block w-full text-left transition hover:brightness-110 ${className}`}
+                      >
+                        {content}
+                      </button>
+                    );
+                  }
+
+                  return (
+                    <div key={n.notificationId} className={className}>
+                      {content}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>

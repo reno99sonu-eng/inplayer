@@ -5,7 +5,7 @@ import Image from "next/image";
 
 import NavbarLogo from "./NavbarLogo";
 import NavbarLinks from "./NavbarLinks";
-import { Menu, X, Search, Home, PlaySquare, ChevronRight, ChevronDown, LogOut } from "lucide-react";
+import { Menu, X, Search, Home, PlaySquare, ChevronRight, ChevronDown, LogOut, Mail, Copy, Check } from "lucide-react";
 import { useAuthModal } from "./auth/AuthProvider";
 import NavbarSearch from "./NavbarSearch";
 import NavbarActions from "./NavbarActions";
@@ -38,13 +38,38 @@ const youItems = [
   { label: "Downloads", href: "/downloads" },
 ];
 
+// Where the Instagram/X icons used to live in the drawer footer.
+const CONTACT_EMAILS = [
+  { label: "Advertising", address: "ads@inplayer.in" },
+  { label: "Business", address: "business@inplayer.in" },
+  { label: "General contact", address: "contact@inplayer.in" },
+  { label: "Copyright", address: "copyright@inplayer.in" },
+  { label: "Corporate", address: "corporate@inplayer.in" },
+  { label: "Help", address: "help@inplayer.in" },
+  { label: "Partners", address: "partners@inplayer.in" },
+  { label: "Team", address: "team@inplayer.in" },
+  { label: "Support", address: "support@inplayer.in" },
+];
+
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [showMoreChannels, setShowMoreChannels] = useState(false);
+  const [contactOpen, setContactOpen] = useState(false);
+  const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
   const router = useRouter();
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const { signedIn, user, signOut, openSignIn, openSignUp } = useAuthModal();
+
+  const copyEmail = async (address: string) => {
+    try {
+      await navigator.clipboard.writeText(address);
+      setCopiedEmail(address);
+      setTimeout(() => setCopiedEmail((cur) => (cur === address ? null : cur)), 1800);
+    } catch {
+      /* clipboard unavailable — the mailto: link on the row still works */
+    }
+  };
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -709,6 +734,76 @@ lg:right-auto
                     )
                   )}
                 </ul>
+              </div>
+            </div>
+
+            {/* Contact — where the Instagram/X icons used to sit. Toggles a
+                panel of every @inplayer.in address inline, right here in
+                the drawer (not a separate modal). */}
+            <div className="mt-4 border-t border-white/10 light:border-black/10 px-3 pt-3">
+              <button
+                onClick={() => setContactOpen((v) => !v)}
+                aria-expanded={contactOpen}
+                className="
+                  flex w-full items-center justify-between rounded-xl px-0 py-1
+                  text-left transition
+                  hover:text-orange-300 light:hover:text-orange-600
+                "
+              >
+                <span className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-orange-300 light:text-orange-600">
+                  <Mail size={12} />
+                  Contact us
+                </span>
+                <ChevronDown
+                  size={14}
+                  className={`text-slate-500 transition-transform duration-300 ${
+                    contactOpen ? "rotate-180" : ""
+                  }`}
+                />
+              </button>
+
+              <div
+                className={`grid overflow-hidden transition-all duration-300 ${
+                  contactOpen ? "grid-rows-[1fr] opacity-100 mt-2" : "grid-rows-[0fr] opacity-0"
+                }`}
+              >
+                <div className="min-h-0 space-y-1">
+                  {CONTACT_EMAILS.map(({ label, address }) => (
+                    <div
+                      key={address}
+                      className="
+                        flex items-center justify-between gap-2 rounded-lg px-2 py-1.5
+                        transition hover:bg-white/5 light:hover:bg-black/5
+                      "
+                    >
+                      <a
+                        href={`mailto:${address}`}
+                        className="min-w-0 flex-1"
+                        title={`Email ${label.toLowerCase()}`}
+                      >
+                        <span className="block text-[10px] uppercase tracking-wide text-slate-500">
+                          {label}
+                        </span>
+                        <span className="block truncate text-xs font-medium text-slate-200 light:text-slate-700">
+                          {address}
+                        </span>
+                      </a>
+
+                      <button
+                        onClick={() => copyEmail(address)}
+                        title="Copy address"
+                        aria-label={`Copy ${address}`}
+                        className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-slate-500 transition hover:bg-white/10 light:hover:bg-black/10 hover:text-orange-300 light:hover:text-orange-600"
+                      >
+                        {copiedEmail === address ? (
+                          <Check size={13} className="text-emerald-400" />
+                        ) : (
+                          <Copy size={13} />
+                        )}
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 

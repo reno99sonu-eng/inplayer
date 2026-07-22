@@ -22,3 +22,12 @@ export const PAYOUT_FREQUENCIES: PayoutFrequency[] = [
   "monthly",
   "annually",
 ];
+
+// The creator's own minimum-balance threshold before a payout goes out —
+// e.g. "only pay me out once I've got at least ₹500 owed", paired with
+// their chosen frequency above (YouTube/AdSense call this a "payment
+// threshold"). Stored as a preference now so the schedule is ready the
+// moment real payouts (via Razorpay) go live — it does not itself move any
+// money today.
+export const MIN_PAYOUT_AMOUNT_DEFAULT = 500;
+export const MIN_PAYOUT_AMOUNT_BOUNDS = { min: 100, max: 100000 };

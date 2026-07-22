@@ -3,7 +3,12 @@
 import { useState } from "react";
 import { fetchAuthSession } from "aws-amplify/auth";
 import { Loader2, ShieldCheck } from "lucide-react";
-import { PAYOUT_FREQUENCIES, PayoutFrequency } from "@/app/lib/creatorPayouts";
+import {
+  PAYOUT_FREQUENCIES,
+  PayoutFrequency,
+  MIN_PAYOUT_AMOUNT_DEFAULT,
+  MIN_PAYOUT_AMOUNT_BOUNDS,
+} from "@/app/lib/creatorPayouts";
 
 const inputClass =
   "w-full rounded-xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-[#FAF5E9] px-3 py-2.5 text-sm text-white light:text-slate-900 outline-none transition focus:border-orange-400/50";
@@ -18,6 +23,7 @@ export default function KycForm({ onSubmitted }: { onSubmitted: () => void }) {
   const [state, setState] = useState("");
   const [pincode, setPincode] = useState("");
   const [payoutFrequency, setPayoutFrequency] = useState<PayoutFrequency>("monthly");
+  const [minPayoutAmount, setMinPayoutAmount] = useState(String(MIN_PAYOUT_AMOUNT_DEFAULT));
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -44,6 +50,7 @@ export default function KycForm({ onSubmitted }: { onSubmitted: () => void }) {
           state,
           pincode,
           payoutFrequency,
+          minPayoutAmount: Number(minPayoutAmount) || MIN_PAYOUT_AMOUNT_DEFAULT,
         }),
       });
 
@@ -141,7 +148,7 @@ export default function KycForm({ onSubmitted }: { onSubmitted: () => void }) {
         </div>
 
         <div className="sm:col-span-2">
-          <label className={labelClass}>Payout frequency</label>
+          <label className={labelClass}>Payout frequency — how often</label>
           <div className="grid grid-cols-4 gap-1.5">
             {PAYOUT_FREQUENCIES.map((f) => (
               <button
@@ -161,6 +168,32 @@ export default function KycForm({ onSubmitted }: { onSubmitted: () => void }) {
               </button>
             ))}
           </div>
+        </div>
+
+        <div className="sm:col-span-2">
+          <label className={labelClass}>
+            Minimum payout amount — how much
+          </label>
+          <div className="relative">
+            <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-500">
+              ₹
+            </span>
+            <input
+              type="number"
+              inputMode="numeric"
+              min={MIN_PAYOUT_AMOUNT_BOUNDS.min}
+              max={MIN_PAYOUT_AMOUNT_BOUNDS.max}
+              value={minPayoutAmount}
+              onChange={(e) => setMinPayoutAmount(e.target.value)}
+              className={`${inputClass} pl-7`}
+            />
+          </div>
+          <p className="mt-1 text-[11px] text-slate-500">
+            We'll hold your balance until it reaches this amount, then pay it
+            out on your chosen frequency above. Between ₹
+            {MIN_PAYOUT_AMOUNT_BOUNDS.min} and ₹
+            {MIN_PAYOUT_AMOUNT_BOUNDS.max.toLocaleString()}.
+          </p>
         </div>
       </div>
 

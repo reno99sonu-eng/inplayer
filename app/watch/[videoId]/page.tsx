@@ -18,9 +18,14 @@ async function getRelatedVideos(currentVideoId: string, category: string) {
   // Shared 30-second cached list (see lib/videoStore) — no per-request
   // table Scan, and it arrives pre-sorted newest-first, so same-category
   // and other-category groups keep their newest-first order for free.
+  // Videos only — Shorts have their own dedicated feed and never belong in
+  // this "Up Next" list. This is the SSR fallback shown before (and if)
+  // the client-side personalized fetch in WatchPageContent replaces it —
+  // see app/api/videos/related.
   const items = (await getReadyVideos()).filter(
     (v) =>
       v.videoId !== currentVideoId &&
+      v.contentType !== "short" &&
       (!v.visibility || v.visibility === "public")
   );
 
@@ -109,8 +114,14 @@ export default async function WatchPage({ params }: WatchPageProps) {
   const relatedVideos = await getRelatedVideos(videoId, video.category);
 
   return (
-    <div className="mx-auto max-w-[1400px] px-3 py-4 lg:px-4 lg:py-8">
-      <BackButton />
+    <div className="mx-auto max-w-[1600px] px-3 py-4 lg:px-4 lg:py-8">
+      {/* Desktop/tablet only — removed from the video-playing screen on
+          mobile per the current design pass. Untouched for the
+          processing/error states above, and for every other BackButton
+          usage in the app. */}
+      <div className="hidden lg:block">
+        <BackButton />
+      </div>
       <WatchHistoryRecorder videoId={videoId} />
 
       <WatchPageContent

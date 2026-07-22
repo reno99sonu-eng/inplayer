@@ -3,6 +3,10 @@ import { GetCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb"
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
 import mux from "@/app/lib/mux";
+import { THUMBNAIL_DATA_URL_MAX_LENGTH } from "@/app/lib/imageCompress";
+
+const VISIBILITY_VALUES = ["public", "unlisted", "private"];
+const SPOKEN_LANGUAGE_VALUES = ["auto", "en", "hi", "bn"];
 
 interface Params {
   params: Promise<{ videoId: string }>;
@@ -40,7 +44,19 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: ownership.error }, { status: ownership.status });
   }
 
-  const { title, description, category } = await request.json();
+  const body = await request.json();
+  const {
+    title,
+    description,
+    category,
+    tags,
+    visibility,
+    madeForKids,
+    ageRestricted,
+    commentsEnabled,
+    spokenLanguage,
+    thumbnailDataUrl,
+  } = body;
 
   if (!title?.trim() || !category?.trim()) {
     return NextResponse.json(
@@ -49,17 +65,81 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     );
   }
 
+  if (visibility !== undefined && !VISIBILITY_VALUES.includes(visibility)) {
+    return NextResponse.json({ error: "Invalid visibility." }, { status: 400 });
+  }
+
+  if (
+    thumbnailDataUrl !== undefined &&
+    thumbnailDataUrl !== null &&
+    thumbnailDataUrl !== "" &&
+    (typeof thumbnailDataUrl !== "string" ||
+      !thumbnailDataUrl.startsWith("data:image/") ||
+      thumbnailDataUrl.length > THUMBNAIL_DATA_URL_MAX_LENGTH)
+  ) {
+    return NextResponse.json(
+      { error: "That thumbnail image is too large or invalid. Please try a different image." },
+      { status: 400 }
+    );
+  }
+
+  // Same field set the Upload page collects, so the edit panel can offer
+  // true parity (see app/components/VideoMetadataFields.tsx, shared by
+  // both). contentType is deliberately never accepted here — changing it
+  // after upload would desync the static-rendition/captions pipeline,
+  // which is keyed off the value chosen at creation time.
+  const sets: string[] = [
+    "title = :title",
+    "description = :description",
+    "category = :category",
+  ];
+  const values: Record<string, unknown> = {
+    ":title": title.trim(),
+    ":description": description?.trim() || "",
+    ":category": category.trim(),
+  };
+
+  if (Array.isArray(tags)) {
+    sets.push("tags = :tags");
+    values[":tags"] = tags
+      .filter((t: unknown) => typeof t === "string" && t.trim())
+      .slice(0, 15)
+      .map((t: string) => t.trim());
+  }
+  if (visibility !== undefined) {
+    sets.push("visibility = :visibility");
+    values[":visibility"] = visibility;
+  }
+  if (madeForKids !== undefined) {
+    sets.push("madeForKids = :madeForKids");
+    values[":madeForKids"] = !!madeForKids;
+  }
+  if (ageRestricted !== undefined) {
+    sets.push("ageRestricted = :ageRestricted");
+    values[":ageRestricted"] = !!ageRestricted;
+  }
+  if (commentsEnabled !== undefined) {
+    sets.push("commentsEnabled = :commentsEnabled");
+    values[":commentsEnabled"] = !!commentsEnabled;
+  }
+  if (spokenLanguage !== undefined && SPOKEN_LANGUAGE_VALUES.includes(spokenLanguage)) {
+    sets.push("spokenLanguage = :spokenLanguage");
+    values[":spokenLanguage"] = spokenLanguage;
+  }
+  if (typeof thumbnailDataUrl === "string" && thumbnailDataUrl.startsWith("data:image/")) {
+    // Setting both together is safe here (unlike the webhook) — this is a
+    // direct creator action happening right now, not a background process
+    // racing an in-flight upload.
+    sets.push("customThumbnailUrl = :thumb", "thumbnailUrl = :thumb");
+    values[":thumb"] = thumbnailDataUrl;
+  }
+
   await docClient.send(
     new UpdateCommand({
       TableName: "InPlayer-Videos",
       Key: { videoId },
-      UpdateExpression:
-        "SET title = :title, description = :description, category = :category",
-      ExpressionAttributeValues: {
-        ":title": title.trim(),
-        ":description": description?.trim() || "",
-        ":category": category.trim(),
-      },
+      UpdateExpression: `SET ${sets.join(", ")}`,
+      ExpressionAttributeValues: values,
     })
   );
 

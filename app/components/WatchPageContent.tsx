@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
+import { fetchAuthSession } from "aws-amplify/auth";
 import {
   Maximize2,
   Minimize2,
@@ -22,6 +23,7 @@ import AddToPlaylistButton from "@/app/components/AddToPlaylistButton";
 import DescriptionBox from "@/app/components/DescriptionBox";
 import CommentSection from "@/app/components/CommentSection";
 import AnimatedCounter from "@/app/components/AnimatedCounter";
+import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { formatTimeAgo, formatViews } from "@/app/lib/formatters";
 
 interface VideoData {
@@ -62,10 +64,56 @@ interface WatchPageContentProps {
 
 export default function WatchPageContent({
   video,
-  relatedVideos,
+  relatedVideos: initialRelatedVideos,
 }: WatchPageContentProps) {
+  const { signedIn } = useAuthModal();
   const [theaterMode, setTheaterMode] = useState(false);
   const [ageConfirmed, setAgeConfirmed] = useState(false);
+  // Seeded with the server-rendered (category-matched, videos-only) list so
+  // there's never an empty flash — replaced in place once the personalized
+  // fetch below resolves, for signed-in viewers with enough watch history
+  // to personalize from.
+  const [relatedVideos, setRelatedVideos] = useState(initialRelatedVideos);
+
+  // Personalize "Up Next" toward what this viewer actually watches (real
+  // watch-history signal, not a static category match) — same idea as
+  // YouTube's related list. Silently keeps the server-rendered fallback on
+  // any failure or for signed-out viewers, so this can never show broken
+  // or empty where the SSR list already had content.
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadPersonalized() {
+      try {
+        let headers: HeadersInit = {};
+
+        if (signedIn) {
+          const session = await fetchAuthSession();
+          const idToken = session.tokens?.idToken?.toString();
+          if (idToken) headers = { Authorization: `Bearer ${idToken}` };
+        }
+
+        const res = await fetch(
+          `/api/videos/related?excludeVideoId=${encodeURIComponent(video.videoId)}&category=${encodeURIComponent(video.category)}`,
+          { headers }
+        );
+        if (!res.ok) return;
+
+        const data = await res.json();
+        if (!cancelled && Array.isArray(data.videos) && data.videos.length > 0) {
+          setRelatedVideos(data.videos);
+        }
+      } catch (err) {
+        console.error("Failed to load personalized related videos:", err);
+      }
+    }
+
+    loadPersonalized();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [video.videoId, video.category, signedIn]);
 
   const commentsOn = video.commentsEnabled !== false;
   const showPlayer = !video.ageRestricted || ageConfirmed;
@@ -94,10 +142,10 @@ export default function WatchPageContent({
       </div>
 
       <div
-        className={`grid grid-cols-1 gap-5 lg:gap-8 transition-all duration-500 ${
+        className={`grid grid-cols-1 gap-5 lg:gap-6 transition-all duration-500 ${
           theaterMode
             ? "lg:grid-cols-1"
-            : "lg:grid-cols-[minmax(0,1fr)_380px]"
+            : "lg:grid-cols-[minmax(0,1fr)_360px]"
         }`}
       >
         {/* Left column — player + info */}
@@ -201,14 +249,16 @@ export default function WatchPageContent({
               )}
             </div>
 
-            {/* Channel identity + actions */}
+            {/* Channel identity + actions — desktop/tablet (sm and up).
+                Mobile gets its own two-row layout right below: same
+                components, just repositioned (see comment there). */}
             <div
               className="
-                animate-fade-in-up mt-4 rounded-3xl border border-white/[0.08] light:border-black/[0.10]
+                animate-fade-in-up mt-4 hidden rounded-3xl border border-white/[0.08] light:border-black/[0.10]
                 bg-gradient-to-br from-white/[0.05] to-white/[0.01] light:from-black/[0.04] light:to-transparent
                 p-3 backdrop-blur-xl
                 shadow-[0_25px_70px_-25px_rgba(0,0,0,.4)]
-                lg:mt-4
+                sm:block lg:mt-4
               "
               style={{ animationDelay: "150ms" }}
             >
@@ -257,6 +307,67 @@ export default function WatchPageContent({
                     />
                   )}
                 </div>
+              </div>
+            </div>
+
+            {/* Channel identity + actions — mobile only. Same components as
+                the desktop card above, just repositioned into two rows:
+                row 1 is avatar+name on the left with the action icons on
+                the right (same row, split), row 2 is the In-Family button
+                (which already carries its own notification bell) on its
+                own. Videos only — this component is never used on Shorts. */}
+            <div
+              className="
+                animate-fade-in-up mt-4 space-y-2.5 rounded-3xl border border-white/[0.08] light:border-black/[0.10]
+                bg-gradient-to-br from-white/[0.05] to-white/[0.01] light:from-black/[0.04] light:to-transparent
+                p-3 backdrop-blur-xl
+                shadow-[0_25px_70px_-25px_rgba(0,0,0,.4)]
+                sm:hidden
+              "
+              style={{ animationDelay: "150ms" }}
+            >
+              {/* Row 1: avatar + name (left) — action icons (right) */}
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <div className="relative flex-shrink-0">
+                    <div className="absolute -inset-[2px] rounded-full bg-gradient-to-br from-orange-400 via-amber-300 to-orange-500 opacity-80 blur-[3px]" />
+                    <div className="relative h-9 w-9 overflow-hidden rounded-full ring-2 ring-[#050816] light:ring-[#F4ECDA]">
+                      <img
+                        src={video.uploaderAvatarUrl || "/avatars/avatar.png"}
+                        alt={video.uploaderName}
+                        className="h-full w-full object-cover"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="min-w-0">
+                    <p className="truncate font-bold leading-tight text-white light:text-slate-900">
+                      {video.uploaderName}
+                    </p>
+                    <p className="text-xs text-slate-400 light:text-slate-600">
+                      Creator
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex flex-shrink-0 flex-wrap items-center justify-end gap-1.5">
+                  <LikeButton videoId={video.videoId} />
+                  <ShareButton videoId={video.videoId} title={video.title} />
+                  <WatchLaterButton videoId={video.videoId} />
+                  <AddToPlaylistButton videoId={video.videoId} />
+                  {video.contentType !== "short" && (
+                    <DownloadButton
+                      videoId={video.videoId}
+                      initialStatus={video.downloadStatus || "unavailable"}
+                      initialRenditions={video.downloadRenditions || {}}
+                    />
+                  )}
+                </div>
+              </div>
+
+              {/* Row 2: In-Family (subscribe) + its notification bell */}
+              <div className="border-t border-white/[0.06] light:border-black/[0.08] pt-2.5">
+                <SubscribeButton creatorId={video.uploaderId} />
               </div>
             </div>
 

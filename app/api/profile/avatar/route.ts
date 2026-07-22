@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
 
+const DEFAULT_SOCIAL_LINKS = { social: {}, other: [] };
+
+// This is the one place AuthProvider's refreshUser() reads on every app
+// load to bootstrap the shared user object — so alongside the avatar it
+// also returns the handful of other InPlayer-Users fields the client
+// needs everywhere (username, privacy, social links), rather than making
+// every page fetch a second endpoint just to know "do I have a username
+// yet."
 export async function GET(request: NextRequest) {
   let user;
 
@@ -19,7 +27,12 @@ export async function GET(request: NextRequest) {
     })
   );
 
-  return NextResponse.json({ avatarUrl: result.Item?.avatarUrl || null });
+  return NextResponse.json({
+    avatarUrl: result.Item?.avatarUrl || null,
+    username: result.Item?.username || null,
+    usernamePrivacy: result.Item?.usernamePrivacy || "public",
+    socialLinks: result.Item?.socialLinks || DEFAULT_SOCIAL_LINKS,
+  });
 }
 
 export async function POST(request: NextRequest) {
@@ -46,13 +59,19 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // UpdateCommand, not PutCommand — this item also carries username,
+  // usernamePrivacy, and socialLinks (see app/api/username and
+  // app/api/profile/settings). A Put here would silently replace the
+  // whole item and wipe those out every time someone just changes their
+  // photo.
   await docClient.send(
-    new PutCommand({
+    new UpdateCommand({
       TableName: "InPlayer-Users",
-      Item: {
-        userId: user.userId,
-        avatarUrl,
-        updatedAt: new Date().toISOString(),
+      Key: { userId: user.userId },
+      UpdateExpression: "SET avatarUrl = :avatarUrl, updatedAt = :updatedAt",
+      ExpressionAttributeValues: {
+        ":avatarUrl": avatarUrl,
+        ":updatedAt": new Date().toISOString(),
       },
     })
   );

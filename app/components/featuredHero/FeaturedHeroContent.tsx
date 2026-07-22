@@ -21,14 +21,14 @@ export default function FeaturedHeroContent({
         flex-col
         justify-end
 
-        pt-3
-        pb-3
+        pt-4
+        pb-4
 
-        sm:pt-4
-        sm:pb-4
+        sm:pt-5
+        sm:pb-5
 
-        md:pt-5
-        md:pb-5
+        md:pt-6
+        md:pb-6
 
         lg:justify-center
         lg:pt-0
@@ -39,8 +39,7 @@ export default function FeaturedHeroContent({
 
       <div
         className="
-          mb-2
-          lg:mb-3
+          mb-3
           inline-flex
           w-fit
           items-center
@@ -48,10 +47,8 @@ export default function FeaturedHeroContent({
           border
           border-orange-400/40
           bg-orange-500/10
-          px-2.5
-          py-1
-          lg:px-3
-          lg:py-1.5
+          px-3
+          py-1.5
           backdrop-blur-xl
         "
       >
@@ -97,7 +94,7 @@ export default function FeaturedHeroContent({
 
       <div
         key={`${slide.id}-creator`}
-        className="animate-hero-fade-up mt-2 lg:mt-3 flex items-center gap-1.5"
+        className="animate-hero-fade-up mt-3 flex items-center gap-1.5"
       >
         <span className="text-sm font-semibold text-white">
           by {slide.isHandle && "@"}
@@ -113,7 +110,7 @@ export default function FeaturedHeroContent({
 
       <p
         key={`${slide.id}-stats`}
-        className="animate-hero-fade-up mt-1.5 lg:mt-2 text-[11px] text-slate-300"
+        className="animate-hero-fade-up mt-2 text-[11px] text-slate-300"
       >
         {slide.views} <span className="text-orange-400">•</span>{" "}
         {slide.duration}
@@ -121,7 +118,7 @@ export default function FeaturedHeroContent({
 
       {/* Buttons */}
 
-      <div className="mt-3 lg:mt-5">
+      <div className="mt-5">
         <FeaturedHeroButtons />
       </div>
     </div>

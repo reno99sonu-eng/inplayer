@@ -2,7 +2,21 @@ import { NextRequest, NextResponse } from "next/server";
 import { GetCommand, PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
-import { PAYOUTS_TABLE, PAYOUT_FREQUENCIES } from "@/app/lib/creatorPayouts";
+import {
+  PAYOUTS_TABLE,
+  PAYOUT_FREQUENCIES,
+  MIN_PAYOUT_AMOUNT_DEFAULT,
+  MIN_PAYOUT_AMOUNT_BOUNDS,
+} from "@/app/lib/creatorPayouts";
+
+function isValidMinPayoutAmount(value: unknown): value is number {
+  return (
+    typeof value === "number" &&
+    Number.isFinite(value) &&
+    value >= MIN_PAYOUT_AMOUNT_BOUNDS.min &&
+    value <= MIN_PAYOUT_AMOUNT_BOUNDS.max
+  );
+}
 
 // Deliberately does NOT accept a bank account number or IFSC code. Real
 // bank-account linking belongs to Razorpay's own onboarding flow (Razorpay
@@ -22,10 +36,22 @@ export async function POST(request: NextRequest) {
   const body = await request.json();
   const { action } = body;
 
-  if (action === "update_frequency") {
-    const { payoutFrequency } = body;
-    if (!PAYOUT_FREQUENCIES.includes(payoutFrequency)) {
+  // Updates the verified creator's own payout schedule — how often
+  // (payoutFrequency) and the minimum balance to wait for first
+  // (minPayoutAmount). Either field may be sent alone or together.
+  if (action === "update_frequency" || action === "update_payout_prefs") {
+    const { payoutFrequency, minPayoutAmount } = body;
+
+    if (payoutFrequency !== undefined && !PAYOUT_FREQUENCIES.includes(payoutFrequency)) {
       return NextResponse.json({ error: "Invalid payout frequency." }, { status: 400 });
+    }
+    if (minPayoutAmount !== undefined && !isValidMinPayoutAmount(minPayoutAmount)) {
+      return NextResponse.json(
+        {
+          error: `Minimum payout amount must be between ₹${MIN_PAYOUT_AMOUNT_BOUNDS.min} and ₹${MIN_PAYOUT_AMOUNT_BOUNDS.max}.`,
+        },
+        { status: 400 }
+      );
     }
 
     try {
@@ -34,22 +60,35 @@ export async function POST(request: NextRequest) {
       );
       if (!existing.Item) {
         return NextResponse.json(
-          { error: "Submit KYC before setting a payout frequency." },
+          { error: "Submit KYC before setting up your payout schedule." },
           { status: 400 }
         );
       }
 
-      await docClient.send(
-        new UpdateCommand({
-          TableName: PAYOUTS_TABLE,
-          Key: { userId: user.userId },
-          UpdateExpression: "SET payoutFrequency = :f",
-          ExpressionAttributeValues: { ":f": payoutFrequency },
-        })
-      );
+      const sets: string[] = [];
+      const values: Record<string, unknown> = {};
+      if (payoutFrequency !== undefined) {
+        sets.push("payoutFrequency = :f");
+        values[":f"] = payoutFrequency;
+      }
+      if (minPayoutAmount !== undefined) {
+        sets.push("minPayoutAmount = :m");
+        values[":m"] = minPayoutAmount;
+      }
+
+      if (sets.length > 0) {
+        await docClient.send(
+          new UpdateCommand({
+            TableName: PAYOUTS_TABLE,
+            Key: { userId: user.userId },
+            UpdateExpression: `SET ${sets.join(", ")}`,
+            ExpressionAttributeValues: values,
+          })
+        );
+      }
       return NextResponse.json({ success: true });
     } catch (err) {
-      console.error("Failed to update payout frequency:", err);
+      console.error("Failed to update payout schedule:", err);
       return NextResponse.json(
         { error: "Couldn't save that right now. Please try again." },
         { status: 500 }
@@ -66,6 +105,7 @@ export async function POST(request: NextRequest) {
     state,
     pincode,
     payoutFrequency,
+    minPayoutAmount,
   } = body;
 
   if (!legalName?.trim() || !panNumber?.trim() || !addressLine1?.trim() ||
@@ -87,6 +127,14 @@ export async function POST(request: NextRequest) {
   if (payoutFrequency && !PAYOUT_FREQUENCIES.includes(payoutFrequency)) {
     return NextResponse.json({ error: "Invalid payout frequency." }, { status: 400 });
   }
+  if (minPayoutAmount !== undefined && !isValidMinPayoutAmount(minPayoutAmount)) {
+    return NextResponse.json(
+      {
+        error: `Minimum payout amount must be between ₹${MIN_PAYOUT_AMOUNT_BOUNDS.min} and ₹${MIN_PAYOUT_AMOUNT_BOUNDS.max}.`,
+      },
+      { status: 400 }
+    );
+  }
 
   try {
     await docClient.send(
@@ -102,6 +150,9 @@ export async function POST(request: NextRequest) {
           state: state.trim(),
           pincode: pincode.trim(),
           payoutFrequency: payoutFrequency || "monthly",
+          minPayoutAmount: isValidMinPayoutAmount(minPayoutAmount)
+            ? minPayoutAmount
+            : MIN_PAYOUT_AMOUNT_DEFAULT,
           submittedAt: new Date().toISOString(),
         },
       })

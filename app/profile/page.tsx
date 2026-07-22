@@ -1,11 +1,39 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
-import { ArrowLeft, Crown, Camera, Loader2 } from "lucide-react";
+import { ReactNode, useEffect, useRef, useState } from "react";
+import {
+  ArrowLeft,
+  Crown,
+  Camera,
+  Loader2,
+  AtSign,
+  Check,
+  X,
+  Globe,
+  Lock,
+  UserCheck,
+  Link2,
+  Plus,
+} from "lucide-react";
 import { fetchAuthSession, updateUserAttributes } from "aws-amplify/auth";
-import { useAuthModal } from "@/app/components/auth/AuthProvider";
+import { useAuthModal, UsernamePrivacy } from "@/app/components/auth/AuthProvider";
 import { compressImage } from "@/app/lib/imageCompress";
+import { isValidUsernameFormat } from "@/app/lib/username";
+
+const SOCIAL_PLATFORMS = [
+  { key: "instagram", label: "Instagram", placeholder: "instagram.com/yourname" },
+  { key: "youtube", label: "YouTube", placeholder: "youtube.com/@yourname" },
+  { key: "x", label: "X (Twitter)", placeholder: "x.com/yourname" },
+  { key: "facebook", label: "Facebook", placeholder: "facebook.com/yourname" },
+  { key: "tiktok", label: "TikTok", placeholder: "tiktok.com/@yourname" },
+] as const;
+
+const PRIVACY_OPTIONS: { value: UsernamePrivacy; label: string; desc: string; icon: ReactNode }[] = [
+  { value: "public", label: "Public", desc: "Anyone can view your full profile", icon: <Globe size={15} /> },
+  { value: "connections", label: "Connections", desc: "Only people you're mutually In-Family with", icon: <UserCheck size={15} /> },
+  { value: "private", label: "Private", desc: "Only you can see your full profile", icon: <Lock size={15} /> },
+];
 
 export default function ProfilePage() {
   const router = useRouter();
@@ -119,6 +147,186 @@ export default function ProfilePage() {
       setError("Couldn't save your name. Please try again.");
     } finally {
       setSavingName(false);
+    }
+  };
+
+  // ---- Username (handle) ----
+  const [usernameDraft, setUsernameDraft] = useState("");
+  const [usernameCheck, setUsernameCheck] = useState<{
+    status: "idle" | "checking" | "available" | "unavailable" | "invalid";
+    reason?: string;
+    suggestions?: string[];
+  }>({ status: "idle" });
+  const [savingUsername, setSavingUsername] = useState(false);
+  const [usernameSaved, setUsernameSaved] = useState(false);
+  const [usernameError, setUsernameError] = useState<string | null>(null);
+
+  // Seed the draft once the real handle loads (avoids a flash of an empty
+  // field before useAuthModal's user object is populated).
+  useEffect(() => {
+    if (user?.handle) setUsernameDraft(user.handle);
+  }, [user?.handle]);
+
+  // Live availability check, debounced — mirrors the "checking as you
+  // type, with alternatives if taken" flow the user asked for.
+  useEffect(() => {
+    const trimmed = usernameDraft.trim();
+
+    if (!trimmed || trimmed === user?.handle) {
+      setUsernameCheck({ status: "idle" });
+      return;
+    }
+    if (!isValidUsernameFormat(trimmed)) {
+      setUsernameCheck({
+        status: "invalid",
+        reason: "3-20 characters, starting with a letter — letters, numbers, and underscores only.",
+      });
+      return;
+    }
+
+    let cancelled = false;
+    setUsernameCheck({ status: "checking" });
+
+    const timer = setTimeout(async () => {
+      try {
+        const session = await fetchAuthSession();
+        const idToken = session.tokens?.idToken?.toString();
+        const res = await fetch(`/api/username/check?username=${encodeURIComponent(trimmed)}`, {
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+        const data = await res.json();
+        if (cancelled) return;
+        setUsernameCheck({
+          status: data.available ? "available" : "unavailable",
+          reason: data.reason,
+          suggestions: data.suggestions,
+        });
+      } catch (err) {
+        console.error("Username check failed:", err);
+        if (!cancelled) setUsernameCheck({ status: "idle" });
+      }
+    }, 500);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [usernameDraft, user?.handle]);
+
+  const handleSaveUsername = async () => {
+    const trimmed = usernameDraft.trim();
+    if (!trimmed || usernameCheck.status !== "available") return;
+
+    setSavingUsername(true);
+    setUsernameError(null);
+
+    try {
+      const session = await fetchAuthSession();
+      const idToken = session.tokens?.idToken?.toString();
+      const res = await fetch("/api/username", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ username: trimmed }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setUsernameError(data.error || "Couldn't save your username.");
+        return;
+      }
+
+      await refreshUser();
+      setUsernameCheck({ status: "idle" });
+      setUsernameSaved(true);
+      setTimeout(() => setUsernameSaved(false), 2000);
+    } catch (err) {
+      console.error("Failed to save username:", err);
+      setUsernameError("Something went wrong. Please try again.");
+    } finally {
+      setSavingUsername(false);
+    }
+  };
+
+  // ---- Privacy ----
+  const [savingPrivacy, setSavingPrivacy] = useState(false);
+
+  const handlePrivacyChange = async (value: UsernamePrivacy) => {
+    if (value === user?.usernamePrivacy || savingPrivacy) return;
+
+    setSavingPrivacy(true);
+    try {
+      const session = await fetchAuthSession();
+      const idToken = session.tokens?.idToken?.toString();
+      await fetch("/api/profile/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ action: "update_privacy", usernamePrivacy: value }),
+      });
+      await refreshUser();
+    } catch (err) {
+      console.error("Failed to update privacy:", err);
+    } finally {
+      setSavingPrivacy(false);
+    }
+  };
+
+  // ---- Social links (two sections: fixed platforms + freeform "other") ----
+  const [socialDraft, setSocialDraft] = useState<Record<string, string>>({});
+  const [otherLinksDraft, setOtherLinksDraft] = useState<{ label: string; url: string }[]>([]);
+  const [savingLinks, setSavingLinks] = useState(false);
+  const [linksSaved, setLinksSaved] = useState(false);
+  const [linksError, setLinksError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user?.socialLinks) {
+      setSocialDraft(user.socialLinks.social || {});
+      setOtherLinksDraft(user.socialLinks.other || []);
+    }
+  }, [user?.socialLinks]);
+
+  const updateOtherLink = (index: number, field: "label" | "url", value: string) => {
+    setOtherLinksDraft((prev) =>
+      prev.map((entry, i) => (i === index ? { ...entry, [field]: value } : entry))
+    );
+  };
+  const addOtherLink = () => {
+    if (otherLinksDraft.length >= 5) return;
+    setOtherLinksDraft((prev) => [...prev, { label: "", url: "" }]);
+  };
+  const removeOtherLink = (index: number) => {
+    setOtherLinksDraft((prev) => prev.filter((_, i) => i !== index));
+  };
+
+  const handleSaveLinks = async () => {
+    setSavingLinks(true);
+    setLinksError(null);
+    try {
+      const session = await fetchAuthSession();
+      const idToken = session.tokens?.idToken?.toString();
+      const res = await fetch("/api/profile/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({
+          action: "update_social_links",
+          social: socialDraft,
+          other: otherLinksDraft.filter((l) => l.label.trim() || l.url.trim()),
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setLinksError(data.error || "Couldn't save your links.");
+        return;
+      }
+
+      await refreshUser();
+      setLinksSaved(true);
+      setTimeout(() => setLinksSaved(false), 2000);
+    } catch (err) {
+      console.error("Failed to save links:", err);
+      setLinksError("Something went wrong. Please try again.");
+    } finally {
+      setSavingLinks(false);
     }
   };
 
@@ -294,6 +502,209 @@ export default function ProfilePage() {
             "
           >
             {savingName ? "Saving..." : saved ? "Saved ✓" : "Save Changes"}
+          </button>
+        </div>
+
+        {/* Username */}
+        <div className="mt-8 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.02] light:bg-black/[0.02] p-5">
+          <h2 className="flex items-center gap-2 text-sm font-black text-white light:text-slate-900">
+            <AtSign size={16} className="text-orange-400" />
+            Username
+          </h2>
+          <p className="mt-1 text-xs text-slate-400 light:text-slate-600">
+            Your handle — how people find and message you across InPlayer.
+          </p>
+
+          <div className="mt-4">
+            <div className="relative">
+              <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">
+                @
+              </span>
+              <input
+                value={usernameDraft}
+                onChange={(e) => setUsernameDraft(e.target.value.replace(/\s/g, ""))}
+                placeholder="yourname"
+                className="w-full rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] py-3 pl-8 pr-4 text-white light:text-slate-900 caret-orange-400 outline-none transition focus:border-orange-400/50"
+              />
+            </div>
+
+            <div className="mt-2 min-h-[18px] text-xs">
+              {usernameCheck.status === "checking" && (
+                <span className="flex items-center gap-1.5 text-slate-500">
+                  <Loader2 size={12} className="animate-spin" /> Checking availability...
+                </span>
+              )}
+              {usernameCheck.status === "available" && (
+                <span className="flex items-center gap-1.5 text-emerald-400">
+                  <Check size={12} /> @{usernameDraft.trim()} is available
+                </span>
+              )}
+              {(usernameCheck.status === "unavailable" || usernameCheck.status === "invalid") && (
+                <div>
+                  <span className="flex items-center gap-1.5 text-red-400">
+                    <X size={12} /> {usernameCheck.reason || "That username isn't available."}
+                  </span>
+                  {!!usernameCheck.suggestions?.length && (
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                      {usernameCheck.suggestions.map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => setUsernameDraft(s)}
+                          className="rounded-full border border-orange-400/30 bg-orange-500/10 px-2.5 py-1 text-[11px] font-semibold text-orange-300 light:text-orange-700 transition hover:bg-orange-500/20"
+                        >
+                          @{s}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+              {user?.handle && usernameCheck.status === "idle" && usernameDraft.trim() === user.handle && (
+                <span className="text-slate-500">This is your current username.</span>
+              )}
+            </div>
+
+            {usernameError && (
+              <p className="mt-2 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-300 light:text-red-700">
+                {usernameError}
+              </p>
+            )}
+
+            <button
+              onClick={handleSaveUsername}
+              disabled={savingUsername || usernameCheck.status !== "available"}
+              className="mt-3 w-full rounded-2xl bg-gradient-to-r from-orange-500 to-amber-400 py-3 text-sm font-bold text-white transition hover:scale-[1.01] disabled:opacity-40 disabled:hover:scale-100"
+            >
+              {savingUsername ? "Saving..." : usernameSaved ? "Saved ✓" : "Save Username"}
+            </button>
+          </div>
+
+          {/* Privacy */}
+          <div className="mt-6 border-t border-white/10 light:border-black/10 pt-5">
+            <h3 className="text-xs font-bold uppercase tracking-[0.15em] text-slate-400 light:text-slate-600">
+              Who can see your full profile
+            </h3>
+            <div className="mt-2.5 grid grid-cols-1 gap-2 sm:grid-cols-3">
+              {PRIVACY_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => handlePrivacyChange(opt.value)}
+                  disabled={savingPrivacy}
+                  className={`flex flex-col items-start gap-1 rounded-2xl border px-3.5 py-3 text-left transition-all disabled:opacity-60 ${
+                    (user?.usernamePrivacy || "public") === opt.value
+                      ? "border-orange-400/50 bg-orange-500/10 text-orange-300 light:text-orange-700"
+                      : "border-white/10 light:border-black/10 text-slate-400 light:text-slate-600 hover:border-white/20 light:hover:border-black/20"
+                  }`}
+                >
+                  <span className="flex items-center gap-1.5 text-sm font-bold">
+                    {opt.icon} {opt.label}
+                  </span>
+                  <span className="text-[11px] font-normal leading-snug opacity-80">{opt.desc}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Social links — two dedicated sections: fixed platforms, then
+            freeform "other" links. Shown on this user's public channel
+            (app/u/[username]) once they've set a username. */}
+        <div className="mt-6 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.02] light:bg-black/[0.02] p-5">
+          <h2 className="flex items-center gap-2 text-sm font-black text-white light:text-slate-900">
+            <Link2 size={16} className="text-orange-400" />
+            Links
+          </h2>
+          <p className="mt-1 text-xs text-slate-400 light:text-slate-600">
+            Shown on your public channel when someone opens your profile.
+          </p>
+
+          <div className="mt-4">
+            <h3 className="text-xs font-bold uppercase tracking-[0.15em] text-slate-400 light:text-slate-600">
+              Social media
+            </h3>
+            <div className="mt-2.5 space-y-2.5">
+              {SOCIAL_PLATFORMS.map((platform) => (
+                <div key={platform.key} className="flex items-center gap-2.5">
+                  <span className="w-[84px] flex-shrink-0 text-xs font-semibold text-slate-400 light:text-slate-600">
+                    {platform.label}
+                  </span>
+                  <input
+                    value={socialDraft[platform.key] || ""}
+                    onChange={(e) =>
+                      setSocialDraft((prev) => ({ ...prev, [platform.key]: e.target.value }))
+                    }
+                    placeholder={platform.placeholder}
+                    className="min-w-0 flex-1 rounded-xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] px-3.5 py-2.5 text-sm text-white light:text-slate-900 caret-orange-400 outline-none transition focus:border-orange-400/50"
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="mt-6 border-t border-white/10 light:border-black/10 pt-5">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-bold uppercase tracking-[0.15em] text-slate-400 light:text-slate-600">
+                Other links
+              </h3>
+              {otherLinksDraft.length < 5 && (
+                <button
+                  type="button"
+                  onClick={addOtherLink}
+                  className="flex items-center gap-1 text-xs font-semibold text-orange-300 light:text-orange-700"
+                >
+                  <Plus size={13} /> Add
+                </button>
+              )}
+            </div>
+
+            {otherLinksDraft.length === 0 ? (
+              <p className="mt-2 text-xs text-slate-500">
+                Add up to 5 — a website, a Discord server, anything else you want on your channel.
+              </p>
+            ) : (
+              <div className="mt-2.5 space-y-2.5">
+                {otherLinksDraft.map((entry, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <input
+                      value={entry.label}
+                      onChange={(e) => updateOtherLink(i, "label", e.target.value)}
+                      placeholder="Label"
+                      className="w-[100px] flex-shrink-0 rounded-xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] px-3 py-2.5 text-sm text-white light:text-slate-900 caret-orange-400 outline-none transition focus:border-orange-400/50"
+                    />
+                    <input
+                      value={entry.url}
+                      onChange={(e) => updateOtherLink(i, "url", e.target.value)}
+                      placeholder="yourwebsite.com"
+                      className="min-w-0 flex-1 rounded-xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] px-3 py-2.5 text-sm text-white light:text-slate-900 caret-orange-400 outline-none transition focus:border-orange-400/50"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => removeOtherLink(i)}
+                      aria-label="Remove link"
+                      className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-red-500/10 hover:text-red-400"
+                    >
+                      <X size={15} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {linksError && (
+            <p className="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-300 light:text-red-700">
+              {linksError}
+            </p>
+          )}
+
+          <button
+            onClick={handleSaveLinks}
+            disabled={savingLinks}
+            className="mt-4 w-full rounded-2xl border border-orange-400/30 bg-orange-500/10 py-3 text-sm font-bold text-orange-300 light:text-orange-700 transition hover:bg-orange-500/20 disabled:opacity-60"
+          >
+            {savingLinks ? "Saving..." : linksSaved ? "Saved ✓" : "Save Links"}
           </button>
         </div>
       </div>

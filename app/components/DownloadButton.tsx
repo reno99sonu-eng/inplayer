@@ -6,6 +6,23 @@ import { fetchAuthSession } from "aws-amplify/auth";
 import { Download, Loader2, AlertCircle } from "lucide-react";
 import { useAuthModal } from "./auth/AuthProvider";
 
+// Fire-and-forget: tallies the download into the viewer's Downloads
+// library (see app/downloads) — mirrors ShareButton's recordShare. Never
+// blocks or surfaces an error; the real file download already succeeded
+// independently of this. Signed-out downloads (allowed once renditions are
+// publicly ready) simply aren't attributable to anyone and are skipped.
+function recordDownload(videoId: string, quality: string, idToken?: string) {
+  if (!idToken) return;
+  fetch("/api/downloads", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${idToken}`,
+    },
+    body: JSON.stringify({ videoId, quality }),
+  }).catch(() => {});
+}
+
 type DownloadStatus = "unavailable" | "preparing" | "ready" | "errored";
 type Renditions = Record<string, string>;
 
@@ -112,6 +129,20 @@ export default function DownloadButton({
 
   const startDownload = (quality?: string) => {
     const q = quality ? `?quality=${encodeURIComponent(quality)}` : "";
+
+    // Fire-and-forget — never delays the actual download below.
+    if (signedIn) {
+      fetchAuthSession()
+        .then((session) =>
+          recordDownload(
+            videoId,
+            quality || "default",
+            session.tokens?.idToken?.toString()
+          )
+        )
+        .catch(() => {});
+    }
+
     // Same-origin route with Content-Disposition: attachment — the browser
     // downloads it and stays on this page, no navigation.
     window.location.href = `/api/videos/${videoId}/download${q}`;

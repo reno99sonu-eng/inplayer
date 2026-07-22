@@ -5,14 +5,15 @@ import { useSearchParams, usePathname } from "next/navigation";
 import { CONTENT_CATEGORIES } from "../data/categories";
 
 // The first two chips are ORIENTATION toggles that drive the home feed
-// (Horizontal = normal 16:9 videos, Vertical = Shorts). They replace the
-// old single "All" chip. Everything after them is a topical content
+// (value "horizontal" = normal 16:9 videos, value "vertical" = Shorts).
+// Displayed as "All" / "Verticals" per the current naming pass — the
+// underlying ?view= values are unchanged so nothing downstream needs to
+// know about the label swap. Everything after them is a topical content
 // category (shared with the upload form via CONTENT_CATEGORIES) that
-// filters the /videos listing. "Verticals" was dropped since the new
-// "Vertical" orientation toggle now covers that meaning directly.
+// filters the /videos listing.
 const orientationTabs = [
-  { label: "Horizontal", value: "horizontal" },
-  { label: "Vertical", value: "vertical" },
+  { label: "All", value: "horizontal" },
+  { label: "Verticals", value: "vertical" },
 ];
 
 const categories = CONTENT_CATEGORIES;

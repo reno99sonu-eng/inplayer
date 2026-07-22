@@ -3,22 +3,18 @@
 import { useEffect } from "react";
 import { fetchAuthSession } from "aws-amplify/auth";
 import { useAuthModal } from "./auth/AuthProvider";
-import { useSettings } from "./settings/SettingsProvider";
 
 interface WatchHistoryRecorderProps {
   videoId: string;
 }
 
 // Renders nothing — just records "this user watched this video" once,
-// the moment the watch page loads, for signed-in users who have Watch
-// History enabled in Settings (Account & Privacy). This is the real,
-// working effect of that toggle: turn it off and nothing gets recorded.
+// the moment the watch page loads, for signed-in users.
 export default function WatchHistoryRecorder({ videoId }: WatchHistoryRecorderProps) {
   const { signedIn } = useAuthModal();
-  const { privacy, ready } = useSettings();
 
   useEffect(() => {
-    if (!signedIn || !ready || !privacy.watchHistory) return;
+    if (!signedIn) return;
 
     async function record() {
       try {
@@ -39,7 +35,7 @@ export default function WatchHistoryRecorder({ videoId }: WatchHistoryRecorderPr
     }
 
     record();
-  }, [videoId, signedIn, ready, privacy.watchHistory]);
+  }, [videoId, signedIn]);
 
   return null;
 }

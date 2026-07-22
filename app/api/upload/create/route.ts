@@ -3,6 +3,7 @@ import { GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import mux, { muxErrorMessages } from "@/app/lib/mux";
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
+import { THUMBNAIL_DATA_URL_MAX_LENGTH } from "@/app/lib/imageCompress";
 
 export async function POST(request: NextRequest) {
   let user;
@@ -29,6 +30,7 @@ export async function POST(request: NextRequest) {
       ageRestricted,
       commentsEnabled,
       spokenLanguage,
+      thumbnailDataUrl,
     } = body;
 
     if (!title?.trim() || !category?.trim()) {
@@ -36,6 +38,24 @@ export async function POST(request: NextRequest) {
         { error: "Title and category are required." },
         { status: 400 }
       );
+    }
+
+    // Optional creator-supplied thumbnail. Validated defensively even
+    // though the client always sends output from compressImageToThumbnail
+    // — a request could bypass the browser entirely.
+    let customThumbnailUrl: string | null = null;
+    if (thumbnailDataUrl !== undefined && thumbnailDataUrl !== null && thumbnailDataUrl !== "") {
+      if (
+        typeof thumbnailDataUrl !== "string" ||
+        !thumbnailDataUrl.startsWith("data:image/") ||
+        thumbnailDataUrl.length > THUMBNAIL_DATA_URL_MAX_LENGTH
+      ) {
+        return NextResponse.json(
+          { error: "That thumbnail image is too large or invalid. Please try a different image." },
+          { status: 400 }
+        );
+      }
+      customThumbnailUrl = thumbnailDataUrl;
     }
 
     // Snapshot the uploader's current avatar so video/short cards can show
@@ -104,6 +124,17 @@ export async function POST(request: NextRequest) {
           uploaderAvatarUrl,
           uploadedAt: new Date().toISOString(),
           views: 0,
+          // A creator-picked thumbnail. customThumbnailUrl is the durable
+          // "did the creator set one" marker — the Mux webhook's
+          // video.asset.ready handler checks it via if_not_exists() so it
+          // never overwrites a custom thumbnail once Mux finishes
+          // processing. thumbnailUrl is set to the same value up front so
+          // the video shows the right image immediately, even while still
+          // "processing".
+          ...(customThumbnailUrl && {
+            customThumbnailUrl,
+            thumbnailUrl: customThumbnailUrl,
+          }),
           // "unavailable" for Shorts (never offered), "preparing" for
           // videos (the static renditions requested above are already in
           // flight), flips to "ready" once Mux's webhook confirms them.

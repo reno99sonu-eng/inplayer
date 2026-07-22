@@ -33,12 +33,26 @@ type AuthModal =
   | "forgot"
   | "verify";
 
+export interface SocialLinks {
+  social: Record<string, string>;
+  other: { label: string; url: string }[];
+}
+
+export type UsernamePrivacy = "public" | "private" | "connections";
+
 export interface AuthUser {
   userId: string;
+  // Cognito's own login identifier (set to the signup email) — NOT the
+  // user-chosen public handle. See `handle` below for that.
   username: string;
   name: string;
   email: string;
   avatarUrl: string | null;
+  // The real, user-chosen public @handle (app/api/username). Null until
+  // they've set one.
+  handle: string | null;
+  usernamePrivacy: UsernamePrivacy;
+  socialLinks: SocialLinks;
 }
 
 interface AuthContextType {
@@ -84,6 +98,9 @@ export default function AuthProvider({
       const attributes = await fetchUserAttributes();
 
       let avatarUrl: string | null = null;
+      let handle: string | null = null;
+      let usernamePrivacy: UsernamePrivacy = "public";
+      let socialLinks: SocialLinks = { social: {}, other: [] };
 
       try {
         const session = await fetchAuthSession();
@@ -97,6 +114,9 @@ export default function AuthProvider({
           if (res.ok) {
             const data = await res.json();
             avatarUrl = data.avatarUrl;
+            handle = data.username || null;
+            usernamePrivacy = data.usernamePrivacy || "public";
+            socialLinks = data.socialLinks || { social: {}, other: [] };
           }
         }
       } catch (err) {
@@ -109,6 +129,9 @@ export default function AuthProvider({
         name: attributes.name || currentUser.username,
         email: attributes.email || "",
         avatarUrl,
+        handle,
+        usernamePrivacy,
+        socialLinks,
       });
     } catch {
       setUser(null);

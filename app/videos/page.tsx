@@ -1,4 +1,5 @@
 import { getReadyVideos } from "@/app/lib/videoStore";
+import { searchUsersByUsername } from "@/app/lib/userSearch";
 import Link from "next/link";
 import Image from "next/image";
 import { Film } from "lucide-react";
@@ -12,6 +13,11 @@ interface VideosPageProps {
 
 export default async function VideosPage({ searchParams }: VideosPageProps) {
   const { category, search } = await searchParams;
+
+  // A search term also looks for matching creators/usernames — shown as
+  // its own row above the video grid — so the homepage search bar can
+  // find people, not just video titles.
+  const matchingUsers = search ? await searchUsersByUsername(search, 6) : [];
 
   // Shared 30-second cached list (see lib/videoStore) — no per-request
   // table Scan. Already sorted newest-first.
@@ -55,6 +61,31 @@ export default async function VideosPage({ searchParams }: VideosPageProps) {
             ? `Everything uploaded under ${category}.`
             : "Everything actually uploaded to InPlayer so far."}
       </p>
+
+      {matchingUsers.length > 0 && (
+        <div className="mt-6">
+          <h2 className="mb-3 text-sm font-black text-white light:text-slate-900">Creators</h2>
+          <div className="flex flex-wrap gap-3">
+            {matchingUsers.map((u) => (
+              <Link
+                key={u.userId}
+                href={`/u/${encodeURIComponent(u.username)}`}
+                className="flex items-center gap-2.5 rounded-full border border-white/10 light:border-black/10 bg-white/[0.02] light:bg-black/[0.02] py-2 pl-2 pr-4 transition hover:border-orange-400/40"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element -- avatar may be a data URL. */}
+                <img
+                  src={u.avatarUrl || "/avatars/avatar.png"}
+                  alt={u.username}
+                  className="h-8 w-8 flex-shrink-0 rounded-full object-cover"
+                />
+                <span className="text-sm font-semibold text-white light:text-slate-900">
+                  @{u.username}
+                </span>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
 
       {videos.length === 0 ? (
         <div className="mt-16 flex flex-col items-center justify-center text-center">

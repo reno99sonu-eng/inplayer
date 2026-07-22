@@ -14,6 +14,7 @@ import MobileMenu from "./MobileMenu";
 import NavigationCategories from "./NavigationCategories";
 import MobileSearchOverlay from "./MobileSearchOverlay";
 import { useRouter } from "next/navigation";
+import { CONTACT_EMAILS } from "@/app/lib/contactEmails";
 
 const subscribedChannels = [
   { name: "ArjunCreates", avatar: "/recommendations/avatars/1.jpg", hasNew: true },
@@ -36,19 +37,6 @@ const youItems = [
   { label: "History", href: "/history" },
   { label: "Watchlist", href: "/watchlist" },
   { label: "Downloads", href: "/downloads" },
-];
-
-// Where the Instagram/X icons used to live in the drawer footer.
-const CONTACT_EMAILS = [
-  { label: "Advertising", address: "ads@inplayer.in" },
-  { label: "Business", address: "business@inplayer.in" },
-  { label: "General contact", address: "contact@inplayer.in" },
-  { label: "Copyright", address: "copyright@inplayer.in" },
-  { label: "Corporate", address: "corporate@inplayer.in" },
-  { label: "Help", address: "help@inplayer.in" },
-  { label: "Partners", address: "partners@inplayer.in" },
-  { label: "Team", address: "team@inplayer.in" },
-  { label: "Support", address: "support@inplayer.in" },
 ];
 
 export default function Navbar() {

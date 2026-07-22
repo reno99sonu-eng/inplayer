@@ -1,6 +1,9 @@
 "use client";
 
+import { useState } from "react";
+import { Mail, ChevronDown, Copy, Check } from "lucide-react";
 import NavbarLogo from "./NavbarLogo";
+import { CONTACT_EMAILS } from "@/app/lib/contactEmails";
 
 const browse = [
   "Movies",
@@ -21,6 +24,19 @@ const company = [
 ];
 
 export default function Footer() {
+  const [contactOpen, setContactOpen] = useState(false);
+  const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
+
+  const copyEmail = async (address: string) => {
+    try {
+      await navigator.clipboard.writeText(address);
+      setCopiedEmail(address);
+      setTimeout(() => setCopiedEmail((cur) => (cur === address ? null : cur)), 1800);
+    } catch {
+      /* clipboard unavailable — the mailto: link on the row still works */
+    }
+  };
+
   return (
     <footer className="relative mt-2 overflow-hidden border-t border-orange-500/10 bg-[#050816] text-white lg:mt-6 light:border-orange-500/20 light:bg-[#FAF5E9] light:text-slate-900">
 
@@ -117,6 +133,78 @@ export default function Footer() {
 
           </div>
 
+        </div>
+
+        {/* Contact Us — a clearly-visible button (not just a text link) that
+            opens every @inplayer.in support address right here in the
+            footer, each with one-tap copy. Same data/interaction as the
+            Navbar mobile drawer's contact panel, via app/lib/contactEmails. */}
+        <div className="mt-3 border-t border-white/10 pt-3 lg:mt-5 lg:pt-4 light:border-slate-200">
+          <button
+            type="button"
+            onClick={() => setContactOpen((v) => !v)}
+            aria-expanded={contactOpen}
+            className="
+              inline-flex items-center gap-2 rounded-full
+              bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A]
+              px-5 py-2.5 text-xs font-bold text-white
+              shadow-[0_10px_25px_rgba(255,153,0,.25)]
+              transition-all duration-300 hover:-translate-y-0.5
+            "
+          >
+            <Mail size={14} />
+            Contact Us
+            <ChevronDown
+              size={14}
+              className={`transition-transform duration-300 ${
+                contactOpen ? "rotate-180" : ""
+              }`}
+            />
+          </button>
+
+          <div
+            className={`grid overflow-hidden transition-all duration-300 ${
+              contactOpen ? "grid-rows-[1fr] opacity-100 mt-3" : "grid-rows-[0fr] opacity-0"
+            }`}
+          >
+            <div className="min-h-0 grid grid-cols-1 gap-1.5 sm:grid-cols-2 xl:grid-cols-3">
+              {CONTACT_EMAILS.map(({ label, address }) => (
+                <div
+                  key={address}
+                  className="
+                    flex items-center justify-between gap-2 rounded-lg px-2.5 py-2
+                    transition hover:bg-white/5 light:hover:bg-black/5
+                  "
+                >
+                  <a
+                    href={`mailto:${address}`}
+                    className="min-w-0 flex-1"
+                    title={`Email ${label.toLowerCase()}`}
+                  >
+                    <span className="block text-[10px] uppercase tracking-wide text-slate-500">
+                      {label}
+                    </span>
+                    <span className="block truncate text-xs font-medium text-slate-200 light:text-slate-700">
+                      {address}
+                    </span>
+                  </a>
+
+                  <button
+                    onClick={() => copyEmail(address)}
+                    title="Copy address"
+                    aria-label={`Copy ${address}`}
+                    className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-slate-500 transition hover:bg-white/10 light:hover:bg-black/10 hover:text-orange-300 light:hover:text-orange-600"
+                  >
+                    {copiedEmail === address ? (
+                      <Check size={13} className="text-emerald-400" />
+                    ) : (
+                      <Copy size={13} />
+                    )}
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
         {/* Bottom */}

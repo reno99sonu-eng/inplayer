@@ -34,6 +34,49 @@ interface VideoPlayerProps {
 const TAP_CHAIN_MS = 400;
 const SEEK_STEP_SECONDS = 10;
 
+// ---------------------------------------------------------------------
+// Mux Player theme colors + a targeted fix for two things its own default
+// theme does that globals.css's `.premium-player` rules can't reach:
+//
+// 1) The control bar background. Mux's compiled default theme (see
+//    node_modules/@mux/mux-player-react/.../mux-player.mjs) sets, inside
+//    its OWN shadow root:
+//      --media-control-background: var(--_secondary-color);
+//      --_secondary-color: var(--media-secondary-color, transparent);
+//    That re-declaration lives closer to the control-bar buttons than
+//    anything `.premium-player` sets from outside, so it wins regardless
+//    of globals.css. Since this app never passed a `secondaryColor` prop,
+//    `--media-secondary-color` fell through to globals.css's own
+//    `--media-secondary-color: #ffb454` (an amber accent meant only for
+//    hover highlights) — which is why the whole bar rendered amber/orange
+//    instead of the intended dark surface. Passing `secondaryColor`
+//    explicitly (same mechanism as the accentColor/primaryColor props
+//    already below) fixes it at the source.
+// 2) The quality/captions/audio-track/playback-rate submenu backgrounds.
+//    That same compiled theme separately force-resets, again inside its
+//    own shadow root:
+//      media-rendition-menu, media-captions-menu, media-audio-track-menu,
+//      media-playback-rate-menu { --media-menu-background: var(--_primary-color); }
+//    which is why the quality picker rendered Mux's plain white default
+//    no matter what `.premium-player` declared — those four menus don't
+//    read --media-menu-background from outside the theme's own shadow
+//    tree at all. There's no component prop for this one (primaryColor
+//    also drives icon color, so changing it would fix the menu but turn
+//    every icon invisible), so the effect below sets the same properties
+//    inline, directly on each menu element, once the player has mounted —
+//    an inline style on the element itself outranks the theme's own
+//    tag-name selector rule for the exact same property.
+// Both fixes were confirmed against the real installed media-chrome/
+// mux-player packages by inspecting computed styles before/after, not
+// guessed from the docs.
+const PLAYER_ACCENT_COLOR = "#EA580C";
+const PLAYER_ICON_COLOR = "#FFFFFF";
+const PLAYER_DARK_SURFACE = "rgba(9, 17, 31, 0.98)";
+const PLAYER_MENU_TEXT_COLOR = "#f1f5f9";
+const PLAYER_MENU_HOVER_BACKGROUND = "rgba(255, 154, 0, 0.16)";
+const PLAYER_MENU_CHECKED_BACKGROUND = "rgba(255, 154, 0, 0.24)";
+const PLAYER_MENU_HOVER_OUTLINE = "rgba(255, 154, 0, 0.5) solid 1px";
+
 // Netflix/YouTube-style vertical swipe on the video surface: left half
 // adjusts brightness, right half adjusts volume, like every mainstream
 // mobile video app. Distinguished from the tap-seek gestures above by
@@ -185,6 +228,59 @@ export default function VideoPlayer({
   useEffect(() => {
     if (!isFullscreen) setLocked(false);
   }, [isFullscreen]);
+
+  // Theme the quality/captions/audio-track/playback-rate submenus — see the
+  // big comment above PLAYER_ACCENT_COLOR for why this can't be done with a
+  // component prop or a plain globals.css rule. These menu elements exist
+  // in the DOM from first mount (just hidden until opened), so one pass
+  // right after mount is enough; a short retry loop only covers the rare
+  // case where the custom element's shadow tree hasn't upgraded yet on the
+  // very first tick.
+  useEffect(() => {
+    const applyMenuTheme = () => {
+      const muxEl = playerRef.current as unknown as HTMLElement | null;
+      const themeEl = muxEl?.shadowRoot?.querySelector(
+        "media-theme"
+      ) as HTMLElement | null;
+      const controller = themeEl?.shadowRoot?.querySelector(
+        "media-controller"
+      ) as HTMLElement | null;
+      if (!controller) return false;
+
+      const menus = controller.querySelectorAll(
+        "media-rendition-menu, media-captions-menu, media-audio-track-menu, media-playback-rate-menu"
+      );
+      if (menus.length === 0) return false;
+
+      menus.forEach((node) => {
+        const style = (node as HTMLElement).style;
+        style.setProperty("--media-menu-background", PLAYER_DARK_SURFACE);
+        style.setProperty("--media-text-color", PLAYER_MENU_TEXT_COLOR);
+        style.setProperty(
+          "--media-menu-item-hover-background",
+          PLAYER_MENU_HOVER_BACKGROUND
+        );
+        style.setProperty(
+          "--media-menu-item-checked-background",
+          PLAYER_MENU_CHECKED_BACKGROUND
+        );
+        style.setProperty(
+          "--media-menu-item-hover-outline",
+          PLAYER_MENU_HOVER_OUTLINE
+        );
+      });
+      return true;
+    };
+
+    if (applyMenuTheme()) return;
+
+    let attempts = 0;
+    const id = window.setInterval(() => {
+      attempts += 1;
+      if (applyMenuTheme() || attempts > 20) window.clearInterval(id);
+    }, 150);
+    return () => window.clearInterval(id);
+  }, []);
 
   // While CSS-fullscreen: freeze page scroll behind the player, and let
   // Esc exit (parity with real fullscreen).
@@ -631,8 +727,9 @@ export default function VideoPlayer({
           video_title: title,
         }}
         videoTitle={title}
-        accentColor="#EA580C"
-        primaryColor="#FFFFFF"
+        accentColor={PLAYER_ACCENT_COLOR}
+        primaryColor={PLAYER_ICON_COLOR}
+        secondaryColor={PLAYER_DARK_SURFACE}
         defaultHiddenCaptions={false}
         playbackRates={[0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]}
         // "any": try to autoplay WITH sound first; if the browser blocks

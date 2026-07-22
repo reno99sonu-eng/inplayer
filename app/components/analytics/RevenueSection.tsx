@@ -18,8 +18,18 @@ import {
   PayoutFrequency,
   MIN_PAYOUT_AMOUNT_DEFAULT,
   MIN_PAYOUT_AMOUNT_BOUNDS,
+  REVENUE_PER_1000_VIEWS_INR,
+  calculateRevenueBalance,
+  getNextPayoutWindow,
 } from "@/app/lib/creatorPayouts";
 import KycForm from "./KycForm";
+
+function formatInr(amount: number) {
+  return amount.toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+}
 
 export interface PayoutStatus {
   kycStatus: "not_started" | "pending_review" | "verified";
@@ -68,6 +78,18 @@ export default function RevenueSection({
   const meetsThreshold =
     subscriberCount >= ELIGIBILITY_THRESHOLD.subscribers &&
     totalViews >= ELIGIBILITY_THRESHOLD.views;
+
+  // Real number, driven by this creator's real view count — see the
+  // REVENUE_PER_1000_VIEWS_INR comment in creatorPayouts.ts for why the
+  // RATE itself is a placeholder pending a real ad/revenue-share source.
+  // `alreadyPaidOutInr` is hardcoded to 0 because no payout has ever
+  // actually gone out yet (there's no live transfer path — see the
+  // disabled "Connect bank account" button below), so lifetime accrued
+  // revenue and current balance are the same number today.
+  const revenueBalance = calculateRevenueBalance(totalViews, 0);
+  const minPayoutAmount = payoutStatus?.minPayoutAmount || MIN_PAYOUT_AMOUNT_DEFAULT;
+  const meetsPayoutThreshold = revenueBalance >= minPayoutAmount;
+  const payoutWindow = getNextPayoutWindow();
 
   const handleFrequencyChange = async (freq: PayoutFrequency) => {
     if (!payoutStatus) return;
@@ -167,14 +189,39 @@ export default function RevenueSection({
           </div>
 
           <div className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.02] light:bg-black/[0.015] p-4">
-            <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-slate-500">
-              Available balance
-            </p>
-            <p className="mt-1 text-3xl font-black text-white light:text-slate-900">₹0.00</p>
-            <p className="mt-1.5 text-xs leading-relaxed text-slate-500 light:text-slate-500">
-              Your balance updates once ad/revenue-share is connected on
-              InPlayer's side — the payout pipeline itself is ready and
-              waiting for that switch to flip on.
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-slate-500">
+                  Available balance
+                </p>
+                <p className="mt-1 text-3xl font-black text-white light:text-slate-900">
+                  ₹{formatInr(revenueBalance)}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] font-bold uppercase tracking-[0.15em] text-slate-500">
+                  Next payout window
+                </p>
+                <p
+                  className={`mt-1 text-xs font-bold ${
+                    payoutWindow.isOpenNow
+                      ? "text-emerald-400"
+                      : "text-slate-300 light:text-slate-700"
+                  }`}
+                >
+                  {payoutWindow.label}
+                </p>
+              </div>
+            </div>
+            <p className="mt-2.5 text-xs leading-relaxed text-slate-500 light:text-slate-500">
+              Calculated from your real view count at ₹{REVENUE_PER_1000_VIEWS_INR} per
+              1,000 views —{" "}
+              {meetsPayoutThreshold
+                ? `you're over your ₹${minPayoutAmount.toLocaleString("en-IN")} minimum, so this queues for transfer in the payout window above`
+                : `queues for transfer once it crosses your ₹${minPayoutAmount.toLocaleString("en-IN")} minimum below`}
+              . Actually moving money still needs a connected bank account
+              (Razorpay, below) — that switch has not been flipped on yet,
+              so no transfer goes out until then.
             </p>
           </div>
 

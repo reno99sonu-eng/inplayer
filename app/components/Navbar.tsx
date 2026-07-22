@@ -227,6 +227,11 @@ export default function Navbar() {
     </button>
   </div>
 
+  {/* Mobile / tablet logo — same animated mark as desktop */}
+  <div className="flex-shrink-0 ml-2">
+    <NavbarLogo />
+  </div>
+
 </div>
 
 {/* Right Side */}
@@ -327,7 +332,18 @@ lg:right-auto
       >
         <div className="flex h-full flex-col">
           <div className="border-b border-white/10 light:border-black/10 px-5 py-3.5">
-            <h2 className="text-lg font-black text-white light:text-slate-900">INPLAYER</h2>
+            <button
+              onClick={() => goTo("/")}
+              aria-label="INPLAYER — Home"
+              className="block transition-transform duration-300 hover:scale-[1.02] active:scale-95"
+            >
+              <img
+                src="/logos/inplayer-full.png"
+                alt="INPLAYER"
+                draggable={false}
+                className="h-7 w-auto object-contain"
+              />
+            </button>
           </div>
 
           <div className="flex-1 overflow-y-auto px-3 py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">

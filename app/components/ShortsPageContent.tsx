@@ -656,7 +656,11 @@ export default function ShortsPageContent({
           overflow-y-scroll
           overscroll-contain
           lg:h-[94vh]
-          lg:max-h-[960px]
+          lg:max-h-[900px]
+          lg:w-auto
+          lg:max-w-none
+          lg:aspect-[9/16]
+          lg:flex-none
           lg:rounded-[22px]
           lg:border
           lg:border-white/10

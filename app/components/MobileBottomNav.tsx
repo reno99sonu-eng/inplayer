@@ -96,7 +96,7 @@ export default function MobileBottomNav() {
         "
       >
         <Rss size={22} />
-        <span className="text-[11px] font-medium">In-House</span>
+        <span className="text-[11px] font-medium">In-Family</span>
       </Link>
 
       <Link

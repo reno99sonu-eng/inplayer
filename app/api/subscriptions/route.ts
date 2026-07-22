@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
 
   let isSubscribed = false;
   // Whether this subscriber wants notifications from the creator (the bell
-  // toggle on the In-House button). Defaults to true when subscribed, since
+  // toggle on the In-Family button). Defaults to true when subscribed, since
   // subscribing opts you into notifications unless you turn the bell off.
   let notifyEnabled = true;
 

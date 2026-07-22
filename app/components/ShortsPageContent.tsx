@@ -21,6 +21,7 @@ import {
 import type { Short } from "../data/shorts";
 import { useAuthModal } from "./auth/AuthProvider";
 import CommentSection from "./CommentSection";
+import { recordShare } from "./ShareButton";
 
 interface ShortsPageContentProps {
   initialShorts: Short[];
@@ -461,6 +462,7 @@ export default function ShortsPageContent({
     if (navigator.share) {
       try {
         await navigator.share({ title: short.title, url });
+        recordShare(short.videoId);
         return;
       } catch {
         return;
@@ -470,6 +472,7 @@ export default function ShortsPageContent({
     try {
       await navigator.clipboard.writeText(url);
       setCopiedId(short.id);
+      recordShare(short.videoId);
       setTimeout(() => setCopiedId(null), 2000);
     } catch (err) {
       console.error("Failed to copy link:", err);

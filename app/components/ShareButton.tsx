@@ -8,6 +8,13 @@ interface ShareButtonProps {
   title: string;
 }
 
+// Fire-and-forget: tallies the share for the creator's analytics. Never
+// blocks or surfaces an error to the person sharing — the share sheet/copy
+// already succeeded for them by the time this runs.
+export function recordShare(videoId: string) {
+  fetch(`/api/videos/${videoId}/share`, { method: "POST" }).catch(() => {});
+}
+
 export default function ShareButton({ videoId, title }: ShareButtonProps) {
   const [copied, setCopied] = useState(false);
 
@@ -19,6 +26,7 @@ export default function ShareButton({ videoId, title }: ShareButtonProps) {
     if (navigator.share) {
       try {
         await navigator.share({ title, url });
+        recordShare(videoId);
         return;
       } catch {
         // User cancelled the share sheet — not an error, just stop here
@@ -29,6 +37,7 @@ export default function ShareButton({ videoId, title }: ShareButtonProps) {
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
+      recordShare(videoId);
       setTimeout(() => setCopied(false), 2000);
     } catch (err) {
       console.error("Failed to copy link:", err);

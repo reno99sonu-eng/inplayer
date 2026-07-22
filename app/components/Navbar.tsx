@@ -331,17 +331,22 @@ lg:right-auto
         `}
       >
         <div className="flex h-full flex-col">
-          <div className="border-b border-white/10 light:border-black/10 px-5 py-3.5">
+          <div className="border-b border-white/10 light:border-black/10 px-5 py-3">
             <button
               onClick={() => goTo("/")}
               aria-label="INPLAYER — Home"
-              className="block transition-transform duration-300 hover:scale-[1.02] active:scale-95"
+              className="
+                block rounded-2xl transition-transform duration-300
+                hover:scale-[1.02] active:scale-95
+                light:bg-[#05070D] light:px-4 light:py-2.5
+                light:shadow-[0_8px_24px_rgba(0,0,0,0.28)]
+              "
             >
               <img
                 src="/logos/inplayer-full.png"
                 alt="INPLAYER"
                 draggable={false}
-                className="h-7 w-auto object-contain"
+                className="h-11 w-auto object-contain"
               />
             </button>
           </div>
@@ -411,6 +416,45 @@ lg:right-auto
               <>
                 <div className="my-3 border-t border-white/10 light:border-black/10" />
 
+            {/* You */}
+            <div>
+              <p className="mb-1 px-3 text-xs font-bold uppercase tracking-[0.25em] text-orange-300/80 light:text-orange-600/90">
+                You
+              </p>
+
+              <div className="space-y-0.5">
+                {youItems.map((item) => (
+                  <button
+                    key={item.label}
+                    onClick={() => goTo(item.href)}
+                    className="
+                      flex
+                      w-full
+                      items-center
+                      rounded-xl
+                      px-3
+                      py-2
+                      text-left
+                      text-sm
+                      text-slate-300
+                      light:text-slate-700
+                      transition-all
+                      duration-300
+                      hover:bg-white/5
+                      light:hover:bg-black/5
+                      hover:translate-x-1
+                      hover:text-orange-300
+                      light:hover:text-orange-600
+                    "
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="my-3 border-t border-white/10 light:border-black/10" />
+
                 {/* Subscriptions */}
                 <div>
                   <button
@@ -433,7 +477,7 @@ lg:right-auto
                   light:hover:text-orange-600
                 "
               >
-                In-House
+                In-Family
                 <ChevronRight size={14} />
               </button>
 
@@ -551,45 +595,6 @@ lg:right-auto
                 </span>
               </button>
             </div>
-
-            <div className="my-3 border-t border-white/10 light:border-black/10" />
-
-            {/* You */}
-            <div>
-              <p className="mb-1 px-3 text-xs font-bold uppercase tracking-[0.25em] text-orange-300/80 light:text-orange-600/90">
-                You
-              </p>
-
-              <div className="space-y-0.5">
-                {youItems.map((item) => (
-                  <button
-                    key={item.label}
-                    onClick={() => goTo(item.href)}
-                    className="
-                      flex
-                      w-full
-                      items-center
-                      rounded-xl
-                      px-3
-                      py-2
-                      text-left
-                      text-sm
-                      text-slate-300
-                      light:text-slate-700
-                      transition-all
-                      duration-300
-                      hover:bg-white/5
-                      light:hover:bg-black/5
-                      hover:translate-x-1
-                      hover:text-orange-300
-                      light:hover:text-orange-600
-                    "
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </div>
-            </div>
               </>
             )}
 
@@ -688,24 +693,7 @@ lg:right-auto
             <div className="my-4 border-t border-white/10 light:border-black/10" />
 
             {/* Compact footer content — moved here from the page bottom */}
-            <div className="grid grid-cols-2 gap-4 px-3">
-              <div>
-                <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-300 light:text-orange-600">
-                  Browse
-                </h4>
-                <ul className="mt-2 space-y-1.5">
-                  {["Movies", "Series", "Originals", "Live TV", "Creators", "Podcasts"].map(
-                    (item) => (
-                      <li key={item}>
-                        <button className="text-xs text-slate-400 light:text-slate-600 transition hover:text-orange-300 light:hover:text-orange-600">
-                          {item}
-                        </button>
-                      </li>
-                    )
-                  )}
-                </ul>
-              </div>
-
+            <div className="px-3">
               <div>
                 <h4 className="text-[10px] font-bold uppercase tracking-[0.2em] text-orange-300 light:text-orange-600">
                   Company
@@ -724,25 +712,8 @@ lg:right-auto
               </div>
             </div>
 
-            <div className="mt-4 flex items-center justify-between border-t border-white/10 light:border-black/10 px-3 pt-3">
-              <p className="text-[10px] text-slate-500">© 2026 INPLAYER</p>
-
-              <div className="flex items-center gap-4">
-                <button className="transition hover:scale-110">
-                  <img
-                    src="/icons/instagram.svg"
-                    alt="Instagram"
-                    className="h-4 w-4 brightness-0 invert light:invert-0 light:opacity-60"
-                  />
-                </button>
-                <button className="transition hover:scale-110">
-                  <img
-                    src="/icons/x.svg"
-                    alt="X"
-                    className="h-4 w-4 brightness-0 invert light:invert-0 light:opacity-60"
-                  />
-                </button>
-              </div>
+            <div className="mt-4 border-t border-white/10 light:border-black/10 px-3 pt-3">
+              <p className="text-[10px] text-slate-500">© 2026 HOMOX</p>
             </div>
           </div>
         </div>

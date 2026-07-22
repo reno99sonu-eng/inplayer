@@ -4,9 +4,12 @@ import { useEffect, useState } from "react";
 import { fetchAuthSession } from "aws-amplify/auth";
 import Image from "next/image";
 import Link from "next/link";
-import { Pencil, Trash2, Loader2, X, Check } from "lucide-react";
+import { Pencil, Trash2, Loader2, X, Check, Film, PlaySquare } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { formatViews, formatTimeAgo } from "@/app/lib/formatters";
+import ChannelAnalytics, { ContentStats } from "@/app/components/analytics/ChannelAnalytics";
+import RevenueSection, { PayoutStatus } from "@/app/components/analytics/RevenueSection";
+import { TrendPoint } from "@/app/components/analytics/TrendChart";
 
 const CATEGORIES = [
   "Movies",
@@ -32,7 +35,25 @@ interface MyVideo {
   thumbnailUrl?: string;
   views: number;
   uploadedAt: string;
+  contentType?: string;
 }
+
+interface AnalyticsResponse {
+  videos: ContentStats;
+  shorts: ContentStats;
+  subscriberCount: number;
+  trend: { videos: TrendPoint[]; shorts: TrendPoint[] };
+  trendAvailable: boolean;
+}
+
+const emptyContentStats: ContentStats = {
+  count: 0,
+  reach: 0,
+  views: 0,
+  likes: 0,
+  comments: 0,
+  shares: 0,
+};
 
 export default function MyVideosPage() {
   const { signedIn, authLoading, openSignIn } = useAuthModal();
@@ -47,9 +68,17 @@ export default function MyVideosPage() {
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  const [activeTab, setActiveTab] = useState<"videos" | "shorts">("videos");
+  const [analytics, setAnalytics] = useState<AnalyticsResponse | null>(null);
+  const [analyticsLoading, setAnalyticsLoading] = useState(true);
+  const [payoutStatus, setPayoutStatus] = useState<PayoutStatus | null>(null);
+  const [payoutLoading, setPayoutLoading] = useState(true);
+
   useEffect(() => {
     if (!signedIn) {
       setLoading(false);
+      setAnalyticsLoading(false);
+      setPayoutLoading(false);
       return;
     }
 
@@ -57,16 +86,32 @@ export default function MyVideosPage() {
       try {
         const session = await fetchAuthSession();
         const idToken = session.tokens?.idToken?.toString();
+        const headers = { Authorization: `Bearer ${idToken}` };
 
-        const res = await fetch("/api/my-videos", {
-          headers: { Authorization: `Bearer ${idToken}` },
-        });
-        const data = await res.json();
-        setVideos(data.videos || []);
-      } catch (err) {
-        console.error("Failed to load your videos:", err);
-      } finally {
+        const [videosRes, analyticsRes, payoutRes] = await Promise.all([
+          fetch("/api/my-videos", { headers }),
+          fetch("/api/my-videos/analytics", { headers }),
+          fetch("/api/creator/payout-status", { headers }),
+        ]);
+
+        const videosData = await videosRes.json();
+        setVideos(videosData.videos || []);
         setLoading(false);
+
+        if (analyticsRes.ok) {
+          setAnalytics(await analyticsRes.json());
+        }
+        setAnalyticsLoading(false);
+
+        if (payoutRes.ok) {
+          setPayoutStatus(await payoutRes.json());
+        }
+        setPayoutLoading(false);
+      } catch (err) {
+        console.error("Failed to load your channel:", err);
+        setLoading(false);
+        setAnalyticsLoading(false);
+        setPayoutLoading(false);
       }
     }
 
@@ -186,8 +231,18 @@ export default function MyVideosPage() {
     );
   }
 
+  const isShort = (v: MyVideo) => v.contentType === "short";
+  const filteredVideos = videos.filter((v) =>
+    activeTab === "shorts" ? isShort(v) : !isShort(v)
+  );
+
+  const tabStats = analytics ? analytics[activeTab] : emptyContentStats;
+  const tabTrend = analytics ? analytics.trend[activeTab] : [];
+  const totalViews = analytics ? analytics.videos.views + analytics.shorts.views : 0;
+  const subscriberCount = analytics?.subscriberCount ?? 0;
+
   return (
-    <div className="mx-auto max-w-[1000px] px-4 py-8 sm:py-12">
+    <div className="mx-auto max-w-[1400px] px-4 py-8 sm:py-12">
       <h1 className="text-2xl sm:text-3xl font-black text-white light:text-slate-900">
         Your Channel
       </h1>
@@ -195,148 +250,205 @@ export default function MyVideosPage() {
         Manage everything you've uploaded to InPlayer.
       </p>
 
-      {videos.length === 0 ? (
-        <div className="mt-16 flex flex-col items-center justify-center text-center">
-          <p className="font-semibold text-white light:text-slate-900">
-            You haven't uploaded anything yet
-          </p>
-          <Link
-            href="/upload"
-            className="mt-4 rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-6 py-2.5 text-sm font-bold text-white"
+      <div className="mt-8 flex flex-col gap-5 lg:flex-row lg:items-start lg:gap-6">
+        {/* Section buttons — left side on larger screens, a pill row on mobile */}
+        <div className="flex flex-shrink-0 gap-2 overflow-x-auto lg:w-48 lg:flex-col lg:gap-1.5 lg:overflow-visible">
+          <button
+            onClick={() => setActiveTab("videos")}
+            className={`
+              flex flex-shrink-0 items-center gap-2.5 rounded-2xl px-4 py-2.5 text-sm font-bold
+              transition-all duration-300
+              ${
+                activeTab === "videos"
+                  ? "bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white shadow-[0_10px_25px_rgba(255,153,0,.3)]"
+                  : "border border-white/10 light:border-black/10 text-slate-300 light:text-slate-700 hover:bg-white/5 light:hover:bg-black/5"
+              }
+            `}
           >
-            Upload a video
-          </Link>
+            <Film size={17} />
+            Videos
+          </button>
+          <button
+            onClick={() => setActiveTab("shorts")}
+            className={`
+              flex flex-shrink-0 items-center gap-2.5 rounded-2xl px-4 py-2.5 text-sm font-bold
+              transition-all duration-300
+              ${
+                activeTab === "shorts"
+                  ? "bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white shadow-[0_10px_25px_rgba(255,153,0,.3)]"
+                  : "border border-white/10 light:border-black/10 text-slate-300 light:text-slate-700 hover:bg-white/5 light:hover:bg-black/5"
+              }
+            `}
+          >
+            <PlaySquare size={17} />
+            Shorts
+          </button>
         </div>
-      ) : (
-        <div className="mt-8 space-y-3">
-          {videos.map((video) => (
-            <div
-              key={video.videoId}
-              className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.02] light:bg-black/[0.02] p-4"
-            >
-              {editingId === video.videoId ? (
-                <div className="space-y-3">
-                  <input
-                    type="text"
-                    value={editTitle}
-                    onChange={(e) => setEditTitle(e.target.value)}
-                    className="w-full rounded-xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-[#FAF5E9] px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-orange-400/50"
-                    placeholder="Title"
-                  />
-                  <textarea
-                    rows={2}
-                    value={editDescription}
-                    onChange={(e) => setEditDescription(e.target.value)}
-                    className="w-full resize-none rounded-xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-[#FAF5E9] px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-orange-400/50"
-                    placeholder="Description"
-                  />
-                  <select
-                    value={editCategory}
-                    onChange={(e) => setEditCategory(e.target.value)}
-                    className="w-full rounded-xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-[#FAF5E9] px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-orange-400/50"
-                  >
-                    {CATEGORIES.map((c) => (
-                      <option key={c} value={c}>
-                        {c}
-                      </option>
-                    ))}
-                  </select>
 
-                  {error && <p className="text-xs text-red-400">{error}</p>}
+        {/* Main content for the active section */}
+        <div className="min-w-0 flex-1 space-y-6">
+          <ChannelAnalytics
+            stats={tabStats}
+            trend={tabTrend}
+            trendAvailable={analytics?.trendAvailable ?? true}
+            loading={analyticsLoading}
+          />
 
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleSave(video.videoId)}
-                      disabled={savingId === video.videoId}
-                      className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-4 py-2 text-xs font-bold text-white disabled:opacity-60"
-                    >
-                      <Check size={14} />
-                      {savingId === video.videoId ? "Saving..." : "Save"}
-                    </button>
-                    <button
-                      onClick={cancelEditing}
-                      className="flex items-center gap-1.5 rounded-full border border-white/10 light:border-black/10 px-4 py-2 text-xs font-semibold text-slate-300 light:text-slate-700"
-                    >
-                      <X size={14} />
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                <div className="flex gap-4">
-                  <div className="relative h-[70px] w-[125px] flex-shrink-0 overflow-hidden rounded-xl bg-white/5 light:bg-black/5">
-                    {video.thumbnailUrl && (
-                      <Image
-                        src={video.thumbnailUrl}
-                        alt={video.title}
-                        fill
-                        sizes="125px"
-                        className="object-cover"
+          <RevenueSection
+            contentLabel={activeTab === "shorts" ? "Shorts" : "Videos"}
+            subscriberCount={subscriberCount}
+            totalViews={totalViews}
+            payoutStatus={payoutStatus}
+            loading={payoutLoading}
+            onStatusChange={setPayoutStatus}
+          />
+
+          {filteredVideos.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-white/10 light:border-black/10 py-16 text-center">
+              <p className="font-semibold text-white light:text-slate-900">
+                {activeTab === "shorts"
+                  ? "You haven't posted any Shorts yet"
+                  : "You haven't uploaded any videos yet"}
+              </p>
+              <Link
+                href="/upload"
+                className="mt-4 rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-6 py-2.5 text-sm font-bold text-white"
+              >
+                Upload {activeTab === "shorts" ? "a Short" : "a video"}
+              </Link>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {filteredVideos.map((video) => (
+                <div
+                  key={video.videoId}
+                  className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.02] light:bg-black/[0.02] p-4"
+                >
+                  {editingId === video.videoId ? (
+                    <div className="space-y-3">
+                      <input
+                        type="text"
+                        value={editTitle}
+                        onChange={(e) => setEditTitle(e.target.value)}
+                        className="w-full rounded-xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-[#FAF5E9] px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-orange-400/50"
+                        placeholder="Title"
                       />
-                    )}
-                  </div>
+                      <textarea
+                        rows={2}
+                        value={editDescription}
+                        onChange={(e) => setEditDescription(e.target.value)}
+                        className="w-full resize-none rounded-xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-[#FAF5E9] px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-orange-400/50"
+                        placeholder="Description"
+                      />
+                      <select
+                        value={editCategory}
+                        onChange={(e) => setEditCategory(e.target.value)}
+                        className="w-full rounded-xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-[#FAF5E9] px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-orange-400/50"
+                      >
+                        {CATEGORIES.map((c) => (
+                          <option key={c} value={c}>
+                            {c}
+                          </option>
+                        ))}
+                      </select>
 
-                  <div className="min-w-0 flex-1">
-                    <h3 className="truncate font-semibold text-white light:text-slate-900">
-                      {video.title}
-                    </h3>
-                    <p className="text-xs text-slate-400 light:text-slate-600">
-                      {video.category} • {formatViews(video.views || 0)} •{" "}
-                      {formatTimeAgo(video.uploadedAt)}
-                    </p>
+                      {error && <p className="text-xs text-red-400">{error}</p>}
 
-                    <span
-                      className={`mt-2 inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${
-                        video.status === "ready"
-                          ? "bg-emerald-500/15 text-emerald-400"
-                          : video.status === "processing"
-                          ? "bg-amber-500/15 text-amber-400"
-                          : "bg-red-500/15 text-red-400"
-                      }`}
-                    >
-                      {video.status}
-                    </span>
-                  </div>
-
-                  <div className="flex flex-shrink-0 items-start gap-1">
-                    <button
-                      onClick={() => startEditing(video)}
-                      className="flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition hover:bg-white/5 light:hover:bg-black/5 hover:text-white light:hover:text-slate-900"
-                    >
-                      <Pencil size={15} />
-                    </button>
-
-                    {confirmingDeleteId === video.videoId ? (
-                      <div className="flex items-center gap-1">
+                      <div className="flex gap-2">
                         <button
-                          onClick={() => handleDelete(video.videoId)}
-                          disabled={deletingId === video.videoId}
-                          className="rounded-full bg-red-500/15 px-3 py-1.5 text-xs font-bold text-red-400 disabled:opacity-60"
+                          onClick={() => handleSave(video.videoId)}
+                          disabled={savingId === video.videoId}
+                          className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-4 py-2 text-xs font-bold text-white disabled:opacity-60"
                         >
-                          {deletingId === video.videoId ? "..." : "Confirm"}
+                          <Check size={14} />
+                          {savingId === video.videoId ? "Saving..." : "Save"}
                         </button>
                         <button
-                          onClick={() => setConfirmingDeleteId(null)}
-                          className="rounded-full px-3 py-1.5 text-xs font-semibold text-slate-400 hover:bg-white/5 light:hover:bg-black/5"
+                          onClick={cancelEditing}
+                          className="flex items-center gap-1.5 rounded-full border border-white/10 light:border-black/10 px-4 py-2 text-xs font-semibold text-slate-300 light:text-slate-700"
                         >
+                          <X size={14} />
                           Cancel
                         </button>
                       </div>
-                    ) : (
-                      <button
-                        onClick={() => setConfirmingDeleteId(video.videoId)}
-                        className="flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition hover:bg-red-500/10 hover:text-red-400"
-                      >
-                        <Trash2 size={15} />
-                      </button>
-                    )}
-                  </div>
+                    </div>
+                  ) : (
+                    <div className="flex gap-4">
+                      <div className="relative h-[70px] w-[125px] flex-shrink-0 overflow-hidden rounded-xl bg-white/5 light:bg-black/5">
+                        {video.thumbnailUrl && (
+                          <Image
+                            src={video.thumbnailUrl}
+                            alt={video.title}
+                            fill
+                            sizes="125px"
+                            className="object-cover"
+                          />
+                        )}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <h3 className="truncate font-semibold text-white light:text-slate-900">
+                          {video.title}
+                        </h3>
+                        <p className="text-xs text-slate-400 light:text-slate-600">
+                          {video.category} • {formatViews(video.views || 0)} •{" "}
+                          {formatTimeAgo(video.uploadedAt)}
+                        </p>
+
+                        <span
+                          className={`mt-2 inline-block rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${
+                            video.status === "ready"
+                              ? "bg-emerald-500/15 text-emerald-400"
+                              : video.status === "processing"
+                              ? "bg-amber-500/15 text-amber-400"
+                              : "bg-red-500/15 text-red-400"
+                          }`}
+                        >
+                          {video.status}
+                        </span>
+                      </div>
+
+                      <div className="flex flex-shrink-0 items-start gap-1">
+                        <button
+                          onClick={() => startEditing(video)}
+                          className="flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition hover:bg-white/5 light:hover:bg-black/5 hover:text-white light:hover:text-slate-900"
+                        >
+                          <Pencil size={15} />
+                        </button>
+
+                        {confirmingDeleteId === video.videoId ? (
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleDelete(video.videoId)}
+                              disabled={deletingId === video.videoId}
+                              className="rounded-full bg-red-500/15 px-3 py-1.5 text-xs font-bold text-red-400 disabled:opacity-60"
+                            >
+                              {deletingId === video.videoId ? "..." : "Confirm"}
+                            </button>
+                            <button
+                              onClick={() => setConfirmingDeleteId(null)}
+                              className="rounded-full px-3 py-1.5 text-xs font-semibold text-slate-400 hover:bg-white/5 light:hover:bg-black/5"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmingDeleteId(video.videoId)}
+                            className="flex h-9 w-9 items-center justify-center rounded-full text-slate-400 transition hover:bg-red-500/10 hover:text-red-400"
+                          >
+                            <Trash2 size={15} />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
-              )}
+              ))}
             </div>
-          ))}
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }

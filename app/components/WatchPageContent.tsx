@@ -213,7 +213,7 @@ export default function WatchPageContent({
               style={{ animationDelay: "150ms" }}
             >
               <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-4">
-                {/* Left: avatar + name + In-House */}
+                {/* Left: avatar + name + In-Family */}
                 <div className="flex min-w-0 items-center gap-2.5 lg:gap-3">
                   <div className="relative flex-shrink-0">
                     <div className="absolute -inset-[2px] rounded-full bg-gradient-to-br from-orange-400 via-amber-300 to-orange-500 opacity-80 blur-[3px]" />

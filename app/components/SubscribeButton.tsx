@@ -9,7 +9,7 @@ interface SubscribeButtonProps {
   creatorId: string;
 }
 
-// "In-House" is InPlayer's name for what other platforms call Subscribe.
+// "In-Family" is InPlayer's name for what other platforms call Subscribe.
 // Once joined, a notification bell appears (YouTube-style) that toggles
 // whether this viewer gets notified about the creator's new uploads.
 export default function SubscribeButton({ creatorId }: SubscribeButtonProps) {
@@ -42,7 +42,7 @@ export default function SubscribeButton({ creatorId }: SubscribeButtonProps) {
         setCount(data.subscriberCount);
         setNotifyEnabled(data.notifyEnabled !== false);
       } catch (err) {
-        console.error("Failed to load In-House status:", err);
+        console.error("Failed to load In-Family status:", err);
       } finally {
         setLoading(false);
       }
@@ -81,7 +81,7 @@ export default function SubscribeButton({ creatorId }: SubscribeButtonProps) {
         if (nowSubscribed) setNotifyEnabled(true);
       }
     } catch (err) {
-      console.error("Failed to toggle In-House:", err);
+      console.error("Failed to toggle In-Family:", err);
     } finally {
       setUpdating(false);
     }
@@ -146,7 +146,7 @@ export default function SubscribeButton({ creatorId }: SubscribeButtonProps) {
         `}
       >
         {isSubscribed && <Check size={15} />}
-        In-House
+        In-Family
         <span className="text-xs opacity-75">{count}</span>
       </button>
 

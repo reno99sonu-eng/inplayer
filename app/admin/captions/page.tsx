@@ -1,0 +1,201 @@
+"use client";
+
+import { useState } from "react";
+import { fetchAuthSession } from "aws-amplify/auth";
+import { Loader2, Wand2, CheckCircle2, AlertTriangle } from "lucide-react";
+import { useAuthModal } from "@/app/components/auth/AuthProvider";
+
+// One-time maintenance screen (admin only — the API behind it checks the
+// signed-in account's email). Repairs captions on everything already
+// published: strips captions off Shorts entirely and rebuilds the clean
+// English / हिन्दी / বাংলা set on videos. Safe to run more than once; it
+// skips anything already repaired and simply resumes.
+//
+// The API self-limits each call to a short time budget and reports how many
+// videos remain, so this page just keeps calling until it says `done`.
+
+interface RunTotals {
+  shortsFixed: number;
+  videosFixed: number;
+  errors: string[];
+}
+
+export default function AdminCaptionsPage() {
+  const { signedIn, authLoading, openSignIn } = useAuthModal();
+
+  const [running, setRunning] = useState(false);
+  const [status, setStatus] = useState("");
+  const [totals, setTotals] = useState<RunTotals | null>(null);
+  const [failed, setFailed] = useState<string | null>(null);
+
+  const run = async () => {
+    setRunning(true);
+    setFailed(null);
+    setTotals(null);
+    setStatus("Starting…");
+
+    const acc: RunTotals = { shortsFixed: 0, videosFixed: 0, errors: [] };
+
+    try {
+      // Hard cap on loop iterations so a stuck "remaining" count can never
+      // spin forever.
+      for (let i = 0; i < 60; i++) {
+        const session = await fetchAuthSession();
+        const idToken = session.tokens?.idToken?.toString();
+        if (!idToken) {
+          setFailed("Your session expired — please sign in again.");
+          break;
+        }
+
+        const res = await fetch("/api/admin/recaption", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+
+        if (res.status === 401) {
+          setFailed(
+            "This account isn't authorized to run the caption repair."
+          );
+          break;
+        }
+        if (!res.ok) {
+          setFailed(`The repair call failed (HTTP ${res.status}).`);
+          break;
+        }
+
+        const data = await res.json();
+
+        acc.shortsFixed += data?.shorts?.processed || 0;
+        acc.videosFixed += data?.videos?.processed || 0;
+        if (Array.isArray(data?.shorts?.errors))
+          acc.errors.push(...data.shorts.errors);
+        if (Array.isArray(data?.videos?.errors))
+          acc.errors.push(...data.videos.errors);
+        setTotals({ ...acc, errors: [...acc.errors] });
+
+        if (data?.done) {
+          setStatus("Done.");
+          break;
+        }
+
+        setStatus(
+          `Working… ${acc.videosFixed} videos and ${acc.shortsFixed} shorts repaired so far (${data?.remainingVideos ?? "?"} videos left)`
+        );
+      }
+    } catch (err) {
+      setFailed(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  if (authLoading) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <Loader2 size={28} className="animate-spin text-orange-400" />
+      </div>
+    );
+  }
+
+  if (!signedIn) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 text-center">
+        <h2 className="text-2xl font-black text-white light:text-slate-900">
+          Sign in required
+        </h2>
+        <p className="mt-2 max-w-sm text-sm text-slate-400 light:text-slate-600">
+          Sign in with the admin account to repair captions.
+        </p>
+        <button
+          onClick={openSignIn}
+          className="mt-6 rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-8 py-3 font-bold text-white shadow-[0_15px_35px_rgba(255,153,0,.3)] transition-all hover:-translate-y-0.5"
+        >
+          Sign In
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-[640px] px-4 py-10 sm:py-14">
+      <h1 className="text-2xl sm:text-3xl font-black text-white light:text-slate-900">
+        Repair captions
+      </h1>
+      <p className="mt-2 text-sm leading-relaxed text-slate-400 light:text-slate-600">
+        Applies the fixed caption pipeline to everything already published:
+        removes captions from Shorts entirely, and rebuilds clean English,
+        हिन्दी, and বাংলা tracks on videos from each one&apos;s existing
+        transcript. You can run this more than once — it skips anything
+        already done.
+      </p>
+
+      <button
+        onClick={run}
+        disabled={running}
+        className="mt-7 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] py-3.5 font-bold text-white shadow-[0_15px_35px_rgba(255,153,0,.3)] transition-all hover:-translate-y-0.5 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        {running ? (
+          <>
+            <Loader2 size={18} className="animate-spin" />
+            Repairing…
+          </>
+        ) : (
+          <>
+            <Wand2 size={18} />
+            Repair all captions
+          </>
+        )}
+      </button>
+
+      {status && (
+        <p className="mt-5 text-sm text-slate-300 light:text-slate-700">
+          {status}
+        </p>
+      )}
+
+      {totals && (
+        <div className="mt-4 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4">
+          <div className="flex items-center gap-2 text-sm font-semibold text-white light:text-slate-900">
+            {!running && !failed && (
+              <CheckCircle2 size={16} className="text-emerald-400" />
+            )}
+            <span>
+              {totals.videosFixed} videos and {totals.shortsFixed} shorts
+              repaired
+            </span>
+          </div>
+
+          {!running && (
+            <p className="mt-2 text-xs text-slate-400 light:text-slate-600">
+              Repaired videos may show no captions for a minute or two while
+              the new tracks register — that&apos;s expected, they appear on
+              their own.
+            </p>
+          )}
+
+          {totals.errors.length > 0 && (
+            <details className="mt-3">
+              <summary className="cursor-pointer text-xs font-semibold text-amber-400">
+                {totals.errors.length} item(s) reported an issue
+              </summary>
+              <ul className="mt-2 space-y-1 text-xs text-slate-400 light:text-slate-600">
+                {totals.errors.slice(0, 40).map((e, i) => (
+                  <li key={i} className="break-words">
+                    {e}
+                  </li>
+                ))}
+              </ul>
+            </details>
+          )}
+        </div>
+      )}
+
+      {failed && (
+        <div className="mt-4 flex items-start gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300 light:text-red-700">
+          <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
+          <span>{failed}</span>
+        </div>
+      )}
+    </div>
+  );
+}

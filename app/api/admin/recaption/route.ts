@@ -2,11 +2,36 @@ import { NextRequest, NextResponse } from "next/server";
 import { ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import mux from "@/app/lib/mux";
 import { docClient } from "@/app/lib/dynamodb";
+import { verifyAuth } from "@/app/lib/verifyAuth";
 import {
   CAPTION_TARGETS,
   resolveSourceLang,
   buildCaptionSet,
 } from "@/app/lib/captions";
+
+// Who may trigger this maintenance job. Two independent ways in, so it
+// works no matter how it's called:
+//   1. A signed-in user whose account email is in ADMIN_EMAILS — this is
+//      what the in-app "Repair captions" button uses (app/admin/captions),
+//      and needs no server configuration at all.
+//   2. A matching x-admin-key header (ADMIN_MAINTENANCE_KEY env var) — for
+//      curl / automation when there's no browser session.
+const ADMIN_EMAILS = ["reno99sonu@gmail.com"];
+
+async function isAuthorized(request: NextRequest): Promise<boolean> {
+  const expectedKey = process.env.ADMIN_MAINTENANCE_KEY;
+  const providedKey = request.headers.get("x-admin-key");
+  if (expectedKey && providedKey === expectedKey) return true;
+
+  try {
+    const user = await verifyAuth(request);
+    const email = user.email?.toLowerCase();
+    if (email && ADMIN_EMAILS.includes(email)) return true;
+  } catch {
+    // Not a valid signed-in request — fall through to unauthorized.
+  }
+  return false;
+}
 
 // One-time maintenance endpoint: brings every ALREADY-PUBLISHED video and
 // Short in line with the fixed caption pipeline (see app/lib/captions and
@@ -23,10 +48,13 @@ import {
 export const maxDuration = 300;
 
 // Stop STARTING new (slow, Gemini-backed) video items once this much wall
-// time has passed, so we always return cleanly before the function ceiling
-// rather than being killed mid-item. Shorts are near-instant and always
-// finish. Tuned to leave generous margin under maxDuration.
-const TIME_BUDGET_MS = 230_000;
+// time has passed, so we always return cleanly with a partial result +
+// `remainingVideos` instead of being killed mid-item. Deliberately well
+// under 60s: some hosting tiers cap function duration at 60s regardless of
+// the maxDuration below, so keeping each call short guarantees it always
+// returns real JSON, and the caller (the in-app button) simply loops until
+// `done`. Shorts are near-instant and always all finish in the first call.
+const TIME_BUDGET_MS = 45_000;
 
 function errMsg(err: unknown): string {
   return err instanceof Error ? err.message : String(err);
@@ -88,10 +116,7 @@ async function markBackfilled(videoId: string, clearCaptions: boolean) {
 }
 
 export async function POST(request: NextRequest) {
-  const expectedKey = process.env.ADMIN_MAINTENANCE_KEY;
-  const providedKey = request.headers.get("x-admin-key");
-
-  if (!expectedKey || providedKey !== expectedKey) {
+  if (!(await isAuthorized(request))) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 

@@ -48,13 +48,14 @@ async function isAuthorized(request: NextRequest): Promise<boolean> {
 export const maxDuration = 300;
 
 // Stop STARTING new (slow, Gemini-backed) video items once this much wall
-// time has passed, so we always return cleanly with a partial result +
-// `remainingVideos` instead of being killed mid-item. Deliberately well
-// under 60s: some hosting tiers cap function duration at 60s regardless of
-// the maxDuration below, so keeping each call short guarantees it always
-// returns real JSON, and the caller (the in-app button) simply loops until
-// `done`. Shorts are near-instant and always all finish in the first call.
-const TIME_BUDGET_MS = 45_000;
+// time has passed, so each call always returns real JSON (with a partial
+// result + `remainingVideos`) well before the 300s function ceiling instead
+// of being killed. This works hand-in-hand with the per-Gemini-call timeout
+// in app/lib/translate: that caps any single video at ~2 min, and this
+// budget guarantees a new one never STARTS late enough to run past the
+// ceiling. The in-app button just keeps calling until `done`. Shorts are
+// near-instant (no Gemini) and always all finish in the first call.
+const TIME_BUDGET_MS = 90_000;
 
 function errMsg(err: unknown): string {
   return err instanceof Error ? err.message : String(err);

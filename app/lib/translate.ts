@@ -7,11 +7,21 @@ const CANDIDATE_MODELS = [
   "gemini-2.5-flash-lite",
 ];
 
+// Hard ceiling on any single Gemini request. Without this a slow (not even
+// failed — just slow) response has no upper bound, and one stuck call can
+// hold the whole caption run open until the serverless function itself is
+// killed at its duration limit (observed as a 300s timeout). Bounding each
+// call means a laggy model is abandoned quickly and the next candidate — or
+// the next caption job — proceeds instead of everything stalling.
+const PER_CALL_TIMEOUT_MS = 60_000;
+
 async function geminiGenerate(prompt: string): Promise<string | null> {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) return null;
 
   for (const model of CANDIDATE_MODELS) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), PER_CALL_TIMEOUT_MS);
     try {
       const response = await fetch(
         `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
@@ -19,6 +29,7 @@ async function geminiGenerate(prompt: string): Promise<string | null> {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+          signal: controller.signal,
         }
       );
 
@@ -41,10 +52,13 @@ async function geminiGenerate(prompt: string): Promise<string | null> {
       console.error(`Gemini error (${model}): ${response.status} — trying next model`);
       continue;
     } catch (err) {
-      // Network-level failure on this model — try the next one rather than
+      // Network failure OR the per-call timeout aborting this request — in
+      // either case move on to the next model rather than hanging or
       // abandoning the whole translation.
-      console.error(`Gemini request failed (${model}):`, err);
+      console.error(`Gemini request failed/timed out (${model}):`, err);
       continue;
+    } finally {
+      clearTimeout(timer);
     }
   }
 

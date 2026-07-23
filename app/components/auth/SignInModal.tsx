@@ -17,6 +17,17 @@ interface SignInModalProps {
   onSuccess?: () => void;
 }
 
+// Google sign-in reaches all the way through Google's own consent screen
+// and back, but the session never actually takes on return — a real,
+// still-unresolved bug (Cognito/Google-side, not something fixable from
+// the app code alone; a genuine fix needs one live browser check that
+// hasn't happened yet). Rather than leave a button on the live site that
+// looks like it works and then quietly fails for every real visitor who
+// tries it, it's hidden until that's actually fixed. Email/password is
+// completely unaffected. Flip this back to `true` once Google sign-in has
+// been confirmed working end to end.
+const GOOGLE_SIGNIN_ENABLED = false;
+
 export default function SignInModal({
   open,
   onClose,
@@ -364,25 +375,29 @@ export default function SignInModal({
                   {loading ? "Signing In..." : "Sign In"}
                 </button>
 
-                <div className="flex items-center gap-3">
-                  <div className="h-px flex-1 bg-white/10 light:bg-black/10" />
-                  <span className="text-[10px] font-medium text-slate-500">OR</span>
-                  <div className="h-px flex-1 bg-white/10 light:bg-black/10" />
-                </div>
+                {GOOGLE_SIGNIN_ENABLED && (
+                  <>
+                    <div className="flex items-center gap-3">
+                      <div className="h-px flex-1 bg-white/10 light:bg-black/10" />
+                      <span className="text-[10px] font-medium text-slate-500">OR</span>
+                      <div className="h-px flex-1 bg-white/10 light:bg-black/10" />
+                    </div>
 
-                <button
-                  type="button"
-                  onClick={handleGoogle}
-                  className="
-                    w-full rounded-2xl border border-white/10 light:border-black/10
-                    py-3 text-sm font-semibold text-slate-200 light:text-slate-700
-                    transition-all duration-300
-                    hover:border-orange-400/30 hover:bg-white/5 light:hover:bg-black/5
-                    active:scale-[0.98]
-                  "
-                >
-                  Continue with Google
-                </button>
+                    <button
+                      type="button"
+                      onClick={handleGoogle}
+                      className="
+                        w-full rounded-2xl border border-white/10 light:border-black/10
+                        py-3 text-sm font-semibold text-slate-200 light:text-slate-700
+                        transition-all duration-300
+                        hover:border-orange-400/30 hover:bg-white/5 light:hover:bg-black/5
+                        active:scale-[0.98]
+                      "
+                    >
+                      Continue with Google
+                    </button>
+                  </>
+                )}
 
                 <p className="text-center text-xs text-slate-400 light:text-slate-600">
                   Don&apos;t have an account?{" "}

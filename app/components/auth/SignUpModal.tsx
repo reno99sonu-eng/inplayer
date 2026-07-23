@@ -11,6 +11,10 @@ interface SignUpModalProps {
   onClose: () => void;
 }
 
+// See the matching flag + comment in SignInModal.tsx — same unresolved
+// bug, same reasoning. Keep these two in sync.
+const GOOGLE_SIGNIN_ENABLED = false;
+
 function getPasswordStrength(password: string) {
   if (!password) return { score: 0, label: "", color: "" };
 
@@ -463,25 +467,29 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
               {loading ? "Creating Account..." : "Create Account"}
             </button>
 
-            <div className="flex items-center gap-3">
-              <div className="h-px flex-1 bg-white/10 light:bg-black/10" />
-              <span className="text-[10px] font-medium text-slate-500">OR</span>
-              <div className="h-px flex-1 bg-white/10 light:bg-black/10" />
-            </div>
+            {GOOGLE_SIGNIN_ENABLED && (
+              <>
+                <div className="flex items-center gap-3">
+                  <div className="h-px flex-1 bg-white/10 light:bg-black/10" />
+                  <span className="text-[10px] font-medium text-slate-500">OR</span>
+                  <div className="h-px flex-1 bg-white/10 light:bg-black/10" />
+                </div>
 
-            <button
-              type="button"
-              onClick={handleGoogle}
-              className="
-                w-full rounded-2xl border border-white/10 light:border-black/10
-                py-3 text-sm font-semibold text-slate-200 light:text-slate-700
-                transition-all duration-300
-                hover:border-orange-400/30 hover:bg-white/5 light:hover:bg-black/5
-                active:scale-[0.98]
-              "
-            >
-              Continue with Google
-            </button>
+                <button
+                  type="button"
+                  onClick={handleGoogle}
+                  className="
+                    w-full rounded-2xl border border-white/10 light:border-black/10
+                    py-3 text-sm font-semibold text-slate-200 light:text-slate-700
+                    transition-all duration-300
+                    hover:border-orange-400/30 hover:bg-white/5 light:hover:bg-black/5
+                    active:scale-[0.98]
+                  "
+                >
+                  Continue with Google
+                </button>
+              </>
+            )}
 
             <p className="text-center text-xs text-slate-400 light:text-slate-600">
               Already have an account?{" "}

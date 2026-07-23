@@ -146,6 +146,19 @@ export default function AuthProvider({
     refreshUser();
   }, []);
 
+  // TEMP DIAGNOSTIC (safe to remove once Google sign-in is confirmed
+  // working): logs whatever landed in the URL on this page load. After the
+  // Google redirect completes, this tells us whether Cognito actually sent
+  // back "?code=..." (exchange is failing after arrival), "?error=..."
+  // (Cognito/Google rejected the request before ever getting here), or
+  // nothing at all (something upstream — DNS forwarding, a wrong redirect
+  // target, etc. — is stripping the query string before we see it).
+  useEffect(() => {
+    if (typeof window !== "undefined" && window.location.search) {
+      console.log("[auth-debug] landed with query:", window.location.search);
+    }
+  }, []);
+
   // OAuth redirect flows (Continue with Google) come back via a full page
   // navigation, and Amplify finishes exchanging the auth code slightly
   // AFTER our first refreshUser() above runs — this Hub listener catches
@@ -153,6 +166,11 @@ export default function AuthProvider({
   // manual refresh.
   useEffect(() => {
     const unsubscribe = Hub.listen("auth", ({ payload }) => {
+      // TEMP DIAGNOSTIC: log every auth event Amplify fires, whatever it
+      // is, so an event we didn't explicitly anticipate still shows up
+      // instead of being silently ignored.
+      console.log("[auth-debug] Hub auth event:", payload.event, payload);
+
       if (
         payload.event === "signInWithRedirect" ||
         payload.event === "signedIn"

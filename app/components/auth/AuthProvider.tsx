@@ -163,6 +163,18 @@ export default function AuthProvider({
       if (payload.event === "signedOut") {
         setUser(null);
       }
+      // Google's redirect can land back here successfully (no error, page
+      // just reloads at "/") while Amplify's code-for-tokens exchange fails
+      // in the background — previously silent, which looked exactly like
+      // "nothing happened" with zero clues in the console. This surfaces
+      // the real reason (e.g. a Cognito app client misconfigured with a
+      // secret, or a redirect-URI mismatch) instead of failing silently.
+      if (payload.event === "signInWithRedirect_failure") {
+        console.error(
+          "Google sign-in redirect failed:",
+          payload.data.error
+        );
+      }
     });
 
     return unsubscribe;

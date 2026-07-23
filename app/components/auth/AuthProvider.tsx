@@ -26,6 +26,37 @@ import SignUpModal from "./SignUpModal";
 import ForgotPasswordModal from "./ForgotPasswordModal";
 import VerifyEmailModal from "./VerifyEmailModal";
 
+// ROOT CAUSE of "Google sign-in completes but the site never shows me as
+// signed in": Amplify checks whether the page just came back from an OAuth
+// redirect (a "?code=..." from Google/Cognito) as a direct side effect of
+// Amplify.configure() — which runs the INSTANT the "@/app/amplify-config"
+// import above is evaluated, before React has mounted a single component.
+// That check finishes async (one microtask hop) and fires a Hub "auth"
+// event the moment it resolves — which happens before React finishes its
+// first render and runs any component's useEffect. The old code
+// registered Hub.listen() inside a useEffect, so it subscribed too late:
+// the event had already fired into an empty room and was gone for good.
+// Amplify itself still cached the tokens correctly (that part doesn't
+// depend on Hub) — the app just never found out, so the UI kept showing
+// "Sign In" no matter what.
+//
+// Fix: subscribe here, at module scope, so it runs synchronously while
+// the module loads — before the JS engine ever yields to the microtask
+// queue where Amplify's async check resumes. Nothing can beat this to the
+// punch. Whatever arrives before a component has mounted to consume it
+// gets queued; the next AuthProvider to mount drains it immediately.
+type AuthPayload = { event: string; data?: unknown };
+let queuedAuthEvent: AuthPayload | null = null;
+let liveAuthHandler: ((payload: AuthPayload) => void) | null = null;
+
+Hub.listen("auth", ({ payload }) => {
+  if (liveAuthHandler) {
+    liveAuthHandler(payload);
+  } else {
+    queuedAuthEvent = payload;
+  }
+});
+
 type AuthModal =
   | null
   | "signin"
@@ -146,31 +177,14 @@ export default function AuthProvider({
     refreshUser();
   }, []);
 
-  // TEMP DIAGNOSTIC (safe to remove once Google sign-in is confirmed
-  // working): logs whatever landed in the URL on this page load. After the
-  // Google redirect completes, this tells us whether Cognito actually sent
-  // back "?code=..." (exchange is failing after arrival), "?error=..."
-  // (Cognito/Google rejected the request before ever getting here), or
-  // nothing at all (something upstream — DNS forwarding, a wrong redirect
-  // target, etc. — is stripping the query string before we see it).
-  useEffect(() => {
-    if (typeof window !== "undefined" && window.location.search) {
-      console.log("[auth-debug] landed with query:", window.location.search);
-    }
-  }, []);
-
   // OAuth redirect flows (Continue with Google) come back via a full page
   // navigation, and Amplify finishes exchanging the auth code slightly
-  // AFTER our first refreshUser() above runs — this Hub listener catches
-  // that moment so the freshly-signed-in Google user appears without a
-  // manual refresh.
+  // AFTER our first refreshUser() above runs — this reacts to that moment
+  // so the freshly-signed-in Google user appears without a manual
+  // refresh. See the module-scope Hub.listen() above this component for
+  // why the actual subscription lives there instead of in this effect.
   useEffect(() => {
-    const unsubscribe = Hub.listen("auth", ({ payload }) => {
-      // TEMP DIAGNOSTIC: log every auth event Amplify fires, whatever it
-      // is, so an event we didn't explicitly anticipate still shows up
-      // instead of being silently ignored.
-      console.log("[auth-debug] Hub auth event:", payload.event, payload);
-
+    function handleAuthEvent(payload: AuthPayload) {
       if (
         payload.event === "signInWithRedirect" ||
         payload.event === "signedIn"
@@ -181,22 +195,27 @@ export default function AuthProvider({
       if (payload.event === "signedOut") {
         setUser(null);
       }
-      // Google's redirect can land back here successfully (no error, page
-      // just reloads at "/") while Amplify's code-for-tokens exchange fails
-      // in the background — previously silent, which looked exactly like
-      // "nothing happened" with zero clues in the console. This surfaces
-      // the real reason (e.g. a Cognito app client misconfigured with a
-      // secret, or a redirect-URI mismatch) instead of failing silently.
+      // However Google sign-in fails post-redirect (bad app-client config,
+      // a redirect-URI mismatch, etc.), this makes sure it's at least
+      // visible in the console instead of silently doing nothing.
       if (payload.event === "signInWithRedirect_failure") {
-        console.error(
-          "Google sign-in redirect failed:",
-          payload.data.error
-        );
+        const data = payload.data as { error?: unknown } | undefined;
+        console.error("Google sign-in redirect failed:", data?.error);
       }
-    });
+    }
 
-    return unsubscribe;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    // Pick up whatever arrived before this component finished mounting.
+    if (queuedAuthEvent) {
+      handleAuthEvent(queuedAuthEvent);
+      queuedAuthEvent = null;
+    }
+
+    liveAuthHandler = handleAuthEvent;
+    return () => {
+      if (liveAuthHandler === handleAuthEvent) {
+        liveAuthHandler = null;
+      }
+    };
   }, []);
 
   async function handleSignOut() {

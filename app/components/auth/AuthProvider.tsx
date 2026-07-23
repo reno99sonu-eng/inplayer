@@ -164,7 +164,12 @@ export default function AuthProvider({
         usernamePrivacy,
         socialLinks,
       });
-    } catch {
+    } catch (err) {
+      // This used to be silent — which is exactly why "Google sign-in
+      // succeeds but the site still shows Sign In" has been so hard to
+      // pin down: whatever throws here is what decides that outcome, and
+      // until now nothing ever said what it actually was.
+      console.error("refreshUser(): getCurrentUser/fetchUserAttributes failed — showing signed out:", err);
       setUser(null);
     } finally {
       setAuthLoading(false);
@@ -185,6 +190,12 @@ export default function AuthProvider({
   // why the actual subscription lives there instead of in this effect.
   useEffect(() => {
     function handleAuthEvent(payload: AuthPayload) {
+      // Logs every auth Hub event that fires, in order — tells us
+      // definitively whether this listener is firing at all after a
+      // Google redirect, and with which event name, instead of inferring
+      // it indirectly from what the UI does afterward.
+      console.log("[Auth] Hub event received:", payload.event);
+
       if (
         payload.event === "signInWithRedirect" ||
         payload.event === "signedIn"

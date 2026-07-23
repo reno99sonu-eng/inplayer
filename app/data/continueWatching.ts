@@ -1,52 +1,5 @@
-export const continueWatching = [
-  {
-    id: 1,
-    title: "Beyond Limits: Episode 01",
-    progress: 78,
-    duration: "2h 18m",
-    remaining: "28 min left",
-    lastWatched: "2 hours ago",
-    completed: false,
-    image: "/posters/poster1.jpg",
-  },
-  {
-    id: 2,
-    title: "Exploring Wildlife at Mount Rainier",
-    progress: 42,
-    duration: "1h 54m",
-    remaining: "1h 06 min left",
-    lastWatched: "Yesterday",
-    completed: false,
-    image: "/posters/poster2.jpg",
-  },
-  {
-    id: 3,
-    title: "Next-Level Gaming Setup Tour (2026)",
-    progress: 91,
-    duration: "2h 07m",
-    remaining: "11 min left",
-    lastWatched: "Today",
-    completed: false,
-    image: "/posters/poster3.jpg",
-  },
-  {
-    id: 4,
-    title: "Hiking Through the Himalayas",
-    progress: 63,
-    duration: "2h 24m",
-    remaining: "53 min left",
-    lastWatched: "3 days ago",
-    completed: false,
-    image: "/posters/poster4.jpg",
-  },
-  {
-    id: 5,
-    title: "The Chernobyl Podcast | Ep. 03",
-    progress: 28,
-    duration: "1h 49m",
-    remaining: "1h 18 min left",
-    lastWatched: "Last week",
-    completed: false,
-    image: "/posters/poster5.jpg",
-  },
-];
+// Unused — not imported anywhere in the app. Emptied out rather than
+// deleted: this session's tools can overwrite files on your machine but
+// can't delete them. Safe to delete this file entirely whenever you get a
+// chance.
+export {};

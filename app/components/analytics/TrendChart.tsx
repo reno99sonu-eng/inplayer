@@ -87,7 +87,7 @@ export default function TrendChart({
           Performance over time
         </h3>
 
-        {hasHistory && (
+        {trendAvailable && data.length >= 1 && (
           <div className="flex flex-wrap gap-1.5">
             {METRICS.map((m) => (
               <button
@@ -170,18 +170,60 @@ export default function TrendChart({
           </div>
         </div>
       ) : (
-        <div className="mt-4 flex flex-col items-center justify-center rounded-xl border border-dashed border-white/10 light:border-black/15 px-6 py-10 text-center">
-          <TrendingUp size={22} className="mb-2 text-orange-400/70" />
-          <p className="text-sm font-semibold text-slate-300 light:text-slate-700">
-            {trendAvailable
-              ? "Building your trend history"
-              : "Trend history isn't set up yet"}
-          </p>
-          <p className="mt-1 max-w-xs text-xs text-slate-500 light:text-slate-500">
-            {trendAvailable
-              ? "Check back tomorrow — this chart fills in with one real data point per day, starting today."
-              : "Ask your developer to finish the analytics setup for day-by-day trends."}
-          </p>
+        <div className="mt-4 rounded-xl border border-dashed border-white/10 light:border-black/15 px-6 py-8">
+          {trendAvailable ? (
+            <div className="flex flex-col items-center text-center">
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/25 bg-emerald-500/10 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-300 light:text-emerald-700">
+                <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-400" />
+                Real data — no demo numbers
+              </span>
+
+              {/* The one real number we DO already have (today's, so far)
+                  stands in for the chart until there's a second day to
+                  draw a line between — better than an empty promise. */}
+              {data.length >= 1 ? (
+                <div className="mt-4 flex items-baseline gap-2">
+                  <span className="text-3xl font-black text-white light:text-slate-900">
+                    {data[data.length - 1][metric].toLocaleString()}
+                  </span>
+                  <span className="text-sm font-semibold text-slate-400 light:text-slate-600">
+                    {METRICS.find((m) => m.key === metric)?.label.toLowerCase()} today
+                  </span>
+                </div>
+              ) : (
+                <p className="mt-4 text-sm font-semibold text-slate-300 light:text-slate-700">
+                  Today is day one
+                </p>
+              )}
+
+              <svg viewBox="0 0 200 36" className="mx-auto mt-5 h-7 w-40 text-orange-400/40">
+                <path
+                  d="M2 30 L30 24 L58 27 L86 16 L114 20 L142 9 L170 13 L198 3"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeDasharray="4 4"
+                  strokeLinecap="round"
+                />
+              </svg>
+
+              <p className="mt-4 max-w-xs text-xs text-slate-500 light:text-slate-500">
+                {data.length >= 1
+                  ? "One real day logged. This line draws itself in the moment there's a second day to compare it to — no waiting on us, just on tomorrow."
+                  : "Nothing logged yet today. Check back once today's numbers come in."}
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center text-center">
+              <TrendingUp size={22} className="mb-2 text-orange-400/70" />
+              <p className="text-sm font-semibold text-slate-300 light:text-slate-700">
+                Trend history isn't set up yet
+              </p>
+              <p className="mt-1 max-w-xs text-xs text-slate-500 light:text-slate-500">
+                Ask your developer to finish the analytics setup for day-by-day trends.
+              </p>
+            </div>
+          )}
         </div>
       )}
     </div>

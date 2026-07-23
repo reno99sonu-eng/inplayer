@@ -29,7 +29,20 @@ Amplify.configure({
             email: true,
             oauth: {
               domain: cognitoDomain,
-              scopes: ["openid", "email", "profile"],
+              // "aws.cognito.signin.user.admin" is the one that matters
+              // here: it's what lets a token obtained through this OAuth/
+              // Hosted-UI flow call fetchUserAttributes() afterward.
+              // Without it, Cognito issues the Google sign-in tokens fine
+              // (the person really is authenticated — that's why a repeat
+              // attempt correctly said "already signed in"), but
+              // AuthProvider's refreshUser() then calls
+              // fetchUserAttributes() to build the user object and gets
+              // "NotAuthorizedException: Access Token does not have
+              // required scopes" — which it (until this session) caught
+              // silently and just showed Sign In for. Email/password
+              // sign-in was never affected because that path doesn't get
+              // its access token through this OAuth scopes list at all.
+              scopes: ["openid", "email", "profile", "aws.cognito.signin.user.admin"],
               redirectSignIn: appUrls,
               redirectSignOut: appUrls,
               responseType: "code",

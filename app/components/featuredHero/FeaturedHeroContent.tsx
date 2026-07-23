@@ -2,6 +2,7 @@
 
 import FeaturedHeroButtons from "./FeaturedHeroButtons";
 import type { FeaturedSlide } from "../../data/featuredSlides";
+import { formatViews } from "../../lib/formatters";
 
 interface FeaturedHeroContentProps {
   slide: FeaturedSlide;
@@ -71,7 +72,7 @@ export default function FeaturedHeroContent({
       {/* Title — re-animates in on every slide change */}
 
       <h1
-        key={slide.id}
+        key={slide.videoId}
         className="
           animate-hero-fade-up
           text-lg
@@ -93,33 +94,27 @@ export default function FeaturedHeroContent({
       {/* Creator */}
 
       <div
-        key={`${slide.id}-creator`}
+        key={`${slide.videoId}-creator`}
         className="animate-hero-fade-up mt-3 flex items-center gap-1.5"
       >
         <span className="text-sm font-semibold text-white">
-          by {slide.isHandle && "@"}
-          {slide.creator}
+          by {slide.creator}
         </span>
-
-        {slide.verified && (
-          <span className="text-xs font-medium text-emerald-400">✓</span>
-        )}
       </div>
 
       {/* Stats */}
 
       <p
-        key={`${slide.id}-stats`}
+        key={`${slide.videoId}-stats`}
         className="animate-hero-fade-up mt-2 text-[11px] text-slate-300"
       >
-        {slide.views} <span className="text-orange-400">•</span>{" "}
-        {slide.duration}
+        {formatViews(slide.views)} this week
       </p>
 
       {/* Buttons */}
 
       <div className="mt-5">
-        <FeaturedHeroButtons />
+        <FeaturedHeroButtons videoId={slide.videoId} />
       </div>
     </div>
   );

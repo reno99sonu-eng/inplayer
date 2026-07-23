@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { fetchAuthSession } from "aws-amplify/auth";
 import { Trash2 } from "lucide-react";
 import { useAuthModal } from "./auth/AuthProvider";
@@ -11,6 +12,7 @@ interface Comment {
   commentId: string;
   userId: string;
   userName: string;
+  userUsername?: string; // present only when the commenter has a username set — see app/lib/resolveUsernames
   userAvatarUrl?: string;
   text: string;
   createdAt: string;
@@ -175,21 +177,45 @@ export default function CommentSection({ videoId }: CommentSectionProps) {
         <div className="space-y-5">
           {comments.map((comment) => (
             <div key={comment.commentId} className="flex gap-3">
-              <div className="relative h-9 w-9 flex-shrink-0 overflow-hidden rounded-full border border-white/10 light:border-black/10">
-                <img
-                  src={comment.userAvatarUrl || "/avatars/avatar.png"}
-                  alt={comment.userName}
-                  loading="lazy"
-                  decoding="async"
-                  className="h-full w-full object-cover"
-                />
-              </div>
+              {comment.userUsername ? (
+                <Link
+                  href={`/u/${encodeURIComponent(comment.userUsername)}`}
+                  className="relative h-9 w-9 flex-shrink-0 overflow-hidden rounded-full border border-white/10 light:border-black/10"
+                >
+                  <img
+                    src={comment.userAvatarUrl || "/avatars/avatar.png"}
+                    alt={comment.userName}
+                    loading="lazy"
+                    decoding="async"
+                    className="h-full w-full object-cover"
+                  />
+                </Link>
+              ) : (
+                <div className="relative h-9 w-9 flex-shrink-0 overflow-hidden rounded-full border border-white/10 light:border-black/10">
+                  <img
+                    src={comment.userAvatarUrl || "/avatars/avatar.png"}
+                    alt={comment.userName}
+                    loading="lazy"
+                    decoding="async"
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              )}
 
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <p className="text-sm font-semibold text-white light:text-slate-900">
-                    {comment.userName}
-                  </p>
+                  {comment.userUsername ? (
+                    <Link
+                      href={`/u/${encodeURIComponent(comment.userUsername)}`}
+                      className="text-sm font-semibold text-white light:text-slate-900 hover:underline"
+                    >
+                      {comment.userName}
+                    </Link>
+                  ) : (
+                    <p className="text-sm font-semibold text-white light:text-slate-900">
+                      {comment.userName}
+                    </p>
+                  )}
                   <p className="text-xs text-slate-500">
                     {formatTimeAgo(comment.createdAt)}
                   </p>

@@ -8,6 +8,7 @@ import {
 import { randomUUID } from "crypto";
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
+import { resolveUsernames } from "@/app/lib/resolveUsernames";
 
 export async function GET(request: NextRequest) {
   const videoId = request.nextUrl.searchParams.get("videoId");
@@ -28,7 +29,16 @@ export async function GET(request: NextRequest) {
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
 
-  return NextResponse.json({ comments });
+  // Batched, distinct-userId lookup so each commenter's name can link to
+  // their real profile — see app/lib/resolveUsernames. A commenter with
+  // no username yet just renders without a link (handled client-side).
+  const usernames = await resolveUsernames(comments.map((c) => c.userId));
+  const commentsWithUsernames = comments.map((c) => ({
+    ...c,
+    userUsername: usernames.get(c.userId),
+  }));
+
+  return NextResponse.json({ comments: commentsWithUsernames });
 }
 
 export async function POST(request: NextRequest) {

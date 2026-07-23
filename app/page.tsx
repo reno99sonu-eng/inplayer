@@ -1,5 +1,3 @@
-import Hero from "./components/Hero";
-import ContinueWatching from "./components/ContinueWatching";
 import TrendingNow from "./components/TrendingNow";
 import FloatingAIButton from "./components/FloatingAIButton";
 import FeaturedHero from "./components/featuredHero/FeaturedHero";
@@ -161,8 +159,6 @@ export default async function Home({ searchParams }: HomeProps) {
             realShorts={realShorts}
             view={activeView}
           />
-
-          {/* <ContinueWatching /> */}
         </div>
       </div>
 

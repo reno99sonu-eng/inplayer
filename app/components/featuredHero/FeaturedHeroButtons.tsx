@@ -1,13 +1,21 @@
 "use client";
 
+import Link from "next/link";
 import { Play, Plus, Info } from "lucide-react";
 
-export default function FeaturedHeroButtons() {
+interface FeaturedHeroButtonsProps {
+  videoId: string;
+}
+
+export default function FeaturedHeroButtons({
+  videoId,
+}: FeaturedHeroButtonsProps) {
   return (
     <div className="flex flex-wrap items-center gap-3">
 
       {/* Watch Now */}
-      <button
+      <Link
+        href={`/watch/${videoId}`}
         className="
           flex
           items-center
@@ -30,7 +38,7 @@ export default function FeaturedHeroButtons() {
       >
         <Play size={16} fill="currentColor" />
         Watch Now
-      </button>
+      </Link>
 
       {/* Watchlist */}
       <button

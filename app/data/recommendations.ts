@@ -12,16 +12,10 @@ export interface Recommendation {
   muxPlaybackId?: string; // present only for real uploaded videos — used for the hover preview
 }
 
-export const recommendations: Recommendation[] = [
-  {
-    id: 26,
-    title: "Bhramit",
-    creator: "InPlay",
-    avatar: "/recommendations/avatars/26.jpg",
-    thumbnail: "/recommendations/thumbnails/26.jpg",
-    views: "890K views",
-    uploaded: "2 days ago",
-    duration: "2:14",
-    verified: true,
-  },
-];
+// No example/dummy recommendations — this feed is real-videos-only. Real
+// DynamoDB-sourced videos are passed in via the `realVideos` prop (see
+// RecommendationFeed.tsx), which still spreads this array in alongside
+// them; kept as an empty array (rather than removing the merge entirely)
+// so a future curated/editorial recommendation list can be added here
+// without any component changes.
+export const recommendations: Recommendation[] = [];

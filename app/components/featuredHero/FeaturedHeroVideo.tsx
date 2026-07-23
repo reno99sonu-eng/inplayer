@@ -16,7 +16,7 @@ export default function FeaturedHeroVideo({
     <div className="absolute inset-0 z-0 overflow-hidden">
       {slides.map((slide, index) => (
         <div
-          key={slide.id}
+          key={slide.videoId}
           className={`
             absolute
             inset-0
@@ -26,15 +26,16 @@ export default function FeaturedHeroVideo({
             ${index === activeIndex ? "opacity-100" : "opacity-0"}
           `}
         >
-          <Image
-            src={slide.image}
-            alt={slide.title}
-            fill
-            priority={index === 0}
-            sizes="100vw"
-            className="object-cover"
-            style={{ objectPosition: slide.objectPosition || "center" }}
-          />
+          {slide.thumbnail && (
+            <Image
+              src={slide.thumbnail}
+              alt={slide.title}
+              fill
+              priority={index === 0}
+              sizes="100vw"
+              className="object-cover"
+            />
+          )}
         </div>
       ))}
 

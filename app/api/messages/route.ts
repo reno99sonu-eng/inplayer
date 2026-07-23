@@ -132,9 +132,9 @@ export async function POST(request: NextRequest) {
 
     const disappearingEnabled = !isNewConversation && !!myRow.Item?.disappearingEnabled;
     const disappearingSeconds = myRow.Item?.disappearingSeconds;
-    const expiresAt =
+    const expiresAtMs =
       disappearingEnabled && disappearingSeconds
-        ? new Date(Date.now() + disappearingSeconds * 1000).toISOString()
+        ? Date.now() + disappearingSeconds * 1000
         : undefined;
 
     await docClient.send(
@@ -146,7 +146,16 @@ export async function POST(request: NextRequest) {
           senderId: user.userId,
           text: trimmedText,
           createdAt: now,
-          ...(expiresAt && { expiresAt }),
+          ...(expiresAtMs !== undefined && {
+            expiresAt: new Date(expiresAtMs).toISOString(),
+            // Numeric mirror in Unix-epoch *seconds* — DynamoDB's native
+            // TTL only acts on a Number attribute, never an ISO string.
+            // expiresAt above is untouched for the existing read-time
+            // filter/cleanup in [conversationId]/messages/route.ts; ttl
+            // just lets AWS reclaim storage in the background for threads
+            // that never get reopened after a message expires.
+            ttl: Math.floor(expiresAtMs / 1000),
+          }),
         },
       })
     );

@@ -33,6 +33,7 @@ interface VideoData {
   category: string;
   uploaderId: string;
   uploaderName: string;
+  uploaderUsername?: string;
   uploaderAvatarUrl?: string;
   uploadedAt: string;
   views: number;
@@ -117,6 +118,39 @@ export default function WatchPageContent({
 
   const commentsOn = video.commentsEnabled !== false;
   const showPlayer = !video.ageRestricted || ageConfirmed;
+
+  // The channel identity card (desktop + mobile below) links to the
+  // uploader's real profile when one was resolved server-side — see
+  // app/watch/[videoId]/page.tsx and app/lib/resolveUsernames. Falls back
+  // to the plain, non-linked avatar+name if a username couldn't be
+  // resolved (e.g. a deleted account), rather than link to a broken URL.
+  const uploaderProfileHref = video.uploaderUsername
+    ? `/u/${encodeURIComponent(video.uploaderUsername)}`
+    : null;
+
+  const channelAvatar = (
+    <div className="relative flex-shrink-0">
+      <div className="absolute -inset-[2px] rounded-full bg-gradient-to-br from-orange-400 via-amber-300 to-orange-500 opacity-80 blur-[3px]" />
+      <div className="relative h-9 w-9 overflow-hidden rounded-full ring-2 ring-[#050816] light:ring-[#F4ECDA]">
+        {/* A plain <img>, not next/image — avatars are base64
+            data URLs (see app/lib/imageCompress.ts). */}
+        <img
+          src={video.uploaderAvatarUrl || "/avatars/avatar.png"}
+          alt={video.uploaderName}
+          className="h-full w-full object-cover"
+        />
+      </div>
+    </div>
+  );
+
+  const channelName = (
+    <div className="min-w-0">
+      <p className="truncate font-bold leading-tight text-white light:text-slate-900">
+        {video.uploaderName}
+      </p>
+      <p className="text-xs text-slate-400 light:text-slate-600">Creator</p>
+    </div>
+  );
 
   return (
     <div className="relative">
@@ -265,27 +299,20 @@ export default function WatchPageContent({
               <div className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:gap-4">
                 {/* Left: avatar + name + In-Family */}
                 <div className="flex min-w-0 items-center gap-2.5 lg:gap-3">
-                  <div className="relative flex-shrink-0">
-                    <div className="absolute -inset-[2px] rounded-full bg-gradient-to-br from-orange-400 via-amber-300 to-orange-500 opacity-80 blur-[3px]" />
-                    <div className="relative h-9 w-9 overflow-hidden rounded-full ring-2 ring-[#050816] light:ring-[#F4ECDA]">
-                      {/* A plain <img>, not next/image — avatars are base64
-                          data URLs (see app/lib/imageCompress.ts). */}
-                      <img
-                        src={video.uploaderAvatarUrl || "/avatars/avatar.png"}
-                        alt={video.uploaderName}
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="min-w-0">
-                    <p className="truncate font-bold leading-tight text-white light:text-slate-900">
-                      {video.uploaderName}
-                    </p>
-                    <p className="text-xs text-slate-400 light:text-slate-600">
-                      Creator
-                    </p>
-                  </div>
+                  {uploaderProfileHref ? (
+                    <Link
+                      href={uploaderProfileHref}
+                      className="flex min-w-0 items-center gap-2.5 lg:gap-3"
+                    >
+                      {channelAvatar}
+                      {channelName}
+                    </Link>
+                  ) : (
+                    <>
+                      {channelAvatar}
+                      {channelName}
+                    </>
+                  )}
 
                   <div className="ml-1 flex-shrink-0">
                     <SubscribeButton creatorId={video.uploaderId} />
@@ -329,25 +356,20 @@ export default function WatchPageContent({
               {/* Row 1: avatar + name (left) — action icons (right) */}
               <div className="flex items-center justify-between gap-2">
                 <div className="flex min-w-0 items-center gap-2.5">
-                  <div className="relative flex-shrink-0">
-                    <div className="absolute -inset-[2px] rounded-full bg-gradient-to-br from-orange-400 via-amber-300 to-orange-500 opacity-80 blur-[3px]" />
-                    <div className="relative h-9 w-9 overflow-hidden rounded-full ring-2 ring-[#050816] light:ring-[#F4ECDA]">
-                      <img
-                        src={video.uploaderAvatarUrl || "/avatars/avatar.png"}
-                        alt={video.uploaderName}
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
-                  </div>
-
-                  <div className="min-w-0">
-                    <p className="truncate font-bold leading-tight text-white light:text-slate-900">
-                      {video.uploaderName}
-                    </p>
-                    <p className="text-xs text-slate-400 light:text-slate-600">
-                      Creator
-                    </p>
-                  </div>
+                  {uploaderProfileHref ? (
+                    <Link
+                      href={uploaderProfileHref}
+                      className="flex min-w-0 items-center gap-2.5"
+                    >
+                      {channelAvatar}
+                      {channelName}
+                    </Link>
+                  ) : (
+                    <>
+                      {channelAvatar}
+                      {channelName}
+                    </>
+                  )}
                 </div>
 
                 <div className="flex flex-shrink-0 flex-wrap items-center justify-end gap-1.5">

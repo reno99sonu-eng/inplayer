@@ -847,20 +847,41 @@ export default function ShortsPageContent({
                   </div>
 
                   <div className="mt-1.5 flex items-center gap-1.5">
-                    <div className="relative h-6 w-6 overflow-hidden rounded-full ring-2 ring-white/25 lg:h-7 lg:w-7">
-                      {/* A plain <img>, not next/image — avatars are
-                          base64 data URLs (see app/lib/imageCompress.ts),
-                          which next/image doesn't optimize/serve cleanly. */}
-                      <img
-                        src={short.uploaderAvatarUrl || "/avatars/avatar.png"}
-                        alt={short.creator}
-                        className="h-full w-full object-cover"
-                      />
-                    </div>
+                    {short.uploaderUsername ? (
+                      <Link
+                        href={`/u/${encodeURIComponent(short.uploaderUsername)}`}
+                        className="pointer-events-auto flex items-center gap-1.5"
+                      >
+                        <div className="relative h-6 w-6 overflow-hidden rounded-full ring-2 ring-white/25 lg:h-7 lg:w-7">
+                          {/* A plain <img>, not next/image — avatars are
+                              base64 data URLs (see app/lib/imageCompress.ts),
+                              which next/image doesn't optimize/serve cleanly. */}
+                          <img
+                            src={short.uploaderAvatarUrl || "/avatars/avatar.png"}
+                            alt={short.creator}
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
 
-                    <span className="text-xs font-semibold text-white lg:text-sm">
-                      {short.creator}
-                    </span>
+                        <span className="text-xs font-semibold text-white lg:text-sm">
+                          {short.creator}
+                        </span>
+                      </Link>
+                    ) : (
+                      <>
+                        <div className="relative h-6 w-6 overflow-hidden rounded-full ring-2 ring-white/25 lg:h-7 lg:w-7">
+                          <img
+                            src={short.uploaderAvatarUrl || "/avatars/avatar.png"}
+                            alt={short.creator}
+                            className="h-full w-full object-cover"
+                          />
+                        </div>
+
+                        <span className="text-xs font-semibold text-white lg:text-sm">
+                          {short.creator}
+                        </span>
+                      </>
+                    )}
 
                     {!isOwnChannel && short.uploaderId && (
                       <button

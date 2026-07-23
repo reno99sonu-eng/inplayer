@@ -9,18 +9,15 @@ export interface Short {
   videoId?: string; // present only for real uploaded shorts — used to link to /watch/[videoId]
   muxPlaybackId?: string; // present only for real uploaded shorts — used for actual playback
   uploaderId?: string; // present only for real uploaded shorts
+  uploaderUsername?: string; // present only when the uploader has a username set — see app/lib/resolveUsernames
   uploaderAvatarUrl?: string; // present only for real uploaded shorts
   description?: string; // present only for real uploaded shorts
 }
 
-export const shorts: Short[] = [
-  {
-    id: 5,
-    title: "Billionaire Ka Vanvas: First Look",
-    creator: "InPlay",
-    poster: "/shorts/5.jpg",
-    views: "3.7M views",
-    likes: "201K",
-    comments: "4.1K",
-  },
-];
+// No example/dummy shorts — the Shorts shelf is real-shorts-only. Real
+// DynamoDB-sourced shorts are passed in via the `realShorts` prop (see
+// RecommendationFeed.tsx), which still spreads this array in alongside
+// them; kept as an empty array (rather than removing the merge entirely)
+// so a future curated/editorial shorts list can be added here without
+// any component changes.
+export const shorts: Short[] = [];

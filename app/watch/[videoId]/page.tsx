@@ -2,6 +2,7 @@ import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { after } from "next/server";
 import { docClient } from "@/app/lib/dynamodb";
 import { getReadyVideos } from "@/app/lib/videoStore";
+import { resolveUsernames } from "@/app/lib/resolveUsernames";
 import BackButton from "@/app/components/BackButton";
 import WatchHistoryRecorder from "@/app/components/WatchHistoryRecorder";
 import ProcessingStatus from "@/app/components/ProcessingStatus";
@@ -109,9 +110,38 @@ export default async function WatchPage({ params }: WatchPageProps) {
     } catch (err) {
       console.error("Failed to record view:", err);
     }
+
+    // Mirrors the same +1 into today's per-video daily bucket — see
+    // app/lib/trendingStore. The all-time counter above can never answer
+    // "what's popular *today*"; this is what Trending Now and Featured
+    // Weekly actually read from. Independent try/catch from the counter
+    // above so one table being unprovisioned never blocks the other.
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      await docClient.send(
+        new UpdateCommand({
+          TableName: "InPlayer-Video-Daily-Views",
+          Key: { date: today, videoId },
+          UpdateExpression: "SET #v = if_not_exists(#v, :zero) + :inc",
+          ExpressionAttributeNames: { "#v": "views" },
+          ExpressionAttributeValues: { ":inc": 1, ":zero": 0 },
+        })
+      );
+    } catch (err) {
+      console.error("Failed to record daily view:", err);
+    }
   });
 
-  const relatedVideos = await getRelatedVideos(videoId, video.category);
+  // Resolved server-side so the channel card can link straight to the
+  // uploader's real profile with no extra client round trip — see
+  // app/lib/resolveUsernames. Run alongside the related-videos fetch
+  // rather than after it, so this doesn't add its own serial round trip.
+  const [relatedVideos, uploaderUsername] = await Promise.all([
+    getRelatedVideos(videoId, video.category),
+    resolveUsernames([video.uploaderId]).then((map) =>
+      map.get(video.uploaderId)
+    ),
+  ]);
 
   return (
     <div className="mx-auto max-w-[1600px] px-3 py-4 lg:px-4 lg:py-8">
@@ -132,6 +162,7 @@ export default async function WatchPage({ params }: WatchPageProps) {
           category: video.category,
           uploaderId: video.uploaderId,
           uploaderName: video.uploaderName,
+          uploaderUsername,
           uploaderAvatarUrl: video.uploaderAvatarUrl,
           uploadedAt: video.uploadedAt,
           views: video.views || 0,

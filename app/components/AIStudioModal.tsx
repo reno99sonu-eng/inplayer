@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
+import { ArrowLeft } from "lucide-react";
 
 interface AIStudioModalProps {
   open: boolean;
@@ -37,6 +38,11 @@ export default function AIStudioModal({
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Which view is showing inside the popover. Switches to "result" once a
+  // generation succeeds; the back button (result view only) returns to
+  // "prompt" without touching the typed prompt. Only the ✕ close button
+  // does a full reset (see the effect below).
+  const [view, setView] = useState<"prompt" | "result">("prompt");
 
   // Animated example-prompt placeholder — only visible while the box is empty
   useEffect(() => {
@@ -69,6 +75,7 @@ export default function AIStudioModal({
       setResult(null);
       setError(null);
       setLoading(false);
+      setView("prompt");
     }
   }, [open]);
 
@@ -92,6 +99,7 @@ export default function AIStudioModal({
         setError(data.error || "Something went wrong. Please try again.");
       } else {
         setResult(data.text);
+        setView("result");
       }
     } catch {
       setError(
@@ -106,6 +114,13 @@ export default function AIStudioModal({
     setPrompt(quickToolPrompts[tool] || "");
     setResult(null);
     setError(null);
+  };
+
+  // Back returns to the prompt view only — it deliberately leaves
+  // `prompt` (and `result`/`error`) untouched so the user can tweak their
+  // prompt and regenerate. Only the ✕ close button performs a full reset.
+  const handleBack = () => {
+    setView("prompt");
   };
 
   if (!open) return null;
@@ -241,6 +256,8 @@ export default function AIStudioModal({
 </button>
 
         <div className="relative z-10">
+          {view === "prompt" ? (
+            <>
 
   <div className="flex items-center">
 
@@ -270,8 +287,6 @@ export default function AIStudioModal({
   <span className="text-[10px] font-medium uppercase tracking-[0.25em] text-emerald-300 light:text-emerald-700">
     AI ONLINE
   </span>
-
-</div>
 
 </div>
 
@@ -343,31 +358,6 @@ lg:text-sm
       </p>
     )}
 
-    {result && (
-      <div
-        className="
-          mt-3
-          max-h-[200px]
-          overflow-y-auto
-          rounded-2xl
-          border
-          border-white/10
-          light:border-black/10
-          bg-[#07111F]
-          light:bg-white
-          p-3
-          text-[12px]
-          leading-6
-          text-slate-200
-          light:text-slate-800
-          [scrollbar-width:none]
-          [&::-webkit-scrollbar]:hidden
-        "
-      >
-        <p className="whitespace-pre-wrap">{result}</p>
-      </div>
-    )}
-
 </div>
         <div className="mt-3">
 
@@ -411,7 +401,95 @@ lg:text-sm
 
         </div>
 
+            </>
+          ) : (
+            <>
+
+  <div className="flex items-center gap-3">
+
+    <button
+      type="button"
+      onClick={(e) => {
+        e.stopPropagation();
+        handleBack();
+      }}
+      aria-label="Back to prompt"
+      className="
+        flex
+        h-10
+        w-10
+        shrink-0
+        items-center
+        justify-center
+        rounded-full
+        border
+        border-white/10
+        light:border-black/10
+        bg-white/5
+        light:bg-black/5
+        text-slate-300
+        light:text-slate-700
+        transition-all
+        duration-300
+        hover:border-orange-400/40
+        hover:bg-orange-500/10
+        hover:text-white
+        light:hover:text-slate-900
+      "
+    >
+      <ArrowLeft size={18} />
+    </button>
+
+    <span className="rounded-full border border-orange-400/60 light:border-orange-400 bg-gradient-to-r from-orange-500/15 to-amber-400/10 light:from-orange-100 light:to-amber-100 px-3 py-1 text-[9px] font-bold uppercase tracking-[0.4em] text-orange-200 light:text-orange-600 shadow-[0_0_20px_rgba(251,146,60,.15)]">
+      INPLAYER AI
+    </span>
+
+  </div>
+
+  <h2 className="mt-3 text-[20px] lg:text-[22px] font-black leading-none tracking-tight text-white light:text-slate-900">
+    Your Result
+  </h2>
+
+  <p className="mt-2 text-[11px] lg:text-[12px] leading-5 lg:leading-6 text-slate-400 light:text-slate-700">
+    Here&apos;s what InPlayer AI generated from your prompt.
+  </p>
+
+  {result && (
+    <div className="mt-3 rounded-[22px] border border-white/10 light:border-slate-300 bg-white/[0.045] light:bg-black/[0.03] p-3 backdrop-blur-xl">
+
+      <p className="mb-3 text-[10px] font-semibold uppercase tracking-[0.35em] text-slate-500 light:text-slate-700">
+        AI RESULT
+      </p>
+
+      <div
+        className="
+          max-h-[320px]
+          overflow-y-auto
+          rounded-2xl
+          border
+          border-white/10
+          light:border-black/10
+          bg-[#07111F]
+          light:bg-white
+          p-3
+          text-[12px]
+          leading-6
+          text-slate-200
+          light:text-slate-800
+          [scrollbar-width:none]
+          [&::-webkit-scrollbar]:hidden
+        "
+      >
+        <p className="whitespace-pre-wrap">{result}</p>
       </div>
+
+    </div>
+  )}
+
+            </>
+          )}
+      </div>
+    </div>
     </div>,
     document.body
   );

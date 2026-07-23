@@ -1,6 +1,7 @@
 import { getReadyVideos } from "@/app/lib/videoStore";
 import type { Short } from "@/app/data/shorts";
 import ShortsPageContent from "@/app/components/ShortsPageContent";
+import { resolveUsernames } from "@/app/lib/resolveUsernames";
 
 export const dynamic = "force-dynamic";
 
@@ -22,6 +23,12 @@ async function getShorts(startVideoId?: string): Promise<Short[]> {
         (!video.visibility || video.visibility === "public")
     );
 
+    // Resolved once for the whole page in a single batched call (distinct
+    // uploaderIds only) — see app/lib/resolveUsernames — rather than once
+    // per short, so the channel name in the feed can link to a real
+    // profile.
+    const usernames = await resolveUsernames(items.map((v) => v.uploaderId));
+
     const mapped = items.map((video) => ({
       id: video.videoId,
       videoId: video.videoId,
@@ -30,6 +37,7 @@ async function getShorts(startVideoId?: string): Promise<Short[]> {
       description: video.description,
       creator: video.uploaderName || "Unknown",
       uploaderId: video.uploaderId,
+      uploaderUsername: usernames.get(video.uploaderId),
       uploaderAvatarUrl: video.uploaderAvatarUrl,
       poster: video.thumbnailUrl || "/shorts/1.jpg",
       views: `${video.views || 0} views`,

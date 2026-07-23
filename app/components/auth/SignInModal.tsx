@@ -18,15 +18,19 @@ interface SignInModalProps {
 }
 
 // Google sign-in reaches all the way through Google's own consent screen
-// and back, but the session never actually takes on return — a real,
-// still-unresolved bug (Cognito/Google-side, not something fixable from
-// the app code alone; a genuine fix needs one live browser check that
-// hasn't happened yet). Rather than leave a button on the live site that
-// looks like it works and then quietly fails for every real visitor who
-// tries it, it's hidden until that's actually fixed. Email/password is
-// completely unaffected. Flip this back to `true` once Google sign-in has
-// been confirmed working end to end.
-const GOOGLE_SIGNIN_ENABLED = false;
+// and back, but the session never actually takes on return. New evidence
+// (an "already authenticated" error on a second attempt, in a browser
+// that had never touched this site before) points to the sign-in itself
+// actually succeeding — Cognito really does end up with a valid session —
+// and the bug being specifically that the app's own signed-in check never
+// picks it up. AuthProvider now logs exactly why that check fails instead
+// of doing so silently.
+//
+// TEMPORARILY re-enabled (was `false`) to get one clean diagnostic test
+// with that logging in place. This is NOT a "confirmed fixed" flip — set
+// it back to `false` again right after this round, unless the console
+// output shows it's actually resolved end to end.
+const GOOGLE_SIGNIN_ENABLED = true;
 
 export default function SignInModal({
   open,

@@ -12,8 +12,9 @@ interface SignUpModalProps {
 }
 
 // See the matching flag + comment in SignInModal.tsx — same unresolved
-// bug, same reasoning. Keep these two in sync.
-const GOOGLE_SIGNIN_ENABLED = false;
+// bug, same reasoning, TEMPORARILY re-enabled for the same one diagnostic
+// test. Keep these two in sync — set both back to `false` together.
+const GOOGLE_SIGNIN_ENABLED = true;
 
 function getPasswordStrength(password: string) {
   if (!password) return { score: 0, label: "", color: "" };

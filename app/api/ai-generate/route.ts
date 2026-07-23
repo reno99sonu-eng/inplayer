@@ -1,13 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Ordered from most to least preferred. If Google retires or restricts one
-// of these for new API keys, the code automatically falls through to the
-// next one instead of breaking the whole feature — this protects against
-// Gemini's frequent model deprecations without needing a manual fix each time.
+// Ordered from most to least preferred. If Groq retires or restricts one of
+// these for new API keys, the code automatically falls through to the next
+// one instead of breaking the whole feature — this protects against model
+// deprecations/outages without needing a manual fix each time.
 const CANDIDATE_MODELS = [
-  "gemini-3-flash-preview",
-  "gemini-3.1-flash-lite",
-  "gemini-2.5-flash-lite",
+  "llama-3.3-70b-versatile",
+  "openai/gpt-oss-120b",
+  "openai/gpt-oss-20b",
+  "llama-3.1-8b-instant",
 ];
 
 export async function POST(request: NextRequest) {
@@ -21,7 +22,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = process.env.GROQ_API_KEY;
 
     if (!apiKey) {
       return NextResponse.json(
@@ -34,12 +35,16 @@ export async function POST(request: NextRequest) {
 
     for (const model of CANDIDATE_MODELS) {
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        "https://api.groq.com/openai/v1/chat/completions",
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
           body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }],
+            model,
+            messages: [{ role: "user", content: prompt }],
           }),
         }
       );
@@ -47,7 +52,7 @@ export async function POST(request: NextRequest) {
       if (response.ok) {
         const data = await response.json();
         const text =
-          data?.candidates?.[0]?.content?.parts?.[0]?.text ??
+          data?.choices?.[0]?.message?.content ??
           "No content was generated. Try rephrasing your prompt.";
 
         console.log(`AI generate succeeded using model: ${model}`);
@@ -57,7 +62,7 @@ export async function POST(request: NextRequest) {
 
       const errorBody = await response.text();
       console.error(
-        `Gemini API error (model: ${model}):`,
+        `Groq API error (model: ${model}):`,
         response.status,
         errorBody
       );

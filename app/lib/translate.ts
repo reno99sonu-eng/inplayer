@@ -1,13 +1,15 @@
-// Server-side Gemini helper for caption translation. Same key and same
-// model-fallback strategy as app/api/ai-generate (Gemini deprecates models
-// often — falling through the list protects the feature from breaking).
+// Server-side Groq helper for caption translation. Same key and same
+// model-fallback strategy as app/api/ai-generate (falling through a list of
+// candidates protects the feature if one model gets deprecated, rate
+// limited, or is briefly overloaded).
 const CANDIDATE_MODELS = [
-  "gemini-3-flash-preview",
-  "gemini-3.1-flash-lite",
-  "gemini-2.5-flash-lite",
+  "llama-3.3-70b-versatile",
+  "openai/gpt-oss-120b",
+  "openai/gpt-oss-20b",
+  "llama-3.1-8b-instant",
 ];
 
-// Hard ceiling on any single Gemini request. Without this a slow (not even
+// Hard ceiling on any single Groq request. Without this a slow (not even
 // failed — just slow) response has no upper bound, and one stuck call can
 // hold the whole caption run open until the serverless function itself is
 // killed at its duration limit (observed as a 300s timeout). Bounding each
@@ -15,8 +17,8 @@ const CANDIDATE_MODELS = [
 // the next caption job — proceeds instead of everything stalling.
 const PER_CALL_TIMEOUT_MS = 60_000;
 
-async function geminiGenerate(prompt: string): Promise<string | null> {
-  const apiKey = process.env.GEMINI_API_KEY;
+async function groqGenerate(prompt: string): Promise<string | null> {
+  const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) return null;
 
   for (const model of CANDIDATE_MODELS) {
@@ -24,38 +26,44 @@ async function geminiGenerate(prompt: string): Promise<string | null> {
     const timer = setTimeout(() => controller.abort(), PER_CALL_TIMEOUT_MS);
     try {
       const response = await fetch(
-        `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`,
+        "https://api.groq.com/openai/v1/chat/completions",
         {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] }),
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model,
+            messages: [{ role: "user", content: prompt }],
+          }),
           signal: controller.signal,
         }
       );
 
       if (response.ok) {
         const data = await response.json();
-        const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        const text = data?.choices?.[0]?.message?.content;
         if (typeof text === "string" && text.trim()) return text;
-        // A 200 with no usable text (e.g. safety-blocked) won't get better
-        // on another model — give up rather than burn the whole list.
+        // A 200 with no usable text won't get better on another model —
+        // give up rather than burn the whole list.
         return null;
       }
 
       // ANY non-OK status falls through to the next candidate model. This
       // is the important fix: the previous version returned null on
-      // anything that wasn't a 404, so a single transient 503/429 (Gemini
+      // anything that wasn't a 404, so a single transient 503/429 (model
       // servers briefly overloaded — which happens routinely) killed the
       // entire translation even though the very next model in the list
       // would have answered. Retired models (404), rate limits (429), and
       // server blips (5xx) are now all just "try the next one".
-      console.error(`Gemini error (${model}): ${response.status} — trying next model`);
+      console.error(`Groq error (${model}): ${response.status} — trying next model`);
       continue;
     } catch (err) {
       // Network failure OR the per-call timeout aborting this request — in
       // either case move on to the next model rather than hanging or
       // abandoning the whole translation.
-      console.error(`Gemini request failed/timed out (${model}):`, err);
+      console.error(`Groq request failed/timed out (${model}):`, err);
       continue;
     } finally {
       clearTimeout(timer);
@@ -71,7 +79,7 @@ async function geminiGenerate(prompt: string): Promise<string | null> {
 // back. Returns null on any failure — both callers are always best-effort
 // and must never break the webhook that calls them.
 async function runVttTransform(prompt: string): Promise<string | null> {
-  const result = await geminiGenerate(prompt);
+  const result = await groqGenerate(prompt);
   if (!result) return null;
 
   // Models occasionally wrap output in code fences despite instructions —
@@ -81,7 +89,7 @@ async function runVttTransform(prompt: string): Promise<string | null> {
 
   // Sanity check: must still look like a VTT file with timestamps.
   if (!cleaned.startsWith("WEBVTT") || !cleaned.includes("-->")) {
-    console.error("Gemini VTT output doesn't look valid — skipping.");
+    console.error("Groq VTT output doesn't look valid — skipping.");
     return null;
   }
 

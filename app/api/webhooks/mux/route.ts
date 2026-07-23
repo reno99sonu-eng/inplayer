@@ -12,7 +12,7 @@ import {
 } from "@/app/lib/captions";
 
 // Caption translation (below) runs after the webhook response via after(),
-// but still needs the function alive long enough to finish the Gemini
+// but still needs the function alive long enough to finish the Groq
 // calls. buildCaptionSet now runs those translations concurrently so it
 // comfortably fits, but we give generous headroom anyway — a caption run
 // that gets killed mid-way leaves a video stuck on its raw auto track
@@ -184,7 +184,7 @@ export async function POST(request: NextRequest) {
   // Fires once Mux's auto-generated captions finish. That single track is
   // in the video's SPOKEN language only — this pipeline turns it into the
   // full multi-language set: fetch the generated VTT, translate it via
-  // Gemini into each remaining target language (English/Hindi/Bengali),
+  // Groq into each remaining target language (English/Hindi/Bengali),
   // store the translations, and register them with Mux as real subtitle
   // tracks. Once registered they live in the playback manifest itself, so
   // every device's player shows the language menu natively.

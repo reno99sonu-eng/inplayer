@@ -47,14 +47,14 @@ async function isAuthorized(request: NextRequest): Promise<boolean> {
 //     few calls instead of one call that dies half-done.
 export const maxDuration = 300;
 
-// Stop STARTING new (slow, Gemini-backed) video items once this much wall
+// Stop STARTING new (slow, Groq-backed) video items once this much wall
 // time has passed, so each call always returns real JSON (with a partial
 // result + `remainingVideos`) well before the 300s function ceiling instead
-// of being killed. This works hand-in-hand with the per-Gemini-call timeout
+// of being killed. This works hand-in-hand with the per-Groq-call timeout
 // in app/lib/translate: that caps any single video at ~2 min, and this
 // budget guarantees a new one never STARTS late enough to run past the
 // ceiling. The in-app button just keeps calling until `done`. Shorts are
-// near-instant (no Gemini) and always all finish in the first call.
+// near-instant (no Groq) and always all finish in the first call.
 const TIME_BUDGET_MS = 90_000;
 
 function errMsg(err: unknown): string {
@@ -133,7 +133,7 @@ export async function POST(request: NextRequest) {
   };
   let remainingVideos = 0;
 
-  // Shorts first: they're fast (no Gemini), so a run always fully clears
+  // Shorts first: they're fast (no Groq), so a run always fully clears
   // them even if the slower video work later runs out of time budget.
   for (const item of allItems) {
     if (item.contentType !== "short") continue;
@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
 
   // Videos: rebuild the clean multi-language set from each video's EXISTING
   // transcript — no re-transcription (Mux would just reproduce the same
-  // bad Hindi/Bengali output; the fix lives entirely in the Gemini layer).
+  // bad Hindi/Bengali output; the fix lives entirely in the Groq layer).
   const origin = request.nextUrl.origin;
 
   for (const item of allItems) {
@@ -231,7 +231,7 @@ export async function POST(request: NextRequest) {
       const captionsVtt = await buildCaptionSet(rawVtt, sourceLang);
       const languages = Object.keys(captionsVtt);
 
-      // Nothing came back (Gemini fully unavailable). Don't touch the
+      // Nothing came back (Groq fully unavailable). Don't touch the
       // asset's existing tracks — leave it for a later run to retry.
       if (languages.length === 0) {
         videos.errors.push(`${videoId}: translation produced nothing`);

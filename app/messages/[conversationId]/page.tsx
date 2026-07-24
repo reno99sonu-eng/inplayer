@@ -334,23 +334,51 @@ export default function ConversationThreadPage() {
 </p>
           </div>
         ) : (
-          messages.map((m) => {
+          messages.map((m, index) => {
             const mine = m.senderId === user?.userId;
+            const previous = messages[index - 1];
+
+const showAvatar =
+  !mine &&
+  (!previous || previous.senderId !== m.senderId);
             return (
-              <div key={m.messageId} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
-                <div
-                  className={`max-w-[72%] rounded-2xl px-3.5 py-2 text-sm ${
-                    mine
-                      ? "bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white"
-                      : "border border-white/10 light:border-black/10 bg-white/[0.04] light:bg-slate-100 text-slate-100 light:text-slate-900"
-                  }`}
-                >
-                  <p className="whitespace-pre-wrap break-words">{m.text}</p>
-                  <p className={`mt-0.5 text-[10px] ${mine ? "text-white/70" : "light:text-slate-600 text-slate-500"}`}>
-                    {formatTimeAgo(m.createdAt)}
-                  </p>
-                </div>
-              </div>
+              <div
+  key={m.messageId}
+  className={`flex items-end gap-2 ${
+    mine ? "justify-end" : "justify-start"
+  }`}
+>
+  {!mine &&
+    (showAvatar ? (
+      <img
+        src={displayAvatar}
+        alt={displayUsername}
+        className="h-8 w-8 flex-shrink-0 rounded-full object-cover"
+      />
+    ) : (
+      <div className="w-8 flex-shrink-0" />
+    ))}
+
+  <div
+    className={`max-w-[72%] rounded-2xl px-3.5 py-2 text-sm ${
+      mine
+        ? "bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white"
+        : "border border-white/10 light:border-black/10 bg-white/[0.04] light:bg-slate-100 text-slate-100 light:text-slate-900"
+    }`}
+  >
+    <p className="whitespace-pre-wrap break-words">{m.text}</p>
+
+    <p
+      className={`mt-0.5 text-[10px] ${
+        mine
+          ? "text-white/70"
+          : "light:text-slate-600 text-slate-500"
+      }`}
+    >
+      {formatTimeAgo(m.createdAt)}
+    </p>
+  </div>
+</div>
             );
           })
         )}

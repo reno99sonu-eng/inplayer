@@ -58,7 +58,7 @@ export default function ShortsPageContent({
   const { signedIn, user, openSignIn } = useAuthModal();
 
   const shorts = initialShorts;
-
+  console.log(initialShorts);
   const [activeIndex, setActiveIndex] = useState(0);
   // Try for sound from the very first frame (matches the watch page) —
   // paired with autoPlay="any" below, which attempts unmuted playback

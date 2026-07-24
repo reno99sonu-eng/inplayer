@@ -36,9 +36,16 @@ export async function resolveUsernames(
           })
         );
         const username = result.Item?.username as string | undefined;
-        if (username) {
-          map.set(userId, username);
-        }
+
+console.log({
+  userId,
+  item: result.Item,
+  username,
+});
+
+if (username) {
+  map.set(userId, username);
+}
       } catch (err) {
         // A single bad lookup shouldn't take down the whole page — skip
         // it and let the caller fall back to non-linked rendering.

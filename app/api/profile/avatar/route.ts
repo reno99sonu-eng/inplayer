@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
+import { ensureUsername } from "@/app/lib/ensureUsername";
 
 const DEFAULT_SOCIAL_LINKS = { social: {}, other: [] };
 
@@ -20,12 +21,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Please sign in." }, { status: 401 });
   }
 
-  const result = await docClient.send(
-    new GetCommand({
-      TableName: "InPlayer-Users",
-      Key: { userId: user.userId },
-    })
-  );
+  await ensureUsername(user.userId);
+
+const result = await docClient.send(
+  new GetCommand({
+    TableName: "InPlayer-Users",
+    Key: { userId: user.userId },
+  })
+);
 
   return NextResponse.json({
     avatarUrl: result.Item?.avatarUrl || null,

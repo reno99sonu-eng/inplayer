@@ -4,6 +4,7 @@ import mux, { muxErrorMessages } from "@/app/lib/mux";
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
 import { THUMBNAIL_DATA_URL_MAX_LENGTH } from "@/app/lib/imageCompress";
+import { ensureUsername } from "@/app/lib/ensureUsername";
 
 export async function POST(request: NextRequest) {
   let user;
@@ -16,7 +17,9 @@ export async function POST(request: NextRequest) {
       { status: 401 }
     );
   }
-
+  
+  await ensureUsername(user.userId);
+  
   try {
     const body = await request.json();
     const {

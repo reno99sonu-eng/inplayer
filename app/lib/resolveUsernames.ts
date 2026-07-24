@@ -37,11 +37,7 @@ export async function resolveUsernames(
         );
         const username = result.Item?.username as string | undefined;
 
-console.log({
-  userId,
-  item: result.Item,
-  username,
-});
+        console.log(JSON.stringify(result.Item, null, 2));
 
 if (username) {
   map.set(userId, username);

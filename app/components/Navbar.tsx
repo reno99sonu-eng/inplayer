@@ -35,7 +35,7 @@ const moreChannels = [
 const youItems = [
   { label: "Your Channel", href: "/my-videos" },
   { label: "History", href: "/history" },
-  { label: "Watchlist", href: "/watchlist" },
+  { label: "Shop", href: "/shop" },
   { label: "Downloads", href: "/downloads" },
 ];
 
@@ -712,7 +712,7 @@ lg:right-auto
                   Company
                 </h4>
                 <ul className="mt-2 space-y-1.5">
-                  {["About", "Careers", "Partners", "Support", "Privacy", "Terms"].map(
+                {["About", "Privacy", "Terms"].map(
                     (item) => (
                       <li key={item}>
                         <button className="text-xs text-slate-400 light:text-slate-600 transition hover:text-orange-300 light:hover:text-orange-600">

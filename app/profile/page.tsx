@@ -23,10 +23,8 @@ import { isValidUsernameFormat } from "@/app/lib/username";
 
 const SOCIAL_PLATFORMS = [
   { key: "instagram", label: "Instagram", placeholder: "instagram.com/yourname" },
-  { key: "youtube", label: "YouTube", placeholder: "youtube.com/@yourname" },
   { key: "x", label: "X (Twitter)", placeholder: "x.com/yourname" },
   { key: "facebook", label: "Facebook", placeholder: "facebook.com/yourname" },
-  { key: "tiktok", label: "TikTok", placeholder: "tiktok.com/@yourname" },
 ] as const;
 
 const PRIVACY_OPTIONS: { value: UsernamePrivacy; label: string; desc: string; icon: ReactNode }[] = [
@@ -641,56 +639,6 @@ export default function ProfilePage() {
                 </div>
               ))}
             </div>
-          </div>
-
-          <div className="mt-6 border-t border-white/10 light:border-black/10 pt-5">
-            <div className="flex items-center justify-between">
-              <h3 className="text-xs font-bold uppercase tracking-[0.15em] text-slate-400 light:text-slate-600">
-                Other links
-              </h3>
-              {otherLinksDraft.length < 5 && (
-                <button
-                  type="button"
-                  onClick={addOtherLink}
-                  className="flex items-center gap-1 text-xs font-semibold text-orange-300 light:text-orange-700"
-                >
-                  <Plus size={13} /> Add
-                </button>
-              )}
-            </div>
-
-            {otherLinksDraft.length === 0 ? (
-              <p className="mt-2 text-xs text-slate-500">
-                Add up to 5 — a website, a Discord server, anything else you want on your channel.
-              </p>
-            ) : (
-              <div className="mt-2.5 space-y-2.5">
-                {otherLinksDraft.map((entry, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <input
-                      value={entry.label}
-                      onChange={(e) => updateOtherLink(i, "label", e.target.value)}
-                      placeholder="Label"
-                      className="w-[100px] flex-shrink-0 rounded-xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] px-3 py-2.5 text-sm text-white light:text-slate-900 caret-orange-400 outline-none transition focus:border-orange-400/50"
-                    />
-                    <input
-                      value={entry.url}
-                      onChange={(e) => updateOtherLink(i, "url", e.target.value)}
-                      placeholder="yourwebsite.com"
-                      className="min-w-0 flex-1 rounded-xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] px-3 py-2.5 text-sm text-white light:text-slate-900 caret-orange-400 outline-none transition focus:border-orange-400/50"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => removeOtherLink(i)}
-                      aria-label="Remove link"
-                      className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-slate-400 transition hover:bg-red-500/10 hover:text-red-400"
-                    >
-                      <X size={15} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
 
           {linksError && (

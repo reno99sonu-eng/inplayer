@@ -225,7 +225,7 @@ export default function ConversationThreadPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-[#06101D] light:bg-[#FAF5E9] text-white light:text-slate-900">
-      <div className="flex items-center gap-3 border-b border-white/10 light:border-black/10 px-5 py-4">
+      <div className="flex items-center gap-3 border-b border-white/10 light:border-black/10 px-4 py-3">
         <button
           onClick={() => router.push("/messages")}
           className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 transition hover:bg-white/15 light:hover:bg-black/10"
@@ -326,7 +326,7 @@ export default function ConversationThreadPage() {
         </div>
       )}
 
-      <div className="mx-auto w-full max-w-3xl flex-1 space-y-3 overflow-y-auto px-5 py-6">
+<div className="mx-auto w-full max-w-3xl flex-1 space-y-2 overflow-y-auto px-4 py-4">
         {messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center py-16 text-center">
             <p className="text-sm text-slate-400 light:text-slate-800">
@@ -339,14 +339,14 @@ export default function ConversationThreadPage() {
             return (
               <div key={m.messageId} className={`flex ${mine ? "justify-end" : "justify-start"}`}>
                 <div
-                  className={`max-w-[75%] rounded-3xl px-4 py-2.5 text-sm ${
+                  className={`max-w-[72%] rounded-2xl px-3.5 py-2 text-sm ${
                     mine
                       ? "bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white"
                       : "border border-white/10 light:border-black/10 bg-white/[0.04] light:bg-slate-100 text-slate-100 light:text-slate-900"
                   }`}
                 >
                   <p className="whitespace-pre-wrap break-words">{m.text}</p>
-                  <p className={`mt-1 text-[10px] ${mine ? "text-white/70" : "light:text-slate-600 text-slate-500"}`}>
+                  <p className={`mt-0.5 text-[10px] ${mine ? "text-white/70" : "light:text-slate-600 text-slate-500"}`}>
                     {formatTimeAgo(m.createdAt)}
                   </p>
                 </div>
@@ -357,7 +357,7 @@ export default function ConversationThreadPage() {
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="border-t border-white/10 light:border-black/10 px-5 py-4">
+      <div className="border-t border-white/10 light:border-black/10 px-4 py-3">
         {isBlocked ? (
           <p className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.02] light:bg-black/[0.02] px-4 py-3 text-center text-xs text-slate-400 light:text-slate-600">
             {conversation?.blocked
@@ -376,12 +376,12 @@ export default function ConversationThreadPage() {
                 }
               }}
               placeholder="Message..."
-              className="min-w-0 flex-1 rounded-full border border-white/10 light:border-slate-300 bg-white/[0.03] light:bg-white px-4 py-3 text-sm text-white light:text-slate-900 placeholder:text-slate-500 caret-orange-500 shadow-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-300/30"
+              className="min-w-0 flex-1 rounded-full border border-white/10 light:border-slate-300 bg-white/[0.03] light:bg-white px-4 py-2.5 text-sm text-white light:text-slate-900 placeholder:text-slate-500 caret-orange-500 shadow-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-300/30"
             />
             <button
               onClick={handleSend}
               disabled={sending || !text.trim()}
-              className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white transition hover:-translate-y-0.5 disabled:opacity-50"
+              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white transition hover:-translate-y-0.5 disabled:opacity-50"
             >
               {sending ? <Loader2 size={17} className="animate-spin" /> : <Send size={17} />}
             </button>

@@ -864,8 +864,12 @@ export default function ShortsPageContent({
                         </div>
 
                         <span className="text-xs font-semibold text-white lg:text-sm">
-                          {short.creator}
-                        </span>
+  {short.creator}
+  <br />
+  <span className="text-[10px] text-yellow-300">
+    @{String(short.uploaderUsername)}
+  </span>
+</span>
                       </Link>
                     ) : (
                       <>

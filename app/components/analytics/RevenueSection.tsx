@@ -172,8 +172,8 @@ export default function RevenueSection({
           <IndianRupee size={16} />
         </div>
         <h3 className="text-sm font-bold text-white light:text-slate-900">
-          {contentLabel} revenue &amp; KYC
-        </h3>
+  Revenue &amp; KYC
+</h3>
       </div>
 
       {loading || !payoutStatus ? (

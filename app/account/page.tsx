@@ -6,7 +6,7 @@ import {
   UserCog,
   User,
   Clock,
-  Heart,
+  MessageCircle,
   Download,
   Settings,
   HelpCircle,
@@ -24,7 +24,7 @@ export default function AccountPage() {
     { icon: UserCog, title: "Edit Profile", href: "/profile" },
     { icon: User, title: "Your Channel", href: "/my-videos" },
     { icon: Clock, title: "History", href: "/history" },
-    { icon: Heart, title: "Watchlist", href: "/watchlist" },
+    { icon: MessageCircle, title: "My Messages", href: "/messages" },
     { icon: Download, title: "Downloads", href: "/downloads" },
     { icon: Settings, title: "Settings", href: "/settings" },
     { icon: HelpCircle, title: "Help & Support", href: "/help" },
@@ -64,7 +64,7 @@ export default function AccountPage() {
         <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
           <h3 className="text-xl font-black">Sign in to InPlayer</h3>
           <p className="mt-2 text-sm text-slate-400 light:text-slate-600">
-            Access your channel, watchlist, history, and more.
+          Access your channel, messages, history, and more.
           </p>
           <button
             onClick={openSignIn}

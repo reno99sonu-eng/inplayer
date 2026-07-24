@@ -1,5 +1,6 @@
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
+import { ensureUsername } from "@/app/lib/ensureUsername";
 
 // Shared userId -> username resolver, used by every read path that needs
 // to turn an uploaderId/userId into a real profile link (/u/[username]):
@@ -35,9 +36,20 @@ export async function resolveUsernames(
             Key: { userId },
           })
         );
-        const username = result.Item?.username as string | undefined;
+        let username = result.Item?.username as string | undefined;
 
-        console.log(JSON.stringify(result.Item, null, 2));
+if (!username) {
+  await ensureUsername(userId);
+
+  const refreshed = await docClient.send(
+    new GetCommand({
+      TableName: "InPlayer-Users",
+      Key: { userId },
+    })
+  );
+
+  username = refreshed.Item?.username as string | undefined;
+}
 
 if (username) {
   map.set(userId, username);

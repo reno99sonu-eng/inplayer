@@ -6,7 +6,8 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "backfill-usernames": "tsx scripts/backfill-usernames.ts"
   },
   "dependencies": {
     "@aws-amplify/ui-react": "^6.15.4",
@@ -16,6 +17,7 @@
     "@mux/mux-player-react": "^3.13.0",
     "aws-amplify": "^6.18.0",
     "aws-jwt-verify": "^5.2.1",
+    "dotenv": "^17.4.2",
     "lucide-react": "^1.23.0",
     "next": "16.2.10",
     "react": "19.2.4",
@@ -30,6 +32,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
     "tailwindcss": "^4",
+    "tsx": "^4.23.1",
     "typescript": "^5"
   }
 }

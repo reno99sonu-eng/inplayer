@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, Suspense } from "react";
 import Image from "next/image";
-
+import { fetchAuthSession } from "aws-amplify/auth";
 import NavbarLogo from "./NavbarLogo";
 import NavbarLinks from "./NavbarLinks";
 import { Menu, X, Search, Home, PlaySquare, ChevronRight, ChevronDown, LogOut, Mail, Copy, Check } from "lucide-react";
@@ -16,21 +16,7 @@ import MobileSearchOverlay from "./MobileSearchOverlay";
 import { useRouter } from "next/navigation";
 import { CONTACT_EMAILS } from "@/app/lib/contactEmails";
 
-const subscribedChannels = [
-  { name: "ArjunCreates", avatar: "/recommendations/avatars/1.jpg", hasNew: true },
-  { name: "TechVerse", avatar: "/recommendations/avatars/2.jpg", hasNew: true },
-  { name: "HomeHack", avatar: "/recommendations/avatars/10.jpg", hasNew: false },
-  { name: "SketchVerse", avatar: "/recommendations/avatars/9.jpg", hasNew: true },
-  { name: "CodeCanvas", avatar: "/recommendations/avatars/16.jpg", hasNew: false },
-  { name: "Wild Miles", avatar: "/recommendations/avatars/12.jpg", hasNew: false },
-  { name: "Chef Armaan", avatar: "/recommendations/avatars/17.jpg", hasNew: true },
-];
 
-const moreChannels = [
-  { name: "Fit Theory", avatar: "/recommendations/avatars/19.jpg", hasNew: false },
-  { name: "Hidden Earth", avatar: "/recommendations/avatars/23.jpg", hasNew: false },
-  { name: "Ocean Trails", avatar: "/recommendations/avatars/25.jpg", hasNew: true },
-];
 
 const youItems = [
   { label: "Your Channel", href: "/my-videos" },
@@ -41,6 +27,17 @@ const youItems = [
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
+
+  const [subscribedChannels, setSubscribedChannels] = useState<
+    {
+      creatorId: string;
+      username: string;
+      name: string;
+      avatarUrl: string | null;
+      notifyEnabled: boolean;
+    }[]
+  >([]);
+
   const [showMoreChannels, setShowMoreChannels] = useState(false);
   const [contactOpen, setContactOpen] = useState(false);
   const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
@@ -48,6 +45,41 @@ export default function Navbar() {
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const { signedIn, user, signOut, openSignIn, openSignUp } = useAuthModal();
+  useEffect(() => {
+    if (!signedIn) {
+      setSubscribedChannels([]);
+      return;
+    }
+  
+    async function loadSubscriptions() {
+      try {
+        const session = await fetchAuthSession();
+        const idToken = session.tokens?.idToken?.toString();
+    
+        if (!idToken) {
+          return;
+        }
+    
+        const res = await fetch("/api/subscriptions/list", {
+          headers: {
+            Authorization: `Bearer ${idToken}`,
+          },
+        });
+    
+        if (!res.ok) {
+          console.error(await res.text());
+          return;
+        }
+    
+        const data = await res.json();
+        setSubscribedChannels(data.subscriptions ?? []);
+      } catch (err) {
+        console.error("Failed to load subscriptions:", err);
+      }
+    }
+  
+    loadSubscriptions();
+  }, [signedIn]);
 
   const copyEmail = async (address: string) => {
     try {
@@ -495,119 +527,65 @@ lg:right-auto
               </button>
 
               <div className="space-y-0.5">
-                {subscribedChannels.map((channel) => (
-                  <button
-                    key={channel.name}
-                    className="
-                      flex
-                      w-full
-                      items-center
-                      gap-3
-                      rounded-xl
-                      px-3
-                      py-1.5
-                      text-left
-                      transition-all
-                      duration-300
-                      hover:bg-white/5
-                      light:hover:bg-black/5
-                      hover:translate-x-1
-                    "
-                  >
-                    <div className="relative h-7 w-7 flex-shrink-0 overflow-hidden rounded-full">
-                      <Image
-                        src={channel.avatar}
-                        alt={channel.name}
-                        fill
-                        sizes="28px"
-                        className="object-cover"
-                      />
-                    </div>
+  {subscribedChannels.length === 0 ? (
+    <div className="rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-4 text-center">
+      <p className="text-sm font-medium text-slate-200 light:text-slate-700">
+        You don't have any subscribed channels yet.
+      </p>
 
-                    <span className="flex-1 truncate text-sm text-slate-200 light:text-slate-700">
-                      {channel.name}
-                    </span>
+      <p className="mt-1 text-xs text-slate-400 light:text-slate-500">
+        Subscribe to your favourite creators and they'll appear here.
+      </p>
 
-                    {channel.hasNew && (
-                      <span className="h-2 w-2 flex-shrink-0 rounded-full bg-orange-400" />
-                    )}
-                  </button>
-                ))}
+      <button
+        onClick={() => goTo("/creators")}
+        className="mt-3 rounded-lg bg-orange-500 px-4 py-2 text-xs font-semibold text-white transition hover:bg-orange-600"
+      >
+        Discover Creators
+      </button>
+    </div>
+  ) : (
+    subscribedChannels.map((channel) => (
+      <button
+        key={channel.creatorId}
+        className="
+          flex
+          w-full
+          items-center
+          gap-3
+          rounded-xl
+          px-3
+          py-1.5
+          text-left
+          transition-all
+          duration-300
+          hover:bg-white/5
+          light:hover:bg-black/5
+          hover:translate-x-1
+        "
+      >
+        <div className="relative h-7 w-7 flex-shrink-0 overflow-hidden rounded-full">
+          <Image
+            src={channel.avatarUrl || "/recommendations/avatars/default.jpg"}
+            alt={channel.name}
+            fill
+            sizes="28px"
+            className="object-cover"
+          />
+        </div>
 
-                {showMoreChannels &&
-                  moreChannels.map((channel) => (
-                    <button
-                      key={channel.name}
-                      className="
-                        flex
-                        w-full
-                        items-center
-                        gap-3
-                        rounded-xl
-                        px-3
-                        py-1.5
-                        text-left
-                        transition-all
-                        duration-300
-                        hover:bg-white/5
-                        light:hover:bg-black/5
-                        hover:translate-x-1
-                      "
-                    >
-                      <div className="relative h-7 w-7 flex-shrink-0 overflow-hidden rounded-full">
-                        <Image
-                          src={channel.avatar}
-                          alt={channel.name}
-                          fill
-                          sizes="28px"
-                          className="object-cover"
-                        />
-                      </div>
+        <span className="flex-1 truncate text-sm text-slate-200 light:text-slate-700">
+          {channel.name}
+        </span>
 
-                      <span className="flex-1 truncate text-sm text-slate-200 light:text-slate-700">
-                        {channel.name}
-                      </span>
-
-                      {channel.hasNew && (
-                        <span className="h-2 w-2 flex-shrink-0 rounded-full bg-orange-400" />
-                      )}
-                    </button>
-                  ))}
-              </div>
-
-              <button
-                onClick={() => setShowMoreChannels(!showMoreChannels)}
-                className="
-                  mt-0.5
-                  flex
-                  w-full
-                  items-center
-                  gap-4
-                  rounded-xl
-                  px-3
-                  py-1.5
-                  text-left
-                  text-slate-400
-                  light:text-slate-600
-                  transition-all
-                  duration-300
-                  hover:bg-white/5
-                  light:hover:bg-black/5
-                  hover:text-orange-300
-                  light:hover:text-orange-600
-                "
-              >
-                <ChevronDown
-                  size={17}
-                  className={`transition-transform duration-300 ${
-                    showMoreChannels ? "rotate-180" : ""
-                  }`}
-                />
-                <span className="text-sm font-semibold">
-                  {showMoreChannels ? "Show less" : "Show more"}
-                </span>
-              </button>
-            </div>
+        {channel.notifyEnabled && (
+          <span className="h-2 w-2 flex-shrink-0 rounded-full bg-orange-400" />
+        )}
+      </button>
+    ))
+  )}
+</div>
+             </div>
               </>
             )}
 

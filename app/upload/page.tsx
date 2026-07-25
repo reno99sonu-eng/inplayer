@@ -48,6 +48,15 @@ export default function UploadPage() {
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
   const [thumbnailBusy, setThumbnailBusy] = useState(false);
   const [thumbnailError, setThumbnailError] = useState<string | null>(null);
+  const [aiGenerating, setAiGenerating] = useState(false);
+
+const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
+
+const [aiType, setAiType] = useState<
+  "title" | "description" | "tags" | null
+>(null);
+
+const [aiError, setAiError] = useState<string | null>(null);
 
   const handleThumbnailSelected = async (selected: File) => {
     if (!selected.type.startsWith("image/")) {
@@ -164,7 +173,73 @@ export default function UploadPage() {
     setDragActive(false);
     handleFile(e.dataTransfer.files?.[0] || null);
   };
-
+  const handleGenerateAI = async (
+    type: "title" | "description" | "tags"
+  ) => {
+    setAiGenerating(true);
+    setAiError(null);
+    setAiSuggestions([]);
+    setAiType(type);
+  
+    try {
+      const response = await fetch("/api/ai-generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          prompt:
+            type === "title"
+              ? `Generate five engaging YouTube-style titles for a ${category} video.
+        
+        Current title: ${title}
+        
+        Description:
+        ${description}
+        
+        Return only the titles, one per line.`
+              : type === "description"
+              ? `Write a professional YouTube description for this ${category} video.
+        
+        Title:
+        ${title}
+        
+        Return only the description.`
+              : `Generate 15 SEO-friendly tags for this ${category} video.
+        
+        Title:
+        ${title}
+        
+        Description:
+        ${description}
+        
+        Return only comma-separated tags.`,
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || "AI generation failed.");
+      }
+      
+      if (type === "title") {
+        const firstTitle = data.text
+          .split("\n")
+          .map((line: string) => line.replace(/^\d+[\).\-\s]*/, "").trim())
+          .find((line: string) => line.length > 0);
+      
+        if (firstTitle) {
+          setTitle(firstTitle);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      setAiError("AI couldn't generate content.");
+    } finally {
+      setAiGenerating(false);
+    }
+  };
   const handlePublish = async () => {
     if (!file) return;
 
@@ -194,17 +269,32 @@ export default function UploadPage() {
           Authorization: `Bearer ${idToken}`,
         },
         body: JSON.stringify({
-          title: title.trim(),
-          description: description.trim(),
-          category,
-          contentType,
-          spokenLanguage,
-          visibility,
-          tags,
-          madeForKids,
-          ageRestricted,
-          commentsEnabled,
-          thumbnailDataUrl: thumbnailPreview || undefined,
+          prompt:
+            type === "title"
+              ? `Generate five engaging YouTube-style titles for a ${category} video.
+        
+        Current title: ${title}
+        
+        Description:
+        ${description}
+        
+        Return only the titles, one per line.`
+              : type === "description"
+              ? `Write a professional YouTube description for this ${category} video.
+        
+        Title:
+        ${title}
+        
+        Return only the description.`
+              : `Generate 15 SEO-friendly tags for this ${category} video.
+        
+        Title:
+        ${title}
+        
+        Description:
+        ${description}
+        
+        Return only comma-separated tags.`,
         }),
       });
 
@@ -381,6 +471,8 @@ export default function UploadPage() {
               value={metadataValue}
               onChange={handleMetadataChange}
               categories={CATEGORIES}
+              aiGenerating={aiGenerating}
+              onGenerateAI={handleGenerateAI}
               thumbnail={{
                 previewUrl: thumbnailPreview,
                 onFileSelected: handleThumbnailSelected,

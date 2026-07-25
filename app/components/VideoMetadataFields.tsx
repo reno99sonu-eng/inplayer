@@ -47,11 +47,26 @@ export interface VideoMetadataValue {
 }
 
 export interface ThumbnailPickerProps {
-  /** Data URL of a newly-picked image, or the existing thumbnail to preview. Null shows the empty state. */
+  /** Existing thumbnail or newly uploaded thumbnail preview */
   previewUrl: string | null;
+
+  /** User uploads a custom thumbnail */
   onFileSelected: (file: File) => void;
+
+  /** Processing state */
   busy?: boolean;
+
+  /** Upload error */
   error?: string | null;
+
+  /** Mux-generated thumbnail choices */
+  muxFrames?: string[];
+
+  /** Currently selected Mux thumbnail */
+  selectedMuxThumbnail?: string | null;
+
+  /** Called when a Mux thumbnail is selected */
+  onMuxThumbnailSelected?: (url: string) => void;
 }
 
 interface VideoMetadataFieldsProps {
@@ -63,6 +78,11 @@ interface VideoMetadataFieldsProps {
   thumbnail?: ThumbnailPickerProps;
   tagInput: string;
   onTagInputChange: (value: string) => void;
+  aiGenerating?: boolean;
+
+onGenerateAI?: (
+  type: "title" | "description" | "tags"
+) => Promise<void>;
 }
 
 // A small on/off switch row used for the age-restriction and comments
@@ -117,9 +137,19 @@ export default function VideoMetadataFields({
   allowContentTypeChange = true,
   thumbnail,
   tagInput,
-  onTagInputChange,
+onTagInputChange,
+aiGenerating = false,
+onGenerateAI,
 }: VideoMetadataFieldsProps) {
   const thumbInputRef = useRef<HTMLInputElement>(null);
+  const muxFrames = thumbnail?.muxFrames ?? [];
+  const runAI = async (
+    type: "title" | "description" | "tags"
+  ) => {
+    if (!onGenerateAI || aiGenerating) return;
+  
+    await onGenerateAI(type);
+  };
 
   const addTag = () => {
     const t = tagInput.trim().replace(/^#/, "");
@@ -136,60 +166,160 @@ export default function VideoMetadataFields({
   return (
     <div className="space-y-5">
       {thumbnail && (
-        <div>
-          <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-600">
-            Thumbnail
-          </label>
-          <div
-            onClick={() => thumbInputRef.current?.click()}
-            role="button"
-            tabIndex={0}
-            className="group relative flex aspect-video w-full max-w-[280px] cursor-pointer items-center justify-center overflow-hidden rounded-2xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-black/[0.03]"
+  <div className="space-y-5">
+    <label className="block text-xs font-medium text-slate-400 light:text-slate-600">
+      Thumbnail
+    </label>
+
+    <div className="space-y-3">
+  <div>
+    <p className="font-semibold text-white light:text-slate-900">
+      🎬 Choose from Video
+    </p>
+
+    <p className="mt-1 text-xs text-slate-400 light:text-slate-600">
+      Pick one of the automatically generated thumbnails from your uploaded
+      video.
+    </p>
+  </div>
+
+  {muxFrames.length > 0 ? (
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      {muxFrames.map((frameUrl) => {
+        const selected =
+          thumbnail?.selectedMuxThumbnail === frameUrl;
+
+        return (
+          <button
+            key={frameUrl}
+            type="button"
+            onClick={() =>
+              thumbnail?.onMuxThumbnailSelected?.(frameUrl)
+            }
+            className={`overflow-hidden rounded-xl border transition-all ${
+              selected
+                ? "border-orange-500 ring-2 ring-orange-500"
+                : "border-white/10 hover:border-orange-400/50"
+            }`}
           >
-            {thumbnail.previewUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element -- data-URL/remote preview inside a small fixed form control; next/image's fill+sizes ceremony adds nothing here.
-              <img
-                src={thumbnail.previewUrl}
-                alt="Thumbnail preview"
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <div className="flex flex-col items-center gap-1.5 text-slate-500">
-                <UploadCloud size={20} />
-                <span className="text-[11px] font-medium">Choose a thumbnail</span>
-              </div>
-            )}
-            <div className="absolute inset-0 flex items-center justify-center bg-black/55 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-              <span className="text-xs font-semibold text-white">
-                {thumbnail.busy ? "Processing…" : "Change thumbnail"}
-              </span>
-            </div>
-            <input
-              ref={thumbInputRef}
-              type="file"
-              accept="image/*"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) thumbnail.onFileSelected(f);
-                e.target.value = "";
-              }}
+            <img
+              src={frameUrl}
+              alt="Video thumbnail"
+              className="aspect-video w-full object-cover"
             />
+          </button>
+        );
+      })}
+    </div>
+  ) : (
+    <div className="flex aspect-video items-center justify-center rounded-xl border border-dashed border-white/10 bg-white/5 text-sm text-slate-500">
+      Thumbnails will appear after your video finishes processing.
+    </div>
+  )}
+</div>
+
+    {/* Upload Custom Thumbnail */}
+    <div>
+      <p className="mb-2 text-xs font-medium text-slate-400 light:text-slate-600">
+        Upload Custom Thumbnail
+      </p>
+
+      <div
+        onClick={() => thumbInputRef.current?.click()}
+        role="button"
+        tabIndex={0}
+        className="group relative flex aspect-video w-full max-w-[280px] cursor-pointer items-center justify-center overflow-hidden rounded-2xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-black/[0.03]"
+      >
+        {thumbnail.previewUrl ? (
+  <div className="relative h-full w-full">
+    <img
+      src={thumbnail.previewUrl}
+      alt="Thumbnail preview"
+      className="h-full w-full object-cover"
+    />
+
+    <div className="absolute left-2 top-2 rounded-full bg-orange-500 px-2 py-1 text-[10px] font-semibold text-white shadow">
+      Custom
+    </div>
+  </div>
+) : (
+          <div className="flex flex-col items-center gap-1.5 text-slate-500">
+            <UploadCloud size={20} />
+            <span className="text-[11px] font-medium">
+              Choose a thumbnail
+            </span>
           </div>
-          <p className="mt-1.5 text-xs text-slate-500">
-            Cropped to a consistent 16:9 frame automatically, so it looks
-            right everywhere it&apos;s shown — on every device.
-          </p>
-          {thumbnail.error && (
-            <p className="mt-1 text-xs text-red-400">{thumbnail.error}</p>
-          )}
+        )}
+
+        <div className="absolute inset-0 flex items-center justify-center bg-black/55 opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+          <span className="text-xs font-semibold text-white">
+            {thumbnail.busy ? "Processing…" : "Change thumbnail"}
+          </span>
         </div>
+
+        <input
+          ref={thumbInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) thumbnail.onFileSelected(f);
+            e.target.value = "";
+          }}
+        />
+      </div>
+
+      <p className="mt-1.5 text-xs text-slate-500">
+  Upload a custom image to override the automatically generated video
+  thumbnails.
+</p>
+
+      {thumbnail.error && (
+        <p className="mt-1 text-xs text-red-400">
+          {thumbnail.error}
+        </p>
       )}
+    </div>
+
+    {/* AI Thumbnail */}
+    <button
+      type="button"
+      disabled
+      className="w-full rounded-2xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-black/[0.03] p-4 text-left opacity-60 cursor-not-allowed"
+    >
+      <div className="flex items-center justify-between">
+        <div>
+          <p className="font-semibold text-white light:text-slate-900">
+            ✨ Generate AI Thumbnail
+          </p>
+          <p className="mt-1 text-xs text-slate-400 light:text-slate-600">
+            Create an AI-powered thumbnail based on your uploaded video.
+          </p>
+        </div>
+
+        <span className="rounded-full bg-orange-500/15 px-2 py-1 text-[10px] font-semibold text-orange-300">
+          Coming Soon
+        </span>
+      </div>
+    </button>
+  </div>
+)}
 
       <div>
         <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-600">
           Title
         </label>
+        <div className="mb-3 flex items-center justify-end">
+  <button
+    type="button"
+    onClick={() => runAI("title")}
+    disabled={aiGenerating}
+    className="rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
+  >
+    {aiGenerating ? "Generating..." : "✨ Generate AI Title"}
+  </button>
+</div>
         <input
           type="text"
           value={value.title}

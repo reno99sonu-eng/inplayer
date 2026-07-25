@@ -22,14 +22,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const apiKey = process.env.GROQ_API_KEY;
+    console.log("GROQ_API_KEY exists:", !!process.env.GROQ_API_KEY);
 
-    if (!apiKey) {
-      return NextResponse.json(
-        { error: "AI is not configured yet. Please contact the site admin." },
-        { status: 500 }
-      );
-    }
+const apiKey = process.env.GROQ_API_KEY;
+
+if (!apiKey) {
+  return NextResponse.json(
+    {
+      error: "AI is not configured yet. Please contact the site admin.",
+      debug: "GROQ_API_KEY is missing",
+    },
+    { status: 500 }
+  );
+}
 
     let lastErrorStatus = 500;
 

@@ -35,6 +35,7 @@ interface MyVideo {
   category: string;
   status: string;
   thumbnailUrl?: string;
+  muxPlaybackId?: string;
   views: number;
   uploadedAt: string;
   contentType?: string;
@@ -77,6 +78,7 @@ export default function MyVideosPage() {
   const [editThumbnailPreview, setEditThumbnailPreview] = useState<string | null>(null);
   const [editThumbnailBusy, setEditThumbnailBusy] = useState(false);
   const [editThumbnailError, setEditThumbnailError] = useState<string | null>(null);
+  const [selectedMuxThumbnail, setSelectedMuxThumbnail] = useState<string | null>(null);
 
   const [savingId, setSavingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -155,12 +157,14 @@ export default function MyVideosPage() {
     setEditThumbnailPreview(null);
     setEditThumbnailBusy(false);
     setEditThumbnailError(null);
+    setSelectedMuxThumbnail(null);
     setError(null);
   };
 
   const cancelEditing = () => {
     setEditingId(null);
     setEditValue(null);
+    setSelectedMuxThumbnail(null);
     setError(null);
   };
 
@@ -221,6 +225,7 @@ export default function MyVideosPage() {
           commentsEnabled: editValue.commentsEnabled,
           spokenLanguage: editValue.spokenLanguage,
           thumbnailDataUrl: editThumbnailPreview || undefined,
+          thumbnailUrl: selectedMuxThumbnail || undefined,
         }),
       });
 
@@ -244,7 +249,10 @@ export default function MyVideosPage() {
                 ageRestricted: editValue.ageRestricted,
                 commentsEnabled: editValue.commentsEnabled,
                 spokenLanguage: editValue.spokenLanguage,
-                ...(editThumbnailPreview && { thumbnailUrl: editThumbnailPreview }),
+                thumbnailUrl:
+                  editThumbnailPreview ||
+                  selectedMuxThumbnail ||
+                  v.thumbnailUrl,
               }
             : v
         )
@@ -431,6 +439,22 @@ export default function MyVideosPage() {
                               onFileSelected: handleEditThumbnailSelected,
                               busy: editThumbnailBusy,
                               error: editThumbnailError,
+                            
+                              muxFrames: video.muxPlaybackId
+  ? [
+      `https://image.mux.com/${video.muxPlaybackId}/thumbnail.jpg?time=2`,
+      `https://image.mux.com/${video.muxPlaybackId}/thumbnail.jpg?time=5`,
+      `https://image.mux.com/${video.muxPlaybackId}/thumbnail.jpg?time=10`,
+      `https://image.mux.com/${video.muxPlaybackId}/thumbnail.jpg?time=15`,
+    ]
+  : [],
+                            
+                              selectedMuxThumbnail,
+                            
+                              onMuxThumbnailSelected: (url) => {
+                                setSelectedMuxThumbnail(url);
+                                setEditThumbnailPreview(null);
+                              },
                             }}
                             tagInput={editTagInput}
                             onTagInputChange={setEditTagInput}

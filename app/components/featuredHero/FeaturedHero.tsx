@@ -54,7 +54,8 @@ export default function FeaturedHero() {
         className="
           relative w-full overflow-hidden bg-black animate-pulse
           min-h-[260px] sm:min-h-[300px] md:min-h-[340px]
-          lg:h-[38vh] xl:h-[42vh] 2xl:h-[46vh]
+          lg:aspect-video
+          lg:max-h-[650px]
         "
       />
     );

@@ -34,17 +34,14 @@ export default function RootLayout({
     duration-300
   `}
 >
-{/* Applies the theme class BEFORE anything paints, so the very first
-    frame already matches: a saved choice wins; otherwise Auto picks by
-    local time of day (light 6:00–17:59, dark at night — keep in sync
-    with ThemeProvider). Without this, the page always flashed dark on
-    first load because the theme was only applied after React hydrated. */}
+{/*
 <script
   dangerouslySetInnerHTML={{
     __html:
       '(function(){try{var t=localStorage.getItem("inplayer-theme");var r=(t==="light"||t==="dark")?t:((new Date().getHours()>=6&&new Date().getHours()<18)?"light":"dark");document.documentElement.classList.add(r);}catch(e){document.documentElement.classList.add("dark");}})();',
   }}
 />
+*/}
 <AuthProvider>
   <SettingsProvider>
     <ThemeProvider>

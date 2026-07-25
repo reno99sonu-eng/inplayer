@@ -5,7 +5,8 @@
 export interface FeaturedSlide {
   videoId: string;
   title: string;
-  creator: string;
-  thumbnail: string | null;
-  views: number; // views over the trailing 7 days, not the video's all-time count
+  uploaderName: string;
+  uploaderAvatarUrl: string | null;
+  thumbnailUrl: string | null;
+  windowViews: number;
 }

@@ -98,7 +98,7 @@ export default function FeaturedHeroContent({
         className="animate-hero-fade-up mt-3 flex items-center gap-1.5"
       >
         <span className="text-sm font-semibold text-white">
-          by {slide.creator}
+        by {slide.uploaderName}
         </span>
       </div>
 
@@ -108,7 +108,7 @@ export default function FeaturedHeroContent({
         key={`${slide.videoId}-stats`}
         className="animate-hero-fade-up mt-2 text-[11px] text-slate-300"
       >
-        {formatViews(slide.views)} this week
+        {formatViews(slide.windowViews)} this week
       </p>
 
       {/* Buttons */}

@@ -26,9 +26,9 @@ export default function FeaturedHeroVideo({
             ${index === activeIndex ? "opacity-100" : "opacity-0"}
           `}
         >
-          {slide.thumbnail && (
+         {slide.thumbnailUrl && (
             <Image
-              src={slide.thumbnail}
+            src={slide.thumbnailUrl}
               alt={slide.title}
               fill
               priority={index === 0}

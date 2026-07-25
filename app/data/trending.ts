@@ -4,7 +4,8 @@
 export interface TrendingItem {
   videoId: string;
   title: string;
-  creator: string;
-  thumbnail: string | null;
-  views: number; // views *today*, not the video's all-time count
+  uploaderName: string;
+  uploaderAvatarUrl: string | null;
+  thumbnailUrl: string | null;
+  windowViews: number;
 }

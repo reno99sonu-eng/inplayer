@@ -547,23 +547,25 @@ lg:right-auto
   ) : (
     subscribedChannels.map((channel) => (
       <button
-        key={channel.creatorId}
-        className="
-          flex
-          w-full
-          items-center
-          gap-3
-          rounded-xl
-          px-3
-          py-1.5
-          text-left
-          transition-all
-          duration-300
-          hover:bg-white/5
-          light:hover:bg-black/5
-          hover:translate-x-1
-        "
-      >
+  key={channel.creatorId}
+  onClick={() => goTo(`/u/${channel.username}`)}
+  className="
+    flex
+    w-full
+    cursor-pointer
+    items-center
+    gap-3
+    rounded-xl
+    px-3
+    py-1.5
+    text-left
+    transition-all
+    duration-300
+    hover:bg-white/5
+    light:hover:bg-black/5
+    hover:translate-x-1
+  "
+>
         <div className="relative h-7 w-7 flex-shrink-0 overflow-hidden rounded-full">
           <Image
             src={channel.avatarUrl || "/recommendations/avatars/default.jpg"}

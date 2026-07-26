@@ -176,7 +176,8 @@ const [aiError, setAiError] = useState<string | null>(null);
   const handleGenerateAI = async (
     type: "title" | "description" | "tags"
   ) => {
-    setAiGenerating(true);
+    console.log("Generate AI clicked:", type);
+setAiGenerating(true);
     setAiError(null);
     setAiSuggestions([]);
     setAiType(type);
@@ -203,6 +204,7 @@ const [aiError, setAiError] = useState<string | null>(null);
       });
       
       const data = await response.json();
+      console.log("AI response:", response.status, data);
       
       if (!response.ok) {
         throw new Error(data.error || "AI generation failed.");

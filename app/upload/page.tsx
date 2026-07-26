@@ -189,17 +189,33 @@ setAiGenerating(true);
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          title,
-          description,
-          category,
-          contentType,
-          spokenLanguage,
-          visibility,
-          madeForKids,
-          ageRestricted,
-          commentsEnabled,
-          tags,
-          thumbnailDataUrl: thumbnailPreview,
+          prompt:
+            type === "title"
+              ? `Generate five engaging YouTube-style titles for a ${category} video.
+        
+        Current title:
+        ${title}
+        
+        Description:
+        ${description}
+        
+        Return ONLY five titles, one per line. Do not number them.`
+              : type === "description"
+              ? `Write a professional YouTube description for this ${category} video.
+        
+        Title:
+        ${title}
+        
+        Return ONLY the description.`
+              : `Generate 15 SEO-friendly tags for this ${category} video.
+        
+        Title:
+        ${title}
+        
+        Description:
+        ${description}
+        
+        Return ONLY comma-separated tags.`,
         }),
       });
       
@@ -256,33 +272,17 @@ setAiGenerating(true);
           Authorization: `Bearer ${idToken}`,
         },
         body: JSON.stringify({
-          prompt:
-            type === "title"
-              ? `Generate five engaging YouTube-style titles for a ${category} video.
-        
-        Current title:
-        ${title}
-        
-        Description:
-        ${description}
-        
-        Return ONLY five titles, one per line. Do not number them.`
-              : type === "description"
-              ? `Write a professional YouTube description for this ${category} video.
-        
-        Title:
-        ${title}
-        
-        Return ONLY the description.`
-              : `Generate 15 SEO-friendly tags for this ${category} video.
-        
-        Title:
-        ${title}
-        
-        Description:
-        ${description}
-        
-        Return ONLY comma-separated tags.`,
+          title,
+          description,
+          category,
+          contentType,
+          spokenLanguage,
+          visibility,
+          madeForKids,
+          ageRestricted,
+          commentsEnabled,
+          tags,
+          thumbnailDataUrl: thumbnailPreview,
         }),
       });
       

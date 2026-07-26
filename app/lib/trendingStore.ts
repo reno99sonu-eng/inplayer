@@ -1,4 +1,4 @@
-import { QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { BatchGetCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "./dynamodb";
 import { getMuxThumbnailUrl } from "./muxThumbnail";
 import { getReadyVideos } from "./videoStore";
@@ -37,6 +37,7 @@ async function getDayViews(date: string): Promise<Map<string, number>> {
 
 export interface RankedVideo {
   videoId: string;
+  uploaderId: string | null;
   title: string;
   uploaderName: string;
   uploaderAvatarUrl: string | null;
@@ -94,6 +95,7 @@ async function rankByWindow(
       }
       return {
         videoId,
+        uploaderId: (video.uploaderId as string) || null,
         title: video.title as string,
         uploaderName: (video.uploaderName as string) || "Unknown",
         uploaderAvatarUrl: (video.uploaderAvatarUrl as string) || null,
@@ -112,6 +114,84 @@ async function rankByWindow(
 // "Trending Now" — today's UTC calendar day so far. A single Query.
 export function getTrendingToday(limit = 20): Promise<RankedVideo[]> {
   return rankByWindow([dateKey(new Date())], limit);
+}
+
+export interface TrendingCreator {
+  userId: string;
+  username: string;
+  name: string;
+  avatarUrl: string | null;
+  isVerified: boolean;
+  windowViews: number;
+}
+
+// The Trending algorithm deliberately stays video-based: each video's views
+// are still calculated from today's daily-view bucket. This presentation
+// groups those ranked videos by uploader, so one creator with several popular
+// videos is ranked by their combined real momentum rather than by a made-up
+// profile metric. Profiles are hydrated in one BatchGet, avoiding N+1 reads.
+export async function getTrendingCreatorsToday(
+  limit = 20
+): Promise<TrendingCreator[]> {
+  const rankedVideos = await getTrendingToday(60);
+  const creators = new Map<
+    string,
+    { name: string; avatarUrl: string | null; windowViews: number }
+  >();
+
+  for (const video of rankedVideos) {
+    if (!video.uploaderId) continue;
+    const existing = creators.get(video.uploaderId);
+    creators.set(video.uploaderId, {
+      name: existing?.name || video.uploaderName || "Unknown Creator",
+      avatarUrl: existing?.avatarUrl || video.uploaderAvatarUrl,
+      windowViews: (existing?.windowViews || 0) + video.windowViews,
+    });
+  }
+
+  const creatorIds = Array.from(creators.keys());
+  if (creatorIds.length === 0) return [];
+
+  const profilesResult = await docClient.send(
+    new BatchGetCommand({
+      RequestItems: {
+        "InPlayer-Users": {
+          Keys: creatorIds.map((userId) => ({ userId })),
+          ProjectionExpression:
+            "userId, username, #name, avatarUrl, verified, isVerified, creatorVerified",
+          ExpressionAttributeNames: { "#name": "name" },
+        },
+      },
+    })
+  );
+  const profiles = new Map(
+    (profilesResult.Responses?.["InPlayer-Users"] || []).map((profile) => [
+      profile.userId as string,
+      profile,
+    ])
+  );
+
+  return creatorIds
+    .map((userId): TrendingCreator | null => {
+      const aggregate = creators.get(userId);
+      const profile = profiles.get(userId);
+      const username = profile?.username as string | undefined;
+      if (!aggregate || !username) return null;
+
+      return {
+        userId,
+        username,
+        name: (profile?.name as string) || aggregate.name,
+        avatarUrl: (profile?.avatarUrl as string) || aggregate.avatarUrl,
+        isVerified: Boolean(
+          profile?.verified || profile?.isVerified || profile?.creatorVerified
+        ),
+        windowViews: aggregate.windowViews,
+      };
+    })
+    .filter((creator): creator is TrendingCreator => creator !== null)
+    .sort((a, b) => b.windowViews - a.windowViews)
+    .slice(0, limit);
 }
 
 // "Featured Weekly" — a rolling trailing 7-day window (today + the 6

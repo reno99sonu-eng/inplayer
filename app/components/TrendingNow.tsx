@@ -2,19 +2,20 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
+import { BadgeCheck, Flame } from "lucide-react";
 
-import type { TrendingItem } from "../data/trending";
+import type { TrendingCreator } from "../data/trending";
 import { formatViews } from "../lib/formatters";
 
 const MIN_ITEMS_TO_LOOP = 6;
 const AUTO_SCROLL_PIXELS_PER_SECOND = 30;
-const FALLBACK_THUMBNAIL = "/avatars/avatar.png";
+const FALLBACK_AVATAR = "/avatars/avatar.png";
 
-function getThumbnailSrc(thumbnailUrl: string | null | undefined) {
-  const source = thumbnailUrl?.trim();
+function getAvatarSrc(avatarUrl: string | null | undefined) {
+  const source = avatarUrl?.trim();
 
   if (!source) {
-    return FALLBACK_THUMBNAIL;
+    return FALLBACK_AVATAR;
   }
 
   if (
@@ -30,7 +31,7 @@ function getThumbnailSrc(thumbnailUrl: string | null | undefined) {
 }
 
 export default function TrendingNow() {
-  const [items, setItems] = useState<TrendingItem[] | null>(null);
+  const [items, setItems] = useState<TrendingCreator[] | null>(null);
   const [loopRepeats, setLoopRepeats] = useState(1);
   const carouselRef = useRef<HTMLDivElement>(null);
   const firstGroupRef = useRef<HTMLDivElement>(null);
@@ -55,7 +56,7 @@ export default function TrendingNow() {
         const data = await res.json();
 
         if (!controller.signal.aborted) {
-          setItems(data.videos || []);
+          setItems(data.creators || []);
           setLoopRepeats(1);
         }
       } catch (error) {
@@ -253,11 +254,11 @@ export default function TrendingNow() {
       <div className="mb-2 lg:mb-3 flex items-center justify-between">
         <div>
           <span className="rounded-full border border-red-500/20 bg-red-500/10 px-2.5 lg:px-3 py-0.5 text-[10px] font-bold uppercase tracking-[0.2em] text-red-300 light:text-red-600 backdrop-blur-sm">
-            Trending
+            Trending today
           </span>
 
           <h2 className="mt-1 text-lg font-black text-white light:text-slate-900">
-            Trending Now
+            Trending Creators
           </h2>
         </div>
       </div>
@@ -284,10 +285,10 @@ export default function TrendingNow() {
               <div
                 key={i}
                 className="
-                  h-[190px]
-                  w-[155px]
-                  lg:h-[230px]
-                  lg:w-[190px]
+                  h-[214px]
+                  w-[174px]
+                  lg:h-[250px]
+                  lg:w-[210px]
                   flex-shrink-0
                   animate-pulse
                   rounded-[28px]
@@ -398,18 +399,17 @@ export default function TrendingNow() {
                 >
                   {loopItems.map((item, index) => (
                     <Link
-                      key={`${groupIndex}-${index}-${item.videoId}`}
-                      href={`/watch/${item.videoId}`}
+                      key={`${groupIndex}-${index}-${item.userId}`}
+                      href={`/u/${encodeURIComponent(item.username)}`}
                       tabIndex={groupIndex === 1 ? -1 : undefined}
                       className="
                         group
                         relative
-                        h-[190px]
-                        w-[155px]
-                        lg:h-[230px]
-                        lg:w-[190px]
+                        h-[214px]
+                        w-[174px]
+                        lg:h-[250px]
+                        lg:w-[210px]
                         flex-shrink-0
-                        overflow-hidden
                         rounded-[28px]
                         border
                         border-white/10
@@ -423,45 +423,43 @@ export default function TrendingNow() {
                         hover:shadow-[0_0_50px_rgba(249,115,22,.22)]
                       "
                     >
-                      <img
-                        src={getThumbnailSrc(item.thumbnailUrl)}
-                        alt={item.title}
-                        onError={(event) => {
-                          if (
-                            event.currentTarget.src.endsWith(FALLBACK_THUMBNAIL)
-                          ) {
-                            return;
-                          }
+                      <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[28px]">
+                        <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-orange-400/20 blur-3xl transition duration-500 group-hover:bg-orange-400/35" />
+                        <div className="absolute -bottom-16 -left-12 h-36 w-36 rounded-full bg-amber-300/10 blur-3xl" />
+                      </div>
 
-                          event.currentTarget.src = FALLBACK_THUMBNAIL;
-                        }}
-                        className="
-                          absolute
-                          inset-0
-                          h-full
-                          w-full
-                          object-cover
-                          object-top
-                          transition
-                          duration-500
-                          group-hover:scale-105
-                        "
-                      />
+                      <div className="relative flex h-full flex-col items-center px-4 pb-4 pt-5 text-center lg:px-5 lg:pb-5 lg:pt-6">
+                        <div className="relative">
+                          <div className="absolute -inset-2 rounded-full bg-gradient-to-br from-orange-400 via-amber-300 to-orange-500 opacity-50 blur-md transition duration-500 group-hover:opacity-90" />
+                          {/* eslint-disable-next-line @next/next/no-img-element -- creator avatars can be data URLs. */}
+                          <img
+                            src={getAvatarSrc(item.avatarUrl)}
+                            alt={item.name}
+                            onError={(event) => {
+                              if (!event.currentTarget.src.endsWith(FALLBACK_AVATAR)) {
+                                event.currentTarget.src = FALLBACK_AVATAR;
+                              }
+                            }}
+                            className="relative h-[76px] w-[76px] rounded-full border-2 border-white/80 object-cover shadow-2xl transition duration-500 group-hover:scale-110 lg:h-[92px] lg:w-[92px]"
+                          />
+                        </div>
 
-                      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
+                        <div className="mt-4 min-w-0">
+                          <div className="flex items-center justify-center gap-1.5">
+                            <h3 className="truncate text-sm font-black text-white lg:text-base">
+                              {item.name}
+                            </h3>
+                            {item.isVerified && (
+                              <BadgeCheck size={16} className="flex-shrink-0 fill-orange-400 text-[#101827]" aria-label="Verified creator" />
+                            )}
+                          </div>
+                          <p className="mt-1 truncate text-xs text-slate-400">@{item.username}</p>
+                        </div>
 
-                      <div className="absolute bottom-0 w-full p-3 lg:p-4">
-                        <h3 className="line-clamp-2 text-base font-black text-white">
-                          {item.title}
-                        </h3>
-
-                        <p className="mt-1 text-xs text-slate-300">
-                          {item.uploaderName}
-                        </p>
-
-                        <p className="mt-0.5 text-[11px] text-orange-300">
+                        <div className="mt-auto flex items-center gap-1 rounded-full border border-orange-400/20 bg-orange-500/10 px-2.5 py-1 text-[10px] font-bold text-orange-200">
+                          <Flame size={11} className="text-orange-400" />
                           {formatViews(item.windowViews)} today
-                        </p>
+                        </div>
                       </div>
                     </Link>
                   ))}

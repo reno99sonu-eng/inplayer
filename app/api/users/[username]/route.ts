@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GetCommand, QueryCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
 import { areUsersConnected } from "@/app/lib/connections";
@@ -60,6 +60,9 @@ export async function GET(request: NextRequest, { params }: Params) {
       return NextResponse.json({ ...base, gated: true });
     }
 
+    // Both reads use existing creatorId indexes. The video lookup used to
+    // Scan the full table and filter it afterwards; a channel must never get
+    // slower as unrelated creators upload more videos.
     const [subscriberCountResult, videosResult] = await Promise.all([
       docClient.send(
         new QueryCommand({
@@ -70,24 +73,39 @@ export async function GET(request: NextRequest, { params }: Params) {
           Select: "COUNT",
         })
       ),
-      docClient.send(
-        new ScanCommand({
-          TableName: "InPlayer-Videos",
-          FilterExpression:
-            "uploaderId = :uid AND #status = :ready AND (attribute_not_exists(visibility) OR visibility = :pub)",
-          ExpressionAttributeNames: { "#status": "status" },
-          ExpressionAttributeValues: {
-            ":uid": targetUserId,
-            ":ready": "ready",
-            ":pub": "public",
-          },
-        })
-      ),
+      (async () => {
+        const items: Record<string, unknown>[] = [];
+        let exclusiveStartKey: Record<string, unknown> | undefined;
+
+        do {
+          const page = await docClient.send(
+            new QueryCommand({
+              TableName: "InPlayer-Videos",
+              IndexName: "creatorId-index",
+              KeyConditionExpression: "uploaderId = :uid",
+              ExpressionAttributeValues: { ":uid": targetUserId },
+              ExclusiveStartKey: exclusiveStartKey,
+            })
+          );
+          items.push(...(page.Items || []));
+          exclusiveStartKey = page.LastEvaluatedKey;
+        } while (exclusiveStartKey);
+
+        return items;
+      })(),
     ]);
 
-    const videos = (videosResult.Items || [])
-      .sort((a, b) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())
-      .slice(0, 24)
+    const publicVideos = videosResult.filter(
+      (video) =>
+        video.status === "ready" &&
+        (!video.visibility || video.visibility === "public")
+    );
+    const totalViews = publicVideos.reduce(
+      (sum, video) => sum + (Number(video.views) || 0),
+      0
+    );
+    const videos = publicVideos
+      .sort((a, b) => (Number(b.views) || 0) - (Number(a.views) || 0))
       .map((v) => ({
         videoId: v.videoId,
         title: v.title,
@@ -101,7 +119,13 @@ export async function GET(request: NextRequest, { params }: Params) {
       ...base,
       gated: false,
       socialLinks: profile.socialLinks || { social: {}, other: [] },
+      name: profile.name || profile.username || handleResult.Item.username,
+      description: profile.description || profile.bio || "",
+      isVerified: Boolean(
+        profile.verified || profile.isVerified || profile.creatorVerified
+      ),
       subscriberCount: subscriberCountResult.Count || 0,
+      totalViews,
       videos,
     });
   } catch (err) {

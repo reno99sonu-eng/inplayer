@@ -67,30 +67,31 @@ export default function FeaturedHeroButtons({
       </button>
 
       {/* Details */}
-      <button
-        className="
-          flex
-          items-center
-          gap-2
-          rounded-full
-          border
-          border-white/10
-          bg-white/5
-          px-5
-          py-2.5
-          text-sm
-          font-semibold
-          text-white
-          backdrop-blur-xl
-          transition-all
-          duration-300
-          hover:border-cyan-400/40
-          hover:bg-white/10
-        "
-      >
-        <Info size={16} />
-        Details
-      </button>
+<Link
+  href={`/watch/${videoId}`}
+  className="
+    flex
+    items-center
+    gap-2
+    rounded-full
+    border
+    border-white/10
+    bg-white/5
+    px-5
+    py-2.5
+    text-sm
+    font-semibold
+    text-white
+    backdrop-blur-xl
+    transition-all
+    duration-300
+    hover:border-cyan-400/40
+    hover:bg-white/10
+  "
+>
+  <Info size={16} />
+  Details
+</Link>
 
     </div>
   );

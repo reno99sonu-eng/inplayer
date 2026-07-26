@@ -1,5 +1,6 @@
 import { QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "./dynamodb";
+import { getMuxThumbnailUrl } from "./muxThumbnail";
 import { getReadyVideos } from "./videoStore";
 
 const DAILY_VIEWS_TABLE = "InPlayer-Video-Daily-Views";
@@ -43,6 +44,19 @@ export interface RankedVideo {
   windowViews: number; // views within the requested window (today, or the trailing 7 days) — NOT the all-time counter on the video item
 }
 
+function resolveThumbnailUrl(video: Record<string, unknown>): string | null {
+  const storedThumbnail = video.thumbnailUrl;
+
+  if (typeof storedThumbnail === "string" && storedThumbnail.trim()) {
+    return storedThumbnail;
+  }
+
+  const playbackId = video.muxPlaybackId;
+  return typeof playbackId === "string"
+    ? getMuxThumbnailUrl(playbackId)
+    : null;
+}
+
 // Sums view counts across the given UTC day-keys per video, then hydrates
 // against the shared ready-videos list (see app/lib/videoStore) for
 // title/thumbnail/uploader. Videos-only — Shorts already have their own
@@ -83,7 +97,10 @@ async function rankByWindow(
         title: video.title as string,
         uploaderName: (video.uploaderName as string) || "Unknown",
         uploaderAvatarUrl: (video.uploaderAvatarUrl as string) || null,
-        thumbnailUrl: (video.thumbnailUrl as string) || null,
+        // Current uploads persist this field at video.asset.ready. Derive it
+        // from the playback ID too, so ready videos created before that field
+        // existed do not fall back to the avatar.
+        thumbnailUrl: resolveThumbnailUrl(video),
         windowViews,
       };
     })

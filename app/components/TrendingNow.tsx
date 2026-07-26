@@ -1,90 +1,268 @@
 "use client";
 
-import Image from "next/image";
 import Link from "next/link";
-import Marquee from "react-fast-marquee";
-import { useEffect,useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { TrendingItem } from "../data/trending";
 import { formatViews } from "../lib/formatters";
 
 const MIN_ITEMS_TO_LOOP = 6;
+const AUTO_SCROLL_PIXELS_PER_SECOND = 30;
+const FALLBACK_THUMBNAIL = "/avatars/avatar.png";
+
+function getThumbnailSrc(thumbnailUrl: string | null | undefined) {
+  const source = thumbnailUrl?.trim();
+
+  if (!source) {
+    return FALLBACK_THUMBNAIL;
+  }
+
+  if (
+    source.startsWith("/") ||
+    source.startsWith("data:") ||
+    source.startsWith("blob:") ||
+    /^https?:\/\//i.test(source)
+  ) {
+    return source;
+  }
+
+  return `/${source}`;
+}
 
 export default function TrendingNow() {
-
   const [items, setItems] = useState<TrendingItem[] | null>(null);
+  const [loopRepeats, setLoopRepeats] = useState(1);
+  const carouselRef = useRef<HTMLDivElement>(null);
+  const firstGroupRef = useRef<HTMLDivElement>(null);
+  const secondGroupRef = useRef<HTMLDivElement>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const lastFrameTimeRef = useRef<number | null>(null);
+  const sequenceWidthRef = useRef(0);
+  const isHoveringRef = useRef(false);
+  const isDraggingRef = useRef(false);
+  const activePointerIdRef = useRef<number | null>(null);
+  const dragStartXRef = useRef(0);
+  const dragStartScrollLeftRef = useRef(0);
+  const hasDraggedRef = useRef(false);
+  const clickResetTimeoutRef = useRef<number | null>(null);
 
   useEffect(() => {
-    let cancelled = false;
+    const controller = new AbortController();
 
-    (async () => {
+    const loadTrending = async () => {
       try {
-        const res = await fetch("/api/trending");
-
+        const res = await fetch("/api/trending", { signal: controller.signal });
         const data = await res.json();
 
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setItems(data.videos || []);
+          setLoopRepeats(1);
         }
       } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") {
+          return;
+        }
+
         console.error("Failed to load trending:", error);
 
-        if (!cancelled) {
+        if (!controller.signal.aborted) {
           setItems([]);
         }
       }
-    })();
+    };
+
+    void loadTrending();
 
     return () => {
-      cancelled = true;
+      controller.abort();
     };
   }, []);
 
   const realItems = items ?? [];
+  const minimumLoopItems =
+    realItems.length === 0
+      ? []
+      : Array.from(
+          {
+            length: Math.max(
+              1,
+              Math.ceil(MIN_ITEMS_TO_LOOP / realItems.length),
+            ),
+          },
+          () => realItems,
+        ).flat();
+  const loopItems = Array.from(
+    { length: loopRepeats },
+    () => minimumLoopItems,
+  ).flat();
 
-  const marqueeItems = items ?? [];
-  
-  
-    if (items !== null && items.length === 0) {
-      return null;
+  useEffect(() => {
+    const carousel = carouselRef.current;
+    const firstGroup = firstGroupRef.current;
+    const secondGroup = secondGroupRef.current;
+
+    if (!carousel || !firstGroup || !secondGroup || loopItems.length === 0) {
+      sequenceWidthRef.current = 0;
+      return;
     }
-  
-    return (
-      <section className="relative mx-auto max-w-[1700px] px-4 lg:px-5 pt-2 lg:pt-3 pb-1.5 lg:pb-2">
-        <div className="pointer-events-none absolute inset-0">
-          <h1
-            className="
-              absolute
-              left-4
-              top-4
-              select-none
-              text-[50px]
-              font-black
-              tracking-[-0.08em]
-              text-white/[0.025]
-              light:text-black/[0.025]
-              lg:left-8
-              lg:top-1
-              lg:text-[90px]
-            "
-          >
-            TRENDING
-          </h1>
-        </div>
-  
-        <div className="mb-2 lg:mb-3 flex items-center justify-between">
-          <div>
-            <span className="rounded-full border border-red-500/20 bg-red-500/10 px-2.5 lg:px-3 py-0.5 text-[10px] font-bold uppercase tracking-[0.2em] text-red-300 light:text-red-600 backdrop-blur-sm">
-              Trending
-            </span>
-  
-            <h2 className="mt-1 text-lg font-black text-white light:text-slate-900">
-              Trending Now
-            </h2>
-          </div>
-        </div>
 
-        <div className="relative overflow-hidden">
+    const measure = () => {
+      const sequenceWidth = secondGroup.offsetLeft - firstGroup.offsetLeft;
+
+      if (sequenceWidth <= 0) {
+        return;
+      }
+
+      sequenceWidthRef.current = sequenceWidth;
+
+      const baseSequenceWidth = sequenceWidth / loopRepeats;
+      const requiredRepeats = Math.max(
+        1,
+        Math.ceil(carousel.clientWidth / baseSequenceWidth) + 1,
+      );
+
+      if (requiredRepeats > loopRepeats) {
+        setLoopRepeats(requiredRepeats);
+        return;
+      }
+
+      if (carousel.scrollLeft >= sequenceWidth) {
+        carousel.scrollLeft %= sequenceWidth;
+      }
+    };
+
+    measure();
+
+    const resizeObserver = new ResizeObserver(measure);
+    resizeObserver.observe(carousel);
+
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, [loopItems.length, loopRepeats]);
+
+  useEffect(() => {
+    const carousel = carouselRef.current;
+
+    if (!carousel || loopItems.length === 0) {
+      return;
+    }
+
+    const animate = (timestamp: number) => {
+      const previousTimestamp = lastFrameTimeRef.current;
+      lastFrameTimeRef.current = timestamp;
+
+      const shouldScroll =
+        !isHoveringRef.current &&
+        !isDraggingRef.current &&
+        document.visibilityState === "visible" &&
+        sequenceWidthRef.current > 0;
+
+      if (shouldScroll && previousTimestamp !== null) {
+        const elapsed = Math.min(timestamp - previousTimestamp, 50);
+        const sequenceWidth = sequenceWidthRef.current;
+        const nextScrollLeft =
+          carousel.scrollLeft +
+          (elapsed * AUTO_SCROLL_PIXELS_PER_SECOND) / 1000;
+
+        carousel.scrollLeft =
+          nextScrollLeft >= sequenceWidth
+            ? nextScrollLeft - sequenceWidth
+            : nextScrollLeft;
+      }
+
+      animationFrameRef.current = requestAnimationFrame(animate);
+    };
+
+    animationFrameRef.current = requestAnimationFrame(animate);
+
+    return () => {
+      if (animationFrameRef.current !== null) {
+        cancelAnimationFrame(animationFrameRef.current);
+        animationFrameRef.current = null;
+      }
+
+      lastFrameTimeRef.current = null;
+    };
+  }, [loopItems.length]);
+
+  useEffect(() => {
+    return () => {
+      if (clickResetTimeoutRef.current !== null) {
+        window.clearTimeout(clickResetTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  const normalizeScrollPosition = (scrollLeft: number) => {
+    const sequenceWidth = sequenceWidthRef.current;
+
+    if (sequenceWidth <= 0) {
+      return Math.max(0, scrollLeft);
+    }
+
+    const normalized = scrollLeft % sequenceWidth;
+    return normalized < 0 ? normalized + sequenceWidth : normalized;
+  };
+
+  const endDrag = (pointerId?: number) => {
+    if (pointerId !== undefined && activePointerIdRef.current !== pointerId) {
+      return;
+    }
+
+    isDraggingRef.current = false;
+    activePointerIdRef.current = null;
+
+    if (clickResetTimeoutRef.current !== null) {
+      window.clearTimeout(clickResetTimeoutRef.current);
+    }
+
+    clickResetTimeoutRef.current = window.setTimeout(() => {
+      hasDraggedRef.current = false;
+      clickResetTimeoutRef.current = null;
+    }, 0);
+  };
+
+  if (items !== null && items.length === 0) {
+    return null;
+  }
+
+  return (
+    <section className="relative mx-auto max-w-[1700px] px-4 lg:px-5 pt-2 lg:pt-3 pb-1.5 lg:pb-2">
+      <div className="pointer-events-none absolute inset-0">
+        <h1
+          className="
+            absolute
+            left-4
+            top-4
+            select-none
+            text-[50px]
+            font-black
+            tracking-[-0.08em]
+            text-white/[0.025]
+            light:text-black/[0.025]
+            lg:left-8
+            lg:top-1
+            lg:text-[90px]
+          "
+        >
+          TRENDING
+        </h1>
+      </div>
+
+      <div className="mb-2 lg:mb-3 flex items-center justify-between">
+        <div>
+          <span className="rounded-full border border-red-500/20 bg-red-500/10 px-2.5 lg:px-3 py-0.5 text-[10px] font-bold uppercase tracking-[0.2em] text-red-300 light:text-red-600 backdrop-blur-sm">
+            Trending
+          </span>
+
+          <h2 className="mt-1 text-lg font-black text-white light:text-slate-900">
+            Trending Now
+          </h2>
+        </div>
+      </div>
+
+      <div className="relative overflow-hidden">
         <div className="pointer-events-none absolute left-0 top-0 z-20 h-full w-10 bg-gradient-to-r from-[#0b1220] light:from-[#FBF6EA] to-transparent lg:w-16" />
 
         <div className="pointer-events-none absolute right-0 top-0 z-20 h-full w-10 bg-gradient-to-l from-[#0b1220] light:from-[#FBF6EA] to-transparent lg:w-16" />
@@ -121,81 +299,176 @@ export default function TrendingNow() {
             ))}
           </div>
         ) : (
-          <Marquee
-          pauseOnHover
-          autoFill
-          speed={25}
-          gradient={false}
-        >
           <div
-            className="
-              flex
-              gap-3
-              lg:gap-5
-              py-2
-              lg:py-3
-              pr-5
-              lg:pr-5
-            "
+            ref={carouselRef}
+            className="cursor-grab touch-pan-y select-none overflow-x-scroll py-2 pr-5 active:cursor-grabbing lg:py-3 lg:pr-5"
+            onPointerEnter={() => {
+              isHoveringRef.current = true;
+            }}
+            onPointerLeave={() => {
+              isHoveringRef.current = false;
+            }}
+            onPointerDown={(event) => {
+              if (event.button !== 0 && event.pointerType === "mouse") {
+                return;
+              }
+
+              const carousel = carouselRef.current;
+
+              if (!carousel) {
+                return;
+              }
+
+              if (clickResetTimeoutRef.current !== null) {
+                window.clearTimeout(clickResetTimeoutRef.current);
+                clickResetTimeoutRef.current = null;
+              }
+
+              isDraggingRef.current = true;
+              activePointerIdRef.current = event.pointerId;
+              dragStartXRef.current = event.clientX;
+              dragStartScrollLeftRef.current = carousel.scrollLeft;
+              hasDraggedRef.current = false;
+              event.currentTarget.setPointerCapture(event.pointerId);
+            }}
+            onPointerMove={(event) => {
+              if (
+                !isDraggingRef.current ||
+                activePointerIdRef.current !== event.pointerId
+              ) {
+                return;
+              }
+
+              const carousel = carouselRef.current;
+
+              if (!carousel) {
+                return;
+              }
+
+              const distance = event.clientX - dragStartXRef.current;
+
+              if (Math.abs(distance) > 3) {
+                hasDraggedRef.current = true;
+              }
+
+              carousel.scrollLeft = normalizeScrollPosition(
+                dragStartScrollLeftRef.current - distance,
+              );
+            }}
+            onPointerUp={(event) => {
+              if (event.currentTarget.hasPointerCapture(event.pointerId)) {
+                event.currentTarget.releasePointerCapture(event.pointerId);
+              }
+
+              endDrag(event.pointerId);
+            }}
+            onPointerCancel={(event) => {
+              endDrag(event.pointerId);
+            }}
+            onLostPointerCapture={(event) => {
+              endDrag(event.pointerId);
+            }}
+            onWheel={(event) => {
+              const delta = event.deltaX || event.deltaY;
+
+              if (delta === 0 || sequenceWidthRef.current <= 0) {
+                return;
+              }
+
+              event.preventDefault();
+              event.currentTarget.scrollLeft = normalizeScrollPosition(
+                event.currentTarget.scrollLeft + delta,
+              );
+            }}
+            onClickCapture={(event) => {
+              if (hasDraggedRef.current) {
+                event.preventDefault();
+                event.stopPropagation();
+                hasDraggedRef.current = false;
+              }
+            }}
           >
-              {marqueeItems.map((item, index) => (
-                <Link
-                  key={`${item.videoId}-${index}`}
-                  href={`/watch/${item.videoId}`}
-                  className="
-                    group
-                    relative
-                    h-[190px]
-                    w-[155px]
-                    lg:h-[230px]
-                    lg:w-[190px]
-                    flex-shrink-0
-                    overflow-hidden
-                    rounded-[28px]
-                    border
-                    border-white/10
-                    bg-[#101827]
-                    shadow-[0_8px_24px_rgba(0,0,0,.35)]
-                    transition-all
-                    duration-300
-                    hover:-translate-y-1
-                    hover:scale-[1.03]
-                    hover:border-orange-400/40
-                    hover:shadow-[0_0_50px_rgba(249,115,22,.22)]
-                  "
+            <div className="flex w-max gap-3 lg:gap-5">
+              {[0, 1].map((groupIndex) => (
+                <div
+                  key={groupIndex}
+                  ref={groupIndex === 0 ? firstGroupRef : secondGroupRef}
+                  aria-hidden={groupIndex === 1}
+                  className="flex w-max gap-3 lg:gap-5"
                 >
-                  <Image
-                    src={item.thumbnailUrl || "/avatars/avatar.png"}
-                    alt={item.title}
-                    fill
-                    className="
-                      object-cover
-                      object-top
-                      transition
-                      duration-500
-                      group-hover:scale-105
-                    "
-                  />
+                  {loopItems.map((item, index) => (
+                    <Link
+                      key={`${groupIndex}-${index}-${item.videoId}`}
+                      href={`/watch/${item.videoId}`}
+                      tabIndex={groupIndex === 1 ? -1 : undefined}
+                      className="
+                        group
+                        relative
+                        h-[190px]
+                        w-[155px]
+                        lg:h-[230px]
+                        lg:w-[190px]
+                        flex-shrink-0
+                        overflow-hidden
+                        rounded-[28px]
+                        border
+                        border-white/10
+                        bg-[#101827]
+                        shadow-[0_8px_24px_rgba(0,0,0,.35)]
+                        transition-all
+                        duration-300
+                        hover:-translate-y-1
+                        hover:scale-[1.03]
+                        hover:border-orange-400/40
+                        hover:shadow-[0_0_50px_rgba(249,115,22,.22)]
+                      "
+                    >
+                      <img
+                        src={getThumbnailSrc(item.thumbnailUrl)}
+                        alt={item.title}
+                        onError={(event) => {
+                          if (
+                            event.currentTarget.src.endsWith(FALLBACK_THUMBNAIL)
+                          ) {
+                            return;
+                          }
 
-                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
+                          event.currentTarget.src = FALLBACK_THUMBNAIL;
+                        }}
+                        className="
+                          absolute
+                          inset-0
+                          h-full
+                          w-full
+                          object-cover
+                          object-top
+                          transition
+                          duration-500
+                          group-hover:scale-105
+                        "
+                      />
 
-                  <div className="absolute bottom-0 w-full p-3 lg:p-4">
-                    <h3 className="line-clamp-2 text-base font-black text-white">
-                      {item.title}
-                    </h3>
+                      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
 
-                    <p className="mt-1 text-xs text-slate-300">
-                      {item.uploaderName}
-                    </p>
+                      <div className="absolute bottom-0 w-full p-3 lg:p-4">
+                        <h3 className="line-clamp-2 text-base font-black text-white">
+                          {item.title}
+                        </h3>
 
-                    <p className="mt-0.5 text-[11px] text-orange-300">
-                      {formatViews(item.windowViews)} today
-                    </p>
-                  </div>
-                </Link>
+                        <p className="mt-1 text-xs text-slate-300">
+                          {item.uploaderName}
+                        </p>
+
+                        <p className="mt-0.5 text-[11px] text-orange-300">
+                          {formatViews(item.windowViews)} today
+                        </p>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
               ))}
             </div>
-          </Marquee>
+          </div>
         )}
       </div>
     </section>

@@ -19,9 +19,16 @@ async function scanReadyVideos() {
     const result = await docClient.send(
       new ScanCommand({
         TableName: "InPlayer-Videos",
-        FilterExpression: "#status = :ready",
+        // A Mux asset is only safe to surface on listings after its
+        // video.asset.ready webhook has stored a non-empty playback ID.
+        // This is the ID image.mux.com and stream.mux.com require.
+        FilterExpression:
+          "#status = :ready AND attribute_exists(muxPlaybackId) AND muxPlaybackId <> :emptyPlaybackId",
         ExpressionAttributeNames: { "#status": "status" },
-        ExpressionAttributeValues: { ":ready": "ready" },
+        ExpressionAttributeValues: {
+          ":ready": "ready",
+          ":emptyPlaybackId": "",
+        },
         ExclusiveStartKey: exclusiveStartKey,
       })
     );

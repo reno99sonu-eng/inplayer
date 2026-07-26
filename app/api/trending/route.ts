@@ -1,12 +1,22 @@
 import { NextResponse } from "next/server";
+import type { TrendingItem } from "@/app/data/trending";
 import { getTrendingToday } from "@/app/lib/trendingStore";
 
-// Real "most-viewed today" videos, ranked from InPlayer-Video-Daily-Views
-// (see app/lib/trendingStore) — no dummy/example entries. An empty
-// `videos` array is a real, expected state (no views logged yet today, or
-// the table isn't provisioned) and the frontend renders an honest "check
-// back later" empty state for it rather than falling back to anything fake.
 export async function GET() {
   const videos = await getTrendingToday(20);
-  return NextResponse.json({ videos });
+
+  return NextResponse.json({
+    count: videos.length,
+    videos: videos.map((v): TrendingItem => ({
+      videoId: v.videoId,
+      title: v.title,
+      uploaderName: v.uploaderName,
+      uploaderAvatarUrl: v.uploaderAvatarUrl,
+      windowViews: v.windowViews,
+      // Keep this exact name in sync with TrendingItem and TrendingNow.
+      // Returning `thumbnail` here made the client treat every result as
+      // thumbnail-less and render its default-avatar fallback.
+      thumbnailUrl: v.thumbnailUrl,
+    })),
+  });
 }

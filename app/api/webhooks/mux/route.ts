@@ -4,6 +4,7 @@ import { after } from "next/server";
 import { ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import mux from "@/app/lib/mux";
 import { docClient } from "@/app/lib/dynamodb";
+import { getMuxThumbnailUrl } from "@/app/lib/muxThumbnail";
 import { READY_VIDEOS_TAG } from "@/app/lib/videoStore";
 import {
   CAPTION_TARGETS,
@@ -101,7 +102,29 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ received: true });
     }
 
-    const playbackId = asset.playback_ids?.[0]?.id;
+    // Direct uploads request public playback. Select that playback ID
+    // explicitly instead of assuming array order; image.mux.com requires a
+    // playback ID (never the asset or direct-upload ID) and signed playback
+    // would need a signed image token we intentionally do not expose here.
+    const playbackId = asset.playback_ids?.find(
+      (id: { id?: string; policy?: string }) => id.policy === "public"
+    )?.id;
+
+    if (!playbackId) {
+      console.error(
+        "video.asset.ready had no public playback ID - asset:",
+        asset.id
+      );
+      // Do not make an unplayable/unthumbnailable asset visible. A non-2xx
+      // response lets Mux retry while the asset's playback configuration is
+      // being finalized.
+      return NextResponse.json(
+        { error: "Mux asset has no public playback ID" },
+        { status: 500 }
+      );
+    }
+
+    const thumbnailUrl = getMuxThumbnailUrl(playbackId);
 
     const updateResult = await docClient.send(
       new UpdateCommand({
@@ -122,11 +145,9 @@ export async function POST(request: NextRequest) {
         ExpressionAttributeValues: {
           ":status": "ready",
           ":assetId": asset.id,
-          ":playbackId": playbackId || "",
+          ":playbackId": playbackId,
           ":duration": asset.duration || 0,
-          ":thumbnailUrl": playbackId
-            ? `https://image.mux.com/${playbackId}/thumbnail.jpg`
-            : "",
+          ":thumbnailUrl": thumbnailUrl,
         },
         // Read contentType/spokenLanguage back (set at upload time, untouched
         // by this update) so the caption step below can decide whether — and

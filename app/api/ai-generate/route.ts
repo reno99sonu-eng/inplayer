@@ -10,10 +10,11 @@ const CANDIDATE_MODELS = [
   "openai/gpt-oss-20b",
   "llama-3.1-8b-instant",
 ];
-
+const PER_CALL_TIMEOUT_MS = 60_000;
 export async function POST(request: NextRequest) {
   try {
     const { prompt } = await request.json();
+    console.log("AI prompt:", prompt);
 
     if (!prompt || typeof prompt !== "string") {
       return NextResponse.json(
@@ -39,64 +40,74 @@ if (!apiKey) {
     let lastErrorStatus = 500;
 
     for (const model of CANDIDATE_MODELS) {
-      const response = await fetch(
-        "https://api.groq.com/openai/v1/chat/completions",
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${apiKey}`,
-          },
-          body: JSON.stringify({
-            model,
-            messages: [{ role: "user", content: prompt }],
-          }),
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        const text =
-          data?.choices?.[0]?.message?.content ??
-          "No content was generated. Try rephrasing your prompt.";
-
-        console.log(`AI generate succeeded using model: ${model}`);
-
-        return NextResponse.json({ text });
-      }
-
-      const errorBody = await response.text();
-      console.error(
-        `Groq API error (model: ${model}):`,
-        response.status,
-        errorBody
-      );
-
-      lastErrorStatus = response.status;
-
-      // Model unavailable/not found — try the next candidate in the list.
-      if (response.status === 404) {
-        continue;
-      }
-
-      if (response.status === 429) {
-        return NextResponse.json(
+      console.log("Trying model:", model);
+    
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), PER_CALL_TIMEOUT_MS);
+    
+      try {
+        const response = await fetch(
+          "https://api.groq.com/openai/v1/chat/completions",
           {
-            error:
-              "AI is a little busy right now (rate limit reached). Please wait a moment and try again.",
-          },
-          { status: 429 }
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${apiKey}`,
+            },
+            body: JSON.stringify({
+              model,
+              messages: [{ role: "user", content: prompt }],
+            }),
+            signal: controller.signal,
+          }
         );
+    
+        console.log("Groq status:", response.status);
+    
+        if (response.ok) {
+          const data = await response.json();
+    
+          const text = data?.choices?.[0]?.message?.content;
+    
+          if (typeof text === "string" && text.trim()) {
+            console.log(`AI generate succeeded using model: ${model}`);
+            return NextResponse.json({ text });
+          }
+    
+          return NextResponse.json(
+            {
+              error: "Groq returned an empty response.",
+            },
+            { status: 502 }
+          );
+        }
+    
+        const errorBody = await response.text();
+    
+        console.error(
+          `Groq API error (${model}):`,
+          response.status,
+          errorBody
+        );
+    
+        lastErrorStatus = response.status;
+    
+        if (
+          response.status === 404 ||
+          response.status === 429 ||
+          response.status >= 500
+        ) {
+          continue;
+        }
+    
+        break;
+      } catch (err) {
+        console.error(`Groq request failed (${model}):`, err);
+        continue;
+      } finally {
+        clearTimeout(timer);
       }
-
-      // Any other error (not a missing-model issue) — stop and report it.
-      break;
     }
-
-    return NextResponse.json(
-      { error: "Something went wrong generating content. Please try again." },
-      { status: lastErrorStatus === 404 ? 502 : lastErrorStatus }
-    );
   } catch (error) {
     console.error("AI generate route error:", error);
     return NextResponse.json(

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Home, PlaySquare, Rss } from "lucide-react";
+import { Home, PlaySquare, Rss, UserRound } from "lucide-react";
 
 import MobileCreateButton from "./MobileCreateButton";
 import { useAuthModal } from "./auth/AuthProvider";
@@ -100,7 +100,7 @@ export default function MobileBottomNav() {
       </Link>
 
       <Link
-        href="/account"
+        href={user?.handle ? `/u/${encodeURIComponent(user.handle)}` : "/profile"}
         className="
           flex
           flex-col
@@ -116,12 +116,8 @@ export default function MobileBottomNav() {
           light:hover:text-orange-600
         "
       >
-        <img
-          src={user?.avatarUrl || "/avatars/avatar.png"}
-          alt="Profile"
-          className="h-6 w-6 rounded-full object-cover ring-1 ring-orange-400/50"
-        />
-        <span className="text-[11px] font-medium">You</span>
+        <UserRound size={22} />
+        <span className="text-[11px] font-medium">Your Channel</span>
       </Link>
     </nav>
   );

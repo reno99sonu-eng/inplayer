@@ -444,9 +444,9 @@ export default function TrendingNow() {
                           />
                         </div>
 
-                        <div className="mt-4 min-w-0">
-                          <div className="flex items-center justify-center gap-1.5">
-                            <h3 className="truncate text-sm font-black text-white lg:text-base">
+                        <div className="mt-4 min-w-0 w-full">
+                          <div className="flex min-h-[2.5rem] items-start justify-center gap-1.5">
+                            <h3 className="line-clamp-2 min-w-0 flex-1 text-sm font-black leading-tight text-white lg:text-base">
                               {item.name}
                             </h3>
                             {item.isVerified && (

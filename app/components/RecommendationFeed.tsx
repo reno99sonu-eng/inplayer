@@ -84,7 +84,7 @@ function ShortCard({ short }: { short: Short }) {
 // A single homepage video card. Owns its own hover-preview state so each
 // card starts/stops its preview independently of every other card on the
 // page.
-function VideoCard({ video }: { video: Recommendation }) {
+export function HomeVideoCard({ video }: { video: Recommendation }) {
   const [previewing, setPreviewing] = useState(false);
   const [canHover, setCanHover] = useState(false);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -372,7 +372,7 @@ export default function RecommendationFeed({
   const remainingVideos = items.slice(20);
 
   const renderCard = (video: Recommendation) => (
-    <VideoCard key={video.id} video={video} />
+    <HomeVideoCard key={video.id} video={video} />
   );
 
   // Vertical view: a Shorts-only responsive grid (fills every device width,

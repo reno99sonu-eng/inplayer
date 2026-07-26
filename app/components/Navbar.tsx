@@ -736,7 +736,7 @@ lg:right-auto
                 }`}
               >
                 <div className="min-h-0 space-y-1">
-                  {CONTACT_EMAILS.map(({ label, address }) => (
+                  {CONTACT_EMAILS.map(({ address }) => (
                     <div
                       key={address}
                       className="
@@ -747,11 +747,8 @@ lg:right-auto
                       <a
                         href={`mailto:${address}`}
                         className="min-w-0 flex-1"
-                        title={`Email ${label.toLowerCase()}`}
+                        title={`Email ${address}`}
                       >
-                        <span className="block text-[10px] uppercase tracking-wide text-slate-500">
-                          {label}
-                        </span>
                         <span className="block truncate text-xs font-medium text-slate-200 light:text-slate-700">
                           {address}
                         </span>
@@ -776,7 +773,7 @@ lg:right-auto
             </div>
 
             <div className="mt-4 border-t border-white/10 light:border-black/10 px-3 pt-3">
-              <p className="text-[10px] text-slate-500">© 2026 HOMOX</p>
+              <p className="text-[10px] text-slate-500">© 2026 Homox Prime Pvt Ltd</p>
             </div>
           </div>
         </div>

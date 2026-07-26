@@ -17,7 +17,6 @@ const browse = [
 const company = [
   "About",
   "Careers",
-  "Partners",
   "Support",
   "Privacy",
   "Terms",
@@ -168,7 +167,7 @@ export default function Footer() {
             }`}
           >
             <div className="min-h-0 grid grid-cols-1 gap-1.5 sm:grid-cols-2 xl:grid-cols-3">
-              {CONTACT_EMAILS.map(({ label, address }) => (
+              {CONTACT_EMAILS.map(({ address }) => (
                 <div
                   key={address}
                   className="
@@ -179,11 +178,8 @@ export default function Footer() {
                   <a
                     href={`mailto:${address}`}
                     className="min-w-0 flex-1"
-                    title={`Email ${label.toLowerCase()}`}
+                    title={`Email ${address}`}
                   >
-                    <span className="block text-[10px] uppercase tracking-wide text-slate-500">
-                      {label}
-                    </span>
                     <span className="block truncate text-xs font-medium text-slate-200 light:text-slate-700">
                       {address}
                     </span>
@@ -211,7 +207,7 @@ export default function Footer() {
 
         <div className="mt-2 flex flex-col items-center justify-between gap-1.5 border-t border-white/10 pt-2 text-[10px] text-slate-500 md:flex-row lg:mt-4 lg:text-[11px] light:border-slate-200 light:text-slate-600">
 
-          <p>© 2026 INPLAYER. All Rights Reserved.</p>
+          <p>© 2026 Homox Prime Pvt Ltd</p>
 
           <div className="flex items-center gap-5">
 

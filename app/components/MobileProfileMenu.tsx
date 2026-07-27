@@ -26,7 +26,7 @@ export default function MobileProfileMenu() {
   };
 
   const items = [
-    { label: "Your Channel", icon: User, href: "/my-videos" },
+    { label: "Your Channel", icon: User, href: user?.username ? `/u/${encodeURIComponent(user.username)}` : "/my-videos" },
     { label: "My Profile", icon: User, href: "/profile" },
     { label: "Watchlist", icon: Heart, href: "/watchlist" },
     { label: "History", icon: History, href: "/history" },

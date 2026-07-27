@@ -907,7 +907,7 @@ export default function ShortsPageContent({
                           }
                         `}
                       >
-                        {isSubscribed ? "Subscribed" : "Subscribe"}
+                        In-Family
                       </button>
                     )}
                   </div>

@@ -342,6 +342,7 @@ export default function MyVideosPage() {
     views: `${formatViews(video.views || 0)} views`,
     uploaded: formatTimeAgo(video.uploadedAt),
     duration: "Video",
+    uploaderUsername: user?.username,
   });
 
   const toShort = (video: MyVideo): Short => ({
@@ -356,6 +357,7 @@ export default function MyVideosPage() {
     likes: "0",
     comments: "0",
     uploaderId: user?.userId,
+    uploaderUsername: user?.username,
     uploaderAvatarUrl: user?.avatarUrl || undefined,
   });
 

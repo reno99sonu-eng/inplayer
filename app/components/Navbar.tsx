@@ -18,13 +18,6 @@ import { CONTACT_EMAILS } from "@/app/lib/contactEmails";
 
 
 
-const youItems = [
-  { label: "Your Channel", href: "/my-videos" },
-  { label: "History", href: "/history" },
-  { label: "Shop", href: "/shop" },
-  { label: "Downloads", href: "/downloads" },
-];
-
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -468,10 +461,8 @@ lg:right-auto
               </p>
 
               <div className="space-y-0.5">
-                {youItems.map((item) => (
-                  <button
-                    key={item.label}
-                    onClick={() => goTo(item.href)}
+                <button
+                    onClick={() => goTo(user?.username ? `/u/${encodeURIComponent(user.username)}` : "/my-videos")}
                     className="
                       flex
                       w-full
@@ -492,9 +483,80 @@ lg:right-auto
                       light:hover:text-orange-600
                     "
                   >
-                    {item.label}
+                    Your Channel
                   </button>
-                ))}
+                  <button
+                    onClick={() => goTo("/history")}
+                    className="
+                      flex
+                      w-full
+                      items-center
+                      rounded-xl
+                      px-3
+                      py-2
+                      text-left
+                      text-sm
+                      text-slate-300
+                      light:text-slate-700
+                      transition-all
+                      duration-300
+                      hover:bg-white/5
+                      light:hover:bg-black/5
+                      hover:translate-x-1
+                      hover:text-orange-300
+                      light:hover:text-orange-600
+                    "
+                  >
+                    History
+                  </button>
+                  <button
+                    onClick={() => goTo("/shop")}
+                    className="
+                      flex
+                      w-full
+                      items-center
+                      rounded-xl
+                      px-3
+                      py-2
+                      text-left
+                      text-sm
+                      text-slate-300
+                      light:text-slate-700
+                      transition-all
+                      duration-300
+                      hover:bg-white/5
+                      light:hover:bg-black/5
+                      hover:translate-x-1
+                      hover:text-orange-300
+                      light:hover:text-orange-600
+                    "
+                  >
+                    Shop
+                  </button>
+                  <button
+                    onClick={() => goTo("/downloads")}
+                    className="
+                      flex
+                      w-full
+                      items-center
+                      rounded-xl
+                      px-3
+                      py-2
+                      text-left
+                      text-sm
+                      text-slate-300
+                      light:text-slate-700
+                      transition-all
+                      duration-300
+                      hover:bg-white/5
+                      light:hover:bg-black/5
+                      hover:translate-x-1
+                      hover:text-orange-300
+                      light:hover:text-orange-600
+                    "
+                  >
+                    Downloads
+                  </button>
               </div>
             </div>
 

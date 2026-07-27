@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GetCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, QueryCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
 import { areUsersConnected } from "@/app/lib/connections";
 import { normalizeUsername } from "@/app/lib/username";
+import { ensureUsername } from "@/app/lib/ensureUsername";
 
 interface Params {
   params: Promise<{ username: string }>;
@@ -29,11 +30,30 @@ export async function GET(request: NextRequest, { params }: Params) {
       new GetCommand({ TableName: "InPlayer-Usernames", Key: { usernameLower } })
     );
 
-    if (!handleResult.Item) {
-      return NextResponse.json({ error: "No channel with that username." }, { status: 404 });
-    }
+    let targetUserId: string | null = handleResult.Item?.userId ?? null;
 
-    const targetUserId = handleResult.Item.userId as string;
+    if (!targetUserId) {
+      const scanResult = await docClient.send(
+        new ScanCommand({
+          TableName: "InPlayer-Users",
+          FilterExpression: "usernameLower = :usernameLower",
+          ExpressionAttributeValues: { ":usernameLower": usernameLower },
+          Limit: 1,
+        })
+      );
+
+      if (!scanResult.Items || scanResult.Items.length === 0) {
+        return NextResponse.json({ error: "No channel with that username." }, { status: 404 });
+      }
+
+      targetUserId = scanResult.Items[0].userId as string;
+
+      try {
+        await ensureUsername(targetUserId);
+      } catch {
+        // Best-effort — the reservation may already exist now.
+      }
+    }
 
     const profileResult = await docClient.send(
       new GetCommand({ TableName: "InPlayer-Users", Key: { userId: targetUserId } })
@@ -50,7 +70,7 @@ export async function GET(request: NextRequest, { params }: Params) {
     const base = {
       found: true,
       userId: targetUserId,
-      username: profile.username || handleResult.Item.username,
+      username: profile.username || handleResult.Item?.username,
       avatarUrl: profile.avatarUrl || null,
       joinedAt:
         profile.createdAt || profile.joinedAt || profile.createdOn || null,
@@ -121,7 +141,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       ...base,
       gated: false,
       socialLinks: profile.socialLinks || { social: {}, other: [] },
-      name: profile.name || profile.username || handleResult.Item.username,
+      name: profile.name || profile.username || handleResult.Item?.username,
       description: profile.description || profile.bio || "",
       isVerified: Boolean(
         profile.verified || profile.isVerified || profile.creatorVerified

@@ -18,6 +18,10 @@ import VideoMetadataFields, {
   Visibility,
 } from "@/app/components/VideoMetadataFields";
 import { CONTENT_CATEGORIES } from "@/app/data/categories";
+import { HomeVideoCard } from "@/app/components/RecommendationFeed";
+import ShortsShelf from "@/app/components/ShortsShelf";
+import type { Recommendation } from "@/app/data/recommendations";
+import type { Short } from "@/app/data/shorts";
 
 // Same source the upload form uses — kept as a local alias so this file
 // doesn't need to change at every call site. This used to be its own
@@ -65,7 +69,7 @@ const emptyContentStats: ContentStats = {
 };
 
 export default function MyVideosPage() {
-  const { signedIn, authLoading, openSignIn } = useAuthModal();
+  const { signedIn, authLoading, openSignIn, user } = useAuthModal();
   const [videos, setVideos] = useState<MyVideo[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -324,6 +328,69 @@ export default function MyVideosPage() {
   const tabTrend = analytics && isContentTab ? analytics.trend[activeTab] : [];
   const totalViews = analytics ? analytics.videos.views + analytics.shorts.views : 0;
   const subscriberCount = analytics?.subscriberCount ?? 0;
+  const creatorName = user?.name || "You";
+  const creatorAvatar = user?.avatarUrl || "/avatars/avatar.png";
+
+  const toRecommendation = (video: MyVideo): Recommendation => ({
+    id: video.videoId,
+    videoId: video.videoId,
+    muxPlaybackId: video.muxPlaybackId,
+    title: video.title,
+    creator: creatorName,
+    avatar: creatorAvatar,
+    thumbnail: video.thumbnailUrl || "/recommendations/thumbnails/1.jpg",
+    views: `${formatViews(video.views || 0)} views`,
+    uploaded: formatTimeAgo(video.uploadedAt),
+    duration: "Video",
+  });
+
+  const toShort = (video: MyVideo): Short => ({
+    id: video.videoId,
+    videoId: video.videoId,
+    muxPlaybackId: video.muxPlaybackId,
+    title: video.title,
+    description: video.description,
+    creator: creatorName,
+    poster: video.thumbnailUrl || "/shorts/1.jpg",
+    views: `${formatViews(video.views || 0)} views`,
+    likes: "0",
+    comments: "0",
+    uploaderId: user?.userId,
+    uploaderAvatarUrl: user?.avatarUrl || undefined,
+  });
+
+  const renderManagementActions = (video: MyVideo) => (
+    <div className="mt-3 flex items-center justify-between gap-2">
+      <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase ${
+        video.status === "ready"
+          ? "bg-emerald-500/15 text-emerald-400"
+          : video.status === "processing"
+          ? "bg-amber-500/15 text-amber-400"
+          : "bg-red-500/15 text-red-400"
+      }`}>
+        {video.status}
+      </span>
+      <div className="flex items-center gap-1">
+        <button type="button" onClick={() => startEditing(video)} className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition hover:bg-white/5 hover:text-white light:hover:bg-black/5 light:hover:text-slate-900" aria-label={`Edit ${video.title}`}>
+          <Pencil size={14} />
+        </button>
+        {confirmingDeleteId === video.videoId ? (
+          <div className="flex items-center gap-1">
+            <button type="button" onClick={() => handleDelete(video.videoId)} disabled={deletingId === video.videoId} className="rounded-full bg-red-500/15 px-3 py-1.5 text-xs font-bold text-red-400 disabled:opacity-60">
+              {deletingId === video.videoId ? "..." : "Confirm"}
+            </button>
+            <button type="button" onClick={() => setConfirmingDeleteId(null)} className="rounded-full px-3 py-1.5 text-xs font-semibold text-slate-400 hover:bg-white/5 light:hover:bg-black/5">
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button type="button" onClick={() => setConfirmingDeleteId(video.videoId)} className="flex h-8 w-8 items-center justify-center rounded-full text-slate-400 transition hover:bg-red-500/10 hover:text-red-400" aria-label={`Delete ${video.title}`}>
+            <Trash2 size={14} />
+          </button>
+        )}
+      </div>
+    </div>
+  );
 
   return (
     <div className="mx-auto max-w-[1400px] px-4 py-8 sm:py-12">
@@ -336,7 +403,7 @@ export default function MyVideosPage() {
 
       <div className="mt-8 flex flex-col gap-5 lg:flex-row lg:items-start lg:gap-6">
         {/* Section buttons — left side on larger screens, a pill row on mobile */}
-        <div className="flex flex-shrink-0 gap-2 overflow-x-auto lg:w-48 lg:flex-col lg:gap-1.5 lg:overflow-visible">
+        <div className="flex flex-shrink-0 gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden lg:w-48 lg:flex-col lg:gap-1.5 lg:overflow-visible lg:[scrollbar-width:auto] lg:[&::-webkit-scrollbar]:block">
           <button
             onClick={() => setActiveTab("videos")}
             className={`
@@ -421,7 +488,34 @@ export default function MyVideosPage() {
                   </Link>
                 </div>
               ) : (
-                <div className="space-y-3">
+                <>
+                  {/* Keep the published channel library visually identical to
+                      the home recommendation feed. Editing temporarily
+                      restores the existing detailed editor below. */}
+                  {!editingId && (
+                    activeTab === "shorts" ? (
+                      <ShortsShelf
+                        items={filteredVideos.map(toShort)}
+                        renderFooter={(short) => {
+                          const video = filteredVideos.find(
+                            (item) => item.videoId === short.videoId
+                          );
+                          return video ? renderManagementActions(video) : null;
+                        }}
+                      />
+                    ) : (
+                      <div className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        {filteredVideos.map((video) => (
+                          <div key={video.videoId}>
+                            <HomeVideoCard video={toRecommendation(video)} />
+                            {renderManagementActions(video)}
+                          </div>
+                        ))}
+                      </div>
+                    )
+                  )}
+
+                <div className={editingId ? "space-y-3" : "hidden"}>
                   {filteredVideos.map((video) => (
                     <div
                       key={video.videoId}
@@ -554,6 +648,7 @@ export default function MyVideosPage() {
                     </div>
                   ))}
                 </div>
+                </>
               )}
             </>
           )}

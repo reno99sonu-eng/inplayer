@@ -3,7 +3,6 @@ import "./amplify-config";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import Navbar from "./components/Navbar";
-import Footer from "./components/Footer";
 import MobileBottomNav from "./components/MobileBottomNav";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { SettingsProvider } from "./components/settings/SettingsProvider";
@@ -48,7 +47,6 @@ export default function RootLayout({
     <ThemeProvider>
       <Navbar />
       <div className="pb-20 lg:pb-0">{children}</div>
-      <Footer />
       <MobileBottomNav />
     </ThemeProvider>
   </SettingsProvider>

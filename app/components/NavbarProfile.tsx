@@ -42,7 +42,7 @@ export default function NavbarProfile() {
   }, []);
 
   const menu = [
-    { icon: User, title: "Your Channel", href: user?.handle ? `/u/${encodeURIComponent(user.handle)}` : "/profile" },
+    { icon: User, title: "Your Channel", href: "/my-videos" },
     { icon: User, title: "My Profile", href: "/profile" },
     { icon: Heart, title: "Watchlist", href: "/watchlist" },
     { icon: MessageSquare, title: "My Messages", href: "/messages" },

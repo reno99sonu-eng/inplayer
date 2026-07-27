@@ -2,13 +2,15 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import type { ReactNode } from "react";
 import { type Short } from "../data/shorts";
 
 interface ShortsShelfProps {
   items: Short[];
+  renderFooter?: (short: Short) => ReactNode;
 }
 
-export default function ShortsShelf({ items }: ShortsShelfProps) {
+export default function ShortsShelf({ items, renderFooter }: ShortsShelfProps) {
   return (
     <section className="mx-auto max-w-[1800px] px-3 lg:px-8 py-3 lg:py-8">
       <div className="mb-3 lg:mb-6 flex items-center gap-2 lg:gap-3">
@@ -44,6 +46,7 @@ export default function ShortsShelf({ items }: ShortsShelfProps) {
         "
       >
         {items.map((short) => {
+          const footer = renderFooter?.(short);
           const cardContent = (
             <div className="relative aspect-[9/16] overflow-hidden rounded-2xl">
               <Image
@@ -115,6 +118,17 @@ export default function ShortsShelf({ items }: ShortsShelfProps) {
           // short (see app/shorts/page.tsx). Example (dummy) cards stay
           // exactly as before — not clickable.
           if (short.videoId) {
+            if (footer) {
+              return (
+                <div key={short.id} className={className}>
+                  <Link href={`/shorts?v=${short.videoId}`} className="group block">
+                    {cardContent}
+                  </Link>
+                  {footer}
+                </div>
+              );
+            }
+
             return (
               <Link
                 key={short.id}
@@ -123,6 +137,15 @@ export default function ShortsShelf({ items }: ShortsShelfProps) {
               >
                 {cardContent}
               </Link>
+            );
+          }
+
+          if (footer) {
+            return (
+              <div key={short.id} className={className}>
+                {cardContent}
+                {footer}
+              </div>
             );
           }
 

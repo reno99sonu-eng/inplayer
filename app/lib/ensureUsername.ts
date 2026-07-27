@@ -13,11 +13,11 @@ function generateUsername() {
   return `user${Math.floor(100000 + Math.random() * 900000)}`;
 }
 
-async function claimUsername(
+async function tryReserveUsername(
   userId: string,
   username: string,
   usernameLower: string
-): Promise<boolean> {
+): Promise<void> {
   try {
     await docClient.send(
       new PutCommand({
@@ -26,30 +26,8 @@ async function claimUsername(
         ConditionExpression: "attribute_not_exists(usernameLower)",
       })
     );
-
-    await docClient.send(
-      new UpdateCommand({
-        TableName: USERS_TABLE,
-        Key: { userId },
-        UpdateExpression:
-          "SET username = :username, usernameLower = :usernameLower, updatedAt = :updatedAt",
-        ExpressionAttributeValues: {
-          ":username": username,
-          ":usernameLower": usernameLower,
-          ":updatedAt": new Date().toISOString(),
-        },
-      })
-    );
-
-    return true;
-  } catch (err) {
-    const name = (err as { name?: string }).name;
-
-    if (name === "ConditionalCheckFailedException") {
-      return false;
-    }
-
-    throw err;
+  } catch {
+    // Table may not exist, or missing permissions — non-critical.
   }
 }
 
@@ -70,38 +48,42 @@ export async function ensureUsername(userId: string) {
     const username = storedUsername.trim();
     const usernameLower = normalizeUsername(username);
 
-    const reservation = await docClient.send(
-      new GetCommand({
-        TableName: USERNAMES_TABLE,
-        Key: { usernameLower },
+    await docClient.send(
+      new UpdateCommand({
+        TableName: USERS_TABLE,
+        Key: { userId },
+        UpdateExpression:
+          "SET usernameLower = :usernameLower, updatedAt = :updatedAt",
+        ExpressionAttributeValues: {
+          ":usernameLower": usernameLower,
+          ":updatedAt": new Date().toISOString(),
+        },
       })
     );
 
-    if (reservation.Item?.userId === userId) {
-      return username;
-    }
+    await tryReserveUsername(userId, username, usernameLower);
 
-    if (!reservation.Item) {
-      const claimed = await claimUsername(userId, username, usernameLower);
-
-      if (claimed) {
-        return username;
-      }
-    }
+    return username;
   }
 
-  while (true) {
-    const username = generateUsername();
-    const usernameLower = normalizeUsername(username);
+  const username = generateUsername();
+  const usernameLower = normalizeUsername(username);
 
-    if (isReservedUsername(usernameLower)) {
-      continue;
-    }
+  await docClient.send(
+    new UpdateCommand({
+      TableName: USERS_TABLE,
+      Key: { userId },
+      UpdateExpression:
+        "SET username = :username, usernameLower = :usernameLower, updatedAt = :updatedAt",
+      ExpressionAttributeValues: {
+        ":username": username,
+        ":usernameLower": usernameLower,
+        ":updatedAt": new Date().toISOString(),
+      },
+    })
+  );
 
-    const claimed = await claimUsername(userId, username, usernameLower);
+  await tryReserveUsername(userId, username, usernameLower);
 
-    if (claimed) {
-      return username;
-    }
-  }
+  return username;
 }

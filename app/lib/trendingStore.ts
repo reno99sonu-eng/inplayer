@@ -236,17 +236,15 @@ export async function getFeaturedThisWeek(limit = 6): Promise<RankedVideo[]> {
       profile.username as string | undefined,
     ])
   );
-  // A channel is addressed by its public handle. Older user rows can predate
-  // that field, so allocate their normal handle here before emitting a hero
-  // slide rather than making Details silently fall back to the video page.
-  const missingUserIds = userIds.filter((userId) => !usernames.get(userId));
-  if (missingUserIds.length) {
-    const ensuredUsernames = await Promise.all(
-      missingUserIds.map(async (userId) => [userId, await ensureUsername(userId)] as const)
-    );
-    for (const [userId, username] of ensuredUsernames) {
-      usernames.set(userId, username);
-    }
+  // A channel is addressed by a reservation in InPlayer-Usernames, not just
+  // the username field on a profile. Reconcile every featured creator here:
+  // this repairs legacy rows with a display handle but no lookup entry before
+  // the Details button is rendered.
+  const ensuredUsernames = await Promise.all(
+    userIds.map(async (userId) => [userId, await ensureUsername(userId)] as const)
+  );
+  for (const [userId, username] of ensuredUsernames) {
+    usernames.set(userId, username);
   }
 
   return videos.map((video) => ({

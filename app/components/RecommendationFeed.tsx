@@ -135,10 +135,8 @@ export function HomeVideoCard({ video }: { video: Recommendation }) {
     setPreviewing(false);
   };
 
-  const cardContent = (
-    <>
-      {/* Thumbnail */}
-      <div
+  const thumbnail = (
+    <div
         ref={cardRef}
         className="
           relative
@@ -222,12 +220,11 @@ export function HomeVideoCard({ video }: { video: Recommendation }) {
             New
           </span>
         )}
-      </div>
+    </div>
+  );
 
-      {/* Information */}
-      <div className="mt-4 flex items-start gap-3">
-
-        <div className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-full border border-white/10 light:border-black/10">
+  const avatar = (
+    <div className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-full border border-white/10 light:border-black/10">
           {/* A plain <img>, not next/image — real uploaders' avatars are
               base64 data URLs (see app/lib/imageCompress.ts), which
               next/image doesn't optimize/serve cleanly. lazy + async so
@@ -240,9 +237,24 @@ export function HomeVideoCard({ video }: { video: Recommendation }) {
             decoding="async"
             className="h-full w-full object-cover"
           />
-        </div>
+    </div>
+  );
 
-        <div className="min-w-0 flex-1">
+  const information = (
+    <div className="mt-4 flex items-start gap-3">
+      {video.uploaderUsername ? (
+        <Link
+          href={`/u/${encodeURIComponent(video.uploaderUsername)}`}
+          aria-label={`Open ${video.creator}'s channel`}
+          className="flex-shrink-0 transition-transform hover:scale-105 focus-visible:rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-400"
+        >
+          {avatar}
+        </Link>
+      ) : (
+        avatar
+      )}
+
+      <div className="min-w-0 flex-1">
 
           <h3
             className="
@@ -254,7 +266,16 @@ export function HomeVideoCard({ video }: { video: Recommendation }) {
               light:text-slate-900
             "
           >
-            {video.title}
+            {video.videoId ? (
+              <Link
+                href={`/watch/${video.videoId}`}
+                className="transition hover:text-orange-200"
+              >
+                {video.title}
+              </Link>
+            ) : (
+              video.title
+            )}
           </h3>
 
           <div className="mt-2 flex items-center gap-1 text-sm text-slate-400 light:text-slate-600">
@@ -273,9 +294,9 @@ export function HomeVideoCard({ video }: { video: Recommendation }) {
             {video.views} • {video.uploaded}
           </p>
 
-        </div>
+      </div>
 
-        <button
+      <button
           className="
             flex
             h-9
@@ -294,10 +315,8 @@ export function HomeVideoCard({ video }: { video: Recommendation }) {
           "
         >
           <MoreVertical size={18} />
-        </button>
-
-      </div>
-    </>
+      </button>
+    </div>
   );
 
   // Real uploaded videos link to their actual watch page. Example
@@ -305,12 +324,16 @@ export function HomeVideoCard({ video }: { video: Recommendation }) {
   // they don't point to anything real.
   if (video.videoId) {
     return (
-      <Link
-        href={`/watch/${video.videoId}`}
-        className="group transition-all duration-300"
-      >
-        {cardContent}
-      </Link>
+      <article className="group transition-all duration-300">
+        <Link
+          href={`/watch/${video.videoId}`}
+          aria-label={`Watch ${video.title}`}
+          className="block"
+        >
+          {thumbnail}
+        </Link>
+        {information}
+      </article>
     );
   }
 
@@ -322,7 +345,8 @@ export function HomeVideoCard({ video }: { video: Recommendation }) {
         duration-300
       "
     >
-      {cardContent}
+      {thumbnail}
+      {information}
     </article>
   );
 }

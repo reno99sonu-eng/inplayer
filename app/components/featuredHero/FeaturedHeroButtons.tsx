@@ -67,31 +67,28 @@ export default function FeaturedHeroButtons({ videoId, uploaderUsername }: Featu
 
       {/* Details opens the creator's existing public channel, including its
           channel header and complete video/Shorts library. */}
-<Link
-  href={`/u/${encodeURIComponent(uploaderUsername ?? "")}`}
-  className="
-    flex
-    items-center
-    gap-2
-    rounded-full
-    border
-    border-white/10
-    bg-white/5
-    px-5
-    py-2.5
-    text-sm
-    font-semibold
-    text-white
-    backdrop-blur-xl
-    transition-all
-    duration-300
-    hover:border-cyan-400/40
-    hover:bg-white/10
-  "
->
-  <Info size={16} />
-  Details
-</Link>
+      {uploaderUsername ? (
+        <Link
+          href={`/u/${encodeURIComponent(uploaderUsername)}`}
+          className="
+            flex items-center gap-2 rounded-full border border-white/10
+            bg-white/5 px-5 py-2.5 text-sm font-semibold text-white
+            backdrop-blur-xl transition-all duration-300
+            hover:border-cyan-400/40 hover:bg-white/10
+          "
+        >
+          <Info size={16} />
+          Details
+        </Link>
+      ) : (
+        <span
+          aria-disabled="true"
+          className="flex cursor-not-allowed items-center gap-2 rounded-full border border-white/10 bg-white/5 px-5 py-2.5 text-sm font-semibold text-white/45"
+        >
+          <Info size={16} />
+          Details unavailable
+        </span>
+      )}
 
     </div>
   );

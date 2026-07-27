@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { QueryCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
+import { ensureUsername } from "@/app/lib/ensureUsername";
 
 export async function GET(request: NextRequest) {
   let user;
@@ -45,9 +46,13 @@ export async function GET(request: NextRequest) {
           return null;
         }
 
+        // Return a handle that is registered in the channel lookup table,
+        // including for subscriptions created before that table was used.
+        const username = await ensureUsername(creatorId);
+
         return {
           creatorId,
-          username: profile.Item.username ?? "",
+          username,
           name:
             profile.Item.name ??
             profile.Item.displayName ??

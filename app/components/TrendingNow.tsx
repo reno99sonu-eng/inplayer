@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from "react";
 import { BadgeCheck } from "lucide-react";
 
 import type { TrendingCreator } from "../data/trending";
+import { formatViews } from "../lib/formatters";
 
 const MIN_ITEMS_TO_LOOP = 6;
 const AUTO_SCROLL_PIXELS_PER_SECOND = 30;
@@ -228,69 +229,46 @@ export default function TrendingNow() {
   }
 
   return (
-    <section className="relative mx-auto max-w-[1700px] px-4 lg:px-5 pt-2 lg:pt-3 pb-1.5 lg:pb-2">
-      <div className="pointer-events-none absolute inset-0">
-        <h1
-          className="
-            absolute
-            left-4
-            top-4
-            select-none
-            text-[50px]
-            font-black
-            tracking-[-0.08em]
-            text-white/[0.025]
-            light:text-black/[0.025]
-            lg:left-8
-            lg:top-1
-            lg:text-[90px]
-          "
-        >
-          TRENDING
-        </h1>
-      </div>
-
-      <div className="mb-2 lg:mb-3 flex items-center justify-between">
+    <section className="mx-auto max-w-[1800px] px-4 pb-2 pt-3 lg:px-8 lg:pb-3 lg:pt-4">
+      <div className="mb-2 flex items-end justify-between lg:mb-3">
         <div>
           <span className="rounded-full border border-red-500/20 bg-red-500/10 px-2.5 lg:px-3 py-0.5 text-[10px] font-bold uppercase tracking-[0.2em] text-red-300 light:text-red-600 backdrop-blur-sm">
             Trending today
           </span>
 
-          <h2 className="mt-1 text-lg font-black text-white light:text-slate-900">
+          <h2 className="mt-1 text-lg font-black tracking-tight text-white light:text-slate-900">
             Trending Creators
           </h2>
         </div>
       </div>
 
-      <div className="relative overflow-hidden">
-        <div className="pointer-events-none absolute left-0 top-0 z-20 h-full w-10 bg-gradient-to-r from-[#0b1220] light:from-[#FBF6EA] to-transparent lg:w-16" />
+      <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.035] light:border-black/10 light:bg-black/[0.025]">
+        <div className="pointer-events-none absolute left-0 top-0 z-20 h-full w-8 bg-gradient-to-r from-[#0b1220] via-[#0b1220]/80 to-transparent light:from-[#FBF6EA] light:via-[#FBF6EA]/80 lg:w-12" />
 
-        <div className="pointer-events-none absolute right-0 top-0 z-20 h-full w-10 bg-gradient-to-l from-[#0b1220] light:from-[#FBF6EA] to-transparent lg:w-16" />
+        <div className="pointer-events-none absolute right-0 top-0 z-20 h-full w-8 bg-gradient-to-l from-[#0b1220] via-[#0b1220]/80 to-transparent light:from-[#FBF6EA] light:via-[#FBF6EA]/80 lg:w-12" />
 
         {items === null ? (
           <div
             className="
               flex
-              gap-2.5
+              gap-2
+              px-4
+              py-3
               lg:gap-3
-              pl-5
-              lg:pl-10
-              pt-2
-              lg:pt-3
-              pb-2
+              lg:px-6
             "
           >
             {Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
                 className="
-                  h-[84px]
-                  w-[84px]
-                  lg:h-[96px]
-                  lg:w-[96px]
+                  h-[108px]
+                  w-[120px]
+                  lg:h-[116px]
+                  lg:w-[132px]
                   flex-shrink-0
                   animate-pulse
-                  rounded-full
+                  rounded-xl
                   border
                   border-white/10
                   bg-white/[0.03]
@@ -301,7 +279,7 @@ export default function TrendingNow() {
         ) : (
           <div
             ref={carouselRef}
-            className="cursor-grab touch-pan-y select-none overflow-x-scroll py-2 pr-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden active:cursor-grabbing lg:py-2 lg:pr-5"
+            className="cursor-grab touch-pan-y select-none overflow-x-scroll px-4 py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden active:cursor-grabbing lg:px-6"
             onPointerEnter={() => {
               isHoveringRef.current = true;
             }}
@@ -388,58 +366,38 @@ export default function TrendingNow() {
               }
             }}
           >
-            <div className="flex w-max gap-2.5 lg:gap-3">
+            <div className="flex w-max gap-2 lg:gap-3">
               {[0, 1].map((groupIndex) => (
                 <div
                   key={groupIndex}
                   ref={groupIndex === 0 ? firstGroupRef : secondGroupRef}
                   aria-hidden={groupIndex === 1}
-                  className="flex w-max gap-2.5 lg:gap-3"
+                  className="flex w-max gap-2 lg:gap-3"
                 >
                   {loopItems.map((item, index) => (
                     <Link
                       key={`${groupIndex}-${index}-${item.userId}`}
                       href={`/u/${encodeURIComponent(item.username)}`}
                       tabIndex={groupIndex === 1 ? -1 : undefined}
-                      className="
-                        group
-                        relative
-                        h-[84px]
-                        w-[84px]
-                        lg:h-[96px]
-                        lg:w-[96px]
-                        flex-shrink-0
-                        rounded-full
-                        transition-all
-                        duration-300
-                        hover:-translate-y-1
-                        hover:scale-[1.03]
-                        hover:border-orange-400/40
-                        hover:shadow-[0_0_50px_rgba(249,115,22,.22)]
-                      "
+                      aria-label={`Open ${item.name}'s channel`}
+                      className="group flex h-[108px] w-[120px] flex-shrink-0 flex-col items-center justify-center rounded-xl border border-white/10 bg-black/10 px-2 text-center transition duration-200 hover:-translate-y-0.5 hover:border-orange-400/45 hover:bg-white/[0.07] light:border-black/10 light:bg-white/30 light:hover:bg-white/55 lg:h-[116px] lg:w-[132px]"
                     >
-                      <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-full">
-                        <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-orange-400/20 blur-3xl transition duration-500 group-hover:bg-orange-400/35" />
-                        <div className="absolute -bottom-16 -left-12 h-36 w-36 rounded-full bg-amber-300/10 blur-3xl" />
+                      <div className="relative">
+                        {/* eslint-disable-next-line @next/next/no-img-element -- creator avatars can be data URLs. */}
+                        <img
+                          src={getAvatarSrc(item.avatarUrl)}
+                          alt=""
+                          onError={(event) => {
+                            if (!event.currentTarget.src.endsWith(FALLBACK_AVATAR)) {
+                              event.currentTarget.src = FALLBACK_AVATAR;
+                            }
+                          }}
+                          className="h-12 w-12 rounded-full border border-white/30 object-cover transition duration-200 group-hover:scale-105 lg:h-14 lg:w-14"
+                        />
+                        {item.isVerified && <BadgeCheck size={14} className="absolute -bottom-1 -right-1 fill-orange-400 text-[#101827]" aria-label="Verified creator" />}
                       </div>
-
-                      <div className="relative flex h-full items-center justify-center">
-                        <div className="relative">
-                          <div className="absolute -inset-2 rounded-full bg-gradient-to-br from-orange-400 via-amber-300 to-orange-500 opacity-50 blur-md transition duration-500 group-hover:opacity-90" />
-                          {/* eslint-disable-next-line @next/next/no-img-element -- creator avatars can be data URLs. */}
-                          <img
-                            src={getAvatarSrc(item.avatarUrl)}
-                            alt={item.name}
-                            onError={(event) => {
-                              if (!event.currentTarget.src.endsWith(FALLBACK_AVATAR)) {
-                                event.currentTarget.src = FALLBACK_AVATAR;
-                              }
-                            }}
-                            className="relative h-[76px] w-[76px] rounded-full border-2 border-white/80 object-cover shadow-2xl transition duration-500 group-hover:scale-110 lg:h-[88px] lg:w-[88px]"
-                          />
-                          {item.isVerified && <BadgeCheck size={16} className="absolute -bottom-1 -right-1 fill-orange-400 text-[#101827]" aria-label="Verified creator" />}
-                        </div>
-                      </div>
+                      <p className="mt-1.5 w-full truncate text-xs font-bold text-white light:text-slate-900">{item.name}</p>
+                      <p className="mt-0.5 w-full truncate text-[10px] font-medium text-slate-400 light:text-slate-600">{formatViews(item.windowViews)}</p>
                     </Link>
                   ))}
                 </div>

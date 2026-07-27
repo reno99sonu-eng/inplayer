@@ -1,5 +1,3 @@
-import { GetCommand } from "@aws-sdk/lib-dynamodb";
-import { docClient } from "@/app/lib/dynamodb";
 import { ensureUsername } from "@/app/lib/ensureUsername";
 
 // Shared userId -> username resolver, used by every read path that needs
@@ -30,30 +28,15 @@ export async function resolveUsernames(
   await Promise.all(
     distinctIds.map(async (userId) => {
       try {
-        const result = await docClient.send(
-          new GetCommand({
-            TableName: "InPlayer-Users",
-            Key: { userId },
-          })
-        );
-        let username = result.Item?.username as string | undefined;
+        // Always pass through ensureUsername, rather than only when the
+        // profile field is absent. Older rows may have a username but no
+        // corresponding InPlayer-Usernames reservation, which made their
+        // otherwise valid /u/[username] links return 404.
+        const username = await ensureUsername(userId);
 
-if (!username) {
-  await ensureUsername(userId);
-
-  const refreshed = await docClient.send(
-    new GetCommand({
-      TableName: "InPlayer-Users",
-      Key: { userId },
-    })
-  );
-
-  username = refreshed.Item?.username as string | undefined;
-}
-
-if (username) {
-  map.set(userId, username);
-}
+        if (username) {
+          map.set(userId, username);
+        }
       } catch (err) {
         // A single bad lookup shouldn't take down the whole page — skip
         // it and let the caller fall back to non-linked rendering.

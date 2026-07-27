@@ -5,6 +5,7 @@ import RecommendationFeed from "./components/RecommendationFeed";
 import { getReadyVideos } from "./lib/videoStore";
 import type { Recommendation } from "./data/recommendations";
 import type { Short } from "./data/shorts";
+import { resolveUsernames } from "./lib/resolveUsernames";
 
 function formatDuration(seconds: number): string {
   if (!seconds) return "0:00";
@@ -45,6 +46,9 @@ async function getRealContent(): Promise<RealContent> {
     const items = allReady.filter(
       (v) => !v.visibility || v.visibility === "public"
     );
+    const usernames = await resolveUsernames(
+      items.map((video) => video.uploaderId)
+    );
 
     const realVideos: Recommendation[] = items
       .filter((video) => video.contentType !== "short")
@@ -54,6 +58,7 @@ async function getRealContent(): Promise<RealContent> {
         muxPlaybackId: video.muxPlaybackId,
         title: video.title,
         creator: video.uploaderName || "Unknown",
+        uploaderUsername: usernames.get(video.uploaderId),
         avatar: video.uploaderAvatarUrl || "/avatars/avatar.png",
         thumbnail: video.thumbnailUrl || "/recommendations/thumbnails/1.jpg",
         views: `${video.views || 0} views`,
@@ -72,6 +77,7 @@ async function getRealContent(): Promise<RealContent> {
         description: video.description,
         creator: video.uploaderName || "Unknown",
         uploaderId: video.uploaderId,
+        uploaderUsername: usernames.get(video.uploaderId),
         uploaderAvatarUrl: video.uploaderAvatarUrl,
         poster: video.thumbnailUrl || "/shorts/1.jpg",
         views: `${video.views || 0} views`,

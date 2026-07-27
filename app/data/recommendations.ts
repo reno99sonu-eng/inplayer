@@ -8,6 +8,7 @@ export interface Recommendation {
   uploaded: string;
   duration: string;
   verified?: boolean;
+  uploaderUsername?: string; // real creator handle for the linked channel avatar
   videoId?: string; // present only for real uploaded videos — used to link to /watch/[videoId]
   muxPlaybackId?: string; // present only for real uploaded videos — used for the hover preview
 }

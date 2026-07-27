@@ -114,7 +114,7 @@ export default function FeaturedHeroContent({
       {/* Buttons */}
 
       <div className="mt-5">
-        <FeaturedHeroButtons videoId={slide.videoId} />
+        <FeaturedHeroButtons videoId={slide.videoId} uploaderUsername={slide.uploaderUsername} />
       </div>
     </div>
   );

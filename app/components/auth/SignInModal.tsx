@@ -44,6 +44,7 @@ export default function SignInModal({
   // Checked by default — most viewers expect to stay signed in. Unchecking
   // it makes the session end when the browser closes (see handleSignIn).
   const [rememberMe, setRememberMe] = useState(true);
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,6 +56,7 @@ export default function SignInModal({
       setEmail("");
       setPassword("");
       setRememberMe(true);
+      setAcceptedTerms(false);
       setShowPassword(false);
       setLoading(false);
       setError(null);
@@ -85,6 +87,12 @@ export default function SignInModal({
       triggerError("Please enter both your email and password.");
       return;
     }
+    if (!acceptedTerms) {
+      triggerError("Please accept InPlayer's Terms and Privacy Policy to continue.");
+      return;
+    }
+
+    try { localStorage.setItem("inplayer-terms-accepted", "1"); } catch { /* ignore */ }
 
     setLoading(true);
 
@@ -155,6 +163,11 @@ export default function SignInModal({
 
   const handleGoogle = async () => {
     setError(null);
+    if (!acceptedTerms) {
+      triggerError("Please accept InPlayer's Terms and Privacy Policy to continue.");
+      return;
+    }
+    try { localStorage.setItem("inplayer-terms-accepted", "1"); } catch { /* ignore */ }
     try {
       // Redirects to Cognito's Hosted UI → Google → back here. Amplify
       // finishes the exchange on return and AuthProvider's Hub listener
@@ -352,6 +365,11 @@ export default function SignInModal({
                   >
                     Forgot Password?
                   </button>
+                </div>
+
+                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3 light:border-black/10 light:bg-black/[0.02]">
+                  <p className="text-xs leading-5 text-slate-400 light:text-slate-600">By continuing, you agree to InPlayer&apos;s Terms of Service and Privacy Policy.</p>
+                  <div className="mt-3 flex gap-2"><button type="button" onClick={() => setAcceptedTerms(true)} className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${acceptedTerms ? "bg-orange-500 text-white" : "bg-white/10 text-slate-300 light:bg-black/5 light:text-slate-700"}`}>Accept</button><button type="button" onClick={onClose} className="flex-1 rounded-xl border border-white/10 py-2 text-xs font-bold text-slate-300 transition hover:bg-red-500/10 hover:text-red-300 light:border-black/10 light:text-slate-700">Reject</button></div>
                 </div>
 
                 {error && (

@@ -41,6 +41,7 @@ export interface RankedVideo {
   title: string;
   uploaderName: string;
   uploaderAvatarUrl: string | null;
+  uploaderUsername?: string | null;
   thumbnailUrl: string | null;
   windowViews: number; // views within the requested window (today, or the trailing 7 days) — NOT the all-time counter on the video item
 }
@@ -202,11 +203,36 @@ export async function getTrendingCreatorsToday(
 // so this is 7 parallel single-day Queries merged in memory — the same
 // fan-out idiom app/api/my-videos/analytics already uses for per-video
 // comment counts.
-export function getFeaturedThisWeek(limit = 6): Promise<RankedVideo[]> {
+export async function getFeaturedThisWeek(limit = 6): Promise<RankedVideo[]> {
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setUTCDate(d.getUTCDate() - i);
     return dateKey(d);
   });
-  return rankByWindow(days, limit);
+  const videos = await rankByWindow(days, limit);
+  const userIds = Array.from(
+    new Set(videos.map((video) => video.uploaderId).filter((id): id is string => Boolean(id)))
+  );
+  if (!userIds.length) return videos;
+
+  const profiles = await docClient.send(
+    new BatchGetCommand({
+      RequestItems: {
+        "InPlayer-Users": {
+          Keys: userIds.map((userId) => ({ userId })),
+          ProjectionExpression: "userId, username",
+        },
+      },
+    })
+  );
+  const usernames = new Map(
+    (profiles.Responses?.["InPlayer-Users"] || []).map((profile) => [
+      profile.userId as string,
+      profile.username as string | undefined,
+    ])
+  );
+  return videos.map((video) => ({
+    ...video,
+    uploaderUsername: video.uploaderId ? usernames.get(video.uploaderId) || null : null,
+  }));
 }

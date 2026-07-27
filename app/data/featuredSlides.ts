@@ -6,6 +6,7 @@ export interface FeaturedSlide {
   videoId: string;
   title: string;
   uploaderName: string;
+  uploaderUsername: string | null;
   uploaderAvatarUrl: string | null;
   thumbnailUrl: string | null;
   windowViews: number;

@@ -33,6 +33,7 @@ export async function POST(request: NextRequest) {
       ageRestricted,
       commentsEnabled,
       spokenLanguage,
+      shortSettings,
       thumbnailDataUrl,
     } = body;
 
@@ -167,6 +168,13 @@ export async function POST(request: NextRequest) {
           ageRestricted: !!ageRestricted,
           // Defaults to on unless explicitly disabled.
           commentsEnabled: commentsEnabled !== false,
+          ...(isShort && shortSettings && typeof shortSettings === "object" && {
+            shortSettings: {
+              soundtrackId: typeof shortSettings.soundtrackId === "string" ? shortSettings.soundtrackId : null,
+              musicClipSeconds: shortSettings.musicClipSeconds === 20 ? 20 : 30,
+              filter: ["original", "warm", "vivid", "mono"].includes(shortSettings.filter) ? shortSettings.filter : "original",
+            },
+          }),
         },
       })
     );

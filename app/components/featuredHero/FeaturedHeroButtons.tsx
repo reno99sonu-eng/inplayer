@@ -5,11 +5,10 @@ import { Play, Plus, Info } from "lucide-react";
 
 interface FeaturedHeroButtonsProps {
   videoId: string;
+  uploaderUsername: string | null;
 }
 
-export default function FeaturedHeroButtons({
-  videoId,
-}: FeaturedHeroButtonsProps) {
+export default function FeaturedHeroButtons({ videoId, uploaderUsername }: FeaturedHeroButtonsProps) {
   return (
     <div className="flex flex-wrap items-center gap-3">
 
@@ -68,7 +67,7 @@ export default function FeaturedHeroButtons({
 
       {/* Details */}
 <Link
-  href={`/watch/${videoId}`}
+  href={uploaderUsername ? `/u/${encodeURIComponent(uploaderUsername)}` : `/watch/${videoId}`}
   className="
     flex
     items-center

@@ -53,9 +53,8 @@ export default function FeaturedHero() {
       <section
         className="
           relative w-full overflow-hidden bg-black animate-pulse
-          min-h-[260px] sm:min-h-[300px] md:min-h-[340px]
-          lg:aspect-video
-          lg:max-h-[650px]
+          min-h-[220px] sm:min-h-[250px] md:min-h-[280px]
+          lg:h-[34vh]
         "
       />
     );
@@ -80,17 +79,12 @@ export default function FeaturedHero() {
         overflow-hidden
         bg-black
 
-        min-h-[260px]
-
-        sm:min-h-[300px]
-
-        md:min-h-[340px]
-
-        lg:h-[38vh]
-
-        xl:h-[42vh]
-
-        2xl:h-[46vh]
+        min-h-[220px]
+        sm:min-h-[250px]
+        md:min-h-[280px]
+        lg:h-[34vh]
+        xl:h-[36vh]
+        2xl:h-[38vh]
       "
     >
       {/* Background */}

@@ -39,6 +39,7 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
+  const [age, setAge] = useState("");
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [agreedToTerms, setAgreedToTerms] = useState(false);
@@ -57,6 +58,7 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
     if (!open) {
       setName("");
       setEmail("");
+      setAge("");
       setPassword("");
       setConfirmPassword("");
       setAgreedToTerms(false);
@@ -76,13 +78,17 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
   const handleSignUp = async () => {
     setError(null);
 
-    if (!name.trim() || !email.trim() || !password) {
-      triggerError("Please fill in your name, email, and password.");
+    if (!name.trim() || !email.trim() || !password || !age) {
+      triggerError("Please fill in your name, age, email, and password.");
       return;
     }
 
     if (!isValidEmail(email)) {
       triggerError("Please enter a valid email address.");
+      return;
+    }
+    if (!Number.isInteger(Number(age)) || Number(age) < 13 || Number(age) > 120) {
+      triggerError("You must enter an age from 13 to 120.");
       return;
     }
 
@@ -102,6 +108,10 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
     }
 
     setLoading(true);
+    try {
+      localStorage.setItem("inplayer-pending-age", age);
+      localStorage.setItem("inplayer-terms-accepted", "1");
+    } catch { /* ignore */ }
 
     try {
       const result = await signUp({
@@ -145,6 +155,18 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
 
   const handleGoogle = async () => {
     setError(null);
+    if (!agreedToTerms) {
+      triggerError("Please accept InPlayer's Terms and Privacy Policy to continue.");
+      return;
+    }
+    if (!Number.isInteger(Number(age)) || Number(age) < 13 || Number(age) > 120) {
+      triggerError("Enter an age from 13 to 120 before continuing with Google.");
+      return;
+    }
+    try {
+      localStorage.setItem("inplayer-pending-age", age);
+      localStorage.setItem("inplayer-terms-accepted", "1");
+    } catch { /* ignore */ }
     try {
       // With Google there's no separate "sign up" — the first Google
       // sign-in creates the account automatically via Cognito.
@@ -322,6 +344,11 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
             </div>
 
             <div>
+              <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-600">Age</label>
+              <input type="number" min="13" max="120" value={age} onChange={(event) => setAge(event.target.value)} className="w-full rounded-2xl border border-white/10 bg-[#07111F] px-4 py-3 text-white caret-orange-400 outline-none transition focus:border-orange-400/50 light:border-black/10 light:bg-black/[0.03] light:text-slate-900" placeholder="You must be 13 or older" />
+            </div>
+
+            <div>
               <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-600">
                 Password
               </label>
@@ -423,25 +450,7 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
               )}
             </div>
 
-            <label className="flex items-start gap-2.5 text-xs text-slate-400 light:text-slate-600 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={agreedToTerms}
-                onChange={(e) => setAgreedToTerms(e.target.checked)}
-                className="mt-0.5 accent-orange-500"
-              />
-              <span>
-                I agree to InPlayer&apos;s{" "}
-                <span className="font-semibold text-orange-300 light:text-orange-600">
-                  Terms of Service
-                </span>{" "}
-                and{" "}
-                <span className="font-semibold text-orange-300 light:text-orange-600">
-                  Privacy Policy
-                </span>
-                .
-              </span>
-            </label>
+            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3 light:border-black/10 light:bg-black/[0.02]"><p className="text-xs leading-5 text-slate-400 light:text-slate-600">Read and accept InPlayer&apos;s Terms of Service and Privacy Policy before creating your account.</p><div className="mt-3 flex gap-2"><button type="button" onClick={() => setAgreedToTerms(true)} className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${agreedToTerms ? "bg-orange-500 text-white" : "bg-white/10 text-slate-300 light:bg-black/5 light:text-slate-700"}`}>Accept</button><button type="button" onClick={onClose} className="flex-1 rounded-xl border border-white/10 py-2 text-xs font-bold text-slate-300 transition hover:bg-red-500/10 hover:text-red-300 light:border-black/10 light:text-slate-700">Reject</button></div></div>
 
             {error && (
               <p className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-300 light:text-red-700">

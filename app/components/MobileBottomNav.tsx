@@ -1,14 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { Home, PlaySquare, Rss, UserRound } from "lucide-react";
+import { Home, PlaySquare, Rss } from "lucide-react";
 
 import MobileCreateButton from "./MobileCreateButton";
-import { useAuthModal } from "./auth/AuthProvider";
+import MobileProfileMenu from "./MobileProfileMenu";
 
 export default function MobileBottomNav() {
-  const { user } = useAuthModal();
-
   return (
     <nav
       className="
@@ -99,26 +97,7 @@ export default function MobileBottomNav() {
         <span className="text-[11px] font-medium">In-Family</span>
       </Link>
 
-      <Link
-        href={user?.handle ? `/u/${encodeURIComponent(user.handle)}` : "/profile"}
-        className="
-          flex
-          flex-col
-          items-center
-          gap-1
-          px-3
-          py-1
-          text-slate-300
-          light:text-slate-600
-          transition-colors
-          duration-200
-          hover:text-orange-300
-          light:hover:text-orange-600
-        "
-      >
-        <UserRound size={22} />
-        <span className="text-[11px] font-medium">Your Channel</span>
-      </Link>
+      <MobileProfileMenu />
     </nav>
   );
 }

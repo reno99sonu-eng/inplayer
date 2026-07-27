@@ -35,6 +35,7 @@ const result = await docClient.send(
     username: result.Item?.username || null,
     usernamePrivacy: result.Item?.usernamePrivacy || "public",
     socialLinks: result.Item?.socialLinks || DEFAULT_SOCIAL_LINKS,
+    age: typeof result.Item?.age === "number" ? result.Item.age : null,
   });
 }
 

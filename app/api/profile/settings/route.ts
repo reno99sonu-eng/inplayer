@@ -61,6 +61,20 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true });
   }
 
+  if (action === "complete_account") {
+    const age = Number(body.age);
+    if (!Number.isInteger(age) || age < 13 || age > 120) {
+      return NextResponse.json({ error: "You must be at least 13 years old to use InPlayer." }, { status: 400 });
+    }
+    await docClient.send(new UpdateCommand({
+      TableName: "InPlayer-Users",
+      Key: { userId: user.userId },
+      UpdateExpression: "SET age = :age, termsAcceptedAt = :terms, updatedAt = :updatedAt",
+      ExpressionAttributeValues: { ":age": age, ":terms": new Date().toISOString(), ":updatedAt": new Date().toISOString() },
+    }));
+    return NextResponse.json({ success: true });
+  }
+
   if (action === "update_social_links") {
     const { social, other } = body;
 

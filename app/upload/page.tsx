@@ -14,6 +14,8 @@ import VideoMetadataFields, {
   SpokenLanguage,
   Visibility,
 } from "@/app/components/VideoMetadataFields";
+import AIStudioModal from "@/app/components/AIStudioModal";
+import ShortCreationTools, { ShortSettings } from "@/app/components/ShortCreationTools";
 
 // Same categories as the nav bar's category chips (shared source).
 const CATEGORIES = CONTENT_CATEGORIES;
@@ -32,6 +34,8 @@ export default function UploadPage() {
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [contentType, setContentType] = useState<"video" | "short">("video");
+  const [shortSettings, setShortSettings] = useState<ShortSettings>({ soundtrackId: null, musicClipSeconds: 30, filter: "original" });
+  const [shortAiOpen, setShortAiOpen] = useState(false);
   const [spokenLanguage, setSpokenLanguage] = useState<SpokenLanguage>("auto");
 
   // YouTube-style upload options.
@@ -282,6 +286,7 @@ setAiGenerating(true);
           ageRestricted,
           commentsEnabled,
           tags,
+          shortSettings: contentType === "short" ? shortSettings : undefined,
           thumbnailDataUrl: thumbnailPreview,
         }),
       });
@@ -334,6 +339,7 @@ setAiGenerating(true);
     setDescription("");
     setCategory(CATEGORIES[0]);
     setContentType("video");
+    setShortSettings({ soundtrackId: null, musicClipSeconds: 30, filter: "original" });
     setSpokenLanguage("auto");
     setVisibility("public");
     setMadeForKids(false);
@@ -470,6 +476,7 @@ setAiGenerating(true);
               tagInput={tagInput}
               onTagInputChange={setTagInput}
             />
+            {contentType === "short" && <ShortCreationTools value={shortSettings} onChange={setShortSettings} onOpenAI={() => setShortAiOpen(true)} />}
 
             {error && (
               <p className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-300 light:text-red-700">
@@ -539,6 +546,7 @@ setAiGenerating(true);
           </div>
         )}
       </div>
+      <AIStudioModal open={shortAiOpen} onClose={() => setShortAiOpen(false)} />
     </div>
   );
 }

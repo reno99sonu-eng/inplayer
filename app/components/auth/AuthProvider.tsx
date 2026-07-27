@@ -25,6 +25,7 @@ import SignInModal from "./SignInModal";
 import SignUpModal from "./SignUpModal";
 import ForgotPasswordModal from "./ForgotPasswordModal";
 import VerifyEmailModal from "./VerifyEmailModal";
+import AgeRequiredModal from "./AgeRequiredModal";
 
 // ROOT CAUSE of "Google sign-in completes but the site never shows me as
 // signed in": Amplify checks whether the page just came back from an OAuth
@@ -84,6 +85,7 @@ export interface AuthUser {
   handle: string | null;
   usernamePrivacy: UsernamePrivacy;
   socialLinks: SocialLinks;
+  age: number | null;
 }
 
 interface AuthContextType {
@@ -132,6 +134,7 @@ export default function AuthProvider({
       let handle: string | null = null;
       let usernamePrivacy: UsernamePrivacy = "public";
       let socialLinks: SocialLinks = { social: {}, other: [] };
+      let age: number | null = null;
 
       try {
         const session = await fetchAuthSession();
@@ -148,6 +151,21 @@ export default function AuthProvider({
             handle = data.username || null;
             usernamePrivacy = data.usernamePrivacy || "public";
             socialLinks = data.socialLinks || { social: {}, other: [] };
+            age = typeof data.age === "number" ? data.age : null;
+            const pendingAge = Number(localStorage.getItem("inplayer-pending-age"));
+            const acceptedTerms = localStorage.getItem("inplayer-terms-accepted") === "1";
+            if (!age && acceptedTerms && Number.isInteger(pendingAge)) {
+              const complete = await fetch("/api/profile/settings", {
+                method: "POST",
+                headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+                body: JSON.stringify({ action: "complete_account", age: pendingAge }),
+              });
+              if (complete.ok) {
+                age = pendingAge;
+                localStorage.removeItem("inplayer-pending-age");
+                localStorage.removeItem("inplayer-terms-accepted");
+              }
+            }
           }
         }
       } catch (err) {
@@ -163,6 +181,7 @@ export default function AuthProvider({
         handle,
         usernamePrivacy,
         socialLinks,
+        age,
       });
     } catch (err) {
       // This used to be silent — which is exactly why "Google sign-in
@@ -298,6 +317,7 @@ export default function AuthProvider({
         onClose={closeAuth}
         email={pendingEmail}
       />
+      {!!user && !authLoading && user.age === null && <AgeRequiredModal onComplete={refreshUser} />}
     </AuthContext.Provider>
   );
 }

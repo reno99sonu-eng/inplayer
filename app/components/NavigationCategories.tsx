@@ -55,7 +55,7 @@ export default function NavigationCategories() {
         top-12
         lg:top-16
         z-40
-        overflow-hidden
+        overflow-visible
         border-b
         border-white/5
         light:border-black/10
@@ -81,8 +81,9 @@ export default function NavigationCategories() {
           lg:px-5
           pt-2
           lg:pt-3
-          pb-7
-          -mb-4
+          pb-2
+          lg:pb-3
+          overscroll-x-contain
           [scrollbar-width:none]
           [&::-webkit-scrollbar]:hidden
         "

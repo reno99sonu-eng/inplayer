@@ -57,6 +57,9 @@ export default function ProfilePage() {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [name, setName] = useState(user?.name || "");
+  const [age, setAge] = useState(user?.age?.toString() || "");
+  const [savingAge, setSavingAge] = useState(false);
+  const [ageMessage, setAgeMessage] = useState<string | null>(null);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [savingName, setSavingName] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -146,6 +149,20 @@ export default function ProfilePage() {
     } finally {
       setSavingName(false);
     }
+  };
+
+  const handleSaveAge = async () => {
+    setSavingAge(true);
+    setAgeMessage(null);
+    try {
+      const session = await fetchAuthSession();
+      const idToken = session.tokens?.idToken?.toString();
+      const res = await fetch("/api/profile/settings", { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` }, body: JSON.stringify({ action: "complete_account", age: Number(age) }) });
+      const data = await res.json();
+      if (!res.ok) { setAgeMessage(data.error || "Couldn't save your age."); return; }
+      await refreshUser();
+      setAgeMessage("Age saved.");
+    } catch { setAgeMessage("Couldn't save your age."); } finally { setSavingAge(false); }
   };
 
   // ---- Username (handle) ----
@@ -474,6 +491,13 @@ export default function ProfilePage() {
             <p className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.02] light:bg-black/[0.02] px-4 py-3 text-slate-400 light:text-slate-600">
               {user?.email}
             </p>
+          </div>
+
+          <div className="rounded-2xl border border-orange-400/20 bg-orange-500/[0.04] p-4">
+            <label className="block text-xs font-bold uppercase tracking-[0.2em] text-orange-300/80 light:text-orange-600/90">Age</label>
+            <p className="mt-1 text-xs text-slate-400 light:text-slate-600">Required to keep InPlayer age-appropriate. You must be 13 or older.</p>
+            <div className="mt-3 flex gap-2"><input type="number" min="13" max="120" value={age} onChange={(event) => setAge(event.target.value)} placeholder="Your age" className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-white outline-none focus:border-orange-400/50 light:border-black/10 light:text-slate-900" /><button type="button" onClick={handleSaveAge} disabled={savingAge} className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-bold text-white disabled:opacity-60">{savingAge ? "Saving..." : "Save age"}</button></div>
+            {ageMessage && <p className="mt-2 text-xs text-orange-200 light:text-orange-700">{ageMessage}</p>}
           </div>
 
           {error && (

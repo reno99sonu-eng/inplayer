@@ -2,10 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useRef, useState } from "react";
-import { BadgeCheck, Flame } from "lucide-react";
+import { BadgeCheck } from "lucide-react";
 
 import type { TrendingCreator } from "../data/trending";
-import { formatViews } from "../lib/formatters";
 
 const MIN_ITEMS_TO_LOOP = 6;
 const AUTO_SCROLL_PIXELS_PER_SECOND = 30;
@@ -272,8 +271,8 @@ export default function TrendingNow() {
           <div
             className="
               flex
-              gap-3
-              lg:gap-5
+              gap-2.5
+              lg:gap-3
               pl-5
               lg:pl-10
               pt-2
@@ -285,13 +284,13 @@ export default function TrendingNow() {
               <div
                 key={i}
                 className="
-                  h-[214px]
-                  w-[174px]
-                  lg:h-[250px]
-                  lg:w-[210px]
+                  h-[84px]
+                  w-[84px]
+                  lg:h-[96px]
+                  lg:w-[96px]
                   flex-shrink-0
                   animate-pulse
-                  rounded-[28px]
+                  rounded-full
                   border
                   border-white/10
                   bg-white/[0.03]
@@ -302,7 +301,7 @@ export default function TrendingNow() {
         ) : (
           <div
             ref={carouselRef}
-            className="cursor-grab touch-pan-y select-none overflow-x-scroll py-2 pr-5 active:cursor-grabbing lg:py-3 lg:pr-5"
+            className="cursor-grab touch-pan-y select-none overflow-x-scroll py-2 pr-5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden active:cursor-grabbing lg:py-2 lg:pr-5"
             onPointerEnter={() => {
               isHoveringRef.current = true;
             }}
@@ -389,13 +388,13 @@ export default function TrendingNow() {
               }
             }}
           >
-            <div className="flex w-max gap-3 lg:gap-5">
+            <div className="flex w-max gap-2.5 lg:gap-3">
               {[0, 1].map((groupIndex) => (
                 <div
                   key={groupIndex}
                   ref={groupIndex === 0 ? firstGroupRef : secondGroupRef}
                   aria-hidden={groupIndex === 1}
-                  className="flex w-max gap-3 lg:gap-5"
+                  className="flex w-max gap-2.5 lg:gap-3"
                 >
                   {loopItems.map((item, index) => (
                     <Link
@@ -405,16 +404,12 @@ export default function TrendingNow() {
                       className="
                         group
                         relative
-                        h-[214px]
-                        w-[174px]
-                        lg:h-[250px]
-                        lg:w-[210px]
+                        h-[84px]
+                        w-[84px]
+                        lg:h-[96px]
+                        lg:w-[96px]
                         flex-shrink-0
-                        rounded-[28px]
-                        border
-                        border-white/10
-                        bg-[#101827]
-                        shadow-[0_8px_24px_rgba(0,0,0,.35)]
+                        rounded-full
                         transition-all
                         duration-300
                         hover:-translate-y-1
@@ -423,12 +418,12 @@ export default function TrendingNow() {
                         hover:shadow-[0_0_50px_rgba(249,115,22,.22)]
                       "
                     >
-                      <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-[28px]">
+                      <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-full">
                         <div className="absolute -right-12 -top-12 h-32 w-32 rounded-full bg-orange-400/20 blur-3xl transition duration-500 group-hover:bg-orange-400/35" />
                         <div className="absolute -bottom-16 -left-12 h-36 w-36 rounded-full bg-amber-300/10 blur-3xl" />
                       </div>
 
-                      <div className="relative flex h-full flex-col items-center px-4 pb-4 pt-5 text-center lg:px-5 lg:pb-5 lg:pt-6">
+                      <div className="relative flex h-full items-center justify-center">
                         <div className="relative">
                           <div className="absolute -inset-2 rounded-full bg-gradient-to-br from-orange-400 via-amber-300 to-orange-500 opacity-50 blur-md transition duration-500 group-hover:opacity-90" />
                           {/* eslint-disable-next-line @next/next/no-img-element -- creator avatars can be data URLs. */}
@@ -440,25 +435,9 @@ export default function TrendingNow() {
                                 event.currentTarget.src = FALLBACK_AVATAR;
                               }
                             }}
-                            className="relative h-[76px] w-[76px] rounded-full border-2 border-white/80 object-cover shadow-2xl transition duration-500 group-hover:scale-110 lg:h-[92px] lg:w-[92px]"
+                            className="relative h-[76px] w-[76px] rounded-full border-2 border-white/80 object-cover shadow-2xl transition duration-500 group-hover:scale-110 lg:h-[88px] lg:w-[88px]"
                           />
-                        </div>
-
-                        <div className="mt-4 min-w-0 w-full">
-                          <div className="flex min-h-[2.5rem] items-start justify-center gap-1.5">
-                            <h3 className="line-clamp-2 min-w-0 flex-1 text-sm font-black leading-tight text-white lg:text-base">
-                              {item.name}
-                            </h3>
-                            {item.isVerified && (
-                              <BadgeCheck size={16} className="flex-shrink-0 fill-orange-400 text-[#101827]" aria-label="Verified creator" />
-                            )}
-                          </div>
-                          <p className="mt-1 truncate text-xs text-slate-400">@{item.username}</p>
-                        </div>
-
-                        <div className="mt-auto flex items-center gap-1 rounded-full border border-orange-400/20 bg-orange-500/10 px-2.5 py-1 text-[10px] font-bold text-orange-200">
-                          <Flame size={11} className="text-orange-400" />
-                          {formatViews(item.windowViews)} today
+                          {item.isVerified && <BadgeCheck size={16} className="absolute -bottom-1 -right-1 fill-orange-400 text-[#101827]" aria-label="Verified creator" />}
                         </div>
                       </div>
                     </Link>

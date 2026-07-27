@@ -38,7 +38,6 @@ export async function GET(request: NextRequest, { params }: Params) {
           TableName: "InPlayer-Users",
           FilterExpression: "usernameLower = :usernameLower",
           ExpressionAttributeValues: { ":usernameLower": usernameLower },
-          Limit: 1,
         })
       );
 

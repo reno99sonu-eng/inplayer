@@ -1,4 +1,4 @@
-import { GetCommand, TransactWriteCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, PutCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import {
   normalizeUsername,
@@ -11,6 +11,46 @@ const USERNAMES_TABLE = "InPlayer-Usernames";
 
 function generateUsername() {
   return `user${Math.floor(100000 + Math.random() * 900000)}`;
+}
+
+async function claimUsername(
+  userId: string,
+  username: string,
+  usernameLower: string
+): Promise<boolean> {
+  try {
+    await docClient.send(
+      new PutCommand({
+        TableName: USERNAMES_TABLE,
+        Item: { usernameLower, username, userId },
+        ConditionExpression: "attribute_not_exists(usernameLower)",
+      })
+    );
+
+    await docClient.send(
+      new UpdateCommand({
+        TableName: USERS_TABLE,
+        Key: { userId },
+        UpdateExpression:
+          "SET username = :username, usernameLower = :usernameLower, updatedAt = :updatedAt",
+        ExpressionAttributeValues: {
+          ":username": username,
+          ":usernameLower": usernameLower,
+          ":updatedAt": new Date().toISOString(),
+        },
+      })
+    );
+
+    return true;
+  } catch (err) {
+    const name = (err as { name?: string }).name;
+
+    if (name === "ConditionalCheckFailedException") {
+      return false;
+    }
+
+    throw err;
+  }
 }
 
 export async function ensureUsername(userId: string) {
@@ -30,10 +70,6 @@ export async function ensureUsername(userId: string) {
     const username = storedUsername.trim();
     const usernameLower = normalizeUsername(username);
 
-    // Some accounts were created before the username lookup table was
-    // consistently populated. A channel route resolves handles through that
-    // table, so make the profile field and its reservation agree before a
-    // caller emits a /u/[username] link.
     const reservation = await docClient.send(
       new GetCommand({
         TableName: USERNAMES_TABLE,
@@ -46,42 +82,10 @@ export async function ensureUsername(userId: string) {
     }
 
     if (!reservation.Item) {
-      try {
-        await docClient.send(
-          new TransactWriteCommand({
-            TransactItems: [
-              {
-                Put: {
-                  TableName: USERNAMES_TABLE,
-                  Item: { usernameLower, username, userId },
-                  ConditionExpression: "attribute_not_exists(usernameLower)",
-                },
-              },
-              {
-                Update: {
-                  TableName: USERS_TABLE,
-                  Key: { userId },
-                  UpdateExpression:
-                    "SET username = :username, usernameLower = :usernameLower, updatedAt = :updatedAt",
-                  ExpressionAttributeValues: {
-                    ":username": username,
-                    ":usernameLower": usernameLower,
-                    ":updatedAt": new Date().toISOString(),
-                  },
-                },
-              },
-            ],
-          })
-        );
+      const claimed = await claimUsername(userId, username, usernameLower);
 
+      if (claimed) {
         return username;
-      } catch (err) {
-        // A competing claim won between the read and transaction. Fall
-        // through to a generated, available handle instead of returning a
-        // channel URL that belongs to somebody else.
-        if ((err as { name?: string }).name !== "TransactionCanceledException") {
-          throw err;
-        }
       }
     }
   }
@@ -94,48 +98,10 @@ export async function ensureUsername(userId: string) {
       continue;
     }
 
-    try {
-      await docClient.send(
-        new TransactWriteCommand({
-          TransactItems: [
-            {
-              Put: {
-                TableName: USERNAMES_TABLE,
-                Item: {
-                  usernameLower,
-                  username,
-                  userId,
-                },
-                ConditionExpression:
-                  "attribute_not_exists(usernameLower)",
-              },
-            },
-            {
-              Update: {
-                TableName: USERS_TABLE,
-                Key: { userId },
-                UpdateExpression:
-                  "SET username = :username, usernameLower = :usernameLower, updatedAt = :updatedAt",
-                ExpressionAttributeValues: {
-                  ":username": username,
-                  ":usernameLower": usernameLower,
-                  ":updatedAt": new Date().toISOString(),
-                },
-              },
-            },
-          ],
-        })
-      );
+    const claimed = await claimUsername(userId, username, usernameLower);
 
+    if (claimed) {
       return username;
-    } catch (err) {
-      const name = (err as { name?: string }).name;
-
-      if (name === "TransactionCanceledException") {
-        continue;
-      }
-
-      throw err;
     }
   }
 }

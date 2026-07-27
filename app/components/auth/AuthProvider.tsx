@@ -26,6 +26,7 @@ import SignUpModal from "./SignUpModal";
 import ForgotPasswordModal from "./ForgotPasswordModal";
 import VerifyEmailModal from "./VerifyEmailModal";
 import AgeRequiredModal from "./AgeRequiredModal";
+import TermsAcceptanceModal from "./TermsAcceptanceModal";
 
 // ROOT CAUSE of "Google sign-in completes but the site never shows me as
 // signed in": Amplify checks whether the page just came back from an OAuth
@@ -86,6 +87,7 @@ export interface AuthUser {
   usernamePrivacy: UsernamePrivacy;
   socialLinks: SocialLinks;
   age: number | null;
+  termsAccepted: boolean;
 }
 
 interface AuthContextType {
@@ -135,6 +137,7 @@ export default function AuthProvider({
       let usernamePrivacy: UsernamePrivacy = "public";
       let socialLinks: SocialLinks = { social: {}, other: [] };
       let age: number | null = null;
+      let termsAccepted = false;
 
       try {
         const session = await fetchAuthSession();
@@ -152,20 +155,7 @@ export default function AuthProvider({
             usernamePrivacy = data.usernamePrivacy || "public";
             socialLinks = data.socialLinks || { social: {}, other: [] };
             age = typeof data.age === "number" ? data.age : null;
-            const pendingAge = Number(localStorage.getItem("inplayer-pending-age"));
-            const acceptedTerms = localStorage.getItem("inplayer-terms-accepted") === "1";
-            if (!age && acceptedTerms && Number.isInteger(pendingAge)) {
-              const complete = await fetch("/api/profile/settings", {
-                method: "POST",
-                headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
-                body: JSON.stringify({ action: "complete_account", age: pendingAge }),
-              });
-              if (complete.ok) {
-                age = pendingAge;
-                localStorage.removeItem("inplayer-pending-age");
-                localStorage.removeItem("inplayer-terms-accepted");
-              }
-            }
+            termsAccepted = Boolean(data.termsAccepted);
           }
         }
       } catch (err) {
@@ -182,6 +172,7 @@ export default function AuthProvider({
         usernamePrivacy,
         socialLinks,
         age,
+        termsAccepted,
       });
     } catch (err) {
       // This used to be silent — which is exactly why "Google sign-in
@@ -253,6 +244,40 @@ export default function AuthProvider({
     setUser(null);
   }
 
+  async function handleAcceptTerms() {
+    const session = await fetchAuthSession();
+    const idToken = session.tokens?.idToken?.toString();
+    const pendingAge = Number(localStorage.getItem("inplayer-pending-age"));
+    const canCompleteAccount =
+      Number.isInteger(pendingAge) && pendingAge >= 13 && pendingAge <= 120;
+    const response = await fetch("/api/profile/settings", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify(
+        canCompleteAccount
+          ? { action: "complete_account", age: pendingAge }
+          : { action: "accept_terms" }
+      ),
+    });
+    if (!response.ok) throw new Error("Couldn't save your terms choice.");
+    if (canCompleteAccount) localStorage.removeItem("inplayer-pending-age");
+    await refreshUser();
+  }
+
+  async function handleRejectTerms() {
+    setUser(null);
+    setActiveModal("signup");
+    try {
+      localStorage.removeItem("inplayer-pending-age");
+      await amplifySignOut();
+    } catch (error) {
+      console.error("Failed to sign out after rejecting terms:", error);
+    }
+  }
+
   function openSignIn() {
     setActiveModal("signin");
   }
@@ -317,7 +342,12 @@ export default function AuthProvider({
         onClose={closeAuth}
         email={pendingEmail}
       />
-      {!!user && !authLoading && user.age === null && <AgeRequiredModal onComplete={refreshUser} />}
+      {!!user && !authLoading && activeModal === null && !user.termsAccepted && (
+        <TermsAcceptanceModal open onAccept={handleAcceptTerms} onReject={handleRejectTerms} />
+      )}
+      {!!user && !authLoading && user.termsAccepted && user.age === null && (
+        <AgeRequiredModal onComplete={refreshUser} />
+      )}
     </AuthContext.Provider>
   );
 }

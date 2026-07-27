@@ -65,9 +65,10 @@ export default function FeaturedHeroButtons({ videoId, uploaderUsername }: Featu
         Watchlist
       </button>
 
-      {/* Details */}
+      {/* Details opens the creator's existing public channel, including its
+          channel header and complete video/Shorts library. */}
 <Link
-  href={uploaderUsername ? `/u/${encodeURIComponent(uploaderUsername)}` : `/watch/${videoId}`}
+  href={`/u/${encodeURIComponent(uploaderUsername ?? "")}`}
   className="
     flex
     items-center

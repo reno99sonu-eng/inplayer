@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import nextDynamic from "next/dynamic";
-import { MoreVertical, ChevronDown } from "lucide-react";
+import { MoreVertical } from "lucide-react";
 
 // The Mux player (with its whole HLS streaming engine) is one of the
 // heaviest pieces of JavaScript in the app. It's only needed here for
@@ -344,7 +344,6 @@ export default function RecommendationFeed({
     ...realShorts,
     ...shorts,
   ]);
-  const [showAll, setShowAll] = useState(false);
 
   useEffect(() => {
     const shuffledRecs = [...recommendations];
@@ -365,11 +364,14 @@ export default function RecommendationFeed({
     setShuffledShorts([...realShorts, ...shuffledShortsArr]);
   }, [realVideos, realShorts]);
 
-  // Recommendations split into three batches: two rows worth, then two more
-  // rows worth, then everything else
-  const firstVideos = items.slice(0, 10);
-  const secondVideos = items.slice(10, 20);
-  const remainingVideos = items.slice(20);
+  // Keep the discovery feed in repeating YouTube-style blocks: exactly four
+  // standard videos, then the next unused shelf of Shorts. New uploads flow
+  // into the same sequence instead of being stranded after a one-off section.
+  const videoBatches = Array.from(
+    { length: Math.ceil(items.length / 4) },
+    (_, index) => items.slice(index * 4, index * 4 + 4)
+  );
+  const shortsPerShelf = 8;
 
   const renderCard = (video: Recommendation) => (
     <HomeVideoCard key={video.id} video={video} />
@@ -402,141 +404,27 @@ export default function RecommendationFeed({
     );
   }
 
-  // Horizontal view: the normal 16:9 video grid. Shorts no longer interleave
-  // here — vertical content lives under the Vertical tab now.
+  // Horizontal view: repeat four normal video cards followed by a Shorts
+  // shelf for as long as there is content to display.
   return (
     <>
-      {/* First batch of recommendations */}
-      <section className="mx-auto max-w-[1800px] px-4 py-5 lg:py-10 lg:px-8">
-        <div
-          className="
-            grid
-            grid-cols-1
-            gap-x-6
-            gap-y-10
+      {videoBatches.map((videos, index) => {
+        const shelfShorts = shuffledShorts.slice(
+          index * shortsPerShelf,
+          (index + 1) * shortsPerShelf
+        );
 
-            sm:grid-cols-2
-            lg:grid-cols-3
-            xl:grid-cols-4
-            2xl:grid-cols-5
-          "
-        >
-          {firstVideos.map(renderCard)}
-        </div>
-      </section>
-
-      {/* Shorts shelf — a horizontal row of vertical Shorts sitting between
-          the first and second rows of videos, exactly like YouTube's home
-          feed. Tapping a card opens the full-screen Shorts feed deep-linked
-          to that short. Only shown when there's at least one short to fill
-          it. */}
-      {shuffledShorts.length > 0 && (
-        <ShortsShelf items={shuffledShorts.slice(0, 8)} />
-      )}
-
-      {/* Second batch of recommendations */}
-      <section className="mx-auto max-w-[1800px] px-4 py-3 lg:py-6 lg:px-8">
-        <div
-          className="
-            grid
-            grid-cols-1
-            gap-x-6
-            gap-y-10
-
-            sm:grid-cols-2
-            lg:grid-cols-3
-            xl:grid-cols-4
-            2xl:grid-cols-5
-          "
-        >
-          {secondVideos.map(renderCard)}
-        </div>
-      </section>
-
-      {/* Remaining Recommendations — only rendered once "Show More" is clicked */}
-      {remainingVideos.length > 0 && (
-        <section className="mx-auto max-w-[1800px] px-4 pb-4 lg:px-8">
-          {showAll && (
-            <div
-              className="
-                grid
-                grid-cols-1
-                gap-x-6
-                gap-y-10
-
-                sm:grid-cols-2
-                lg:grid-cols-3
-                xl:grid-cols-4
-                2xl:grid-cols-5
-              "
-            >
-              {remainingVideos.map(renderCard)}
-            </div>
-          )}
-
-          {!showAll && (
-            <div className="mt-2 mb-4 flex justify-center">
-              <button
-                onClick={() => setShowAll(true)}
-                className="
-                  group
-                  relative
-                  overflow-hidden
-                  rounded-full
-                  border
-                  border-orange-400/30
-                  bg-gradient-to-r
-                  from-[#111827]
-                  via-[#182234]
-                  to-[#111827]
-                  light:from-[#EFE4CC]
-                  light:via-[#F3EAD6]
-                  light:to-[#EFE4CC]
-                  px-7
-                  py-3.5
-                  text-white
-                  light:text-slate-900
-                  shadow-[0_0_30px_rgba(249,115,22,.12)]
-                  transition-all
-                  duration-300
-                  active:scale-95
-                "
-              >
-                {/* Animated Glow */}
-                <span
-                  className="
-                    absolute
-                    inset-0
-                    opacity-0
-                    bg-gradient-to-r
-                    from-orange-500/10
-                    via-yellow-300/10
-                    to-orange-500/10
-                    transition-opacity
-                    duration-300
-                    group-hover:opacity-100
-                  "
-                />
-
-                <span className="relative flex items-center gap-2">
-                  <span className="font-semibold tracking-wide">
-                    Show More
-                  </span>
-
-                  <ChevronDown
-                    size={18}
-                    className="
-                      transition-transform
-                      duration-300
-                      group-hover:translate-y-1
-                    "
-                  />
-                </span>
-              </button>
-            </div>
-          )}
-        </section>
-      )}
+        return (
+          <div key={`feed-block-${index}`}>
+            <section className="mx-auto max-w-[1800px] px-4 py-5 lg:py-8 lg:px-8">
+              <div className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {videos.map(renderCard)}
+              </div>
+            </section>
+            {shelfShorts.length > 0 && <ShortsShelf items={shelfShorts} />}
+          </div>
+        );
+      })}
     </>
   );
 }

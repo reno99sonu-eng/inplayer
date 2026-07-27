@@ -44,7 +44,6 @@ export default function SignInModal({
   // Checked by default — most viewers expect to stay signed in. Unchecking
   // it makes the session end when the browser closes (see handleSignIn).
   const [rememberMe, setRememberMe] = useState(true);
-  const [acceptedTerms, setAcceptedTerms] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +55,6 @@ export default function SignInModal({
       setEmail("");
       setPassword("");
       setRememberMe(true);
-      setAcceptedTerms(false);
       setShowPassword(false);
       setLoading(false);
       setError(null);
@@ -87,13 +85,6 @@ export default function SignInModal({
       triggerError("Please enter both your email and password.");
       return;
     }
-    if (!acceptedTerms) {
-      triggerError("Please accept InPlayer's Terms and Privacy Policy to continue.");
-      return;
-    }
-
-    try { localStorage.setItem("inplayer-terms-accepted", "1"); } catch { /* ignore */ }
-
     setLoading(true);
 
     try {
@@ -163,11 +154,6 @@ export default function SignInModal({
 
   const handleGoogle = async () => {
     setError(null);
-    if (!acceptedTerms) {
-      triggerError("Please accept InPlayer's Terms and Privacy Policy to continue.");
-      return;
-    }
-    try { localStorage.setItem("inplayer-terms-accepted", "1"); } catch { /* ignore */ }
     try {
       // Redirects to Cognito's Hosted UI → Google → back here. Amplify
       // finishes the exchange on return and AuthProvider's Hub listener
@@ -228,13 +214,13 @@ export default function SignInModal({
         <div
           className={`
             relative
-            max-h-[92vh] overflow-y-auto
+            max-h-[88vh] overflow-y-auto
             [scrollbar-width:none] [&::-webkit-scrollbar]:hidden
             rounded-[28px] sm:rounded-[30px]
             border border-orange-400/15 light:border-orange-400/25
             bg-gradient-to-br from-[#07111F]/95 via-[#0B1728]/95 to-[#040A14]/95
             light:from-[#FBF6EA]/98 light:via-[#EDE2C9]/98 light:to-[#FBF6EA]/98
-            p-5 sm:p-7
+            p-4 sm:p-5
             shadow-[0_25px_90px_rgba(0,0,0,.55)]
             light:shadow-[0_25px_90px_rgba(0,0,0,.18)]
             animate-modal-pop
@@ -272,17 +258,17 @@ export default function SignInModal({
                 INPLAYER
               </span>
 
-              <h2 className="mt-4 text-[28px] sm:text-3xl font-black leading-none text-white light:text-slate-900">
+              <h2 className="mt-3 text-[26px] sm:text-[28px] font-black leading-none text-white light:text-slate-900">
                 Welcome
                 <br />
                 Back.
               </h2>
 
-              <p className="mt-2 text-sm text-slate-400 light:text-slate-600">
+              <p className="mt-1.5 text-sm text-slate-400 light:text-slate-600">
                 Sign in to continue watching your favourite creators and premium content.
               </p>
 
-              <div className="mt-6 space-y-4">
+              <div className="mt-4 space-y-3">
                 <div>
                   <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-600">
                     Email
@@ -299,7 +285,7 @@ export default function SignInModal({
                       className="
                         w-full rounded-2xl border border-white/10 light:border-black/10
                         bg-[#07111F] light:bg-black/[0.03]
-                        py-3 pl-11 pr-4
+                        py-2.5 pl-11 pr-4
                         text-white light:text-slate-900 caret-orange-400
                         outline-none transition-all duration-300
                         placeholder:text-slate-500 light:placeholder:text-slate-400
@@ -329,7 +315,7 @@ export default function SignInModal({
                       className="
                         w-full rounded-2xl border border-white/10 light:border-black/10
                         bg-[#07111F] light:bg-black/[0.03]
-                        py-3 pl-11 pr-16
+                        py-2.5 pl-11 pr-16
                         text-white light:text-slate-900 caret-orange-400
                         outline-none transition-all duration-300
                         placeholder:text-slate-500 light:placeholder:text-slate-400
@@ -367,11 +353,6 @@ export default function SignInModal({
                   </button>
                 </div>
 
-                <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-3 light:border-black/10 light:bg-black/[0.02]">
-                  <p className="text-xs leading-5 text-slate-400 light:text-slate-600">By continuing, you agree to InPlayer&apos;s Terms of Service and Privacy Policy.</p>
-                  <div className="mt-3 flex gap-2"><button type="button" onClick={() => setAcceptedTerms(true)} className={`flex-1 rounded-xl py-2 text-xs font-bold transition ${acceptedTerms ? "bg-orange-500 text-white" : "bg-white/10 text-slate-300 light:bg-black/5 light:text-slate-700"}`}>Accept</button><button type="button" onClick={onClose} className="flex-1 rounded-xl border border-white/10 py-2 text-xs font-bold text-slate-300 transition hover:bg-red-500/10 hover:text-red-300 light:border-black/10 light:text-slate-700">Reject</button></div>
-                </div>
-
                 {error && (
                   <p className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-300 light:text-red-700">
                     {error}
@@ -385,7 +366,7 @@ export default function SignInModal({
                   className="
                     flex w-full items-center justify-center gap-2
                     rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A]
-                    py-3.5 font-bold text-white
+                    py-3 font-bold text-white
                     shadow-[0_15px_35px_rgba(255,153,0,.3)]
                     transition-all duration-300
                     hover:-translate-y-0.5 hover:shadow-[0_20px_45px_rgba(255,153,0,.4)]

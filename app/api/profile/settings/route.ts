@@ -75,6 +75,19 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true });
   }
 
+  if (action === "accept_terms") {
+    await docClient.send(new UpdateCommand({
+      TableName: "InPlayer-Users",
+      Key: { userId: user.userId },
+      UpdateExpression: "SET termsAcceptedAt = :terms, updatedAt = :updatedAt",
+      ExpressionAttributeValues: {
+        ":terms": new Date().toISOString(),
+        ":updatedAt": new Date().toISOString(),
+      },
+    }));
+    return NextResponse.json({ success: true });
+  }
+
   if (action === "update_social_links") {
     const { social, other } = body;
 

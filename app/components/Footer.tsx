@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { Mail, ChevronDown, Copy, Check } from "lucide-react";
 import NavbarLogo from "./NavbarLogo";
 import { CONTACT_EMAILS } from "@/app/lib/contactEmails";
@@ -23,6 +24,7 @@ const company = [
 ];
 
 export default function Footer() {
+  const pathname = usePathname();
   const [contactOpen, setContactOpen] = useState(false);
   const [copiedEmail, setCopiedEmail] = useState<string | null>(null);
 
@@ -35,6 +37,10 @@ export default function Footer() {
       /* clipboard unavailable — the mailto: link on the row still works */
     }
   };
+
+  // The home feed is intentionally open-ended, so it does not end with the
+  // site footer. Other pages retain the footer as before.
+  if (pathname === "/") return null;
 
   return (
     <footer className="relative mt-2 overflow-hidden border-t border-orange-500/10 bg-[#050816] text-white lg:mt-6 light:border-orange-500/20 light:bg-[#FAF5E9] light:text-slate-900">

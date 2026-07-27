@@ -2,6 +2,7 @@ import { BatchGetCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "./dynamodb";
 import { getMuxThumbnailUrl } from "./muxThumbnail";
 import { getReadyVideos } from "./videoStore";
+import { ensureUsername } from "./ensureUsername";
 
 const DAILY_VIEWS_TABLE = "InPlayer-Video-Daily-Views";
 
@@ -209,7 +210,11 @@ export async function getFeaturedThisWeek(limit = 6): Promise<RankedVideo[]> {
     d.setUTCDate(d.getUTCDate() - i);
     return dateKey(d);
   });
-  const videos = await rankByWindow(days, limit);
+  // A weekly feature is creator-led and must have a channel destination.
+  // Video rows without an uploader cannot provide that experience.
+  const videos = (await rankByWindow(days, limit)).filter(
+    (video) => Boolean(video.uploaderId)
+  );
   const userIds = Array.from(
     new Set(videos.map((video) => video.uploaderId).filter((id): id is string => Boolean(id)))
   );
@@ -231,6 +236,19 @@ export async function getFeaturedThisWeek(limit = 6): Promise<RankedVideo[]> {
       profile.username as string | undefined,
     ])
   );
+  // A channel is addressed by its public handle. Older user rows can predate
+  // that field, so allocate their normal handle here before emitting a hero
+  // slide rather than making Details silently fall back to the video page.
+  const missingUserIds = userIds.filter((userId) => !usernames.get(userId));
+  if (missingUserIds.length) {
+    const ensuredUsernames = await Promise.all(
+      missingUserIds.map(async (userId) => [userId, await ensureUsername(userId)] as const)
+    );
+    for (const [userId, username] of ensuredUsernames) {
+      usernames.set(userId, username);
+    }
+  }
+
   return videos.map((video) => ({
     ...video,
     uploaderUsername: video.uploaderId ? usernames.get(video.uploaderId) || null : null,

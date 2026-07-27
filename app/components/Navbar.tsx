@@ -462,7 +462,7 @@ lg:right-auto
 
               <div className="space-y-0.5">
                 <button
-                    onClick={() => goTo(user?.username ? `/u/${encodeURIComponent(user.username)}` : "/my-videos")}
+                    onClick={() => goTo(user?.handle ? `/u/${encodeURIComponent(user.handle)}` : "/my-videos")}
                     className="
                       flex
                       w-full

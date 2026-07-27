@@ -44,10 +44,18 @@ export default function WatchHero({ video }: WatchHeroProps) {
         <div className="mt-4"><WatchMeta views={video.views} uploadedAt={video.uploadedAt} category={video.category} ageRestricted={video.ageRestricted} /></div>
 
         <div className="mt-5 flex items-center gap-3">
-          <div className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-full ring-2 ring-orange-400/70">
-            {/* eslint-disable-next-line @next/next/no-img-element -- uploader avatars can be data URLs. */}
-            <img src={video.uploaderAvatarUrl || "/avatars/avatar.png"} alt={video.uploaderName} className="h-full w-full object-cover" />
-          </div>
+          {profileHref ? (
+            <Link href={profileHref} className="flex-shrink-0 transition-transform hover:scale-105">
+              <div className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-full ring-2 ring-orange-400/70">
+                {/* eslint-disable-next-line @next/next/no-img-element -- uploader avatars can be data URLs. */}
+                <img src={video.uploaderAvatarUrl || "/avatars/avatar.png"} alt={video.uploaderName} className="h-full w-full object-cover" />
+              </div>
+            </Link>
+          ) : (
+            <div className="relative h-10 w-10 flex-shrink-0 overflow-hidden rounded-full ring-2 ring-orange-400/70">
+              <img src={video.uploaderAvatarUrl || "/avatars/avatar.png"} alt={video.uploaderName} className="h-full w-full object-cover" />
+            </div>
+          )}
           <div>
             {profileHref ? <Link href={profileHref} className="font-bold text-white transition hover:text-orange-300 light:text-slate-900">{video.uploaderName}</Link> : <p className="font-bold text-white light:text-slate-900">{video.uploaderName}</p>}
             {video.uploaderUsername && <p className="text-xs text-slate-400">@{video.uploaderUsername}</p>}

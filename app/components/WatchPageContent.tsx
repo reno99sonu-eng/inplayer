@@ -103,7 +103,7 @@ export default function WatchPageContent({ video, relatedVideos: initialRelatedV
             <button onClick={() => setTheaterMode((active) => !active)} title={theaterMode ? "Exit theater mode" : "Theater mode"} className="absolute right-3 top-3 z-10 hidden h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/65 text-white opacity-0 backdrop-blur transition hover:scale-110 hover:border-orange-400/50 group-hover:opacity-100 lg:flex">{theaterMode ? <Minimize2 size={17} /> : <Maximize2 size={17} />}</button>
           </div>
 
-          <div className={`mt-4 rounded-3xl border border-white/[0.08] bg-gradient-to-br from-white/[0.055] to-white/[0.015] p-3 backdrop-blur-xl light:border-black/[0.08] light:from-black/[0.04] light:to-transparent ${theaterMode ? "mx-auto max-w-[1300px]" : ""}`}>
+          <div className={`mt-4 rounded-3xl border border-white/[0.08] bg-gradient-to-br from-white/[0.055] to-white/[0.015] p-4 sm:p-5 backdrop-blur-xl light:border-black/[0.08] light:from-black/[0.04] light:to-transparent ${theaterMode ? "mx-auto max-w-[1300px]" : ""}`}>
             <WatchActions
               videoId={video.videoId}
               title={video.title}

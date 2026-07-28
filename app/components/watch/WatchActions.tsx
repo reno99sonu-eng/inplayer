@@ -46,8 +46,8 @@ export default function WatchActions({
   );
 
   return (
-    <div className="flex items-center gap-2 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      <div className="flex flex-shrink-0 items-center gap-2">
+    <div className="flex items-center justify-between gap-4 overflow-x-auto py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="flex flex-shrink-0 items-center gap-3">
         {profileHref ? (
           <Link
             href={profileHref}
@@ -63,7 +63,7 @@ export default function WatchActions({
         <SubscribeButton creatorId={uploaderId} />
       </div>
 
-      <div className="flex flex-shrink-0 items-center gap-2 lg:ml-auto">
+      <div className="flex flex-shrink-0 items-center gap-3">
         <LikeButton videoId={videoId} />
         <ShareButton videoId={videoId} title={title} />
         <VideoOptionsMenu

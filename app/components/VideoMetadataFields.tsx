@@ -80,11 +80,12 @@ interface VideoMetadataFieldsProps {
   onTagInputChange: (value: string) => void;
   aiGenerating?: boolean;
 
-onGenerateAI?: (
-  type: "title" | "description" | "tags"
-) => Promise<void>;
+  /** Opens the AI title-assist popup (see AITitleAssistModal), owned by
+      the parent page so it can share state with its own AI-generate
+      request. */
+  onOpenAITitleAssist?: () => void;
 
-  /** Error from the last onGenerateAI call, surfaced under the AI button. */
+  /** Error from the last AI title generation, surfaced under the AI button. */
   aiError?: string | null;
   /** Up to 5 title options from the last successful title generation. */
   aiSuggestions?: string[];
@@ -144,7 +145,7 @@ export default function VideoMetadataFields({
   tagInput,
 onTagInputChange,
 aiGenerating = false,
-onGenerateAI,
+onOpenAITitleAssist,
   aiError = null,
   aiSuggestions = [],
 }: VideoMetadataFieldsProps) {
@@ -152,13 +153,6 @@ onGenerateAI,
   const muxFrames = thumbnail?.muxFrames ?? [];
   const [aiThumbBusy, setAiThumbBusy] = useState(false);
   const [aiThumbError, setAiThumbError] = useState<string | null>(null);
-  const runAI = async (
-    type: "title" | "description" | "tags"
-  ) => {
-    if (!onGenerateAI || aiGenerating) return;
-
-    await onGenerateAI(type);
-  };
 
   const runAIThumbnail = async () => {
     if (muxFrames.length === 0 || aiThumbBusy) return;
@@ -317,40 +311,54 @@ onGenerateAI,
       )}
     </div>
 
-    {/* AI Thumbnail — needs real Mux frames to choose from, which only
-        exist once the video has finished processing (my-videos edit panel
-        always has them; the pre-upload form never does, see
-        UploadThumbnailStep for that flow's equivalent). */}
-    <button
-      type="button"
-      onClick={runAIThumbnail}
-      disabled={aiThumbBusy || muxFrames.length === 0}
-      className="w-full rounded-2xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-black/[0.03] p-4 text-left transition hover:border-orange-400/40 disabled:cursor-not-allowed disabled:opacity-60"
-    >
-      <div className="flex items-center justify-between gap-3">
-        <div className="min-w-0">
-          <p className="font-semibold text-white light:text-slate-900">
-            ✨ Generate AI Thumbnail
-          </p>
-          <p className="mt-1 text-xs text-slate-400 light:text-slate-600">
-            {muxFrames.length === 0
-              ? "Available once your video finishes processing."
-              : aiThumbBusy
-              ? "Analyzing your video's frames..."
-              : "Let AI pick the sharpest, most eye-catching frame from your video."}
-          </p>
-        </div>
+    {/* AI Thumbnail needs real frames from the processed video, which only
+        exist once Mux has finished transcoding — that can't happen before
+        the file is even uploaded. Rather than show a button that's
+        permanently disabled at that step (which just looked broken), the
+        pre-upload form shows an honest "not yet" note instead and points
+        to the real, working AI-pick step that follows right after
+        publishing (see UploadThumbnailStep). The my-videos edit panel
+        always has real muxFrames by the time it opens, so the actual
+        button renders there. */}
+    {muxFrames.length > 0 ? (
+      <button
+        type="button"
+        onClick={runAIThumbnail}
+        disabled={aiThumbBusy}
+        className="w-full rounded-2xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-black/[0.03] p-4 text-left transition hover:border-orange-400/40 disabled:cursor-not-allowed disabled:opacity-60"
+      >
+        <div className="flex items-center justify-between gap-3">
+          <div className="min-w-0">
+            <p className="font-semibold text-white light:text-slate-900">
+              ✨ Generate AI Thumbnail
+            </p>
+            <p className="mt-1 text-xs text-slate-400 light:text-slate-600">
+              {aiThumbBusy
+                ? "Analyzing your video's frames..."
+                : "Let AI pick the sharpest, most eye-catching frame from your video."}
+            </p>
+          </div>
 
-        {aiThumbBusy ? (
-          <Loader2 size={16} className="flex-shrink-0 animate-spin text-orange-400" />
-        ) : (
-          <Sparkles size={16} className="flex-shrink-0 text-orange-400" />
+          {aiThumbBusy ? (
+            <Loader2 size={16} className="flex-shrink-0 animate-spin text-orange-400" />
+          ) : (
+            <Sparkles size={16} className="flex-shrink-0 text-orange-400" />
+          )}
+        </div>
+        {aiThumbError && (
+          <p className="mt-2 text-xs text-red-400">{aiThumbError}</p>
         )}
+      </button>
+    ) : (
+      <div className="flex items-center gap-3 rounded-2xl border border-dashed border-white/10 light:border-black/10 bg-white/[0.02] light:bg-black/[0.02] p-4">
+        <Sparkles size={16} className="flex-shrink-0 text-orange-400" />
+        <p className="text-xs text-slate-400 light:text-slate-600">
+          AI thumbnail picking becomes available right after your video
+          finishes uploading — you&apos;ll get to choose one on the next
+          screen.
+        </p>
       </div>
-      {aiThumbError && (
-        <p className="mt-2 text-xs text-red-400">{aiThumbError}</p>
-      )}
-    </button>
+    )}
   </div>
 )}
 
@@ -361,7 +369,7 @@ onGenerateAI,
         <div className="mb-3 flex items-center justify-end">
   <button
     type="button"
-    onClick={() => runAI("title")}
+    onClick={onOpenAITitleAssist}
     disabled={aiGenerating}
     className="rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-orange-600 disabled:cursor-not-allowed disabled:opacity-50"
   >

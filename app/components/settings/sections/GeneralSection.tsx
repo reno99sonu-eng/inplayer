@@ -4,18 +4,20 @@ import {
   Globe,
   Shield,
   Baby,
-  Star,
 } from "lucide-react";
 
 import SettingsCard from "../common/SettingsCard";
 import SettingsRow from "../common/SettingsRow";
 import SettingsToggle from "../common/SettingsToggle";
+import { useSettings } from "../SettingsProvider";
 
-import { useState } from "react";
-
+// Wired to the real SettingsProvider instead of local-only useState — see
+// PrivacySection.tsx for the same fix and why it matters. "Earn Stars" was
+// removed outright rather than wired up: it had no onClick, no destination
+// page, and no backing feature anywhere in the app, so it was a dead link
+// dressed up to look like a real settings row (chevron and all).
 export default function GeneralSection() {
-  const [restrictedMode, setRestrictedMode] = useState(false);
-  const [childMode, setChildMode] = useState(false);
+  const { general, updateGeneral } = useSettings();
 
   return (
     <SettingsCard
@@ -28,7 +30,7 @@ export default function GeneralSection() {
         <SettingsRow
           icon={<Globe size={20} />}
           title="Language"
-          description="Choose the language used by InPlayer."
+          description="InPlayer is currently available in English only."
           value="English"
         />
 
@@ -38,8 +40,8 @@ export default function GeneralSection() {
           description="Hide potentially mature content."
         >
           <SettingsToggle
-            checked={restrictedMode}
-            onChange={setRestrictedMode}
+            checked={general.restrictedMode}
+            onChange={(checked) => updateGeneral({ restrictedMode: checked })}
           />
         </SettingsRow>
 
@@ -49,17 +51,10 @@ export default function GeneralSection() {
           description="Create a safer experience for children."
         >
           <SettingsToggle
-            checked={childMode}
-            onChange={setChildMode}
+            checked={general.childMode}
+            onChange={(checked) => updateGeneral({ childMode: checked })}
           />
         </SettingsRow>
-
-        <SettingsRow
-          icon={<Star size={20} />}
-          title="Earn Stars"
-          description="Learn how to earn rewards on InPlayer."
-          value="Learn More"
-        />
 
       </div>
     </SettingsCard>

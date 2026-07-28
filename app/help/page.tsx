@@ -6,16 +6,8 @@ import { ArrowLeft, ChevronDown, Mail } from "lucide-react";
 
 const faqs = [
   {
-    q: "How do I cancel my Premium subscription?",
-    a: "Go to Settings from your profile menu, then look for the subscription section to manage or cancel your plan at any time.",
-  },
-  {
     q: "Can I download videos to watch offline?",
     a: "Yes, look for the Download option on any title's details page. Downloaded content will appear under Downloads in your profile.",
-  },
-  {
-    q: "How many devices can I use at once?",
-    a: "Premium members can stream on up to 4 devices simultaneously, depending on your plan.",
   },
   {
     q: "I found a bug or playback issue, what do I do?",

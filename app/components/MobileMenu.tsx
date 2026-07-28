@@ -12,7 +12,6 @@ import {
   Users,
   Sparkles,
   ShoppingBag,
-  Crown,
   History,
 } from "lucide-react";
 
@@ -24,7 +23,6 @@ const links = [
   { icon: Users, title: "Creators", href: "/creators" },
   { icon: Sparkles, title: "AI Studio", href: "/ai-studio" },
   { icon: ShoppingBag, title: "Marketplace", href: "/marketplace" },
-  { icon: Crown, title: "Premium", href: "/premium" },
 
   // NEW
   { icon: History, title: "History", href: "/history" },
@@ -157,21 +155,6 @@ export default function MobileMenu() {
                 "
               >
                 Sign In
-              </button>
-
-              <button
-                className="
-                  w-full
-                  rounded-full
-                  bg-gradient-to-r
-                  from-orange-500
-                  to-amber-400
-                  py-3
-                  font-bold
-                  text-slate-900
-                "
-              >
-                ✦ Premium
               </button>
 
             </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FileCheck2, Loader2 } from "lucide-react";
 
 interface TermsAcceptanceModalProps {
@@ -9,6 +9,13 @@ interface TermsAcceptanceModalProps {
   onReject: () => Promise<void>;
 }
 
+// The parent (AuthProvider) now always renders this component and just
+// flips `open` — it used to conditionally mount/unmount it instead, which
+// yanked the modal out of the tree the instant terms were accepted, with
+// no time for any exit transition to play. `mounted`/`visible` here are
+// what actually let "the pop up fades away" happen: stay mounted for one
+// more transition duration after `open` goes false, and drive opacity off
+// a delayed `visible` flag rather than `open` directly.
 export default function TermsAcceptanceModal({
   open,
   onAccept,
@@ -16,6 +23,19 @@ export default function TermsAcceptanceModal({
 }: TermsAcceptanceModalProps) {
   const [pending, setPending] = useState<"accept" | "reject" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(open);
+  const [visible, setVisible] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setMounted(true);
+      const raf = requestAnimationFrame(() => setVisible(true));
+      return () => cancelAnimationFrame(raf);
+    }
+    setVisible(false);
+    const timeout = setTimeout(() => setMounted(false), 220);
+    return () => clearTimeout(timeout);
+  }, [open]);
 
   const run = async (choice: "accept" | "reject") => {
     setPending(choice);
@@ -29,11 +49,19 @@ export default function TermsAcceptanceModal({
     }
   };
 
-  if (!open) return null;
+  if (!mounted) return null;
 
   return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/75 p-4 backdrop-blur-md">
-      <div className="w-full max-w-md rounded-3xl border border-orange-400/25 bg-[#08111F] p-5 shadow-[0_25px_90px_rgba(0,0,0,.55)] light:bg-[#F5EEDC] sm:p-6">
+    <div
+      className={`fixed inset-0 z-[10000] flex items-center justify-center bg-black/75 p-4 backdrop-blur-md transition-opacity duration-200 ${
+        visible ? "opacity-100" : "opacity-0"
+      }`}
+    >
+      <div
+        className={`w-full max-w-md rounded-3xl border border-orange-400/25 bg-[#08111F] p-5 shadow-[0_25px_90px_rgba(0,0,0,.55)] light:bg-[#F5EEDC] sm:p-6 transition-all duration-200 ${
+          visible ? "translate-y-0 scale-100 opacity-100" : "translate-y-2 scale-95 opacity-0"
+        }`}
+      >
         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-orange-500/15 text-orange-300">
           <FileCheck2 size={22} />
         </div>

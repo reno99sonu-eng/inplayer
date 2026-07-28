@@ -8,7 +8,6 @@ type Section =
   | "payments"
   | "analytics"
   | "storage"
-  | "notifications"
   | "about";
 
 interface MobileSettingsTabsProps {
@@ -24,7 +23,6 @@ const tabs = [
   { id: "payments", label: "Plans" },
   { id: "analytics", label: "Analytics" },
   { id: "storage", label: "Storage" },
-  { id: "notifications", label: "Alerts" },
   { id: "about", label: "About" },
 ] as const;
 

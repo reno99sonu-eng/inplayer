@@ -39,7 +39,6 @@ export interface PrivacySettings {
   privateAccount: boolean;
   watchHistory: boolean;
   personalizedAds: boolean;
-  biometricLogin: boolean;
 }
 
 interface SettingsState {
@@ -71,7 +70,6 @@ const DEFAULTS: SettingsState = {
     privateAccount: false,
     watchHistory: true,
     personalizedAds: true,
-    biometricLogin: true,
   },
 };
 

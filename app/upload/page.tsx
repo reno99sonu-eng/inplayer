@@ -16,6 +16,7 @@ import VideoMetadataFields, {
   SpokenLanguage,
   Visibility,
 } from "@/app/components/VideoMetadataFields";
+import AITitleAssistModal from "@/app/components/AITitleAssistModal";
 import AIStudioModal from "@/app/components/AIStudioModal";
 import ShortCreationTools, { ShortSettings } from "@/app/components/ShortCreationTools";
 
@@ -63,6 +64,7 @@ const [aiType, setAiType] = useState<
 >(null);
 
 const [aiError, setAiError] = useState<string | null>(null);
+const [aiTitleAssistOpen, setAiTitleAssistOpen] = useState(false);
 
   const handleThumbnailSelected = async (selected: File) => {
     if (!selected.type.startsWith("image/")) {
@@ -180,7 +182,8 @@ const [aiError, setAiError] = useState<string | null>(null);
     handleFile(e.dataTransfer.files?.[0] || null);
   };
   const handleGenerateAI = async (
-    type: "title" | "description" | "tags"
+    type: "title" | "description" | "tags",
+    userDescription?: string
   ) => {
     setAiGenerating(true);
     setAiError(null);
@@ -199,6 +202,7 @@ const [aiError, setAiError] = useState<string | null>(null);
             description,
             category,
             contentType,
+            userDescription,
           }),
         }),
       });
@@ -212,10 +216,6 @@ const [aiError, setAiError] = useState<string | null>(null);
       if (type === "title") {
         const suggestions = parseAITitleSuggestions(data.text);
         setAiSuggestions(suggestions);
-
-        if (suggestions[0]) {
-          setTitle(suggestions[0]);
-        }
       }
     } catch (err) {
       console.error(err);
@@ -443,7 +443,7 @@ const [aiError, setAiError] = useState<string | null>(null);
               onChange={handleMetadataChange}
               categories={CATEGORIES}
               aiGenerating={aiGenerating}
-              onGenerateAI={handleGenerateAI}
+              onOpenAITitleAssist={() => setAiTitleAssistOpen(true)}
               aiError={aiType === "title" ? aiError : null}
               aiSuggestions={aiType === "title" ? aiSuggestions : []}
               thumbnail={{
@@ -537,6 +537,19 @@ const [aiError, setAiError] = useState<string | null>(null);
         )}
       </div>
       <AIStudioModal open={shortAiOpen} onClose={() => setShortAiOpen(false)} />
+      <AITitleAssistModal
+        open={aiTitleAssistOpen}
+        onClose={() => setAiTitleAssistOpen(false)}
+        initialDescription={description}
+        generating={aiGenerating}
+        error={aiType === "title" ? aiError : null}
+        suggestions={aiType === "title" ? aiSuggestions : []}
+        onGenerate={(userDescription) => handleGenerateAI("title", userDescription)}
+        onPick={(pickedTitle) => {
+          setTitle(pickedTitle);
+          setAiTitleAssistOpen(false);
+        }}
+      />
     </div>
   );
 }

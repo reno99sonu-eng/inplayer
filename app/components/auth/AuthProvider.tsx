@@ -18,6 +18,7 @@ import {
   fetchUserAttributes,
   fetchAuthSession,
   signOut as amplifySignOut,
+  deleteUser,
 } from "aws-amplify/auth";
 import { Hub } from "aws-amplify/utils";
 
@@ -270,11 +271,23 @@ export default function AuthProvider({
   async function handleRejectTerms() {
     setUser(null);
     setActiveModal("signup");
+    localStorage.removeItem("inplayer-pending-age");
     try {
-      localStorage.removeItem("inplayer-pending-age");
-      await amplifySignOut();
+      // deleteUser() removes the Cognito account entirely (and ends the
+      // session as part of that) — a plain signOut would leave the
+      // account behind, so trying to sign up again with the same email
+      // would fail with "an account already exists," which breaks the
+      // whole point of "reject sends you back to sign up again."
+      await deleteUser();
     } catch (error) {
-      console.error("Failed to sign out after rejecting terms:", error);
+      console.error("Failed to delete account after rejecting terms:", error);
+      // Best-effort fallback so the session doesn't linger even if the
+      // delete itself failed for some reason (e.g. a network blip).
+      try {
+        await amplifySignOut();
+      } catch (signOutError) {
+        console.error("Fallback sign-out after failed account deletion also failed:", signOutError);
+      }
     }
   }
 
@@ -342,9 +355,11 @@ export default function AuthProvider({
         onClose={closeAuth}
         email={pendingEmail}
       />
-      {!!user && !authLoading && activeModal === null && !user.termsAccepted && (
-        <TermsAcceptanceModal open onAccept={handleAcceptTerms} onReject={handleRejectTerms} />
-      )}
+      <TermsAcceptanceModal
+        open={!!user && !authLoading && activeModal === null && !user.termsAccepted}
+        onAccept={handleAcceptTerms}
+        onReject={handleRejectTerms}
+      />
       {!!user && !authLoading && user.termsAccepted && user.age === null && (
         <AgeRequiredModal onComplete={refreshUser} />
       )}

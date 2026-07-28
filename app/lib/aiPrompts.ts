@@ -9,6 +9,12 @@ export interface AIPromptContext {
   description: string;
   category: string;
   contentType: "video" | "short";
+  /** Free-text context the creator typed specifically to help the AI (see
+      AITitleAssistModal) — the AI can't watch the actual video, so when
+      this is present it's by far the strongest signal available, and is
+      what actually fixed titles coming back "random": before this, the
+      prompt had nothing but a filename and a category to go on. */
+  userDescription?: string;
 }
 
 // A freshly-picked file's title defaults to its filename (see handleFile in
@@ -39,7 +45,17 @@ export function buildAIGeneratePrompt(
   const descriptionLine = ctx.description.trim()
     ? `Description: ${ctx.description.trim()}`
     : "No description written yet.";
-  const context = `This is a ${ctx.category} ${format}.\n${titleLine}\n${descriptionLine}`;
+  const creatorContextLine = ctx.userDescription?.trim()
+    ? `What this video is actually about, in the creator's own words: ${ctx.userDescription.trim()}`
+    : null;
+  const context = [
+    `This is a ${ctx.category} ${format}.`,
+    creatorContextLine,
+    titleLine,
+    descriptionLine,
+  ]
+    .filter(Boolean)
+    .join("\n");
 
   if (type === "title") {
     return (

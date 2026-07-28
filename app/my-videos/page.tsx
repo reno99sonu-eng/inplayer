@@ -18,6 +18,7 @@ import VideoMetadataFields, {
   SpokenLanguage,
   Visibility,
 } from "@/app/components/VideoMetadataFields";
+import AITitleAssistModal from "@/app/components/AITitleAssistModal";
 import { CONTENT_CATEGORIES } from "@/app/data/categories";
 import { HomeVideoCard } from "@/app/components/RecommendationFeed";
 import ShortsShelf from "@/app/components/ShortsShelf";
@@ -87,6 +88,7 @@ export default function MyVideosPage() {
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
+  const [aiTitleAssistOpen, setAiTitleAssistOpen] = useState(false);
 
   const [savingId, setSavingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -168,6 +170,7 @@ export default function MyVideosPage() {
     setSelectedMuxThumbnail(null);
     setAiError(null);
     setAiSuggestions([]);
+    setAiTitleAssistOpen(false);
     setError(null);
   };
 
@@ -177,6 +180,7 @@ export default function MyVideosPage() {
     setSelectedMuxThumbnail(null);
     setAiError(null);
     setAiSuggestions([]);
+    setAiTitleAssistOpen(false);
     setError(null);
   };
 
@@ -192,7 +196,10 @@ export default function MyVideosPage() {
   // panel — previously this callback simply didn't exist here, so clicking
   // the button in VideoMetadataFields did nothing at all (see the
   // `if (!onGenerateAI || aiGenerating) return;` guard there).
-  const handleGenerateAI = async (type: "title" | "description" | "tags") => {
+  const handleGenerateAI = async (
+    type: "title" | "description" | "tags",
+    userDescription?: string
+  ) => {
     if (!editValue) return;
 
     setAiGenerating(true);
@@ -209,6 +216,7 @@ export default function MyVideosPage() {
             description: editValue.description,
             category: editValue.category,
             contentType: editValue.contentType,
+            userDescription,
           }),
         }),
       });
@@ -220,12 +228,7 @@ export default function MyVideosPage() {
       }
 
       if (type === "title") {
-        const suggestions = parseAITitleSuggestions(data.text);
-        setAiSuggestions(suggestions);
-
-        if (suggestions[0]) {
-          handleEditChange("title", suggestions[0]);
-        }
+        setAiSuggestions(parseAITitleSuggestions(data.text));
       }
     } catch (err) {
       console.error(err);
@@ -587,7 +590,7 @@ export default function MyVideosPage() {
                             categories={CATEGORIES}
                             allowContentTypeChange={false}
                             aiGenerating={aiGenerating}
-                            onGenerateAI={handleGenerateAI}
+                            onOpenAITitleAssist={() => setAiTitleAssistOpen(true)}
                             aiError={aiError}
                             aiSuggestions={aiSuggestions}
                             thumbnail={{
@@ -614,6 +617,20 @@ export default function MyVideosPage() {
                             }}
                             tagInput={editTagInput}
                             onTagInputChange={setEditTagInput}
+                          />
+
+                          <AITitleAssistModal
+                            open={aiTitleAssistOpen}
+                            onClose={() => setAiTitleAssistOpen(false)}
+                            initialDescription={editValue.description}
+                            generating={aiGenerating}
+                            error={aiError}
+                            suggestions={aiSuggestions}
+                            onGenerate={(userDescription) => handleGenerateAI("title", userDescription)}
+                            onPick={(pickedTitle) => {
+                              handleEditChange("title", pickedTitle);
+                              setAiTitleAssistOpen(false);
+                            }}
                           />
 
                           {error && <p className="text-xs text-red-400">{error}</p>}

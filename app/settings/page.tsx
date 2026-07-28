@@ -16,7 +16,6 @@ type Section =
   | "payments"
   | "analytics"
   | "storage"
-  | "notifications"
   | "about";
 
 export default function SettingsPage() {

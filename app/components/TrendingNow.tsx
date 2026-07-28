@@ -261,9 +261,9 @@ export default function TrendingNow() {
             {Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
-                className="flex w-[84px] flex-shrink-0 flex-col items-center gap-1.5 lg:w-[92px]"
+                className="flex w-28 flex-shrink-0 flex-col items-center gap-1.5 lg:w-32"
               >
-                <div className="h-16 w-16 animate-pulse rounded-full border border-white/10 bg-white/[0.06] lg:h-[72px] lg:w-[72px]" />
+                <div className="h-20 w-20 animate-pulse rounded-full bg-white/[0.06] lg:h-24 lg:w-24" />
                 <div className="h-2.5 w-12 animate-pulse rounded-full bg-white/[0.06]" />
                 <div className="h-2 w-8 animate-pulse rounded-full bg-white/[0.05]" />
               </div>
@@ -373,28 +373,26 @@ export default function TrendingNow() {
                       href={`/u/${encodeURIComponent(item.username)}`}
                       tabIndex={groupIndex === 1 ? -1 : undefined}
                       aria-label={`Open ${item.name}'s channel`}
-                      className="group flex w-[84px] flex-shrink-0 flex-col items-center gap-1.5 text-center lg:w-[92px]"
+                      className="group flex w-28 flex-shrink-0 flex-col items-center gap-1.5 text-center lg:w-32"
                     >
-                      {/* Circular avatar chip — no card box, the avatar itself
-                          (with a slim trending-colored ring) is the entire
-                          visual, matching a Stories-style trending row. */}
-                      <div className="relative h-16 w-16 flex-shrink-0 rounded-full bg-gradient-to-br from-orange-400 via-red-400 to-orange-500 p-[2px] transition duration-200 group-hover:scale-105 group-active:scale-95 lg:h-[72px] lg:w-[72px]">
-                        <div className="flex h-full w-full items-center justify-center rounded-full bg-[#0b1220] p-[2px] light:bg-[#FBF6EA]">
-                          {/* eslint-disable-next-line @next/next/no-img-element -- creator avatars can be data URLs. */}
-                          <img
-                            src={getAvatarSrc(item.avatarUrl)}
-                            alt=""
-                            onError={(event) => {
-                              if (!event.currentTarget.src.endsWith(FALLBACK_AVATAR)) {
-                                event.currentTarget.src = FALLBACK_AVATAR;
-                              }
-                            }}
-                            className="h-full w-full rounded-full object-cover"
-                          />
-                        </div>
+                      {/* Plain circular avatar — no ring/border/card, just the
+                          image itself, a little bigger than before, matching
+                          a Stories-style trending row. */}
+                      <div className="relative h-20 w-20 flex-shrink-0 transition duration-200 group-hover:scale-105 group-active:scale-95 lg:h-24 lg:w-24">
+                        {/* eslint-disable-next-line @next/next/no-img-element -- creator avatars can be data URLs. */}
+                        <img
+                          src={getAvatarSrc(item.avatarUrl)}
+                          alt=""
+                          onError={(event) => {
+                            if (!event.currentTarget.src.endsWith(FALLBACK_AVATAR)) {
+                              event.currentTarget.src = FALLBACK_AVATAR;
+                            }
+                          }}
+                          className="h-full w-full rounded-full object-cover"
+                        />
                         {item.isVerified && (
                           <BadgeCheck
-                            size={16}
+                            size={18}
                             className="absolute -bottom-0.5 -right-0.5 rounded-full fill-orange-400 text-[#101827] ring-2 ring-[#0b1220] light:ring-[#FBF6EA]"
                             aria-label="Verified creator"
                           />

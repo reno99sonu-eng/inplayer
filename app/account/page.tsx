@@ -11,7 +11,6 @@ import {
   Settings,
   HelpCircle,
   LogOut,
-  Crown,
 } from "lucide-react";
 
 import { useAuthModal } from "../components/auth/AuthProvider";
@@ -107,27 +106,6 @@ export default function AccountPage() {
         />
 
         <h3 className="mt-3 text-lg font-black">{user?.name}</h3>
-
-        <div
-          className="
-            mt-3
-            inline-flex
-            items-center
-            gap-1.5
-            rounded-full
-            bg-gradient-to-r
-            from-yellow-400
-            to-orange-500
-            px-3
-            py-1
-            text-[10px]
-            font-semibold
-            text-white
-          "
-        >
-          <Crown size={12} />
-          Premium
-        </div>
       </button>
 
       <div className="border-t border-white/10 light:border-black/10 p-4">

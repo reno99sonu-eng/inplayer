@@ -3,6 +3,9 @@
 import { ReactNode } from "react";
 import PlaybackSection from "../sections/PlaybackSection";
 import PrivacySection from "../sections/PrivacySection";
+import AnalyticsSection from "../sections/AnalyticsSection";
+import StorageSection from "../sections/StorageSection";
+import AboutSection from "../sections/AboutSection";
 
 type Section =
   | "appearance"
@@ -12,7 +15,6 @@ type Section =
   | "payments"
   | "analytics"
   | "storage"
-  | "notifications"
   | "about";
 
 interface SettingsContentProps {
@@ -64,16 +66,13 @@ export default function SettingsContent({
       return <ComingSoon title="Plans & Purchases" />;
 
     case "analytics":
-      return <ComingSoon title="User Analytics" />;
+      return <AnalyticsSection />;
 
     case "storage":
-      return <ComingSoon title="Storage" />;
-
-    case "notifications":
-      return <ComingSoon title="Notifications" />;
+      return <StorageSection />;
 
     case "about":
-      return <ComingSoon title="About InPlayer" />;
+      return <AboutSection />;
 
     default:
       return appearance;

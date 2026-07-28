@@ -4,7 +4,6 @@ import { useRouter } from "next/navigation";
 import { ReactNode, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
-  Crown,
   Camera,
   Loader2,
   AtSign,
@@ -448,11 +447,6 @@ export default function ProfilePage() {
               className="hidden"
               onChange={handleAvatarChange}
             />
-          </div>
-
-          <div className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-yellow-400 to-orange-500 px-3 py-1 text-[10px] font-semibold text-white">
-            <Crown size={12} />
-            Premium Member
           </div>
         </div>
 

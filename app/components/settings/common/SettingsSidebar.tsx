@@ -8,7 +8,6 @@ import {
   CreditCard,
   BarChart3,
   HardDrive,
-  Bell,
   Info,
 } from "lucide-react";
 
@@ -20,7 +19,6 @@ type Section =
   | "payments"
   | "analytics"
   | "storage"
-  | "notifications"
   | "about";
 
 interface SettingsSidebarProps {
@@ -63,11 +61,6 @@ const items = [
     id: "storage",
     label: "Storage",
     icon: HardDrive,
-  },
-  {
-    id: "notifications",
-    label: "Notifications",
-    icon: Bell,
   },
   {
     id: "about",

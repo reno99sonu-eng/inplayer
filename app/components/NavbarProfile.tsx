@@ -11,7 +11,6 @@ import {
   Settings,
   HelpCircle,
   LogOut,
-  Crown,
 } from "lucide-react";
 
 import Greeting from "./Greeting";
@@ -191,27 +190,6 @@ bg-[#08111F]/95
           <h3 className="mt-3 text-lg font-black text-white light:text-slate-900">
             {user?.name}
           </h3>
-
-          <div
-            className="
-              mt-2
-              inline-flex
-              items-center
-              gap-1.5
-              rounded-full
-              bg-gradient-to-r
-              from-yellow-400
-              to-orange-500
-              px-3
-              py-1
-              text-[10px]
-              font-semibold
-              text-white
-            "
-          >
-            <Crown size={12} />
-            Premium
-          </div>
 
         </div>
 

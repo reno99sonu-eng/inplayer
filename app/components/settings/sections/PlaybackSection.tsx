@@ -1,6 +1,5 @@
 "use client";
 
-import { useState } from "react";
 import SettingsSectionTitle from "../common/SettingsSectionTitle";
 import {
   MonitorPlay,
@@ -20,20 +19,16 @@ import SettingsCard from "../common/SettingsCard";
 import SettingsRow from "../common/SettingsRow";
 import SettingsToggle from "../common/SettingsToggle";
 import SettingsSelect from "../common/SettingsSelect";
+import { useSettings } from "../SettingsProvider";
 
+// Wired to the real SettingsProvider instead of local-only useState — see
+// PrivacySection.tsx for the same fix. Data Saver in particular was the
+// most deceptive stub in the app: RecommendationFeed.tsx already reads
+// settings.playback.dataSaver for real (to gate autoplaying previews), but
+// this toggle never called updatePlayback(), so flipping it on screen had
+// zero effect on that downstream behavior.
 export default function PlaybackSection() {
-  
-  const [mobileQuality, setMobileQuality] = useState("Auto");
-  const [wifiQuality, setWifiQuality] = useState("Ultra HD (4K)");
-  const [audioQuality, setAudioQuality] = useState("High");
-  const [autoplay, setAutoplay] = useState(true);
-  const [pip, setPip] = useState(true);
-  const [captions, setCaptions] = useState(false);
-  const [dataSaver, setDataSaver] = useState(false);
-const [backgroundPlayback, setBackgroundPlayback] = useState(true);
-const [rememberPosition, setRememberPosition] = useState(true);
-const [skipIntro, setSkipIntro] = useState(false);
-const [mobileDownloads, setMobileDownloads] = useState(false);
+  const { playback, updatePlayback } = useSettings();
 
   return (
     <SettingsCard
@@ -53,8 +48,8 @@ const [mobileDownloads, setMobileDownloads] = useState(false);
           description="Quality while using mobile data."
         >
           <SettingsSelect
-            value={mobileQuality}
-            onChange={setMobileQuality}
+            value={playback.mobileQuality}
+            onChange={(value) => updatePlayback({ mobileQuality: value })}
             options={[
               "Auto",
               "480p",
@@ -70,8 +65,8 @@ const [mobileDownloads, setMobileDownloads] = useState(false);
           description="Quality while connected to Wi-Fi."
         >
           <SettingsSelect
-            value={wifiQuality}
-            onChange={setWifiQuality}
+            value={playback.wifiQuality}
+            onChange={(value) => updatePlayback({ wifiQuality: value })}
             options={[
               "720p",
               "1080p",
@@ -87,8 +82,8 @@ const [mobileDownloads, setMobileDownloads] = useState(false);
           description="Preferred streaming audio quality."
         >
           <SettingsSelect
-            value={audioQuality}
-            onChange={setAudioQuality}
+            value={playback.audioQuality}
+            onChange={(value) => updatePlayback({ audioQuality: value })}
             options={[
               "Auto",
               "Standard",
@@ -107,8 +102,8 @@ const [mobileDownloads, setMobileDownloads] = useState(false);
           description="Automatically continue watching."
         >
           <SettingsToggle
-            checked={autoplay}
-            onChange={setAutoplay}
+            checked={playback.autoplay}
+            onChange={(checked) => updatePlayback({ autoplay: checked })}
           />
         </SettingsRow>
 
@@ -118,8 +113,8 @@ const [mobileDownloads, setMobileDownloads] = useState(false);
           description="Continue watching while using other apps."
         >
           <SettingsToggle
-            checked={pip}
-            onChange={setPip}
+            checked={playback.pip}
+            onChange={(checked) => updatePlayback({ pip: checked })}
           />
         </SettingsRow>
         <SettingsSectionTitle
@@ -132,8 +127,8 @@ const [mobileDownloads, setMobileDownloads] = useState(false);
           description="Show captions whenever available."
         >
           <SettingsToggle
-            checked={captions}
-            onChange={setCaptions}
+            checked={playback.captions}
+            onChange={(checked) => updatePlayback({ captions: checked })}
           />
         </SettingsRow>
         <SettingsSectionTitle
@@ -147,8 +142,8 @@ const [mobileDownloads, setMobileDownloads] = useState(false);
   description="Reduce streaming quality to save mobile data."
 >
   <SettingsToggle
-    checked={dataSaver}
-    onChange={setDataSaver}
+    checked={playback.dataSaver}
+    onChange={(checked) => updatePlayback({ dataSaver: checked })}
   />
 </SettingsRow>
 
@@ -158,8 +153,8 @@ const [mobileDownloads, setMobileDownloads] = useState(false);
   description="Resume videos where you left off."
 >
   <SettingsToggle
-    checked={rememberPosition}
-    onChange={setRememberPosition}
+    checked={playback.rememberPosition}
+    onChange={(checked) => updatePlayback({ rememberPosition: checked })}
   />
 </SettingsRow>
 
@@ -169,8 +164,8 @@ const [mobileDownloads, setMobileDownloads] = useState(false);
   description="Skip intros when available."
 >
   <SettingsToggle
-    checked={skipIntro}
-    onChange={setSkipIntro}
+    checked={playback.skipIntro}
+    onChange={(checked) => updatePlayback({ skipIntro: checked })}
   />
 </SettingsRow>
 
@@ -180,8 +175,8 @@ const [mobileDownloads, setMobileDownloads] = useState(false);
   description="Allow downloads without Wi-Fi."
 >
   <SettingsToggle
-    checked={mobileDownloads}
-    onChange={setMobileDownloads}
+    checked={playback.mobileDownloads}
+    onChange={(checked) => updatePlayback({ mobileDownloads: checked })}
   />
 </SettingsRow>
 
@@ -191,8 +186,8 @@ const [mobileDownloads, setMobileDownloads] = useState(false);
   description="Continue playing while using other apps."
 >
   <SettingsToggle
-    checked={backgroundPlayback}
-    onChange={setBackgroundPlayback}
+    checked={playback.backgroundPlayback}
+    onChange={(checked) => updatePlayback({ backgroundPlayback: checked })}
   />
 </SettingsRow>
 

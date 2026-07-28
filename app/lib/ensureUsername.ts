@@ -26,8 +26,9 @@ async function tryReserveUsername(
         ConditionExpression: "attribute_not_exists(usernameLower)",
       })
     );
-  } catch {
-    // Table may not exist, or missing permissions — non-critical.
+  } catch (err) {
+    // Table may not exist, or missing permissions — log but don't fail
+    console.warn(`Failed to reserve username ${username} for user ${userId}:`, err);
   }
 }
 

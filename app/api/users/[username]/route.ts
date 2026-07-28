@@ -42,6 +42,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       );
 
       if (!scanResult.Items || scanResult.Items.length === 0) {
+        console.error(`No user found for username: ${usernameLower}`);
         return NextResponse.json({ error: "No channel with that username." }, { status: 404 });
       }
 
@@ -49,7 +50,8 @@ export async function GET(request: NextRequest, { params }: Params) {
 
       try {
         await ensureUsername(targetUserId);
-      } catch {
+      } catch (err) {
+        console.error(`Failed to ensure username for userId ${targetUserId}:`, err);
         // Best-effort — the reservation may already exist now.
       }
     }
@@ -58,6 +60,10 @@ export async function GET(request: NextRequest, { params }: Params) {
       new GetCommand({ TableName: "InPlayer-Users", Key: { userId: targetUserId } })
     );
     const profile = profileResult.Item || {};
+    
+    if (!profileResult.Item) {
+      console.error(`No profile found for userId: ${targetUserId}`);
+    }
     const usernamePrivacy = profile.usernamePrivacy || "public";
     const isOwner = viewerId === targetUserId;
 
@@ -135,6 +141,17 @@ export async function GET(request: NextRequest, { params }: Params) {
         uploadedAt: v.uploadedAt,
         contentType: v.contentType || "video",
       }));
+
+    console.log(`Profile data for ${usernameLower}:`, {
+      userId: targetUserId,
+      username: profile.username,
+      name: profile.name,
+      videosCount: videos.length,
+      subscriberCount: subscriberCountResult.Count,
+      totalViews,
+      canViewFull,
+      usernamePrivacy,
+    });
 
     return NextResponse.json({
       ...base,

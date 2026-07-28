@@ -36,6 +36,8 @@ export async function resolveUsernames(
 
         if (username) {
           map.set(userId, username);
+        } else {
+          console.warn(`ensureUsername returned null for userId ${userId}`);
         }
       } catch (err) {
         // A single bad lookup shouldn't take down the whole page — skip

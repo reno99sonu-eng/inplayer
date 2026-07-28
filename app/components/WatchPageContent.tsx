@@ -83,8 +83,15 @@ export default function WatchPageContent({ video, relatedVideos: initialRelatedV
 
       <div className={`grid grid-cols-1 gap-6 transition-all duration-500 ${theaterMode ? "" : "xl:grid-cols-[minmax(0,1fr)_360px]"}`}>
         <div className="min-w-0">
-          <div id="watch-player" className="group relative scroll-mt-5">
-            <div className={`overflow-hidden rounded-[28px] border border-white/10 bg-black shadow-[0_25px_70px_rgba(0,0,0,.4)] light:border-black/10 ${theaterMode ? "mx-auto max-w-[1300px]" : ""}`}>
+          {/* -mx-3/lg:mx-0 cancels the shared page container's horizontal
+              padding (app/watch/[videoId]/page.tsx) so the player alone
+              runs edge-to-edge on mobile/tablet portrait, like YouTube —
+              everything else on this page (hero, actions, comments,
+              sidebar) keeps its normal inset. Card look (rounded corners,
+              border, shadow) returns at lg: (desktop/tablet landscape),
+              matching this app's existing mobile-vs-desktop breakpoint. */}
+          <div id="watch-player" className="group relative scroll-mt-5 -mx-3 lg:mx-0">
+            <div className={`overflow-hidden rounded-none border-0 border-white/10 bg-black shadow-none light:border-black/10 lg:rounded-[28px] lg:border lg:shadow-[0_25px_70px_rgba(0,0,0,.4)] ${theaterMode ? "mx-auto max-w-[1300px]" : ""}`}>
               {showPlayer ? <VideoPlayer playbackId={video.muxPlaybackId} title={video.title} videoId={video.videoId} /> : (
                 <div className="flex aspect-video w-full flex-col items-center justify-center gap-4 bg-black px-6 text-center">
                   <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-500/15 text-red-400"><ShieldAlert size={26} /></div>
@@ -96,11 +103,18 @@ export default function WatchPageContent({ video, relatedVideos: initialRelatedV
             <button onClick={() => setTheaterMode((active) => !active)} title={theaterMode ? "Exit theater mode" : "Theater mode"} className="absolute right-3 top-3 z-10 hidden h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/65 text-white opacity-0 backdrop-blur transition hover:scale-110 hover:border-orange-400/50 group-hover:opacity-100 lg:flex">{theaterMode ? <Minimize2 size={17} /> : <Maximize2 size={17} />}</button>
           </div>
 
-          <div className={`mt-4 rounded-3xl border border-white/[0.08] bg-gradient-to-br from-white/[0.055] to-white/[0.015] p-4 backdrop-blur-xl light:border-black/[0.08] light:from-black/[0.04] light:to-transparent ${theaterMode ? "mx-auto max-w-[1300px]" : ""}`}>
-            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <div><p className="text-[11px] font-black uppercase tracking-[0.2em] text-orange-300 light:text-orange-700">More options</p><p className="mt-1 text-sm text-slate-400 light:text-slate-600">Save, share, or add this title to a playlist.</p></div>
-              <WatchActions videoId={video.videoId} title={video.title} contentType={video.contentType} downloadStatus={video.downloadStatus} downloadRenditions={video.downloadRenditions} />
-            </div>
+          <div className={`mt-4 rounded-3xl border border-white/[0.08] bg-gradient-to-br from-white/[0.055] to-white/[0.015] p-3 backdrop-blur-xl light:border-black/[0.08] light:from-black/[0.04] light:to-transparent ${theaterMode ? "mx-auto max-w-[1300px]" : ""}`}>
+            <WatchActions
+              videoId={video.videoId}
+              title={video.title}
+              contentType={video.contentType}
+              downloadStatus={video.downloadStatus}
+              downloadRenditions={video.downloadRenditions}
+              uploaderId={video.uploaderId}
+              uploaderName={video.uploaderName}
+              uploaderUsername={video.uploaderUsername}
+              uploaderAvatarUrl={video.uploaderAvatarUrl}
+            />
           </div>
 
           <div className={theaterMode ? "mx-auto max-w-[1300px]" : ""}>

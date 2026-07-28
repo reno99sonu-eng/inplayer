@@ -5,23 +5,37 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CheckCircle2, Loader2 } from "lucide-react";
 
+export interface ProcessingReadyInfo {
+  muxPlaybackId: string | null;
+  duration: number;
+  thumbnailUrl: string | null;
+}
+
 interface ProcessingStatusProps {
   videoId: string;
   // If true, calls router.refresh() once ready instead of showing its own
   // "Watch Now" screen — used on the watch page, so it seamlessly
   // transitions into the real player instead of showing a redundant link.
   autoRefreshOnReady?: boolean;
+  // Lets a caller replace the default "Watch Now" ready screen with
+  // something else once Mux has actually finished processing — e.g. the
+  // Upload flow's post-processing thumbnail-confirmation step, which needs
+  // the playbackId/duration this now resolves with to build real candidate
+  // frames (see app/components/UploadThumbnailStep.tsx).
+  renderReady?: (info: ProcessingReadyInfo) => React.ReactNode;
 }
 
 export default function ProcessingStatus({
   videoId,
   autoRefreshOnReady = false,
+  renderReady,
 }: ProcessingStatusProps) {
   const router = useRouter();
   const [status, setStatus] = useState<"processing" | "ready" | "error">(
     "processing"
   );
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const [readyInfo, setReadyInfo] = useState<ProcessingReadyInfo | null>(null);
 
   useEffect(() => {
     const startTime = Date.now();
@@ -42,6 +56,11 @@ export default function ProcessingStatus({
           if (autoRefreshOnReady) {
             router.refresh();
           } else {
+            setReadyInfo({
+              muxPlaybackId: data.muxPlaybackId || null,
+              duration: data.duration || 0,
+              thumbnailUrl: data.thumbnailUrl || null,
+            });
             setStatus("ready");
           }
         } else if (data.status === "error") {
@@ -64,6 +83,16 @@ export default function ProcessingStatus({
   const seconds = elapsedSeconds % 60;
 
   if (status === "ready") {
+    if (renderReady) {
+      return (
+        <>
+          {renderReady(
+            readyInfo || { muxPlaybackId: null, duration: 0, thumbnailUrl: null }
+          )}
+        </>
+      );
+    }
+
     return (
       <div className="flex flex-col items-center gap-5 py-12 text-center">
         <div className="flex h-20 w-20 items-center justify-center rounded-full bg-emerald-500/15 border border-emerald-400/30">

@@ -1,7 +1,7 @@
 "use client";
 
-import { useRef } from "react";
-import { UploadCloud, X, Globe, Link2, Lock, Film, PlaySquare } from "lucide-react";
+import { useRef, useState } from "react";
+import { UploadCloud, X, Globe, Link2, Lock, Film, PlaySquare, Loader2, Sparkles } from "lucide-react";
 
 // Single source of truth for these option lists — shared by the Upload
 // page and the My Channel edit panel so the two forms can never drift
@@ -83,6 +83,11 @@ interface VideoMetadataFieldsProps {
 onGenerateAI?: (
   type: "title" | "description" | "tags"
 ) => Promise<void>;
+
+  /** Error from the last onGenerateAI call, surfaced under the AI button. */
+  aiError?: string | null;
+  /** Up to 5 title options from the last successful title generation. */
+  aiSuggestions?: string[];
 }
 
 // A small on/off switch row used for the age-restriction and comments
@@ -140,15 +145,45 @@ export default function VideoMetadataFields({
 onTagInputChange,
 aiGenerating = false,
 onGenerateAI,
+  aiError = null,
+  aiSuggestions = [],
 }: VideoMetadataFieldsProps) {
   const thumbInputRef = useRef<HTMLInputElement>(null);
   const muxFrames = thumbnail?.muxFrames ?? [];
+  const [aiThumbBusy, setAiThumbBusy] = useState(false);
+  const [aiThumbError, setAiThumbError] = useState<string | null>(null);
   const runAI = async (
     type: "title" | "description" | "tags"
   ) => {
     if (!onGenerateAI || aiGenerating) return;
-  
+
     await onGenerateAI(type);
+  };
+
+  const runAIThumbnail = async () => {
+    if (muxFrames.length === 0 || aiThumbBusy) return;
+    setAiThumbBusy(true);
+    setAiThumbError(null);
+    try {
+      const res = await fetch("/api/ai-thumbnail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          frameUrls: muxFrames,
+          title: value.title,
+          category: value.category,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "AI couldn't pick a thumbnail.");
+      if (data.thumbnailUrl) {
+        thumbnail?.onMuxThumbnailSelected?.(data.thumbnailUrl);
+      }
+    } catch (err) {
+      setAiThumbError(err instanceof Error ? err.message : "AI couldn't pick a thumbnail.");
+    } finally {
+      setAiThumbBusy(false);
+    }
   };
 
   const addTag = () => {
@@ -282,26 +317,39 @@ onGenerateAI,
       )}
     </div>
 
-    {/* AI Thumbnail */}
+    {/* AI Thumbnail — needs real Mux frames to choose from, which only
+        exist once the video has finished processing (my-videos edit panel
+        always has them; the pre-upload form never does, see
+        UploadThumbnailStep for that flow's equivalent). */}
     <button
       type="button"
-      disabled
-      className="w-full rounded-2xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-black/[0.03] p-4 text-left opacity-60 cursor-not-allowed"
+      onClick={runAIThumbnail}
+      disabled={aiThumbBusy || muxFrames.length === 0}
+      className="w-full rounded-2xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-black/[0.03] p-4 text-left transition hover:border-orange-400/40 disabled:cursor-not-allowed disabled:opacity-60"
     >
-      <div className="flex items-center justify-between">
-        <div>
+      <div className="flex items-center justify-between gap-3">
+        <div className="min-w-0">
           <p className="font-semibold text-white light:text-slate-900">
             ✨ Generate AI Thumbnail
           </p>
           <p className="mt-1 text-xs text-slate-400 light:text-slate-600">
-            Create an AI-powered thumbnail based on your uploaded video.
+            {muxFrames.length === 0
+              ? "Available once your video finishes processing."
+              : aiThumbBusy
+              ? "Analyzing your video's frames..."
+              : "Let AI pick the sharpest, most eye-catching frame from your video."}
           </p>
         </div>
 
-        <span className="rounded-full bg-orange-500/15 px-2 py-1 text-[10px] font-semibold text-orange-300">
-          Coming Soon
-        </span>
+        {aiThumbBusy ? (
+          <Loader2 size={16} className="flex-shrink-0 animate-spin text-orange-400" />
+        ) : (
+          <Sparkles size={16} className="flex-shrink-0 text-orange-400" />
+        )}
       </div>
+      {aiThumbError && (
+        <p className="mt-2 text-xs text-red-400">{aiThumbError}</p>
+      )}
     </button>
   </div>
 )}
@@ -320,6 +368,27 @@ onGenerateAI,
     {aiGenerating ? "Generating..." : "✨ Generate AI Title"}
   </button>
 </div>
+        {aiError && (
+          <p className="mb-2 text-xs text-red-400">{aiError}</p>
+        )}
+        {aiSuggestions.length > 1 && (
+          <div className="mb-2 flex flex-wrap gap-1.5">
+            {aiSuggestions.map((suggestion) => (
+              <button
+                key={suggestion}
+                type="button"
+                onClick={() => onChange("title", suggestion)}
+                className={`rounded-full border px-2.5 py-1 text-left text-[11px] font-medium transition ${
+                  value.title === suggestion
+                    ? "border-orange-400/60 bg-orange-500/15 text-orange-300"
+                    : "border-white/10 light:border-black/10 text-slate-400 light:text-slate-600 hover:border-orange-400/40 hover:text-orange-300"
+                }`}
+              >
+                {suggestion}
+              </button>
+            ))}
+          </div>
+        )}
         <input
           type="text"
           value={value.title}

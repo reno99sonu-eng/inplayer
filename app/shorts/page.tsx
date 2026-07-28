@@ -43,6 +43,8 @@ async function getShorts(startVideoId?: string): Promise<Short[]> {
       views: `${video.views || 0} views`,
       likes: "0",
       comments: "0",
+      soundtrackId: video.shortSettings?.soundtrackId ?? null,
+      musicClipSeconds: (video.shortSettings?.musicClipSeconds === 20 ? 20 : 30) as 20 | 30,
     }));
 
     // Move the requested short to the front so the feed opens on it

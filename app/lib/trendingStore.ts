@@ -173,6 +173,26 @@ export async function getTrendingCreatorsToday(
     ])
   );
 
+  // A trending creator needs a real channel destination too. Without this,
+  // any profile that predates usernames (or never got a username reserved)
+  // silently vanished from the whole Trending Creators list below — the
+  // same failure mode getFeaturedThisWeek already guards against. Self-heal
+  // via the shared ensureUsername() so every creator with real views gets a
+  // working /u/[username] link, not just the ones that happened to have one.
+  const missingUsernameIds = creatorIds.filter(
+    (userId) => !(profiles.get(userId)?.username as string | undefined)
+  );
+  if (missingUsernameIds.length) {
+    const ensured = await Promise.all(
+      missingUsernameIds.map(
+        async (userId) => [userId, await ensureUsername(userId)] as const
+      )
+    );
+    for (const [userId, username] of ensured) {
+      profiles.set(userId, { ...(profiles.get(userId) || {}), username });
+    }
+  }
+
   return creatorIds
     .map((userId): TrendingCreator | null => {
       const aggregate = creators.get(userId);

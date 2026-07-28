@@ -6,9 +6,11 @@ import { fetchAuthSession } from "aws-amplify/auth";
 import { UploadCloud, Film, Loader2, X } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import ProcessingStatus from "@/app/components/ProcessingStatus";
+import UploadThumbnailStep from "@/app/components/UploadThumbnailStep";
 import BackButton from "@/app/components/BackButton";
 import { CONTENT_CATEGORIES } from "@/app/data/categories";
 import { compressImageToThumbnail } from "@/app/lib/imageCompress";
+import { buildAIGeneratePrompt, parseAITitleSuggestions } from "@/app/lib/aiPrompts";
 import VideoMetadataFields, {
   VideoMetadataValue,
   SpokenLanguage,
@@ -180,12 +182,11 @@ const [aiError, setAiError] = useState<string | null>(null);
   const handleGenerateAI = async (
     type: "title" | "description" | "tags"
   ) => {
-    console.log("Generate AI clicked:", type);
-setAiGenerating(true);
+    setAiGenerating(true);
     setAiError(null);
     setAiSuggestions([]);
     setAiType(type);
-  
+
     try {
       const response = await fetch("/api/ai-generate", {
         method: "POST",
@@ -193,56 +194,32 @@ setAiGenerating(true);
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          prompt:
-            type === "title"
-              ? `Generate five engaging YouTube-style titles for a ${category} video.
-        
-        Current title:
-        ${title}
-        
-        Description:
-        ${description}
-        
-        Return ONLY five titles, one per line. Do not number them.`
-              : type === "description"
-              ? `Write a professional YouTube description for this ${category} video.
-        
-        Title:
-        ${title}
-        
-        Return ONLY the description.`
-              : `Generate 15 SEO-friendly tags for this ${category} video.
-        
-        Title:
-        ${title}
-        
-        Description:
-        ${description}
-        
-        Return ONLY comma-separated tags.`,
+          prompt: buildAIGeneratePrompt(type, {
+            title,
+            description,
+            category,
+            contentType,
+          }),
         }),
       });
-      
+
       const data = await response.json();
-      console.log("AI response:", response.status, data);
-      
+
       if (!response.ok) {
         throw new Error(data.error || "AI generation failed.");
       }
-      
+
       if (type === "title") {
-        const firstTitle = data.text
-          .split("\n")
-          .map((line: string) => line.replace(/^\d+[\).\-\s]*/, "").trim())
-          .find((line: string) => line.length > 0);
-      
-        if (firstTitle) {
-          setTitle(firstTitle);
+        const suggestions = parseAITitleSuggestions(data.text);
+        setAiSuggestions(suggestions);
+
+        if (suggestions[0]) {
+          setTitle(suggestions[0]);
         }
       }
     } catch (err) {
       console.error(err);
-      setAiError("AI couldn't generate content.");
+      setAiError(err instanceof Error ? err.message : "AI couldn't generate content.");
     } finally {
       setAiGenerating(false);
     }
@@ -467,6 +444,8 @@ setAiGenerating(true);
               categories={CATEGORIES}
               aiGenerating={aiGenerating}
               onGenerateAI={handleGenerateAI}
+              aiError={aiType === "title" ? aiError : null}
+              aiSuggestions={aiType === "title" ? aiSuggestions : []}
               thumbnail={{
                 previewUrl: thumbnailPreview,
                 onFileSelected: handleThumbnailSelected,
@@ -534,7 +513,18 @@ setAiGenerating(true);
 
         {stage === "processing" && uploadedVideoId && (
           <div>
-            <ProcessingStatus videoId={uploadedVideoId} />
+            <ProcessingStatus
+              videoId={uploadedVideoId}
+              renderReady={(info) => (
+                <UploadThumbnailStep
+                  videoId={uploadedVideoId}
+                  muxPlaybackId={info.muxPlaybackId}
+                  duration={info.duration}
+                  defaultThumbnailUrl={info.thumbnailUrl}
+                  onDone={() => router.push(`/watch/${uploadedVideoId}`)}
+                />
+              )}
+            />
             <div className="mt-2 flex justify-center">
               <button
                 onClick={() => router.push("/")}

@@ -33,20 +33,38 @@ export async function GET(request: NextRequest, { params }: Params) {
     let targetUserId: string | null = handleResult.Item?.userId ?? null;
 
     if (!targetUserId) {
-      const scanResult = await docClient.send(
-        new ScanCommand({
-          TableName: "InPlayer-Users",
-          FilterExpression: "usernameLower = :usernameLower",
-          ExpressionAttributeValues: { ":usernameLower": usernameLower },
-        })
-      );
+      // Fast path missed (no InPlayer-Usernames reservation for this handle).
+      // Legacy accounts created before usernameLower existed have no
+      // usernameLower attribute at all, so a FilterExpression keyed on it can
+      // never match them — that used to make an otherwise-real channel 404.
+      // Scan the whole table (same RCU cost a filtered Scan already paid)
+      // and match case-insensitively against usernameLower OR the raw
+      // username field in memory, paginating like the video lookup below.
+      const candidates: Record<string, unknown>[] = [];
+      let scanStartKey: Record<string, unknown> | undefined;
+      do {
+        const page = await docClient.send(
+          new ScanCommand({
+            TableName: "InPlayer-Users",
+            ProjectionExpression: "userId, username, usernameLower",
+            ExclusiveStartKey: scanStartKey,
+          })
+        );
+        candidates.push(...(page.Items || []));
+        scanStartKey = page.LastEvaluatedKey;
+      } while (scanStartKey);
 
-      if (!scanResult.Items || scanResult.Items.length === 0) {
+      const match = candidates.find((item) => {
+        const handle = (item.usernameLower as string) || (item.username as string);
+        return Boolean(handle) && normalizeUsername(handle) === usernameLower;
+      });
+
+      if (!match) {
         console.error(`No user found for username: ${usernameLower}`);
         return NextResponse.json({ error: "No channel with that username." }, { status: 404 });
       }
 
-      targetUserId = scanResult.Items[0].userId as string;
+      targetUserId = match.userId as string;
 
       try {
         await ensureUsername(targetUserId);

@@ -12,6 +12,11 @@ export interface Short {
   uploaderUsername?: string; // present only when the uploader has a username set — see app/lib/resolveUsernames
   uploaderAvatarUrl?: string; // present only for real uploaded shorts
   description?: string; // present only for real uploaded shorts
+  // Soundtrack chosen at upload time (see ShortCreationTools) — resolved
+  // against app/data/soundtracks.ts for actual playback. Absent/null means
+  // "play with its own original audio, no soundtrack attached."
+  soundtrackId?: string | null;
+  musicClipSeconds?: 20 | 30;
 }
 
 // No example/dummy shorts — the Shorts shelf is real-shorts-only. Real

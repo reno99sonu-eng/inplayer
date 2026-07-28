@@ -261,19 +261,12 @@ export default function TrendingNow() {
             {Array.from({ length: 6 }).map((_, i) => (
               <div
                 key={i}
-                className="
-                  h-[108px]
-                  w-[120px]
-                  lg:h-[116px]
-                  lg:w-[132px]
-                  flex-shrink-0
-                  animate-pulse
-                  rounded-xl
-                  border
-                  border-white/10
-                  bg-white/[0.03]
-                "
-              />
+                className="flex w-[84px] flex-shrink-0 flex-col items-center gap-1.5 lg:w-[92px]"
+              >
+                <div className="h-16 w-16 animate-pulse rounded-full border border-white/10 bg-white/[0.06] lg:h-[72px] lg:w-[72px]" />
+                <div className="h-2.5 w-12 animate-pulse rounded-full bg-white/[0.06]" />
+                <div className="h-2 w-8 animate-pulse rounded-full bg-white/[0.05]" />
+              </div>
             ))}
           </div>
         ) : (
@@ -366,13 +359,13 @@ export default function TrendingNow() {
               }
             }}
           >
-            <div className="flex w-max gap-2 lg:gap-3">
+            <div className="flex w-max gap-3 lg:gap-4">
               {[0, 1].map((groupIndex) => (
                 <div
                   key={groupIndex}
                   ref={groupIndex === 0 ? firstGroupRef : secondGroupRef}
                   aria-hidden={groupIndex === 1}
-                  className="flex w-max gap-2 lg:gap-3"
+                  className="flex w-max gap-3 lg:gap-4"
                 >
                   {loopItems.map((item, index) => (
                     <Link
@@ -380,24 +373,35 @@ export default function TrendingNow() {
                       href={`/u/${encodeURIComponent(item.username)}`}
                       tabIndex={groupIndex === 1 ? -1 : undefined}
                       aria-label={`Open ${item.name}'s channel`}
-                      className="group flex h-[108px] w-[120px] flex-shrink-0 flex-col items-center justify-center rounded-xl border border-white/10 bg-black/10 px-2 text-center transition duration-200 hover:-translate-y-0.5 hover:border-orange-400/45 hover:bg-white/[0.07] light:border-black/10 light:bg-white/30 light:hover:bg-white/55 lg:h-[116px] lg:w-[132px]"
+                      className="group flex w-[84px] flex-shrink-0 flex-col items-center gap-1.5 text-center lg:w-[92px]"
                     >
-                      <div className="relative">
-                        {/* eslint-disable-next-line @next/next/no-img-element -- creator avatars can be data URLs. */}
-                        <img
-                          src={getAvatarSrc(item.avatarUrl)}
-                          alt=""
-                          onError={(event) => {
-                            if (!event.currentTarget.src.endsWith(FALLBACK_AVATAR)) {
-                              event.currentTarget.src = FALLBACK_AVATAR;
-                            }
-                          }}
-                          className="h-12 w-12 rounded-full border border-white/30 object-cover transition duration-200 group-hover:scale-105 lg:h-14 lg:w-14"
-                        />
-                        {item.isVerified && <BadgeCheck size={14} className="absolute -bottom-1 -right-1 fill-orange-400 text-[#101827]" aria-label="Verified creator" />}
+                      {/* Circular avatar chip — no card box, the avatar itself
+                          (with a slim trending-colored ring) is the entire
+                          visual, matching a Stories-style trending row. */}
+                      <div className="relative h-16 w-16 flex-shrink-0 rounded-full bg-gradient-to-br from-orange-400 via-red-400 to-orange-500 p-[2px] transition duration-200 group-hover:scale-105 group-active:scale-95 lg:h-[72px] lg:w-[72px]">
+                        <div className="flex h-full w-full items-center justify-center rounded-full bg-[#0b1220] p-[2px] light:bg-[#FBF6EA]">
+                          {/* eslint-disable-next-line @next/next/no-img-element -- creator avatars can be data URLs. */}
+                          <img
+                            src={getAvatarSrc(item.avatarUrl)}
+                            alt=""
+                            onError={(event) => {
+                              if (!event.currentTarget.src.endsWith(FALLBACK_AVATAR)) {
+                                event.currentTarget.src = FALLBACK_AVATAR;
+                              }
+                            }}
+                            className="h-full w-full rounded-full object-cover"
+                          />
+                        </div>
+                        {item.isVerified && (
+                          <BadgeCheck
+                            size={16}
+                            className="absolute -bottom-0.5 -right-0.5 rounded-full fill-orange-400 text-[#101827] ring-2 ring-[#0b1220] light:ring-[#FBF6EA]"
+                            aria-label="Verified creator"
+                          />
+                        )}
                       </div>
-                      <p className="mt-1.5 w-full truncate text-xs font-bold text-white light:text-slate-900">{item.name}</p>
-                      <p className="mt-0.5 w-full truncate text-[10px] font-medium text-slate-400 light:text-slate-600">{formatViews(item.windowViews)}</p>
+                      <p className="w-full truncate text-xs font-bold text-white light:text-slate-900">{item.name}</p>
+                      <p className="w-full truncate text-[10px] font-medium text-slate-400 light:text-slate-600">{formatViews(item.windowViews)} views</p>
                     </Link>
                   ))}
                 </div>

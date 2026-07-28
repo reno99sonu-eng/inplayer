@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 
 import type { Short } from "../data/shorts";
+import { getSoundtrackById } from "../data/soundtracks";
 import { useAuthModal } from "./auth/AuthProvider";
 import CommentSection from "./CommentSection";
 import { recordShare } from "./ShareButton";
@@ -90,6 +91,12 @@ export default function ShortsPageContent({
 
   const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
   const playerRef = useRef<any>(null);
+  // Background soundtrack (see app/data/soundtracks.ts) chosen at upload
+  // time for whichever Short is active — a single shared <audio> element,
+  // same idea as the one shared MuxPlayer instance below, kept and driven
+  // entirely separately from it so none of the existing video/gesture
+  // logic in this file has to change to support it.
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   // Single/double-tap disambiguation on the video itself, done manually
   // rather than relying on the browser's native "dblclick" event — dblclick
   // is a desktop mouse concept and doesn't fire reliably from two quick
@@ -205,6 +212,69 @@ export default function ShortsPageContent({
     player.addEventListener("volumechange", syncMuted);
     return () => player.removeEventListener("volumechange", syncMuted);
   }, [activeIndex]);
+
+  // Point the shared <audio> element at whichever soundtrack the active
+  // Short was published with (none = play silently, no soundtrack was
+  // chosen). Manually enforces the creator's chosen clip length (20s/30s)
+  // by looping back to 0 itself rather than relying on the native `loop`
+  // attribute, since the source files are ~30s and a 20s clip needs to cut
+  // short of the file's natural end.
+  useEffect(() => {
+    const audio = audioRef.current;
+    const short = shorts[activeIndex];
+    const track = getSoundtrackById(short?.soundtrackId);
+
+    if (!audio || !track) {
+      audio?.pause();
+      return;
+    }
+
+    const clipSeconds = Math.min(short?.musicClipSeconds || 30, track.durationSeconds);
+
+    if (!audio.src || !audio.src.endsWith(track.url)) {
+      audio.src = track.url;
+      audio.currentTime = 0;
+    }
+
+    audio.muted = muted;
+    audio.play().catch(() => {
+      // Match MuxPlayer's autoPlay="any" fallback just above: browsers that
+      // block unmuted autoplay still generally allow a muted one, so at
+      // least start the beat instead of leaving it silent until the next
+      // tap (toggleMuted's own play() retry then recovers real sound).
+      if (!audio.muted) {
+        audio.muted = true;
+        audio.play().catch(() => {});
+      }
+    });
+
+    const enforceClip = () => {
+      if (audio.currentTime >= clipSeconds) {
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
+      }
+    };
+    audio.addEventListener("timeupdate", enforceClip);
+
+    return () => {
+      audio.removeEventListener("timeupdate", enforceClip);
+      audio.pause();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeIndex, shorts]);
+
+  // Keeps the background soundtrack's mute state glued to the video's.
+  // toggleMuted (tap-to-mute, and the header speaker button) only ever
+  // touches the video player directly — this is what makes a mute/unmute
+  // affect both at once without changing that existing gesture logic.
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.muted = muted;
+    if (!muted && audio.paused && audio.src) {
+      audio.play().catch(() => {});
+    }
+  }, [muted]);
 
   // Lazy-load real like / subscribe / save / comment-count status for
   // whichever short is currently active, and cache it so scrolling back
@@ -499,6 +569,11 @@ export default function ShortsPageContent({
     // section fight the page's own scroll, which is what caused the
     // "doesn't fit" and "not smooth" scrolling issues.
     <div className="fixed inset-0 z-[999] overflow-hidden bg-[#0b0b0d] lg:flex lg:items-center lg:justify-center">
+      {/* Background soundtrack for the active Short, if it has one — see
+          the effects above. One shared element for the whole feed, not
+          per-slide. */}
+      <audio ref={audioRef} className="hidden" />
+
       {/* Ambient blurred backdrop — on wide desktop windows the vertical
           feed column doesn't fill the whole screen (it shouldn't; a
           9:16 video stretched edge-to-edge on a wide monitor would look

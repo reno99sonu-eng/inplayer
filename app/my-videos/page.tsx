@@ -12,6 +12,7 @@ import RevenueSection, { PayoutStatus } from "@/app/components/analytics/Revenue
 import { TrendPoint } from "@/app/components/analytics/TrendChart";
 import HowInPlayerWorks from "@/app/components/HowInPlayerWorks";
 import { compressImageToThumbnail } from "@/app/lib/imageCompress";
+import { buildAIGeneratePrompt, parseAITitleSuggestions } from "@/app/lib/aiPrompts";
 import VideoMetadataFields, {
   VideoMetadataValue,
   SpokenLanguage,
@@ -83,6 +84,9 @@ export default function MyVideosPage() {
   const [editThumbnailBusy, setEditThumbnailBusy] = useState(false);
   const [editThumbnailError, setEditThumbnailError] = useState<string | null>(null);
   const [selectedMuxThumbnail, setSelectedMuxThumbnail] = useState<string | null>(null);
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiError, setAiError] = useState<string | null>(null);
+  const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
 
   const [savingId, setSavingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -162,6 +166,8 @@ export default function MyVideosPage() {
     setEditThumbnailBusy(false);
     setEditThumbnailError(null);
     setSelectedMuxThumbnail(null);
+    setAiError(null);
+    setAiSuggestions([]);
     setError(null);
   };
 
@@ -169,6 +175,8 @@ export default function MyVideosPage() {
     setEditingId(null);
     setEditValue(null);
     setSelectedMuxThumbnail(null);
+    setAiError(null);
+    setAiSuggestions([]);
     setError(null);
   };
 
@@ -177,6 +185,54 @@ export default function MyVideosPage() {
     val: VideoMetadataValue[K]
   ) => {
     setEditValue((prev) => (prev ? { ...prev, [field]: val } : prev));
+  };
+
+  // Mirrors app/upload/page.tsx's handleGenerateAI (shared prompt-builder,
+  // same parsing) so "Generate AI Title" behaves identically in the edit
+  // panel — previously this callback simply didn't exist here, so clicking
+  // the button in VideoMetadataFields did nothing at all (see the
+  // `if (!onGenerateAI || aiGenerating) return;` guard there).
+  const handleGenerateAI = async (type: "title" | "description" | "tags") => {
+    if (!editValue) return;
+
+    setAiGenerating(true);
+    setAiError(null);
+    setAiSuggestions([]);
+
+    try {
+      const response = await fetch("/api/ai-generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: buildAIGeneratePrompt(type, {
+            title: editValue.title,
+            description: editValue.description,
+            category: editValue.category,
+            contentType: editValue.contentType,
+          }),
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "AI generation failed.");
+      }
+
+      if (type === "title") {
+        const suggestions = parseAITitleSuggestions(data.text);
+        setAiSuggestions(suggestions);
+
+        if (suggestions[0]) {
+          handleEditChange("title", suggestions[0]);
+        }
+      }
+    } catch (err) {
+      console.error(err);
+      setAiError(err instanceof Error ? err.message : "AI couldn't generate content.");
+    } finally {
+      setAiGenerating(false);
+    }
   };
 
   const handleEditThumbnailSelected = async (file: File) => {
@@ -530,6 +586,10 @@ export default function MyVideosPage() {
                             onChange={handleEditChange}
                             categories={CATEGORIES}
                             allowContentTypeChange={false}
+                            aiGenerating={aiGenerating}
+                            onGenerateAI={handleGenerateAI}
+                            aiError={aiError}
+                            aiSuggestions={aiSuggestions}
                             thumbnail={{
                               previewUrl: editThumbnailPreview || video.thumbnailUrl || null,
                               onFileSelected: handleEditThumbnailSelected,

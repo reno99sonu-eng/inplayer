@@ -108,6 +108,18 @@ if (!apiKey) {
         clearTimeout(timer);
       }
     }
+
+    // Every candidate model was tried (or the loop `break`-ed on a
+    // non-retryable error) without ever returning — this used to fall
+    // through with no response at all, which the client saw as a silent
+    // failure and then rendered whatever half-formed text it had. Always
+    // return something explicit so the caller can show a real error instead
+    // of guessing.
+    console.error("AI generate: all Groq models exhausted, last status:", lastErrorStatus);
+    return NextResponse.json(
+      { error: "AI title generation is temporarily unavailable. Please try again shortly." },
+      { status: lastErrorStatus >= 400 ? lastErrorStatus : 502 }
+    );
   } catch (error) {
     console.error("AI generate route error:", error);
     return NextResponse.json(

@@ -49,20 +49,30 @@ export async function ensureUsername(userId: string) {
     const username = storedUsername.trim();
     const usernameLower = normalizeUsername(username);
 
-    await docClient.send(
-      new UpdateCommand({
-        TableName: USERS_TABLE,
-        Key: { userId },
-        UpdateExpression:
-          "SET usernameLower = :usernameLower, updatedAt = :updatedAt",
-        ExpressionAttributeValues: {
-          ":usernameLower": usernameLower,
-          ":updatedAt": new Date().toISOString(),
-        },
-      })
-    );
+    // resolveUsernames.ts calls ensureUsername for every uploader shown on
+    // every page load (by design, so older rows self-heal). Once a row is
+    // already healed — usernameLower matches — re-running the write below
+    // is a no-op that costs a real DynamoDB write every single time, and
+    // tryReserveUsername's ConditionExpression is *designed* to fail once
+    // the reservation exists, so it was flooding the logs with a
+    // ConditionalCheckFailedException on nearly every request. Only touch
+    // the DB when something is actually missing.
+    if (existing.Item?.usernameLower !== usernameLower) {
+      await docClient.send(
+        new UpdateCommand({
+          TableName: USERS_TABLE,
+          Key: { userId },
+          UpdateExpression:
+            "SET usernameLower = :usernameLower, updatedAt = :updatedAt",
+          ExpressionAttributeValues: {
+            ":usernameLower": usernameLower,
+            ":updatedAt": new Date().toISOString(),
+          },
+        })
+      );
 
-    await tryReserveUsername(userId, username, usernameLower);
+      await tryReserveUsername(userId, username, usernameLower);
+    }
 
     return username;
   }

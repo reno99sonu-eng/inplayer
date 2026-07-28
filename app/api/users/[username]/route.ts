@@ -105,9 +105,18 @@ export async function GET(request: NextRequest, { params }: Params) {
       return NextResponse.json({ ...base, gated: true });
     }
 
-    // Both reads use existing creatorId indexes. The video lookup used to
-    // Scan the full table and filter it afterwards; a channel must never get
-    // slower as unrelated creators upload more videos.
+    // InPlayer-Subscriptions really does have a "creatorId-index" GSI (the
+    // same one app/api/subscriptions/route.ts and my-videos/analytics use
+    // successfully). InPlayer-Videos does NOT have any secondary index —
+    // every other working read path (app/lib/videoStore.ts,
+    // app/api/my-videos/route.ts) fetches a creator's videos with a
+    // paginated Scan+FilterExpression on uploaderId instead. An earlier
+    // version of this route queried InPlayer-Videos with
+    // IndexName: "creatorId-index" too, which doesn't exist on that table —
+    // DynamoDB rejected it with ValidationException every time, which
+    // 500'd this whole endpoint and made every channel page show
+    // "No channel at @username", even once the username itself resolved
+    // correctly. Confirmed via production runtime logs on 2026-07-28.
     const [subscriberCountResult, videosResult] = await Promise.all([
       docClient.send(
         new QueryCommand({
@@ -124,10 +133,9 @@ export async function GET(request: NextRequest, { params }: Params) {
 
         do {
           const page = await docClient.send(
-            new QueryCommand({
+            new ScanCommand({
               TableName: "InPlayer-Videos",
-              IndexName: "creatorId-index",
-              KeyConditionExpression: "uploaderId = :uid",
+              FilterExpression: "uploaderId = :uid",
               ExpressionAttributeValues: { ":uid": targetUserId },
               ExclusiveStartKey: exclusiveStartKey,
             })

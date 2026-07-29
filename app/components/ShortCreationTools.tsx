@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Loader2, Music2, Pause, Play, SlidersHorizontal, Sparkles, Wand2 } from "lucide-react";
+import { Loader2, Music2, Pause, Play, SlidersHorizontal, Wand2 } from "lucide-react";
 import { searchSoundtracks, toResolvedSoundtrack, ResolvedSoundtrack } from "@/app/data/soundtracks";
 
 export interface ShortSettings {
@@ -10,23 +10,21 @@ export interface ShortSettings {
   filter: "original" | "warm" | "vivid" | "mono";
 }
 
-// Soundtrack picker, clip length, look filter, and the AI-assist entry
-// point for Shorts creation. Two catalogs feed the same picker: InPlayer's
-// own local instrumentals (app/data/soundtracks.ts — 100% synthesized, no
-// licensing needed at all) and a live search against real Creative
-// Commons music via Jamendo (app/api/music/search) — the "works now, real
-// commercial licensing later" stopgap. Whichever is picked gets stored in
-// full (id/title/artist/url/duration/source), not just an id, so
-// ShortsPageContent.tsx never has to re-look-up an external track to play
-// a published Short back.
+// Soundtrack picker, clip length, and look filter for Shorts creation. Two
+// catalogs feed the same picker: InPlayer's own local instrumentals
+// (app/data/soundtracks.ts — 100% synthesized, no licensing needed at all)
+// and a live search against real Creative Commons music via Jamendo
+// (app/api/music/search) — the "works now, real commercial licensing
+// later" stopgap. Whichever is picked gets stored in full (id/title/
+// artist/url/duration/source), not just an id, so ShortsPageContent.tsx
+// never has to re-look-up an external track to play a published Short
+// back.
 export default function ShortCreationTools({
   value,
   onChange,
-  onOpenAI,
 }: {
   value: ShortSettings;
   onChange: (value: ShortSettings) => void;
-  onOpenAI: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [previewingId, setPreviewingId] = useState<string | null>(null);
@@ -125,24 +123,14 @@ export default function ShortCreationTools({
     <section className="rounded-3xl border border-orange-400/20 bg-orange-500/[0.04] p-4 sm:p-5">
       <audio ref={previewAudioRef} onEnded={() => setPreviewingId(null)} className="hidden" />
 
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="flex items-center gap-2 text-sm font-black text-white light:text-slate-900">
-            <Music2 size={17} className="text-orange-400" />
-            Short creation tools
-          </p>
-          <p className="mt-1 text-xs leading-5 text-slate-400 light:text-slate-600">
-            Choose a soundtrack clip, a look, or start an AI-assisted idea.
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={onOpenAI}
-          className="flex shrink-0 items-center gap-1.5 rounded-full border border-violet-400/30 bg-violet-500/10 px-3 py-2 text-xs font-bold text-violet-200 transition hover:bg-violet-500/20 light:text-violet-700"
-        >
-          <Sparkles size={14} />
-          Create with AI
-        </button>
+      <div>
+        <p className="flex items-center gap-2 text-sm font-black text-white light:text-slate-900">
+          <Music2 size={17} className="text-orange-400" />
+          Short creation tools
+        </p>
+        <p className="mt-1 text-xs leading-5 text-slate-400 light:text-slate-600">
+          Choose a soundtrack clip and a look for your Short.
+        </p>
       </div>
 
       <div className="mt-4">

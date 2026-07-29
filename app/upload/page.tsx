@@ -17,7 +17,6 @@ import VideoMetadataFields, {
   Visibility,
 } from "@/app/components/VideoMetadataFields";
 import AITitleAssistModal from "@/app/components/AITitleAssistModal";
-import AIStudioModal from "@/app/components/AIStudioModal";
 import ShortCreationTools, { ShortSettings } from "@/app/components/ShortCreationTools";
 
 // Same categories as the nav bar's category chips (shared source).
@@ -38,7 +37,6 @@ export default function UploadPage() {
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [contentType, setContentType] = useState<"video" | "short">("video");
   const [shortSettings, setShortSettings] = useState<ShortSettings>({ soundtrack: null, musicClipSeconds: 30, filter: "original" });
-  const [shortAiOpen, setShortAiOpen] = useState(false);
   const [spokenLanguage, setSpokenLanguage] = useState<SpokenLanguage>("auto");
 
   // YouTube-style upload options.
@@ -455,7 +453,7 @@ const [aiTitleAssistOpen, setAiTitleAssistOpen] = useState(false);
               tagInput={tagInput}
               onTagInputChange={setTagInput}
             />
-            {contentType === "short" && <ShortCreationTools value={shortSettings} onChange={setShortSettings} onOpenAI={() => setShortAiOpen(true)} />}
+            {contentType === "short" && <ShortCreationTools value={shortSettings} onChange={setShortSettings} />}
 
             {error && (
               <p className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-300 light:text-red-700">
@@ -536,7 +534,6 @@ const [aiTitleAssistOpen, setAiTitleAssistOpen] = useState(false);
           </div>
         )}
       </div>
-      <AIStudioModal open={shortAiOpen} onClose={() => setShortAiOpen(false)} />
       <AITitleAssistModal
         open={aiTitleAssistOpen}
         onClose={() => setAiTitleAssistOpen(false)}

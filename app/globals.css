@@ -741,8 +741,25 @@ animation: aiGlassSweep 5.5s linear infinite;
 /* Compact controls on mobile — smaller control bar/buttons/text, never
    the video itself. Uses Media Chrome's documented sizing variables
    (Mux Player is built on Media Chrome) instead of transform:scale(),
-   which would also shrink the control bar's width and misalign it. */
-@media (max-width: 1023px) {
+   which would also shrink the control bar's width and misalign it.
+
+   Split into portrait vs landscape, for a reason confirmed directly in
+   the installed @mux/mux-player package's compiled default theme: Mux
+   measures the PLAYER'S OWN rendered width (not the viewport) and, below
+   its internal 470px breakpoint, hides several bottom-bar controls
+   entirely via `media-controller:not([breakpointsm]) { --bottom-play-
+   button: none; --bottom-seek-backward-button: none; --bottom-seek-
+   forward-button: none; --bottom-time-display: none; --bottom-playback-
+   rate-menu-button: none; --bottom-pip-button: none; }`. A portrait
+   phone's video is narrower than 470px, so those vanish outright — a
+   landscape phone's video is usually wider than 470px, so Mux already
+   shows everything there without any help from us. The "landscape shows
+   them but they're too small/clumsy" complaint was purely a SIZE
+   problem from reusing the same tiny portrait-tuned values for a much
+   wider bar, not a missing-control problem — so landscape only needs
+   more comfortable sizing, while portrait needs specific controls
+   explicitly forced back on. */
+@media (max-width: 1023px) and (orientation: portrait) {
   .premium-player mux-player {
     --media-control-height: 34px;
     --media-button-icon-width: 16px;
@@ -760,6 +777,37 @@ animation: aiGlassSweep 5.5s linear infinite;
        our own Expand button (which fullscreens the whole container) and by
        device rotation — both keep the overlays intact. Desktop keeps Mux's
        button, since our Expand button is hidden there. */
+    --fullscreen-button: none;
+
+    /* Bring back playback speed (0.25x–2x) and the time readout — the
+       controls actually asked for — WITHOUT also reintroducing Mux's own
+       ±10s seek buttons, bottom play button, or PiP button. Those three
+       stay hidden here on purpose: this app already has its own big
+       center play/pause tap target and its own double/triple-tap seek
+       gesture (see VideoPlayer.tsx), so re-adding Mux's versions would
+       just eat scarce portrait width duplicating an action that already
+       works. Captions/quality/audio-track aren't in Mux's hide list at
+       all (confirmed — only the six properties above are), so they were
+       never actually hidden by this; a video with no caption track just
+       has nothing for that button to open. */
+    --bottom-playback-rate-menu-button: inline-flex;
+    --bottom-time-display: inline-flex;
+  }
+}
+
+@media (max-width: 1023px) and (orientation: landscape) {
+  .premium-player mux-player {
+    /* Landscape has real room to work with — Mux's own 470px breakpoint
+       is already crossed here, so every control Mux offers is already
+       present; they just needed sizing meant for a phone held upright. */
+    --media-control-height: 42px;
+    --media-button-icon-width: 19px;
+    --media-button-icon-height: 19px;
+    --media-font-size: 13px;
+    --media-range-thumb-height: 13px;
+    --media-range-thumb-width: 13px;
+    --media-range-track-height: 4px;
+
     --fullscreen-button: none;
   }
 }

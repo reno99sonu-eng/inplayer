@@ -82,6 +82,7 @@ export interface AuthUser {
   name: string;
   email: string;
   avatarUrl: string | null;
+  coverPhotoUrl: string | null;
   // The real, user-chosen public @handle (app/api/username). Null until
   // they've set one.
   handle: string | null;
@@ -134,6 +135,7 @@ export default function AuthProvider({
       const attributes = await fetchUserAttributes();
 
       let avatarUrl: string | null = null;
+      let coverPhotoUrl: string | null = null;
       let handle: string | null = null;
       let usernamePrivacy: UsernamePrivacy = "public";
       let socialLinks: SocialLinks = { social: {}, other: [] };
@@ -152,6 +154,7 @@ export default function AuthProvider({
           if (res.ok) {
             const data = await res.json();
             avatarUrl = data.avatarUrl;
+            coverPhotoUrl = data.coverPhotoUrl || null;
             handle = data.username || null;
             usernamePrivacy = data.usernamePrivacy || "public";
             socialLinks = data.socialLinks || { social: {}, other: [] };
@@ -169,6 +172,7 @@ export default function AuthProvider({
         name: attributes.name || currentUser.username,
         email: attributes.email || "",
         avatarUrl,
+        coverPhotoUrl,
         handle,
         usernamePrivacy,
         socialLinks,

@@ -32,6 +32,7 @@ const result = await docClient.send(
 
   return NextResponse.json({
     avatarUrl: result.Item?.avatarUrl || null,
+    coverPhotoUrl: result.Item?.coverPhotoUrl || null,
     username: result.Item?.username || null,
     usernamePrivacy: result.Item?.usernamePrivacy || "public",
     socialLinks: result.Item?.socialLinks || DEFAULT_SOCIAL_LINKS,

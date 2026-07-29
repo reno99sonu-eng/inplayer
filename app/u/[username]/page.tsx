@@ -24,6 +24,7 @@ interface PublicProfile {
   name: string;
   description?: string;
   avatarUrl: string | null;
+  coverPhotoUrl: string | null;
   isVerified?: boolean;
   usernamePrivacy: "public" | "private" | "connections";
   isOwner: boolean;
@@ -106,7 +107,11 @@ export default function PublicProfilePage() {
   if (loading) return <div className="flex min-h-[60vh] items-center justify-center"><Loader2 size={28} className="animate-spin text-orange-400" /></div>;
   if (notFound || !profile) return <div className="mx-auto max-w-[720px] px-4 py-8 sm:py-12"><BackButton /><div className="flex flex-col items-center justify-center py-16 text-center"><p className="font-semibold text-white light:text-slate-900">No channel at @{params.username}</p><p className="mt-1 text-sm text-slate-400 light:text-slate-600">Double-check the username and try again.</p></div></div>;
 
-  const bannerImage = allVideos[0]?.thumbnailUrl;
+  // A real, creator-chosen cover photo always wins over the old fallback
+  // (borrowing whichever video happened to be most-viewed as a makeshift
+  // banner) — that fallback stays in place for channels that haven't set
+  // one yet, so the header never regresses to a blank/empty look.
+  const bannerImage = profile.coverPhotoUrl || allVideos[0]?.thumbnailUrl;
   const videos: Recommendation[] = regularVideos.map((video) => ({ id: video.videoId, videoId: video.videoId, title: video.title, creator: profile.name || profile.username, uploaderUsername: profile.username, avatar: profile.avatarUrl || "/avatars/avatar.png", thumbnail: video.thumbnailUrl || "/recommendations/thumbnails/1.jpg", views: `${formatViews(video.views || 0)} views`, uploaded: formatTimeAgo(video.uploadedAt), duration: "Video", verified: profile.isVerified }));
   const shorts: Short[] = shortVideos.map((video) => ({ id: video.videoId, videoId: video.videoId, title: video.title, creator: profile.name || profile.username, poster: video.thumbnailUrl || "/shorts/1.jpg", views: `${formatViews(video.views || 0)} views`, likes: "0", comments: "0", uploaderId: profile.userId, uploaderUsername: profile.username, uploaderAvatarUrl: profile.avatarUrl || undefined }));
   const socialLinks = [...Object.entries(profile.socialLinks?.social || {}).map(([key, url]) => ({ label: SOCIAL_LABELS[key] || key, url })), ...(profile.socialLinks?.other || [])].filter((link): link is { label: string; url: string } => Boolean(link.url));

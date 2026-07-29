@@ -95,6 +95,7 @@ export async function GET(request: NextRequest, { params }: Params) {
       userId: targetUserId,
       username: profile.username || handleResult.Item?.username,
       avatarUrl: profile.avatarUrl || null,
+      coverPhotoUrl: profile.coverPhotoUrl || null,
       joinedAt:
         profile.createdAt || profile.joinedAt || profile.createdOn || null,
       usernamePrivacy,

@@ -14,10 +14,13 @@ import {
   UserCheck,
   Link2,
   Plus,
+  Image as ImageIcon,
+  Trash2,
+  Sparkles,
 } from "lucide-react";
 import { fetchAuthSession, updateUserAttributes } from "aws-amplify/auth";
 import { useAuthModal, UsernamePrivacy } from "@/app/components/auth/AuthProvider";
-import { compressImage } from "@/app/lib/imageCompress";
+import { compressImage, compressImageToBanner, compressDataUrlToBanner } from "@/app/lib/imageCompress";
 import { isValidUsernameFormat } from "@/app/lib/username";
 
 const SOCIAL_PLATFORMS = [
@@ -115,6 +118,109 @@ export default function ProfilePage() {
     } finally {
       setUploadingAvatar(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  // ---- Cover photo (channel banner) ----
+  const coverInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingCover, setUploadingCover] = useState(false);
+  const [coverError, setCoverError] = useState<string | null>(null);
+
+  const handleCoverClick = () => {
+    coverInputRef.current?.click();
+  };
+
+  const saveCoverPhoto = async (coverPhotoUrl: string | null) => {
+    const session = await fetchAuthSession();
+    const idToken = session.tokens?.idToken?.toString();
+
+    const res = await fetch("/api/profile/cover", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${idToken}`,
+      },
+      body: JSON.stringify({ coverPhotoUrl }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Couldn't save your cover photo.");
+
+    await refreshUser();
+  };
+
+  const handleCoverChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setCoverError("Please choose an image file.");
+      return;
+    }
+
+    setCoverError(null);
+    setUploadingCover(true);
+
+    try {
+      const compressed = await compressImageToBanner(file);
+      await saveCoverPhoto(compressed);
+    } catch (err) {
+      console.error("Cover photo upload failed:", err);
+      setCoverError(err instanceof Error ? err.message : "Something went wrong uploading your cover photo.");
+    } finally {
+      setUploadingCover(false);
+      if (coverInputRef.current) coverInputRef.current.value = "";
+    }
+  };
+
+  const handleRemoveCover = async () => {
+    setCoverError(null);
+    setUploadingCover(true);
+    try {
+      await saveCoverPhoto(null);
+    } catch (err) {
+      console.error("Failed to remove cover photo:", err);
+      setCoverError(err instanceof Error ? err.message : "Couldn't remove your cover photo.");
+    } finally {
+      setUploadingCover(false);
+    }
+  };
+
+  const [generatingCover, setGeneratingCover] = useState(false);
+
+  const handleGenerateCover = async () => {
+    setCoverError(null);
+    setGeneratingCover(true);
+
+    try {
+      const session = await fetchAuthSession();
+      const idToken = session.tokens?.idToken?.toString();
+
+      const res = await fetch("/api/profile/cover/generate", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ name: user?.name, handle: user?.handle }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setCoverError(data.error || "Couldn't generate a cover photo. Please try again.");
+        return;
+      }
+
+      // Same crop/compress budget as an uploaded photo — the AI image
+      // comes back full-size, so it still needs to fit alongside the
+      // avatar on the same DynamoDB item before it's saved.
+      const compressed = await compressDataUrlToBanner(data.dataUrl);
+      await saveCoverPhoto(compressed);
+    } catch (err) {
+      console.error("AI cover photo generation failed:", err);
+      setCoverError(err instanceof Error ? err.message : "Something went wrong generating your cover photo.");
+    } finally {
+      setGeneratingCover(false);
     }
   };
 
@@ -396,7 +502,74 @@ export default function ProfilePage() {
       </div>
 
       <div className="mx-auto max-w-2xl px-5 py-8">
-        <div className="flex flex-col items-center">
+        {/* Cover photo (channel banner) — shown behind your name/avatar on
+            your public channel page (app/u/[username]). Falls back to a
+            plain gradient there until one is set, same as this preview. */}
+        <div>
+          <label className="mb-2 block text-xs font-bold uppercase tracking-[0.2em] text-orange-300/80 light:text-orange-600/90">
+            Cover Photo
+          </label>
+          <div className="relative h-32 w-full overflow-hidden rounded-2xl border border-white/10 light:border-black/10 sm:h-40">
+            {user?.coverPhotoUrl ? (
+              <img
+                src={user.coverPhotoUrl}
+                alt="Cover"
+                className="h-full w-full object-cover"
+              />
+            ) : (
+              <div className="h-full w-full bg-[radial-gradient(circle_at_20%_20%,rgba(249,115,22,.35),transparent_32%),radial-gradient(circle_at_80%_5%,rgba(251,191,36,.2),transparent_25%),linear-gradient(120deg,#10182d,#030712)]" />
+            )}
+
+            {(uploadingCover || generatingCover) && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-2 bg-black/60">
+                <Loader2 size={22} className="animate-spin text-white" />
+                {generatingCover && <p className="text-xs font-semibold text-white">Generating with AI…</p>}
+              </div>
+            )}
+
+            <div className="absolute bottom-2.5 right-2.5 flex flex-wrap justify-end gap-2">
+              {user?.coverPhotoUrl && (
+                <button
+                  onClick={handleRemoveCover}
+                  disabled={uploadingCover || generatingCover}
+                  title="Remove cover photo"
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-white/15 bg-black/60 text-white backdrop-blur-md transition hover:bg-red-500/70 disabled:opacity-60"
+                >
+                  <Trash2 size={15} />
+                </button>
+              )}
+              <button
+                onClick={handleGenerateCover}
+                disabled={uploadingCover || generatingCover}
+                className="flex items-center gap-1.5 rounded-full border border-orange-400/30 bg-gradient-to-r from-orange-500/80 to-amber-400/80 px-3.5 py-2 text-xs font-bold text-white backdrop-blur-md transition hover:from-orange-500 hover:to-amber-400 disabled:opacity-60"
+              >
+                <Sparkles size={14} /> Generate with AI
+              </button>
+              <button
+                onClick={handleCoverClick}
+                disabled={uploadingCover || generatingCover}
+                className="flex items-center gap-1.5 rounded-full border border-white/15 bg-black/60 px-3.5 py-2 text-xs font-bold text-white backdrop-blur-md transition hover:bg-black/75 disabled:opacity-60"
+              >
+                <ImageIcon size={14} /> {user?.coverPhotoUrl ? "Change" : "Upload"} cover photo
+              </button>
+            </div>
+
+            <input
+              ref={coverInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handleCoverChange}
+            />
+          </div>
+          {coverError && (
+            <p className="mt-2 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-300 light:text-red-700">
+              {coverError}
+            </p>
+          )}
+        </div>
+
+        <div className="mt-8 flex flex-col items-center">
           <div className="relative">
             <div className="relative h-24 w-24 overflow-hidden rounded-full ring-4 ring-orange-400/40">
               <img

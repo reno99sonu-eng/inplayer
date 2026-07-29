@@ -128,3 +128,122 @@ export function compressImageToThumbnail(
     reader.readAsDataURL(file);
   });
 }
+
+// Compresses a channel cover/banner photo down to a byte budget far
+// tighter than a video thumbnail's — this data URL is stored on the SAME
+// InPlayer-Users DynamoDB item as the avatar (see COVER_PHOTO_MAX_LENGTH
+// in app/api/profile/cover/route.ts), and that item already has up to
+// 350KB spoken for by avatarUrl alone against DynamoDB's hard 400KB
+// item-size limit. Rather than picking one fixed size/quality and hoping
+// it lands under budget (which would make some perfectly normal photos
+// fail the server's size check with no way for the person to know why),
+// this tries progressively smaller width+quality combinations and stops
+// at the first one that fits — so an upload only ever fails if even the
+// smallest, lowest-quality attempt is still too big, which in practice
+// doesn't happen for a JPEG at these sizes.
+// Shared crop+iterative-compress core for the banner budget — used by
+// both compressImageToBanner (a File picked from disk) and
+// compressDataUrlToBanner (an already-generated image, e.g. from the
+// "Generate with AI" flow, which never touches disk at all).
+function cropAndCompressToBanner(
+  img: HTMLImageElement,
+  targetMaxLength: number,
+  aspectRatio: number
+): string {
+  const srcRatio = img.width / img.height;
+  let cropWidth = img.width;
+  let cropHeight = img.height;
+  if (srcRatio > aspectRatio) {
+    cropWidth = img.height * aspectRatio;
+  } else {
+    cropHeight = img.width / aspectRatio;
+  }
+  const cropX = (img.width - cropWidth) / 2;
+  const cropY = (img.height - cropHeight) / 2;
+
+  const renderAt = (maxWidth: number, quality: number): string => {
+    const outWidth = Math.min(maxWidth, cropWidth);
+    const outHeight = outWidth / aspectRatio;
+
+    const canvas = document.createElement("canvas");
+    canvas.width = outWidth;
+    canvas.height = outHeight;
+
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("Canvas is not supported in this browser.");
+
+    ctx.drawImage(img, cropX, cropY, cropWidth, cropHeight, 0, 0, outWidth, outHeight);
+    return canvas.toDataURL("image/jpeg", quality);
+  };
+
+  const widths = [960, 720, 480, 320];
+  const qualities = [0.7, 0.5, 0.35, 0.22];
+
+  let best = renderAt(widths[0], qualities[0]);
+  for (const width of widths) {
+    for (const quality of qualities) {
+      const candidate = renderAt(width, quality);
+      best = candidate;
+      if (candidate.length <= targetMaxLength) return candidate;
+    }
+  }
+
+  // Smallest/lowest-quality attempt still exceeded budget (would only
+  // happen for an unusually complex/noisy image) — hand back the best
+  // effort and let the server's own size check make the final call
+  // rather than silently pretending it fit.
+  return best;
+}
+
+export function compressImageToBanner(
+  file: File,
+  targetMaxLength = 45_000,
+  aspectRatio = 3.2
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      const img = new Image();
+
+      img.onload = () => {
+        try {
+          resolve(cropAndCompressToBanner(img, targetMaxLength, aspectRatio));
+        } catch (err) {
+          reject(err instanceof Error ? err : new Error("Couldn't process that image."));
+        }
+      };
+
+      img.onerror = () => reject(new Error("Couldn't read that image file."));
+      img.src = e.target?.result as string;
+    };
+
+    reader.onerror = () => reject(new Error("Couldn't read that file."));
+    reader.readAsDataURL(file);
+  });
+}
+
+// Same crop/compress pipeline as compressImageToBanner, but for an image
+// that already exists as a data URL in memory (the AI-generated cover
+// photo comes back from the server this way) — no File/FileReader step
+// needed since there's nothing on disk to read.
+export function compressDataUrlToBanner(
+  dataUrl: string,
+  targetMaxLength = 45_000,
+  aspectRatio = 3.2
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+
+    img.onload = () => {
+      try {
+        resolve(cropAndCompressToBanner(img, targetMaxLength, aspectRatio));
+      } catch (err) {
+        reject(err instanceof Error ? err : new Error("Couldn't process that image."));
+      }
+    };
+
+    img.onerror = () => reject(new Error("Couldn't read the generated image."));
+    img.src = dataUrl;
+  });
+}

@@ -231,15 +231,6 @@ export default function ShortCreationTools({
         {showJamendoError && (
           <p className="mt-2 text-[11px] text-red-300">{showJamendoError}</p>
         )}
-
-        <p className="mt-2 text-[11px] text-slate-500">
-          <span className="font-semibold text-orange-300">InPlayer</span>-tagged
-          tracks are original instrumentals — no licensing needed.{" "}
-          <span className="font-semibold text-emerald-300">CC music</span>{" "}
-          results are real songs shared under Creative Commons, free to use
-          under their own terms today. Clips play for {value.musicClipSeconds}{" "}
-          seconds.
-        </p>
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">

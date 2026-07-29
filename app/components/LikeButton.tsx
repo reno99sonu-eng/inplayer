@@ -91,7 +91,7 @@ export default function LikeButton({ videoId }: LikeButtonProps) {
 
   if (loading) {
     return (
-      <div className="h-9 w-28 animate-pulse rounded-full bg-white/10 light:bg-black/5" />
+      <div className="h-8 w-20 animate-pulse rounded-full bg-white/10 light:bg-black/5 sm:h-9 sm:w-28" />
     );
   }
 
@@ -101,10 +101,10 @@ export default function LikeButton({ videoId }: LikeButtonProps) {
         onClick={() => handleReact("like")}
         disabled={updating}
         className={`
-          flex items-center gap-1.5 px-3 py-2 h-9 text-sm font-bold
+          flex items-center gap-1 px-2 py-1.5 h-8 text-xs font-bold
           transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-60
 
-          lg:gap-1.5 lg:px-3 lg:py-2 lg:h-9
+          sm:gap-1.5 sm:px-3 sm:py-2 sm:h-9 sm:text-sm
           ${
             myReaction === "like"
               ? "bg-gradient-to-br from-orange-500/25 to-amber-400/10 text-orange-300 light:text-orange-700 shadow-[inset_0_0_20px_-8px_rgba(249,115,22,.5)]"
@@ -112,20 +112,24 @@ export default function LikeButton({ videoId }: LikeButtonProps) {
           }
         `}
       >
-        <ThumbsUp size={17} className={myReaction === "like" ? "fill-current" : ""} />
-        {likeCount}
+        <ThumbsUp size={15} className={`sm:hidden ${myReaction === "like" ? "fill-current" : ""}`} />
+        <ThumbsUp size={17} className={`hidden sm:block ${myReaction === "like" ? "fill-current" : ""}`} />
+        {/* Zero is the common case for a freshly published video — showing
+            it adds noise, not signal, and it's exactly what was eating the
+            width this row needed to actually fit without scrolling. */}
+        {likeCount > 0 && likeCount}
       </button>
 
-      <div className="h-6 w-px bg-white/10 light:bg-black/10" />
+      <div className="h-5 w-px bg-white/10 light:bg-black/10 sm:h-6" />
 
       <button
         onClick={() => handleReact("dislike")}
         disabled={updating}
         className={`
-          flex items-center gap-1.5 px-3 py-2 h-9 text-sm font-bold
+          flex items-center gap-1 px-2 py-1.5 h-8 text-xs font-bold
           transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-60
 
-          lg:gap-1.5 lg:px-3 lg:py-2 lg:h-9
+          sm:gap-1.5 sm:px-3 sm:py-2 sm:h-9 sm:text-sm
           ${
             myReaction === "dislike"
               ? "bg-gradient-to-br from-red-500/25 to-rose-400/10 text-red-300 light:text-red-700 shadow-[inset_0_0_20px_-8px_rgba(239,68,68,.5)]"
@@ -133,8 +137,9 @@ export default function LikeButton({ videoId }: LikeButtonProps) {
           }
         `}
       >
-        <ThumbsDown size={17} className={myReaction === "dislike" ? "fill-current" : ""} />
-        {dislikeCount}
+        <ThumbsDown size={15} className={`sm:hidden ${myReaction === "dislike" ? "fill-current" : ""}`} />
+        <ThumbsDown size={17} className={`hidden sm:block ${myReaction === "dislike" ? "fill-current" : ""}`} />
+        {dislikeCount > 0 && dislikeCount}
       </button>
     </div>
   );

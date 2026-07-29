@@ -5,11 +5,8 @@
 export const CONTENT_CATEGORIES = [
   "InPlayer Originals",
   "Movies",
-  "Trending",
   "Music",
   "Gaming",
-  "AI",
-  "Live",
   "Podcasts",
   "News",
   "Sports",

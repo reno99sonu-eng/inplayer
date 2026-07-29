@@ -118,26 +118,28 @@ export default function SubscribeButton({ creatorId }: SubscribeButtonProps) {
 
   if (loading) {
     return (
-      <div className="h-9 w-28 animate-pulse rounded-full bg-white/10 light:bg-black/5" />
+      <div className="h-8 w-20 animate-pulse rounded-full bg-white/10 light:bg-black/5 sm:h-9 sm:w-28" />
     );
   }
 
   if (isOwnChannel) {
     return (
-      <span className="rounded-full border border-white/10 light:border-black/15 px-3 py-2 text-xs font-semibold text-slate-500 light:text-slate-600">
+      <span className="rounded-full border border-white/10 light:border-black/15 px-2.5 py-1.5 text-[11px] font-semibold text-slate-500 light:text-slate-600 sm:px-3 sm:py-2 sm:text-xs">
         This is you
       </span>
     );
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex items-center gap-1.5 sm:gap-2">
       <button
         onClick={handleToggle}
         disabled={updating}
         className={`
-          flex items-center gap-1.5 rounded-full px-4 py-2 text-sm font-bold
+          flex items-center gap-1 rounded-full px-3 py-1.5 text-xs font-bold
           transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-60
+
+          sm:gap-1.5 sm:px-4 sm:py-2 sm:text-sm
           ${
             isSubscribed
               ? "border border-white/15 light:border-black/20 text-slate-200 light:text-slate-800 hover:bg-white/5 light:hover:bg-black/5"
@@ -145,9 +147,12 @@ export default function SubscribeButton({ creatorId }: SubscribeButtonProps) {
           }
         `}
       >
-        {isSubscribed && <Check size={15} />}
+        {isSubscribed && <Check size={14} />}
         In-Family
-        <span className="text-xs opacity-75">{count}</span>
+        {/* Zero is the common case for a freshly published video — same
+            reasoning as LikeButton's counts: hide it, only show once
+            there's an actual number worth seeing. */}
+        {count > 0 && <span className="text-[10px] opacity-75 sm:text-xs">{count}</span>}
       </button>
 
       {/* Notification bell — only meaningful once you've joined. */}
@@ -164,8 +169,10 @@ export default function SubscribeButton({ creatorId }: SubscribeButtonProps) {
             notifyEnabled ? "Turn off notifications" : "Turn on notifications"
           }
           className={`
-            flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border
+            flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border
             transition-all duration-300 disabled:cursor-not-allowed disabled:opacity-60
+
+            sm:h-9 sm:w-9
             ${
               notifyEnabled
                 ? "border-orange-400/50 bg-gradient-to-br from-orange-500/20 to-amber-400/10 text-orange-300 light:text-orange-700"
@@ -174,9 +181,9 @@ export default function SubscribeButton({ creatorId }: SubscribeButtonProps) {
           `}
         >
           {notifyEnabled ? (
-            <Bell size={16} className="fill-current" />
+            <Bell size={15} className="fill-current" />
           ) : (
-            <BellOff size={16} />
+            <BellOff size={15} />
           )}
         </button>
       )}

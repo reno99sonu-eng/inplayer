@@ -475,9 +475,10 @@ export default function VideoOptionsMenu({
         onClick={() => setOpen(true)}
         title="More options"
         aria-label="More options"
-        className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] text-slate-300 light:text-slate-600 transition-all duration-300 hover:border-white/20 light:hover:border-black/20 hover:bg-white/[0.06]"
+        className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] text-slate-300 light:text-slate-600 transition-all duration-300 hover:border-white/20 light:hover:border-black/20 hover:bg-white/[0.06] sm:h-9 sm:w-9"
       >
-        <MoreVertical size={18} />
+        <MoreVertical size={16} className="sm:hidden" />
+        <MoreVertical size={18} className="hidden sm:block" />
       </button>
 
       {/* Portaled to <body> as a bottom sheet (centered on larger

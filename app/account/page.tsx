@@ -5,7 +5,6 @@ import {
   ArrowLeft,
   UserCog,
   User,
-  Clock,
   MessageCircle,
   Download,
   Settings,
@@ -22,7 +21,6 @@ export default function AccountPage() {
   const menu = [
     { icon: UserCog, title: "Edit Profile", href: "/profile" },
     { icon: User, title: "Your Channel", href: "/my-videos" },
-    { icon: Clock, title: "History", href: "/history" },
     { icon: MessageCircle, title: "My Messages", href: "/messages" },
     { icon: Download, title: "Downloads", href: "/downloads" },
     { icon: Settings, title: "Settings", href: "/settings" },

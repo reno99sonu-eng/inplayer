@@ -373,18 +373,22 @@ lg:right-auto
             <button
               onClick={() => goTo("/")}
               aria-label="INPLAYER — Home"
-              className="
-                block rounded-2xl transition-transform duration-300
-                hover:scale-[1.02] active:scale-95
-                light:bg-[#05070D] light:px-4 light:py-2.5
-                light:shadow-[0_8px_24px_rgba(0,0,0,0.28)]
-              "
+              className="block rounded-2xl transition-transform duration-300 hover:scale-[1.02] active:scale-95"
             >
+              {/* Same theme-matched pair NavbarLogo uses — the dark
+                  wrapper/padding this used to need in light mode is gone
+                  now that the light asset has its own proper dark tone. */}
               <img
-                src="/logos/inplayer-full.png"
+                src="/logos/inplayer-mark-dark.png"
                 alt="INPLAYER"
                 draggable={false}
-                className="h-11 w-auto object-contain"
+                className="light:hidden h-10 sm:h-11 w-auto object-contain"
+              />
+              <img
+                src="/logos/inplayer-mark-light.png"
+                alt="INPLAYER"
+                draggable={false}
+                className="hidden light:block h-10 sm:h-11 w-auto object-contain"
               />
             </button>
           </div>
@@ -527,7 +531,7 @@ lg:right-auto
                       light:hover:text-orange-600
                     "
                   >
-                    Shop
+                    HamMart
                   </button>
                   <button
                     onClick={() => goTo("/downloads")}

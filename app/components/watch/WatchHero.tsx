@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Play, Share2 } from "lucide-react";
+import { Play } from "lucide-react";
 import SubscribeButton from "@/app/components/SubscribeButton";
 import WatchLaterButton from "@/app/components/WatchLaterButton";
 import ShareButton from "@/app/components/ShareButton";
@@ -66,11 +66,16 @@ export default function WatchHero({ video }: WatchHeroProps) {
         <p className="mt-5 line-clamp-3 max-w-2xl whitespace-pre-wrap text-sm leading-6 text-slate-200 light:text-slate-700">{video.description?.trim() || "No description provided."}</p>
         {video.tags && video.tags.length > 0 && <div className="mt-4 flex flex-wrap gap-2">{video.tags.map((tag) => <span key={tag} className="rounded-full border border-white/15 bg-black/20 px-2.5 py-1 text-[11px] font-semibold text-slate-200 backdrop-blur-sm light:border-black/10 light:bg-white/40 light:text-slate-700">#{tag}</span>)}</div>}
 
-        <div className="mt-6 flex flex-wrap items-center gap-2.5">
+        {/* gap-3.5 (up from 2.5) and a plain, single ShareButton — the old
+            mobile-only chip wrapped a decorative Share2 icon AROUND the
+            real ShareButton itself, so on phones its own 36px circular
+            button visibly overlapped the small pill built for just an
+            icon+text. One ShareButton at every width fixes the overlap
+            and gives the row more breathing room to match. */}
+        <div className="mt-6 flex flex-wrap items-center gap-3.5">
           <button onClick={scrollToPlayer} className="flex items-center gap-2 rounded-full bg-gradient-to-r from-[#ff7315] via-[#ff9a00] to-[#ffc83d] px-5 py-3 text-sm font-black text-white shadow-[0_12px_30px_rgba(249,115,22,.35)] transition hover:-translate-y-0.5"><Play size={17} fill="currentColor" /> Watch now</button>
           <WatchLaterButton videoId={video.videoId} />
-          <span className="flex items-center gap-1.5 rounded-full border border-white/15 bg-black/25 px-2.5 py-1.5 text-xs text-slate-300 backdrop-blur sm:hidden"><Share2 size={13} /> <ShareButton videoId={video.videoId} title={video.title} /></span>
-          <div className="hidden sm:block"><ShareButton videoId={video.videoId} title={video.title} /></div>
+          <ShareButton videoId={video.videoId} title={video.title} />
           <div className="sm:hidden"><SubscribeButton creatorId={video.uploaderId} /></div>
         </div>
       </div>

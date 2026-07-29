@@ -106,6 +106,16 @@ export default function SignInModal({
       const result = await signIn({
         username: email.trim(),
         password,
+        // Sydney -> Mumbai account migration (see app/lib/verifyAuth.ts and
+        // the InPlayer-Users "migratedFromSub" field) runs on a Cognito
+        // "migrate user" Lambda trigger that only receives the plaintext
+        // password when sign-in uses USER_PASSWORD_AUTH — Amplify's default
+        // SRP flow never sends the password to Cognito at all, so migration
+        // would silently never fire here without this override. Once every
+        // existing account has signed in at least once post-cutover, this
+        // can be removed to go back to Amplify's more private SRP default —
+        // it's only required during the migration window.
+        options: { authFlowType: "USER_PASSWORD_AUTH" },
       });
 
       if (result.isSignedIn) {

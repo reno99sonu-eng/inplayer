@@ -5,9 +5,9 @@ import { NextRequest } from "next/server";
 // App Client, just verified here on the server instead of trusted
 // blindly from the browser.
 const verifier = CognitoJwtVerifier.create({
-  userPoolId: "ap-southeast-2_36G5R1WuZ",
+  userPoolId: "ap-south-1_OrIhWadFN",
   tokenUse: "id",
-  clientId: "76299q1n17bk11rcpojf1372hr",
+  clientId: "1ckejhd5mp3oohgsfuqseeda5t",
 });
 
 export interface VerifiedUser {

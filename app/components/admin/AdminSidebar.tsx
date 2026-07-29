@@ -1,0 +1,114 @@
+"use client";
+
+import Link from "next/link";
+import { usePathname, useSearchParams } from "next/navigation";
+import {
+  LayoutDashboard,
+  Users,
+  Star,
+  Video,
+  Film,
+  Flag,
+  Copyright,
+  DollarSign,
+  Megaphone,
+  BarChart3,
+  Bot,
+  Bell,
+  Settings,
+  ScrollText,
+  Wrench,
+} from "lucide-react";
+
+// One entry per Admin Panel section. `href: null` items are real, planned
+// phases that simply haven't been built yet — they render as disabled with
+// a "Soon" badge instead of linking anywhere, so nothing ever looks live
+// before it actually is. Update an item's href here the moment its phase
+// ships; nothing else about the sidebar needs to change.
+const items = [
+  { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, href: "/admin/dashboard" },
+  { id: "users", label: "Users", icon: Users, href: "/admin/users" },
+  { id: "creators", label: "Creators", icon: Star, href: null },
+  { id: "videos", label: "Videos", icon: Video, href: "/admin/videos" },
+  { id: "shorts", label: "Shorts", icon: Film, href: "/admin/videos?type=short" },
+  { id: "reports", label: "Reports & Moderation", icon: Flag, href: null },
+  { id: "copyright", label: "Copyright Center", icon: Copyright, href: null },
+  { id: "revenue", label: "Revenue", icon: DollarSign, href: null },
+  { id: "ads", label: "Advertising", icon: Megaphone, href: null },
+  { id: "analytics", label: "Analytics", icon: BarChart3, href: null },
+  { id: "ai-moderation", label: "AI Moderation", icon: Bot, href: null },
+  { id: "notifications", label: "Notifications", icon: Bell, href: null },
+  { id: "settings", label: "Platform Settings", icon: Settings, href: null },
+  { id: "audit-logs", label: "Audit Logs", icon: ScrollText, href: null },
+  { id: "captions", label: "Maintenance", icon: Wrench, href: "/admin/captions" },
+] as const;
+
+export default function AdminSidebar() {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  // Full current path including query (e.g. "/admin/videos?type=short"),
+  // so Videos and Shorts — which share the same page and are only told
+  // apart by ?type= — never both light up (or both stay dark) at once.
+  const query = searchParams.toString();
+  const currentPath = query ? `${pathname}?${query}` : pathname;
+
+  return (
+    <aside className="hidden lg:block w-[280px] shrink-0">
+      <div className="sticky top-28 rounded-[28px] border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.03] p-3 backdrop-blur-xl">
+        {items.map((item) => {
+          const Icon = item.icon;
+          const selected = item.href
+            ? item.href.includes("?")
+              ? currentPath === item.href
+              : pathname === item.href && !query
+            : false;
+
+          if (!item.href) {
+            return (
+              <div
+                key={item.id}
+                className="mb-2 flex w-full cursor-not-allowed items-center justify-between gap-3 rounded-2xl px-4 py-3 opacity-45"
+              >
+                <span className="flex items-center gap-3">
+                  <Icon size={20} className="text-slate-500" />
+                  <span className="font-medium text-slate-400 light:text-slate-600">
+                    {item.label}
+                  </span>
+                </span>
+                <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-500 light:bg-black/5">
+                  Soon
+                </span>
+              </div>
+            );
+          }
+
+          return (
+            <Link
+              key={item.id}
+              href={item.href}
+              className={`mb-2 flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition-all duration-300 ${
+                selected
+                  ? "border border-orange-400/30 bg-gradient-to-r from-orange-500/20 to-amber-400/10"
+                  : "hover:bg-white/5 light:hover:bg-black/5"
+              }`}
+            >
+              <Icon
+                size={20}
+                className={selected ? "text-orange-300" : "text-slate-400 light:text-slate-600"}
+              />
+              <span
+                className={
+                  selected
+                    ? "font-bold text-white light:text-slate-900"
+                    : "font-medium text-slate-300 light:text-slate-700"
+                }
+              >
+                {item.label}
+              </span>
+            </Link>
+          );
+        })}
+      </div>
+    </aside>
+  );
+}

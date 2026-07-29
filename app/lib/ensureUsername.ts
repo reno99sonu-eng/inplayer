@@ -62,8 +62,16 @@ export async function ensureUsername(userId: string) {
         new UpdateCommand({
           TableName: USERS_TABLE,
           Key: { userId },
+          // if_not_exists on createdAt: backfills a real signup timestamp for
+          // any row that predates this line (this is the only path every
+          // user's row eventually passes through), without ever overwriting
+          // an already-stamped one. It won't be the user's TRUE historical
+          // signup date for existing accounts — there was no way to capture
+          // that before this — but every account from this point forward
+          // gets an accurate one, which is what the Admin Dashboard's
+          // "signups over time" needs.
           UpdateExpression:
-            "SET usernameLower = :usernameLower, updatedAt = :updatedAt",
+            "SET usernameLower = :usernameLower, updatedAt = :updatedAt, createdAt = if_not_exists(createdAt, :updatedAt)",
           ExpressionAttributeValues: {
             ":usernameLower": usernameLower,
             ":updatedAt": new Date().toISOString(),
@@ -84,8 +92,10 @@ export async function ensureUsername(userId: string) {
     new UpdateCommand({
       TableName: USERS_TABLE,
       Key: { userId },
+      // Same if_not_exists backfill as above — this is the brand-new-user
+      // path, so createdAt here really is the true signup moment.
       UpdateExpression:
-        "SET username = :username, usernameLower = :usernameLower, updatedAt = :updatedAt",
+        "SET username = :username, usernameLower = :usernameLower, updatedAt = :updatedAt, createdAt = if_not_exists(createdAt, :updatedAt)",
       ExpressionAttributeValues: {
         ":username": username,
         ":usernameLower": usernameLower,

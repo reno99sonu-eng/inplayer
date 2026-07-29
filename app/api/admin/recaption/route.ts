@@ -3,6 +3,7 @@ import { ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import mux from "@/app/lib/mux";
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
+import { isAdminEmail } from "@/app/lib/isAdmin";
 import {
   CAPTION_TARGETS,
   resolveSourceLang,
@@ -11,13 +12,12 @@ import {
 
 // Who may trigger this maintenance job. Two independent ways in, so it
 // works no matter how it's called:
-//   1. A signed-in user whose account email is in ADMIN_EMAILS — this is
-//      what the in-app "Repair captions" button uses (app/admin/captions),
-//      and needs no server configuration at all.
+//   1. A signed-in user whose account email is an admin (app/lib/isAdmin —
+//      shared with the full Admin Panel) — this is what the in-app "Repair
+//      captions" button uses (app/admin/captions), and needs no server
+//      configuration at all.
 //   2. A matching x-admin-key header (ADMIN_MAINTENANCE_KEY env var) — for
 //      curl / automation when there's no browser session.
-const ADMIN_EMAILS = ["reno99sonu@gmail.com"];
-
 async function isAuthorized(request: NextRequest): Promise<boolean> {
   const expectedKey = process.env.ADMIN_MAINTENANCE_KEY;
   const providedKey = request.headers.get("x-admin-key");
@@ -25,8 +25,7 @@ async function isAuthorized(request: NextRequest): Promise<boolean> {
 
   try {
     const user = await verifyAuth(request);
-    const email = user.email?.toLowerCase();
-    if (email && ADMIN_EMAILS.includes(email)) return true;
+    if (isAdminEmail(user.email)) return true;
   } catch {
     // Not a valid signed-in request — fall through to unauthorized.
   }

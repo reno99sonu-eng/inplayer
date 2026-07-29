@@ -37,7 +37,7 @@ export default function UploadPage() {
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [contentType, setContentType] = useState<"video" | "short">("video");
-  const [shortSettings, setShortSettings] = useState<ShortSettings>({ soundtrackId: null, musicClipSeconds: 30, filter: "original" });
+  const [shortSettings, setShortSettings] = useState<ShortSettings>({ soundtrack: null, musicClipSeconds: 30, filter: "original" });
   const [shortAiOpen, setShortAiOpen] = useState(false);
   const [spokenLanguage, setSpokenLanguage] = useState<SpokenLanguage>("auto");
 
@@ -316,7 +316,7 @@ const [aiTitleAssistOpen, setAiTitleAssistOpen] = useState(false);
     setDescription("");
     setCategory(CATEGORIES[0]);
     setContentType("video");
-    setShortSettings({ soundtrackId: null, musicClipSeconds: 30, filter: "original" });
+    setShortSettings({ soundtrack: null, musicClipSeconds: 30, filter: "original" });
     setSpokenLanguage("auto");
     setVisibility("public");
     setMadeForKids(false);

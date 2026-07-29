@@ -222,7 +222,20 @@ export default function ShortsPageContent({
   useEffect(() => {
     const audio = audioRef.current;
     const short = shorts[activeIndex];
-    const track = getSoundtrackById(short?.soundtrackId);
+
+    // New Shorts store the full resolved track (id/title/artist/url/
+    // duration/source — either InPlayer's own local catalog or a real
+    // Jamendo track) directly on the item, so playback never needs an
+    // external lookup. Older, already-published Shorts only have the
+    // legacy soundtrackId string, which still resolves against InPlayer's
+    // local catalog exactly as before — this fallback is what keeps those
+    // already-live Shorts' soundtracks from silently breaking.
+    const legacyTrack = !short?.soundtrack ? getSoundtrackById(short?.soundtrackId) : null;
+    const track = short?.soundtrack
+      ? { url: short.soundtrack.url, durationSeconds: short.soundtrack.durationSeconds }
+      : legacyTrack
+        ? { url: legacyTrack.url, durationSeconds: legacyTrack.durationSeconds }
+        : null;
 
     if (!audio || !track) {
       audio?.pause();

@@ -19,6 +19,35 @@ export interface Soundtrack {
   durationSeconds: number;
 }
 
+// The shape actually stored on a Short once a track is picked at upload
+// time — either one of the local, always-safe InPlayer instrumentals
+// above, or a real track found via the "search real music" tab (see
+// app/api/music/search, backed by Jamendo's free Creative Commons
+// catalog). Storing the resolved fields directly (not just an id) means
+// playback never needs to re-look-up an external track later — see the
+// comment on ResolvedSoundtrack's only consumer, ShortsPageContent.tsx.
+export interface ResolvedSoundtrack {
+  id: string;
+  title: string;
+  artist: string;
+  url: string;
+  durationSeconds: number;
+  source: "inplayer" | "jamendo";
+  /** Only set for source: "jamendo" — the track's specific CC license page. */
+  licenseUrl?: string;
+}
+
+export function toResolvedSoundtrack(track: Soundtrack): ResolvedSoundtrack {
+  return {
+    id: track.id,
+    title: track.title,
+    artist: track.artist,
+    url: track.url,
+    durationSeconds: track.durationSeconds,
+    source: "inplayer",
+  };
+}
+
 export const SOUNDTRACKS: Soundtrack[] = [
   { id: "sunset-drive", title: "Sunset Drive", artist: "InPlayer Sounds", mood: "Chill", url: "/sounds/sunset-drive.mp3", durationSeconds: 30 },
   { id: "late-night", title: "Late Night Loop", artist: "InPlayer Sounds", mood: "Chill", url: "/sounds/late-night.mp3", durationSeconds: 30 },

@@ -12,9 +12,27 @@ export interface Short {
   uploaderUsername?: string; // present only when the uploader has a username set — see app/lib/resolveUsernames
   uploaderAvatarUrl?: string; // present only for real uploaded shorts
   description?: string; // present only for real uploaded shorts
-  // Soundtrack chosen at upload time (see ShortCreationTools) — resolved
-  // against app/data/soundtracks.ts for actual playback. Absent/null means
-  // "play with its own original audio, no soundtrack attached."
+  // Soundtrack chosen at upload time (see ShortCreationTools). Absent/null
+  // on both fields means "play with its own original audio, no soundtrack
+  // attached."
+  //
+  // `soundtrack` is the current, full-object form (id/title/artist/url/
+  // duration/source) — set for every Short uploaded after the Jamendo
+  // real-music integration shipped, and resolved directly at playback time
+  // with no external lookup needed (see ShortsPageContent.tsx).
+  soundtrack?: {
+    id: string;
+    title: string;
+    artist: string;
+    url: string;
+    durationSeconds: number;
+    source: "inplayer" | "jamendo";
+    licenseUrl?: string;
+  } | null;
+  // `soundtrackId` is the legacy, id-only form used by Shorts published
+  // before that change — kept so those older items still resolve against
+  // InPlayer's local catalog (app/data/soundtracks.ts's getSoundtrackById)
+  // instead of losing their soundtrack entirely.
   soundtrackId?: string | null;
   musicClipSeconds?: 20 | 30;
 }

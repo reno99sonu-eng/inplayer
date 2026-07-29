@@ -6,6 +6,52 @@ import { verifyAuth } from "@/app/lib/verifyAuth";
 import { THUMBNAIL_DATA_URL_MAX_LENGTH } from "@/app/lib/imageCompress";
 import { ensureUsername } from "@/app/lib/ensureUsername";
 
+// Defensive re-validation of a client-supplied soundtrack pick (see
+// ShortCreationTools/soundtracks.ts's ResolvedSoundtrack shape) before it's
+// stored on the video item. Bounds every string field so a malicious/buggy
+// request can't stuff an oversized blob into shortSettings — same spirit as
+// THUMBNAIL_DATA_URL_MAX_LENGTH just above. Returns null for anything that
+// doesn't look like a real track, which is exactly "no soundtrack" to every
+// downstream reader (upload create, ShortsPageContent playback).
+const SOUNDTRACK_STRING_MAX_LENGTH = 500;
+
+function sanitizeSoundtrack(input: unknown): {
+  id: string;
+  title: string;
+  artist: string;
+  url: string;
+  durationSeconds: number;
+  source: "inplayer" | "jamendo";
+  licenseUrl?: string;
+} | null {
+  if (!input || typeof input !== "object") return null;
+  const t = input as Record<string, unknown>;
+
+  const isBoundedString = (v: unknown) =>
+    typeof v === "string" && v.trim() && v.length <= SOUNDTRACK_STRING_MAX_LENGTH;
+
+  if (!isBoundedString(t.id) || !isBoundedString(t.title) || !isBoundedString(t.artist) || !isBoundedString(t.url)) {
+    return null;
+  }
+  if (t.source !== "inplayer" && t.source !== "jamendo") return null;
+  if (typeof t.url === "string" && !/^https?:\/\//.test(t.url) && !t.url.startsWith("/")) return null;
+
+  const durationSeconds =
+    typeof t.durationSeconds === "number" && Number.isFinite(t.durationSeconds) && t.durationSeconds > 0
+      ? Math.min(t.durationSeconds, 3600)
+      : 30;
+
+  return {
+    id: (t.id as string).trim(),
+    title: (t.title as string).trim(),
+    artist: (t.artist as string).trim(),
+    url: (t.url as string).trim(),
+    durationSeconds,
+    source: t.source,
+    ...(isBoundedString(t.licenseUrl) && { licenseUrl: (t.licenseUrl as string).trim() }),
+  };
+}
+
 export async function POST(request: NextRequest) {
   let user;
 
@@ -170,7 +216,15 @@ export async function POST(request: NextRequest) {
           commentsEnabled: commentsEnabled !== false,
           ...(isShort && shortSettings && typeof shortSettings === "object" && {
             shortSettings: {
-              soundtrackId: typeof shortSettings.soundtrackId === "string" ? shortSettings.soundtrackId : null,
+              // Full resolved track (id/title/artist/url/duration/source),
+              // not just an id — see app/data/soundtracks.ts's
+              // ResolvedSoundtrack comment for why: it lets already-published
+              // Shorts play back without ever re-looking-up an external
+              // (Jamendo) track later. Each field is type/length-sanitized
+              // before it ever reaches DynamoDB, since this is a raw client
+              // body a request could forge regardless of what the picker UI
+              // actually sends.
+              soundtrack: sanitizeSoundtrack(shortSettings.soundtrack),
               musicClipSeconds: shortSettings.musicClipSeconds === 20 ? 20 : 30,
               filter: ["original", "warm", "vivid", "mono"].includes(shortSettings.filter) ? shortSettings.filter : "original",
             },

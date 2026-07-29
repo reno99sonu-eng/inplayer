@@ -46,7 +46,16 @@ export default function WatchActions({
   );
 
   return (
-    <div className="flex items-center justify-between gap-4 overflow-x-auto py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    // justify-between deliberately avoided here: combined with
+    // overflow-x-auto it makes browsers mis-measure the scrollable
+    // content on narrow screens, cropping the right-hand group (the
+    // three-dot menu) instead of letting you scroll to it. ml-auto on
+    // the right group gives the same "pinned to opposite ends" look
+    // when everything fits, but degrades to plain left-to-right flow
+    // (fully scrollable, nothing clipped) once it doesn't. The trailing
+    // pr-1 keeps the last icon from sitting flush against the very
+    // edge of the row so it never reads as cut off.
+    <div className="flex items-center gap-4 overflow-x-auto py-1 pr-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
       <div className="flex flex-shrink-0 items-center gap-3">
         {profileHref ? (
           <Link
@@ -63,7 +72,7 @@ export default function WatchActions({
         <SubscribeButton creatorId={uploaderId} />
       </div>
 
-      <div className="flex flex-shrink-0 items-center gap-3">
+      <div className="ml-auto flex flex-shrink-0 items-center gap-3 pr-1">
         <LikeButton videoId={videoId} />
         <ShareButton videoId={videoId} title={title} />
         <VideoOptionsMenu

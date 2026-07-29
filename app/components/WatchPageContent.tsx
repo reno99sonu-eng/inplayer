@@ -10,7 +10,7 @@ import CommentSection from "@/app/components/CommentSection";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { formatTimeAgo, formatViews } from "@/app/lib/formatters";
 import WatchActions from "@/app/components/watch/WatchActions";
-import WatchHero from "@/app/components/watch/WatchHero";
+import WatchMeta from "@/app/components/watch/WatchMeta";
 
 interface VideoData {
   videoId: string;
@@ -52,8 +52,11 @@ export default function WatchPageContent({ video, relatedVideos: initialRelatedV
   const [theaterMode, setTheaterMode] = useState(false);
   const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [relatedVideos, setRelatedVideos] = useState(initialRelatedVideos);
+  const [descExpanded, setDescExpanded] = useState(false);
   const commentsOn = video.commentsEnabled !== false;
   const showPlayer = !video.ageRestricted || ageConfirmed;
+  const trimmedDescription = video.description?.trim() || "";
+  const hasMoreInfo = trimmedDescription.length > 0 || (video.tags && video.tags.length > 0);
 
   useEffect(() => {
     let cancelled = false;
@@ -79,14 +82,15 @@ export default function WatchPageContent({ video, relatedVideos: initialRelatedV
 
   return (
     <div className="relative space-y-6 lg:space-y-8">
-      <WatchHero video={video} />
-
       <div className={`grid grid-cols-1 gap-6 transition-all duration-500 ${theaterMode ? "" : "xl:grid-cols-[minmax(0,1fr)_360px]"}`}>
         <div className="min-w-0">
-          {/* -mx-3/lg:mx-0 cancels the shared page container's horizontal
-              padding (app/watch/[videoId]/page.tsx) so the player alone
-              runs edge-to-edge on mobile/tablet portrait, like YouTube —
-              everything else on this page (hero, actions, comments,
+          {/* The player is the very first thing on the page — no banner
+              above it (there used to be a large cinematic hero here that
+              pushed the actual player down and shrank it). -mx-3/lg:mx-0
+              cancels the shared page container's horizontal padding
+              (app/watch/[videoId]/page.tsx) so the player alone runs
+              edge-to-edge on mobile/tablet portrait, like YouTube —
+              everything else on this page (title, actions, comments,
               sidebar) keeps its normal inset. Card look (rounded corners,
               border, shadow) returns at lg: (desktop/tablet landscape),
               matching this app's existing mobile-vs-desktop breakpoint. */}
@@ -103,7 +107,17 @@ export default function WatchPageContent({ video, relatedVideos: initialRelatedV
             <button onClick={() => setTheaterMode((active) => !active)} title={theaterMode ? "Exit theater mode" : "Theater mode"} className="absolute right-3 top-3 z-10 hidden h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/65 text-white opacity-0 backdrop-blur transition hover:scale-110 hover:border-orange-400/50 group-hover:opacity-100 lg:flex">{theaterMode ? <Minimize2 size={17} /> : <Maximize2 size={17} />}</button>
           </div>
 
-          <div className={`mt-4 rounded-3xl border border-white/[0.08] bg-gradient-to-br from-white/[0.055] to-white/[0.015] p-4 sm:p-5 backdrop-blur-xl light:border-black/[0.08] light:from-black/[0.04] light:to-transparent ${theaterMode ? "mx-auto max-w-[1300px]" : ""}`}>
+          {/* Title + views/date/category, directly under the player — the
+              same spot YouTube puts them, now that there's no banner
+              above the player pushing everything else down. */}
+          <div className={`mt-4 ${theaterMode ? "mx-auto max-w-[1300px]" : ""}`}>
+            <h1 className="text-lg font-black leading-snug text-white sm:text-xl light:text-slate-900">{video.title}</h1>
+            <div className="mt-2">
+              <WatchMeta views={video.views} uploadedAt={video.uploadedAt} category={video.category} ageRestricted={video.ageRestricted} />
+            </div>
+          </div>
+
+          <div className={`mt-3 rounded-3xl border border-white/[0.08] bg-gradient-to-br from-white/[0.055] to-white/[0.015] p-4 sm:p-5 backdrop-blur-xl light:border-black/[0.08] light:from-black/[0.04] light:to-transparent ${theaterMode ? "mx-auto max-w-[1300px]" : ""}`}>
             <WatchActions
               videoId={video.videoId}
               title={video.title}
@@ -116,6 +130,33 @@ export default function WatchPageContent({ video, relatedVideos: initialRelatedV
               uploaderAvatarUrl={video.uploaderAvatarUrl}
             />
           </div>
+
+          {/* Collapsible description/tags card — YouTube's own "Show
+              more" pattern, tucked below the actions row instead of
+              taking up a full banner above the player. */}
+          {hasMoreInfo && (
+            <button
+              type="button"
+              onClick={() => setDescExpanded((v) => !v)}
+              className={`mt-3 w-full rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4 text-left transition hover:bg-white/[0.035] light:border-black/[0.08] light:bg-black/[0.015] light:hover:bg-black/[0.03] ${theaterMode ? "mx-auto max-w-[1300px]" : ""}`}
+            >
+              {trimmedDescription && (
+                <p className={`whitespace-pre-wrap text-sm leading-6 text-slate-300 light:text-slate-700 ${descExpanded ? "" : "line-clamp-2"}`}>
+                  {trimmedDescription}
+                </p>
+              )}
+              {video.tags && video.tags.length > 0 && (
+                <div className={`flex flex-wrap gap-2 ${trimmedDescription ? "mt-3" : ""}`}>
+                  {video.tags.map((tag) => (
+                    <span key={tag} className="rounded-full border border-white/15 bg-black/20 px-2.5 py-1 text-[11px] font-semibold text-slate-200 backdrop-blur-sm light:border-black/10 light:bg-white/40 light:text-slate-700">#{tag}</span>
+                  ))}
+                </div>
+              )}
+              <span className="mt-2 inline-block text-xs font-bold text-orange-300 light:text-orange-700">
+                {descExpanded ? "Show less" : "Show more"}
+              </span>
+            </button>
+          )}
 
           <div className={theaterMode ? "mx-auto max-w-[1300px]" : ""}>
             {commentsOn ? <CommentSection videoId={video.videoId} /> : <div className="mt-6 flex items-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.02] px-4 py-3 text-sm text-slate-400 light:border-black/[0.08] light:bg-black/[0.02] light:text-slate-600"><MessageSquareOff size={16} />Comments are turned off for this video.</div>}

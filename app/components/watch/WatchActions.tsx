@@ -2,6 +2,7 @@ import Link from "next/link";
 import SubscribeButton from "@/app/components/SubscribeButton";
 import LikeButton from "@/app/components/LikeButton";
 import ShareButton from "@/app/components/ShareButton";
+import WatchLaterButton from "@/app/components/WatchLaterButton";
 import VideoOptionsMenu from "@/app/components/watch/VideoOptionsMenu";
 
 interface WatchActionsProps {
@@ -18,13 +19,11 @@ interface WatchActionsProps {
 
 // One YouTube-style line directly under the video (videos only — Shorts
 // have their own separate action rail): the channel avatar, In-Family
-// (InPlayer's Subscribe), Like/Dislike, Share, and a three-dot "more"
-// menu. The creator's avatar/name + In-Family already appear once above
-// the player in WatchHero — this is a second, deliberate appearance
-// directly under the video, exactly where YouTube puts its own
-// channel-and-actions row. Never wraps to a second line: on narrow
-// screens the row scrolls horizontally instead, so it's always genuinely
-// one line like the user asked for.
+// (InPlayer's Subscribe), Like/Dislike, Share, Save (Watch Later), and a
+// three-dot "more" menu — the same row YouTube shows directly beneath its
+// own player. Never wraps to a second line: on narrow screens the row
+// scrolls horizontally instead, so it's always genuinely one line like
+// the user asked for.
 export default function WatchActions({
   videoId,
   title,
@@ -75,6 +74,7 @@ export default function WatchActions({
       <div className="ml-auto flex flex-shrink-0 items-center gap-3 pr-1">
         <LikeButton videoId={videoId} />
         <ShareButton videoId={videoId} title={title} />
+        <WatchLaterButton videoId={videoId} />
         <VideoOptionsMenu
           videoId={videoId}
           contentType={contentType}

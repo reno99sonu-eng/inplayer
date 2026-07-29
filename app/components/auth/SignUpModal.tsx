@@ -435,7 +435,34 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
                   Passwords don&apos;t match yet.
                 </p>
               )}
+              {passwordsMatch && (
+                <p className="mt-1.5 flex items-center gap-1 text-[11px] text-emerald-400 light:text-emerald-600">
+                  <CheckCircle2 size={12} /> Passwords match.
+                </p>
+              )}
             </div>
+
+            <p className="text-center text-[11px] leading-relaxed text-slate-500 light:text-slate-500">
+              By creating an account, you agree to InPlayer&apos;s{" "}
+              <a
+                href="/terms"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-orange-300 light:text-orange-600 hover:underline"
+              >
+                Terms of Service
+              </a>{" "}
+              and{" "}
+              <a
+                href="/privacy"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-orange-300 light:text-orange-600 hover:underline"
+              >
+                Privacy Policy
+              </a>
+              .
+            </p>
 
             {error && (
               <p className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-300 light:text-red-700">

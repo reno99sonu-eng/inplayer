@@ -6,6 +6,12 @@ import { verifyAuth } from "@/app/lib/verifyAuth";
 const CONVERSATIONS_TABLE = "InPlayer-Conversations";
 const DISAPPEARING_OPTIONS = [3600, 86400, 604800]; // 1 hour / 1 day / 1 week
 
+// Anyone whose presence heartbeat (app/api/presence) landed within this
+// window counts as "online" — wider than the 45s heartbeat interval in
+// AuthProvider so one slightly-late ping never flickers someone offline
+// and back.
+const PRESENCE_WINDOW_MS = 90_000;
+
 interface Params {
   params: Promise<{ conversationId: string }>;
 }
@@ -50,7 +56,34 @@ export async function GET(request: NextRequest, { params }: Params) {
         .catch((err) => console.error("Failed to clear unread count:", err));
     }
 
-    return NextResponse.json({ conversation: { ...row, unreadCount: 0 } });
+    // Real online/offline presence for the header ("Online" / "Last seen
+    // ..."), read from the other participant's own InPlayer-Users row —
+    // best-effort, never lets a presence lookup failure break loading the
+    // conversation itself.
+    let otherLastActiveAt: string | null = null;
+    if (row.otherUserId) {
+      try {
+        const otherUserRow = await docClient.send(
+          new GetCommand({
+            TableName: "InPlayer-Users",
+            Key: { userId: row.otherUserId },
+            ProjectionExpression: "lastActiveAt",
+          })
+        );
+        otherLastActiveAt = (otherUserRow.Item?.lastActiveAt as string) || null;
+      } catch (err) {
+        console.error("Failed to load presence:", err);
+      }
+    }
+    const otherIsOnline = !!(
+      otherLastActiveAt && Date.now() - new Date(otherLastActiveAt).getTime() < PRESENCE_WINDOW_MS
+    );
+
+    return NextResponse.json({
+      conversation: { ...row, unreadCount: 0 },
+      otherIsOnline,
+      otherLastActiveAt,
+    });
   } catch (err) {
     console.error("Failed to load conversation:", err);
     return NextResponse.json({ error: "Couldn't load that conversation." }, { status: 500 });

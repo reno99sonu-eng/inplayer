@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { KeyRound, X } from "lucide-react";
+import { KeyRound, X, Check } from "lucide-react";
 import { confirmSignUp, resendSignUpCode } from "aws-amplify/auth";
 import { useAuthModal } from "./AuthProvider";
 
@@ -23,6 +23,7 @@ export default function VerifyEmailModal({
   const [resending, setResending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [resendMessage, setResendMessage] = useState<string | null>(null);
+  const [verified, setVerified] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -31,8 +32,19 @@ export default function VerifyEmailModal({
       setResending(false);
       setError(null);
       setResendMessage(null);
+      setVerified(false);
     }
   }, [open]);
+
+  // Shows a clear "Verified!" success screen for a beat before switching to
+  // Sign In — verification itself was silently succeeding before this
+  // (confirmSignUp() worked, then the modal just swapped straight to Sign
+  // In), which read as "I entered the code and nothing happened" since
+  // there was nothing on screen actually confirming the code was accepted.
+  const goToSignIn = () => {
+    setVerified(true);
+    setTimeout(() => openSignIn(), 1400);
+  };
 
   const handleVerify = async () => {
     setError(null);
@@ -55,7 +67,7 @@ export default function VerifyEmailModal({
         confirmationCode: code.trim(),
       });
 
-      openSignIn();
+      goToSignIn();
     } catch (err: unknown) {
       const name = (err as { name?: string })?.name;
       const message =
@@ -65,6 +77,14 @@ export default function VerifyEmailModal({
         setError("That code doesn't match. Please check and try again.");
       } else if (name === "ExpiredCodeException") {
         setError("That code has expired. Tap 'Resend Code' below for a new one.");
+      } else if (name === "NotAuthorizedException") {
+        // Cognito throws this if the account is already confirmed — most
+        // commonly from double-tapping Verify, or re-entering an old code
+        // after an earlier attempt already went through. That's not
+        // actually a failure from the account's point of view, so this
+        // treats it as success instead of showing a scary error for
+        // something that already worked.
+        goToSignIn();
       } else {
         setError(message);
       }
@@ -114,24 +134,26 @@ export default function VerifyEmailModal({
             focused used to push this out of view/out of tapping range
             when it lived inside the scrolling area. stopPropagation here
             too, defensively, so it can never depend on bubbling order. */}
-        <button
-          type="button"
-          onClick={(e) => {
-            e.stopPropagation();
-            onClose();
-          }}
-          className="
-            absolute right-4 top-4 z-20 flex h-9 w-9 items-center justify-center
-            rounded-full border border-white/10 light:border-black/10
-            bg-white/5 light:bg-black/5
-            text-slate-300 light:text-slate-600
-            backdrop-blur-xl
-            transition-all duration-300
-            hover:rotate-90 hover:border-orange-400/40 hover:bg-orange-500/10 hover:text-white light:hover:text-slate-900
-          "
-        >
-          <X size={18} />
-        </button>
+        {!verified && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            className="
+              absolute right-4 top-4 z-20 flex h-9 w-9 items-center justify-center
+              rounded-full border border-white/10 light:border-black/10
+              bg-white/5 light:bg-black/5
+              text-slate-300 light:text-slate-600
+              backdrop-blur-xl
+              transition-all duration-300
+              hover:rotate-90 hover:border-orange-400/40 hover:bg-orange-500/10 hover:text-white light:hover:text-slate-900
+            "
+          >
+            <X size={18} />
+          </button>
+        )}
 
         <div
           className="
@@ -153,6 +175,19 @@ export default function VerifyEmailModal({
           <div className="absolute -right-16 bottom-0 h-40 w-40 rounded-full bg-cyan-500/10 blur-[80px]" />
         </div>
 
+        {verified ? (
+          <div className="relative z-10 flex flex-col items-center justify-center py-10 text-center">
+            <div className="animate-success-pop flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/15 border border-emerald-400/30">
+              <Check size={32} className="text-emerald-400" />
+            </div>
+            <h2 className="mt-5 text-xl font-black text-white light:text-slate-900">
+              Email Verified!
+            </h2>
+            <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
+              Taking you to sign in...
+            </p>
+          </div>
+        ) : (
         <div className="relative z-10">
           <span
             className="
@@ -253,6 +288,7 @@ export default function VerifyEmailModal({
             </button>
           </div>
         </div>
+        )}
         </div>
       </div>
     </div>

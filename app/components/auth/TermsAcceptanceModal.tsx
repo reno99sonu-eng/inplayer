@@ -68,7 +68,25 @@ export default function TermsAcceptanceModal({
         <p className="mt-4 text-[10px] font-black uppercase tracking-[.25em] text-orange-300 light:text-orange-700">Welcome to InPlayer</p>
         <h2 className="mt-2 text-2xl font-black text-white light:text-slate-900">Accept the terms to continue</h2>
         <p className="mt-3 text-sm leading-6 text-slate-400 light:text-slate-600">
-          Before you use InPlayer, please accept our Terms of Service and Privacy Policy.
+          Before you use InPlayer, please read and accept our{" "}
+          <a
+            href="/terms"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-orange-300 light:text-orange-600 hover:underline"
+          >
+            Terms of Service
+          </a>{" "}
+          and{" "}
+          <a
+            href="/privacy"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-semibold text-orange-300 light:text-orange-600 hover:underline"
+          >
+            Privacy Policy
+          </a>
+          .
         </p>
         <div className="mt-6 grid grid-cols-2 gap-3">
           <button type="button" disabled={pending !== null} onClick={() => void run("reject")} className="rounded-2xl border border-white/10 px-4 py-3 text-sm font-bold text-slate-200 transition hover:border-red-400/40 hover:bg-red-500/10 hover:text-red-200 disabled:opacity-60 light:border-black/10 light:text-slate-700">

@@ -197,6 +197,36 @@ export default function AuthProvider({
     refreshUser();
   }, []);
 
+  // Real online/offline presence (see app/api/presence) — a heartbeat for
+  // as long as this tab is open and signed in, not just while a messages
+  // thread happens to be open, so "@user is online" reflects them using
+  // the site at all, the same way it does on other platforms.
+  useEffect(() => {
+    if (!user?.userId) return;
+
+    let cancelled = false;
+    async function ping() {
+      try {
+        const session = await fetchAuthSession();
+        const idToken = session.tokens?.idToken?.toString();
+        if (!idToken || cancelled) return;
+        await fetch("/api/presence", {
+          method: "POST",
+          headers: { Authorization: `Bearer ${idToken}` },
+        });
+      } catch (err) {
+        console.error("Presence heartbeat failed:", err);
+      }
+    }
+
+    ping();
+    const interval = setInterval(ping, 45000);
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+    };
+  }, [user?.userId]);
+
   // OAuth redirect flows (Continue with Google) come back via a full page
   // navigation, and Amplify finishes exchanging the auth code slightly
   // AFTER our first refreshUser() above runs — this reacts to that moment

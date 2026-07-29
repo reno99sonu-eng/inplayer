@@ -13,6 +13,7 @@ import {
   Bell,
   Timer,
   Check,
+  CheckCheck,
   X,
   Loader2,
 } from "lucide-react";
@@ -20,6 +21,7 @@ import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { formatTimeAgo } from "@/app/lib/formatters";
 import { otherParticipant } from "@/app/lib/conversationId";
 import ReportButton from "@/app/components/ReportButton";
+import MessageActionsMenu from "@/app/components/MessageActionsMenu";
 
 interface ConversationDetail {
   conversationId: string;
@@ -41,6 +43,7 @@ interface MessageItem {
   senderId: string;
   text: string;
   createdAt: string;
+  deletedForEveryone?: boolean;
 }
 
 const DISAPPEARING_OPTIONS = [
@@ -60,13 +63,18 @@ export default function ConversationThreadPage() {
 
   const [conversation, setConversation] = useState<ConversationDetail | null>(null);
   const [conversationLoaded, setConversationLoaded] = useState(false);
+  const [otherIsOnline, setOtherIsOnline] = useState(false);
+  const [otherLastActiveAt, setOtherLastActiveAt] = useState<string | null>(null);
   const [messages, setMessages] = useState<MessageItem[]>([]);
+  const [otherLastReadAt, setOtherLastReadAt] = useState<string | null>(null);
+  const [otherIsTyping, setOtherIsTyping] = useState(false);
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const lastTypingPingRef = useRef(0);
 
   async function authHeaders() {
     const session = await fetchAuthSession();
@@ -81,6 +89,8 @@ export default function ConversationThreadPage() {
       if (res.ok) {
         const data = await res.json();
         setConversation(data.conversation);
+        setOtherIsOnline(!!data.otherIsOnline);
+        setOtherLastActiveAt(data.otherLastActiveAt || null);
       }
     } catch (err) {
       console.error("Failed to load conversation:", err);
@@ -96,9 +106,31 @@ export default function ConversationThreadPage() {
       if (res.ok) {
         const data = await res.json();
         setMessages(data.messages || []);
+        setOtherLastReadAt(data.otherLastReadAt || null);
+        setOtherIsTyping(!!data.otherIsTyping);
       }
     } catch (err) {
       console.error("Failed to load messages:", err);
+    }
+  }
+
+  // Typing indicator ping (app/api/messages/[conversationId]/typing) —
+  // throttled to at most once every 2s of active typing so a fast typist
+  // doesn't fire a request per keystroke. The route's own TTL (6s) means
+  // the indicator naturally clears on the other side shortly after
+  // whoever's typing stops or navigates away.
+  async function pingTyping() {
+    const nowMs = Date.now();
+    if (nowMs - lastTypingPingRef.current < 2000) return;
+    lastTypingPingRef.current = nowMs;
+    try {
+      const headers = await authHeaders();
+      await fetch(`/api/messages/${params.conversationId}/typing`, {
+        method: "POST",
+        headers,
+      });
+    } catch (err) {
+      console.error("Failed to send typing ping:", err);
     }
   }
 
@@ -250,9 +282,25 @@ export default function ConversationThreadPage() {
           href={`/u/${encodeURIComponent(displayUsername)}`}
           className="flex min-w-0 flex-1 items-center gap-3"
         >
-          {/* eslint-disable-next-line @next/next/no-img-element -- avatar may be a data URL. */}
-          <img src={displayAvatar} alt={displayUsername} className="h-10 w-10 flex-shrink-0 rounded-full object-cover" />
-          <span className="truncate font-bold">@{displayUsername}</span>
+          <div className="relative flex-shrink-0">
+            {/* eslint-disable-next-line @next/next/no-img-element -- avatar may be a data URL. */}
+            <img src={displayAvatar} alt={displayUsername} className="h-10 w-10 rounded-full object-cover" />
+            {otherIsOnline && (
+              <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[#06101D] light:border-[#FAF5E9] bg-emerald-400" />
+            )}
+          </div>
+          <div className="min-w-0">
+            <span className="block truncate font-bold">@{displayUsername}</span>
+            <span className="block truncate text-[11px] text-slate-400 light:text-slate-600">
+              {otherIsTyping
+                ? "typing..."
+                : otherIsOnline
+                ? "Online"
+                : otherLastActiveAt
+                ? `Last seen ${formatTimeAgo(otherLastActiveAt)}`
+                : ""}
+            </span>
+          </div>
         </Link>
 
         <div className="relative flex-shrink-0">
@@ -375,7 +423,9 @@ const showAvatar =
   <div className={`flex max-w-[72%] items-end gap-1.5 ${mine ? "flex-row-reverse" : ""}`}>
     <div
       className={`rounded-2xl px-3.5 py-2 text-sm ${
-        mine
+        m.deletedForEveryone
+          ? "border border-dashed border-white/15 light:border-black/15 text-slate-500 italic"
+          : mine
           ? "bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white"
           : "border border-white/10 light:border-black/10 bg-white/[0.04] light:bg-slate-100 text-slate-100 light:text-slate-900"
       }`}
@@ -383,26 +433,74 @@ const showAvatar =
       <p className="whitespace-pre-wrap break-words">{m.text}</p>
 
       <p
-        className={`mt-0.5 text-[10px] ${
-          mine
+        className={`mt-0.5 flex items-center gap-1 text-[10px] ${
+          m.deletedForEveryone
+            ? "text-slate-500"
+            : mine
             ? "text-white/70"
             : "light:text-slate-600 text-slate-500"
         }`}
       >
         {formatTimeAgo(m.createdAt)}
+        {mine && !m.deletedForEveryone && (
+          <>
+            {m.messageId.startsWith("optimistic-") ? (
+              // Sent, not yet confirmed persisted by the server.
+              <Check size={11} className="text-white/70" />
+            ) : otherLastReadAt && m.createdAt <= otherLastReadAt ? (
+              // Read — the other participant has polled the thread since
+              // this message's timestamp (see the messages GET route).
+              <CheckCheck size={12} className="text-sky-300" />
+            ) : (
+              // Delivered — saved to the server, not yet read.
+              <CheckCheck size={12} className="text-white/70" />
+            )}
+          </>
+        )}
       </p>
     </div>
 
-    {!mine && !m.messageId.startsWith("optimistic-") && (
-      <ReportButton
-        target={{ targetType: "message", conversationId: m.conversationId, messageId: m.messageId }}
-        className="mb-1 flex-shrink-0 text-slate-500 transition hover:text-red-400"
-      />
+    {!m.messageId.startsWith("optimistic-") && !m.deletedForEveryone && (
+      <div className="mb-1 flex flex-shrink-0 items-center gap-2">
+        {!mine && (
+          <ReportButton
+            target={{ targetType: "message", conversationId: m.conversationId, messageId: m.messageId }}
+            className="text-slate-500 transition hover:text-red-400"
+          />
+        )}
+        <MessageActionsMenu
+          conversationId={m.conversationId}
+          messageId={m.messageId}
+          mine={mine}
+          onDeleted={(mode) => {
+            if (mode === "delete_for_everyone") {
+              setMessages((prev) =>
+                prev.map((msg) =>
+                  msg.messageId === m.messageId ? { ...msg, deletedForEveryone: true } : msg
+                )
+              );
+            } else {
+              setMessages((prev) => prev.filter((msg) => msg.messageId !== m.messageId));
+            }
+          }}
+        />
+      </div>
     )}
   </div>
 </div>
             );
           })
+        )}
+        {otherIsTyping && (
+          <div className="flex items-end gap-2">
+            {/* eslint-disable-next-line @next/next/no-img-element -- avatar may be a data URL. */}
+            <img src={displayAvatar} alt={displayUsername} className="h-8 w-8 flex-shrink-0 rounded-full object-cover" />
+            <div className="flex items-center gap-1 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.04] light:bg-slate-100 px-4 py-3">
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.3s]" />
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.15s]" />
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" />
+            </div>
+          </div>
         )}
         <div ref={messagesEndRef} />
       </div>
@@ -418,7 +516,10 @@ const showAvatar =
           <div className="mx-auto flex w-full max-w-3xl items-center gap-2.5">
             <input
               value={text}
-              onChange={(e) => setText(e.target.value)}
+              onChange={(e) => {
+                setText(e.target.value);
+                if (e.target.value.trim()) pingTyping();
+              }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && !e.shiftKey) {
                   e.preventDefault();

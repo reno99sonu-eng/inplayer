@@ -31,7 +31,7 @@ const items = [
   { id: "creators", label: "Creators", icon: Star, href: null },
   { id: "videos", label: "Videos", icon: Video, href: "/admin/videos" },
   { id: "shorts", label: "Shorts", icon: Film, href: "/admin/videos?type=short" },
-  { id: "reports", label: "Reports & Moderation", icon: Flag, href: null },
+  { id: "reports", label: "Reports & Moderation", icon: Flag, href: "/admin/moderation" },
   { id: "copyright", label: "Copyright Center", icon: Copyright, href: null },
   { id: "revenue", label: "Revenue", icon: DollarSign, href: null },
   { id: "ads", label: "Advertising", icon: Megaphone, href: null },

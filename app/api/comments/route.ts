@@ -9,6 +9,7 @@ import { randomUUID } from "crypto";
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
 import { resolveUsernames } from "@/app/lib/resolveUsernames";
+import { moderateText } from "@/app/lib/moderation";
 
 export async function GET(request: NextRequest) {
   const videoId = request.nextUrl.searchParams.get("videoId");
@@ -25,9 +26,14 @@ export async function GET(request: NextRequest) {
     })
   );
 
-  const comments = (result.Items || []).sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
+  // Auto-flagged comments (see moderateText in POST below) are hidden from
+  // everyone here — including the person who posted them — until an admin
+  // clears them in the Admin Panel's moderation queue. The poster still
+  // finds out immediately: POST's own response below tells them right when
+  // they submit it, before this GET is ever involved.
+  const comments = (result.Items || [])
+    .filter((c) => c.hidden !== true)
+    .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
   // Batched, distinct-userId lookup so each commenter's name can link to
   // their real profile — see app/lib/resolveUsernames. A commenter with
@@ -71,6 +77,10 @@ export async function POST(request: NextRequest) {
   );
   const userAvatarUrl = profileResult.Item?.avatarUrl || null;
 
+  // Real-time auto-moderation (app/lib/moderation.ts) — fails open, so a
+  // moderation API hiccup never blocks a real comment from posting.
+  const moderation = await moderateText(text.trim());
+
   const comment = {
     videoId,
     commentId: randomUUID(),
@@ -79,6 +89,13 @@ export async function POST(request: NextRequest) {
     userAvatarUrl,
     text: text.trim(),
     createdAt: new Date().toISOString(),
+    ...(moderation.checked &&
+      moderation.flagged && {
+        flagged: true,
+        flaggedCategories: moderation.categories,
+        hidden: true,
+        moderatedAt: new Date().toISOString(),
+      }),
   };
 
   await docClient.send(
@@ -87,6 +104,13 @@ export async function POST(request: NextRequest) {
       Item: comment,
     })
   );
+
+  // Flagged comments are hidden and go straight to the Admin Panel's
+  // moderation queue instead of notifying the video owner — no point
+  // pinging them about something nobody else can see yet.
+  if (comment.hidden) {
+    return NextResponse.json({ comment, flagged: true });
+  }
 
   // Notify the video owner, unless they're commenting on their own video
   try {

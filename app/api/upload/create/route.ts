@@ -5,6 +5,7 @@ import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
 import { THUMBNAIL_DATA_URL_MAX_LENGTH } from "@/app/lib/imageCompress";
 import { ensureUsername } from "@/app/lib/ensureUsername";
+import { moderateText } from "@/app/lib/moderation";
 
 // Defensive re-validation of a client-supplied soundtrack pick (see
 // ShortCreationTools/soundtracks.ts's ResolvedSoundtrack shape) before it's
@@ -119,6 +120,17 @@ export async function POST(request: NextRequest) {
     );
     const uploaderAvatarUrl = profileResult.Item?.avatarUrl || null;
     const isShort = contentType === "short";
+
+    // Real-time auto-moderation on the title + description (app/lib/
+    // moderation.ts) — this scans the submitted text, not the video content
+    // itself. Fails open, so a moderation API hiccup never blocks a real
+    // upload. A flagged upload still gets created and fully processed —
+    // the creator can still see and manage it from My Videos — but it's
+    // hidden from every public listing (app/lib/videoStore.ts) and from
+    // direct watch links (app/watch/[videoId]/page.tsx) until an admin
+    // reviews it in the Admin Panel's moderation queue.
+    const uploadModeration = await moderateText(`${title} ${description || ""}`);
+    const moderationHidden = uploadModeration.checked && uploadModeration.flagged;
     // Ground truth for which language the video is spoken in — trusted
     // over Mux's own "auto" detection by the caption pipeline (see
     // app/api/webhooks/mux), since Mux has no ASR model for Hindi/Bengali
@@ -174,6 +186,12 @@ export async function POST(request: NextRequest) {
           uploaderAvatarUrl,
           uploadedAt: new Date().toISOString(),
           views: 0,
+          ...(moderationHidden && {
+            flagged: true,
+            flaggedCategories: uploadModeration.categories,
+            moderationHidden: true,
+            moderatedAt: new Date().toISOString(),
+          }),
           // A creator-picked thumbnail. customThumbnailUrl is the durable
           // "did the creator set one" marker — the Mux webhook's
           // video.asset.ready handler checks it via if_not_exists() so it

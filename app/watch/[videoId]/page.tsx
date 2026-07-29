@@ -48,14 +48,18 @@ export default async function WatchPage({ params }: WatchPageProps) {
 
   const video = result.Item;
 
-  if (!video) {
+  // Auto-flagged at upload (app/lib/moderation.ts) and awaiting admin
+  // review — treated exactly like "not found" for a direct link, same as
+  // it already is everywhere this video would otherwise be listed (see
+  // app/lib/videoStore.ts).
+  if (!video || video.moderationHidden === true) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 text-center lg:px-6">
         <h2 className="text-2xl font-black text-white light:text-slate-900">
           Video not found
         </h2>
         <p className="mt-1.5 text-sm text-slate-400 light:text-slate-600 lg:mt-2">
-          This video doesn't exist or may have been removed.
+          This video doesn&apos;t exist or may have been removed.
         </p>
         <Link
           href="/videos"

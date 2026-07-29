@@ -54,7 +54,10 @@ export async function GET(request: NextRequest, { params }: Params) {
     );
 
     const now = Date.now();
-    const items = result.Items || [];
+    // Auto-flagged messages (see moderateText in app/api/messages' POST)
+    // are held out of the thread entirely — including from the sender —
+    // until an admin reviews them in the Admin Panel's moderation queue.
+    const items = (result.Items || []).filter((m) => m.hidden !== true);
     const live = items.filter((m) => !m.expiresAt || new Date(m.expiresAt).getTime() > now);
     const expired = items.filter((m) => m.expiresAt && new Date(m.expiresAt).getTime() <= now);
 

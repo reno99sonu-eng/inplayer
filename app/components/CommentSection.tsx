@@ -6,6 +6,7 @@ import { fetchAuthSession } from "aws-amplify/auth";
 import { Trash2 } from "lucide-react";
 import { useAuthModal } from "./auth/AuthProvider";
 import { formatTimeAgo } from "@/app/lib/formatters";
+import ReportButton from "@/app/components/ReportButton";
 
 interface Comment {
   videoId: string;
@@ -29,6 +30,7 @@ export default function CommentSection({ videoId }: CommentSectionProps) {
   const [text, setText] = useState("");
   const [posting, setPosting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   useEffect(() => {
     async function load() {
@@ -56,6 +58,7 @@ export default function CommentSection({ videoId }: CommentSectionProps) {
 
     setPosting(true);
     setError(null);
+    setNotice(null);
 
     try {
       const session = await fetchAuthSession();
@@ -77,7 +80,14 @@ export default function CommentSection({ videoId }: CommentSectionProps) {
         return;
       }
 
-      setComments((prev) => [data.comment, ...prev]);
+      // Auto-moderation (app/lib/moderation.ts, via app/api/comments) held
+      // this one back — it's real, saved, and in the admin review queue,
+      // but not shown to anyone (including its own author) until cleared.
+      if (data.flagged) {
+        setNotice("Your comment was flagged for review and isn't visible to others yet.");
+      } else {
+        setComments((prev) => [data.comment, ...prev]);
+      }
       setText("");
     } catch (err) {
       console.error("Failed to post comment:", err);
@@ -136,6 +146,7 @@ export default function CommentSection({ videoId }: CommentSectionProps) {
           />
 
           {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
+          {notice && <p className="mt-1 text-xs text-amber-400">{notice}</p>}
 
           {text.trim() && (
             <div className="mt-2 flex justify-end gap-2">
@@ -226,14 +237,21 @@ export default function CommentSection({ videoId }: CommentSectionProps) {
                 </p>
               </div>
 
-              {user?.userId === comment.userId && (
-                <button
-                  onClick={() => handleDelete(comment.commentId)}
-                  className="flex-shrink-0 text-slate-500 transition hover:text-red-400"
-                >
-                  <Trash2 size={15} />
-                </button>
-              )}
+              <div className="flex flex-shrink-0 items-center gap-3">
+                {user?.userId !== comment.userId && (
+                  <ReportButton
+                    target={{ targetType: "comment", videoId, commentId: comment.commentId }}
+                  />
+                )}
+                {user?.userId === comment.userId && (
+                  <button
+                    onClick={() => handleDelete(comment.commentId)}
+                    className="text-slate-500 transition hover:text-red-400"
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>

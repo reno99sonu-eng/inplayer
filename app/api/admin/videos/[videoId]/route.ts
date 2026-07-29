@@ -1,8 +1,36 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GetCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, DeleteCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { requireAdmin } from "@/app/lib/isAdmin";
 import mux from "@/app/lib/mux";
+
+// Restores a video/Short auto-flagged at upload (app/lib/moderation.ts via
+// app/api/upload/create) — clears moderationHidden so it reappears in
+// public listings and at its direct watch link (see app/lib/videoStore.ts
+// and app/watch/[videoId]/page.tsx), for when the AI got it wrong.
+export async function PATCH(
+  request: NextRequest,
+  { params }: { params: Promise<{ videoId: string }> }
+) {
+  try {
+    await requireAdmin(request);
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { videoId } = await params;
+
+  await docClient.send(
+    new UpdateCommand({
+      TableName: "InPlayer-Videos",
+      Key: { videoId },
+      UpdateExpression: "SET moderationHidden = :f, flagged = :f",
+      ExpressionAttributeValues: { ":f": false },
+    })
+  );
+
+  return NextResponse.json({ success: true });
+}
 
 // Admin removal of any video or Short, regardless of who uploaded it —
 // app/api/my-videos/[videoId]'s DELETE is the creator-owned equivalent

@@ -6,6 +6,7 @@ import { verifyAuth } from "@/app/lib/verifyAuth";
 import { areUsersConnected } from "@/app/lib/connections";
 import { createNotification } from "@/app/lib/notifications";
 import { makeConversationId } from "@/app/lib/conversationId";
+import { moderateText } from "@/app/lib/moderation";
 
 const CONVERSATIONS_TABLE = "InPlayer-Conversations";
 const MESSAGES_TABLE = "InPlayer-Messages";
@@ -137,6 +138,11 @@ export async function POST(request: NextRequest) {
         ? Date.now() + disappearingSeconds * 1000
         : undefined;
 
+    // Real-time auto-moderation (app/lib/moderation.ts) — fails open, so a
+    // moderation API hiccup never blocks a real message from sending.
+    const moderation = await moderateText(trimmedText);
+    const flagged = moderation.checked && moderation.flagged;
+
     await docClient.send(
       new PutCommand({
         TableName: MESSAGES_TABLE,
@@ -156,9 +162,24 @@ export async function POST(request: NextRequest) {
             // that never get reopened after a message expires.
             ttl: Math.floor(expiresAtMs / 1000),
           }),
+          ...(flagged && {
+            flagged: true,
+            flaggedCategories: moderation.categories,
+            hidden: true,
+            moderatedAt: now,
+          }),
         },
       })
     );
+
+    // Flagged messages are saved and queued for admin review, but never
+    // shown to the recipient (see the GET on
+    // [conversationId]/messages, which filters hidden ones out) — no
+    // conversation-preview update or notification either, so the recipient
+    // never sees so much as a hint of it until/unless an admin restores it.
+    if (flagged) {
+      return NextResponse.json({ success: true, conversationId, requestStatus, flagged: true });
+    }
 
     const myUsername = (myUserRecord.Item?.username as string) || null;
     const myAvatarUrl = (myUserRecord.Item?.avatarUrl as string) || null;

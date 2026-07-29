@@ -13,7 +13,7 @@ const items = [
   { id: "creators", label: "Creators", href: null },
   { id: "videos", label: "Videos", href: "/admin/videos" },
   { id: "shorts", label: "Shorts", href: "/admin/videos?type=short" },
-  { id: "reports", label: "Reports", href: null },
+  { id: "reports", label: "Reports", href: "/admin/moderation" },
   { id: "copyright", label: "Copyright", href: null },
   { id: "revenue", label: "Revenue", href: null },
   { id: "ads", label: "Advertising", href: null },

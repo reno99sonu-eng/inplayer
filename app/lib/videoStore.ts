@@ -22,12 +22,18 @@ async function scanReadyVideos() {
         // A Mux asset is only safe to surface on listings after its
         // video.asset.ready webhook has stored a non-empty playback ID.
         // This is the ID image.mux.com and stream.mux.com require.
+        // moderationHidden (see app/api/upload/create and
+        // app/lib/moderation.ts) keeps anything auto-flagged at upload out
+        // of every surface that reads from this shared cache — homepage,
+        // /videos, /shorts, and every watch page's related list.
         FilterExpression:
-          "#status = :ready AND attribute_exists(muxPlaybackId) AND muxPlaybackId <> :emptyPlaybackId",
+          "#status = :ready AND attribute_exists(muxPlaybackId) AND muxPlaybackId <> :emptyPlaybackId " +
+          "AND (attribute_not_exists(moderationHidden) OR moderationHidden = :notHidden)",
         ExpressionAttributeNames: { "#status": "status" },
         ExpressionAttributeValues: {
           ":ready": "ready",
           ":emptyPlaybackId": "",
+          ":notHidden": false,
         },
         ExclusiveStartKey: exclusiveStartKey,
       })

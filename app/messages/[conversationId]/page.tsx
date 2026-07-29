@@ -19,6 +19,7 @@ import {
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { formatTimeAgo } from "@/app/lib/formatters";
 import { otherParticipant } from "@/app/lib/conversationId";
+import ReportButton from "@/app/components/ReportButton";
 
 interface ConversationDetail {
   conversationId: string;
@@ -147,6 +148,18 @@ export default function ConversationThreadPage() {
         setMessages((prev) => prev.filter((m) => m.messageId !== optimisticId));
         setSendError(data.error || "Couldn't send that message.");
         setText(trimmed);
+        return;
+      }
+
+      // Auto-moderation (app/lib/moderation.ts, via app/api/messages) held
+      // this one back — it's saved and in the admin review queue, but the
+      // recipient never sees it. fetchMessages() below won't include it
+      // (the GET filters hidden messages out), which would otherwise make
+      // it look like it silently vanished — this makes sure the sender
+      // actually finds out what happened instead.
+      if (data.flagged) {
+        setMessages((prev) => prev.filter((m) => m.messageId !== optimisticId));
+        setSendError("This message was flagged for review and wasn't delivered.");
         return;
       }
 
@@ -359,24 +372,33 @@ const showAvatar =
       <div className="w-8 flex-shrink-0" />
     ))}
 
-  <div
-    className={`max-w-[72%] rounded-2xl px-3.5 py-2 text-sm ${
-      mine
-        ? "bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white"
-        : "border border-white/10 light:border-black/10 bg-white/[0.04] light:bg-slate-100 text-slate-100 light:text-slate-900"
-    }`}
-  >
-    <p className="whitespace-pre-wrap break-words">{m.text}</p>
-
-    <p
-      className={`mt-0.5 text-[10px] ${
+  <div className={`flex max-w-[72%] items-end gap-1.5 ${mine ? "flex-row-reverse" : ""}`}>
+    <div
+      className={`rounded-2xl px-3.5 py-2 text-sm ${
         mine
-          ? "text-white/70"
-          : "light:text-slate-600 text-slate-500"
+          ? "bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white"
+          : "border border-white/10 light:border-black/10 bg-white/[0.04] light:bg-slate-100 text-slate-100 light:text-slate-900"
       }`}
     >
-      {formatTimeAgo(m.createdAt)}
-    </p>
+      <p className="whitespace-pre-wrap break-words">{m.text}</p>
+
+      <p
+        className={`mt-0.5 text-[10px] ${
+          mine
+            ? "text-white/70"
+            : "light:text-slate-600 text-slate-500"
+        }`}
+      >
+        {formatTimeAgo(m.createdAt)}
+      </p>
+    </div>
+
+    {!mine && !m.messageId.startsWith("optimistic-") && (
+      <ReportButton
+        target={{ targetType: "message", conversationId: m.conversationId, messageId: m.messageId }}
+        className="mb-1 flex-shrink-0 text-slate-500 transition hover:text-red-400"
+      />
+    )}
   </div>
 </div>
             );

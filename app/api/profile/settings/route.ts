@@ -61,6 +61,33 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true });
   }
 
+  if (action === "update_name") {
+    const { name } = body;
+    const trimmed = typeof name === "string" ? name.trim().slice(0, 100) : "";
+
+    if (!trimmed) {
+      return NextResponse.json({ error: "Name can't be empty." }, { status: 400 });
+    }
+
+    // This is the app's own stable copy of the display name (see
+    // app/lib/verifyAuth.ts) — an explicit save here always wins,
+    // overriding whatever got auto-seeded from Cognito earlier.
+    await docClient.send(
+      new UpdateCommand({
+        TableName: "InPlayer-Users",
+        Key: { userId: user.userId },
+        UpdateExpression: "SET #n = :name, updatedAt = :u",
+        ExpressionAttributeNames: { "#n": "name" },
+        ExpressionAttributeValues: {
+          ":name": trimmed,
+          ":u": new Date().toISOString(),
+        },
+      })
+    );
+
+    return NextResponse.json({ success: true });
+  }
+
   if (action === "complete_account") {
     const age = Number(body.age);
     if (!Number.isInteger(age) || age < 13 || age > 120) {

@@ -141,6 +141,10 @@ export default function AuthProvider({
       let socialLinks: SocialLinks = { social: {}, other: [] };
       let age: number | null = null;
       let termsAccepted = false;
+      // This app's own stable display name (see app/lib/verifyAuth.ts) —
+      // null until /api/profile/avatar answers, in which case attributes.name
+      // below is used as a same-request fallback only, never stored.
+      let storedName: string | null = null;
 
       try {
         const session = await fetchAuthSession();
@@ -153,6 +157,7 @@ export default function AuthProvider({
 
           if (res.ok) {
             const data = await res.json();
+            storedName = data.name || null;
             avatarUrl = data.avatarUrl;
             coverPhotoUrl = data.coverPhotoUrl || null;
             handle = data.username || null;
@@ -169,7 +174,11 @@ export default function AuthProvider({
       setUser({
         userId: currentUser.userId,
         username: currentUser.username,
-        name: attributes.name || currentUser.username,
+        // Prefer this app's own stored name over Cognito's live attribute
+        // (attributes.name) — the latter gets silently overwritten by
+        // Google's own profile name on every Google sign-in for a linked
+        // account. See app/lib/verifyAuth.ts.
+        name: storedName || attributes.name || currentUser.username,
         email: attributes.email || "",
         avatarUrl,
         coverPhotoUrl,

@@ -31,6 +31,12 @@ const result = await docClient.send(
 );
 
   return NextResponse.json({
+    // Sourced from verifyAuth(), which already resolves this app's own
+    // stable, stored display name (falling back to — and seeding itself
+    // from — Cognito's live attribute only the very first time). See
+    // verifyAuth.ts for why this must never just be the raw ID token
+    // claim: Google sign-ins silently overwrite Cognito's own copy.
+    name: user.name || null,
     avatarUrl: result.Item?.avatarUrl || null,
     coverPhotoUrl: result.Item?.coverPhotoUrl || null,
     username: result.Item?.username || null,

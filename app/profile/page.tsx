@@ -238,10 +238,20 @@ export default function ProfilePage() {
         userAttributes: { name: name.trim() },
       });
 
-      // Server-side routes read the name from the ID token's claims, not
-      // a live Cognito lookup — force a refresh so the token actually
-      // carries the new name before we ask the server to sync it out.
-      await fetchAuthSession({ forceRefresh: true });
+      // Also persist to this app's own stored name (InPlayer-Users) — the
+      // single source of truth server routes actually read (see
+      // app/lib/verifyAuth.ts). The Cognito attribute above is kept in
+      // sync too since it's still what's shown pre-fill on this page and
+      // in the Cognito console, but it's the stored copy below that
+      // survives a Google sign-in silently overwriting Cognito's copy
+      // with the Google account's own name.
+      const session = await fetchAuthSession({ forceRefresh: true });
+      const idToken = session.tokens?.idToken?.toString();
+      await fetch("/api/profile/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({ action: "update_name", name: name.trim() }),
+      });
 
       await refreshUser();
       await syncProfileEverywhere();

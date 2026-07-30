@@ -10,6 +10,7 @@ import {
   KycStatus,
 } from "@/app/lib/creatorPayouts";
 import { resolveUsernames } from "@/app/lib/resolveUsernames";
+import { logAdminAction } from "@/app/lib/auditLog";
 
 // Real KYC review queue — every field an admin sees here (the text fields
 // AND the four document photos) is exactly what the creator actually
@@ -199,6 +200,16 @@ export async function POST(request: NextRequest) {
     console.error(`admin/creators: ${action} failed for ${userId}:`, err);
     return NextResponse.json({ error: "Couldn't save that right now." }, { status: 500 });
   }
+
+  await logAdminAction({
+    request,
+    adminId: admin.userId,
+    adminEmail: admin.email,
+    action: action === "approve" ? "kyc.approve" : "kyc.reject",
+    targetType: "user",
+    targetId: userId,
+    details: action === "reject" ? reason.trim() : undefined,
+  });
 
   // The review decision above is the part that has to succeed for this
   // request to count as done. Purging the photos is a required cleanup

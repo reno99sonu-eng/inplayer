@@ -33,13 +33,13 @@ const items = [
   { id: "shorts", label: "Shorts", icon: Film, href: "/admin/videos?type=short" },
   { id: "reports", label: "Reports & Moderation", icon: Flag, href: "/admin/moderation" },
   { id: "copyright", label: "Copyright Center", icon: Copyright, href: null },
-  { id: "revenue", label: "Revenue", icon: DollarSign, href: null },
+  { id: "revenue", label: "Revenue", icon: DollarSign, href: "/admin/revenue" },
   { id: "ads", label: "Advertising", icon: Megaphone, href: null },
-  { id: "analytics", label: "Analytics", icon: BarChart3, href: null },
+  { id: "analytics", label: "Analytics", icon: BarChart3, href: "/admin/analytics" },
   { id: "ai-moderation", label: "AI Moderation", icon: Bot, href: null },
-  { id: "notifications", label: "Notifications", icon: Bell, href: null },
+  { id: "notifications", label: "Notifications", icon: Bell, href: "/admin/notifications" },
   { id: "settings", label: "Platform Settings", icon: Settings, href: null },
-  { id: "audit-logs", label: "Audit Logs", icon: ScrollText, href: null },
+  { id: "audit-logs", label: "Audit Logs", icon: ScrollText, href: "/admin/audit-logs" },
   { id: "captions", label: "Maintenance", icon: Wrench, href: "/admin/captions" },
 ] as const;
 

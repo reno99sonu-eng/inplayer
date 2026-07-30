@@ -16,11 +16,12 @@ import {
   Sparkles,
   MessageSquare,
   MessageSquarePlus,
+  Megaphone,
 } from "lucide-react";
 
 interface Notification {
   notificationId: string;
-  type: "like" | "comment" | "subscribe" | "message" | "message_request";
+  type: "like" | "comment" | "subscribe" | "message" | "message_request" | "admin_announcement";
   message: string;
   read: boolean;
   createdAt: string;
@@ -284,18 +285,24 @@ export default function NavbarActions() {
               <div className="space-y-2">
                 {notifications.map((n) => {
                   const isMessageType = n.type === "message" || n.type === "message_request";
+                  const isAnnouncement = n.type === "admin_announcement";
+                  const hasIcon = isMessageType || isAnnouncement;
                   const content = (
                     <>
                       <div className="flex items-start gap-2">
-                        {isMessageType &&
+                        {isAnnouncement ? (
+                          <Megaphone size={14} className="mt-0.5 flex-shrink-0 text-orange-400" />
+                        ) : (
+                          isMessageType &&
                           (n.type === "message_request" ? (
                             <MessageSquarePlus size={14} className="mt-0.5 flex-shrink-0 text-orange-400" />
                           ) : (
                             <MessageSquare size={14} className="mt-0.5 flex-shrink-0 text-orange-400" />
-                          ))}
+                          ))
+                        )}
                         <p className="text-sm text-white light:text-slate-900">{n.message}</p>
                       </div>
-                      <p className={isMessageType ? "mt-0.5 pl-[22px] text-xs text-slate-500" : "text-xs text-slate-500"}>
+                      <p className={hasIcon ? "mt-0.5 pl-[22px] text-xs text-slate-500" : "text-xs text-slate-500"}>
                         {formatTimeAgo(n.createdAt)}
                       </p>
                     </>

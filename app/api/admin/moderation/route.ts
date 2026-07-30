@@ -111,9 +111,14 @@ export async function GET(request: NextRequest) {
   }
 
   try {
+    // "hidden" collides with a DynamoDB reserved word, so it needs an
+    // ExpressionAttributeNames alias rather than being written bare into
+    // the FilterExpression string (bare use throws ValidationException on
+    // every call, which the catch below was silently swallowing — this
+    // tab was returning zero auto-flagged items no matter what).
     const [comments, messages, videos] = await Promise.all([
-      scanAll("InPlayer-Comments", "hidden = :t", { ":t": true }),
-      scanAll("InPlayer-Messages", "hidden = :t", { ":t": true }),
+      scanAll("InPlayer-Comments", "#hidden = :t", { ":t": true }, { "#hidden": "hidden" }),
+      scanAll("InPlayer-Messages", "#hidden = :t", { ":t": true }, { "#hidden": "hidden" }),
       scanAll("InPlayer-Videos", "moderationHidden = :t", { ":t": true }),
     ]);
 

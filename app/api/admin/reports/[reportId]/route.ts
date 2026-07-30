@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { requireAdmin } from "@/app/lib/isAdmin";
+import { logAdminAction } from "@/app/lib/auditLog";
 
 // Marks a human-submitted report (InPlayer-Reports) as handled. This never
 // touches the reported content itself — an admin who wants the
@@ -12,8 +13,9 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ reportId: string }> }
 ) {
+  let admin;
   try {
-    await requireAdmin(request);
+    admin = await requireAdmin(request);
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -31,6 +33,15 @@ export async function PATCH(
       ExpressionAttributeValues: { ":s": status, ":r": new Date().toISOString() },
     })
   );
+
+  await logAdminAction({
+    request,
+    adminId: admin.userId,
+    adminEmail: admin.email,
+    action: status === "resolved" ? "report.resolve" : "report.reopen",
+    targetType: "report",
+    targetId: reportId,
+  });
 
   return NextResponse.json({ success: true });
 }

@@ -3,6 +3,7 @@ import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { requireAdmin } from "@/app/lib/isAdmin";
 import { deleteVideoCascade } from "@/app/lib/cascadeDelete";
+import { logAdminAction } from "@/app/lib/auditLog";
 
 // Restores a video/Short auto-flagged at upload (app/lib/moderation.ts via
 // app/api/upload/create) — clears moderationHidden so it reappears in
@@ -12,8 +13,9 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ videoId: string }> }
 ) {
+  let admin;
   try {
-    await requireAdmin(request);
+    admin = await requireAdmin(request);
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -28,6 +30,15 @@ export async function PATCH(
       ExpressionAttributeValues: { ":f": false },
     })
   );
+
+  await logAdminAction({
+    request,
+    adminId: admin.userId,
+    adminEmail: admin.email,
+    action: "video.restore",
+    targetType: "video",
+    targetId: videoId,
+  });
 
   return NextResponse.json({ success: true });
 }
@@ -44,8 +55,9 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ videoId: string }> }
 ) {
+  let admin;
   try {
-    await requireAdmin(request);
+    admin = await requireAdmin(request);
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -62,6 +74,19 @@ export async function DELETE(
   if (!result.success) {
     console.error(`Admin delete: video ${videoId} had partial failures:`, result.errors);
   }
+
+  await logAdminAction({
+    request,
+    adminId: admin.userId,
+    adminEmail: admin.email,
+    action: "video.delete",
+    targetType: "video",
+    targetId: videoId,
+    details:
+      result.errors.length > 0
+        ? `Completed with ${result.errors.length} warning(s) — see server logs.`
+        : undefined,
+  });
 
   return NextResponse.json({ success: true, warnings: result.errors });
 }

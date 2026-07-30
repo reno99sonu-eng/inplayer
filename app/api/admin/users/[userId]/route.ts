@@ -3,6 +3,7 @@ import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { requireAdmin } from "@/app/lib/isAdmin";
 import { deleteUserCascade } from "@/app/lib/cascadeDelete";
+import { logAdminAction } from "@/app/lib/auditLog";
 
 // Suspend/unsuspend a user. Setting isSuspended: true takes effect
 // immediately and everywhere — app/lib/verifyAuth.ts checks this same
@@ -56,6 +57,15 @@ export async function PATCH(
     })
   );
 
+  await logAdminAction({
+    request,
+    adminId: admin.userId,
+    adminEmail: admin.email,
+    action: body.isSuspended ? "user.suspend" : "user.unsuspend",
+    targetType: "user",
+    targetId: userId,
+  });
+
   return NextResponse.json({ success: true });
 }
 
@@ -101,6 +111,19 @@ export async function DELETE(
   if (!result.success) {
     console.error(`Admin delete: user ${userId} had partial failures:`, result.errors);
   }
+
+  await logAdminAction({
+    request,
+    adminId: admin.userId,
+    adminEmail: admin.email,
+    action: "user.delete",
+    targetType: "user",
+    targetId: userId,
+    details:
+      result.errors.length > 0
+        ? `Completed with ${result.errors.length} warning(s) — see server logs.`
+        : undefined,
+  });
 
   return NextResponse.json({ success: true, warnings: result.errors });
 }

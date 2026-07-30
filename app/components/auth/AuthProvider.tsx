@@ -10,7 +10,6 @@ import {
   useContext,
   useState,
   useEffect,
-  useMemo,
   ReactNode,
 } from "react";
 import { useRouter, usePathname } from "next/navigation";
@@ -22,6 +21,8 @@ import {
   deleteUser,
 } from "aws-amplify/auth";
 import { Hub } from "aws-amplify/utils";
+import { authedFetch } from "@/app/lib/apiFetch";
+import { registerCurrentSession, revokeCurrentSessionBestEffort } from "@/app/lib/sessionClient";
 
 import SignInModal from "./SignInModal";
 import SignUpModal from "./SignUpModal";
@@ -202,6 +203,15 @@ export default function AuthProvider({
         termsAccepted,
       });
 
+      // Records this device in InPlayer-Sessions — see app/lib/sessions.ts
+      // for the full "why," and app/lib/apiFetch.ts for how a session
+      // being revoked later actually takes effect. Only on a real fresh
+      // sign-in, same gate as the admin-redirect check right below, so a
+      // page refresh never registers a duplicate row for the same login.
+      if (options?.isFreshSignIn && idToken) {
+        await registerCurrentSession(idToken);
+      }
+
       // Send an admin straight to the Admin Panel the moment they actually
       // sign in, instead of leaving them on the normal site. Uses the same
       // /api/admin/me check app/admin/layout.tsx already relies on — the
@@ -235,26 +245,35 @@ export default function AuthProvider({
   // Check for an already-active session on first load (e.g. returning
   // visitor who signed in previously and never signed out)
   useEffect(() => {
-    refreshUser();
+    (async () => {
+      await refreshUser();
+    })();
   }, []);
 
   // Real online/offline presence (see app/api/presence) — a heartbeat for
   // as long as this tab is open and signed in, not just while a messages
   // thread happens to be open, so "@user is online" reflects them using
   // the site at all, the same way it does on other platforms.
+  //
+  // This is ALSO the mechanism that makes "log out this device" (Settings
+  // > Privacy, or an admin forcing it) actually take effect on a device
+  // that isn't otherwise clicking anything: every authedFetch() call
+  // (including this one, via the shared helper) carries this device's own
+  // X-Session-Id, so once that session row is deleted, this heartbeat gets
+  // a 401 within one interval — at most ~45s — and this signs the tab out
+  // locally rather than silently retrying forever against a session that's
+  // already gone.
   useEffect(() => {
     if (!user?.userId) return;
 
     let cancelled = false;
     async function ping() {
       try {
-        const session = await fetchAuthSession();
-        const idToken = session.tokens?.idToken?.toString();
-        if (!idToken || cancelled) return;
-        await fetch("/api/presence", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${idToken}` },
-        });
+        const res = await authedFetch("/api/presence", { method: "POST" });
+        if (res.status === 401 && !cancelled) {
+          await amplifySignOut().catch(() => {});
+          if (!cancelled) setUser(null);
+        }
       } catch (err) {
         console.error("Presence heartbeat failed:", err);
       }
@@ -316,6 +335,18 @@ export default function AuthProvider({
   }, []);
 
   async function handleSignOut() {
+    // Best-effort: clears this device's own InPlayer-Sessions row BEFORE
+    // ending the actual Cognito session, since that call needs a still-
+    // valid ID token to authenticate as this account. Never blocks sign-
+    // out if it fails — worst case, a stale row lingers in the device list
+    // until it naturally falls off, nothing is left signed in either way.
+    try {
+      const session = await fetchAuthSession();
+      const idToken = session.tokens?.idToken?.toString() || null;
+      await revokeCurrentSessionBestEffort(idToken);
+    } catch (err) {
+      console.error("Failed to clear this device's session row on sign out:", err);
+    }
     await amplifySignOut();
     setUser(null);
   }

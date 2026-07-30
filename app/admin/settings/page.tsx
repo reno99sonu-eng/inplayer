@@ -1,7 +1,7 @@
 "use client";
 
+import { authedFetch } from "@/app/lib/apiFetch";
 import { useEffect, useState } from "react";
-import { fetchAuthSession } from "aws-amplify/auth";
 import {
   Loader2,
   Save,
@@ -15,18 +15,6 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-async function authedFetch(path: string, options: RequestInit = {}) {
-  const session = await fetchAuthSession();
-  const idToken = session.tokens?.idToken?.toString();
-  if (!idToken) throw new Error("Session expired — please sign in again.");
-  return fetch(path, {
-    ...options,
-    headers: {
-      ...(options.headers || {}),
-      Authorization: `Bearer ${idToken}`,
-    },
-  });
-}
 
 interface CoreSettings {
   maintenanceMode: boolean;

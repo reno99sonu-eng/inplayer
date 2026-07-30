@@ -1,9 +1,9 @@
 "use client";
 
+import { authedFetch } from "@/app/lib/apiFetch";
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { fetchAuthSession } from "aws-amplify/auth";
 import {
   Search,
   Loader2,
@@ -14,6 +14,10 @@ import {
   UserRound,
   Trash2,
   X,
+  Monitor,
+  MapPin,
+  LogOut,
+  ChevronDown,
 } from "lucide-react";
 
 interface AdminUserRow {
@@ -26,19 +30,6 @@ interface AdminUserRow {
   email: string | null;
 }
 
-async function authedFetch(path: string, options: RequestInit = {}) {
-  const session = await fetchAuthSession();
-  const idToken = session.tokens?.idToken?.toString();
-  if (!idToken) throw new Error("Session expired — please sign in again.");
-
-  return fetch(path, {
-    ...options,
-    headers: {
-      ...(options.headers || {}),
-      Authorization: `Bearer ${idToken}`,
-    },
-  });
-}
 
 function formatDate(iso: string | null): string {
   if (!iso) return "Unknown";
@@ -139,6 +130,143 @@ function DeleteUserModal({
   );
 }
 
+interface AdminSessionRow {
+  sessionId: string;
+  device: string | null;
+  location: string | null;
+  createdAt: string;
+}
+
+// Real per-account device/location visibility for the admin — every row
+// here is an actual InPlayer-Sessions entry from a real sign-in (see
+// app/lib/sessions.ts), not simulated. "Log out" here uses the same admin-
+// aware /api/sessions routes Settings > Privacy uses for a person's own
+// account, just targeting someone else's userId.
+function UserSessionsPanel({ userId }: { userId: string }) {
+  const [sessions, setSessions] = useState<AdminSessionRow[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [loggingOutAll, setLoggingOutAll] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setLoading(true);
+      setError(null);
+      try {
+        const res = await authedFetch(`/api/sessions?userId=${encodeURIComponent(userId)}`);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Couldn't load sessions.");
+        if (!cancelled) setSessions(data.sessions || []);
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : "Something went wrong.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  const logOutOne = async (sessionId: string) => {
+    setBusyId(sessionId);
+    try {
+      const res = await authedFetch(
+        `/api/sessions/${sessionId}?userId=${encodeURIComponent(userId)}`,
+        { method: "DELETE" }
+      );
+      if (res.ok) setSessions((prev) => prev.filter((s) => s.sessionId !== sessionId));
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
+  const logOutAll = async () => {
+    if (!window.confirm("Force-log-out every device this account is currently signed in on?")) {
+      return;
+    }
+    setLoggingOutAll(true);
+    try {
+      const res = await authedFetch("/api/sessions/logout-all", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId }),
+      });
+      if (res.ok) setSessions([]);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setLoggingOutAll(false);
+    }
+  };
+
+  return (
+    <div className="mt-3 rounded-xl border border-white/10 light:border-black/10 bg-black/10 light:bg-black/[0.03] p-3">
+      {error ? (
+        <p className="text-xs text-red-300">{error}</p>
+      ) : loading ? (
+        <div className="flex items-center justify-center py-3">
+          <Loader2 size={16} className="animate-spin text-slate-400" />
+        </div>
+      ) : sessions.length === 0 ? (
+        <p className="text-xs text-slate-500">Not currently signed in on any device.</p>
+      ) : (
+        <>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+              {sessions.length} active device{sessions.length === 1 ? "" : "s"}
+            </p>
+            <button
+              type="button"
+              onClick={logOutAll}
+              disabled={loggingOutAll}
+              className="flex items-center gap-1 rounded-lg bg-red-500/15 px-2.5 py-1 text-[11px] font-bold text-red-300 hover:bg-red-500/25 disabled:opacity-60"
+            >
+              {loggingOutAll ? <Loader2 size={11} className="animate-spin" /> : <LogOut size={11} />}
+              Log out all
+            </button>
+          </div>
+          <div className="mt-2 space-y-1.5">
+            {sessions.map((s) => (
+              <div
+                key={s.sessionId}
+                className="flex items-center justify-between gap-2 rounded-lg bg-white/[0.03] px-2.5 py-1.5"
+              >
+                <div className="min-w-0 text-xs text-slate-300">
+                  <span className="inline-flex items-center gap-1">
+                    <Monitor size={11} /> {s.device || "Unknown device"}
+                  </span>
+                  <span className="mx-1.5 text-slate-600">·</span>
+                  <span className="inline-flex items-center gap-1">
+                    <MapPin size={11} /> {s.location || "Unknown location"}
+                  </span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => logOutOne(s.sessionId)}
+                  disabled={busyId === s.sessionId}
+                  className="flex flex-shrink-0 items-center gap-1 text-[11px] font-semibold text-slate-400 hover:text-red-300 disabled:opacity-60"
+                >
+                  {busyId === s.sessionId ? (
+                    <Loader2 size={11} className="animate-spin" />
+                  ) : (
+                    <LogOut size={11} />
+                  )}
+                  Log out
+                </button>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 export default function AdminUsersPage() {
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -150,6 +278,7 @@ export default function AdminUsersPage() {
   const [actioningId, setActioningId] = useState<string | null>(null);
   const [deletingUser, setDeletingUser] = useState<AdminUserRow | null>(null);
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [expandedUserId, setExpandedUserId] = useState<string | null>(null);
 
   // Debounce the search box the same way ShortCreationTools debounces its
   // music search — avoids firing a request on every keystroke.
@@ -298,8 +427,9 @@ export default function AdminUsersPage() {
           {users.map((u) => (
             <div
               key={u.userId}
-              className="flex flex-col gap-3 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4 sm:flex-row sm:items-center sm:justify-between"
+              className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4"
             >
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex min-w-0 items-center gap-3">
                 {u.avatarUrl ? (
                   <Image
@@ -374,7 +504,21 @@ export default function AdminUsersPage() {
                   <Trash2 size={13} />
                   Delete
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setExpandedUserId(expandedUserId === u.userId ? null : u.userId)}
+                  className="flex items-center gap-1.5 rounded-xl bg-white/5 light:bg-black/5 px-3 py-2 text-xs font-bold text-slate-400 transition hover:bg-white/10 light:hover:bg-black/10"
+                >
+                  <Monitor size={13} />
+                  Sessions
+                  <ChevronDown
+                    size={13}
+                    className={`transition-transform ${expandedUserId === u.userId ? "rotate-180" : ""}`}
+                  />
+                </button>
               </div>
+            </div>
+            {expandedUserId === u.userId && <UserSessionsPanel userId={u.userId} />}
             </div>
           ))}
         </div>

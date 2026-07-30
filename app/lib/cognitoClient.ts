@@ -65,6 +65,28 @@ export async function resolveCognitoEmails(
   return result;
 }
 
+// Cognito's own Username value for a given sub/userId — needed for any
+// Admin* API (AdminUserGlobalSignOut, AdminDeleteUser, ...), since those
+// all key off Username, not the sub. For a Google-linked account this is a
+// provider-prefixed string like "google_1234567890", NOT the sub and NOT
+// necessarily the email, so it always has to be looked up rather than
+// assumed.
+export async function resolveCognitoUsername(userId: string): Promise<string | null> {
+  try {
+    const res = await cognitoClient.send(
+      new ListUsersCommand({
+        UserPoolId: COGNITO_USER_POOL_ID,
+        Filter: `sub = "${userId}"`,
+        Limit: 1,
+      })
+    );
+    return res.Users?.[0]?.Username || null;
+  } catch (err) {
+    console.error(`resolveCognitoUsername: lookup failed for ${userId}:`, err);
+    return null;
+  }
+}
+
 // Real, permanent removal from Cognito — the account can never sign in
 // again after this (unlike suspend, which only blocks app-side actions
 // while the Cognito account itself stays intact). Used by the real

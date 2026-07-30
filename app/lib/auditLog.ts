@@ -24,6 +24,8 @@ export type AuditAction =
   | "user.suspend"
   | "user.unsuspend"
   | "user.delete"
+  | "user.session_revoke"
+  | "user.session_revoke_all"
   | "video.delete"
   | "video.restore"
   | "kyc.approve"

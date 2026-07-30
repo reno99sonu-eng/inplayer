@@ -1,7 +1,7 @@
 "use client";
 
+import { authedFetch } from "@/app/lib/apiFetch";
 import { useEffect, useMemo, useRef, useState } from "react";
-import { fetchAuthSession } from "aws-amplify/auth";
 import {
   Loader2,
   AlertTriangle,
@@ -16,15 +16,6 @@ import {
 } from "lucide-react";
 import { compressImageToBanner } from "@/app/lib/imageCompress";
 
-async function authedFetch(path: string, options: RequestInit = {}) {
-  const session = await fetchAuthSession();
-  const idToken = session.tokens?.idToken?.toString();
-  if (!idToken) throw new Error("Session expired — please sign in again.");
-  return fetch(path, {
-    ...options,
-    headers: { ...(options.headers || {}), Authorization: `Bearer ${idToken}` },
-  });
-}
 
 type AdSlotSource = "house" | "adsense" | "off";
 type Placement = "homepage" | "watch";

@@ -1,8 +1,8 @@
 "use client";
 
+import { authedFetch } from "@/app/lib/apiFetch";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { fetchAuthSession } from "aws-amplify/auth";
 import {
   Loader2,
   AlertTriangle,
@@ -41,12 +41,6 @@ interface TopVideo {
   windowViews: number;
 }
 
-async function authedFetch(path: string) {
-  const session = await fetchAuthSession();
-  const idToken = session.tokens?.idToken?.toString();
-  if (!idToken) throw new Error("Session expired — please sign in again.");
-  return fetch(path, { headers: { Authorization: `Bearer ${idToken}` } });
-}
 
 function fmt(n: number): string {
   return n.toLocaleString("en-IN");

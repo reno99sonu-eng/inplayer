@@ -1,10 +1,10 @@
 "use client";
 
+import { authedFetch } from "@/app/lib/apiFetch";
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { fetchAuthSession } from "aws-amplify/auth";
 import {
   Search,
   Loader2,
@@ -31,16 +31,6 @@ interface AdminVideoRow {
 
 type TypeFilter = "all" | "video" | "short";
 
-async function authedFetch(path: string, options: RequestInit = {}) {
-  const session = await fetchAuthSession();
-  const idToken = session.tokens?.idToken?.toString();
-  if (!idToken) throw new Error("Session expired — please sign in again.");
-
-  return fetch(path, {
-    ...options,
-    headers: { ...(options.headers || {}), Authorization: `Bearer ${idToken}` },
-  });
-}
 
 function watchHref(v: AdminVideoRow): string {
   return v.contentType === "short" ? `/shorts?v=${v.videoId}` : `/watch/${v.videoId}`;

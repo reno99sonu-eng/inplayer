@@ -1,23 +1,11 @@
 "use client";
 
+import { authedFetch } from "@/app/lib/apiFetch";
 import { useState } from "react";
-import { fetchAuthSession } from "aws-amplify/auth";
 import { Loader2, Megaphone, Send, CheckCircle2, AlertTriangle, Users, User } from "lucide-react";
 
 const MAX_MESSAGE_LENGTH = 500;
 
-async function authedFetch(path: string, options: RequestInit = {}) {
-  const session = await fetchAuthSession();
-  const idToken = session.tokens?.idToken?.toString();
-  if (!idToken) throw new Error("Session expired — please sign in again.");
-  return fetch(path, {
-    ...options,
-    headers: {
-      ...(options.headers || {}),
-      Authorization: `Bearer ${idToken}`,
-    },
-  });
-}
 
 export default function AdminNotificationsPage() {
   const [target, setTarget] = useState<"all" | "user">("all");

@@ -12,6 +12,7 @@ import SettingsRow from "../common/SettingsRow";
 import SettingsToggle from "../common/SettingsToggle";
 import { useSettings } from "../SettingsProvider";
 import DeleteAccountCard from "./DeleteAccountCard";
+import SessionsCard from "./SessionsCard";
 
 // Wired to the real SettingsProvider (persisted to localStorage, read by
 // useSettings() anywhere in the app — see RecommendationFeed.tsx for a
@@ -64,6 +65,7 @@ export default function PrivacySection() {
 
       </div>
 
+      <SessionsCard />
       <DeleteAccountCard />
     </SettingsCard>
   );

@@ -2,6 +2,7 @@ import { CognitoJwtVerifier } from "aws-jwt-verify";
 import { NextRequest } from "next/server";
 import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
+import { sessionStillActive } from "@/app/lib/sessions";
 
 // These match the values in amplify-config.ts — same User Pool, same
 // App Client, just verified here on the server instead of trusted
@@ -25,6 +26,15 @@ export interface VerifiedUser {
 // messaging, etc.) sitewide the moment it's flipped on, with no changes
 // needed anywhere else.
 const SUSPENDED_MESSAGE = "Account suspended";
+
+// Thrown when a request explicitly identifies which device/session it's
+// from (via X-Session-Id — see app/lib/apiFetch.ts) and that session has
+// since been logged out (Settings > Privacy, or an admin forcing it) — see
+// app/lib/sessions.ts for why this app-level check exists instead of a
+// Cognito token revocation. A request with NO X-Session-Id header (an
+// older cached page, or a route this app hasn't wired up yet) always
+// skips this check rather than being blocked by it.
+const SESSION_REVOKED_MESSAGE = "Signed out of this device";
 
 // Call this at the top of any API route that should only work for
 // signed-in users (uploading, liking, commenting, etc.). It expects
@@ -106,6 +116,14 @@ export async function verifyAuth(request: NextRequest): Promise<VerifiedUser> {
   } catch (err) {
     if (err instanceof Error && err.message === SUSPENDED_MESSAGE) throw err;
     console.error("verifyAuth: suspension/name check failed, failing open:", err);
+  }
+
+  const sessionId = request.headers.get("x-session-id");
+  if (sessionId) {
+    const active = await sessionStillActive(userId, sessionId);
+    if (!active) {
+      throw new Error(SESSION_REVOKED_MESSAGE);
+    }
   }
 
   return {

@@ -1,7 +1,7 @@
 "use client";
 
+import { authedFetch } from "@/app/lib/apiFetch";
 import { useEffect, useMemo, useState } from "react";
-import { fetchAuthSession } from "aws-amplify/auth";
 import {
   Loader2,
   AlertTriangle,
@@ -19,6 +19,7 @@ import {
   Monitor,
   ShieldAlert,
   Search,
+  LogOut,
 } from "lucide-react";
 import { formatTimeAgo } from "@/app/lib/formatters";
 
@@ -26,6 +27,8 @@ type AuditAction =
   | "user.suspend"
   | "user.unsuspend"
   | "user.delete"
+  | "user.session_revoke"
+  | "user.session_revoke_all"
   | "video.delete"
   | "video.restore"
   | "kyc.approve"
@@ -62,6 +65,8 @@ const ACTION_META: Record<
   "user.suspend": { label: "Suspended user", icon: UserX, tone: "amber" },
   "user.unsuspend": { label: "Unsuspended user", icon: UserCheck, tone: "emerald" },
   "user.delete": { label: "Permanently deleted user", icon: Trash2, tone: "red" },
+  "user.session_revoke": { label: "Force-logged-out one device", icon: LogOut, tone: "amber" },
+  "user.session_revoke_all": { label: "Force-logged-out every device", icon: LogOut, tone: "amber" },
   "video.delete": { label: "Permanently deleted video/Short", icon: Trash2, tone: "red" },
   "video.restore": { label: "Restored video/Short", icon: RotateCcw, tone: "emerald" },
   "kyc.approve": { label: "Approved creator KYC", icon: ShieldCheck, tone: "emerald" },
@@ -93,12 +98,6 @@ const FILTERS = [
   { id: "notification", label: "Notifications" },
 ] as const;
 
-async function authedFetch(path: string) {
-  const session = await fetchAuthSession();
-  const idToken = session.tokens?.idToken?.toString();
-  if (!idToken) throw new Error("Session expired — please sign in again.");
-  return fetch(path, { headers: { Authorization: `Bearer ${idToken}` } });
-}
 
 function targetDisplay(item: AuditLogItem): string {
   if (item.targetType === "user" && item.targetLabel) return `@${item.targetLabel}`;

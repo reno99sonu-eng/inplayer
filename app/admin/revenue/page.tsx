@@ -1,7 +1,7 @@
 "use client";
 
+import { authedFetch } from "@/app/lib/apiFetch";
 import { useEffect, useMemo, useState } from "react";
-import { fetchAuthSession } from "aws-amplify/auth";
 import {
   Loader2,
   AlertTriangle,
@@ -38,12 +38,6 @@ interface CreatorRevenueRow {
   lastChargeAt: string | null;
 }
 
-async function authedFetch(path: string) {
-  const session = await fetchAuthSession();
-  const idToken = session.tokens?.idToken?.toString();
-  if (!idToken) throw new Error("Session expired — please sign in again.");
-  return fetch(path, { headers: { Authorization: `Bearer ${idToken}` } });
-}
 
 function inr(n: number): string {
   return `₹${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;

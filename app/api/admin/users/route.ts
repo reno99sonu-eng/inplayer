@@ -3,6 +3,7 @@ import { ScanCommand, BatchGetCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { requireAdmin } from "@/app/lib/isAdmin";
 import { normalizeUsername } from "@/app/lib/username";
+import { resolveCognitoEmails } from "@/app/lib/cognitoClient";
 
 const PAGE_SIZE = 25;
 
@@ -13,6 +14,7 @@ export interface AdminUserRow {
   avatarUrl: string | null;
   createdAt: string | null;
   isSuspended: boolean;
+  email: string | null;
 }
 
 function toRow(item: Record<string, unknown>): AdminUserRow {
@@ -23,7 +25,22 @@ function toRow(item: Record<string, unknown>): AdminUserRow {
     avatarUrl: (item.avatarUrl as string) || null,
     createdAt: (item.createdAt as string) || null,
     isSuspended: item.isSuspended === true,
+    // Filled in afterward by attachEmails() — Cognito is the only place
+    // InPlayer stores real email addresses, so this starts null and gets
+    // hydrated with one ListUsers-by-sub lookup per row.
+    email: null,
   };
+}
+
+// Cognito has no bulk "get many users by sub" API, so this is one real
+// ListUsers call per row (run in parallel by resolveCognitoEmails) — fine
+// at a PAGE_SIZE of 25. A row whose email can't be resolved (e.g. the
+// Cognito account is gone) just keeps email: null rather than failing the
+// whole list.
+async function attachEmails(rows: AdminUserRow[]): Promise<AdminUserRow[]> {
+  if (rows.length === 0) return rows;
+  const emails = await resolveCognitoEmails(rows.map((r) => r.userId));
+  return rows.map((r) => ({ ...r, email: emails.get(r.userId) || null }));
 }
 
 const USER_PROJECTION =
@@ -33,10 +50,10 @@ const USER_PROJECTION_NAMES = { "#n": "name" };
 // Free-text search: real accounts only, matched by username (InPlayer's
 // only indexed-ish lookup — see app/lib/userSearch.ts, this mirrors that
 // same Scan-and-filter approach on the small InPlayer-Usernames table,
-// then hydrates full rows from InPlayer-Users). Email is NOT stored in
-// InPlayer-Users at all (it lives only in Cognito), so it can't be
-// searched or shown here without adding a separate Cognito lookup — a
-// real gap, not a bug, flagged here rather than faked.
+// then hydrates full rows from InPlayer-Users). Search itself still only
+// matches by username, not email — InPlayer-Users doesn't store email, so
+// there's no indexed way to search Cognito by partial email match. Email
+// is attached afterward (see attachEmails) purely for display.
 async function searchUsers(query: string): Promise<AdminUserRow[]> {
   const q = normalizeUsername(query);
   if (!q) return [];
@@ -132,12 +149,12 @@ export async function GET(request: NextRequest) {
 
   try {
     if (query) {
-      const rows = await searchUsers(query);
+      const rows = await attachEmails(await searchUsers(query));
       return NextResponse.json({ users: rows, nextCursor: null });
     }
 
     const { rows, nextCursor } = await listUsers(cursor);
-    return NextResponse.json({ users: rows, nextCursor });
+    return NextResponse.json({ users: await attachEmails(rows), nextCursor });
   } catch (err) {
     console.error("Admin users list failed:", err);
     return NextResponse.json(

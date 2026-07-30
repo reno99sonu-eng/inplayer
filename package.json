@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@aws-amplify/ui-react": "^6.15.4",
+    "@aws-sdk/client-cognito-identity-provider": "^3.1098.0",
     "@aws-sdk/client-dynamodb": "^3.1090.0",
     "@aws-sdk/lib-dynamodb": "^3.1090.0",
     "@mux/mux-node": "^14.1.1",

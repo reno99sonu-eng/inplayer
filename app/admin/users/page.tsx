@@ -21,6 +21,7 @@ interface AdminUserRow {
   avatarUrl: string | null;
   createdAt: string | null;
   isSuspended: boolean;
+  email: string | null;
 }
 
 async function authedFetch(path: string, options: RequestInit = {}) {
@@ -163,12 +164,6 @@ export default function AdminUsersPage() {
         />
       </div>
 
-      <div className="mt-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs leading-5 text-amber-300 light:text-amber-700">
-        Email addresses aren&apos;t shown here — InPlayer only stores them in the sign-in
-        system (Cognito), not in the database this list reads from. Search and matching
-        works by username.
-      </div>
-
       {error && (
         <div className="mt-4 flex items-start gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300 light:text-red-700">
           <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
@@ -219,6 +214,9 @@ export default function AdminUsersPage() {
                   <p className="truncate text-xs text-slate-400 light:text-slate-600">
                     {u.username ? `@${u.username}` : "No username yet"} · Joined{" "}
                     {formatDate(u.createdAt)}
+                  </p>
+                  <p className="truncate text-xs text-slate-500">
+                    {u.email || "Email unavailable"}
                   </p>
                 </div>
               </div>

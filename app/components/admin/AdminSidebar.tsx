@@ -28,7 +28,7 @@ import {
 const items = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, href: "/admin/dashboard" },
   { id: "users", label: "Users", icon: Users, href: "/admin/users" },
-  { id: "creators", label: "Creators", icon: Star, href: null },
+  { id: "creators", label: "Creators", icon: Star, href: "/admin/creators" },
   { id: "videos", label: "Videos", icon: Video, href: "/admin/videos" },
   { id: "shorts", label: "Shorts", icon: Film, href: "/admin/videos?type=short" },
   { id: "reports", label: "Reports & Moderation", icon: Flag, href: "/admin/moderation" },

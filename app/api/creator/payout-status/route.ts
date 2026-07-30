@@ -45,6 +45,7 @@ export async function GET(request: NextRequest) {
       // estimate derived from views.
       lifetimeEarnedInr: result.Item.lifetimeEarnedInr || 0,
       lifetimePaidOutInr: result.Item.lifetimePaidOutInr || 0,
+      rejectionReason: result.Item.rejectionReason || null,
     });
   } catch (err) {
     // The InPlayer-Creator-Payouts table needs to exist in DynamoDB (userId

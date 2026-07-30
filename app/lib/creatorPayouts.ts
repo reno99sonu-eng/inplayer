@@ -15,6 +15,18 @@ export const REVENUE_LEDGER_TABLE = "InPlayer-Revenue-Ledger";
 // Real memberships: one row per (subscriberId, creatorId) pair.
 export const MEMBERSHIPS_TABLE = "InPlayer-Memberships";
 
+// Real KYC documents (PAN card / Aadhaar / bank proof / selfie photos) a
+// creator submits for manual review — one row per (userId, docType) pair,
+// so each document gets its own DynamoDB item instead of competing for
+// space inside one big item. Admin-only: see app/api/admin/creators and
+// app/admin/creators. Nothing in this app ever serves these images back to
+// anyone except the account they belong to (write-only from that side) and
+// a signed-in admin (read, for review) — see requireAdmin() in
+// app/lib/isAdmin.ts.
+export const KYC_DOCUMENTS_TABLE = "InPlayer-KYC-Documents";
+export const KYC_DOC_TYPES = ["pan_card", "id_proof", "bank_proof", "selfie"] as const;
+export type KycDocType = (typeof KYC_DOC_TYPES)[number];
+
 export const MEMBERSHIP_PRICE_INR = 119;
 
 // The one true split, applied to every real charge recorded in the
@@ -31,7 +43,7 @@ export const ELIGIBILITY_THRESHOLD = {
   views: 10000,
 };
 
-export type KycStatus = "not_started" | "pending_review" | "verified";
+export type KycStatus = "not_started" | "pending_review" | "verified" | "rejected";
 export type PayoutFrequency = "daily" | "weekly" | "monthly" | "annually";
 
 export const PAYOUT_FREQUENCIES: PayoutFrequency[] = [

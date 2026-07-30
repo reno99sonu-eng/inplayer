@@ -11,6 +11,7 @@ import {
   Loader2,
   Landmark,
   Check,
+  AlertTriangle,
 } from "lucide-react";
 import {
   ELIGIBILITY_THRESHOLD,
@@ -33,11 +34,15 @@ function formatInr(amount: number) {
 }
 
 export interface PayoutStatus {
-  kycStatus: "not_started" | "pending_review" | "verified";
+  kycStatus: "not_started" | "pending_review" | "verified" | "rejected";
   payoutFrequency: string | null;
   legalName: string | null;
   submittedAt: string | null;
   minPayoutAmount?: number;
+  // Set only when kycStatus is "rejected" — the admin's reason, shown back
+  // to the creator so a resubmission actually fixes what was wrong (see
+  // app/admin/creators).
+  rejectionReason?: string | null;
   // Real money, credited by app/api/webhooks/razorpay on every confirmed
   // paid-membership charge — not a views-based estimate.
   lifetimeEarnedInr?: number;
@@ -314,10 +319,43 @@ export default function RevenueSection({
             <Clock size={14} /> KYC submitted — under review
           </p>
           <p className="mt-1 text-xs leading-relaxed text-slate-400 light:text-slate-600">
-            We'll unlock live revenue tracking for {payoutStatus.legalName} as
-            soon as this is verified.
+            A real person on the InPlayer team is reviewing what{" "}
+            {payoutStatus.legalName} submitted — we'll unlock live revenue
+            tracking as soon as it's approved.
           </p>
         </div>
+      ) : payoutStatus.kycStatus === "rejected" ? (
+        showKycForm ? (
+          <KycForm
+            rejectionReason={payoutStatus.rejectionReason}
+            onSubmitted={() =>
+              onStatusChange({
+                kycStatus: "pending_review",
+                payoutFrequency: payoutStatus.payoutFrequency,
+                legalName: payoutStatus.legalName,
+                submittedAt: new Date().toISOString(),
+                rejectionReason: null,
+              })
+            }
+          />
+        ) : (
+          <div className="mt-4 rounded-xl border border-red-500/25 bg-red-500/[0.06] px-3 py-3">
+            <p className="flex items-center gap-1.5 text-sm font-bold text-red-300 light:text-red-700">
+              <AlertTriangle size={16} /> KYC wasn&apos;t approved
+            </p>
+            {payoutStatus.rejectionReason && (
+              <p className="mt-1 text-xs leading-relaxed text-slate-400 light:text-slate-600">
+                &quot;{payoutStatus.rejectionReason}&quot;
+              </p>
+            )}
+            <button
+              onClick={() => setShowKycForm(true)}
+              className="mt-3 rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-5 py-2 text-xs font-bold text-white shadow-[0_10px_25px_rgba(255,153,0,.3)] transition-all hover:-translate-y-0.5"
+            >
+              Resubmit KYC
+            </button>
+          </div>
+        )
       ) : meetsThreshold ? (
         showKycForm ? (
           <KycForm

@@ -129,6 +129,81 @@ export function compressImageToThumbnail(
   });
 }
 
+// Data-URL length guard for KYC documents (see app/api/creator/kyc) — each
+// document lives in its OWN DynamoDB item (InPlayer-KYC-Documents, one row
+// per userId+docType) rather than sharing an item with other fields like
+// the thumbnail budget above does, so this gets a much bigger slice of the
+// 400KB hard item limit while still leaving comfortable headroom for the
+// item's other small attributes (userId, docType, uploadedAt).
+export const KYC_DOCUMENT_DATA_URL_MAX_LENGTH = 380_000;
+
+// Compresses an identity/bank document photo (PAN card, Aadhaar, a
+// cancelled cheque, a selfie) for KYC review. Deliberately higher
+// resolution and quality than compressImageToThumbnail — an admin has to
+// actually read the printed text on this image to approve someone for
+// real money, so over-compressing it defeats the entire point. No forced
+// crop/aspect-ratio (unlike thumbnails/banners): documents come in
+// whatever shape the source photo is, and cropping one could cut off part
+// of the ID. Same progressive width/quality search as
+// cropAndCompressToBanner, just with a far larger target budget and
+// starting resolution.
+export function compressImageToDocument(
+  file: File,
+  targetMaxLength = KYC_DOCUMENT_DATA_URL_MAX_LENGTH
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      const img = new Image();
+
+      img.onload = () => {
+        const renderAt = (maxWidth: number, quality: number): string => {
+          const scale = Math.min(1, maxWidth / img.width);
+          const outWidth = Math.round(img.width * scale);
+          const outHeight = Math.round(img.height * scale);
+
+          const canvas = document.createElement("canvas");
+          canvas.width = outWidth;
+          canvas.height = outHeight;
+
+          const ctx = canvas.getContext("2d");
+          if (!ctx) throw new Error("Canvas is not supported in this browser.");
+
+          ctx.drawImage(img, 0, 0, outWidth, outHeight);
+          return canvas.toDataURL("image/jpeg", quality);
+        };
+
+        try {
+          const widths = [1600, 1280, 1000, 720];
+          const qualities = [0.85, 0.75, 0.6, 0.45];
+
+          let best = renderAt(widths[0], qualities[0]);
+          outer: for (const width of widths) {
+            for (const quality of qualities) {
+              const candidate = renderAt(width, quality);
+              best = candidate;
+              if (candidate.length <= targetMaxLength) {
+                best = candidate;
+                break outer;
+              }
+            }
+          }
+          resolve(best);
+        } catch (err) {
+          reject(err instanceof Error ? err : new Error("Couldn't process that image."));
+        }
+      };
+
+      img.onerror = () => reject(new Error("Couldn't read that image file."));
+      img.src = e.target?.result as string;
+    };
+
+    reader.onerror = () => reject(new Error("Couldn't read that file."));
+    reader.readAsDataURL(file);
+  });
+}
+
 // Compresses a channel cover/banner photo down to a byte budget far
 // tighter than a video thumbnail's — this data URL is stored on the SAME
 // InPlayer-Users DynamoDB item as the avatar (see COVER_PHOTO_MAX_LENGTH

@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GetCommand, DeleteCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { requireAdmin } from "@/app/lib/isAdmin";
-import mux from "@/app/lib/mux";
+import { deleteVideoCascade } from "@/app/lib/cascadeDelete";
 
 // Restores a video/Short auto-flagged at upload (app/lib/moderation.ts via
 // app/api/upload/create) — clears moderationHidden so it reappears in
@@ -34,9 +34,12 @@ export async function PATCH(
 
 // Admin removal of any video or Short, regardless of who uploaded it —
 // app/api/my-videos/[videoId]'s DELETE is the creator-owned equivalent
-// (ownership-gated); this is the same real deletion (Mux asset + database
-// row), just gated by requireAdmin instead of upload ownership, for
-// moderation use.
+// (ownership-gated); this calls the exact same shared cascade
+// (app/lib/cascadeDelete.ts), just gated by requireAdmin instead of
+// upload ownership, for moderation use. Real, full, permanent deletion:
+// the Mux asset AND every row anywhere in the app that references this
+// video (comments, likes, watch history, playlist entries, notifications,
+// reports, daily view stats), not just the video row itself.
 export async function DELETE(
   request: NextRequest,
   { params }: { params: Promise<{ videoId: string }> }
@@ -52,22 +55,13 @@ export async function DELETE(
     return NextResponse.json({ error: "Missing videoId" }, { status: 400 });
   }
 
-  const existing = await docClient.send(
-    new GetCommand({ TableName: "InPlayer-Videos", Key: { videoId } })
-  );
-  if (!existing.Item) {
+  const result = await deleteVideoCascade(videoId);
+  if (!result.success && result.errors[0] === "Video not found.") {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
-
-  if (existing.Item.muxAssetId) {
-    try {
-      await mux.video.assets.delete(existing.Item.muxAssetId as string);
-    } catch (err) {
-      console.error("Admin delete: failed to delete Mux asset (continuing anyway):", err);
-    }
+  if (!result.success) {
+    console.error(`Admin delete: video ${videoId} had partial failures:`, result.errors);
   }
 
-  await docClient.send(new DeleteCommand({ TableName: "InPlayer-Videos", Key: { videoId } }));
-
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, warnings: result.errors });
 }

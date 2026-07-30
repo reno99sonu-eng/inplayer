@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GetCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
-import mux from "@/app/lib/mux";
 import { THUMBNAIL_DATA_URL_MAX_LENGTH } from "@/app/lib/imageCompress";
+import { deleteVideoCascade } from "@/app/lib/cascadeDelete";
 
 const VISIBILITY_VALUES = ["public", "unlisted", "private"];
 const SPOKEN_LANGUAGE_VALUES = ["auto", "en", "hi", "bn"];
@@ -178,19 +178,15 @@ export async function DELETE(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: ownership.error }, { status: ownership.status });
   }
 
-  // Also delete the underlying Mux asset, so storage isn't kept (and
-  // billed) for a video that no longer exists in the app.
-  if (ownership.video.muxAssetId) {
-    try {
-      await mux.video.assets.delete(ownership.video.muxAssetId);
-    } catch (err) {
-      console.error("Failed to delete Mux asset (continuing anyway):", err);
-    }
+  // Real, full deletion — the Mux asset AND every row anywhere in the app
+  // that references this video (comments, likes, watch history, playlist
+  // entries, notifications, reports, daily view stats), not just the
+  // video row itself. Shared with the admin delete (app/api/admin/videos)
+  // so both stay identical — see app/lib/cascadeDelete.ts.
+  const result = await deleteVideoCascade(videoId);
+  if (!result.success) {
+    console.error(`Video ${videoId} delete had partial failures:`, result.errors);
   }
 
-  await docClient.send(
-    new DeleteCommand({ TableName: "InPlayer-Videos", Key: { videoId } })
-  );
-
-  return NextResponse.json({ success: true });
+  return NextResponse.json({ success: true, warnings: result.errors });
 }

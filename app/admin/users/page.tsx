@@ -12,6 +12,8 @@ import {
   ShieldCheck,
   ExternalLink,
   UserRound,
+  Trash2,
+  X,
 } from "lucide-react";
 
 interface AdminUserRow {
@@ -51,6 +53,92 @@ function formatDate(iso: string | null): string {
   }
 }
 
+// Deleting a real account is permanent and immediate — no undo, no grace
+// period (see app/lib/cascadeDelete.ts for exactly what it wipes: every
+// video, comment, like, membership, KYC document, the profile, and the
+// real Cognito sign-in itself). A plain window.confirm() is what the
+// Suspend button uses, but that's reversible; this isn't, so it gets a
+// stronger "type the exact handle" gate instead — the same pattern
+// GitHub/Vercel use for destructive deletes, appropriate for a
+// non-technical admin about to do something they can't take back.
+function DeleteUserModal({
+  user,
+  onCancel,
+  onConfirm,
+  deleting,
+}: {
+  user: AdminUserRow;
+  onCancel: () => void;
+  onConfirm: () => void;
+  deleting: boolean;
+}) {
+  const [confirmText, setConfirmText] = useState("");
+  const expected = user.username || user.userId;
+  const canConfirm = confirmText.trim() === expected;
+
+  return (
+    <div
+      className="fixed inset-0 z-[999] flex items-center justify-center bg-black/75 p-4"
+      onClick={onCancel}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-md rounded-2xl border border-red-500/25 bg-[#0B1420] light:bg-[#FBF6EA] p-5"
+      >
+        <div className="flex items-start justify-between gap-2">
+          <h3 className="flex items-center gap-2 text-base font-black text-red-300">
+            <AlertTriangle size={18} /> Permanently delete this account?
+          </h3>
+          <button type="button" onClick={onCancel} className="text-slate-400 hover:text-white">
+            <X size={18} />
+          </button>
+        </div>
+
+        <p className="mt-3 text-xs leading-relaxed text-slate-400 light:text-slate-600">
+          This immediately and permanently removes{" "}
+          <span className="font-bold text-slate-200 light:text-slate-800">
+            {user.name || user.username || "this account"}
+          </span>{" "}
+          from InPlayer: every video/Short they uploaded (and its comments, likes, watch
+          history), their profile, KYC documents, and their real sign-in account (they can
+          never log back in). Any active paid memberships involving them are cancelled at
+          Razorpay too. There is no undo.
+        </p>
+
+        <p className="mt-3 text-xs font-semibold text-slate-300 light:text-slate-700">
+          Type <span className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-orange-300">{expected}</span>{" "}
+          to confirm:
+        </p>
+        <input
+          autoFocus
+          value={confirmText}
+          onChange={(e) => setConfirmText(e.target.value)}
+          className="mt-2 w-full rounded-xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-white px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-red-400/50"
+        />
+
+        <div className="mt-4 flex justify-end gap-2">
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded-xl px-4 py-2 text-xs font-semibold text-slate-400 hover:bg-white/5"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={!canConfirm || deleting}
+            onClick={onConfirm}
+            className="flex items-center gap-1.5 rounded-xl bg-red-500/20 px-4 py-2 text-xs font-bold text-red-300 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
+            Delete permanently
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminUsersPage() {
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
@@ -60,6 +148,8 @@ export default function AdminUsersPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [actioningId, setActioningId] = useState<string | null>(null);
+  const [deletingUser, setDeletingUser] = useState<AdminUserRow | null>(null);
+  const [deleteBusy, setDeleteBusy] = useState(false);
 
   // Debounce the search box the same way ShortCreationTools debounces its
   // music search — avoids firing a request on every keystroke.
@@ -141,6 +231,29 @@ export default function AdminUsersPage() {
       window.alert(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setActioningId(null);
+    }
+  };
+
+  const confirmDelete = async () => {
+    if (!deletingUser) return;
+    setDeleteBusy(true);
+    try {
+      const res = await authedFetch(`/api/admin/users/${deletingUser.userId}`, {
+        method: "DELETE",
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Couldn't delete this account.");
+
+      if (data.warnings?.length) {
+        console.error("Account deleted with partial cleanup failures:", data.warnings);
+      }
+
+      setUsers((prev) => prev.filter((u) => u.userId !== deletingUser.userId));
+      setDeletingUser(null);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setDeleteBusy(false);
     }
   };
 
@@ -251,10 +364,28 @@ export default function AdminUsersPage() {
                   )}
                   {u.isSuspended ? "Unsuspend" : "Suspend"}
                 </button>
+                <button
+                  type="button"
+                  onClick={() => setDeletingUser(u)}
+                  disabled={actioningId === u.userId}
+                  className="flex items-center gap-1.5 rounded-xl bg-white/5 light:bg-black/5 px-3 py-2 text-xs font-bold text-slate-400 transition hover:bg-red-500/15 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Trash2 size={13} />
+                  Delete
+                </button>
               </div>
             </div>
           ))}
         </div>
+      )}
+
+      {deletingUser && (
+        <DeleteUserModal
+          user={deletingUser}
+          onCancel={() => setDeletingUser(null)}
+          onConfirm={confirmDelete}
+          deleting={deleteBusy}
+        />
       )}
 
       {!debouncedQuery && nextCursor && (

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { requireAdmin } from "@/app/lib/isAdmin";
+import { deleteUserCascade } from "@/app/lib/cascadeDelete";
 
 // Suspend/unsuspend a user. Setting isSuspended: true takes effect
 // immediately and everywhere — app/lib/verifyAuth.ts checks this same
@@ -56,4 +57,50 @@ export async function PATCH(
   );
 
   return NextResponse.json({ success: true });
+}
+
+// Real, permanent, immediate account deletion — everything the account
+// owns across every table this app uses, every video's Mux asset, any
+// active paid membership actually cancelled at Razorpay (not just
+// deleted from our own database), and the real Cognito sign-in account
+// itself so this person can never sign back in. See
+// app/lib/cascadeDelete.ts for the full, table-by-table breakdown and the
+// two deliberate exceptions (revenue ledger anonymized not deleted;
+// messages/conversations left alone, matching the existing self-service
+// account-delete policy). There is no undo.
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ userId: string }> }
+) {
+  let admin;
+  try {
+    admin = await requireAdmin(request);
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { userId } = await params;
+  if (!userId) {
+    return NextResponse.json({ error: "Missing userId" }, { status: 400 });
+  }
+
+  // Same reasoning as the suspend guard above — deleting your own admin
+  // account here would have no way back in except editing the database
+  // by hand.
+  if (userId === admin.userId) {
+    return NextResponse.json(
+      { error: "You can't delete your own admin account." },
+      { status: 400 }
+    );
+  }
+
+  const result = await deleteUserCascade(userId);
+  if (!result.success && result.errors[0] === "User not found.") {
+    return NextResponse.json({ error: "User not found." }, { status: 404 });
+  }
+  if (!result.success) {
+    console.error(`Admin delete: user ${userId} had partial failures:`, result.errors);
+  }
+
+  return NextResponse.json({ success: true, warnings: result.errors });
 }

@@ -10,7 +10,8 @@ import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
 import { resolveUsernames } from "@/app/lib/resolveUsernames";
 import { resolveActiveMemberIds } from "@/app/lib/memberships";
-import { moderateText } from "@/app/lib/moderation";
+import { moderateText, UNCHECKED } from "@/app/lib/moderation";
+import { getPlatformSettings } from "@/app/lib/platformSettings";
 
 export async function GET(request: NextRequest) {
   const videoId = request.nextUrl.searchParams.get("videoId");
@@ -98,8 +99,13 @@ export async function POST(request: NextRequest) {
   const userAvatarUrl = profileResult.Item?.avatarUrl || null;
 
   // Real-time auto-moderation (app/lib/moderation.ts) — fails open, so a
-  // moderation API hiccup never blocks a real comment from posting.
-  const moderation = await moderateText(text.trim());
+  // moderation API hiccup never blocks a real comment from posting. Skipped
+  // entirely (not just ignored) when Admin Panel -> Platform Settings has
+  // comment moderation turned off — no OpenAI call is made at all.
+  const platformSettings = await getPlatformSettings();
+  const moderation = platformSettings.moderationEnabledComments
+    ? await moderateText(text.trim())
+    : UNCHECKED;
 
   const comment = {
     videoId,

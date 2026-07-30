@@ -34,7 +34,14 @@ export type AuditAction =
   | "message.delete"
   | "report.resolve"
   | "report.reopen"
-  | "notification.broadcast";
+  | "notification.broadcast"
+  | "settings.update"
+  | "copyright.strike"
+  | "copyright.dismiss"
+  | "copyright.autosuspend"
+  | "ad.create"
+  | "ad.update"
+  | "ad.delete";
 
 export type AuditTargetType =
   | "user"
@@ -42,7 +49,9 @@ export type AuditTargetType =
   | "comment"
   | "message"
   | "report"
-  | "notification";
+  | "notification"
+  | "settings"
+  | "ad";
 
 interface LogAdminActionInput {
   // The route's own request object — required, not optional, so every

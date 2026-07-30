@@ -5,7 +5,8 @@ import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
 import { THUMBNAIL_DATA_URL_MAX_LENGTH } from "@/app/lib/imageCompress";
 import { ensureUsername } from "@/app/lib/ensureUsername";
-import { moderateText } from "@/app/lib/moderation";
+import { moderateText, UNCHECKED } from "@/app/lib/moderation";
+import { getPlatformSettings } from "@/app/lib/platformSettings";
 
 // Defensive re-validation of a client-supplied soundtrack pick (see
 // ShortCreationTools/soundtracks.ts's ResolvedSoundtrack shape) before it's
@@ -130,7 +131,10 @@ export async function POST(request: NextRequest) {
     // hidden from every public listing (app/lib/videoStore.ts) and from
     // direct watch links (app/watch/[videoId]/page.tsx) until an admin
     // reviews it in the Admin Panel's moderation queue.
-    const uploadModeration = await moderateText(`${title} ${description || ""}`);
+    const platformSettings = await getPlatformSettings();
+    const uploadModeration = platformSettings.moderationEnabledUploads
+      ? await moderateText(`${title} ${description || ""}`)
+      : UNCHECKED;
     const moderationHidden = uploadModeration.checked && uploadModeration.flagged;
     // Ground truth for which language the video is spoken in — trusted
     // over Mux's own "auto" detection by the caption pipeline (see

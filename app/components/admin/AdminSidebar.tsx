@@ -20,11 +20,10 @@ import {
   Wrench,
 } from "lucide-react";
 
-// One entry per Admin Panel section. `href: null` items are real, planned
-// phases that simply haven't been built yet — they render as disabled with
-// a "Soon" badge instead of linking anywhere, so nothing ever looks live
-// before it actually is. Update an item's href here the moment its phase
-// ships; nothing else about the sidebar needs to change.
+// One entry per Admin Panel section — every section is real and live as
+// of this list (no more `href: null` placeholders). If a future section
+// needs to ship in stages again, add `href: string | null` back to this
+// array's type and restore the disabled/"Soon" branch below.
 const items = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, href: "/admin/dashboard" },
   { id: "users", label: "Users", icon: Users, href: "/admin/users" },
@@ -32,13 +31,13 @@ const items = [
   { id: "videos", label: "Videos", icon: Video, href: "/admin/videos" },
   { id: "shorts", label: "Shorts", icon: Film, href: "/admin/videos?type=short" },
   { id: "reports", label: "Reports & Moderation", icon: Flag, href: "/admin/moderation" },
-  { id: "copyright", label: "Copyright Center", icon: Copyright, href: null },
+  { id: "copyright", label: "Copyright Center", icon: Copyright, href: "/admin/copyright" },
   { id: "revenue", label: "Revenue", icon: DollarSign, href: "/admin/revenue" },
-  { id: "ads", label: "Advertising", icon: Megaphone, href: null },
+  { id: "ads", label: "Advertising", icon: Megaphone, href: "/admin/advertising" },
   { id: "analytics", label: "Analytics", icon: BarChart3, href: "/admin/analytics" },
-  { id: "ai-moderation", label: "AI Moderation", icon: Bot, href: null },
+  { id: "ai-moderation", label: "AI Moderation", icon: Bot, href: "/admin/ai-moderation" },
   { id: "notifications", label: "Notifications", icon: Bell, href: "/admin/notifications" },
-  { id: "settings", label: "Platform Settings", icon: Settings, href: null },
+  { id: "settings", label: "Platform Settings", icon: Settings, href: "/admin/settings" },
   { id: "audit-logs", label: "Audit Logs", icon: ScrollText, href: "/admin/audit-logs" },
   { id: "captions", label: "Maintenance", icon: Wrench, href: "/admin/captions" },
 ] as const;
@@ -57,30 +56,9 @@ export default function AdminSidebar() {
       <div className="sticky top-28 rounded-[28px] border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.03] p-3 backdrop-blur-xl">
         {items.map((item) => {
           const Icon = item.icon;
-          const selected = item.href
-            ? item.href.includes("?")
-              ? currentPath === item.href
-              : pathname === item.href && !query
-            : false;
-
-          if (!item.href) {
-            return (
-              <div
-                key={item.id}
-                className="mb-2 flex w-full cursor-not-allowed items-center justify-between gap-3 rounded-2xl px-4 py-3 opacity-45"
-              >
-                <span className="flex items-center gap-3">
-                  <Icon size={20} className="text-slate-500" />
-                  <span className="font-medium text-slate-400 light:text-slate-600">
-                    {item.label}
-                  </span>
-                </span>
-                <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-500 light:bg-black/5">
-                  Soon
-                </span>
-              </div>
-            );
-          }
+          const selected = item.href.includes("?")
+            ? currentPath === item.href
+            : pathname === item.href && !query;
 
           return (
             <Link

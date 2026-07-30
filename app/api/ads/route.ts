@@ -1,0 +1,112 @@
+import { NextRequest, NextResponse } from "next/server";
+import { ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { docClient } from "@/app/lib/dynamodb";
+import { getPlatformSettings } from "@/app/lib/platformSettings";
+import { AD_CREATIVES_TABLE, AdPlacement } from "@/app/lib/adCreatives";
+
+// Public, unauthenticated — every visitor's browser calls this to decide
+// what (if anything) to render in a given ad slot. Reads the real,
+// per-slot source Admin Panel -> Advertising sets (house creative /
+// AdSense / off — see app/lib/platformSettings.ts) and, for "house",
+// picks one real active creative for that placement at random so
+// multiple uploads for the same slot rotate naturally instead of only
+// the newest one ever showing.
+const VALID_PLACEMENTS: AdPlacement[] = ["homepage", "watch"];
+
+export async function GET(request: NextRequest) {
+  const placement = request.nextUrl.searchParams.get("placement") as AdPlacement | null;
+  if (!placement || !VALID_PLACEMENTS.includes(placement)) {
+    return NextResponse.json({ error: "Invalid placement." }, { status: 400 });
+  }
+
+  const settings = await getPlatformSettings();
+  const source =
+    placement === "homepage" ? settings.homepageBannerSource : settings.watchPageBannerSource;
+
+  if (source === "off") {
+    return NextResponse.json({ source: "off" });
+  }
+
+  if (source === "adsense") {
+    if (!settings.adsenseEnabled || !settings.adsensePublisherId) {
+      return NextResponse.json({ source: "off" });
+    }
+    return NextResponse.json({ source: "adsense", adsensePublisherId: settings.adsensePublisherId });
+  }
+
+  // source === "house"
+  try {
+    const items: Record<string, unknown>[] = [];
+    let exclusiveStartKey: Record<string, unknown> | undefined;
+    do {
+      const result = await docClient.send(
+        new ScanCommand({
+          TableName: AD_CREATIVES_TABLE,
+          FilterExpression: "placement = :p AND active = :a",
+          ExpressionAttributeValues: { ":p": placement, ":a": true },
+          ExclusiveStartKey: exclusiveStartKey,
+        })
+      );
+      items.push(...((result.Items || []) as Record<string, unknown>[]));
+      exclusiveStartKey = result.LastEvaluatedKey;
+    } while (exclusiveStartKey);
+
+    if (items.length === 0) {
+      return NextResponse.json({ source: "off" });
+    }
+
+    const pick = items[Math.floor(Math.random() * items.length)];
+
+    // Best-effort impression counter — never blocks or fails the actual
+    // response if this write hiccups.
+    docClient
+      .send(
+        new UpdateCommand({
+          TableName: AD_CREATIVES_TABLE,
+          Key: { adId: pick.adId },
+          UpdateExpression: "ADD impressions :one",
+          ExpressionAttributeValues: { ":one": 1 },
+        })
+      )
+      .catch((err) => console.error("ads: impression counter failed:", err));
+
+    return NextResponse.json({
+      source: "house",
+      creative: {
+        adId: pick.adId,
+        imageUrl: pick.imageUrl,
+        linkUrl: pick.linkUrl,
+        title: pick.title,
+      },
+    });
+  } catch (err) {
+    console.error("Ad creatives lookup failed (table may not exist yet):", err);
+    return NextResponse.json({ source: "off" });
+  }
+}
+
+// Real click-tracking — fired by AdBanner right before it navigates the
+// visitor to the creative's real linkUrl. Fire-and-forget on the client
+// side (see AdBanner.tsx), so a slow/failed write never delays the click.
+export async function POST(request: NextRequest) {
+  const body = await request.json().catch(() => null);
+  const adId = body?.adId;
+  if (!adId || typeof adId !== "string") {
+    return NextResponse.json({ error: "adId is required." }, { status: 400 });
+  }
+
+  try {
+    await docClient.send(
+      new UpdateCommand({
+        TableName: AD_CREATIVES_TABLE,
+        Key: { adId },
+        UpdateExpression: "ADD clicks :one",
+        ExpressionAttributeValues: { ":one": 1 },
+      })
+    );
+    return NextResponse.json({ success: true });
+  } catch (err) {
+    console.error("Ad click tracking failed:", err);
+    return NextResponse.json({ success: false });
+  }
+}

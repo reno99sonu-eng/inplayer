@@ -2,6 +2,7 @@ import TrendingNow from "./components/TrendingNow";
 import FloatingAIButton from "./components/FloatingAIButton";
 import FeaturedHero from "./components/featuredHero/FeaturedHero";
 import RecommendationFeed from "./components/RecommendationFeed";
+import AdBanner from "./components/AdBanner";
 import { getReadyVideos } from "./lib/videoStore";
 import type { Recommendation } from "./data/recommendations";
 import type { Short } from "./data/shorts";
@@ -162,6 +163,8 @@ export default async function Home({ searchParams }: HomeProps) {
               <TrendingNow />
 
               <div className="mx-auto h-px w-[92%] bg-gradient-to-r from-transparent via-white/10 to-transparent light:via-black/10" />
+
+              <AdBanner placement="homepage" />
             </>
           )}
 

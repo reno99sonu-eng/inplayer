@@ -12,6 +12,7 @@ import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { formatTimeAgo, formatViews } from "@/app/lib/formatters";
 import WatchActions from "@/app/components/watch/WatchActions";
 import WatchMeta from "@/app/components/watch/WatchMeta";
+import AdBanner from "@/app/components/AdBanner";
 
 interface VideoData {
   videoId: string;
@@ -175,6 +176,10 @@ export default function WatchPageContent({ video, relatedVideos: initialRelatedV
               </span>
             </button>
           )}
+
+          <div className={`mt-3 ${theaterMode ? "mx-auto max-w-[1300px]" : ""}`}>
+            <AdBanner placement="watch" />
+          </div>
 
           <div className={theaterMode ? "mx-auto max-w-[1300px]" : ""}>
             {commentsOn ? <CommentSection videoId={video.videoId} /> : <div className="mt-6 flex items-center gap-2 rounded-2xl border border-white/[0.08] bg-white/[0.02] px-4 py-3 text-sm text-slate-400 light:border-black/[0.08] light:bg-black/[0.02] light:text-slate-600"><MessageSquareOff size={16} />Comments are turned off for this video.</div>}

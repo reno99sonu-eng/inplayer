@@ -18,7 +18,10 @@ export interface ModerationResult {
   categories: string[];
 }
 
-const UNCHECKED: ModerationResult = { checked: false, flagged: false, categories: [] };
+// Exported so callers can hand this back directly when Admin Panel ->
+// Platform Settings has that content type's moderation turned off,
+// without duplicating this literal at every call site.
+export const UNCHECKED: ModerationResult = { checked: false, flagged: false, categories: [] };
 
 export async function moderateText(text: string): Promise<ModerationResult> {
   const apiKey = process.env.OPENAI_API_KEY;

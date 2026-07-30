@@ -7,6 +7,8 @@ import MobileBottomNav from "./components/MobileBottomNav";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { SettingsProvider } from "./components/settings/SettingsProvider";
 import AuthProvider from "./components/auth/AuthProvider";
+import MaintenanceGate from "./components/MaintenanceGate";
+import AnnouncementBanner from "./components/AnnouncementBanner";
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -45,9 +47,12 @@ export default function RootLayout({
 <AuthProvider>
   <SettingsProvider>
     <ThemeProvider>
-      <Navbar />
-      <div className="pb-20 lg:pb-0">{children}</div>
-      <MobileBottomNav />
+      <MaintenanceGate>
+        <Navbar />
+        <AnnouncementBanner />
+        <div className="pb-20 lg:pb-0">{children}</div>
+        <MobileBottomNav />
+      </MaintenanceGate>
     </ThemeProvider>
   </SettingsProvider>
 </AuthProvider>

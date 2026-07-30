@@ -1,10 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { User, Mail, Lock, X, Loader2, Check, CheckCircle2 } from "lucide-react";
+import { User, Mail, Lock, X, Loader2, Check, CheckCircle2, UserX } from "lucide-react";
 import { signUp } from "@/app/lib/auth";
 import { signInWithRedirect } from "aws-amplify/auth";
 import { useAuthModal } from "./AuthProvider";
+import { usePlatformSettings } from "@/app/hooks/usePlatformSettings";
 
 interface SignUpModalProps {
   open: boolean;
@@ -36,6 +37,12 @@ const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)
 
 export default function SignUpModal({ open, onClose }: SignUpModalProps) {
   const { openSignIn, openVerifyEmail } = useAuthModal();
+  // Real Platform Settings toggle (Admin Panel -> Platform Settings). A
+  // still-loading or unreachable settings fetch (settings === null) fails
+  // open — never block real sign-ups over a transient network error, same
+  // convention as every other consumer of usePlatformSettings.
+  const { settings: platformSettings } = usePlatformSettings();
+  const signupsPaused = platformSettings?.signupsEnabled === false;
 
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -167,6 +174,52 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
   };
 
   if (!open) return null;
+
+  if (signupsPaused) {
+    return (
+      <div
+        onClick={onClose}
+        className="
+          fixed inset-0 z-[9999] flex items-center justify-center
+          bg-black/70 light:bg-black/40 backdrop-blur-md p-4 sm:p-5
+        "
+      >
+        <div
+          onClick={(e) => e.stopPropagation()}
+          className="
+            relative w-full max-w-[420px] rounded-[28px] border border-orange-400/15
+            bg-gradient-to-br from-[#07111F]/95 via-[#0B1728]/95 to-[#040A14]/95
+            light:from-[#FBF6EA]/98 light:via-[#EDE2C9]/98 light:to-[#FBF6EA]/98
+            p-6 text-center shadow-[0_25px_90px_rgba(0,0,0,.55)]
+          "
+        >
+          <button
+            type="button"
+            onClick={onClose}
+            className="absolute right-4 top-4 flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-300 transition hover:rotate-90 hover:border-orange-400/40 light:border-black/10 light:text-slate-600"
+          >
+            <X size={18} />
+          </button>
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-amber-400/30 bg-amber-500/10">
+            <UserX size={26} className="text-amber-300" />
+          </div>
+          <h2 className="mt-4 text-xl font-black text-white light:text-slate-900">
+            Sign-ups are paused
+          </h2>
+          <p className="mt-2 text-sm text-slate-400 light:text-slate-600">
+            InPlayer isn&apos;t accepting new accounts right now. Please check back soon.
+          </p>
+          <button
+            type="button"
+            onClick={openSignIn}
+            className="mt-5 text-sm font-semibold text-orange-300 transition hover:text-orange-200 light:text-orange-600"
+          >
+            Already have an account? Sign In
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div

@@ -6,7 +6,8 @@ import { verifyAuth } from "@/app/lib/verifyAuth";
 import { areUsersConnected } from "@/app/lib/connections";
 import { createNotification } from "@/app/lib/notifications";
 import { makeConversationId } from "@/app/lib/conversationId";
-import { moderateText } from "@/app/lib/moderation";
+import { moderateText, UNCHECKED } from "@/app/lib/moderation";
+import { getPlatformSettings } from "@/app/lib/platformSettings";
 
 const CONVERSATIONS_TABLE = "InPlayer-Conversations";
 const MESSAGES_TABLE = "InPlayer-Messages";
@@ -140,7 +141,12 @@ export async function POST(request: NextRequest) {
 
     // Real-time auto-moderation (app/lib/moderation.ts) — fails open, so a
     // moderation API hiccup never blocks a real message from sending.
-    const moderation = await moderateText(trimmedText);
+    // Skipped entirely when Admin Panel -> Platform Settings has message
+    // moderation turned off — no OpenAI call is made at all.
+    const platformSettings = await getPlatformSettings();
+    const moderation = platformSettings.moderationEnabledMessages
+      ? await moderateText(trimmedText)
+      : UNCHECKED;
     const flagged = moderation.checked && moderation.flagged;
 
     await docClient.send(

@@ -2,13 +2,10 @@ import type { Metadata } from "next";
 import "./amplify-config";
 import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
-import Navbar from "./components/Navbar";
-import MobileBottomNav from "./components/MobileBottomNav";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { SettingsProvider } from "./components/settings/SettingsProvider";
 import AuthProvider from "./components/auth/AuthProvider";
-import MaintenanceGate from "./components/MaintenanceGate";
-import AnnouncementBanner from "./components/AnnouncementBanner";
+import SiteChrome from "./components/SiteChrome";
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -47,12 +44,7 @@ export default function RootLayout({
 <AuthProvider>
   <SettingsProvider>
     <ThemeProvider>
-      <MaintenanceGate>
-        <Navbar />
-        <AnnouncementBanner />
-        <div className="pb-20 lg:pb-0">{children}</div>
-        <MobileBottomNav />
-      </MaintenanceGate>
+      <SiteChrome>{children}</SiteChrome>
     </ThemeProvider>
   </SettingsProvider>
 </AuthProvider>

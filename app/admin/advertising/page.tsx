@@ -68,7 +68,7 @@ function SourcePicker({
           onClick={() => onChange(o.value)}
           className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
             value === o.value
-              ? "bg-orange-500 text-white"
+              ? "bg-indigo-500 text-white"
               : "bg-white/5 text-slate-400 hover:bg-white/10 light:bg-black/5"
           }`}
         >
@@ -308,7 +308,7 @@ export default function AdvertisingPage() {
                 update("adsenseEnabled", e.target.value.trim().length > 0);
               }}
               placeholder="pub-1234567890123456"
-              className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-orange-400/50"
+              className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-indigo-400/50"
             />
           </div>
         </div>
@@ -330,7 +330,7 @@ export default function AdvertisingPage() {
           type="button"
           onClick={saveSettings}
           disabled={saving}
-          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-5 py-2.5 text-sm font-bold text-white shadow-[0_10px_25px_rgba(255,153,0,.25)] transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#6366F1] via-[#8B5CF6] to-[#A855F7] px-5 py-2.5 text-sm font-bold text-white shadow-[0_10px_25px_rgba(139,92,246,.25)] transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
         >
           {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
           Save slot settings
@@ -354,7 +354,7 @@ export default function AdvertisingPage() {
                 onClick={() => setUploadPlacement(p)}
                 className={`rounded-full px-4 py-1.5 text-xs font-bold transition ${
                   uploadPlacement === p
-                    ? "bg-orange-500 text-white"
+                    ? "bg-indigo-500 text-white"
                     : "bg-white/5 text-slate-400 hover:bg-white/10 light:bg-black/5"
                 }`}
               >
@@ -395,7 +395,7 @@ export default function AdvertisingPage() {
               value={uploadTitle}
               onChange={(e) => setUploadTitle(e.target.value)}
               placeholder="e.g. Diwali membership promo"
-              className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-orange-400/50"
+              className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-indigo-400/50"
             />
           </div>
 
@@ -408,7 +408,7 @@ export default function AdvertisingPage() {
               value={uploadLink}
               onChange={(e) => setUploadLink(e.target.value)}
               placeholder="https://..."
-              className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-orange-400/50"
+              className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-indigo-400/50"
             />
           </div>
 
@@ -423,7 +423,7 @@ export default function AdvertisingPage() {
             type="button"
             onClick={submitCreative}
             disabled={!canUpload || uploading}
-            className="mt-4 flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-5 py-2.5 text-sm font-bold text-white shadow-[0_10px_25px_rgba(255,153,0,.25)] transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+            className="mt-4 flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#6366F1] via-[#8B5CF6] to-[#A855F7] px-5 py-2.5 text-sm font-bold text-white shadow-[0_10px_25px_rgba(139,92,246,.25)] transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
           >
             {uploading ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
             Add creative
@@ -439,7 +439,7 @@ export default function AdvertisingPage() {
 
         {creativesLoading ? (
           <div className="flex min-h-[15vh] items-center justify-center">
-            <Loader2 size={20} className="animate-spin text-orange-400" />
+            <Loader2 size={20} className="animate-spin text-indigo-400" />
           </div>
         ) : creatives.length === 0 ? (
           <div className="mt-6 flex flex-col items-center gap-2 py-6 text-center">

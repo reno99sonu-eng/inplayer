@@ -184,7 +184,7 @@ export default function AuditLogsPage() {
             onClick={() => setFilter(f.id)}
             className={`rounded-full px-4 py-1.5 text-xs font-bold transition ${
               filter === f.id
-                ? "bg-orange-500 text-white"
+                ? "bg-indigo-500 text-white"
                 : "bg-white/5 text-slate-400 hover:bg-white/10 light:bg-black/5"
             }`}
           >
@@ -209,7 +209,7 @@ export default function AuditLogsPage() {
 
       {loading ? (
         <div className="flex min-h-[30vh] items-center justify-center">
-          <Loader2 size={24} className="animate-spin text-orange-400" />
+          <Loader2 size={24} className="animate-spin text-indigo-400" />
         </div>
       ) : filtered.length === 0 ? (
         <div className="mt-8 flex flex-col items-center gap-2 py-8 text-center">

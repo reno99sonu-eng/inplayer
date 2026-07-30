@@ -48,7 +48,7 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
       aria-checked={checked}
       onClick={() => onChange(!checked)}
       className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors ${
-        checked ? "bg-orange-500" : "bg-white/10 light:bg-black/10"
+        checked ? "bg-indigo-500" : "bg-white/10 light:bg-black/10"
       }`}
     >
       <span
@@ -164,7 +164,7 @@ export default function AiModerationPage() {
         </p>
       </div>
 
-      <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-3">
+      <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         <CountCard
           icon={MessageSquare}
           label="Flagged comments"
@@ -215,7 +215,7 @@ export default function AiModerationPage() {
         <div className="mt-4 max-w-2xl space-y-3">
           <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4">
             <div className="flex items-center gap-3">
-              <MessageSquare size={16} className="text-orange-300" />
+              <MessageSquare size={16} className="text-indigo-300" />
               <span className="text-sm font-semibold text-white light:text-slate-900">
                 Comments
               </span>
@@ -230,7 +230,7 @@ export default function AiModerationPage() {
           </div>
           <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4">
             <div className="flex items-center gap-3">
-              <Mail size={16} className="text-orange-300" />
+              <Mail size={16} className="text-indigo-300" />
               <span className="text-sm font-semibold text-white light:text-slate-900">
                 Direct messages
               </span>
@@ -245,7 +245,7 @@ export default function AiModerationPage() {
           </div>
           <div className="flex items-center justify-between gap-4 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4">
             <div className="flex items-center gap-3">
-              <Upload size={16} className="text-orange-300" />
+              <Upload size={16} className="text-indigo-300" />
               <span className="text-sm font-semibold text-white light:text-slate-900">
                 Video/Short uploads
               </span>
@@ -277,7 +277,7 @@ export default function AiModerationPage() {
           type="button"
           onClick={save}
           disabled={saving}
-          className="mt-4 flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-5 py-2.5 text-sm font-bold text-white shadow-[0_10px_25px_rgba(255,153,0,.25)] transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+          className="mt-4 flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#6366F1] via-[#8B5CF6] to-[#A855F7] px-5 py-2.5 text-sm font-bold text-white shadow-[0_10px_25px_rgba(139,92,246,.25)] transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
         >
           {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
           Save changes

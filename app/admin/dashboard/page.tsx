@@ -65,7 +65,7 @@ export default function AdminDashboardPage() {
   if (loading) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
-        <Loader2 size={26} className="animate-spin text-orange-400" />
+        <Loader2 size={26} className="animate-spin text-indigo-400" />
       </div>
     );
   }
@@ -84,7 +84,7 @@ export default function AdminDashboardPage() {
       label: "Total Users",
       value: formatNumber(stats.totalUsers),
       icon: Users,
-      accent: "from-orange-500/20 to-amber-400/10 border-orange-400/20 text-orange-300",
+      accent: "from-indigo-500/20 to-violet-400/10 border-indigo-400/20 text-indigo-300",
     },
     {
       label: "Total Videos",
@@ -158,13 +158,6 @@ export default function AdminDashboardPage() {
             </div>
           );
         })}
-      </div>
-
-      <div className="mt-6 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4 text-xs leading-5 text-slate-400 light:text-slate-600">
-        More sections (Users, Creators, Videos, Shorts, Reports &amp; Moderation, Copyright
-        Center, Revenue, Advertising, Analytics, AI Moderation, Notifications, Platform
-        Settings, Audit Logs) are being built out next — each one goes live in the sidebar
-        the moment it&apos;s real and working, never before.
       </div>
     </div>
   );

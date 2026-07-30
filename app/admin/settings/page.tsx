@@ -50,7 +50,7 @@ function Toggle({
       aria-checked={checked}
       onClick={() => onChange(!checked)}
       className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors ${
-        checked ? "bg-orange-500" : "bg-white/10 light:bg-black/10"
+        checked ? "bg-indigo-500" : "bg-white/10 light:bg-black/10"
       }`}
     >
       <span
@@ -162,8 +162,8 @@ export default function AdminSettingsPage() {
         <div className="rounded-3xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-5">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
-              <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-orange-500/10">
-                <Wrench size={16} className="text-orange-300" />
+              <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-indigo-500/10">
+                <Wrench size={16} className="text-indigo-300" />
               </div>
               <div>
                 <h3 className="font-bold text-white light:text-slate-900">Maintenance mode</h3>
@@ -185,7 +185,7 @@ export default function AdminSettingsPage() {
                 onChange={(e) => update("maintenanceMessage", e.target.value.slice(0, 500))}
                 rows={2}
                 placeholder="InPlayer is down for scheduled maintenance. We'll be back shortly."
-                className="w-full resize-none rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2.5 text-sm text-white light:text-slate-900 outline-none focus:border-orange-400/50"
+                className="w-full resize-none rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2.5 text-sm text-white light:text-slate-900 outline-none focus:border-indigo-400/50"
               />
             </div>
           )}
@@ -195,8 +195,8 @@ export default function AdminSettingsPage() {
         <div className="rounded-3xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-5">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
-              <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-orange-500/10">
-                <UserPlus size={16} className="text-orange-300" />
+              <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-indigo-500/10">
+                <UserPlus size={16} className="text-indigo-300" />
               </div>
               <div>
                 <h3 className="font-bold text-white light:text-slate-900">New sign-ups</h3>
@@ -214,8 +214,8 @@ export default function AdminSettingsPage() {
         <div className="rounded-3xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-5">
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
-              <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-orange-500/10">
-                <Megaphone size={16} className="text-orange-300" />
+              <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-indigo-500/10">
+                <Megaphone size={16} className="text-indigo-300" />
               </div>
               <div>
                 <h3 className="font-bold text-white light:text-slate-900">Site-wide announcement</h3>
@@ -243,7 +243,7 @@ export default function AdminSettingsPage() {
                 value={settings.announcementText}
                 onChange={(e) => update("announcementText", e.target.value.slice(0, 200))}
                 placeholder="e.g. Paid memberships are now live on InPlayer!"
-                className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-orange-400/50"
+                className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-indigo-400/50"
               />
             </div>
           )}
@@ -267,7 +267,7 @@ export default function AdminSettingsPage() {
             type="button"
             onClick={save}
             disabled={saving}
-            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-5 py-2.5 text-sm font-bold text-white shadow-[0_10px_25px_rgba(255,153,0,.25)] transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#6366F1] via-[#8B5CF6] to-[#A855F7] px-5 py-2.5 text-sm font-bold text-white shadow-[0_10px_25px_rgba(139,92,246,.25)] transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
           >
             {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
             Save changes

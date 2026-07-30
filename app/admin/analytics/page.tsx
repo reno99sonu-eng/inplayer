@@ -80,7 +80,7 @@ function ViewsTrendChart({ points }: { points: ViewsTrendPoint[] }) {
         <div key={p.date} className="flex flex-1 flex-col items-center gap-2">
           <div className="flex w-full flex-1 items-end">
             <div
-              className="w-full rounded-t-md bg-gradient-to-t from-orange-500/60 to-amber-400/60"
+              className="w-full rounded-t-md bg-gradient-to-t from-indigo-500/60 to-violet-400/60"
               style={{ height: `${Math.max(2, (p.views / max) * 100)}%` }}
               title={`${p.views} view${p.views === 1 ? "" : "s"} on ${p.date}`}
             />
@@ -147,7 +147,7 @@ export default function AdminAnalyticsPage() {
 
       {loading ? (
         <div className="flex min-h-[30vh] items-center justify-center">
-          <Loader2 size={24} className="animate-spin text-orange-400" />
+          <Loader2 size={24} className="animate-spin text-indigo-400" />
         </div>
       ) : totals ? (
         <>
@@ -221,7 +221,7 @@ export default function AdminAnalyticsPage() {
                       </p>
                       <p className="truncate text-xs text-slate-500">{v.uploaderName}</p>
                     </div>
-                    <span className="flex flex-shrink-0 items-center gap-1 text-xs font-bold text-orange-300">
+                    <span className="flex flex-shrink-0 items-center gap-1 text-xs font-bold text-indigo-300">
                       <Eye size={12} /> {fmt(v.windowViews)}
                     </span>
                   </Link>

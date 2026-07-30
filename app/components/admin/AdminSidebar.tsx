@@ -66,13 +66,13 @@ export default function AdminSidebar() {
               href={item.href}
               className={`mb-2 flex w-full items-center gap-3 rounded-2xl px-4 py-3 text-left transition-all duration-300 ${
                 selected
-                  ? "border border-orange-400/30 bg-gradient-to-r from-orange-500/20 to-amber-400/10"
+                  ? "border border-indigo-400/30 bg-gradient-to-r from-indigo-500/20 to-violet-400/10"
                   : "hover:bg-white/5 light:hover:bg-black/5"
               }`}
             >
               <Icon
                 size={20}
-                className={selected ? "text-orange-300" : "text-slate-400 light:text-slate-600"}
+                className={selected ? "text-indigo-300" : "text-slate-400 light:text-slate-600"}
               />
               <span
                 className={

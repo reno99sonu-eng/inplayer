@@ -199,7 +199,7 @@ export default function AdminModerationPage() {
           onClick={() => setTab("reports")}
           className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${
             tab === "reports"
-              ? "bg-orange-500 text-white"
+              ? "bg-indigo-500 text-white"
               : "bg-white/5 text-slate-400 hover:bg-white/10 light:bg-black/5"
           }`}
         >
@@ -210,7 +210,7 @@ export default function AdminModerationPage() {
           onClick={() => setTab("autoflagged")}
           className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${
             tab === "autoflagged"
-              ? "bg-orange-500 text-white"
+              ? "bg-indigo-500 text-white"
               : "bg-white/5 text-slate-400 hover:bg-white/10 light:bg-black/5"
           }`}
         >
@@ -234,7 +234,7 @@ export default function AdminModerationPage() {
 
       {loading ? (
         <div className="flex min-h-[30vh] items-center justify-center">
-          <Loader2 size={24} className="animate-spin text-orange-400" />
+          <Loader2 size={24} className="animate-spin text-indigo-400" />
         </div>
       ) : tab === "reports" ? (
         reports.length === 0 ? (
@@ -260,7 +260,7 @@ export default function AdminModerationPage() {
                     <Link
                       href={`/watch/${r.videoId}`}
                       target="_blank"
-                      className="flex items-center gap-1 text-[11px] font-semibold text-orange-300 hover:text-orange-200"
+                      className="flex items-center gap-1 text-[11px] font-semibold text-indigo-300 hover:text-indigo-200"
                     >
                       <ExternalLink size={11} /> View video
                     </Link>
@@ -329,7 +329,7 @@ export default function AdminModerationPage() {
                   <Link
                     href={`/watch/${item.videoId}`}
                     target="_blank"
-                    className="flex items-center gap-1 text-[11px] font-semibold text-orange-300 hover:text-orange-200"
+                    className="flex items-center gap-1 text-[11px] font-semibold text-indigo-300 hover:text-indigo-200"
                   >
                     <ExternalLink size={11} /> View video
                   </Link>

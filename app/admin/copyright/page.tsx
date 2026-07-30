@@ -148,7 +148,7 @@ export default function CopyrightCenterPage() {
 
       {loading ? (
         <div className="flex min-h-[30vh] items-center justify-center">
-          <Loader2 size={24} className="animate-spin text-orange-400" />
+          <Loader2 size={24} className="animate-spin text-indigo-400" />
         </div>
       ) : items.length === 0 ? (
         <div className="mt-8 flex flex-col items-center gap-2 py-8 text-center">
@@ -179,7 +179,7 @@ export default function CopyrightCenterPage() {
                 <Link
                   href={`/watch/${item.videoId}`}
                   target="_blank"
-                  className="flex items-center gap-1 text-[11px] font-semibold text-orange-300 hover:text-orange-200"
+                  className="flex items-center gap-1 text-[11px] font-semibold text-indigo-300 hover:text-indigo-200"
                 >
                   <ExternalLink size={11} /> View video
                 </Link>

@@ -77,7 +77,7 @@ function DocThumb({ label, src }: { label: string; src?: string }) {
         <img
           src={src}
           alt={label}
-          className="h-20 w-20 flex-shrink-0 rounded-xl border border-white/10 object-cover transition group-hover:border-orange-400/50"
+          className="h-20 w-20 flex-shrink-0 rounded-xl border border-white/10 object-cover transition group-hover:border-indigo-400/50"
         />
         <span className="text-[10px] font-semibold text-slate-400">{label}</span>
       </button>
@@ -206,7 +206,7 @@ export default function AdminCreatorsPage() {
             onClick={() => setTab(t.key)}
             className={`rounded-full px-4 py-1.5 text-xs font-bold transition ${
               tab === t.key
-                ? "bg-orange-500 text-white"
+                ? "bg-indigo-500 text-white"
                 : "bg-white/5 text-slate-400 hover:bg-white/10 light:bg-black/5"
             }`}
           >
@@ -231,7 +231,7 @@ export default function AdminCreatorsPage() {
 
       {loading ? (
         <div className="flex min-h-[30vh] items-center justify-center">
-          <Loader2 size={24} className="animate-spin text-orange-400" />
+          <Loader2 size={24} className="animate-spin text-indigo-400" />
         </div>
       ) : items.length === 0 ? (
         <div className="mt-8 flex flex-col items-center gap-2 py-8 text-center">
@@ -276,7 +276,7 @@ export default function AdminCreatorsPage() {
                     <Link
                       href={`/u/${encodeURIComponent(c.username)}`}
                       target="_blank"
-                      className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-orange-300 hover:text-orange-200"
+                      className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-indigo-300 hover:text-indigo-200"
                     >
                       <ExternalLink size={11} /> @{c.username}
                     </Link>

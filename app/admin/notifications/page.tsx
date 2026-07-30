@@ -87,7 +87,7 @@ export default function AdminNotificationsPage() {
             onClick={() => setTarget("all")}
             className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${
               target === "all"
-                ? "bg-orange-500 text-white"
+                ? "bg-indigo-500 text-white"
                 : "bg-white/5 text-slate-400 hover:bg-white/10 light:bg-black/5"
             }`}
           >
@@ -98,7 +98,7 @@ export default function AdminNotificationsPage() {
             onClick={() => setTarget("user")}
             className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${
               target === "user"
-                ? "bg-orange-500 text-white"
+                ? "bg-indigo-500 text-white"
                 : "bg-white/5 text-slate-400 hover:bg-white/10 light:bg-black/5"
             }`}
           >
@@ -116,7 +116,7 @@ export default function AdminNotificationsPage() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               placeholder="e.g. rahulcreates"
-              className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-orange-400/50"
+              className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-indigo-400/50"
             />
           </div>
         )}
@@ -133,7 +133,7 @@ export default function AdminNotificationsPage() {
             onChange={(e) => setMessage(e.target.value)}
             rows={4}
             placeholder="e.g. InPlayer is rolling out paid memberships this week — check your Creator dashboard for details."
-            className="w-full resize-none rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2.5 text-sm text-white light:text-slate-900 outline-none focus:border-orange-400/50"
+            className="w-full resize-none rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2.5 text-sm text-white light:text-slate-900 outline-none focus:border-indigo-400/50"
           />
         </div>
 
@@ -154,7 +154,7 @@ export default function AdminNotificationsPage() {
           type="button"
           onClick={send}
           disabled={!canSend || sending}
-          className="mt-4 flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-5 py-2.5 text-sm font-bold text-white shadow-[0_10px_25px_rgba(255,153,0,.25)] transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+          className="mt-4 flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#6366F1] via-[#8B5CF6] to-[#A855F7] px-5 py-2.5 text-sm font-bold text-white shadow-[0_10px_25px_rgba(139,92,246,.25)] transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
         >
           {sending ? (
             <Loader2 size={15} className="animate-spin" />

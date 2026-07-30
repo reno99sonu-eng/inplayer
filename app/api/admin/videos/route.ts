@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { ScanCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { requireAdmin } from "@/app/lib/isAdmin";
 import { getMuxThumbnailUrl } from "@/app/lib/muxThumbnail";
@@ -59,8 +59,32 @@ function typeFilter(type: string | null) {
   return null;
 }
 
+// Exact videoId match — a cheap, direct GetCommand tried first so pasting
+// a real videoId (e.g. copied from a /watch URL, Copyright Center, or the
+// Moderation queue) always finds it, even though the title search below
+// has no way to match on ID.
+async function findVideoById(rawQuery: string): Promise<AdminVideoRow | null> {
+  const trimmed = rawQuery.trim();
+  if (!trimmed) return null;
+  try {
+    const result = await docClient.send(
+      new GetCommand({
+        TableName: "InPlayer-Videos",
+        Key: { videoId: trimmed },
+        ProjectionExpression: PROJECTION,
+        ExpressionAttributeNames: NAMES,
+      })
+    );
+    return result.Item ? toRow(result.Item as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+}
+
 // Title search: bounded, in-memory, case-insensitive — see SEARCH_SCAN_CAP.
 async function searchVideos(query: string, type: string | null): Promise<AdminVideoRow[]> {
+  const byId = await findVideoById(query);
+
   const q = query.toLowerCase();
   const tf = typeFilter(type);
   const matches: AdminVideoRow[] = [];
@@ -94,7 +118,14 @@ async function searchVideos(query: string, type: string | null): Promise<AdminVi
     exclusiveStartKey = result.LastEvaluatedKey;
   } while (exclusiveStartKey && scanned < SEARCH_SCAN_CAP && matches.length < PAGE_SIZE);
 
-  return matches.slice(0, PAGE_SIZE);
+  // An exact-ID match respects the active type filter (searching within
+  // "Shorts" for a videoId that turns out to be a regular video shouldn't
+  // surface it there), and is deduped against the title-match list.
+  const idMatchApplies =
+    byId && (!type || byId.contentType === type) && !matches.some((m) => m.videoId === byId.videoId);
+
+  const titleMatches = matches.slice(0, idMatchApplies ? PAGE_SIZE - 1 : PAGE_SIZE);
+  return idMatchApplies ? [byId as AdminVideoRow, ...titleMatches] : titleMatches;
 }
 
 async function listVideos(

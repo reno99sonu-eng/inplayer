@@ -80,7 +80,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   if (authLoading || checking) {
     return (
       <div className="flex min-h-[70vh] items-center justify-center">
-        <Loader2 size={28} className="animate-spin text-orange-400" />
+        <Loader2 size={28} className="animate-spin text-indigo-400" />
       </div>
     );
   }
@@ -96,7 +96,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         </p>
         <button
           onClick={openSignIn}
-          className="mt-6 rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-8 py-3 font-bold text-white shadow-[0_15px_35px_rgba(255,153,0,.3)] transition-all hover:-translate-y-0.5"
+          className="mt-6 rounded-2xl bg-gradient-to-r from-[#6366F1] via-[#8B5CF6] to-[#A855F7] px-8 py-3 font-bold text-white shadow-[0_15px_35px_rgba(139,92,246,.3)] transition-all hover:-translate-y-0.5"
         >
           Sign In
         </button>

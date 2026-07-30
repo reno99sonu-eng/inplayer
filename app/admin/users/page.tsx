@@ -106,7 +106,7 @@ function DeleteUserModal({
         </p>
 
         <p className="mt-3 text-xs font-semibold text-slate-300 light:text-slate-700">
-          Type <span className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-orange-300">{expected}</span>{" "}
+          Type <span className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-indigo-300">{expected}</span>{" "}
           to confirm:
         </p>
         <input
@@ -262,7 +262,8 @@ export default function AdminUsersPage() {
       <div>
         <h2 className="text-xl font-black text-white light:text-slate-900">Users</h2>
         <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
-          Real accounts from InPlayer&apos;s database. Search by username, or browse everyone.
+          Real accounts from InPlayer&apos;s database. Search by username or user ID, or browse
+          everyone.
         </p>
       </div>
 
@@ -272,7 +273,7 @@ export default function AdminUsersPage() {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by username…"
+          placeholder="Search by username or user ID…"
           className="w-full bg-transparent text-sm text-white light:text-slate-900 outline-none placeholder:text-slate-500"
         />
       </div>
@@ -286,7 +287,7 @@ export default function AdminUsersPage() {
 
       {loading ? (
         <div className="flex min-h-[30vh] items-center justify-center">
-          <Loader2 size={24} className="animate-spin text-orange-400" />
+          <Loader2 size={24} className="animate-spin text-indigo-400" />
         </div>
       ) : users.length === 0 ? (
         <p className="mt-8 text-center text-sm text-slate-500">

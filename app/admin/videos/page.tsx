@@ -174,7 +174,7 @@ export default function AdminVideosPage() {
             onClick={() => setType(t.id)}
             className={`rounded-full px-4 py-1.5 text-xs font-bold transition ${
               type === t.id
-                ? "bg-orange-500 text-white"
+                ? "bg-indigo-500 text-white"
                 : "bg-white/5 text-slate-400 hover:bg-white/10 light:bg-black/5"
             }`}
           >
@@ -189,7 +189,7 @@ export default function AdminVideosPage() {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by title…"
+          placeholder="Search by title or video ID…"
           className="w-full bg-transparent text-sm text-white light:text-slate-900 outline-none placeholder:text-slate-500"
         />
       </div>
@@ -203,7 +203,7 @@ export default function AdminVideosPage() {
 
       {loading ? (
         <div className="flex min-h-[30vh] items-center justify-center">
-          <Loader2 size={24} className="animate-spin text-orange-400" />
+          <Loader2 size={24} className="animate-spin text-indigo-400" />
         </div>
       ) : rows.length === 0 ? (
         <p className="mt-8 text-center text-sm text-slate-500">

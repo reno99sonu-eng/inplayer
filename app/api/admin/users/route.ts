@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ScanCommand, BatchGetCommand } from "@aws-sdk/lib-dynamodb";
+import { ScanCommand, BatchGetCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { requireAdmin } from "@/app/lib/isAdmin";
 import { normalizeUsername } from "@/app/lib/username";
@@ -54,9 +54,36 @@ const USER_PROJECTION_NAMES = { "#n": "name" };
 // matches by username, not email — InPlayer-Users doesn't store email, so
 // there's no indexed way to search Cognito by partial email match. Email
 // is attached afterward (see attachEmails) purely for display.
+// Exact userId match — a cheap, direct GetCommand tried first so pasting
+// a real userId (e.g. copied from Audit Logs, a support ticket, or the
+// browser URL of a user's own profile fetch) always finds the account,
+// even though InPlayer-Users has no separate "search by ID" index. Tried
+// against the RAW query (a Cognito sub isn't a normalized username).
+async function findUserById(rawQuery: string): Promise<AdminUserRow | null> {
+  const trimmed = rawQuery.trim();
+  if (!trimmed) return null;
+  try {
+    const result = await docClient.send(
+      new GetCommand({
+        TableName: "InPlayer-Users",
+        Key: { userId: trimmed },
+        ProjectionExpression: USER_PROJECTION,
+        ExpressionAttributeNames: USER_PROJECTION_NAMES,
+      })
+    );
+    return result.Item ? toRow(result.Item) : null;
+  } catch {
+    // Not a valid key shape (or the lookup otherwise failed) — not an
+    // error worth surfacing, the username search below still runs.
+    return null;
+  }
+}
+
 async function searchUsers(query: string): Promise<AdminUserRow[]> {
+  const byId = await findUserById(query);
+
   const q = normalizeUsername(query);
-  if (!q) return [];
+  if (!q) return byId ? [byId] : [];
 
   const matches: { userId: string; username: string }[] = [];
   let exclusiveStartKey: Record<string, unknown> | undefined;
@@ -77,15 +104,16 @@ async function searchUsers(query: string): Promise<AdminUserRow[]> {
   } while (exclusiveStartKey && matches.length < PAGE_SIZE * 4);
 
   const top = matches
+    .filter((m) => m.userId !== byId?.userId)
     .sort((a, b) => {
       const aStarts = a.username.toLowerCase().startsWith(q) ? 0 : 1;
       const bStarts = b.username.toLowerCase().startsWith(q) ? 0 : 1;
       if (aStarts !== bStarts) return aStarts - bStarts;
       return a.username.length - b.username.length;
     })
-    .slice(0, PAGE_SIZE);
+    .slice(0, byId ? PAGE_SIZE - 1 : PAGE_SIZE);
 
-  if (top.length === 0) return [];
+  if (top.length === 0) return byId ? [byId] : [];
 
   const result = await docClient.send(
     new BatchGetCommand({
@@ -99,7 +127,8 @@ async function searchUsers(query: string): Promise<AdminUserRow[]> {
     })
   );
 
-  return (result.Responses?.["InPlayer-Users"] || []).map(toRow);
+  const usernameMatches = (result.Responses?.["InPlayer-Users"] || []).map(toRow);
+  return byId ? [byId, ...usernameMatches] : usernameMatches;
 }
 
 // No query: plain browse, newest first isn't possible without a table

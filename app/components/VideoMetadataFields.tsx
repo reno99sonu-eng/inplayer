@@ -44,6 +44,10 @@ export interface VideoMetadataValue {
   ageRestricted: boolean;
   commentsEnabled: boolean;
   tags: string[];
+  // Videos only (Shorts have no per-item gating UI yet) — restricts
+  // playback to the creator themselves and viewers with an active paid
+  // membership. See app/watch/[videoId]/page.tsx for the real enforcement.
+  membersOnly: boolean;
 }
 
 export interface ThumbnailPickerProps {
@@ -610,6 +614,14 @@ onOpenAITitleAssist,
           on={value.commentsEnabled}
           onChange={() => onChange("commentsEnabled", !value.commentsEnabled)}
         />
+        {value.contentType === "video" && (
+          <ToggleRow
+            label="Members only"
+            desc="Only your paid members (and you) can watch this video."
+            on={value.membersOnly}
+            onChange={() => onChange("membersOnly", !value.membersOnly)}
+          />
+        )}
       </div>
     </div>
   );

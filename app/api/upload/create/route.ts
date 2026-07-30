@@ -82,6 +82,7 @@ export async function POST(request: NextRequest) {
       spokenLanguage,
       shortSettings,
       thumbnailDataUrl,
+      membersOnly,
     } = body;
 
     if (!title?.trim() || !category?.trim()) {
@@ -155,13 +156,29 @@ export async function POST(request: NextRequest) {
     const upload = await mux.video.uploads.create({
       cors_origin: "*", // Tighten this to your real domain before going fully live
       new_asset_settings: {
-        playback_policy: ["public"],
+        // Videos (not Shorts) get a second, "signed" playback ID alongside
+        // the public one — that's what makes "Members only" a real,
+        // enforced gate (see app/api/videos/[videoId]/playback-token)
+        // instead of just a UI toggle: the signed ID is useless to anyone
+        // without a per-request token InPlayer's own server issues after
+        // checking real membership status, unlike the public ID which
+        // plays for anyone who has the URL regardless of app logic. Every
+        // video still gets a public ID too, since most videos aren't
+        // members-only and should keep working exactly as before.
+        playback_policy: isShort ? ["public"] : ["public", "signed"],
         ...(!isShort && {
           static_renditions: [
             { resolution: "1080p" },
             { resolution: "720p" },
             { resolution: "480p" },
           ],
+          // Lets this asset be encoded/stored/streamed up to real 4K if the
+          // source actually is 4K — Mux never upscales and bills by what's
+          // actually delivered, so this costs nothing extra for the (today,
+          // typical) 1080p-and-under upload. It's what makes "4K" a real,
+          // working perk for paid members (see app/components/VideoPlayer.tsx's
+          // maxResolutionTier prop) instead of a promise with nothing behind it.
+          max_resolution_tier: "2160p",
         }),
       },
     });
@@ -232,6 +249,12 @@ export async function POST(request: NextRequest) {
           ageRestricted: !!ageRestricted,
           // Defaults to on unless explicitly disabled.
           commentsEnabled: commentsEnabled !== false,
+          // Real member-only gating — see app/watch/[videoId]/page.tsx,
+          // which checks this against the viewer's actual active
+          // membership (app/lib/memberships.ts) before ever handing back
+          // playback details. Shorts can't be members-only for now (the
+          // Shorts feed has no per-item gating UI yet).
+          ...(!isShort && { membersOnly: !!membersOnly }),
           ...(isShort && shortSettings && typeof shortSettings === "object" && {
             shortSettings: {
               // Full resolved track (id/title/artist/url/duration/source),

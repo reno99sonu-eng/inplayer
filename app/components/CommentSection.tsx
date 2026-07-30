@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { fetchAuthSession } from "aws-amplify/auth";
-import { Trash2 } from "lucide-react";
+import { Trash2, Crown } from "lucide-react";
 import { useAuthModal } from "./auth/AuthProvider";
 import { formatTimeAgo } from "@/app/lib/formatters";
 import ReportButton from "@/app/components/ReportButton";
@@ -17,6 +17,10 @@ interface Comment {
   userAvatarUrl?: string;
   text: string;
   createdAt: string;
+  // Real, server-checked: does this commenter have an active paid
+  // membership with this video's creator right now? See app/api/comments
+  // (GET) and app/lib/memberships.ts.
+  isMember?: boolean;
 }
 
 interface CommentSectionProps {
@@ -226,6 +230,15 @@ export default function CommentSection({ videoId }: CommentSectionProps) {
                     <p className="text-sm font-semibold text-white light:text-slate-900">
                       {comment.userName}
                     </p>
+                  )}
+                  {comment.isMember && (
+                    <span
+                      title="Paid member of this channel"
+                      aria-label="Paid member of this channel"
+                      className="flex items-center gap-0.5 rounded-full border border-amber-400/30 bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold text-amber-300"
+                    >
+                      <Crown size={10} /> Member
+                    </span>
                   )}
                   <p className="text-xs text-slate-500">
                     {formatTimeAgo(comment.createdAt)}

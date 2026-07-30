@@ -6,6 +6,7 @@ import Image from "next/image";
 import { fetchAuthSession } from "aws-amplify/auth";
 import { Maximize2, MessageSquareOff, Minimize2, ShieldAlert } from "lucide-react";
 import VideoPlayer from "@/app/components/VideoPlayer";
+import MembersOnlyVideoPlayer from "@/app/components/MembersOnlyVideoPlayer";
 import CommentSection from "@/app/components/CommentSection";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { formatTimeAgo, formatViews } from "@/app/lib/formatters";
@@ -23,7 +24,13 @@ interface VideoData {
   uploaderAvatarUrl?: string;
   uploadedAt: string;
   views: number;
-  muxPlaybackId: string;
+  // Absent for a members-only video — the server never includes the real
+  // playback ID in this payload for one (see app/watch/[videoId]/page.tsx
+  // and app/api/videos/[videoId]/playback-token); MembersOnlyVideoPlayer
+  // fetches it itself, authenticated, only for a viewer who actually
+  // qualifies.
+  muxPlaybackId?: string;
+  membersOnly?: boolean;
   thumbnailUrl?: string;
   contentType?: string;
   downloadStatus?: "unavailable" | "preparing" | "ready" | "errored";
@@ -96,7 +103,18 @@ export default function WatchPageContent({ video, relatedVideos: initialRelatedV
               matching this app's existing mobile-vs-desktop breakpoint. */}
           <div id="watch-player" className="group relative scroll-mt-5 -mx-3 lg:mx-0">
             <div className={`overflow-hidden rounded-none border-0 border-white/10 bg-black shadow-none light:border-black/10 lg:rounded-[28px] lg:border lg:shadow-[0_25px_70px_rgba(0,0,0,.4)] ${theaterMode ? "mx-auto max-w-[1300px]" : ""}`}>
-              {showPlayer ? <VideoPlayer playbackId={video.muxPlaybackId} title={video.title} videoId={video.videoId} /> : (
+              {showPlayer ? (
+                video.membersOnly ? (
+                  <MembersOnlyVideoPlayer
+                    videoId={video.videoId}
+                    title={video.title}
+                    uploaderId={video.uploaderId}
+                    uploaderName={video.uploaderName}
+                  />
+                ) : (
+                  <VideoPlayer playbackId={video.muxPlaybackId || ""} title={video.title} videoId={video.videoId} />
+                )
+              ) : (
                 <div className="flex aspect-video w-full flex-col items-center justify-center gap-4 bg-black px-6 text-center">
                   <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-500/15 text-red-400"><ShieldAlert size={26} /></div>
                   <div><p className="text-base font-bold text-white">Age-restricted video</p><p className="mt-1 max-w-sm text-sm text-slate-400">This video is intended for viewers 18 and older.</p></div>

@@ -57,6 +57,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     spokenLanguage,
     thumbnailDataUrl,
     thumbnailUrl,
+    membersOnly,
   } = body;
 
   if (!title?.trim() || !category?.trim()) {
@@ -126,6 +127,13 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   if (spokenLanguage !== undefined && SPOKEN_LANGUAGE_VALUES.includes(spokenLanguage)) {
     sets.push("spokenLanguage = :spokenLanguage");
     values[":spokenLanguage"] = spokenLanguage;
+  }
+  // Shorts never send this (see app/upload/page.tsx / my-videos/page.tsx),
+  // so a real, already-published Short can't accidentally get gated by a
+  // stray value here.
+  if (membersOnly !== undefined) {
+    sets.push("membersOnly = :membersOnly");
+    values[":membersOnly"] = !!membersOnly;
   }
   if (
     typeof thumbnailDataUrl === "string" &&

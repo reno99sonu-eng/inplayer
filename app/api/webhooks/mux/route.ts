@@ -102,12 +102,23 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ received: true });
     }
 
-    // Direct uploads request public playback. Select that playback ID
-    // explicitly instead of assuming array order; image.mux.com requires a
-    // playback ID (never the asset or direct-upload ID) and signed playback
-    // would need a signed image token we intentionally do not expose here.
+    // Direct uploads always request public playback, and (for videos, not
+    // Shorts — see app/api/upload/create) ALSO request a second, signed
+    // playback ID on the same asset. image.mux.com requires a playback ID
+    // (never the asset or direct-upload ID) and signed playback would need
+    // a signed image token we intentionally do not expose here, so
+    // thumbnails always use the public one.
     const playbackId = asset.playback_ids?.find(
       (id: { id?: string; policy?: string }) => id.policy === "public"
+    )?.id;
+    // Real enforcement for the "Members only" toggle (see
+    // app/api/videos/[videoId]/playback-token) — a signed playback ID is
+    // useless to anyone without a per-request token InPlayer's own server
+    // issues, unlike the public one above which anyone with the URL can
+    // play regardless of app-level checks. Absent on Shorts (never
+    // requested) — that's expected, not an error.
+    const signedPlaybackId = asset.playback_ids?.find(
+      (id: { id?: string; policy?: string }) => id.policy === "signed"
     )?.id;
 
     if (!playbackId) {
@@ -137,7 +148,8 @@ export async function POST(request: NextRequest) {
         // without a custom thumbnail simply have no customThumbnailUrl
         // attribute, so if_not_exists() falls through to Mux's own image.
         UpdateExpression:
-          "SET #status = :status, muxAssetId = :assetId, muxPlaybackId = :playbackId, #duration = :duration, thumbnailUrl = if_not_exists(customThumbnailUrl, :thumbnailUrl)",
+          "SET #status = :status, muxAssetId = :assetId, muxPlaybackId = :playbackId, #duration = :duration, thumbnailUrl = if_not_exists(customThumbnailUrl, :thumbnailUrl)" +
+          (signedPlaybackId ? ", muxSignedPlaybackId = :signedPlaybackId" : ""),
         ExpressionAttributeNames: {
           "#status": "status",
           "#duration": "duration",
@@ -148,6 +160,7 @@ export async function POST(request: NextRequest) {
           ":playbackId": playbackId,
           ":duration": asset.duration || 0,
           ":thumbnailUrl": thumbnailUrl,
+          ...(signedPlaybackId && { ":signedPlaybackId": signedPlaybackId }),
         },
         // Read contentType/spokenLanguage back (set at upload time, untouched
         // by this update) so the caption step below can decide whether — and

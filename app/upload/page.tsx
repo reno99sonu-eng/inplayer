@@ -44,6 +44,7 @@ export default function UploadPage() {
   const [madeForKids, setMadeForKids] = useState(false);
   const [ageRestricted, setAgeRestricted] = useState(false);
   const [commentsEnabled, setCommentsEnabled] = useState(true);
+  const [membersOnly, setMembersOnly] = useState(false);
   const [tags, setTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState("");
 
@@ -98,6 +99,7 @@ const [aiTitleAssistOpen, setAiTitleAssistOpen] = useState(false);
     ageRestricted,
     commentsEnabled,
     tags,
+    membersOnly,
   };
 
   const handleMetadataChange = <K extends keyof VideoMetadataValue>(
@@ -134,6 +136,9 @@ const [aiTitleAssistOpen, setAiTitleAssistOpen] = useState(false);
         break;
       case "tags":
         setTags(val as string[]);
+        break;
+      case "membersOnly":
+        setMembersOnly(val as boolean);
         break;
     }
   };
@@ -261,6 +266,7 @@ const [aiTitleAssistOpen, setAiTitleAssistOpen] = useState(false);
           ageRestricted,
           commentsEnabled,
           tags,
+          membersOnly: contentType === "video" ? membersOnly : undefined,
           shortSettings: contentType === "short" ? shortSettings : undefined,
           thumbnailDataUrl: thumbnailPreview,
         }),

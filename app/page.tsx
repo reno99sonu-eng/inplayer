@@ -55,7 +55,12 @@ async function getRealContent(): Promise<RealContent> {
       .map((video) => ({
         id: video.videoId,
         videoId: video.videoId,
-        muxPlaybackId: video.muxPlaybackId,
+        // Withheld for a members-only video — this feeds the homepage's
+        // hover-preview (see RecommendationFeed.tsx), which would
+        // otherwise play the actual video for anyone hovering the card,
+        // members-only or not. The card still shows and links to /watch,
+        // it just can't preview on hover.
+        muxPlaybackId: video.membersOnly ? undefined : video.muxPlaybackId,
         title: video.title,
         creator: video.uploaderName || "Unknown",
         uploaderUsername: usernames.get(video.uploaderId),

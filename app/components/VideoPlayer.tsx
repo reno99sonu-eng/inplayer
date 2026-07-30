@@ -19,6 +19,11 @@ interface VideoPlayerProps {
   playbackId: string;
   title: string;
   videoId: string;
+  // Only set for a members-only video's SIGNED playback ID (see
+  // app/api/videos/[videoId]/playback-token) — the token that actually
+  // authorizes playback of that ID. Omitted entirely for every ordinary
+  // public playback ID, which needs no token.
+  token?: string;
 }
 
 // Multi-tap seek tuning (touch devices): taps on the left/right third of
@@ -92,6 +97,7 @@ export default function VideoPlayer({
   playbackId,
   title,
   videoId,
+  token,
 }: VideoPlayerProps) {
   const playerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -722,6 +728,7 @@ export default function VideoPlayer({
       <MuxPlayer
         ref={playerRef}
         playbackId={playbackId}
+        tokens={token ? { playback: token } : undefined}
         metadata={{
           video_id: videoId,
           video_title: title,

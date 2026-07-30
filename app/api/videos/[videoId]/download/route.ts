@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
+import { verifyAuth } from "@/app/lib/verifyAuth";
+import { isActiveMember } from "@/app/lib/memberships";
 
 interface Params {
   params: Promise<{ videoId: string }>;
@@ -25,6 +27,29 @@ export async function GET(request: NextRequest, { params }: Params) {
 
   if (!video || video.contentType === "short") {
     return NextResponse.json({ error: "Not available." }, { status: 404 });
+  }
+
+  // This route otherwise needs no sign-in at all — but a members-only
+  // video's actual file must never be fetchable by anyone who isn't the
+  // owner or an active paid member, download link or not. Without this,
+  // the "Members only" toggle would still leak the whole video through
+  // this URL regardless of the real playback gating built into the player
+  // (see app/api/videos/[videoId]/playback-token).
+  if (video.membersOnly) {
+    let user;
+    try {
+      user = await verifyAuth(request);
+    } catch {
+      return NextResponse.json({ error: "Please sign in." }, { status: 401 });
+    }
+    const isOwner = video.uploaderId === user.userId;
+    const isMember = isOwner ? false : await isActiveMember(user.userId, video.uploaderId);
+    if (!isOwner && !isMember) {
+      return NextResponse.json(
+        { error: "This video is for paid members only." },
+        { status: 403 }
+      );
+    }
   }
 
   const renditions: Record<string, string> = video.downloadRenditions || {};

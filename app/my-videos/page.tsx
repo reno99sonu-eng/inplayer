@@ -51,6 +51,7 @@ interface MyVideo {
   ageRestricted?: boolean;
   commentsEnabled?: boolean;
   spokenLanguage?: string;
+  membersOnly?: boolean;
 }
 
 interface AnalyticsResponse {
@@ -162,6 +163,7 @@ export default function MyVideosPage() {
       ageRestricted: !!video.ageRestricted,
       commentsEnabled: video.commentsEnabled !== false,
       tags: Array.isArray(video.tags) ? video.tags : [],
+      membersOnly: !!video.membersOnly,
     });
     setEditTagInput("");
     setEditThumbnailPreview(null);
@@ -287,6 +289,7 @@ export default function MyVideosPage() {
           ageRestricted: editValue.ageRestricted,
           commentsEnabled: editValue.commentsEnabled,
           spokenLanguage: editValue.spokenLanguage,
+          membersOnly: editValue.contentType === "video" ? editValue.membersOnly : undefined,
           thumbnailDataUrl: editThumbnailPreview || undefined,
           thumbnailUrl: selectedMuxThumbnail || undefined,
         }),
@@ -312,6 +315,7 @@ export default function MyVideosPage() {
                 ageRestricted: editValue.ageRestricted,
                 commentsEnabled: editValue.commentsEnabled,
                 spokenLanguage: editValue.spokenLanguage,
+                membersOnly: editValue.contentType === "video" ? editValue.membersOnly : v.membersOnly,
                 thumbnailUrl:
                   editThumbnailPreview ||
                   selectedMuxThumbnail ||

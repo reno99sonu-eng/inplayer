@@ -9,6 +9,7 @@ import { randomUUID } from "crypto";
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
 import { resolveUsernames } from "@/app/lib/resolveUsernames";
+import { resolveActiveMemberIds } from "@/app/lib/memberships";
 import { moderateText } from "@/app/lib/moderation";
 
 export async function GET(request: NextRequest) {
@@ -39,9 +40,28 @@ export async function GET(request: NextRequest) {
   // their real profile — see app/lib/resolveUsernames. A commenter with
   // no username yet just renders without a link (handled client-side).
   const usernames = await resolveUsernames(comments.map((c) => c.userId));
+
+  // Real "Member" badge — who among these commenters has an actual, active
+  // paid membership with THIS video's creator (see app/lib/memberships).
+  // Only fetched if the video still exists and has an uploader; fails to
+  // "nobody's a member" rather than breaking comment loading entirely.
+  let memberIds = new Set<string>();
+  try {
+    const videoResult = await docClient.send(
+      new GetCommand({ TableName: "InPlayer-Videos", Key: { videoId }, ProjectionExpression: "uploaderId" })
+    );
+    const uploaderId = videoResult.Item?.uploaderId as string | undefined;
+    if (uploaderId) {
+      memberIds = await resolveActiveMemberIds(uploaderId, comments.map((c) => c.userId));
+    }
+  } catch (err) {
+    console.error("comments GET: member badge lookup failed:", err);
+  }
+
   const commentsWithUsernames = comments.map((c) => ({
     ...c,
     userUsername: usernames.get(c.userId),
+    isMember: memberIds.has(c.userId),
   }));
 
   return NextResponse.json({ comments: commentsWithUsernames });

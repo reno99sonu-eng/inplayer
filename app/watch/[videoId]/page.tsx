@@ -170,7 +170,14 @@ export default async function WatchPage({ params }: WatchPageProps) {
           uploaderAvatarUrl: video.uploaderAvatarUrl,
           uploadedAt: video.uploadedAt,
           views: video.views || 0,
-          muxPlaybackId: video.muxPlaybackId,
+          // Withheld entirely for a members-only video, regardless of who's
+          // requesting the page — this is server-rendered HTML sent to
+          // every visitor, member or not, so the real playback ID can
+          // never be in it. MembersOnlyVideoPlayer fetches its own,
+          // authenticated, only for a viewer who actually qualifies. See
+          // app/api/videos/[videoId]/playback-token.
+          muxPlaybackId: video.membersOnly ? undefined : video.muxPlaybackId,
+          membersOnly: !!video.membersOnly,
           thumbnailUrl: video.thumbnailUrl,
           contentType: video.contentType,
           downloadStatus: video.downloadStatus || "unavailable",

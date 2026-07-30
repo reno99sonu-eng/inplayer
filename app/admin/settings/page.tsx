@@ -49,8 +49,10 @@ function Toggle({
       role="switch"
       aria-checked={checked}
       onClick={() => onChange(!checked)}
-      className={`relative h-6 w-11 flex-shrink-0 rounded-full transition-colors ${
-        checked ? "bg-indigo-500" : "bg-white/10 light:bg-black/10"
+      className={`relative h-6 w-11 flex-shrink-0 rounded-full border transition-colors ${
+        checked
+          ? "border-indigo-500 bg-indigo-500"
+          : "border-black/10 bg-white/10 light:border-slate-400/60 light:bg-slate-300"
       }`}
     >
       <span

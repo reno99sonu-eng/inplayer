@@ -15,7 +15,6 @@ import { verifyAuth } from "@/app/lib/verifyAuth";
 //      under Project -> Settings -> Environment Variables to add or swap
 //      admin accounts WITHOUT a code change or a new deploy.
 const HARDCODED_ADMIN_EMAILS = [
-  "reno99sonu@gmail.com",
   "inplayerdigital@gmail.com",
 ];
 

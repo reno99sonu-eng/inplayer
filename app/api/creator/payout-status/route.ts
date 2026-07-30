@@ -18,6 +18,8 @@ export async function GET(request: NextRequest) {
     legalName: null as string | null,
     submittedAt: null as string | null,
     minPayoutAmount: MIN_PAYOUT_AMOUNT_DEFAULT,
+    lifetimeEarnedInr: 0,
+    lifetimePaidOutInr: 0,
   };
 
   try {
@@ -38,6 +40,11 @@ export async function GET(request: NextRequest) {
       legalName: result.Item.legalName || null,
       submittedAt: result.Item.submittedAt || null,
       minPayoutAmount: result.Item.minPayoutAmount || MIN_PAYOUT_AMOUNT_DEFAULT,
+      // Real money already collected via paid memberships, credited by
+      // app/api/webhooks/razorpay on every confirmed charge — not an
+      // estimate derived from views.
+      lifetimeEarnedInr: result.Item.lifetimeEarnedInr || 0,
+      lifetimePaidOutInr: result.Item.lifetimePaidOutInr || 0,
     });
   } catch (err) {
     // The InPlayer-Creator-Payouts table needs to exist in DynamoDB (userId

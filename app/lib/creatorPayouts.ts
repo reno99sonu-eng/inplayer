@@ -5,6 +5,24 @@
 
 export const PAYOUTS_TABLE = "InPlayer-Creator-Payouts";
 
+// Every individual real charge (a paid membership's monthly Razorpay
+// renewal) is recorded once here, keyed by Razorpay's own payment id —
+// that's what makes a duplicate webhook delivery (Razorpay retries on
+// anything but a 2xx response) a safe no-op instead of double-crediting a
+// creator. See app/api/webhooks/razorpay.
+export const REVENUE_LEDGER_TABLE = "InPlayer-Revenue-Ledger";
+
+// Real memberships: one row per (subscriberId, creatorId) pair.
+export const MEMBERSHIPS_TABLE = "InPlayer-Memberships";
+
+export const MEMBERSHIP_PRICE_INR = 119;
+
+// The one true split, applied to every real charge recorded in the
+// revenue ledger — 80% to the creator whose membership was paid for, 20%
+// to InPlayer.
+export const CREATOR_SHARE = 0.8;
+export const PLATFORM_SHARE = 0.2;
+
 // Eligibility is intentionally simple and stated in one place so it's easy
 // to tune later: 100 In-Family members (subscribers) AND 10,000 total views
 // (videos + Shorts combined) unlocks the KYC / revenue flow.
@@ -35,26 +53,23 @@ export const MIN_PAYOUT_AMOUNT_BOUNDS = { min: 100, max: 100000 };
 // ---------------------------------------------------------------------
 // Revenue calculation.
 //
-// IMPORTANT — read before changing: InPlayer has no ad network or
-// subscription revenue-share plugged in yet (RevenueSection.tsx says as
-// much: "updates once ad/revenue-share is connected on InPlayer's side").
-// There is therefore no real, external source of truth for "how many
-// rupees has this creator actually earned" — no rate has ever been
-// specified anywhere in this codebase or by the person running it. This
-// constant is a clearly-labeled, easily-tunable placeholder so the balance
-// shown to creators is a real, live, computed number driven by their real
-// view counts (not a hardcoded ₹0.00) rather than fabricated per-creator —
-// but the RATE ITSELF is a business decision, not an engineering one.
-// Confirm/replace this with the actual payout rate before this is treated
-// as a real financial promise to creators.
-export const REVENUE_PER_1000_VIEWS_INR = 30;
-
+// InPlayer's first real revenue source is paid per-creator memberships
+// (see app/api/memberships, app/api/webhooks/razorpay) — a viewer pays
+// MEMBERSHIP_PRICE_INR/month via Razorpay, and CREATOR_SHARE (80%) of
+// each confirmed charge is credited to that creator. Every charge is
+// recorded once in InPlayer-Revenue-Ledger and folded into
+// InPlayer-Creator-Payouts.lifetimeEarnedInr by the webhook handler — so
+// "how many rupees has this creator actually earned" now has a real
+// external source of truth (Razorpay), not a formula. This function is
+// now just "earned minus already paid out", not a views-based estimate.
 export function calculateRevenueBalance(
-  totalViews: number,
+  lifetimeEarnedInr: number,
   alreadyPaidOutInr: number = 0
 ): number {
-  const earned = (Math.max(0, totalViews) / 1000) * REVENUE_PER_1000_VIEWS_INR;
-  return Math.max(0, Math.round((earned - alreadyPaidOutInr) * 100) / 100);
+  return Math.max(
+    0,
+    Math.round((Math.max(0, lifetimeEarnedInr) - alreadyPaidOutInr) * 100) / 100
+  );
 }
 
 // ---------------------------------------------------------------------

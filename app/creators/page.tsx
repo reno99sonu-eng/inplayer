@@ -6,6 +6,7 @@ import { Compass, Loader2, UserRound } from "lucide-react";
 
 import BackButton from "@/app/components/BackButton";
 import SubscribeButton from "@/app/components/SubscribeButton";
+import MembershipButton from "@/app/components/MembershipButton";
 import type { PublicCreatorRow } from "@/app/api/creators/route";
 
 export default function CreatorsPage() {
@@ -140,7 +141,10 @@ export default function CreatorsPage() {
                   </div>
                 </button>
 
-                <SubscribeButton creatorId={creator.userId} />
+                <div className="flex flex-wrap items-center justify-center gap-1.5">
+                  <SubscribeButton creatorId={creator.userId} />
+                  <MembershipButton creatorId={creator.userId} creatorName={creator.name} />
+                </div>
               </div>
             ))}
           </div>

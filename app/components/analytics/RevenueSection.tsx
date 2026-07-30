@@ -18,7 +18,8 @@ import {
   PayoutFrequency,
   MIN_PAYOUT_AMOUNT_DEFAULT,
   MIN_PAYOUT_AMOUNT_BOUNDS,
-  REVENUE_PER_1000_VIEWS_INR,
+  MEMBERSHIP_PRICE_INR,
+  CREATOR_SHARE,
   calculateRevenueBalance,
   getNextPayoutWindow,
 } from "@/app/lib/creatorPayouts";
@@ -37,6 +38,10 @@ export interface PayoutStatus {
   legalName: string | null;
   submittedAt: string | null;
   minPayoutAmount?: number;
+  // Real money, credited by app/api/webhooks/razorpay on every confirmed
+  // paid-membership charge — not a views-based estimate.
+  lifetimeEarnedInr?: number;
+  lifetimePaidOutInr?: number;
 }
 
 function ProgressBar({ value, max }: { value: number; max: number }) {
@@ -79,14 +84,17 @@ export default function RevenueSection({
     subscriberCount >= ELIGIBILITY_THRESHOLD.subscribers &&
     totalViews >= ELIGIBILITY_THRESHOLD.views;
 
-  // Real number, driven by this creator's real view count — see the
-  // REVENUE_PER_1000_VIEWS_INR comment in creatorPayouts.ts for why the
-  // RATE itself is a placeholder pending a real ad/revenue-share source.
-  // `alreadyPaidOutInr` is hardcoded to 0 because no payout has ever
-  // actually gone out yet (there's no live transfer path — see the
-  // disabled "Connect bank account" button below), so lifetime accrued
-  // revenue and current balance are the same number today.
-  const revenueBalance = calculateRevenueBalance(totalViews, 0);
+  // Real number now: lifetimeEarnedInr is credited by the Razorpay webhook
+  // handler on every confirmed paid-membership charge (this creator's 80%
+  // share of each ₹{MEMBERSHIP_PRICE_INR} monthly charge) — not a
+  // views-based estimate. `lifetimePaidOutInr` stays 0 until a live
+  // transfer path exists (see the disabled "Connect bank account" button
+  // below), so today lifetime accrued revenue and current balance are the
+  // same number only until a real payout goes out.
+  const revenueBalance = calculateRevenueBalance(
+    payoutStatus?.lifetimeEarnedInr || 0,
+    payoutStatus?.lifetimePaidOutInr || 0
+  );
   const minPayoutAmount = payoutStatus?.minPayoutAmount || MIN_PAYOUT_AMOUNT_DEFAULT;
   const meetsPayoutThreshold = revenueBalance >= minPayoutAmount;
   const payoutWindow = getNextPayoutWindow();
@@ -214,8 +222,8 @@ export default function RevenueSection({
               </div>
             </div>
             <p className="mt-2.5 text-xs leading-relaxed text-slate-500 light:text-slate-500">
-              Calculated from your real view count at ₹{REVENUE_PER_1000_VIEWS_INR} per
-              1,000 views —{" "}
+              Your {Math.round(CREATOR_SHARE * 100)}% share of every paid
+              InPlayer membership (₹{MEMBERSHIP_PRICE_INR}/month per member) —{" "}
               {meetsPayoutThreshold
                 ? `you're over your ₹${minPayoutAmount.toLocaleString("en-IN")} minimum, so this queues for transfer in the payout window above`
                 : `queues for transfer once it crosses your ₹${minPayoutAmount.toLocaleString("en-IN")} minimum below`}

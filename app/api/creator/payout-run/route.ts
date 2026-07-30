@@ -8,18 +8,21 @@ import {
   getNextPayoutWindow,
 } from "@/app/lib/creatorPayouts";
 
-// Monthly payout batch run — real eligibility computation over real view
-// counts, producing a real queued-for-transfer list. This deliberately
-// stops there: it does NOT call Razorpay (or any other payment rail) and
-// does NOT move money. There is no live bank-transfer integration in this
-// project yet (see the disabled "Connect bank account via Razorpay" button
-// in RevenueSection.tsx) — building one is a real, separate, KYC/compliance
-// -heavy integration project, and actually executing a fund transfer isn't
-// something this assistant can do regardless. What this route DOES give
-// you: every verified creator's real, computed balance, refreshed and
-// written back to InPlayer-Creator-Payouts so an admin (or, later, a real
-// Razorpay payout job reading these same fields) knows exactly who's due
-// and how much, the moment payments go live.
+// Monthly payout batch run — real eligibility computation over each
+// creator's real, ledger-backed earnings (InPlayer-Creator-Payouts.
+// lifetimeEarnedInr, credited by app/api/webhooks/razorpay on every
+// confirmed membership charge), producing a real queued-for-transfer list.
+// This deliberately stops there: it does NOT call Razorpay (or any other
+// payment rail) and does NOT move money. There is no live bank-transfer
+// integration in this project yet (see the disabled "Connect bank account
+// via Razorpay" button in RevenueSection.tsx) — building one is a real,
+// separate, KYC/compliance-heavy integration project, and actually
+// executing a fund transfer isn't something this assistant can do
+// regardless. What this route DOES give you: every verified creator's
+// real, computed balance, refreshed and written back to
+// InPlayer-Creator-Payouts so an admin (or, later, a real Razorpay payout
+// job reading these same fields) knows exactly who's due and how much, the
+// moment payouts go live.
 //
 // Call this once a day during the 1st–5th payout window (or anytime, to
 // preview current standing) with:
@@ -53,6 +56,7 @@ async function runPayoutBatch(request: NextRequest) {
   interface PayoutRecord {
     userId: string;
     kycStatus?: string;
+    lifetimeEarnedInr?: number;
     lifetimePaidOutInr?: number;
     minPayoutAmount?: number;
   }
@@ -79,7 +83,7 @@ async function runPayoutBatch(request: NextRequest) {
 
   interface PayoutRunResult {
     userId: string;
-    totalViews: number;
+    lifetimeEarnedInr: number;
     balance: number;
     eligible: boolean;
     failed: boolean;
@@ -89,20 +93,12 @@ async function runPayoutBatch(request: NextRequest) {
     verifiedCreators.map(async (creator): Promise<PayoutRunResult> => {
       const userId = creator.userId as string;
       try {
-        const videosResult = await docClient.send(
-          new ScanCommand({
-            TableName: "InPlayer-Videos",
-            FilterExpression: "uploaderId = :uploaderId",
-            ExpressionAttributeValues: { ":uploaderId": userId },
-          })
-        );
-        const totalViews = (videosResult.Items || []).reduce(
-          (sum, v) => sum + (v.views || 0),
-          0
-        );
-
+        // lifetimeEarnedInr is credited by the Razorpay webhook handler
+        // (app/api/webhooks/razorpay) on every confirmed membership
+        // charge — this is real money already collected, not an estimate.
+        const lifetimeEarnedInr = creator.lifetimeEarnedInr || 0;
         const alreadyPaidOutInr = creator.lifetimePaidOutInr || 0;
-        const balance = calculateRevenueBalance(totalViews, alreadyPaidOutInr);
+        const balance = calculateRevenueBalance(lifetimeEarnedInr, alreadyPaidOutInr);
         const minPayoutAmount = creator.minPayoutAmount || MIN_PAYOUT_AMOUNT_DEFAULT;
         const eligible = balance >= minPayoutAmount;
 
@@ -122,10 +118,10 @@ async function runPayoutBatch(request: NextRequest) {
           })
         );
 
-        return { userId, totalViews, balance, eligible, failed: false };
+        return { userId, lifetimeEarnedInr, balance, eligible, failed: false };
       } catch (err) {
         console.error(`payout-run: failed for creator ${userId}:`, err);
-        return { userId, totalViews: 0, balance: 0, eligible: false, failed: true };
+        return { userId, lifetimeEarnedInr: 0, balance: 0, eligible: false, failed: true };
       }
     })
   );

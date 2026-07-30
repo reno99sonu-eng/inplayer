@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { fetchAuthSession } from "aws-amplify/auth";
 import {
   Loader2,
@@ -12,6 +12,7 @@ import {
   Eye,
   MousePointerClick,
   ImagePlus,
+  Search,
 } from "lucide-react";
 import { compressImageToBanner } from "@/app/lib/imageCompress";
 
@@ -89,6 +90,18 @@ export default function AdvertisingPage() {
   const [creatives, setCreatives] = useState<AdCreative[]>([]);
   const [creativesLoading, setCreativesLoading] = useState(true);
   const [creativesError, setCreativesError] = useState<string | null>(null);
+  const [creativeQuery, setCreativeQuery] = useState("");
+
+  const filteredCreatives = useMemo(() => {
+    const q = creativeQuery.trim().toLowerCase();
+    if (!q) return creatives;
+    return creatives.filter(
+      (ad) =>
+        ad.title.toLowerCase().includes(q) ||
+        ad.adId.toLowerCase().includes(q) ||
+        ad.placement.toLowerCase().includes(q)
+    );
+  }, [creatives, creativeQuery]);
 
   const [uploadPlacement, setUploadPlacement] = useState<Placement>("homepage");
   const [uploadTitle, setUploadTitle] = useState("");
@@ -437,6 +450,19 @@ export default function AdvertisingPage() {
           </div>
         )}
 
+        {creatives.length > 0 && (
+          <div className="mt-4 flex items-center gap-2 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] px-4 py-3">
+            <Search size={16} className="text-slate-500" />
+            <input
+              type="text"
+              value={creativeQuery}
+              onChange={(e) => setCreativeQuery(e.target.value)}
+              placeholder="Search by title, ad ID, or placement…"
+              className="w-full bg-transparent text-sm text-white light:text-slate-900 outline-none placeholder:text-slate-500"
+            />
+          </div>
+        )}
+
         {creativesLoading ? (
           <div className="flex min-h-[15vh] items-center justify-center">
             <Loader2 size={20} className="animate-spin text-indigo-400" />
@@ -446,9 +472,13 @@ export default function AdvertisingPage() {
             <ImagePlus size={26} className="text-slate-600" />
             <p className="text-sm text-slate-500">No creatives uploaded yet.</p>
           </div>
+        ) : filteredCreatives.length === 0 ? (
+          <p className="mt-6 text-center text-sm text-slate-500">
+            Nothing matches &quot;{creativeQuery}&quot;.
+          </p>
         ) : (
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {creatives.map((ad) => (
+            {filteredCreatives.map((ad) => (
               <div
                 key={ad.adId}
                 className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-3"

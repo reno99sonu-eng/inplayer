@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { fetchAuthSession } from "aws-amplify/auth";
 import {
   Loader2,
@@ -11,6 +11,7 @@ import {
   Receipt,
   ShieldCheck,
   CalendarClock,
+  Search,
 } from "lucide-react";
 import { formatTimeAgo } from "@/app/lib/formatters";
 
@@ -83,6 +84,15 @@ export default function AdminRevenuePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tableMissing, setTableMissing] = useState(false);
+  const [query, setQuery] = useState("");
+
+  const filteredCreators = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return creators;
+    return creators.filter(
+      (c) => (c.username || "").toLowerCase().includes(q) || c.userId.toLowerCase().includes(q)
+    );
+  }, [creators, query]);
 
   useEffect(() => {
     let cancelled = false;
@@ -177,6 +187,19 @@ export default function AdminRevenuePage() {
             Creator earnings
           </h3>
 
+          {creators.length > 0 && (
+            <div className="mt-3 flex items-center gap-2 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] px-4 py-3">
+              <Search size={16} className="text-slate-500" />
+              <input
+                type="text"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="Search by username or user ID…"
+                className="w-full bg-transparent text-sm text-white light:text-slate-900 outline-none placeholder:text-slate-500"
+              />
+            </div>
+          )}
+
           {creators.length === 0 ? (
             <div className="mt-4 flex flex-col items-center gap-2 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.02] py-10 text-center">
               <Wallet size={26} className="text-slate-500" />
@@ -185,6 +208,10 @@ export default function AdminRevenuePage() {
                 submissions come in.
               </p>
             </div>
+          ) : filteredCreators.length === 0 ? (
+            <p className="mt-4 text-center text-sm text-slate-500">
+              Nothing matches &quot;{query}&quot;.
+            </p>
           ) : (
             <div className="mt-4 overflow-x-auto rounded-2xl border border-white/10 light:border-black/10">
               <table className="w-full text-left text-sm">
@@ -200,7 +227,7 @@ export default function AdminRevenuePage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {creators.map((c) => (
+                  {filteredCreators.map((c) => (
                     <tr
                       key={c.userId}
                       className="border-t border-white/5 light:border-black/5"

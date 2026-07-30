@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { fetchAuthSession } from "aws-amplify/auth";
 import {
@@ -11,6 +11,7 @@ import {
   X,
   ExternalLink,
   IndianRupee,
+  Search,
 } from "lucide-react";
 
 type Tab = "pending_review" | "verified" | "rejected";
@@ -108,6 +109,19 @@ export default function AdminCreatorsPage() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
+  const [query, setQuery] = useState("");
+
+  const filteredItems = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter(
+      (c) =>
+        (c.legalName || "").toLowerCase().includes(q) ||
+        (c.username || "").toLowerCase().includes(q) ||
+        (c.panNumber || "").toLowerCase().includes(q) ||
+        c.userId.toLowerCase().includes(q)
+    );
+  }, [items, query]);
 
   useEffect(() => {
     let cancelled = false;
@@ -215,6 +229,17 @@ export default function AdminCreatorsPage() {
         ))}
       </div>
 
+      <div className="mt-3 flex items-center gap-2 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] px-4 py-3">
+        <Search size={16} className="text-slate-500" />
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search by name, username, PAN, or user ID…"
+          className="w-full bg-transparent text-sm text-white light:text-slate-900 outline-none placeholder:text-slate-500"
+        />
+      </div>
+
       {tableMissing && (
         <div className="mt-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs leading-5 text-amber-300 light:text-amber-700">
           InPlayer-Creator-Payouts hasn&apos;t been created in AWS yet, so
@@ -233,16 +258,20 @@ export default function AdminCreatorsPage() {
         <div className="flex min-h-[30vh] items-center justify-center">
           <Loader2 size={24} className="animate-spin text-indigo-400" />
         </div>
-      ) : items.length === 0 ? (
+      ) : filteredItems.length === 0 ? (
         <div className="mt-8 flex flex-col items-center gap-2 py-8 text-center">
           <ShieldCheck size={28} className="text-emerald-400" />
           <p className="text-sm text-slate-500">
-            {tab === "pending_review" ? "Nothing waiting on review." : "Nothing here yet."}
+            {query
+              ? `Nothing matches "${query}".`
+              : tab === "pending_review"
+                ? "Nothing waiting on review."
+                : "Nothing here yet."}
           </p>
         </div>
       ) : (
         <div className="mt-4 space-y-3">
-          {items.map((c) => (
+          {filteredItems.map((c) => (
             <div
               key={c.userId}
               className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4"

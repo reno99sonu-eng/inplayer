@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { fetchAuthSession } from "aws-amplify/auth";
 import {
@@ -12,6 +12,7 @@ import {
   Trash2,
   ExternalLink,
   ShieldCheck,
+  Search,
 } from "lucide-react";
 
 type Tab = "reports" | "autoflagged";
@@ -81,6 +82,36 @@ export default function AdminModerationPage() {
   const [error, setError] = useState<string | null>(null);
   const [tableMissing, setTableMissing] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+
+  const filteredReports = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return reports;
+    return reports.filter(
+      (r) =>
+        r.reportId.toLowerCase().includes(q) ||
+        (r.videoId || "").toLowerCase().includes(q) ||
+        (r.commentId || "").toLowerCase().includes(q) ||
+        (r.messageId || "").toLowerCase().includes(q) ||
+        r.reason.toLowerCase().includes(q) ||
+        (r.snippet || "").toLowerCase().includes(q) ||
+        r.reporterId.toLowerCase().includes(q)
+    );
+  }, [reports, query]);
+
+  const filteredAutoFlagged = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return autoFlagged;
+    return autoFlagged.filter(
+      (item) =>
+        item.id.toLowerCase().includes(q) ||
+        (item.videoId || "").toLowerCase().includes(q) ||
+        (item.commentId || "").toLowerCase().includes(q) ||
+        (item.messageId || "").toLowerCase().includes(q) ||
+        (item.snippet || "").toLowerCase().includes(q) ||
+        item.categories.some((c) => c.toLowerCase().includes(q))
+    );
+  }, [autoFlagged, query]);
 
   useEffect(() => {
     let cancelled = false;
@@ -218,6 +249,17 @@ export default function AdminModerationPage() {
         </button>
       </div>
 
+      <div className="mt-3 flex items-center gap-2 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] px-4 py-3">
+        <Search size={16} className="text-slate-500" />
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search by report ID, video/content ID, reason, or reporter…"
+          className="w-full bg-transparent text-sm text-white light:text-slate-900 outline-none placeholder:text-slate-500"
+        />
+      </div>
+
       {tableMissing && tab === "reports" && (
         <div className="mt-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs leading-5 text-amber-300 light:text-amber-700">
           The Reports table (InPlayer-Reports) hasn&apos;t been created in AWS yet, so reports
@@ -237,14 +279,16 @@ export default function AdminModerationPage() {
           <Loader2 size={24} className="animate-spin text-indigo-400" />
         </div>
       ) : tab === "reports" ? (
-        reports.length === 0 ? (
+        filteredReports.length === 0 ? (
           <div className="mt-8 flex flex-col items-center gap-2 py-8 text-center">
             <ShieldCheck size={28} className="text-emerald-400" />
-            <p className="text-sm text-slate-500">No open reports. All caught up.</p>
+            <p className="text-sm text-slate-500">
+              {query ? `Nothing matches "${query}".` : "No open reports. All caught up."}
+            </p>
           </div>
         ) : (
           <div className="mt-4 space-y-2">
-            {reports.map((r) => (
+            {filteredReports.map((r) => (
               <div
                 key={r.reportId}
                 className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4"
@@ -301,14 +345,16 @@ export default function AdminModerationPage() {
             ))}
           </div>
         )
-      ) : autoFlagged.length === 0 ? (
+      ) : filteredAutoFlagged.length === 0 ? (
         <div className="mt-8 flex flex-col items-center gap-2 py-8 text-center">
           <ShieldCheck size={28} className="text-emerald-400" />
-          <p className="text-sm text-slate-500">Nothing auto-flagged right now.</p>
+          <p className="text-sm text-slate-500">
+            {query ? `Nothing matches "${query}".` : "Nothing auto-flagged right now."}
+          </p>
         </div>
       ) : (
         <div className="mt-4 space-y-2">
-          {autoFlagged.map((item) => (
+          {filteredAutoFlagged.map((item) => (
             <div
               key={item.id}
               className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4"

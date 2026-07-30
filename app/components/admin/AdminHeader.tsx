@@ -43,12 +43,14 @@ export default function AdminHeader({ email }: { email: string | null }) {
           pointer-events-none
           absolute
           left-4
-          top-2
+          top-1
           select-none
-          text-[80px]
+          text-[56px]
           font-black
           tracking-[-0.08em]
           text-white/[0.025] light:text-black/[0.04]
+          sm:top-2
+          sm:text-[80px]
           lg:left-8
           lg:text-[140px]
         "
@@ -56,8 +58,12 @@ export default function AdminHeader({ email }: { email: string | null }) {
         ADMIN
       </h1>
 
-      <div className="relative z-10 flex flex-wrap items-center justify-between gap-4 px-5 py-6">
-        <div className="flex items-center gap-4">
+      {/* Below sm: two fixed rows (logo+controls, then identity) instead
+          of relying on flex-wrap to reflow mid-content — that was the
+          source of the cramped/broken mobile layout. From sm up, it's
+          back to a single row like before. */}
+      <div className="relative z-10 flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-6">
+        <div className="flex items-center justify-between gap-3 sm:justify-start sm:gap-4">
           <Link
             href="/admin/dashboard"
             aria-label="Admin Panel — Dashboard"
@@ -67,31 +73,53 @@ export default function AdminHeader({ email }: { email: string | null }) {
               src="/logos/inplayer-mark-dark.png"
               alt="INPLAYER"
               draggable={false}
-              className="light:hidden h-8 w-auto object-contain"
+              className="light:hidden h-7 w-auto object-contain sm:h-8"
             />
             <img
               src="/logos/inplayer-mark-light.png"
               alt="INPLAYER"
               draggable={false}
-              className="hidden light:block h-8 w-auto object-contain"
+              className="hidden light:block h-7 w-auto object-contain sm:h-8"
             />
           </Link>
 
-          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-full border border-indigo-400/30 bg-indigo-500/10">
-            <ShieldCheck size={20} className="text-indigo-300" />
+          {/* Theme + sign out ride the logo's row on mobile (always fits,
+              two small controls), and move to the far right on sm+. */}
+          <div className="flex flex-shrink-0 items-center gap-2 sm:hidden">
+            <button
+              type="button"
+              onClick={toggleTheme}
+              aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 text-slate-300 light:text-slate-600 transition hover:border-indigo-400/40 hover:text-indigo-300"
+            >
+              {isDark ? <Sun size={16} /> : <Moon size={16} />}
+            </button>
+            <button
+              type="button"
+              onClick={() => signOut()}
+              className="flex items-center gap-1.5 rounded-full border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-xs font-bold text-red-400 transition hover:bg-red-500/10"
+            >
+              <LogOut size={13} /> Sign Out
+            </button>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 sm:gap-4">
+          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-indigo-400/30 bg-indigo-500/10 sm:h-11 sm:w-11">
+            <ShieldCheck size={18} className="text-indigo-300" />
           </div>
 
           <div className="min-w-0">
-            <h2 className="text-2xl font-black tracking-[-0.03em] text-white light:text-slate-900 sm:text-3xl">
+            <h2 className="truncate text-xl font-black tracking-[-0.03em] text-white light:text-slate-900 sm:text-2xl lg:text-3xl">
               Admin Panel
             </h2>
-            <p className="mt-1 truncate text-sm text-slate-400 light:text-slate-600">
+            <p className="mt-1 truncate text-xs text-slate-400 light:text-slate-600 sm:text-sm">
               {email ? `Signed in as ${email}` : "Real InPlayer data — no dummy numbers."}
             </p>
           </div>
         </div>
 
-        <div className="flex flex-shrink-0 items-center gap-2">
+        <div className="hidden flex-shrink-0 items-center gap-2 sm:flex">
           <button
             type="button"
             onClick={toggleTheme}

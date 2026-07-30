@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { fetchAuthSession } from "aws-amplify/auth";
 import {
@@ -12,6 +12,7 @@ import {
   Gavel,
   ShieldCheck,
   ShieldAlert,
+  Search,
 } from "lucide-react";
 
 interface CopyrightItem {
@@ -43,6 +44,20 @@ export default function CopyrightCenterPage() {
   const [error, setError] = useState<string | null>(null);
   const [tableMissing, setTableMissing] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
+
+  const filteredItems = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return items;
+    return items.filter(
+      (item) =>
+        item.reportId.toLowerCase().includes(q) ||
+        item.videoId.toLowerCase().includes(q) ||
+        item.title.toLowerCase().includes(q) ||
+        (item.uploaderUsername || "").toLowerCase().includes(q) ||
+        (item.uploaderId || "").toLowerCase().includes(q)
+    );
+  }, [items, query]);
 
   const load = async () => {
     setLoading(true);
@@ -132,6 +147,17 @@ export default function CopyrightCenterPage() {
         </p>
       </div>
 
+      <div className="mt-4 flex items-center gap-2 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] px-4 py-3">
+        <Search size={16} className="text-slate-500" />
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search by video title, video ID, report ID, or uploader…"
+          className="w-full bg-transparent text-sm text-white light:text-slate-900 outline-none placeholder:text-slate-500"
+        />
+      </div>
+
       {tableMissing && (
         <div className="mt-4 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs leading-5 text-amber-300 light:text-amber-700">
           The Reports table (InPlayer-Reports) hasn&apos;t been created in AWS yet, so copyright
@@ -150,14 +176,16 @@ export default function CopyrightCenterPage() {
         <div className="flex min-h-[30vh] items-center justify-center">
           <Loader2 size={24} className="animate-spin text-indigo-400" />
         </div>
-      ) : items.length === 0 ? (
+      ) : filteredItems.length === 0 ? (
         <div className="mt-8 flex flex-col items-center gap-2 py-8 text-center">
           <ShieldCheck size={28} className="text-emerald-400" />
-          <p className="text-sm text-slate-500">No open copyright reports. All caught up.</p>
+          <p className="text-sm text-slate-500">
+            {query ? `Nothing matches "${query}".` : "No open copyright reports. All caught up."}
+          </p>
         </div>
       ) : (
         <div className="mt-5 space-y-2">
-          {items.map((item) => (
+          {filteredItems.map((item) => (
             <div
               key={item.reportId}
               className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4"

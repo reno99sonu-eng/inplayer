@@ -18,6 +18,7 @@ import {
   MapPin,
   Monitor,
   ShieldAlert,
+  Search,
 } from "lucide-react";
 import { formatTimeAgo } from "@/app/lib/formatters";
 
@@ -113,6 +114,7 @@ export default function AuditLogsPage() {
   const [error, setError] = useState<string | null>(null);
   const [tableMissing, setTableMissing] = useState(false);
   const [filter, setFilter] = useState<(typeof FILTERS)[number]["id"]>("all");
+  const [query, setQuery] = useState("");
   const [viewerLocation, setViewerLocation] = useState<string | null>(null);
   const [viewerDevice, setViewerDevice] = useState<string | null>(null);
 
@@ -143,10 +145,21 @@ export default function AuditLogsPage() {
     };
   }, []);
 
-  const filtered = useMemo(
-    () => (filter === "all" ? items : items.filter((i) => i.targetType === filter)),
-    [items, filter]
-  );
+  const filtered = useMemo(() => {
+    const byCategory = filter === "all" ? items : items.filter((i) => i.targetType === filter);
+    const q = query.trim().toLowerCase();
+    if (!q) return byCategory;
+    return byCategory.filter((i) => {
+      const label = (ACTION_META[i.action]?.label || i.action).toLowerCase();
+      return (
+        label.includes(q) ||
+        i.targetId.toLowerCase().includes(q) ||
+        (i.targetLabel || "").toLowerCase().includes(q) ||
+        i.adminEmail.toLowerCase().includes(q) ||
+        (i.details || "").toLowerCase().includes(q)
+      );
+    });
+  }, [items, filter, query]);
 
   return (
     <div>
@@ -193,6 +206,17 @@ export default function AuditLogsPage() {
         ))}
       </div>
 
+      <div className="mt-3 flex items-center gap-2 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] px-4 py-3">
+        <Search size={16} className="text-slate-500" />
+        <input
+          type="text"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Search by action, target ID/username, admin, or details…"
+          className="w-full bg-transparent text-sm text-white light:text-slate-900 outline-none placeholder:text-slate-500"
+        />
+      </div>
+
       {tableMissing && (
         <div className="mt-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs leading-5 text-amber-300 light:text-amber-700">
           The Audit Logs table (InPlayer-Audit-Logs) hasn&apos;t been created in AWS yet, so
@@ -215,9 +239,11 @@ export default function AuditLogsPage() {
         <div className="mt-8 flex flex-col items-center gap-2 py-8 text-center">
           <ScrollText size={28} className="text-slate-500" />
           <p className="text-sm text-slate-500">
-            {items.length === 0
-              ? "No admin actions logged yet."
-              : "Nothing in this category yet."}
+            {query
+              ? `Nothing matches "${query}".`
+              : items.length === 0
+                ? "No admin actions logged yet."
+                : "Nothing in this category yet."}
           </p>
         </div>
       ) : (

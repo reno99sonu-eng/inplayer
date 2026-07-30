@@ -13,6 +13,7 @@ import {
   useMemo,
   ReactNode,
 } from "react";
+import { useRouter, usePathname } from "next/navigation";
 import {
   getCurrentUser,
   fetchUserAttributes,
@@ -128,8 +129,16 @@ export default function AuthProvider({
 
   const [user, setUser] = useState<AuthUser | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const router = useRouter();
+  const pathname = usePathname();
 
-  async function refreshUser() {
+  // `isFreshSignIn` is only ever true when this call is a direct result of
+  // someone actively signing in this visit (password submit, or the Google
+  // Hub "signedIn"/"signInWithRedirect" event) — NOT the passive
+  // session-restore check that runs once on first page load. That
+  // distinction is what stops an already-signed-in admin from being
+  // yanked back to /admin every time they navigate or refresh a page.
+  async function refreshUser(options?: { isFreshSignIn?: boolean }) {
     try {
       const currentUser = await getCurrentUser();
       const attributes = await fetchUserAttributes();
@@ -145,10 +154,14 @@ export default function AuthProvider({
       // null until /api/profile/avatar answers, in which case attributes.name
       // below is used as a same-request fallback only, never stored.
       let storedName: string | null = null;
+      // Hoisted out of the inner try below so the post-sign-in admin
+      // check further down can reuse the same token instead of fetching
+      // the session a second time.
+      let idToken: string | null = null;
 
       try {
         const session = await fetchAuthSession();
-        const idToken = session.tokens?.idToken?.toString();
+        idToken = session.tokens?.idToken?.toString() || null;
 
         if (idToken) {
           const res = await fetch("/api/profile/avatar", {
@@ -188,6 +201,25 @@ export default function AuthProvider({
         age,
         termsAccepted,
       });
+
+      // Send an admin straight to the Admin Panel the moment they actually
+      // sign in, instead of leaving them on the normal site. Uses the same
+      // /api/admin/me check app/admin/layout.tsx already relies on — the
+      // real admin-email list is server-only, so this is the one place a
+      // client component can safely ask "is this account an admin."
+      if (options?.isFreshSignIn && idToken && !pathname?.startsWith("/admin")) {
+        try {
+          const adminRes = await fetch("/api/admin/me", {
+            headers: { Authorization: `Bearer ${idToken}` },
+          });
+          const adminData = await adminRes.json();
+          if (adminData.isAdmin) {
+            router.push("/admin");
+          }
+        } catch (err) {
+          console.error("Post-sign-in admin check failed:", err);
+        }
+      }
     } catch (err) {
       // This used to be silent — which is exactly why "Google sign-in
       // succeeds but the site still shows Sign In" has been so hard to
@@ -254,7 +286,7 @@ export default function AuthProvider({
         payload.event === "signInWithRedirect" ||
         payload.event === "signedIn"
       ) {
-        refreshUser();
+        refreshUser({ isFreshSignIn: true });
         setActiveModal(null);
       }
       if (payload.event === "signedOut") {
@@ -380,7 +412,7 @@ export default function AuthProvider({
       <SignInModal
         open={activeModal === "signin"}
         onClose={closeAuth}
-        onSuccess={refreshUser}
+        onSuccess={() => refreshUser({ isFreshSignIn: true })}
       />
 
       <SignUpModal

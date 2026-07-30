@@ -40,25 +40,38 @@ interface ModerationData {
   categories: Record<string, number>;
 }
 
+// A plain two-button On/Off switch — deliberately not a sliding pill toggle.
+// Each state is its own solid, fully-opaque button (no low-opacity overlay
+// colors that can wash out against a light background), so which one is
+// active is never ambiguous in either theme.
 function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean) => void }) {
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={() => onChange(!checked)}
-      className={`relative h-6 w-11 flex-shrink-0 rounded-full border transition-colors ${
-        checked
-          ? "border-indigo-500 bg-indigo-500"
-          : "border-black/10 bg-white/10 light:border-slate-400/60 light:bg-slate-300"
-      }`}
-    >
-      <span
-        className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-transform ${
-          checked ? "translate-x-[22px]" : "translate-x-0.5"
+    <div className="flex flex-shrink-0 overflow-hidden rounded-full border border-white/10 light:border-black/10">
+      <button
+        type="button"
+        aria-pressed={checked}
+        onClick={() => onChange(true)}
+        className={`px-3.5 py-1.5 text-xs font-black transition-colors ${
+          checked
+            ? "bg-emerald-500 text-white"
+            : "bg-white/5 light:bg-black/5 text-slate-400 light:text-slate-600 hover:bg-white/10 light:hover:bg-black/10"
         }`}
-      />
-    </button>
+      >
+        On
+      </button>
+      <button
+        type="button"
+        aria-pressed={!checked}
+        onClick={() => onChange(false)}
+        className={`px-3.5 py-1.5 text-xs font-black transition-colors ${
+          !checked
+            ? "bg-red-500 text-white"
+            : "bg-white/5 light:bg-black/5 text-slate-400 light:text-slate-600 hover:bg-white/10 light:hover:bg-black/10"
+        }`}
+      >
+        Off
+      </button>
+    </div>
   );
 }
 

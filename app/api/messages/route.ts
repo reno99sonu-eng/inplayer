@@ -8,6 +8,7 @@ import { createNotification } from "@/app/lib/notifications";
 import { makeConversationId } from "@/app/lib/conversationId";
 import { moderateText, UNCHECKED } from "@/app/lib/moderation";
 import { getPlatformSettings } from "@/app/lib/platformSettings";
+import { applyModerationStrike } from "@/app/lib/moderationStrikes";
 
 const CONVERSATIONS_TABLE = "InPlayer-Conversations";
 const MESSAGES_TABLE = "InPlayer-Messages";
@@ -184,6 +185,9 @@ export async function POST(request: NextRequest) {
     // conversation-preview update or notification either, so the recipient
     // never sees so much as a hint of it until/unless an admin restores it.
     if (flagged) {
+      await applyModerationStrike(request, user.userId, "message", moderation.categories).catch((err) =>
+        console.error("messages: applyModerationStrike failed:", err)
+      );
       return NextResponse.json({ success: true, conversationId, requestStatus, flagged: true });
     }
 

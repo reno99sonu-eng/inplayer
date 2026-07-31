@@ -12,7 +12,7 @@ export const AD_CREATIVES_TABLE = "InPlayer-Ad-Creatives";
 // this large would be unusual but shouldn't silently corrupt the item.
 export const AD_IMAGE_DATA_URL_MAX_LENGTH = 150_000;
 
-export type AdPlacement = "homepage" | "watch";
+export type AdPlacement = "homepage" | "watch" | "homepage_spotlight";
 
 export interface AdCreative {
   adId: string;

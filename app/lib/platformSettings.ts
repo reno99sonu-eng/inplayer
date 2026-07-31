@@ -27,6 +27,16 @@ export interface PlatformSettings {
   adsensePublisherId: string;
   homepageBannerSource: AdSlotSource;
   watchPageBannerSource: AdSlotSource;
+  // A second, static homepage ad slot — same AdSlotSource/AdCreative
+  // machinery as the two above (see app/lib/adCreatives.ts's AdPlacement
+  // union, which now also includes "homepage_spotlight"), just a different
+  // spot on the page (see app/page.tsx).
+  homepageSpotlightSource: AdSlotSource;
+  midrollEnabled: boolean;
+  // How often (in seconds of watch time) a new mid-roll break can trigger.
+  // See app/components/VideoPlayer.tsx's onTimeUpdate handler for where
+  // this is actually consumed.
+  midrollIntervalSeconds: number;
   updatedAt: string | null;
   updatedBy: string | null;
 }
@@ -44,6 +54,9 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
   adsensePublisherId: "",
   homepageBannerSource: "off",
   watchPageBannerSource: "off",
+  homepageSpotlightSource: "off",
+  midrollEnabled: false,
+  midrollIntervalSeconds: 300,
   updatedAt: null,
   updatedBy: null,
 };
@@ -65,6 +78,9 @@ export type PublicPlatformSettings = Pick<
   | "adsensePublisherId"
   | "homepageBannerSource"
   | "watchPageBannerSource"
+  | "homepageSpotlightSource"
+  | "midrollEnabled"
+  | "midrollIntervalSeconds"
 >;
 
 export async function getPlatformSettings(): Promise<PlatformSettings> {
@@ -91,6 +107,9 @@ export function toPublicSettings(settings: PlatformSettings): PublicPlatformSett
     adsensePublisherId: settings.adsensePublisherId,
     homepageBannerSource: settings.homepageBannerSource,
     watchPageBannerSource: settings.watchPageBannerSource,
+    homepageSpotlightSource: settings.homepageSpotlightSource,
+    midrollEnabled: settings.midrollEnabled,
+    midrollIntervalSeconds: settings.midrollIntervalSeconds,
   };
 }
 

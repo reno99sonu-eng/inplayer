@@ -1,14 +1,20 @@
 import { NextRequest, NextResponse } from "next/server";
-import { ScanCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
+import { ScanCommand, GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { requireAdmin } from "@/app/lib/isAdmin";
+import { resolveUsernames } from "@/app/lib/resolveUsernames";
+import { logAdminAction } from "@/app/lib/auditLog";
 
-// Combines everything an admin needs to review into two tabs:
+// Combines everything an admin needs to review into three tabs:
 //   "reports"     — real user-submitted reports (InPlayer-Reports,
 //                    status: "open") on videos, comments, or messages.
 //   "autoflagged" — content app/lib/moderation.ts's real-time AI scan held
 //                    back on its own, before any human reported it.
-// Both are real data straight from DynamoDB — nothing here is simulated.
+//   "strikes"     — accounts app/lib/moderationStrikes.ts's automated
+//                    3-strike system suspended on its own after a third
+//                    violation (banReviewPending: true on InPlayer-Users),
+//                    waiting on a human to uphold or lift the ban.
+// All real data straight from DynamoDB — nothing here is simulated.
 
 async function scanAll(
   tableName: string,
@@ -84,7 +90,31 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  const tab = request.nextUrl.searchParams.get("tab") === "autoflagged" ? "autoflagged" : "reports";
+  const tabParam = request.nextUrl.searchParams.get("tab");
+  const tab = tabParam === "autoflagged" ? "autoflagged" : tabParam === "strikes" ? "strikes" : "reports";
+
+  if (tab === "strikes") {
+    try {
+      const users = await scanAll("InPlayer-Users", "banReviewPending = :t", { ":t": true });
+      const usernames = await resolveUsernames(users.map((u) => u.userId as string));
+
+      const items = users
+        .map((u) => ({
+          userId: u.userId as string,
+          username: usernames.get(u.userId as string) || null,
+          name: (u.name as string) || null,
+          aiModerationStrikes: Number(u.aiModerationStrikes) || 0,
+          banReviewReason: (u.banReviewReason as string) || null,
+          updatedAt: (u.updatedAt as string) || null,
+        }))
+        .sort((a, b) => new Date(b.updatedAt || 0).getTime() - new Date(a.updatedAt || 0).getTime());
+
+      return NextResponse.json({ items });
+    } catch (err) {
+      console.error("Strike review scan failed:", err);
+      return NextResponse.json({ items: [] });
+    }
+  }
 
   if (tab === "reports") {
     try {
@@ -156,4 +186,75 @@ export async function GET(request: NextRequest) {
     console.error("Auto-flagged content scan failed:", err);
     return NextResponse.json({ items: [] });
   }
+}
+
+// The human half of the 3-strike system's "admin-reviewed" promise — see
+// app/lib/moderationStrikes.ts. A strike-3 account is already suspended
+// the moment it happens; this endpoint just lets an admin either confirm
+// that (uphold — clears banReviewPending so it drops off this queue, the
+// suspension itself is untouched) or overturn it (lift — un-suspends the
+// account AND resets the strike counter back to 0, a genuine clean slate
+// rather than leaving them one more flagged post away from an instant
+// re-ban).
+export async function POST(request: NextRequest) {
+  let admin;
+  try {
+    admin = await requireAdmin(request);
+  } catch {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const body = await request.json().catch(() => ({}));
+  const { userId, action } = body;
+
+  if (!userId || typeof userId !== "string") {
+    return NextResponse.json({ error: "userId is required." }, { status: 400 });
+  }
+  if (action !== "uphold_ban" && action !== "lift_ban") {
+    return NextResponse.json({ error: "Invalid action." }, { status: 400 });
+  }
+
+  try {
+    if (action === "uphold_ban") {
+      await docClient.send(
+        new UpdateCommand({
+          TableName: "InPlayer-Users",
+          Key: { userId },
+          UpdateExpression: "SET banReviewPending = :f, banReviewedAt = :now, banReviewedBy = :by",
+          ExpressionAttributeValues: { ":f": false, ":now": new Date().toISOString(), ":by": admin.email },
+        })
+      );
+    } else {
+      await docClient.send(
+        new UpdateCommand({
+          TableName: "InPlayer-Users",
+          Key: { userId },
+          UpdateExpression:
+            "SET isSuspended = :s, banReviewPending = :f, aiModerationStrikes = :zero, banReviewedAt = :now, banReviewedBy = :by REMOVE suspendedUntil",
+          ExpressionAttributeValues: {
+            ":s": false,
+            ":f": false,
+            ":zero": 0,
+            ":now": new Date().toISOString(),
+            ":by": admin.email,
+          },
+        })
+      );
+    }
+  } catch (err) {
+    console.error(`admin/moderation: ${action} failed for ${userId}:`, err);
+    return NextResponse.json({ error: "Couldn't save that right now." }, { status: 500 });
+  }
+
+  await logAdminAction({
+    request,
+    adminId: admin.userId,
+    adminEmail: admin.email,
+    action: action === "uphold_ban" ? "user.ban_strike" : "user.ban_lift",
+    targetType: "user",
+    targetId: userId,
+    details: action === "uphold_ban" ? "Admin upheld the strike-3 suspension" : "Admin lifted the ban and reset strikes",
+  });
+
+  return NextResponse.json({ success: true });
 }

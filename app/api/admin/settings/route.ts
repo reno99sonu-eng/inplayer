@@ -63,6 +63,16 @@ export async function PATCH(request: NextRequest) {
   if (AD_SLOT_SOURCES.includes(body.watchPageBannerSource)) {
     partial.watchPageBannerSource = body.watchPageBannerSource;
   }
+  if (AD_SLOT_SOURCES.includes(body.homepageSpotlightSource)) {
+    partial.homepageSpotlightSource = body.homepageSpotlightSource;
+  }
+  if (typeof body.midrollEnabled === "boolean") partial.midrollEnabled = body.midrollEnabled;
+  if (typeof body.midrollIntervalSeconds === "number" && Number.isFinite(body.midrollIntervalSeconds)) {
+    // Floor of 60s — anything shorter turns every video into an ad break
+    // every few sentences, which isn't a real product decision anyone
+    // would want to be one fat-fingered admin input away from.
+    partial.midrollIntervalSeconds = Math.max(60, Math.min(3600, Math.round(body.midrollIntervalSeconds)));
+  }
 
   if (Object.keys(partial).length === 0) {
     return NextResponse.json({ error: "No valid settings provided." }, { status: 400 });

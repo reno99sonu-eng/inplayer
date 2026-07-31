@@ -2,17 +2,19 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
+import { useAdminMode } from "@/app/components/admin/AdminModeContext";
 
-// Same section list as AdminSidebar, condensed into a horizontally
-// scrollable strip for phones (that sidebar is `hidden lg:block`). Kept as
-// a separate small list here (not imported from AdminSidebar) since this
-// only needs id/label/href, not icons. Every section is real and live as
-// of this list (no more `href: null` placeholders) — keep in sync with
-// AdminSidebar.tsx's own items array when a section's route changes.
-const items = [
+// Same two section lists as AdminSidebar (see that file's comment),
+// condensed into a horizontally scrollable strip for phones (that sidebar
+// is `hidden lg:block`). Kept as separate small lists here (not imported
+// from AdminSidebar) since this only needs id/label/href, not icons —
+// keep both in sync with AdminSidebar.tsx's own arrays when a section's
+// route changes.
+const inplayerItems = [
   { id: "dashboard", label: "Dashboard", href: "/admin/dashboard" },
   { id: "users", label: "Users", href: "/admin/users" },
   { id: "creators", label: "Creators", href: "/admin/creators" },
+  { id: "bug-reports", label: "Bug Reports", href: "/admin/bug-reports" },
   { id: "videos", label: "Videos", href: "/admin/videos" },
   { id: "shorts", label: "Shorts", href: "/admin/videos?type=short" },
   { id: "reports", label: "Reports", href: "/admin/moderation" },
@@ -27,9 +29,18 @@ const items = [
   { id: "captions", label: "Maintenance", href: "/admin/captions" },
 ] as const;
 
+const hammartItems = [
+  { id: "hammart-vendors", label: "Vendors & KYC", href: "/admin/hammart-vendors" },
+  { id: "hammart-products", label: "Products", href: "/admin/hammart-products" },
+  { id: "settings", label: "Settings", href: "/admin/settings" },
+  { id: "audit-logs", label: "Audit Logs", href: "/admin/audit-logs" },
+] as const;
+
 export default function AdminMobileNav() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { mode } = useAdminMode();
+  const items = mode === "hammart" ? hammartItems : inplayerItems;
   const query = searchParams.toString();
   const currentPath = query ? `${pathname}?${query}` : pathname;
 

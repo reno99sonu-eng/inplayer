@@ -20,7 +20,7 @@ type AdResponse =
 // unit, or nothing at all). Fails silently to "render nothing" on any
 // error, exactly like every other optional widget on this site (never
 // worth breaking the page over an ad).
-export default function AdBanner({ placement }: { placement: "homepage" | "watch" }) {
+export default function AdBanner({ placement }: { placement: "homepage" | "watch" | "homepage_spotlight" }) {
   const [data, setData] = useState<AdResponse | null>(null);
 
   useEffect(() => {

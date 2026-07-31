@@ -173,6 +173,13 @@ export default async function Home({ searchParams }: HomeProps) {
             realShorts={realShorts}
             view={activeView}
           />
+
+          {/* Second, static homepage ad slot — its own admin-configurable
+              source (Admin Panel -> Advertising -> Homepage Spotlight),
+              independent of the banner above. Shown in both Horizontal and
+              Vertical (Shorts) views, unlike the hero-row banner above,
+              which only makes sense alongside the horizontal showcases. */}
+          <AdBanner placement="homepage_spotlight" />
         </div>
       </div>
 

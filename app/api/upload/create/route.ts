@@ -7,6 +7,7 @@ import { THUMBNAIL_DATA_URL_MAX_LENGTH } from "@/app/lib/imageCompress";
 import { ensureUsername } from "@/app/lib/ensureUsername";
 import { moderateText, UNCHECKED } from "@/app/lib/moderation";
 import { getPlatformSettings } from "@/app/lib/platformSettings";
+import { applyModerationStrike } from "@/app/lib/moderationStrikes";
 
 // Defensive re-validation of a client-supplied soundtrack pick (see
 // ShortCreationTools/soundtracks.ts's ResolvedSoundtrack shape) before it's
@@ -277,6 +278,15 @@ export async function POST(request: NextRequest) {
         },
       })
     );
+
+    if (moderationHidden) {
+      await applyModerationStrike(
+        request,
+        user.userId,
+        isShort ? "Short" : "video upload",
+        uploadModeration.categories
+      ).catch((err) => console.error("upload/create: applyModerationStrike failed:", err));
+    }
 
     return NextResponse.json({
       uploadUrl: upload.url,

@@ -27,6 +27,15 @@ export interface VerifiedUser {
 // needed anywhere else.
 const SUSPENDED_MESSAGE = "Account suspended";
 
+// Strike 2 of the AI moderation 3-strike system (see
+// app/lib/moderationStrikes.ts) is a temporary block, not a permanent
+// suspension — same enforcement path (any verifyAuth rejection is a 401
+// everywhere), different message purely for server-log clarity. An
+// expired suspendedUntil is treated as if it were never set at all; there
+// is no cron/TTL job that clears the field, it's just ignored once it's
+// in the past.
+const TEMP_BLOCKED_MESSAGE = "Account temporarily blocked";
+
 // Thrown when a request explicitly identifies which device/session it's
 // from (via X-Session-Id — see app/lib/apiFetch.ts) and that session has
 // since been logged out (Settings > Privacy, or an admin forcing it) — see
@@ -77,12 +86,16 @@ export async function verifyAuth(request: NextRequest): Promise<VerifiedUser> {
       new GetCommand({
         TableName: "InPlayer-Users",
         Key: { userId },
-        ProjectionExpression: "isSuspended, #n",
+        ProjectionExpression: "isSuspended, suspendedUntil, #n",
         ExpressionAttributeNames: { "#n": "name" },
       })
     );
     if (result.Item?.isSuspended === true) {
       throw new Error(SUSPENDED_MESSAGE);
+    }
+    const suspendedUntil = result.Item?.suspendedUntil as string | undefined;
+    if (suspendedUntil && new Date(suspendedUntil).getTime() > Date.now()) {
+      throw new Error(TEMP_BLOCKED_MESSAGE);
     }
 
     const storedName = result.Item?.name as string | undefined;
@@ -114,7 +127,9 @@ export async function verifyAuth(request: NextRequest): Promise<VerifiedUser> {
       }
     }
   } catch (err) {
-    if (err instanceof Error && err.message === SUSPENDED_MESSAGE) throw err;
+    if (err instanceof Error && (err.message === SUSPENDED_MESSAGE || err.message === TEMP_BLOCKED_MESSAGE)) {
+      throw err;
+    }
     console.error("verifyAuth: suspension/name check failed, failing open:", err);
   }
 

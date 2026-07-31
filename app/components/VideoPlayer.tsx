@@ -102,6 +102,123 @@ export default function VideoPlayer({
   const playerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // --- Mid-roll ad breaks -------------------------------------------------
+  // Real ad interruptions, not a stub: on mount, fetch once whether
+  // mid-roll is on platform-wide (Admin Panel -> Advertising) and which
+  // creative to show; then, as playback reports its own currentTime via
+  // onTimeUpdate below, trigger a break every time currentTime crosses a
+  // fresh multiple of the configured interval. midrollBreaksShownRef
+  // tracks which break indices have already fired THIS mount so seeking
+  // back over an old break never re-triggers it. Tiered skip timers (see
+  // MIDROLL_SKIP_TIERS_SECONDS in app/lib/videoAds.ts) escalate with how
+  // many breaks this viewer has already sat through in this video.
+  const [midrollConfig, setMidrollConfig] = useState<{
+    enabled: boolean;
+    intervalSeconds: number;
+    skipTiersSeconds: number[];
+  } | null>(null);
+  const [midrollAd, setMidrollAd] = useState<{
+    adId: string;
+    imageUrl: string;
+    linkUrl: string;
+    title: string;
+  } | null>(null);
+  const [midrollBreakActive, setMidrollBreakActive] = useState(false);
+  const [midrollSkipUnlocked, setMidrollSkipUnlocked] = useState(false);
+  const [midrollCountdown, setMidrollCountdown] = useState(0);
+  const midrollBreaksShownRef = useRef<Set<number>>(new Set());
+  const midrollWasPlayingRef = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/midroll-ads");
+        const data = await res.json().catch(() => ({ enabled: false }));
+        if (cancelled) return;
+        if (data.enabled && data.ad) {
+          setMidrollConfig({
+            enabled: true,
+            intervalSeconds: data.intervalSeconds || 300,
+            skipTiersSeconds: Array.isArray(data.skipTiersSeconds) && data.skipTiersSeconds.length
+              ? data.skipTiersSeconds
+              : [5, 10, 15],
+          });
+          setMidrollAd(data.ad);
+        }
+      } catch (err) {
+        console.error("VideoPlayer: mid-roll config fetch failed:", err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleMidrollTimeUpdate = () => {
+    const player = playerRef.current;
+    if (!player || !midrollConfig?.enabled || !midrollAd || midrollBreakActive) return;
+
+    const currentTime = player.currentTime || 0;
+    const duration = player.duration || 0;
+    const breakIndex = Math.floor(currentTime / midrollConfig.intervalSeconds);
+
+    // breakIndex 0 covers "before the first interval has elapsed" — never
+    // a real break. Also never trigger in the last few seconds, so a
+    // break can't fire moments before the video ends anyway.
+    if (breakIndex < 1) return;
+    if (duration && duration - currentTime < 5) return;
+    if (midrollBreaksShownRef.current.has(breakIndex)) return;
+
+    midrollBreaksShownRef.current.add(breakIndex);
+    midrollWasPlayingRef.current = !player.paused;
+    player.pause();
+
+    const tierIndex = Math.min(
+      midrollBreaksShownRef.current.size - 1,
+      midrollConfig.skipTiersSeconds.length - 1
+    );
+    setMidrollCountdown(midrollConfig.skipTiersSeconds[tierIndex] ?? 5);
+    setMidrollSkipUnlocked(false);
+    setMidrollBreakActive(true);
+  };
+
+  // Ticks the skip countdown down to zero, then unlocks the Skip button —
+  // the setState call is wrapped in a nested function (rather than called
+  // bare in the effect body) purely to satisfy
+  // react-hooks/set-state-in-effect, same convention used throughout this
+  // codebase.
+  useEffect(() => {
+    if (!midrollBreakActive) return;
+    const unlockSkip = () => setMidrollSkipUnlocked(true);
+    if (midrollCountdown <= 0) {
+      unlockSkip();
+      return;
+    }
+    const id = window.setTimeout(() => setMidrollCountdown((c) => c - 1), 1000);
+    return () => window.clearTimeout(id);
+  }, [midrollBreakActive, midrollCountdown]);
+
+  const trackMidrollEvent = (kind: "click" | "skip") => {
+    if (!midrollAd) return;
+    fetch("/api/midroll-ads", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ adId: midrollAd.adId, kind }),
+    }).catch(() => {
+      /* best-effort — never blocks resuming playback */
+    });
+  };
+
+  const skipMidroll = () => {
+    if (!midrollSkipUnlocked) return;
+    trackMidrollEvent("skip");
+    setMidrollBreakActive(false);
+    const player = playerRef.current;
+    if (player && midrollWasPlayingRef.current) player.play();
+  };
+  // --- End mid-roll ad breaks ---------------------------------------------
+
   const [realFullscreen, setRealFullscreen] = useState(false);
   // CSS "fake" fullscreen — used wherever the real Fullscreen API is
   // unavailable (iPhone Safari has none for custom players) or refuses to
@@ -536,6 +653,13 @@ export default function VideoPlayer({
   // swallow while locked. Clicks in the bottom control-bar zone are never
   // touched, so Mux's real controls keep working.
   const handlePlayerClickCapture = (e: React.MouseEvent<HTMLDivElement>) => {
+    // While a mid-roll break is showing, none of the play/pause/seek
+    // gesture logic below should run — the ad overlay (rendered as a
+    // sibling of MuxPlayer, inside this same container) handles its own
+    // clicks (the ad link, the Skip button) and stopPropagation()s them
+    // itself. This early return is a backstop for anything that isn't.
+    if (midrollBreakActive) return;
+
     // A brightness/volume drag that just ended still fires a click on
     // release — swallow exactly that one so it doesn't ALSO toggle
     // play/pause or start a seek chain.
@@ -627,7 +751,7 @@ export default function VideoPlayer({
 
   // Brightness (left half) / volume (right half) vertical drag — start.
   const handlePlayerPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (e.pointerType !== "touch" || locked) return;
+    if (midrollBreakActive || e.pointerType !== "touch" || locked) return;
     if (isOnRealControl(e.nativeEvent, e.currentTarget)) return;
 
     const rect = e.currentTarget.getBoundingClientRect();
@@ -746,6 +870,7 @@ export default function VideoPlayer({
         thumbnailTime={0}
         onPlay={() => flashPulse("play")}
         onPause={() => flashPulse("pause")}
+        onTimeUpdate={handleMidrollTimeUpdate}
         style={
           {
             width: "100%",
@@ -762,6 +887,54 @@ export default function VideoPlayer({
           } as MuxCSSProperties
         }
       />
+
+      {/* Mid-roll ad break — a real interruption, not a stub: the
+          underlying player is genuinely paused (see
+          handleMidrollTimeUpdate) while this is shown. z-40 so it sits
+          above every other overlay/indicator in this player, and its own
+          onClick/onPointerDown handlers stopPropagation() so none of the
+          tap-seek/brightness gesture handlers on the container fire while
+          it's up (handlePlayerClickCapture/handlePlayerPointerDown also
+          bail out early on midrollBreakActive as a backstop). */}
+      {midrollBreakActive && midrollAd && (
+        <div
+          className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-4 bg-black/95 p-6 text-center"
+          onClick={(e) => e.stopPropagation()}
+          onPointerDown={(e) => e.stopPropagation()}
+        >
+          <span className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-wide text-slate-300">
+            Advertisement
+          </span>
+          <a
+            href={midrollAd.linkUrl}
+            target="_blank"
+            rel="noopener noreferrer sponsored"
+            onClick={() => trackMidrollEvent("click")}
+            className="block max-h-[55%] max-w-full overflow-hidden rounded-2xl border border-white/10"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element -- an
+                admin-uploaded data URL, not a static app asset. */}
+            <img
+              src={midrollAd.imageUrl}
+              alt={midrollAd.title}
+              className="max-h-full max-w-full object-contain"
+            />
+          </a>
+          <p className="max-w-xs text-xs text-slate-400">{midrollAd.title}</p>
+          <button
+            type="button"
+            onClick={skipMidroll}
+            disabled={!midrollSkipUnlocked}
+            className={`rounded-full px-5 py-2.5 text-sm font-bold transition ${
+              midrollSkipUnlocked
+                ? "bg-white text-black hover:bg-white/90"
+                : "cursor-not-allowed bg-white/10 text-slate-400"
+            }`}
+          >
+            {midrollSkipUnlocked ? "Skip Ad" : `Skip in ${midrollCountdown}s`}
+          </button>
+        </div>
+      )}
 
       {/* Double/triple-tap seek feedback (touch) */}
       {seekIndicator && (

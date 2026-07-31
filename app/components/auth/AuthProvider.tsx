@@ -371,6 +371,35 @@ export default function AuthProvider({
     });
     if (!response.ok) throw new Error("Couldn't save your terms choice.");
     if (canCompleteAccount) localStorage.removeItem("inplayer-pending-age");
+
+    // Hammart: if this person chose "Sell on Hammart" on the sign-up form,
+    // the vendor ID/business-type they picked was stashed in localStorage
+    // (see SignUpModal.tsx) since there's no account yet at that point to
+    // attach it to — this is the first moment a real, verified account
+    // exists to create the vendor row against. Best-effort: a failure here
+    // (e.g. the vendor ID got taken by someone else in the meantime, or
+    // the Hammart-Vendors table isn't set up yet) should never block the
+    // person from finishing normal sign-up — they land as a regular user
+    // and can register as a vendor again later from Settings.
+    const pendingVendorRaw = localStorage.getItem("inplayer-pending-vendor");
+    if (pendingVendorRaw && idToken) {
+      try {
+        const pendingVendor = JSON.parse(pendingVendorRaw);
+        await fetch("/api/hammart/vendor/register", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${idToken}`,
+          },
+          body: JSON.stringify(pendingVendor),
+        });
+      } catch (err) {
+        console.error("Hammart vendor registration failed (account creation still succeeded):", err);
+      } finally {
+        localStorage.removeItem("inplayer-pending-vendor");
+      }
+    }
+
     await refreshUser();
   }
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Mail, Lock, X, Loader2, Check } from "lucide-react";
-import { signIn } from "@/app/lib/auth";
+import { signIn, signOut } from "@/app/lib/auth";
 import { signInWithRedirect } from "aws-amplify/auth";
 import { cognitoUserPoolsTokenProvider } from "aws-amplify/auth/cognito";
 import {
@@ -51,7 +51,7 @@ export default function SignInModal({
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    if (!open) {
+    const resetForm = () => {
       setEmail("");
       setPassword("");
       setRememberMe(true);
@@ -60,7 +60,8 @@ export default function SignInModal({
       setError(null);
       setShake(false);
       setSuccess(false);
-    }
+    };
+    if (!open) resetForm();
   }, [open]);
 
   useEffect(() => {
@@ -103,20 +104,43 @@ export default function SignInModal({
         rememberMe ? defaultStorage : amplifySessionStorage
       );
 
-      const result = await signIn({
-        username: email.trim(),
-        password,
-        // Sydney -> Mumbai account migration (see app/lib/verifyAuth.ts and
-        // the InPlayer-Users "migratedFromSub" field) runs on a Cognito
-        // "migrate user" Lambda trigger that only receives the plaintext
-        // password when sign-in uses USER_PASSWORD_AUTH — Amplify's default
-        // SRP flow never sends the password to Cognito at all, so migration
-        // would silently never fire here without this override. Once every
-        // existing account has signed in at least once post-cutover, this
-        // can be removed to go back to Amplify's more private SRP default —
-        // it's only required during the migration window.
-        options: { authFlowType: "USER_PASSWORD_AUTH" },
-      });
+      const attemptSignIn = () =>
+        signIn({
+          username: email.trim(),
+          password,
+          // Sydney -> Mumbai account migration (see app/lib/verifyAuth.ts and
+          // the InPlayer-Users "migratedFromSub" field) runs on a Cognito
+          // "migrate user" Lambda trigger that only receives the plaintext
+          // password when sign-in uses USER_PASSWORD_AUTH — Amplify's default
+          // SRP flow never sends the password to Cognito at all, so migration
+          // would silently never fire here without this override. Once every
+          // existing account has signed in at least once post-cutover, this
+          // can be removed to go back to Amplify's more private SRP default —
+          // it's only required during the migration window.
+          options: { authFlowType: "USER_PASSWORD_AUTH" },
+        });
+
+      let result;
+      try {
+        result = await attemptSignIn();
+      } catch (err: unknown) {
+        // A device can end up with a stale local Amplify session (e.g. this
+        // browser signed in once before, or was left on a shared computer),
+        // which makes Amplify refuse to even try a new sign-in — it throws
+        // this locally, before ever reaching Cognito, regardless of whether
+        // any OTHER device is signed in. It's not a real "signed in
+        // elsewhere" conflict, and signing in from several devices at once
+        // (e.g. phone + PC) is expected to work fine — so clear this
+        // device's stale session and retry once automatically instead of
+        // surfacing a confusing error for something the person never did
+        // knowingly on this device.
+        if ((err as { name?: string })?.name === "UserAlreadyAuthenticatedException") {
+          await signOut();
+          result = await attemptSignIn();
+        } else {
+          throw err;
+        }
+      }
 
       if (result.isSignedIn) {
         // A brief success moment before closing feels more confirmed

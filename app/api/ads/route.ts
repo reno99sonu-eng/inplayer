@@ -11,7 +11,7 @@ import { AD_CREATIVES_TABLE, AdPlacement } from "@/app/lib/adCreatives";
 // picks one real active creative for that placement at random so
 // multiple uploads for the same slot rotate naturally instead of only
 // the newest one ever showing.
-const VALID_PLACEMENTS: AdPlacement[] = ["homepage", "watch"];
+const VALID_PLACEMENTS: AdPlacement[] = ["homepage", "watch", "homepage_spotlight"];
 
 export async function GET(request: NextRequest) {
   const placement = request.nextUrl.searchParams.get("placement") as AdPlacement | null;
@@ -21,7 +21,11 @@ export async function GET(request: NextRequest) {
 
   const settings = await getPlatformSettings();
   const source =
-    placement === "homepage" ? settings.homepageBannerSource : settings.watchPageBannerSource;
+    placement === "homepage"
+      ? settings.homepageBannerSource
+      : placement === "watch"
+      ? settings.watchPageBannerSource
+      : settings.homepageSpotlightSource;
 
   if (source === "off") {
     return NextResponse.json({ source: "off" });

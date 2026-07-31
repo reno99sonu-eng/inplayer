@@ -7,6 +7,7 @@ import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import AdminHeader from "@/app/components/admin/AdminHeader";
 import AdminSidebar from "@/app/components/admin/AdminSidebar";
 import AdminMobileNav from "@/app/components/admin/AdminMobileNav";
+import { AdminModeProvider } from "@/app/components/admin/AdminModeContext";
 
 // Gate for every /admin/* page (including the pre-existing
 // /admin/captions tool, which now sits inside this same shell). This is a
@@ -122,17 +123,19 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#06101D] light:bg-transparent text-white light:text-slate-900">
-      <AdminHeader email={user?.email || null} />
+    <AdminModeProvider>
+      <div className="min-h-screen bg-[#06101D] light:bg-transparent text-white light:text-slate-900">
+        <AdminHeader email={user?.email || null} />
 
-      <div className="mx-auto max-w-[1700px] px-5 py-8 lg:px-8">
-        <AdminMobileNav />
+        <div className="mx-auto max-w-[1700px] px-5 py-8 lg:px-8">
+          <AdminMobileNav />
 
-        <div className="lg:flex lg:items-start lg:gap-8">
-          <AdminSidebar />
-          <main className="min-w-0 flex-1">{children}</main>
+          <div className="lg:flex lg:items-start lg:gap-8">
+            <AdminSidebar />
+            <main className="min-w-0 flex-1">{children}</main>
+          </div>
         </div>
       </div>
-    </div>
+    </AdminModeProvider>
   );
 }

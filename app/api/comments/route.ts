@@ -12,6 +12,7 @@ import { resolveUsernames } from "@/app/lib/resolveUsernames";
 import { resolveActiveMemberIds } from "@/app/lib/memberships";
 import { moderateText, UNCHECKED } from "@/app/lib/moderation";
 import { getPlatformSettings } from "@/app/lib/platformSettings";
+import { applyModerationStrike } from "@/app/lib/moderationStrikes";
 
 export async function GET(request: NextRequest) {
   const videoId = request.nextUrl.searchParams.get("videoId");
@@ -133,8 +134,12 @@ export async function POST(request: NextRequest) {
 
   // Flagged comments are hidden and go straight to the Admin Panel's
   // moderation queue instead of notifying the video owner — no point
-  // pinging them about something nobody else can see yet.
+  // pinging them about something nobody else can see yet. They also count
+  // against the poster's 3-strike record (app/lib/moderationStrikes.ts).
   if (comment.hidden) {
+    await applyModerationStrike(request, user.userId, "comment", moderation.categories).catch((err) =>
+      console.error("comments: applyModerationStrike failed:", err)
+    );
     return NextResponse.json({ comment, flagged: true });
   }
 

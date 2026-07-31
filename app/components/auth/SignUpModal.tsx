@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { User, Mail, Lock, X, Loader2, Check, CheckCircle2, UserX } from "lucide-react";
+import { User, Mail, Lock, X, Loader2, Check, CheckCircle2, UserX, Store } from "lucide-react";
 import { signUp } from "@/app/lib/auth";
 import { signInWithRedirect } from "aws-amplify/auth";
 import { useAuthModal } from "./AuthProvider";
@@ -54,6 +54,21 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
   const [shake, setShake] = useState(false);
   const [success, setSuccess] = useState(false);
 
+  // Hammart vendor signup — "As Vendor / As User" split. A vendor account
+  // is still a normal InPlayer account underneath; this just also reserves
+  // a storefront ID and creates a Hammart-Vendors row the moment sign-up
+  // actually completes (see the localStorage handoff below and
+  // handleAcceptTerms() in AuthProvider.tsx — mirrors how "pending age"
+  // already survives the email-verification step).
+  const [accountType, setAccountType] = useState<"user" | "vendor">("user");
+  const [businessType, setBusinessType] = useState<"individual" | "business">("individual");
+  const [vendorId, setVendorId] = useState("");
+  const [businessName, setBusinessName] = useState("");
+  const [vendorIdCheck, setVendorIdCheck] = useState<{
+    status: "idle" | "checking" | "available" | "unavailable";
+    reason?: string;
+  }>({ status: "idle" });
+
   const strength = useMemo(() => getPasswordStrength(password), [password]);
   const emailValid = email.length > 0 && isValidEmail(email);
   const nameValid = name.trim().length > 1;
@@ -61,7 +76,7 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
   const passwordsMismatch = confirmPassword.length > 0 && confirmPassword !== password;
 
   useEffect(() => {
-    if (!open) {
+    const resetForm = () => {
       setName("");
       setEmail("");
       setAge("");
@@ -71,8 +86,56 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
       setError(null);
       setShake(false);
       setSuccess(false);
-    }
+      setAccountType("user");
+      setBusinessType("individual");
+      setVendorId("");
+      setBusinessName("");
+      setVendorIdCheck({ status: "idle" });
+    };
+    if (!open) resetForm();
   }, [open]);
+
+  // Live vendor-ID availability check, debounced — mirrors the same
+  // pattern already used for @handle checking on the profile page.
+  useEffect(() => {
+    const clearCheck = () => setVendorIdCheck({ status: "idle" });
+
+    if (accountType !== "vendor") {
+      clearCheck();
+      return;
+    }
+
+    const trimmed = vendorId.trim();
+    if (!trimmed) {
+      clearCheck();
+      return;
+    }
+
+    let cancelled = false;
+    const markChecking = () => setVendorIdCheck({ status: "checking" });
+    markChecking();
+
+    const timer = setTimeout(async () => {
+      try {
+        const res = await fetch(`/api/hammart/vendor-id/check?vendorId=${encodeURIComponent(trimmed)}`);
+        const data = await res.json();
+        if (cancelled) return;
+        setVendorIdCheck({
+          status: data.available ? "available" : "unavailable",
+          reason: data.reason,
+        });
+      } catch {
+        if (!cancelled) {
+          setVendorIdCheck({ status: "unavailable", reason: "Couldn't check that vendor ID right now." });
+        }
+      }
+    }, 450);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [accountType, vendorId]);
 
   const triggerError = (message: string) => {
     setError(message);
@@ -107,9 +170,30 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
       return;
     }
 
+    if (accountType === "vendor") {
+      if (!vendorId.trim() || vendorIdCheck.status !== "available") {
+        triggerError("Please choose an available vendor ID before continuing.");
+        return;
+      }
+      if (businessType === "business" && !businessName.trim()) {
+        triggerError("Please enter your registered business name.");
+        return;
+      }
+    }
+
     setLoading(true);
     try {
       localStorage.setItem("inplayer-pending-age", age);
+      if (accountType === "vendor") {
+        localStorage.setItem(
+          "inplayer-pending-vendor",
+          JSON.stringify({
+            vendorId: vendorId.trim(),
+            businessType,
+            businessName: businessType === "business" ? businessName.trim() : null,
+          })
+        );
+      }
     } catch { /* ignore */ }
 
     try {
@@ -158,8 +242,28 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
       triggerError("Enter an age from 13 to 120 before continuing with Google.");
       return;
     }
+    if (accountType === "vendor") {
+      if (!vendorId.trim() || vendorIdCheck.status !== "available") {
+        triggerError("Please choose an available vendor ID before continuing with Google.");
+        return;
+      }
+      if (businessType === "business" && !businessName.trim()) {
+        triggerError("Please enter your registered business name.");
+        return;
+      }
+    }
     try {
       localStorage.setItem("inplayer-pending-age", age);
+      if (accountType === "vendor") {
+        localStorage.setItem(
+          "inplayer-pending-vendor",
+          JSON.stringify({
+            vendorId: vendorId.trim(),
+            businessType,
+            businessName: businessType === "business" ? businessName.trim() : null,
+          })
+        );
+      }
     } catch { /* ignore */ }
     try {
       // With Google there's no separate "sign up" — the first Google
@@ -315,6 +419,111 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
           <p className="mt-1.5 text-sm text-slate-400 light:text-slate-600">
             Join InPlayer to save your favourites and get personalized recommendations.
           </p>
+
+          <div className="mt-4 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setAccountType("user")}
+              className={`flex items-center justify-center gap-1.5 rounded-2xl border py-2.5 text-sm font-bold transition-all duration-300 ${
+                accountType === "user"
+                  ? "border-orange-400/50 bg-orange-500/15 text-orange-300 light:text-orange-700"
+                  : "border-white/10 light:border-black/10 text-slate-400 light:text-slate-600 hover:border-white/20"
+              }`}
+            >
+              <User size={15} /> Use InPlayer
+            </button>
+            <button
+              type="button"
+              onClick={() => setAccountType("vendor")}
+              className={`flex items-center justify-center gap-1.5 rounded-2xl border py-2.5 text-sm font-bold transition-all duration-300 ${
+                accountType === "vendor"
+                  ? "border-orange-400/50 bg-orange-500/15 text-orange-300 light:text-orange-700"
+                  : "border-white/10 light:border-black/10 text-slate-400 light:text-slate-600 hover:border-white/20"
+              }`}
+            >
+              <Store size={15} /> Sell on Hammart
+            </button>
+          </div>
+
+          {accountType === "vendor" && (
+            <div className="mt-3 space-y-3 rounded-2xl border border-orange-400/15 bg-orange-500/[0.04] p-3">
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setBusinessType("individual")}
+                  className={`rounded-xl border py-2 text-xs font-bold transition ${
+                    businessType === "individual"
+                      ? "border-orange-400/50 bg-orange-500/15 text-orange-300 light:text-orange-700"
+                      : "border-white/10 light:border-black/10 text-slate-400 light:text-slate-600"
+                  }`}
+                >
+                  Individual Seller
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setBusinessType("business")}
+                  className={`rounded-xl border py-2 text-xs font-bold transition ${
+                    businessType === "business"
+                      ? "border-orange-400/50 bg-orange-500/15 text-orange-300 light:text-orange-700"
+                      : "border-white/10 light:border-black/10 text-slate-400 light:text-slate-600"
+                  }`}
+                >
+                  Registered Business
+                </button>
+              </div>
+
+              {businessType === "business" && (
+                <div>
+                  <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-600">
+                    Business Name
+                  </label>
+                  <input
+                    type="text"
+                    value={businessName}
+                    onChange={(e) => setBusinessName(e.target.value)}
+                    className="w-full rounded-2xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-black/[0.03] px-4 py-2.5 text-white light:text-slate-900 caret-orange-400 outline-none transition focus:border-orange-400/50"
+                    placeholder="Your registered business name"
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-600">
+                  Vendor ID (your storefront address)
+                </label>
+                <div className="group relative">
+                  <Store
+                    size={15}
+                    className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500 light:text-slate-600"
+                  />
+                  <input
+                    type="text"
+                    value={vendorId}
+                    onChange={(e) => setVendorId(e.target.value.toLowerCase())}
+                    className="w-full rounded-2xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-black/[0.03] py-2.5 pl-10 pr-10 text-white light:text-slate-900 caret-orange-400 outline-none transition focus:border-orange-400/50"
+                    placeholder="your-shop-name"
+                  />
+                  {vendorIdCheck.status === "checking" && (
+                    <Loader2 size={15} className="absolute right-4 top-1/2 -translate-y-1/2 animate-spin text-slate-400" />
+                  )}
+                  {vendorIdCheck.status === "available" && (
+                    <CheckCircle2 size={15} className="absolute right-4 top-1/2 -translate-y-1/2 text-emerald-400" />
+                  )}
+                </div>
+                {vendorIdCheck.status === "unavailable" && (
+                  <p className="mt-1.5 text-[11px] text-red-400 light:text-red-600">{vendorIdCheck.reason}</p>
+                )}
+                {vendorIdCheck.status === "available" && (
+                  <p className="mt-1.5 text-[11px] text-emerald-400 light:text-emerald-600">
+                    inplayer.in/shop/{vendorId.trim()}
+                  </p>
+                )}
+                <p className="mt-1.5 text-[11px] leading-relaxed text-slate-500">
+                  You&apos;ll complete business verification (KYC) after signing up, before you can publish listings.
+                </p>
+              </div>
+            </div>
+          )}
 
           <div className="mt-4 space-y-3">
             <div>

@@ -61,6 +61,36 @@ export async function createSubscription(params: {
   return data as RazorpaySubscription;
 }
 
+// Hammart vendor's own ₹249/month platform subscription fee (unlocks
+// publishing more listings past the first 10 free ones) — structurally
+// identical to the creator-membership subscription above, but with a
+// `vendorId` note instead of `subscriberId`/`creatorId` so the webhook
+// handler (app/api/webhooks/razorpay/route.ts) can tell the two apart
+// without a second lookup table. Reno needs to create a real ₹249/month
+// Plan in the Razorpay Dashboard and set RAZORPAY_HAMMART_VENDOR_PLAN_ID —
+// same manual-setup pattern as every DynamoDB table in this app.
+export async function createVendorSubscription(params: {
+  planId: string;
+  vendorId: string;
+}): Promise<RazorpaySubscription> {
+  const res = await fetch(`${RAZORPAY_API_BASE}/subscriptions`, {
+    method: "POST",
+    headers: { Authorization: authHeader(), "Content-Type": "application/json" },
+    body: JSON.stringify({
+      plan_id: params.planId,
+      total_count: INDEFINITE_MONTHLY_CYCLES,
+      customer_notify: 1,
+      notes: { vendorId: params.vendorId },
+    }),
+  });
+
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error((data?.error?.description as string) || "Razorpay subscription creation failed.");
+  }
+  return data as RazorpaySubscription;
+}
+
 export async function cancelSubscription(subscriptionId: string): Promise<void> {
   const res = await fetch(
     `${RAZORPAY_API_BASE}/subscriptions/${encodeURIComponent(subscriptionId)}/cancel`,

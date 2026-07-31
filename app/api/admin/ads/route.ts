@@ -6,7 +6,7 @@ import { requireAdmin } from "@/app/lib/isAdmin";
 import { logAdminAction } from "@/app/lib/auditLog";
 import { AD_CREATIVES_TABLE, AD_IMAGE_DATA_URL_MAX_LENGTH, AdPlacement } from "@/app/lib/adCreatives";
 
-const VALID_PLACEMENTS: AdPlacement[] = ["homepage", "watch"];
+const VALID_PLACEMENTS: AdPlacement[] = ["homepage", "watch", "homepage_spotlight"];
 
 export async function GET(request: NextRequest) {
   try {

@@ -43,7 +43,18 @@ export type AuditAction =
   | "copyright.autosuspend"
   | "ad.create"
   | "ad.update"
-  | "ad.delete";
+  | "ad.delete"
+  | "vendor.kyc_approve"
+  | "vendor.kyc_reject"
+  | "vendor.suspend"
+  | "vendor.unsuspend"
+  | "hammart_product.remove"
+  | "hammart_product.restore"
+  | "user.ban_strike"
+  | "user.ban_lift"
+  | "midroll_ad.create"
+  | "midroll_ad.update"
+  | "midroll_ad.delete";
 
 export type AuditTargetType =
   | "user"
@@ -53,7 +64,10 @@ export type AuditTargetType =
   | "report"
   | "notification"
   | "settings"
-  | "ad";
+  | "ad"
+  | "vendor"
+  | "hammart_product"
+  | "midroll_ad";
 
 interface LogAdminActionInput {
   // The route's own request object — required, not optional, so every

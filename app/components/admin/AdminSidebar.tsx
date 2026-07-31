@@ -18,16 +18,21 @@ import {
   Settings,
   ScrollText,
   Wrench,
+  Store,
+  Bug,
+  ShoppingBag,
 } from "lucide-react";
+import { useAdminMode } from "@/app/components/admin/AdminModeContext";
 
-// One entry per Admin Panel section — every section is real and live as
-// of this list (no more `href: null` placeholders). If a future section
-// needs to ship in stages again, add `href: string | null` back to this
-// array's type and restore the disabled/"Soon" branch below.
-const items = [
+// Two section lists, one per AdminMode (see AdminModeContext + the
+// switcher in AdminHeader). Hammart's own items stay out of the InPlayer
+// list and vice versa — that's the actual "separate Hammart admin
+// section" Reno asked for, not just one more flat sidebar row.
+const inplayerItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, href: "/admin/dashboard" },
   { id: "users", label: "Users", icon: Users, href: "/admin/users" },
   { id: "creators", label: "Creators", icon: Star, href: "/admin/creators" },
+  { id: "bug-reports", label: "Bug Reports", icon: Bug, href: "/admin/bug-reports" },
   { id: "videos", label: "Videos", icon: Video, href: "/admin/videos" },
   { id: "shorts", label: "Shorts", icon: Film, href: "/admin/videos?type=short" },
   { id: "reports", label: "Reports & Moderation", icon: Flag, href: "/admin/moderation" },
@@ -42,9 +47,18 @@ const items = [
   { id: "captions", label: "Maintenance", icon: Wrench, href: "/admin/captions" },
 ] as const;
 
+const hammartItems = [
+  { id: "hammart-vendors", label: "Vendors & KYC", icon: Store, href: "/admin/hammart-vendors" },
+  { id: "hammart-products", label: "Products", icon: ShoppingBag, href: "/admin/hammart-products" },
+  { id: "settings", label: "Platform Settings", icon: Settings, href: "/admin/settings" },
+  { id: "audit-logs", label: "Audit Logs", icon: ScrollText, href: "/admin/audit-logs" },
+] as const;
+
 export default function AdminSidebar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const { mode } = useAdminMode();
+  const items = mode === "hammart" ? hammartItems : inplayerItems;
   // Full current path including query (e.g. "/admin/videos?type=short"),
   // so Videos and Shorts — which share the same page and are only told
   // apart by ?type= — never both light up (or both stay dark) at once.

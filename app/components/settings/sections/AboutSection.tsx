@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { Info, HelpCircle, Mail, ShieldCheck, Sparkles } from "lucide-react";
 import SettingsCard from "../common/SettingsCard";
 import SettingsRow from "../common/SettingsRow";
+import ReportProblemCard from "./ReportProblemCard";
 
 export default function AboutSection() {
   const router = useRouter();
@@ -51,6 +52,8 @@ export default function AboutSection() {
               window.location.href = "mailto:support@inplayer.app";
             }}
           />
+
+          <ReportProblemCard />
         </div>
       </SettingsCard>
     </div>

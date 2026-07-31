@@ -2,9 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ShieldCheck, LogOut, Sun, Moon } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { ShieldCheck, LogOut, Sun, Moon, Store, LayoutDashboard } from "lucide-react";
 import { useTheme } from "@/app/components/ThemeProvider";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
+import { useAdminMode } from "@/app/components/admin/AdminModeContext";
 
 // The Admin Panel's own dedicated header — deliberately NOT the public
 // site's Navbar (no search bar, no category bar, no "Your Channel"/
@@ -17,7 +19,18 @@ import { useAuthModal } from "@/app/components/auth/AuthProvider";
 export default function AdminHeader({ email }: { email: string | null }) {
   const { setTheme } = useTheme();
   const { signOut } = useAuthModal();
+  const { mode, setMode } = useAdminMode();
+  const router = useRouter();
   const [isDark, setIsDark] = useState(true);
+
+  // Switching modes also navigates to that side's home page, so clicking
+  // "Hammart" always lands somewhere real (the vendor KYC queue) instead
+  // of leaving an admin stranded on a page the new sidebar doesn't list.
+  const switchMode = (next: "inplayer" | "hammart") => {
+    if (next === mode) return;
+    setMode(next);
+    router.push(next === "hammart" ? "/admin/hammart-vendors" : "/admin/dashboard");
+  };
 
   useEffect(() => {
     const readTheme = () => {
@@ -134,6 +147,36 @@ export default function AdminHeader({ email }: { email: string | null }) {
             className="flex items-center gap-2 rounded-full border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-4 py-2.5 text-xs font-bold text-red-400 transition hover:bg-red-500/10"
           >
             <LogOut size={14} /> Sign Out
+          </button>
+        </div>
+      </div>
+
+      {/* InPlayer / Hammart switcher — one Admin Panel, two section lists.
+          AdminSidebar/AdminMobileNav read this same mode to decide which
+          items to render. */}
+      <div className="relative z-10 px-4 pb-4 sm:px-5 sm:pb-5">
+        <div className="inline-flex rounded-full border border-white/10 light:border-black/10 bg-white/[0.04] light:bg-black/[0.04] p-1">
+          <button
+            type="button"
+            onClick={() => switchMode("inplayer")}
+            className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${
+              mode === "inplayer"
+                ? "bg-gradient-to-r from-indigo-500 to-violet-400 text-white shadow-lg shadow-indigo-500/20"
+                : "text-slate-400 light:text-slate-600 hover:text-slate-200"
+            }`}
+          >
+            <LayoutDashboard size={13} /> InPlayer
+          </button>
+          <button
+            type="button"
+            onClick={() => switchMode("hammart")}
+            className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${
+              mode === "hammart"
+                ? "bg-gradient-to-r from-orange-500 to-amber-400 text-white shadow-lg shadow-orange-500/20"
+                : "text-slate-400 light:text-slate-600 hover:text-slate-200"
+            }`}
+          >
+            <Store size={13} /> Hammart
           </button>
         </div>
       </div>

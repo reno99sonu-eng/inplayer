@@ -8,6 +8,7 @@ import {
   PAYOUTS_TABLE,
   CREATOR_SHARE,
 } from "@/app/lib/creatorPayouts";
+import { VENDORS_TABLE, VENDOR_SUBSCRIPTION_LEDGER_TABLE } from "@/app/lib/hammartVendors";
 
 // This is the ONLY place real money ever gets credited to a creator's
 // balance in InPlayer. Everything else in the app (Checkout's browser
@@ -31,7 +32,7 @@ interface RazorpayPaymentEntity {
 interface RazorpaySubscriptionEntity {
   id: string;
   status: string;
-  notes?: { subscriberId?: string; creatorId?: string };
+  notes?: { subscriberId?: string; creatorId?: string; vendorId?: string };
 }
 
 interface RazorpayWebhookPayload {
@@ -96,6 +97,16 @@ async function handleCharged(payload: RazorpayWebhookPayload["payload"]) {
   if (paymentEntity.status !== "captured") {
     // Shouldn't happen for this event, but never credit anything for a
     // payment that isn't actually captured.
+    return;
+  }
+
+  // Hammart vendor platform-fee subscriptions carry a `vendorId` note
+  // instead of `subscriberId`/`creatorId` (see createVendorSubscription in
+  // app/lib/razorpay.ts) — branch here rather than conflating them with
+  // creator-membership charges below, which credit a completely different
+  // table.
+  if (subEntity.notes?.vendorId) {
+    await handleVendorCharged(paymentEntity, subEntity, subEntity.notes.vendorId);
     return;
   }
 
@@ -168,12 +179,73 @@ async function handleCharged(payload: RazorpayWebhookPayload["payload"]) {
   );
 }
 
+async function handleVendorCharged(
+  paymentEntity: RazorpayPaymentEntity,
+  subEntity: RazorpaySubscriptionEntity,
+  vendorId: string
+) {
+  const amountInr = paymentEntity.amount / 100;
+
+  // Same idempotency gate as the creator-membership path — keyed on
+  // Razorpay's own payment id, never processed twice.
+  try {
+    await docClient.send(
+      new PutCommand({
+        TableName: VENDOR_SUBSCRIPTION_LEDGER_TABLE,
+        Item: {
+          razorpayPaymentId: paymentEntity.id,
+          razorpaySubscriptionId: subEntity.id,
+          vendorId,
+          amountInr,
+          recordedAt: new Date().toISOString(),
+        },
+        ConditionExpression: "attribute_not_exists(razorpayPaymentId)",
+      })
+    );
+  } catch (err) {
+    const name = (err as { name?: string } | undefined)?.name;
+    if (name === "ConditionalCheckFailedException") return;
+    throw err;
+  }
+
+  await docClient.send(
+    new UpdateCommand({
+      TableName: VENDORS_TABLE,
+      Key: { userId: vendorId },
+      UpdateExpression:
+        "SET subscriptionStatus = :active, razorpaySubscriptionId = :subId, lastChargedAt = :now, updatedAt = :now",
+      ExpressionAttributeValues: {
+        ":active": "active",
+        ":subId": subEntity.id,
+        ":now": new Date().toISOString(),
+      },
+    })
+  );
+}
+
+async function handleVendorDeactivated(vendorId: string, status: "cancelled" | "halted") {
+  console.log(`razorpay webhook: vendor ${vendorId} subscription ${status}`);
+  await docClient.send(
+    new UpdateCommand({
+      TableName: VENDORS_TABLE,
+      Key: { userId: vendorId },
+      UpdateExpression: "SET subscriptionStatus = :status, updatedAt = :now",
+      ExpressionAttributeValues: { ":status": "expired", ":now": new Date().toISOString() },
+    })
+  );
+}
+
 async function handleDeactivated(
   payload: RazorpayWebhookPayload["payload"],
   status: "cancelled" | "halted"
 ) {
   const subEntity = payload.subscription?.entity;
   if (!subEntity) return;
+
+  if (subEntity.notes?.vendorId) {
+    await handleVendorDeactivated(subEntity.notes.vendorId, status);
+    return;
+  }
 
   const subscriberId = subEntity.notes?.subscriberId;
   const creatorId = subEntity.notes?.creatorId;

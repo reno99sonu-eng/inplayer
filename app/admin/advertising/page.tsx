@@ -18,13 +18,22 @@ import { compressImageToBanner } from "@/app/lib/imageCompress";
 
 
 type AdSlotSource = "house" | "adsense" | "off";
-type Placement = "homepage" | "watch";
+type Placement = "homepage" | "watch" | "homepage_spotlight";
+
+const PLACEMENT_LABELS: Record<Placement, string> = {
+  homepage: "Homepage banner",
+  watch: "Watch page",
+  homepage_spotlight: "Homepage spotlight",
+};
 
 interface AdSettings {
   adsenseEnabled: boolean;
   adsensePublisherId: string;
   homepageBannerSource: AdSlotSource;
   watchPageBannerSource: AdSlotSource;
+  homepageSpotlightSource: AdSlotSource;
+  midrollEnabled: boolean;
+  midrollIntervalSeconds: number;
 }
 
 interface AdCreative {
@@ -37,6 +46,18 @@ interface AdCreative {
   createdAt: string;
   impressions: number;
   clicks: number;
+}
+
+interface MidrollAdCreative {
+  adId: string;
+  imageUrl: string;
+  linkUrl: string;
+  title: string;
+  active: boolean;
+  createdAt: string;
+  impressions: number;
+  clicks: number;
+  skips: number;
 }
 
 function SourcePicker({
@@ -112,6 +133,9 @@ export default function AdvertisingPage() {
         adsensePublisherId: data.settings.adsensePublisherId || "",
         homepageBannerSource: data.settings.homepageBannerSource || "off",
         watchPageBannerSource: data.settings.watchPageBannerSource || "off",
+        homepageSpotlightSource: data.settings.homepageSpotlightSource || "off",
+        midrollEnabled: Boolean(data.settings.midrollEnabled),
+        midrollIntervalSeconds: data.settings.midrollIntervalSeconds || 300,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -134,10 +158,35 @@ export default function AdvertisingPage() {
     }
   };
 
+  const [midrollAds, setMidrollAds] = useState<MidrollAdCreative[]>([]);
+  const [midrollLoading, setMidrollLoading] = useState(true);
+  const [midrollError, setMidrollError] = useState<string | null>(null);
+  const [midrollTitle, setMidrollTitle] = useState("");
+  const [midrollLink, setMidrollLink] = useState("");
+  const [midrollPreview, setMidrollPreview] = useState<string | null>(null);
+  const [midrollUploading, setMidrollUploading] = useState(false);
+  const [midrollUploadError, setMidrollUploadError] = useState<string | null>(null);
+  const midrollFileInputRef = useRef<HTMLInputElement>(null);
+
+  const loadMidrollAds = async () => {
+    setMidrollLoading(true);
+    try {
+      const res = await authedFetch("/api/admin/midroll-ads");
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Couldn't load mid-roll creatives (HTTP ${res.status}).`);
+      setMidrollAds(data.items || []);
+    } catch (err) {
+      setMidrollError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setMidrollLoading(false);
+    }
+  };
+
   useEffect(() => {
     (async () => {
       await loadSettings();
       await loadCreatives();
+      await loadMidrollAds();
     })();
   }, []);
 
@@ -238,6 +287,74 @@ export default function AdvertisingPage() {
     }
   };
 
+  const handleMidrollFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setMidrollUploadError(null);
+    try {
+      const compressed = await compressImageToBanner(file);
+      setMidrollPreview(compressed);
+    } catch (err) {
+      setMidrollUploadError(err instanceof Error ? err.message : "Couldn't process that image.");
+    }
+  };
+
+  const canUploadMidroll =
+    Boolean(midrollPreview) && midrollTitle.trim().length > 0 && /^https?:\/\//.test(midrollLink.trim());
+
+  const submitMidrollAd = async () => {
+    if (!canUploadMidroll || midrollUploading) return;
+    setMidrollUploading(true);
+    setMidrollUploadError(null);
+    try {
+      const res = await authedFetch("/api/admin/midroll-ads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageUrl: midrollPreview,
+          linkUrl: midrollLink.trim(),
+          title: midrollTitle.trim(),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Couldn't create that ad.");
+      setMidrollAds((prev) => [data.ad, ...prev]);
+      setMidrollPreview(null);
+      setMidrollTitle("");
+      setMidrollLink("");
+      if (midrollFileInputRef.current) midrollFileInputRef.current.value = "";
+    } catch (err) {
+      setMidrollUploadError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setMidrollUploading(false);
+    }
+  };
+
+  const toggleMidrollActive = async (ad: MidrollAdCreative) => {
+    try {
+      const res = await authedFetch(`/api/admin/midroll-ads/${ad.adId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active: !ad.active }),
+      });
+      if (res.ok) {
+        setMidrollAds((prev) => prev.map((c) => (c.adId === ad.adId ? { ...c, active: !c.active } : c)));
+      }
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Something went wrong.");
+    }
+  };
+
+  const deleteMidrollAd = async (ad: MidrollAdCreative) => {
+    if (!window.confirm(`Delete "${ad.title}"? This can't be undone.`)) return;
+    try {
+      const res = await authedFetch(`/api/admin/midroll-ads/${ad.adId}`, { method: "DELETE" });
+      if (res.ok) setMidrollAds((prev) => prev.filter((c) => c.adId !== ad.adId));
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Something went wrong.");
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20 text-slate-400">
@@ -288,6 +405,67 @@ export default function AdvertisingPage() {
               onChange={(v) => update("watchPageBannerSource", v)}
             />
           </div>
+        </div>
+        <div className="rounded-3xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-5">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <span className="text-sm font-bold text-white light:text-slate-900">
+                Homepage spotlight
+              </span>
+              <p className="mt-0.5 text-xs text-slate-400 light:text-slate-600">
+                A second, static homepage slot — shown below the feed, in both Horizontal and Shorts view.
+              </p>
+            </div>
+            <SourcePicker
+              value={settings.homepageSpotlightSource}
+              onChange={(v) => update("homepageSpotlightSource", v)}
+            />
+          </div>
+        </div>
+
+        {/* Mid-roll video ads */}
+        <div className="rounded-3xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-5">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <h3 className="text-sm font-bold text-white light:text-slate-900">Mid-roll video ads</h3>
+              <p className="mt-0.5 text-xs text-slate-400 light:text-slate-600">
+                A real ad break interrupts playback at the interval below. Skip timers escalate the
+                longer a viewer keeps watching the same video: 5s on the first break, 10s on the
+                second, 15s on the third and every one after that.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => update("midrollEnabled", !settings.midrollEnabled)}
+              className={`flex-shrink-0 rounded-full px-4 py-1.5 text-xs font-bold transition ${
+                settings.midrollEnabled
+                  ? "bg-emerald-500/20 text-emerald-300"
+                  : "bg-white/5 text-slate-400 hover:bg-white/10"
+              }`}
+            >
+              {settings.midrollEnabled ? "On" : "Off"}
+            </button>
+          </div>
+          {settings.midrollEnabled && (
+            <div className="mt-3">
+              <label className="mb-1.5 block text-xs font-semibold text-slate-400 light:text-slate-600">
+                Minimum seconds of watch time between breaks
+              </label>
+              <input
+                type="number"
+                min={60}
+                max={3600}
+                value={settings.midrollIntervalSeconds}
+                onChange={(e) =>
+                  update("midrollIntervalSeconds", Math.max(60, Math.min(3600, Number(e.target.value) || 300)))
+                }
+                className="w-40 rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-indigo-400/50"
+              />
+              <p className="mt-1.5 text-[11px] text-slate-500">
+                A short video may never reach the first break — that&apos;s expected, not a bug.
+              </p>
+            </div>
+          )}
         </div>
 
         {/* AdSense config */}
@@ -350,8 +528,8 @@ export default function AdvertisingPage() {
         </p>
 
         <div className="mt-4 max-w-2xl rounded-3xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-5">
-          <div className="flex items-center gap-2">
-            {(["homepage", "watch"] as Placement[]).map((p) => (
+          <div className="flex flex-wrap items-center gap-2">
+            {(["homepage", "watch", "homepage_spotlight"] as Placement[]).map((p) => (
               <button
                 key={p}
                 type="button"
@@ -362,7 +540,7 @@ export default function AdvertisingPage() {
                     : "bg-white/5 text-slate-400 hover:bg-white/10 light:bg-black/5"
                 }`}
               >
-                {p === "homepage" ? "Homepage" : "Watch page"}
+                {PLACEMENT_LABELS[p]}
               </button>
             ))}
           </div>
@@ -486,7 +664,7 @@ export default function AdvertisingPage() {
                     {ad.title}
                   </p>
                   <span className="flex-shrink-0 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-300">
-                    {ad.placement}
+                    {PLACEMENT_LABELS[ad.placement] || ad.placement}
                   </span>
                 </div>
                 <div className="mt-1 flex items-center gap-3 text-xs text-slate-500">
@@ -512,6 +690,148 @@ export default function AdvertisingPage() {
                   <button
                     type="button"
                     onClick={() => deleteCreative(ad)}
+                    className="flex items-center gap-1.5 rounded-xl bg-red-500/15 px-3 py-1.5 text-xs font-bold text-red-300 transition hover:bg-red-500/25"
+                  >
+                    <Trash2 size={13} /> Delete
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Mid-roll ad creatives */}
+      <div className="mt-8">
+        <h3 className="text-sm font-bold text-white light:text-slate-900">Mid-roll ad creatives</h3>
+        <p className="mt-1 text-xs text-slate-400 light:text-slate-600">
+          Shown full-screen over a paused player when a viewer hits a mid-roll break (see the toggle
+          above). Multiple active creatives rotate randomly, same as banner slots.
+        </p>
+
+        <div className="mt-4 max-w-2xl rounded-3xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-5">
+          <div>
+            <label className="mb-1.5 block text-xs font-semibold text-slate-400 light:text-slate-600">
+              Ad image (any aspect — shown centered over the player)
+            </label>
+            <input
+              ref={midrollFileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleMidrollFileChange}
+              className="block w-full text-xs text-slate-400 file:mr-3 file:rounded-lg file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-white hover:file:bg-white/20"
+            />
+            {midrollPreview && (
+              /* eslint-disable-next-line @next/next/no-img-element -- a
+                 freshly compressed in-memory data URL, not a static app
+                 asset next/image can optimize. */
+              <img
+                src={midrollPreview}
+                alt="Preview"
+                className="mt-3 w-full rounded-xl border border-white/10 light:border-black/10 object-cover"
+              />
+            )}
+          </div>
+
+          <div className="mt-3">
+            <label className="mb-1.5 block text-xs font-semibold text-slate-400 light:text-slate-600">
+              Title (internal label)
+            </label>
+            <input
+              type="text"
+              value={midrollTitle}
+              onChange={(e) => setMidrollTitle(e.target.value)}
+              placeholder="e.g. Membership push"
+              className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-indigo-400/50"
+            />
+          </div>
+
+          <div className="mt-3">
+            <label className="mb-1.5 block text-xs font-semibold text-slate-400 light:text-slate-600">
+              Link URL
+            </label>
+            <input
+              type="text"
+              value={midrollLink}
+              onChange={(e) => setMidrollLink(e.target.value)}
+              placeholder="https://..."
+              className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-indigo-400/50"
+            />
+          </div>
+
+          {midrollUploadError && (
+            <div className="mt-3 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-300 light:text-red-700">
+              <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
+              <span>{midrollUploadError}</span>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={submitMidrollAd}
+            disabled={!canUploadMidroll || midrollUploading}
+            className="mt-4 flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#6366F1] via-[#8B5CF6] to-[#A855F7] px-5 py-2.5 text-sm font-bold text-white shadow-[0_10px_25px_rgba(139,92,246,.25)] transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+          >
+            {midrollUploading ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
+            Add creative
+          </button>
+        </div>
+
+        {midrollError && (
+          <div className="mt-4 flex items-start gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300 light:text-red-700">
+            <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
+            <span>{midrollError}</span>
+          </div>
+        )}
+
+        {midrollLoading ? (
+          <div className="flex min-h-[15vh] items-center justify-center">
+            <Loader2 size={20} className="animate-spin text-indigo-400" />
+          </div>
+        ) : midrollAds.length === 0 ? (
+          <div className="mt-6 flex flex-col items-center gap-2 py-6 text-center">
+            <ImagePlus size={26} className="text-slate-600" />
+            <p className="text-sm text-slate-500">No mid-roll creatives uploaded yet.</p>
+          </div>
+        ) : (
+          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {midrollAds.map((ad) => (
+              <div
+                key={ad.adId}
+                className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-3"
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element --
+                    admin-uploaded data URL, not a static app asset. */}
+                <img
+                  src={ad.imageUrl}
+                  alt={ad.title}
+                  className="w-full rounded-xl border border-white/10 light:border-black/10 object-cover"
+                />
+                <p className="mt-2 truncate text-sm font-bold text-white light:text-slate-900">{ad.title}</p>
+                <div className="mt-1 flex items-center gap-3 text-xs text-slate-500">
+                  <span className="flex items-center gap-1">
+                    <Eye size={12} /> {ad.impressions.toLocaleString("en-IN")}
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <MousePointerClick size={12} /> {ad.clicks.toLocaleString("en-IN")}
+                  </span>
+                  <span className="flex items-center gap-1">Skipped {ad.skips.toLocaleString("en-IN")}</span>
+                </div>
+                <div className="mt-3 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => toggleMidrollActive(ad)}
+                    className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${
+                      ad.active
+                        ? "bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"
+                        : "bg-white/5 text-slate-400 hover:bg-white/10"
+                    }`}
+                  >
+                    {ad.active ? "Active" : "Paused"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => deleteMidrollAd(ad)}
                     className="flex items-center gap-1.5 rounded-xl bg-red-500/15 px-3 py-1.5 text-xs font-bold text-red-300 transition hover:bg-red-500/25"
                   >
                     <Trash2 size={13} /> Delete

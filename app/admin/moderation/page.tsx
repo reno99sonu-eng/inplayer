@@ -13,9 +13,12 @@ import {
   ExternalLink,
   ShieldCheck,
   Search,
+  Gavel,
+  Ban,
+  RotateCcw,
 } from "lucide-react";
 
-type Tab = "reports" | "autoflagged";
+type Tab = "reports" | "autoflagged" | "strikes";
 type ContentType = "video" | "comment" | "message";
 
 interface ReportItem {
@@ -44,6 +47,15 @@ interface AutoFlagItem {
   createdAt: string;
 }
 
+interface StrikeItem {
+  userId: string;
+  username: string | null;
+  name: string | null;
+  aiModerationStrikes: number;
+  banReviewReason: string | null;
+  updatedAt: string | null;
+}
+
 
 function contentAdminPath(
   contentType: ContentType,
@@ -69,6 +81,7 @@ export default function AdminModerationPage() {
   const [tab, setTab] = useState<Tab>("reports");
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [autoFlagged, setAutoFlagged] = useState<AutoFlagItem[]>([]);
+  const [strikes, setStrikes] = useState<StrikeItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tableMissing, setTableMissing] = useState(false);
@@ -104,6 +117,18 @@ export default function AdminModerationPage() {
     );
   }, [autoFlagged, query]);
 
+  const filteredStrikes = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return strikes;
+    return strikes.filter(
+      (s) =>
+        s.userId.toLowerCase().includes(q) ||
+        (s.username || "").toLowerCase().includes(q) ||
+        (s.name || "").toLowerCase().includes(q) ||
+        (s.banReviewReason || "").toLowerCase().includes(q)
+    );
+  }, [strikes, query]);
+
   useEffect(() => {
     let cancelled = false;
 
@@ -119,6 +144,8 @@ export default function AdminModerationPage() {
         if (tab === "reports") {
           setReports(data.items || []);
           setTableMissing(Boolean(data.tableMissing));
+        } else if (tab === "strikes") {
+          setStrikes(data.items || []);
         } else {
           setAutoFlagged(data.items || []);
         }
@@ -203,6 +230,29 @@ export default function AdminModerationPage() {
     }
   };
 
+  const decideStrike = async (s: StrikeItem, action: "uphold_ban" | "lift_ban") => {
+    if (action === "uphold_ban" && !window.confirm(`Keep @${s.username || s.userId} permanently suspended?`)) return;
+    if (action === "lift_ban" && !window.confirm(`Lift the ban on @${s.username || s.userId} and reset their strikes to 0?`)) return;
+
+    setBusyId(s.userId);
+    try {
+      const res = await authedFetch("/api/admin/moderation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: s.userId, action }),
+      });
+      if (res.ok) setStrikes((prev) => prev.filter((x) => x.userId !== s.userId));
+      else {
+        const data = await res.json().catch(() => ({}));
+        window.alert(data.error || "Couldn't save that right now.");
+      }
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   return (
     <div>
       <div>
@@ -210,8 +260,9 @@ export default function AdminModerationPage() {
           Reports & Moderation
         </h2>
         <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
-          Real reports from viewers, plus anything InPlayer&apos;s AI moderation held back
-          automatically before a human ever saw it.
+          Real reports from viewers, anything InPlayer&apos;s AI moderation held back automatically
+          before a human ever saw it, and every account the automated 3-strike system has suspended
+          on a third violation, waiting on your review.
         </p>
       </div>
 
@@ -237,6 +288,17 @@ export default function AdminModerationPage() {
           }`}
         >
           <Bot size={12} /> Auto-flagged by AI
+        </button>
+        <button
+          type="button"
+          onClick={() => setTab("strikes")}
+          className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${
+            tab === "strikes"
+              ? "bg-indigo-500 text-white"
+              : "bg-white/5 text-slate-400 hover:bg-white/10 light:bg-black/5"
+          }`}
+        >
+          <Gavel size={12} /> Strikes
         </button>
       </div>
 
@@ -330,6 +392,72 @@ export default function AdminModerationPage() {
                       <Trash2 size={13} />
                     )}
                     Remove content
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )
+      ) : tab === "strikes" ? (
+        filteredStrikes.length === 0 ? (
+          <div className="mt-8 flex flex-col items-center gap-2 py-8 text-center">
+            <ShieldCheck size={28} className="text-emerald-400" />
+            <p className="text-sm text-slate-500">
+              {query ? `Nothing matches "${query}".` : "No third-strike accounts waiting on review."}
+            </p>
+          </div>
+        ) : (
+          <div className="mt-4 space-y-2">
+            {filteredStrikes.map((s) => (
+              <div
+                key={s.userId}
+                className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4"
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-red-300">
+                    {s.aiModerationStrikes} strikes
+                  </span>
+                  {s.username ? (
+                    <Link
+                      href={`/u/${encodeURIComponent(s.username)}`}
+                      target="_blank"
+                      className="flex items-center gap-1 text-sm font-bold text-white light:text-slate-900 hover:text-indigo-300"
+                    >
+                      @{s.username} <ExternalLink size={11} />
+                    </Link>
+                  ) : (
+                    <span className="text-sm font-bold text-white light:text-slate-900">
+                      {s.name || s.userId}
+                    </span>
+                  )}
+                  {s.updatedAt && (
+                    <span className="text-[11px] text-slate-500">
+                      {new Date(s.updatedAt).toLocaleString("en-IN")}
+                    </span>
+                  )}
+                </div>
+
+                {s.banReviewReason && (
+                  <p className="mt-2 text-xs text-slate-400 light:text-slate-600">{s.banReviewReason}</p>
+                )}
+
+                <div className="mt-3 flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => decideStrike(s, "uphold_ban")}
+                    disabled={busyId === s.userId}
+                    className="flex items-center gap-1.5 rounded-xl bg-red-500/15 px-3 py-1.5 text-xs font-bold text-red-300 transition hover:bg-red-500/25 disabled:opacity-60"
+                  >
+                    {busyId === s.userId ? <Loader2 size={13} className="animate-spin" /> : <Ban size={13} />}
+                    Uphold ban
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => decideStrike(s, "lift_ban")}
+                    disabled={busyId === s.userId}
+                    className="flex items-center gap-1.5 rounded-xl bg-emerald-500/15 px-3 py-1.5 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500/25 disabled:opacity-60"
+                  >
+                    <RotateCcw size={13} /> Lift ban &amp; reset strikes
                   </button>
                 </div>
               </div>

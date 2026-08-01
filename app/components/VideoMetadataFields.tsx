@@ -469,10 +469,10 @@ onOpenAITitleAssist,
           <select
             value={value.spokenLanguage}
             onChange={(e) => onChange("spokenLanguage", e.target.value as SpokenLanguage)}
-            className="w-full rounded-2xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-black/[0.03] px-4 py-3 text-white light:text-slate-900 outline-none focus:border-orange-400/50"
+            className="w-full rounded-2xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-white px-4 py-3 text-white light:text-slate-900 outline-none focus:border-orange-400/50"
           >
             {SPOKEN_LANGUAGES.map((l) => (
-              <option key={l.value} value={l.value} className="bg-[#07111F] text-white">
+              <option key={l.value} value={l.value} className="bg-[#07111F] text-white light:bg-white light:text-slate-900">
                 {l.label}
               </option>
             ))}
@@ -492,10 +492,10 @@ onOpenAITitleAssist,
         <select
           value={value.category}
           onChange={(e) => onChange("category", e.target.value)}
-          className="w-full rounded-2xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-black/[0.03] px-4 py-3 text-white light:text-slate-900 outline-none focus:border-orange-400/50"
+          className="w-full rounded-2xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-white px-4 py-3 text-white light:text-slate-900 outline-none focus:border-orange-400/50"
         >
           {categories.map((c) => (
-            <option key={c} value={c} className="bg-[#07111F] text-white">
+            <option key={c} value={c} className="bg-[#07111F] text-white light:bg-white light:text-slate-900">
               {c}
             </option>
           ))}

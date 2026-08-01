@@ -1,7 +1,9 @@
 "use client";
 
+import { useRef, useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useSearchParams, usePathname } from "next/navigation";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 import { CONTENT_CATEGORIES } from "../data/categories";
 
 // The first two chips are ORIENTATION toggles that drive the home feed
@@ -28,6 +30,48 @@ export default function NavigationCategories() {
   const onHome = pathname === "/";
   const activeView = searchParams.get("view") || "horizontal";
 
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [showLeftArrow, setShowLeftArrow] = useState(false);
+  const [showRightArrow, setShowRightArrow] = useState(false);
+
+  const checkScrollState = useCallback(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    setShowLeftArrow(scrollLeft > 5);
+    setShowRightArrow(scrollLeft < scrollWidth - clientWidth - 5);
+  }, []);
+
+  useEffect(() => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+
+    checkScrollState();
+    el.addEventListener("scroll", checkScrollState, { passive: true });
+    window.addEventListener("resize", checkScrollState, { passive: true });
+
+    return () => {
+      el.removeEventListener("scroll", checkScrollState);
+      window.removeEventListener("resize", checkScrollState);
+    };
+  }, [checkScrollState]);
+
+  const handleScroll = (direction: "left" | "right") => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    const scrollAmount = direction === "left" ? -280 : 280;
+    el.scrollBy({ left: scrollAmount, behavior: "smooth" });
+  };
+
+  // Convert mouse wheel vertical scroll to horizontal scroll for desktop users
+  const handleWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    const el = scrollContainerRef.current;
+    if (!el) return;
+    if (e.deltaY !== 0) {
+      el.scrollLeft += e.deltaY;
+    }
+  };
+
   const chipBase = `
     flex-shrink-0
     rounded-lg
@@ -51,11 +95,12 @@ export default function NavigationCategories() {
   return (
     <div
       className="
+        relative
         sticky
         top-12
         lg:top-16
         z-40
-        overflow-visible
+        overflow-hidden
         border-b
         border-white/5
         light:border-black/10
@@ -64,13 +109,38 @@ export default function NavigationCategories() {
         backdrop-blur-2xl
       "
     >
-      {/* Extra 24px of bottom padding pushes any native scrollbar past the
-          visible area, and the matching negative margin pulls the box back
-          up — the parent's overflow-hidden clips that strip away entirely.
-          This hides scrollbars even where scrollbar-hiding CSS properties
-          have no effect (some Android browsers render a native overlay
-          scroll indicator that isn't part of the CSS scrollbar system). */}
+      {/* Left Scroll Arrow Overlay */}
+      {showLeftArrow && (
+        <div className="absolute left-0 top-0 bottom-0 z-10 flex items-center pl-2 pr-6 bg-gradient-to-r from-[#06101D] via-[#06101D]/90 to-transparent light:from-[#F5EEDC] light:via-[#F5EEDC]/90 light:to-transparent pointer-events-none">
+          <button
+            type="button"
+            onClick={() => handleScroll("left")}
+            aria-label="Scroll categories left"
+            className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/30 hover:scale-110 active:scale-95 light:bg-black/15 light:text-slate-900 light:hover:bg-black/25 shadow-lg backdrop-blur-md"
+          >
+            <ChevronLeft size={18} />
+          </button>
+        </div>
+      )}
+
+      {/* Right Scroll Arrow Overlay */}
+      {showRightArrow && (
+        <div className="absolute right-0 top-0 bottom-0 z-10 flex items-center pr-2 pl-6 bg-gradient-to-l from-[#06101D] via-[#06101D]/90 to-transparent light:from-[#F5EEDC] light:via-[#F5EEDC]/90 light:to-transparent pointer-events-none">
+          <button
+            type="button"
+            onClick={() => handleScroll("right")}
+            aria-label="Scroll categories right"
+            className="pointer-events-auto flex h-8 w-8 items-center justify-center rounded-full bg-white/15 text-white transition hover:bg-white/30 hover:scale-110 active:scale-95 light:bg-black/15 light:text-slate-900 light:hover:bg-black/25 shadow-lg backdrop-blur-md"
+          >
+            <ChevronRight size={18} />
+          </button>
+        </div>
+      )}
+
+      {/* Scrollable Container */}
       <div
+        ref={scrollContainerRef}
+        onWheel={handleWheel}
         className="
           flex
           gap-2
@@ -84,6 +154,7 @@ export default function NavigationCategories() {
           pb-2
           lg:pb-3
           overscroll-x-contain
+          scroll-smooth
           [scrollbar-width:none]
           [&::-webkit-scrollbar]:hidden
         "
@@ -131,3 +202,4 @@ export default function NavigationCategories() {
     </div>
   );
 }
+

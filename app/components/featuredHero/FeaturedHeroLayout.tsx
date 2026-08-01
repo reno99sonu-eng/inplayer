@@ -9,7 +9,7 @@ interface Props {
 export default function FeaturedHeroLayout({ children }: Props) {
   return (
     <>
-      {/* Mobile */}
+      {/* Mobile — sits right down at the bottom of the hero banner */}
       <div
         className="
           relative
@@ -17,10 +17,10 @@ export default function FeaturedHeroLayout({ children }: Props) {
           flex
           h-full
           items-end
-          px-4
-          pb-6
+          px-3
+          pb-2
           sm:px-6
-          sm:pb-7
+          sm:pb-5
 
           lg:hidden
         "

@@ -10,35 +10,37 @@ interface FeaturedHeroButtonsProps {
 
 export default function FeaturedHeroButtons({ videoId }: FeaturedHeroButtonsProps) {
   return (
-    <div className="flex flex-nowrap items-center gap-2 overflow-x-auto max-w-full no-scrollbar">
+    <div className="flex flex-nowrap items-center gap-1.5 sm:gap-2 overflow-x-auto max-w-full no-scrollbar">
       {/* Watch Now */}
       <Link
         href={`/watch/${videoId}`}
         className="
           flex
-          h-8
+          h-7
           sm:h-9
           flex-shrink-0
           items-center
-          gap-1.5
+          gap-1
+          sm:gap-1.5
           whitespace-nowrap
           rounded-full
           bg-gradient-to-r
           from-orange-500
           via-amber-400
           to-yellow-300
-          px-3.5
+          px-3
           sm:px-4
-          text-xs
+          text-[11px]
+          sm:text-xs
           font-extrabold
           text-slate-900
-          shadow-[0_4px_15px_rgba(249,115,22,.30)]
+          shadow-[0_4px_12px_rgba(249,115,22,.30)]
           transition-all
           duration-200
           hover:opacity-95
         "
       >
-        <Play size={13} fill="currentColor" />
+        <Play size={11} className="sm:w-3.5 sm:h-3.5" fill="currentColor" />
         Watch Now
       </Link>
 
@@ -47,19 +49,21 @@ export default function FeaturedHeroButtons({ videoId }: FeaturedHeroButtonsProp
         type="button"
         className="
           flex
-          h-8
+          h-7
           sm:h-9
           flex-shrink-0
           items-center
-          gap-1.5
+          gap-1
+          sm:gap-1.5
           whitespace-nowrap
           rounded-full
           border
           border-white/15
           bg-white/10
-          px-3.5
+          px-3
           sm:px-4
-          text-xs
+          text-[11px]
+          sm:text-xs
           font-bold
           text-white
           backdrop-blur-md
@@ -69,7 +73,7 @@ export default function FeaturedHeroButtons({ videoId }: FeaturedHeroButtonsProp
           hover:bg-white/15
         "
       >
-        <Plus size={13} />
+        <Plus size={11} className="sm:w-3.5 sm:h-3.5" />
         Watchlist
       </button>
 
@@ -78,19 +82,21 @@ export default function FeaturedHeroButtons({ videoId }: FeaturedHeroButtonsProp
         href={`/watch/${videoId}/details`}
         className="
           flex
-          h-8
+          h-7
           sm:h-9
           flex-shrink-0
           items-center
-          gap-1.5
+          gap-1
+          sm:gap-1.5
           whitespace-nowrap
           rounded-full
           border
           border-white/15
           bg-white/10
-          px-3.5
+          px-3
           sm:px-4
-          text-xs
+          text-[11px]
+          sm:text-xs
           font-bold
           text-white
           backdrop-blur-md
@@ -100,7 +106,7 @@ export default function FeaturedHeroButtons({ videoId }: FeaturedHeroButtonsProp
           hover:bg-white/15
         "
       >
-        <Info size={13} />
+        <Info size={11} className="sm:w-3.5 sm:h-3.5" />
         Details
       </Link>
     </div>

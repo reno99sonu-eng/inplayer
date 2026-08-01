@@ -22,18 +22,18 @@ export default function FeaturedHeroContent({
         flex-col
         justify-end
 
-        pt-2
-        pb-2
+        pt-1
+        pb-1
 
         lg:justify-center
         lg:pt-0
         lg:pb-0
       "
     >
-      {/* Badge */}
+      {/* Sleek Compact Badge */}
       <div
         className="
-          mb-1.5
+          mb-1
           inline-flex
           w-fit
           items-center
@@ -41,19 +41,20 @@ export default function FeaturedHeroContent({
           border
           border-orange-400/40
           bg-orange-500/10
-          px-2.5
-          py-1
+          px-2
+          py-0.5
           backdrop-blur-xl
         "
       >
-        <span className="h-1.5 w-1.5 rounded-full bg-orange-400 animate-pulse" />
+        <span className="h-1 w-1 rounded-full bg-orange-400 animate-pulse" />
         <span
           className="
-            ml-1.5
-            text-[9px]
+            ml-1
+            text-[8px]
+            sm:text-[9px]
             font-black
             uppercase
-            tracking-[0.2em]
+            tracking-[0.18em]
             text-orange-300
           "
         >
@@ -66,14 +67,14 @@ export default function FeaturedHeroContent({
         key={slide.videoId}
         className="
           animate-hero-fade-up
-          text-base
+          text-sm
           font-black
           leading-tight
           tracking-[-0.02em]
           text-white
           line-clamp-1
 
-          sm:text-lg
+          sm:text-base
 
           md:text-xl
 
@@ -86,19 +87,19 @@ export default function FeaturedHeroContent({
       {/* Creator & Stats in a single compact row */}
       <div
         key={`${slide.videoId}-meta`}
-        className="animate-hero-fade-up mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-300"
+        className="animate-hero-fade-up mt-0.5 flex flex-wrap items-center gap-1.5 text-[10px] sm:text-xs text-slate-300"
       >
-        <span className="font-bold text-white truncate max-w-[240px] sm:max-w-none">
+        <span className="font-bold text-white truncate max-w-[200px] sm:max-w-none">
           by {slide.uploaderName}
         </span>
-        <span className="text-orange-400/70 font-black">•</span>
-        <span className="text-slate-300 text-[11px] sm:text-xs">
-          {formatViews(slide.windowViews)} views this week
+        <span className="text-orange-400/80 font-bold">•</span>
+        <span className="text-slate-300">
+          {formatViews(slide.windowViews)} this week
         </span>
       </div>
 
       {/* Buttons */}
-      <div className="mt-2.5 sm:mt-3">
+      <div className="mt-1.5 sm:mt-3">
         <FeaturedHeroButtons videoId={slide.videoId} uploaderUsername={slide.uploaderUsername} />
       </div>
     </div>

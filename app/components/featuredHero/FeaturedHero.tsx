@@ -48,7 +48,7 @@ export default function FeaturedHero() {
       <section
         className="
           relative w-full overflow-hidden bg-black animate-pulse
-          min-h-[240px] sm:min-h-[270px] md:min-h-[300px]
+          min-h-[190px] sm:min-h-[240px] md:min-h-[280px]
           lg:h-[32vh] xl:h-[34vh]
         "
       />
@@ -71,9 +71,9 @@ export default function FeaturedHero() {
         overflow-hidden
         bg-black
 
-        min-h-[240px]
-        sm:min-h-[270px]
-        md:min-h-[300px]
+        min-h-[190px]
+        sm:min-h-[240px]
+        md:min-h-[280px]
         lg:h-[32vh]
         xl:h-[34vh]
         2xl:h-[36vh]
@@ -93,18 +93,21 @@ export default function FeaturedHero() {
       {/* Background Image — crossfading carousel */}
       <FeaturedHeroVideo slides={slides} activeIndex={activeIndex} />
 
-      {/* Slide progress indicators */}
+      {/* Slide progress indicators — placed at bottom-right on mobile, centered on sm+ */}
       {slides.length > 1 && (
         <div
           className="
             absolute
-            bottom-2.5
-            left-1/2
+            bottom-2
+            right-3
             z-30
             flex
-            -translate-x-1/2
             gap-1.5
 
+            sm:bottom-2.5
+            sm:left-1/2
+            sm:right-auto
+            sm:-translate-x-1/2
             lg:bottom-3.5
           "
         >
@@ -116,7 +119,8 @@ export default function FeaturedHero() {
               className="
                 relative
                 h-1
-                w-5
+                w-4
+                sm:w-5
                 overflow-hidden
                 rounded-full
                 bg-white/20

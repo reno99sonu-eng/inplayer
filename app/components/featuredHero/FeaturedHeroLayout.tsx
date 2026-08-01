@@ -9,18 +9,18 @@ interface Props {
 export default function FeaturedHeroLayout({ children }: Props) {
   return (
     <>
-      {/* Mobile — sits right down at the bottom of the hero banner */}
+      {/* Mobile — absolute inset-0 forces flex items-end to position content at the bottom left */}
       <div
         className="
-          relative
+          absolute
+          inset-0
           z-20
           flex
-          h-full
           items-end
           px-3
-          pb-2
+          pb-3
           sm:px-6
-          sm:pb-5
+          sm:pb-4
 
           lg:hidden
         "
@@ -30,18 +30,20 @@ export default function FeaturedHeroLayout({ children }: Props) {
         </div>
       </div>
 
-      {/* Desktop / TV */}
+      {/* Desktop / TV — absolute inset-0 forces flex items-end to position content at the bottom left */}
       <div
         className="
-          relative
+          absolute
+          inset-0
           z-20
           hidden
-          h-full
-          max-w-[1800px]
-          items-center
+          items-end
           px-8
-          lg:px-10
+          pb-6
+          lg:px-12
+          lg:pb-8
           mx-auto
+          max-w-[1800px]
 
           lg:flex
         "

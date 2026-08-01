@@ -21,11 +21,13 @@ export default function FeaturedHeroContent({
         max-w-[560px]
         flex-col
         justify-end
+        items-start
+        text-left
 
         pt-1
         pb-1
 
-        lg:justify-center
+        lg:justify-end
         lg:pt-0
         lg:pb-0
       "

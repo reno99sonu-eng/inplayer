@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Download, Heart, LogOut, MessageSquare, Settings, User } from "lucide-react";
+import { Heart, ListMusic, LogOut, MessageSquare, Settings, ThumbsUp, User } from "lucide-react";
 
 import { useAuthModal } from "./auth/AuthProvider";
 
@@ -27,10 +27,10 @@ export default function MobileProfileMenu() {
 
   const items = [
     { label: "Your Channel", icon: User, href: "/my-videos" },
-    { label: "My Profile", icon: User, href: "/profile" },
+    { label: "Playlists", icon: ListMusic, href: "/playlists" },
+    { label: "Liked Videos", icon: ThumbsUp, href: "/liked-videos" },
     { label: "Watchlist", icon: Heart, href: "/watchlist" },
     { label: "Messages", icon: MessageSquare, href: "/messages" },
-    { label: "Downloads", icon: Download, href: "/downloads" },
     { label: "Settings", icon: Settings, href: "/settings" },
   ];
 

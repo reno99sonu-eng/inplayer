@@ -526,22 +526,6 @@ export default function VideoOptionsMenu({
 
               {view === "main" && (
                 <div className="space-y-0.5">
-                  {contentType !== "short" && (
-                    <MenuRow
-                      icon={
-                        dlStatus === "preparing" || dlRequesting ? (
-                          <Loader2 size={18} className="animate-spin text-slate-300" />
-                        ) : dlStatus === "errored" ? (
-                          <AlertCircle size={18} className="text-red-400" />
-                        ) : (
-                          <Download size={18} />
-                        )
-                      }
-                      label={downloadLabel}
-                      onClick={handleDownloadClick}
-                      disabled={dlStatus === "preparing" || dlRequesting}
-                    />
-                  )}
                   <MenuRow
                     icon={watchLater ? <Check size={18} className="text-orange-300" /> : <Clock size={18} />}
                     label={watchLater ? "Remove from Watch Later" : "Watch Later"}

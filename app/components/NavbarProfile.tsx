@@ -7,7 +7,8 @@ import {
   User,
   Heart,
   MessageSquare,
-  Download,
+  ListMusic,
+  ThumbsUp,
   Settings,
   HelpCircle,
   LogOut,
@@ -42,10 +43,10 @@ export default function NavbarProfile() {
 
   const menu = [
     { icon: User, title: "Your Channel", href: "/my-videos" },
-    { icon: User, title: "My Profile", href: "/profile" },
+    { icon: ListMusic, title: "Playlists", href: "/playlists" },
+    { icon: ThumbsUp, title: "Liked Videos", href: "/liked-videos" },
     { icon: Heart, title: "Watchlist", href: "/watchlist" },
     { icon: MessageSquare, title: "My Messages", href: "/messages" },
-    { icon: Download, title: "Downloads", href: "/downloads" },
     { icon: Settings, title: "Settings", href: "/settings" },
     { icon: HelpCircle, title: "Help & Support", href: "/help" },
   ];
@@ -62,15 +63,12 @@ export default function NavbarProfile() {
     await signOut();
   };
 
-  // While the initial session check is running, avoid flashing either
-  // state incorrectly
   if (authLoading) {
     return (
       <div className="h-11 w-11 animate-pulse rounded-full bg-white/10 light:bg-black/5" />
     );
   }
 
-  // Not signed in — show a simple Sign In button instead of a fake profile
   if (!signedIn) {
     return (
       <button
@@ -109,29 +107,29 @@ export default function NavbarProfile() {
       <button
         onClick={() => setOpen(!open)}
         className="
-  group
-  flex
-  items-center
-  gap-3
-  rounded-full
-  border
-  border-white/10
-  light:border-black/10
-  bg-white/5
-  light:bg-black/5
-  px-3
-  py-2.5
-  backdrop-blur-3xl
-  shadow-[0_10px_30px_rgba(0,0,0,.25)]
-  light:shadow-[0_10px_30px_rgba(0,0,0,.08)]
-  transition-all
-  duration-300
-  hover:-translate-y-1
-  hover:border-orange-400/40
-  hover:bg-white/[0.08]
-  light:hover:bg-black/[0.08]
-  hover:shadow-[0_0_35px_rgba(249,115,22,.18)]
-"
+          group
+          flex
+          items-center
+          gap-3
+          rounded-full
+          border
+          border-white/10
+          light:border-black/10
+          bg-white/5
+          light:bg-black/5
+          px-3
+          py-2.5
+          backdrop-blur-3xl
+          shadow-[0_10px_30px_rgba(0,0,0,.25)]
+          light:shadow-[0_10px_30px_rgba(0,0,0,.08)]
+          transition-all
+          duration-300
+          hover:-translate-y-1
+          hover:border-orange-400/40
+          hover:bg-white/[0.08]
+          light:hover:bg-black/[0.08]
+          hover:shadow-[0_0_35px_rgba(249,115,22,.18)]
+        "
       >
         <img
           src={user?.avatarUrl || "/avatars/avatar.png"}
@@ -139,11 +137,11 @@ export default function NavbarProfile() {
           className="h-11 w-11 rounded-full object-cover ring-2 ring-orange-400/40 transition-all duration-300 group-hover:ring-orange-300"
         />
 
-<div className="hidden md:block">
-<div className="hidden xl:flex">
-  <Greeting name={user?.name} />
-</div>
-</div>
+        <div className="hidden md:block">
+          <div className="hidden xl:flex">
+            <Greeting name={user?.name} />
+          </div>
+        </div>
 
         <ChevronDown
           size={16}
@@ -164,7 +162,7 @@ export default function NavbarProfile() {
           border
           border-white/10
           light:border-black/10
-bg-[#08111F]/95
+          bg-[#08111F]/95
           light:bg-[#F5EEDC]/95
           backdrop-blur-3xl
           shadow-[0_30px_80px_rgba(0,0,0,.55)]
@@ -180,7 +178,6 @@ bg-[#08111F]/95
         `}
       >
         <div className="p-4 text-center">
-
           <img
             src={user?.avatarUrl || "/avatars/avatar.png"}
             alt="Profile"
@@ -190,11 +187,9 @@ bg-[#08111F]/95
           <h3 className="mt-3 text-lg font-black text-white light:text-slate-900">
             {user?.name}
           </h3>
-
         </div>
 
         <div className="border-t border-white/10 light:border-black/10 p-2">
-
           {menu.map((item) => {
             const Icon = item.icon;
 
@@ -251,7 +246,6 @@ bg-[#08111F]/95
             <LogOut size={16} />
             Sign Out
           </button>
-
         </div>
       </div>
     </div>

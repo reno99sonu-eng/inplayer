@@ -486,11 +486,62 @@ lg:right-auto
                     Your Channel
                   </button>
                   <button
+                    onClick={() => goTo("/playlists")}
+                    className="
+                      flex
+                      w-full
+                      items-center
+                      gap-3
+                      rounded-xl
+                      px-3
+                      py-2
+                      text-left
+                      text-sm
+                      text-slate-300
+                      light:text-slate-700
+                      transition-all
+                      duration-300
+                      hover:bg-white/5
+                      light:hover:bg-black/5
+                      hover:translate-x-1
+                      hover:text-orange-300
+                      light:hover:text-orange-600
+                    "
+                  >
+                    Playlists
+                  </button>
+                  <button
+                    onClick={() => goTo("/liked-videos")}
+                    className="
+                      flex
+                      w-full
+                      items-center
+                      gap-3
+                      rounded-xl
+                      px-3
+                      py-2
+                      text-left
+                      text-sm
+                      text-slate-300
+                      light:text-slate-700
+                      transition-all
+                      duration-300
+                      hover:bg-white/5
+                      light:hover:bg-black/5
+                      hover:translate-x-1
+                      hover:text-orange-300
+                      light:hover:text-orange-600
+                    "
+                  >
+                    Liked Videos
+                  </button>
+                  <button
                     onClick={() => goTo("/history")}
                     className="
                       flex
                       w-full
                       items-center
+                      gap-3
                       rounded-xl
                       px-3
                       py-2
@@ -515,6 +566,7 @@ lg:right-auto
                       flex
                       w-full
                       items-center
+                      gap-3
                       rounded-xl
                       px-3
                       py-2
@@ -532,30 +584,6 @@ lg:right-auto
                     "
                   >
                     HamMart
-                  </button>
-                  <button
-                    onClick={() => goTo("/downloads")}
-                    className="
-                      flex
-                      w-full
-                      items-center
-                      rounded-xl
-                      px-3
-                      py-2
-                      text-left
-                      text-sm
-                      text-slate-300
-                      light:text-slate-700
-                      transition-all
-                      duration-300
-                      hover:bg-white/5
-                      light:hover:bg-black/5
-                      hover:translate-x-1
-                      hover:text-orange-300
-                      light:hover:text-orange-600
-                    "
-                  >
-                    Downloads
                   </button>
               </div>
             </div>

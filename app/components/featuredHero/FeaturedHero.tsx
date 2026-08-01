@@ -33,9 +33,6 @@ export default function FeaturedHero() {
     };
   }, []);
 
-  // Only worth auto-advancing when there's more than one real slide to
-  // advance *to* — with exactly one, `(prev + 1) % 1` is always 0, so the
-  // timer would just re-render the same slide forever for no reason.
   useEffect(() => {
     if (isPaused || !slides || slides.length <= 1) return;
 
@@ -46,23 +43,18 @@ export default function FeaturedHero() {
     return () => clearTimeout(timer);
   }, [activeIndex, isPaused, slides]);
 
-  // Still loading — keep the section's footprint (avoids a layout jump)
-  // but nothing to render inside yet.
   if (slides === null) {
     return (
       <section
         className="
           relative w-full overflow-hidden bg-black animate-pulse
-          min-h-[220px] sm:min-h-[250px] md:min-h-[280px]
-          lg:h-[34vh]
+          min-h-[240px] sm:min-h-[270px] md:min-h-[300px]
+          lg:h-[32vh] xl:h-[34vh]
         "
       />
     );
   }
 
-  // No real weekly data yet (fresh app, or the daily-views table isn't
-  // provisioned) — omit the section entirely rather than show anything
-  // fake in this much screen real estate.
   if (slides.length === 0) return null;
 
   const activeSlide = slides[Math.min(activeIndex, slides.length - 1)];
@@ -79,19 +71,19 @@ export default function FeaturedHero() {
         overflow-hidden
         bg-black
 
-        min-h-[220px]
-        sm:min-h-[250px]
-        md:min-h-[280px]
-        lg:h-[34vh]
-        xl:h-[36vh]
-        2xl:h-[38vh]
+        min-h-[240px]
+        sm:min-h-[270px]
+        md:min-h-[300px]
+        lg:h-[32vh]
+        xl:h-[34vh]
+        2xl:h-[36vh]
       "
     >
       {/* Background */}
       <FeaturedHeroBackground />
 
       {/* Dark Overlay */}
-      <div className="absolute inset-0 z-10 bg-gradient-to-r from-[#050816]/95 via-[#050816]/55 to-transparent" />
+      <div className="absolute inset-0 z-10 bg-gradient-to-r from-[#050816]/95 via-[#050816]/60 to-transparent" />
 
       {/* Responsive Layout */}
       <FeaturedHeroLayout>
@@ -106,14 +98,14 @@ export default function FeaturedHero() {
         <div
           className="
             absolute
-            bottom-4
+            bottom-2.5
             left-1/2
             z-30
             flex
             -translate-x-1/2
-            gap-2
+            gap-1.5
 
-            lg:bottom-6
+            lg:bottom-3.5
           "
         >
           {slides.map((slide, index) => (
@@ -123,14 +115,14 @@ export default function FeaturedHero() {
               aria-label={`Go to slide ${index + 1}`}
               className="
                 relative
-                h-1.5
-                w-6
+                h-1
+                w-5
                 overflow-hidden
                 rounded-full
                 bg-white/20
                 transition-colors
                 duration-300
-                hover:bg-white/30
+                hover:bg-white/40
               "
             >
               {index === activeIndex && !isPaused && (
@@ -144,7 +136,7 @@ export default function FeaturedHero() {
               )}
 
               {index === activeIndex && isPaused && (
-                <div className="absolute inset-y-0 left-0 w-full rounded-full bg-orange-400/50" />
+                <div className="absolute inset-y-0 left-0 w-full rounded-full bg-orange-400/60" />
               )}
             </button>
           ))}

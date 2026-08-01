@@ -17,8 +17,10 @@ export default function FeaturedHeroLayout({ children }: Props) {
           flex
           h-full
           items-end
-          px-6
-          pb-10
+          px-4
+          pb-6
+          sm:px-6
+          sm:pb-7
 
           lg:hidden
         "
@@ -37,13 +39,14 @@ export default function FeaturedHeroLayout({ children }: Props) {
           h-full
           max-w-[1800px]
           items-center
-          px-12
+          px-8
+          lg:px-10
           mx-auto
 
           lg:flex
         "
       >
-        <div className="max-w-[760px]">
+        <div className="max-w-[680px]">
           {children}
         </div>
       </div>

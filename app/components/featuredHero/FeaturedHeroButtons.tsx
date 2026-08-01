@@ -8,18 +8,19 @@ interface FeaturedHeroButtonsProps {
   uploaderUsername: string | null;
 }
 
-export default function FeaturedHeroButtons({ videoId, uploaderUsername }: FeaturedHeroButtonsProps) {
+export default function FeaturedHeroButtons({ videoId }: FeaturedHeroButtonsProps) {
   return (
-    <div className="flex flex-nowrap items-center gap-2 sm:gap-3 overflow-x-auto max-w-full no-scrollbar pb-1">
+    <div className="flex flex-nowrap items-center gap-2 overflow-x-auto max-w-full no-scrollbar">
       {/* Watch Now */}
       <Link
         href={`/watch/${videoId}`}
         className="
           flex
+          h-8
+          sm:h-9
           flex-shrink-0
           items-center
           gap-1.5
-          sm:gap-2
           whitespace-nowrap
           rounded-full
           bg-gradient-to-r
@@ -27,20 +28,17 @@ export default function FeaturedHeroButtons({ videoId, uploaderUsername }: Featu
           via-amber-400
           to-yellow-300
           px-3.5
-          py-2
-          sm:px-5
-          sm:py-2.5
+          sm:px-4
           text-xs
-          sm:text-sm
-          font-bold
+          font-extrabold
           text-slate-900
-          shadow-[0_10px_25px_rgba(249,115,22,.30)]
+          shadow-[0_4px_15px_rgba(249,115,22,.30)]
           transition-all
-          duration-300
-          hover:scale-105
+          duration-200
+          hover:opacity-95
         "
       >
-        <Play size={14} className="sm:w-4 sm:h-4" fill="currentColor" />
+        <Play size={13} fill="currentColor" />
         Watch Now
       </Link>
 
@@ -49,31 +47,29 @@ export default function FeaturedHeroButtons({ videoId, uploaderUsername }: Featu
         type="button"
         className="
           flex
+          h-8
+          sm:h-9
           flex-shrink-0
           items-center
           gap-1.5
-          sm:gap-2
           whitespace-nowrap
           rounded-full
           border
-          border-white/10
-          bg-white/5
+          border-white/15
+          bg-white/10
           px-3.5
-          py-2
-          sm:px-5
-          sm:py-2.5
+          sm:px-4
           text-xs
-          sm:text-sm
-          font-semibold
+          font-bold
           text-white
-          backdrop-blur-xl
+          backdrop-blur-md
           transition-all
-          duration-300
+          duration-200
           hover:border-orange-400/40
-          hover:bg-white/10
+          hover:bg-white/15
         "
       >
-        <Plus size={14} className="sm:w-4 sm:h-4" />
+        <Plus size={13} />
         Watchlist
       </button>
 
@@ -82,31 +78,29 @@ export default function FeaturedHeroButtons({ videoId, uploaderUsername }: Featu
         href={`/watch/${videoId}/details`}
         className="
           flex
+          h-8
+          sm:h-9
           flex-shrink-0
           items-center
           gap-1.5
-          sm:gap-2
           whitespace-nowrap
           rounded-full
           border
-          border-white/10
-          bg-white/5
+          border-white/15
+          bg-white/10
           px-3.5
-          py-2
-          sm:px-5
-          sm:py-2.5
+          sm:px-4
           text-xs
-          sm:text-sm
-          font-semibold
+          font-bold
           text-white
-          backdrop-blur-xl
+          backdrop-blur-md
           transition-all
-          duration-300
+          duration-200
           hover:border-cyan-400/40
-          hover:bg-white/10
+          hover:bg-white/15
         "
       >
-        <Info size={14} className="sm:w-4 sm:h-4" />
+        <Info size={13} />
         Details
       </Link>
     </div>

@@ -22,14 +22,8 @@ export default function FeaturedHeroContent({
         flex-col
         justify-end
 
-        pt-4
-        pb-4
-
-        sm:pt-5
-        sm:pb-5
-
-        md:pt-6
-        md:pb-6
+        pt-2
+        pb-2
 
         lg:justify-center
         lg:pt-0
@@ -37,10 +31,9 @@ export default function FeaturedHeroContent({
       "
     >
       {/* Badge */}
-
       <div
         className="
-          mb-3
+          mb-1.5
           inline-flex
           w-fit
           items-center
@@ -48,20 +41,19 @@ export default function FeaturedHeroContent({
           border
           border-orange-400/40
           bg-orange-500/10
-          px-3
-          py-1.5
+          px-2.5
+          py-1
           backdrop-blur-xl
         "
       >
         <span className="h-1.5 w-1.5 rounded-full bg-orange-400 animate-pulse" />
-
         <span
           className="
-            ml-2
+            ml-1.5
             text-[9px]
             font-black
             uppercase
-            tracking-[0.24em]
+            tracking-[0.2em]
             text-orange-300
           "
         >
@@ -69,51 +61,44 @@ export default function FeaturedHeroContent({
         </span>
       </div>
 
-      {/* Title — re-animates in on every slide change */}
-
+      {/* Title */}
       <h1
         key={slide.videoId}
         className="
           animate-hero-fade-up
-          text-lg
+          text-base
           font-black
-          leading-none
-          tracking-[-0.03em]
+          leading-tight
+          tracking-[-0.02em]
           text-white
+          line-clamp-1
 
-          sm:text-xl
+          sm:text-lg
 
-          md:text-2xl
+          md:text-xl
 
-          lg:text-3xl
+          lg:text-2xl
         "
       >
         {slide.title}
       </h1>
 
-      {/* Creator */}
-
+      {/* Creator & Stats in a single compact row */}
       <div
-        key={`${slide.videoId}-creator`}
-        className="animate-hero-fade-up mt-3 flex items-center gap-1.5"
+        key={`${slide.videoId}-meta`}
+        className="animate-hero-fade-up mt-1 flex flex-wrap items-center gap-1.5 text-xs text-slate-300"
       >
-        <span className="text-sm font-semibold text-white">
-        by {slide.uploaderName}
+        <span className="font-bold text-white truncate max-w-[240px] sm:max-w-none">
+          by {slide.uploaderName}
+        </span>
+        <span className="text-orange-400/70 font-black">•</span>
+        <span className="text-slate-300 text-[11px] sm:text-xs">
+          {formatViews(slide.windowViews)} views this week
         </span>
       </div>
 
-      {/* Stats */}
-
-      <p
-        key={`${slide.videoId}-stats`}
-        className="animate-hero-fade-up mt-2 text-[11px] text-slate-300"
-      >
-        {formatViews(slide.windowViews)} this week
-      </p>
-
       {/* Buttons */}
-
-      <div className="mt-5">
+      <div className="mt-2.5 sm:mt-3">
         <FeaturedHeroButtons videoId={slide.videoId} uploaderUsername={slide.uploaderUsername} />
       </div>
     </div>

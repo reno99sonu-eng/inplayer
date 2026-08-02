@@ -18,6 +18,7 @@ const MuxPlayer = nextDynamic(() => import("@mux/mux-player-react"), {
 import { recommendations, type Recommendation } from "../data/recommendations";
 import { shorts, type Short } from "../data/shorts";
 import ShortsShelf from "./ShortsShelf";
+import AdBanner from "./AdBanner";
 import { useSettings } from "./settings/SettingsProvider";
 
 // Hover-preview delay — don't start streaming a preview for every card the
@@ -388,12 +389,11 @@ export default function RecommendationFeed({
     setShuffledShorts([...realShorts, ...shuffledShortsArr]);
   }, [realVideos, realShorts]);
 
-  // Keep the discovery feed in repeating YouTube-style blocks: exactly four
-  // standard videos, then the next unused shelf of Shorts. New uploads flow
-  // into the same sequence instead of being stranded after a one-off section.
+  // Keep the discovery feed in repeating blocks: 6 standard videos, followed by
+  // a slim horizontal ad banner, and alternating Shorts shelves.
   const videoBatches = Array.from(
-    { length: Math.ceil(items.length / 4) },
-    (_, index) => items.slice(index * 4, index * 4 + 4)
+    { length: Math.ceil(items.length / 6) },
+    (_, index) => items.slice(index * 6, index * 6 + 6)
   );
   const shortsPerShelf = 8;
 
@@ -428,8 +428,8 @@ export default function RecommendationFeed({
     );
   }
 
-  // Horizontal view: repeat four normal video cards followed by a Shorts
-  // shelf for as long as there is content to display.
+  // Horizontal view: repeat 6 video cards followed by a repeating inline ad banner
+  // and alternating Shorts shelf.
   return (
     <>
       {videoBatches.map((videos, index) => {
@@ -440,12 +440,17 @@ export default function RecommendationFeed({
 
         return (
           <div key={`feed-block-${index}`}>
-            <section className="mx-auto max-w-[1800px] px-4 py-5 lg:py-8 lg:px-8">
-              <div className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <section className="mx-auto max-w-[1800px] px-4 py-4 lg:py-6 lg:px-8">
+              <div className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-6">
                 {videos.map(renderCard)}
               </div>
             </section>
-            {shelfShorts.length > 0 && <ShortsShelf items={shelfShorts} />}
+
+            {/* Repeating sleek ad banner after every 6 videos */}
+            <AdBanner placement="homepage" seed={index} />
+
+            {/* Alternating Shorts shelf */}
+            {shelfShorts.length > 0 && index % 2 === 0 && <ShortsShelf items={shelfShorts} />}
           </div>
         );
       })}

@@ -45,8 +45,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       }
 
       try {
-        const session = await fetchAuthSession();
-        const idToken = session.tokens?.idToken?.toString();
+        const session = await fetchAuthSession().catch(() => null);
+        const idToken = session?.tokens?.idToken?.toString();
         if (!idToken) {
           if (!cancelled) {
             setIsAdmin(false);
@@ -57,11 +57,20 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
         const res = await fetch("/api/admin/me", {
           headers: { Authorization: `Bearer ${idToken}` },
-        });
-        const data = await res.json();
+        }).catch(() => null);
+
+        if (!res) {
+          if (!cancelled) {
+            setIsAdmin(false);
+            setChecking(false);
+          }
+          return;
+        }
+
+        const data = await res.json().catch(() => ({ isAdmin: false }));
 
         if (!cancelled) {
-          setIsAdmin(Boolean(data.isAdmin));
+          setIsAdmin(Boolean(data?.isAdmin));
           setChecking(false);
         }
       } catch (err) {

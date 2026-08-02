@@ -161,10 +161,6 @@ export default async function Home({ searchParams }: HomeProps) {
               <div className="mx-auto h-px w-[92%] bg-gradient-to-r from-transparent via-white/10 to-transparent light:via-black/10" />
 
               <TrendingNow />
-
-              <div className="mx-auto h-px w-[92%] bg-gradient-to-r from-transparent via-white/10 to-transparent light:via-black/10" />
-
-              <AdBanner placement="homepage" />
             </>
           )}
 

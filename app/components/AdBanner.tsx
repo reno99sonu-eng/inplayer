@@ -19,11 +19,13 @@ const AUTO_SCROLL_MS = 4000;
 
 export default function AdBanner({
   placement,
+  seed = 0,
 }: {
   placement: "homepage" | "watch" | "homepage_spotlight";
+  seed?: number;
 }) {
   const [data, setData] = useState<AdResponse | null>(null);
-  const [currentIndex, setCurrentIndex] = useState(0);
+  const [currentIndex, setCurrentIndex] = useState(seed);
   const [isHovered, setIsHovered] = useState(false);
 
   useEffect(() => {
@@ -77,7 +79,7 @@ export default function AdBanner({
   }
 
   if (data.source === "house") {
-    const activeCreative = creatives[Math.min(currentIndex, creatives.length - 1)];
+    const activeCreative = creatives[Math.abs(currentIndex) % creatives.length];
 
     const handleClick = (creative: HouseCreative) => {
       fetch("/api/ads", {
@@ -89,18 +91,18 @@ export default function AdBanner({
 
     return (
       <div
-        className="mx-auto w-full max-w-[1300px] px-2 sm:px-4 my-2 sm:my-3"
+        className="mx-auto w-full max-w-[1400px] px-2 sm:px-4 my-2 sm:my-3"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        <div className="relative overflow-hidden rounded-2xl border border-white/10 light:border-black/10 bg-black/40 shadow-lg">
-          {/* Ad slide link */}
+        <div className="relative overflow-hidden rounded-xl border border-white/10 light:border-black/10 bg-[#060D18] shadow-md">
+          {/* Ad slide link — ultra-sleek horizontal straight line strip */}
           <a
             href={activeCreative.linkUrl}
             target="_blank"
             rel="noopener noreferrer sponsored"
             onClick={() => handleClick(activeCreative)}
-            className="group relative block w-full overflow-hidden transition duration-300 max-h-[140px] sm:max-h-[180px] lg:max-h-[220px] aspect-[16/5]"
+            className="group relative flex h-12 sm:h-16 md:h-20 lg:h-24 w-full items-center justify-center overflow-hidden transition duration-300 bg-[#060D18]"
           >
             {activeCreative.imageUrl?.startsWith("data:video/") ||
             /\.mp4|\.webm/i.test(activeCreative.imageUrl || "") ? (
@@ -121,13 +123,13 @@ export default function AdBanner({
             )}
 
             {/* AD badge */}
-            <span className="absolute right-2 top-2 z-10 rounded-full bg-black/75 backdrop-blur-md px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-orange-400 border border-orange-500/20">
+            <span className="absolute right-2 top-2 z-10 rounded-md bg-black/80 backdrop-blur-md px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-orange-400 border border-orange-500/30">
               Ad
             </span>
 
             {/* Title overlay hint */}
             {activeCreative.title && (
-              <div className="absolute left-3 bottom-3 z-10 hidden sm:block rounded-xl bg-black/70 backdrop-blur-md px-3 py-1 text-xs font-semibold text-white border border-white/10">
+              <div className="absolute left-3 bottom-2 z-10 hidden sm:block rounded-lg bg-black/75 backdrop-blur-md px-2.5 py-0.5 text-[11px] font-semibold text-white border border-white/10">
                 {activeCreative.title}
               </div>
             )}

@@ -1,7 +1,6 @@
 "use client";
 
-import { useEffect, useState, useRef } from "react";
-import Script from "next/script";
+import { useEffect, useState } from "react";
 
 interface HouseCreative {
   adId: string;
@@ -27,6 +26,7 @@ export default function AdBanner({
   const [data, setData] = useState<AdResponse | null>(null);
   const [currentIndex, setCurrentIndex] = useState(seed);
   const [isHovered, setIsHovered] = useState(false);
+  const [failedAdIds, setFailedAdIds] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -80,6 +80,7 @@ export default function AdBanner({
 
   if (data.source === "house") {
     const activeCreative = creatives[Math.abs(currentIndex) % creatives.length];
+    const isImageBroken = Boolean(failedAdIds[activeCreative.adId] || !activeCreative.imageUrl);
 
     const handleClick = (creative: HouseCreative) => {
       fetch("/api/ads", {
@@ -96,7 +97,7 @@ export default function AdBanner({
         onMouseLeave={() => setIsHovered(false)}
       >
         <div className="relative overflow-hidden rounded-2xl border border-white/10 light:border-black/10 bg-[#060D18] shadow-md">
-          {/* Ad slide link — 16:9 matching video cards on Mobile, slim stretched strip on Desktop */}
+          {/* Ad slide link */}
           <a
             href={activeCreative.linkUrl}
             target="_blank"
@@ -104,31 +105,50 @@ export default function AdBanner({
             onClick={() => handleClick(activeCreative)}
             className="group relative flex aspect-video sm:aspect-auto sm:h-16 md:h-20 lg:h-24 w-full items-center justify-center overflow-hidden transition duration-300 bg-[#060D18]"
           >
-            {activeCreative.imageUrl?.startsWith("data:video/") ||
-            /\.mp4|\.webm/i.test(activeCreative.imageUrl || "") ? (
+            {isImageBroken ? (
+              <div className="flex h-full w-full items-center justify-between bg-gradient-to-r from-indigo-900 via-purple-900 to-pink-900 px-6 py-2">
+                <div className="flex items-center gap-3">
+                  <span className="rounded-full bg-orange-500/20 px-3 py-1 text-[10px] font-black uppercase text-orange-400 border border-orange-500/30">
+                    Sponsored
+                  </span>
+                  <span className="text-xs sm:text-sm font-black text-white truncate max-w-[300px] sm:max-w-[500px]">
+                    {activeCreative.title || "InPlayer Special Showcase Offer"}
+                  </span>
+                </div>
+                <span className="rounded-xl bg-white px-3 py-1.5 text-[11px] font-extrabold text-slate-900 shadow hover:bg-orange-400 transition">
+                  Explore ↗
+                </span>
+              </div>
+            ) : activeCreative.imageUrl?.startsWith("data:video/") ||
+              /\.mp4|\.webm/i.test(activeCreative.imageUrl || "") ? (
               <video
                 src={activeCreative.imageUrl}
                 autoPlay
                 loop
                 muted
                 playsInline
+                onError={() => setFailedAdIds((prev) => ({ ...prev, [activeCreative.adId]: true }))}
                 className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.01]"
               />
             ) : (
+              /* eslint-disable-next-line @next/next/no-img-element */
               <img
                 src={activeCreative.imageUrl}
-                alt={activeCreative.title}
+                alt={activeCreative.title || "Advertisement"}
+                onError={() => setFailedAdIds((prev) => ({ ...prev, [activeCreative.adId]: true }))}
                 className="h-full w-full object-cover transition duration-500 group-hover:scale-[1.01]"
               />
             )}
 
             {/* AD badge */}
-            <span className="absolute right-2 top-2 z-10 rounded-md bg-black/80 backdrop-blur-md px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-orange-400 border border-orange-500/30">
-              Ad
-            </span>
+            {!isImageBroken && (
+              <span className="absolute right-2 top-2 z-10 rounded-md bg-black/80 backdrop-blur-md px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-orange-400 border border-orange-500/30">
+                Ad
+              </span>
+            )}
 
             {/* Title overlay hint */}
-            {activeCreative.title && (
+            {!isImageBroken && activeCreative.title && (
               <div className="absolute left-3 bottom-2 z-10 rounded-lg bg-black/75 backdrop-blur-md px-2.5 py-1 text-xs font-semibold text-white border border-white/10">
                 {activeCreative.title}
               </div>
@@ -156,22 +176,5 @@ export default function AdBanner({
     );
   }
 
-  // data.source === "adsense"
-  return (
-    <div className="mx-auto w-full max-w-[1300px] px-2 sm:px-4 my-3">
-      <Script
-        async
-        src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-${data.adsensePublisherId}`}
-        crossOrigin="anonymous"
-        strategy="afterInteractive"
-      />
-      <ins
-        className="adsbygoogle block"
-        style={{ display: "block" }}
-        data-ad-client={`ca-pub-${data.adsensePublisherId}`}
-        data-ad-format="auto"
-        data-full-width-responsive="true"
-      />
-    </div>
-  );
+  return null;
 }

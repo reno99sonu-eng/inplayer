@@ -8,8 +8,13 @@ import { AD_CREATIVES_TABLE } from "@/app/lib/adCreatives";
 export async function GET() {
   const settings = await getPlatformSettings();
 
+  // If midrollEnabled setting is explicitly set to false in Admin Panel, return disabled
+  if (settings.midrollEnabled === false) {
+    return NextResponse.json({ enabled: false, ads: [] });
+  }
+
   try {
-    // 1. Dedicated Midroll ads table
+    // 1. Dedicated Midroll ads table (filtered strictly for non-empty imageUrl)
     const items: Record<string, unknown>[] = [];
     let exclusiveStartKey: Record<string, unknown> | undefined;
     do {
@@ -28,10 +33,10 @@ export async function GET() {
       exclusiveStartKey = result?.LastEvaluatedKey;
     } while (exclusiveStartKey);
 
-    let activeItems = items.filter((item) => item.active !== false);
+    let activeItems = items.filter((item) => item && item.active !== false && Boolean(item.imageUrl));
     let isHouseFallback = false;
 
-    // 2. Fallback to House Ad Creatives table
+    // 2. Fallback to House Ad Creatives table (filtered strictly for placement="midroll" or non-empty imageUrl)
     if (activeItems.length === 0) {
       const houseItems: Record<string, unknown>[] = [];
       let houseKey: Record<string, unknown> | undefined;
@@ -51,20 +56,35 @@ export async function GET() {
         houseKey = result?.LastEvaluatedKey;
       } while (houseKey);
 
-      activeItems = houseItems.filter((item) => item.active !== false);
+      // Filter for midroll placement first
+      const midrollHouse = houseItems.filter(
+        (item) => item && (item.placement === "midroll" || item.placement === "homepage") && item.active !== false && Boolean(item.imageUrl)
+      );
+
+      activeItems = midrollHouse.length > 0 ? midrollHouse : houseItems.filter((item) => item && item.active !== false && Boolean(item.imageUrl));
       isHouseFallback = true;
     }
 
-    if (activeItems.length === 0) {
-      return NextResponse.json({ enabled: false, ads: [] });
-    }
+    // Default built-in house mid-roll ad fallback if no valid uploaded ad image is found
+    const defaultMidrollAd = [
+      {
+        adId: "house_pro_midroll",
+        imageUrl:
+          "data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxMjAwIiBoZWlnaHQ9IjY3NSI+PHJlY3Qgd2lkdGg9IjEyMDAiIGhlaWdodD0iNjc1IiBmaWxsPSIjNEY0NkU1Ii8+PHRleHQgeD0iNjAwIiB5PSIzMDAiIGZvbnQtc2l6ZT0iNDgiIGZpbGw9IiNGRkZGRkYiIHRleHQtYW5jaG9yPSJtaWRkbGUiPkluUGxheWVyIFBybyBGaWxtcyAmYW1wOyBPcmlnaW5hbHM8L3RleHQ+PHRleHQgeD0iNjAwIiB5PSIzNzAiIGZvbnQtc2l6ZT0iMjQiIGZpbGw9IiNGRkZGRkYiIHRleHQtYW5jaG9yPSJtaWRkbGUiPldhdGNoIDRLIEFkLUZyZWUgaW4gMTBwNjA8L3RleHQ+PC9zdmc+",
+        linkUrl: "https://inplayer.in/pro",
+        title: "InPlayer Pro Pass — Watch 4K Originals & Ad-Free",
+      },
+    ];
 
-    const formattedAds = activeItems.map((pick) => ({
-      adId: String(pick.adId || ""),
-      imageUrl: String(pick.imageUrl || ""),
-      linkUrl: String(pick.linkUrl || "#"),
-      title: String(pick.title || "Advertisement"),
-    }));
+    const formattedAds =
+      activeItems.length > 0
+        ? activeItems.map((pick) => ({
+            adId: String(pick.adId || "midroll_ad"),
+            imageUrl: String(pick.imageUrl || ""),
+            linkUrl: String(pick.linkUrl || "https://inplayer.in/pro"),
+            title: String(pick.title || "InPlayer Special Offer"),
+          }))
+        : defaultMidrollAd;
 
     return NextResponse.json({
       enabled: true,

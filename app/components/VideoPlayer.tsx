@@ -932,19 +932,19 @@ export default function VideoPlayer({
             onClick={() => trackMidrollEvent("click")}
             className="group relative flex h-full w-full items-center justify-center bg-[#060D18] cursor-pointer"
           >
-            {adImageFailed ? (
-              <div className="flex h-full w-full flex-col items-center justify-center bg-gradient-to-br from-[#1E1B4B] via-[#0F172A] to-[#060D18] p-8 text-center">
-                <div className="rounded-full bg-orange-500/20 px-4 py-1 text-xs font-black uppercase tracking-wider text-orange-400 border border-orange-500/30">
-                  Sponsored Advertisement
+            {adImageFailed || !midrollAd?.imageUrl ? (
+              <div className="flex h-full w-full flex-col items-center justify-center bg-gradient-to-br from-[#4F46E5] via-[#7C3AED] to-[#DB2777] p-8 text-center select-none">
+                <div className="rounded-full bg-white/20 px-4 py-1 text-xs font-black uppercase tracking-wider text-white border border-white/30 backdrop-blur-md">
+                  🔥 Sponsored Advertisement
                 </div>
-                <h3 className="mt-4 max-w-md text-xl sm:text-2xl font-black text-white">
-                  {midrollAd.title || "InPlayer Special Offer"}
+                <h3 className="mt-4 max-w-lg text-2xl sm:text-3xl font-black text-white drop-shadow">
+                  {midrollAd?.title || "InPlayer Pro Pass — Stream 4K Ad-Free"}
                 </h3>
-                <p className="mt-2 text-xs sm:text-sm text-slate-300">
-                  Click anywhere to visit advertiser page ↗
+                <p className="mt-3 text-xs sm:text-sm font-semibold text-white/90">
+                  Click anywhere to explore offer ↗
                 </p>
               </div>
-            ) : midrollAd.imageUrl?.startsWith("data:video/") || /\.mp4|\.webm/i.test(midrollAd.imageUrl || "") ? (
+            ) : midrollAd.imageUrl.startsWith("data:video/") || /\.mp4|\.webm/i.test(midrollAd.imageUrl) ? (
               <video
                 src={midrollAd.imageUrl}
                 autoPlay
@@ -955,9 +955,10 @@ export default function VideoPlayer({
                 className="h-full w-full object-contain"
               />
             ) : (
+              /* eslint-disable-next-line @next/next/no-img-element */
               <img
                 src={midrollAd.imageUrl}
-                alt={midrollAd.title}
+                alt={midrollAd.title || "Ad"}
                 onError={() => setAdImageFailed(true)}
                 className="h-full w-full object-contain"
               />

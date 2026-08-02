@@ -37,12 +37,12 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
   moderationEnabledUploads: true,
   adsenseEnabled: false,
   adsensePublisherId: "",
-  homepageBannerSource: "off",
-  watchPageBannerSource: "off",
+  homepageBannerSource: "house",
+  watchPageBannerSource: "house",
   homepageSpotlightSource: "off",
-  weeklyFeaturedEnabled: false, // OFF by default
-  midrollEnabled: false,
-  midrollIntervalSeconds: 300,
+  weeklyFeaturedEnabled: true, // ON by default
+  midrollEnabled: true,
+  midrollIntervalSeconds: 900,
   updatedAt: null,
   updatedBy: null,
 };
@@ -111,7 +111,7 @@ export function toPublicSettings(settings: PlatformSettings): PublicPlatformSett
     homepageBannerSource: settings.homepageBannerSource,
     watchPageBannerSource: settings.watchPageBannerSource,
     homepageSpotlightSource: settings.homepageSpotlightSource,
-    weeklyFeaturedEnabled: Boolean(settings.weeklyFeaturedEnabled),
+    weeklyFeaturedEnabled: settings.weeklyFeaturedEnabled !== false,
     midrollEnabled: settings.midrollEnabled,
     midrollIntervalSeconds: settings.midrollIntervalSeconds,
   };

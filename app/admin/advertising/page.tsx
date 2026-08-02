@@ -86,7 +86,7 @@ const DEFAULT_SETTINGS: AdSettings = {
   homepageBannerSource: "house",
   watchPageBannerSource: "house",
   homepageSpotlightSource: "off",
-  weeklyFeaturedEnabled: false, // OFF by default
+  weeklyFeaturedEnabled: true, // ON by default
   midrollEnabled: true,
   midrollIntervalSeconds: 900,
 };
@@ -197,7 +197,7 @@ function AdvertisingPage() {
           homepageBannerSource: (s.homepageBannerSource as AdSlotSource) || "house",
           watchPageBannerSource: (s.watchPageBannerSource as AdSlotSource) || "house",
           homepageSpotlightSource: (s.homepageSpotlightSource as AdSlotSource) || "off",
-          weeklyFeaturedEnabled: Boolean(s.weeklyFeaturedEnabled),
+          weeklyFeaturedEnabled: s.weeklyFeaturedEnabled !== false,
           midrollEnabled: Boolean(s.midrollEnabled),
           midrollIntervalSeconds: Number(s.midrollIntervalSeconds) || 900,
         });

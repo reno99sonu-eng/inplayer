@@ -88,7 +88,7 @@ const DEFAULT_SETTINGS: AdSettings = {
   homepageBannerSource: "house",
   watchPageBannerSource: "house",
   homepageSpotlightSource: "off",
-  weeklyFeaturedEnabled: true, // ON by default
+  weeklyFeaturedEnabled: false, // OFF by default
   midrollEnabled: true,
   midrollIntervalSeconds: 900,
 };
@@ -140,7 +140,7 @@ export default function AdvertisingPage() {
           homepageBannerSource: s.homepageBannerSource || "house",
           watchPageBannerSource: s.watchPageBannerSource || "house",
           homepageSpotlightSource: s.homepageSpotlightSource || "off",
-          weeklyFeaturedEnabled: s.weeklyFeaturedEnabled !== false, // ON by default
+          weeklyFeaturedEnabled: Boolean(s.weeklyFeaturedEnabled),
           midrollEnabled: Boolean(s.midrollEnabled),
           midrollIntervalSeconds: s.midrollIntervalSeconds || 900,
         });
@@ -620,7 +620,7 @@ export default function AdvertisingPage() {
                 <div className="flex justify-between p-2 rounded-xl bg-white/5 light:bg-black/5">
                   <span className="text-slate-400 light:text-slate-700">Weekly Featured Carousel:</span>
                   <span className="font-bold text-emerald-400 light:text-emerald-700">
-                    {settings.weeklyFeaturedEnabled !== false ? "ON" : "OFF"}
+                    {settings.weeklyFeaturedEnabled ? "ON (Custom Ad Poster)" : "OFF (User Videos - Default)"}
                   </span>
                 </div>
               </div>
@@ -641,7 +641,7 @@ export default function AdvertisingPage() {
                 </span>
                 <span className="text-[11px] text-slate-400 light:text-slate-600">
                   {activePanel === "weekly_featured"
-                    ? "Weekly Featured Hero Carousel is ON by default."
+                    ? "OFF (Default): Shows users' Weekly Featured videos. ON: Swaps poster to admin's custom uploaded ad poster."
                     : "Select how this slot delivers ads to viewers across InPlayer."}
                 </span>
               </div>
@@ -653,12 +653,12 @@ export default function AdvertisingPage() {
                     saveSettings();
                   }}
                   className={`rounded-full px-3.5 py-1 text-xs font-bold transition ${
-                    settings.weeklyFeaturedEnabled !== false
+                    settings.weeklyFeaturedEnabled
                       ? "bg-emerald-500/20 text-emerald-300 light:bg-emerald-100 light:text-emerald-800"
                       : "bg-white/5 text-slate-400 light:bg-black/5"
                   }`}
                 >
-                  {settings.weeklyFeaturedEnabled !== false ? "ON (Active)" : "OFF"}
+                  {settings.weeklyFeaturedEnabled ? "ON (Custom Ad Poster Mode)" : "OFF (User Videos Mode - Default)"}
                 </button>
               ) : (
                 <div className="flex items-center gap-1.5">

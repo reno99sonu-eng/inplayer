@@ -1,15 +1,6 @@
 import { GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 
-// One real row, one true source for every platform-wide toggle the Admin
-// Panel's Settings/AI Moderation/Advertising pages expose — a single
-// DynamoDB item (settingsId: "global") rather than one table per section,
-// since these are all small, related, admin-only config values read
-// together far more often than they're written. Every reader (public
-// pages, moderation call sites, ad banners) goes through
-// getPlatformSettings() below and gets DEFAULT_SETTINGS if the table or
-// row doesn't exist yet — same fail-open, "never break the real feature
-// over a missing config row" convention as the rest of this app.
 export const PLATFORM_SETTINGS_TABLE = "InPlayer-Platform-Settings";
 
 export type AdSlotSource = "house" | "adsense" | "off";
@@ -27,16 +18,9 @@ export interface PlatformSettings {
   adsensePublisherId: string;
   homepageBannerSource: AdSlotSource;
   watchPageBannerSource: AdSlotSource;
-  // A second, static homepage ad slot — same AdSlotSource/AdCreative
-  // machinery as the two above (see app/lib/adCreatives.ts's AdPlacement
-  // union, which now also includes "homepage_spotlight"), just a different
-  // spot on the page (see app/page.tsx).
   homepageSpotlightSource: AdSlotSource;
   weeklyFeaturedEnabled: boolean;
   midrollEnabled: boolean;
-  // How often (in seconds of watch time) a new mid-roll break can trigger.
-  // See app/components/VideoPlayer.tsx's onTimeUpdate handler for where
-  // this is actually consumed.
   midrollIntervalSeconds: number;
   updatedAt: string | null;
   updatedBy: string | null;
@@ -56,19 +40,13 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
   homepageBannerSource: "off",
   watchPageBannerSource: "off",
   homepageSpotlightSource: "off",
-  weeklyFeaturedEnabled: true,
+  weeklyFeaturedEnabled: false, // OFF by default
   midrollEnabled: false,
   midrollIntervalSeconds: 300,
   updatedAt: null,
   updatedBy: null,
 };
 
-// The only fields a signed-out visitor (or any non-admin page) is allowed
-// to see — deliberately excludes nothing sensitive today (adsensePublisherId
-// is meant to be public, it's embedded straight into page HTML for
-// AdSense to work at all), but kept as an explicit allowlist rather than
-// "return everything" so a future admin-only field doesn't leak by
-// accident.
 export type PublicPlatformSettings = Pick<
   PlatformSettings,
   | "maintenanceMode"
@@ -99,6 +77,28 @@ export async function getPlatformSettings(): Promise<PlatformSettings> {
   }
 }
 
+export async function updatePlatformSettings(
+  partial: Partial<PlatformSettings>,
+  updatedBy: string
+): Promise<PlatformSettings> {
+  const current = await getPlatformSettings();
+  const updated: PlatformSettings = {
+    ...current,
+    ...partial,
+    updatedAt: new Date().toISOString(),
+    updatedBy,
+  };
+
+  await docClient.send(
+    new PutCommand({
+      TableName: PLATFORM_SETTINGS_TABLE,
+      Item: { settingsId: "global", ...updated },
+    })
+  );
+
+  return updated;
+}
+
 export function toPublicSettings(settings: PlatformSettings): PublicPlatformSettings {
   return {
     maintenanceMode: settings.maintenanceMode,
@@ -111,36 +111,8 @@ export function toPublicSettings(settings: PlatformSettings): PublicPlatformSett
     homepageBannerSource: settings.homepageBannerSource,
     watchPageBannerSource: settings.watchPageBannerSource,
     homepageSpotlightSource: settings.homepageSpotlightSource,
-    weeklyFeaturedEnabled: settings.weeklyFeaturedEnabled !== false,
+    weeklyFeaturedEnabled: Boolean(settings.weeklyFeaturedEnabled),
     midrollEnabled: settings.midrollEnabled,
     midrollIntervalSeconds: settings.midrollIntervalSeconds,
   };
-}
-
-// Full-row overwrite rather than a partial UpdateExpression — there's
-// exactly one writer path (the admin Settings page, one admin account),
-// so there's no concurrent-write race to guard against, and always writing
-// the complete merged object means a reader can never see a half-updated
-// row.
-export async function updatePlatformSettings(
-  partial: Partial<PlatformSettings>,
-  updatedBy: string
-): Promise<PlatformSettings> {
-  const current = await getPlatformSettings();
-  const next: PlatformSettings = {
-    ...current,
-    ...partial,
-    settingsId: "global",
-    updatedAt: new Date().toISOString(),
-    updatedBy,
-  } as PlatformSettings;
-
-  await docClient.send(
-    new PutCommand({
-      TableName: PLATFORM_SETTINGS_TABLE,
-      Item: { settingsId: "global", ...next },
-    })
-  );
-
-  return next;
 }

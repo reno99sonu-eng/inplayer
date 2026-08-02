@@ -4,6 +4,54 @@ export interface GeneratedAiAd {
   imageUrl: string;
 }
 
+const SECTION_SPECIFIC_TITLES: Record<string, { titles: string[]; linkUrl: string }> = {
+  homepage: {
+    titles: [
+      "InPlayer Pro Pass — Watch 4K Originals & Ad-Free",
+      "Discover Top Trending Creators Across India",
+      "Stream Premieres Live in 1080p60 Low Latency",
+      "Join the Official InPlayer Creator Program",
+    ],
+    linkUrl: "https://inplayer.in/pro",
+  },
+  watch: {
+    titles: [
+      "Upgrade to InPlayer Ultra HD — No Playback Interruptions",
+      "Support Creator Channels Directly with Super Thanks",
+      "Stream Official Music Videos & Originals in HD",
+      "Unlock Member-Only Perks & Badge Flair",
+    ],
+    linkUrl: "https://inplayer.in/watch-pro",
+  },
+  weekly_featured: {
+    titles: [
+      "Weekly Featured Showcase — Top Rated Films of the Week",
+      "Curated Independent Filmmakers & Creators Spotlight",
+      "Weekly Blockbuster Premiere — Watch Exclusively Now",
+      "Official Weekly Festival Selection — InPlayer Originals",
+    ],
+    linkUrl: "https://inplayer.in/featured",
+  },
+  homepage_spotlight: {
+    titles: [
+      "InPlayer Shorts Arena — Discover Trending Clips Now",
+      "Live Gaming Arenas & Esports Tournament Stadium",
+      "Official Studio Releases & Exclusive Documentaries",
+      "Explore Short-Form Vertical Videos & Reels",
+    ],
+    linkUrl: "https://inplayer.in/shorts",
+  },
+  midroll: {
+    titles: [
+      "InPlayer Pro — Skip All Mid-Roll Ads Forever",
+      "Download Videos for Offline Playback on Mobile",
+      "Support Your Favorite Creators with Monthly Memberships",
+      "Enjoy Uninterrupted 4K Playback with InPlayer Pro",
+    ],
+    linkUrl: "https://inplayer.in/pro",
+  },
+};
+
 const THEMATIC_TITLES: Record<string, { titles: string[]; defaultLink: string }> = {
   vibrant_purple: {
     titles: [
@@ -48,8 +96,8 @@ const THEMATIC_TITLES: Record<string, { titles: string[]; defaultLink: string }>
 };
 
 export function generateAiTitle(placement: string): string {
-  const allThemes = Object.values(THEMATIC_TITLES).flatMap((t) => t.titles);
-  return allThemes[Math.floor(Math.random() * allThemes.length)];
+  const sectionConfig = SECTION_SPECIFIC_TITLES[placement] || SECTION_SPECIFIC_TITLES.homepage;
+  return sectionConfig.titles[Math.floor(Math.random() * sectionConfig.titles.length)];
 }
 
 // AI Image Vision & Color Analysis Engine — Analyzes uploaded poster pixels to generate highly accurate, matching titles
@@ -58,10 +106,12 @@ export function analyzeImageAndGenerateTitle(
   placement: string
 ): Promise<{ title: string; linkUrl: string }> {
   return new Promise((resolve) => {
+    const sectionConfig = SECTION_SPECIFIC_TITLES[placement] || SECTION_SPECIFIC_TITLES.homepage;
+
     if (!dataUrl || typeof window === "undefined") {
       resolve({
         title: generateAiTitle(placement),
-        linkUrl: "https://inplayer.in/pro",
+        linkUrl: sectionConfig.linkUrl,
       });
       return;
     }
@@ -75,7 +125,7 @@ export function analyzeImageAndGenerateTitle(
         const ctx = canvas.getContext("2d");
 
         if (!ctx) {
-          resolve({ title: generateAiTitle(placement), linkUrl: "https://inplayer.in/pro" });
+          resolve({ title: generateAiTitle(placement), linkUrl: sectionConfig.linkUrl });
           return;
         }
 
@@ -112,12 +162,12 @@ export function analyzeImageAndGenerateTitle(
         resolve({ title, linkUrl: theme.defaultLink });
       } catch (err) {
         console.error("Image analysis failed:", err);
-        resolve({ title: generateAiTitle(placement), linkUrl: "https://inplayer.in/pro" });
+        resolve({ title: generateAiTitle(placement), linkUrl: sectionConfig.linkUrl });
       }
     };
 
     img.onerror = () => {
-      resolve({ title: generateAiTitle(placement), linkUrl: "https://inplayer.in/pro" });
+      resolve({ title: generateAiTitle(placement), linkUrl: sectionConfig.linkUrl });
     };
 
     img.src = dataUrl;
@@ -125,10 +175,8 @@ export function analyzeImageAndGenerateTitle(
 }
 
 export function generateAiAdData(placement: "homepage" | "watch" | "homepage_spotlight" | "weekly_featured" | "midroll"): GeneratedAiAd {
-  const keys = Object.keys(THEMATIC_TITLES);
-  const themeKey = keys[Math.floor(Math.random() * keys.length)];
-  const theme = THEMATIC_TITLES[themeKey];
-  const title = theme.titles[Math.floor(Math.random() * theme.titles.length)];
+  const sectionConfig = SECTION_SPECIFIC_TITLES[placement] || SECTION_SPECIFIC_TITLES.homepage;
+  const title = sectionConfig.titles[Math.floor(Math.random() * sectionConfig.titles.length)];
 
   let width = 1200;
   let height = 375;
@@ -167,7 +215,7 @@ export function generateAiAdData(placement: "homepage" | "watch" | "homepage_spo
 
   return {
     title,
-    linkUrl: theme.defaultLink,
+    linkUrl: sectionConfig.linkUrl,
     imageUrl: dataUrl,
   };
 }

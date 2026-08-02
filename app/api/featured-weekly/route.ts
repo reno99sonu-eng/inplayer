@@ -7,15 +7,16 @@ import { AD_CREATIVES_TABLE } from "@/app/lib/adCreatives";
 
 export async function GET() {
   const settings = await getPlatformSettings();
-
-  // Weekly Featured is ON by default (enabled !== false)
-  if (settings.weeklyFeaturedEnabled === false) {
-    return NextResponse.json({ videos: [], banners: [], enabled: false });
-  }
-
   const defaultVideos = await getFeaturedThisWeek(6);
 
-  // Fetch active weekly_featured ad banners uploaded by Admin
+  // When Weekly Featured is OFF (default state):
+  // Show users' Weekly Featured content/videos!
+  if (!settings.weeklyFeaturedEnabled) {
+    return NextResponse.json({ videos: defaultVideos, banners: [], enabled: false });
+  }
+
+  // When Weekly Featured is ON (Admin Custom Poster mode):
+  // Swap the poster inside the Weekly Featured banner to the admin's uploaded ad posters!
   let adSlides: Record<string, unknown>[] = [];
   try {
     const result = await docClient.send(
@@ -42,8 +43,8 @@ export async function GET() {
     console.error("Failed to fetch weekly_featured ad banners:", err);
   }
 
-  // If admin uploaded custom weekly_featured ad posters, serve them in the Weekly Featured banner!
-  // Otherwise, fall back to featured weekly videos.
+  // If admin has uploaded custom weekly_featured ad posters, display them.
+  // Otherwise, fall back to featured weekly user videos so the section never disappears!
   const finalVideos = adSlides.length > 0 ? adSlides : defaultVideos;
 
   return NextResponse.json({ videos: finalVideos, banners: adSlides, enabled: true });

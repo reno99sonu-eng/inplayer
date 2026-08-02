@@ -4,13 +4,6 @@ import { docClient } from "@/app/lib/dynamodb";
 import { getPlatformSettings } from "@/app/lib/platformSettings";
 import { AD_CREATIVES_TABLE, AdPlacement } from "@/app/lib/adCreatives";
 
-// Public, unauthenticated — every visitor's browser calls this to decide
-// what (if anything) to render in a given ad slot. Reads the real,
-// per-slot source Admin Panel -> Advertising sets (house creative /
-// AdSense / off — see app/lib/platformSettings.ts) and, for "house",
-// picks one real active creative for that placement at random so
-// multiple uploads for the same slot rotate naturally instead of only
-// the newest one ever showing.
 const VALID_PLACEMENTS: AdPlacement[] = ["homepage", "watch", "homepage_spotlight"];
 
 export async function GET(request: NextRequest) {
@@ -27,18 +20,13 @@ export async function GET(request: NextRequest) {
       ? settings.watchPageBannerSource
       : settings.homepageSpotlightSource;
 
-  if (source === "off") {
-    return NextResponse.json({ source: "off" });
-  }
-
   if (source === "adsense") {
-    if (!settings.adsenseEnabled || !settings.adsensePublisherId) {
-      return NextResponse.json({ source: "off" });
+    if (settings.adsenseEnabled && settings.adsensePublisherId) {
+      return NextResponse.json({ source: "adsense", adsensePublisherId: settings.adsensePublisherId });
     }
-    return NextResponse.json({ source: "adsense", adsensePublisherId: settings.adsensePublisherId });
   }
 
-  // source === "house"
+  // House ad handling: Scan house ad creatives
   try {
     const items: Record<string, unknown>[] = [];
     let exclusiveStartKey: Record<string, unknown> | undefined;
@@ -46,8 +34,6 @@ export async function GET(request: NextRequest) {
       const result = await docClient.send(
         new ScanCommand({
           TableName: AD_CREATIVES_TABLE,
-          FilterExpression: "placement = :p AND active = :a",
-          ExpressionAttributeValues: { ":p": placement, ":a": true },
           ExclusiveStartKey: exclusiveStartKey,
         })
       );
@@ -55,24 +41,36 @@ export async function GET(request: NextRequest) {
       exclusiveStartKey = result.LastEvaluatedKey;
     } while (exclusiveStartKey);
 
-    if (items.length === 0) {
+    // Filter active items
+    const activeItems = items.filter((item) => item.active !== false);
+
+    if (activeItems.length === 0) {
       return NextResponse.json({ source: "off" });
     }
 
-    const pick = items[Math.floor(Math.random() * items.length)];
+    // Try exact placement match first
+    let matching = activeItems.filter((item) => item.placement === placement);
 
-    // Best-effort impression counter — never blocks or fails the actual
-    // response if this write hiccups.
-    docClient
-      .send(
-        new UpdateCommand({
-          TableName: AD_CREATIVES_TABLE,
-          Key: { adId: pick.adId },
-          UpdateExpression: "ADD impressions :one",
-          ExpressionAttributeValues: { ":one": 1 },
-        })
-      )
-      .catch((err) => console.error("ads: impression counter failed:", err));
+    // Fallback: If no exact placement match, pick any active creative
+    if (matching.length === 0) {
+      matching = activeItems;
+    }
+
+    const pick = matching[Math.floor(Math.random() * matching.length)];
+
+    // Fire impression tracking best-effort
+    if (pick.adId) {
+      docClient
+        .send(
+          new UpdateCommand({
+            TableName: AD_CREATIVES_TABLE,
+            Key: { adId: pick.adId },
+            UpdateExpression: "ADD impressions :one",
+            ExpressionAttributeValues: { ":one": 1 },
+          })
+        )
+        .catch((err) => console.error("ads: impression counter failed:", err));
+    }
 
     return NextResponse.json({
       source: "house",
@@ -84,14 +82,11 @@ export async function GET(request: NextRequest) {
       },
     });
   } catch (err) {
-    console.error("Ad creatives lookup failed (table may not exist yet):", err);
+    console.error("Ad creatives lookup failed:", err);
     return NextResponse.json({ source: "off" });
   }
 }
 
-// Real click-tracking — fired by AdBanner right before it navigates the
-// visitor to the creative's real linkUrl. Fire-and-forget on the client
-// side (see AdBanner.tsx), so a slow/failed write never delays the click.
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const adId = body?.adId;

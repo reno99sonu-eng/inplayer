@@ -3,58 +3,81 @@ import { ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { getPlatformSettings } from "@/app/lib/platformSettings";
 import { MIDROLL_ADS_TABLE, MIDROLL_SKIP_TIERS_SECONDS } from "@/app/lib/videoAds";
+import { AD_CREATIVES_TABLE } from "@/app/lib/adCreatives";
 
-// Public, unauthenticated — app/components/VideoPlayer.tsx calls this
-// once per mount to learn whether mid-roll breaks are on at all and, if
-// so, which creative to show when a break triggers. Same
-// "resolve-once-then-reuse" shape as AdBanner/api/ads, not fetched again
-// per break — a single video playback shows the same picked creative at
-// every break it triggers, which also keeps the impression counter
-// meaning "this creative was queued up for a viewer," same convention as
-// the homepage/watch banner's impression count.
 export async function GET() {
   const settings = await getPlatformSettings();
 
-  if (!settings.midrollEnabled) {
-    return NextResponse.json({ enabled: false });
-  }
-
   try {
+    // 1. Try dedicated Midroll ads table
     const items: Record<string, unknown>[] = [];
     let exclusiveStartKey: Record<string, unknown> | undefined;
     do {
-      const result = await docClient.send(
-        new ScanCommand({
-          TableName: MIDROLL_ADS_TABLE,
-          FilterExpression: "active = :a",
-          ExpressionAttributeValues: { ":a": true },
-          ExclusiveStartKey: exclusiveStartKey,
-        })
-      );
-      items.push(...((result.Items || []) as Record<string, unknown>[]));
-      exclusiveStartKey = result.LastEvaluatedKey;
+      const result = await docClient
+        .send(
+          new ScanCommand({
+            TableName: MIDROLL_ADS_TABLE,
+            ExclusiveStartKey: exclusiveStartKey,
+          })
+        )
+        .catch(() => null);
+
+      if (result?.Items) {
+        items.push(...(result.Items as Record<string, unknown>[]));
+      }
+      exclusiveStartKey = result?.LastEvaluatedKey;
     } while (exclusiveStartKey);
 
-    if (items.length === 0) {
+    let activeItems = items.filter((item) => item.active !== false);
+
+    // 2. Fallback: if no dedicated midroll items, query House Ad Creatives table
+    let isHouseFallback = false;
+    if (activeItems.length === 0) {
+      const houseItems: Record<string, unknown>[] = [];
+      let houseKey: Record<string, unknown> | undefined;
+      do {
+        const result = await docClient
+          .send(
+            new ScanCommand({
+              TableName: AD_CREATIVES_TABLE,
+              ExclusiveStartKey: houseKey,
+            })
+          )
+          .catch(() => null);
+
+        if (result?.Items) {
+          houseItems.push(...(result.Items as Record<string, unknown>[]));
+        }
+        houseKey = result?.LastEvaluatedKey;
+      } while (houseKey);
+
+      activeItems = houseItems.filter((item) => item.active !== false);
+      isHouseFallback = true;
+    }
+
+    if (activeItems.length === 0) {
       return NextResponse.json({ enabled: false });
     }
 
-    const pick = items[Math.floor(Math.random() * items.length)];
+    const pick = activeItems[Math.floor(Math.random() * activeItems.length)];
+    const targetTable = isHouseFallback ? AD_CREATIVES_TABLE : MIDROLL_ADS_TABLE;
 
-    docClient
-      .send(
-        new UpdateCommand({
-          TableName: MIDROLL_ADS_TABLE,
-          Key: { adId: pick.adId },
-          UpdateExpression: "ADD impressions :one",
-          ExpressionAttributeValues: { ":one": 1 },
-        })
-      )
-      .catch((err) => console.error("midroll-ads: impression counter failed:", err));
+    if (pick.adId) {
+      docClient
+        .send(
+          new UpdateCommand({
+            TableName: targetTable,
+            Key: { adId: pick.adId },
+            UpdateExpression: "ADD impressions :one",
+            ExpressionAttributeValues: { ":one": 1 },
+          })
+        )
+        .catch((err) => console.error("midroll-ads: impression counter failed:", err));
+    }
 
     return NextResponse.json({
       enabled: true,
-      intervalSeconds: settings.midrollIntervalSeconds,
+      intervalSeconds: settings.midrollIntervalSeconds || 180,
       skipTiersSeconds: MIDROLL_SKIP_TIERS_SECONDS,
       ad: {
         adId: pick.adId,
@@ -64,12 +87,11 @@ export async function GET() {
       },
     });
   } catch (err) {
-    console.error("Midroll ad lookup failed (table may not exist yet):", err);
+    console.error("Midroll ad lookup failed:", err);
     return NextResponse.json({ enabled: false });
   }
 }
 
-// Real click/skip tracking, fired by VideoPlayer's mid-roll overlay.
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const adId = body?.adId;
@@ -86,7 +108,17 @@ export async function POST(request: NextRequest) {
         UpdateExpression: `ADD ${kind === "click" ? "clicks" : "skips"} :one`,
         ExpressionAttributeValues: { ":one": 1 },
       })
-    );
+    ).catch(async () => {
+      // Best effort fallback to AD_CREATIVES_TABLE
+      await docClient.send(
+        new UpdateCommand({
+          TableName: AD_CREATIVES_TABLE,
+          Key: { adId },
+          UpdateExpression: `ADD ${kind === "click" ? "clicks" : "skips"} :one`,
+          ExpressionAttributeValues: { ":one": 1 },
+        })
+      );
+    });
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error("Midroll ad tracking failed:", err);

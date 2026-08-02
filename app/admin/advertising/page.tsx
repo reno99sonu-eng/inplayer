@@ -11,11 +11,8 @@ import {
   Trash2,
   Eye,
   MousePointerClick,
-  ImagePlus,
-  Search,
   Wand2,
   Sparkles,
-  LayoutGrid,
   Video,
   Home,
   Tv,
@@ -26,10 +23,9 @@ import {
   BarChart3,
   X,
   Crop,
-  Play,
 } from "lucide-react";
 import { compressImageToBanner, aiCropAndRedesignImage } from "@/app/lib/imageCompress";
-import { generateAiAdData, generateAiTitle } from "@/app/lib/aiAdGenerator";
+import { generateAiAdData, analyzeImageAndGenerateTitle } from "@/app/lib/aiAdGenerator";
 
 type AdSlotSource = "house" | "adsense" | "off";
 type Placement = "homepage" | "watch" | "homepage_spotlight" | "weekly_featured";
@@ -92,7 +88,7 @@ const DEFAULT_SETTINGS: AdSettings = {
   homepageBannerSource: "house",
   watchPageBannerSource: "house",
   homepageSpotlightSource: "off",
-  weeklyFeaturedEnabled: true,
+  weeklyFeaturedEnabled: true, // ON by default
   midrollEnabled: true,
   midrollIntervalSeconds: 900,
 };
@@ -107,12 +103,8 @@ export default function AdvertisingPage() {
 
   const [creatives, setCreatives] = useState<AdCreative[]>([]);
   const [creativesLoading, setCreativesLoading] = useState(true);
-  const [creativesError, setCreativesError] = useState<string | null>(null);
-  const [creativeQuery, setCreativeQuery] = useState("");
 
   const [midrollAds, setMidrollAds] = useState<MidrollAdCreative[]>([]);
-  const [midrollLoading, setMidrollLoading] = useState(true);
-  const [midrollError, setMidrollError] = useState<string | null>(null);
 
   // Banner Upload Form State
   const [uploadTitle, setUploadTitle] = useState("");
@@ -122,6 +114,7 @@ export default function AdvertisingPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [croppingAi, setCroppingAi] = useState(false);
+  const [generatingTitleAi, setGeneratingTitleAi] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Midroll Upload Form State
@@ -132,6 +125,7 @@ export default function AdvertisingPage() {
   const [midrollUploading, setMidrollUploading] = useState(false);
   const [midrollUploadError, setMidrollUploadError] = useState<string | null>(null);
   const [midrollCroppingAi, setMidrollCroppingAi] = useState(false);
+  const [midrollGeneratingTitleAi, setMidrollGeneratingTitleAi] = useState(false);
   const midrollFileInputRef = useRef<HTMLInputElement>(null);
 
   const loadSettings = async () => {
@@ -146,7 +140,7 @@ export default function AdvertisingPage() {
           homepageBannerSource: s.homepageBannerSource || "house",
           watchPageBannerSource: s.watchPageBannerSource || "house",
           homepageSpotlightSource: s.homepageSpotlightSource || "off",
-          weeklyFeaturedEnabled: s.weeklyFeaturedEnabled !== false,
+          weeklyFeaturedEnabled: s.weeklyFeaturedEnabled !== false, // ON by default
           midrollEnabled: Boolean(s.midrollEnabled),
           midrollIntervalSeconds: s.midrollIntervalSeconds || 900,
         });
@@ -165,32 +159,21 @@ export default function AdvertisingPage() {
     try {
       const res = await authedFetch("/api/admin/ads");
       const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-        setCreatives(data.items || []);
-      } else {
-        setCreativesError(data?.error || `Couldn't load ad creatives (HTTP ${res.status}).`);
-      }
-    } catch (err) {
-      setCreativesError(err instanceof Error ? err.message : "Something went wrong loading ad creatives.");
+      if (res.ok) setCreatives(data.items || []);
+    } catch {
+      // safe fallback
     } finally {
       setCreativesLoading(false);
     }
   };
 
   const loadMidrollAds = async () => {
-    setMidrollLoading(true);
     try {
       const res = await authedFetch("/api/admin/midroll-ads");
       const data = await res.json().catch(() => ({}));
-      if (res.ok) {
-        setMidrollAds(data.items || []);
-      } else {
-        setMidrollError(data?.error || `Couldn't load mid-roll creatives (HTTP ${res.status}).`);
-      }
-    } catch (err) {
-      setMidrollError(err instanceof Error ? err.message : "Something went wrong loading mid-roll creatives.");
-    } finally {
-      setMidrollLoading(false);
+      if (res.ok) setMidrollAds(data.items || []);
+    } catch {
+      // safe fallback
     }
   };
 
@@ -228,7 +211,7 @@ export default function AdvertisingPage() {
     }
   };
 
-  // Clear File Handler (X Button)
+  // Clear File Selection (X Button)
   const clearFileSelection = (isMidroll = false) => {
     if (isMidroll) {
       setMidrollPreview(null);
@@ -289,7 +272,30 @@ export default function AdvertisingPage() {
     }
   };
 
-  // AI Crop & Redesign Button Handler
+  // AI Title Generator — Vision-Assisted Analysis of Uploaded Image
+  const generateTitleWithAi = async (targetPlacement: string, isMidroll = false) => {
+    if (isMidroll) {
+      setMidrollGeneratingTitleAi(true);
+      try {
+        const res = await analyzeImageAndGenerateTitle(midrollPreview || "", targetPlacement);
+        setMidrollTitle(res.title);
+        if (!midrollLink) setMidrollLink(res.linkUrl);
+      } finally {
+        setMidrollGeneratingTitleAi(false);
+      }
+    } else {
+      setGeneratingTitleAi(true);
+      try {
+        const res = await analyzeImageAndGenerateTitle(uploadPreview || "", targetPlacement);
+        setUploadTitle(res.title);
+        if (!uploadLink) setUploadLink(res.linkUrl);
+      } finally {
+        setGeneratingTitleAi(false);
+      }
+    }
+  };
+
+  // AI Crop & Redesign Engine
   const handleAiCropAndRedesign = async (placement: Placement) => {
     if (!uploadPreview || uploadFileType === "video") return;
     setCroppingAi(true);
@@ -317,31 +323,31 @@ export default function AdvertisingPage() {
     }
   };
 
-  // AI Title Generator
-  const generateTitle = (targetPlacement: string, isMidroll = false) => {
-    const title = generateAiTitle(targetPlacement);
-    if (isMidroll) {
-      setMidrollTitle(title);
+  // Magic AI Full Auto-Generate
+  const generateMagicAiAd = async (placement: Placement) => {
+    if (uploadPreview) {
+      await generateTitleWithAi(placement, false);
+      await handleAiCropAndRedesign(placement);
     } else {
-      setUploadTitle(title);
+      const aiData = generateAiAdData(placement);
+      setUploadTitle(aiData.title);
+      setUploadLink(aiData.linkUrl);
+      setUploadPreview(aiData.imageUrl);
+      setUploadFileType("image");
     }
   };
 
-  // Magic AI Full Generator
-  const generateMagicAiAd = (placement: Placement) => {
-    const aiData = generateAiAdData(placement);
-    setUploadTitle(aiData.title);
-    setUploadLink(aiData.linkUrl);
-    setUploadPreview(aiData.imageUrl);
-    setUploadFileType("image");
-  };
-
-  const generateMagicAiMidroll = () => {
-    const aiData = generateAiAdData("midroll");
-    setMidrollTitle(aiData.title);
-    setMidrollLink(aiData.linkUrl);
-    setMidrollPreview(aiData.imageUrl);
-    setMidrollFileType("image");
+  const generateMagicAiMidroll = async () => {
+    if (midrollPreview) {
+      await generateTitleWithAi("midroll", true);
+      await handleAiCropMidroll();
+    } else {
+      const aiData = generateAiAdData("midroll");
+      setMidrollTitle(aiData.title);
+      setMidrollLink(aiData.linkUrl);
+      setMidrollPreview(aiData.imageUrl);
+      setMidrollFileType("image");
+    }
   };
 
   const canUploadBanner =
@@ -544,7 +550,7 @@ export default function AdvertisingPage() {
               {navItems.find((n) => n.id === activePanel)?.label}
             </h2>
             <p className="text-xs text-slate-400 light:text-slate-600">
-              Manage ad creatives, AI crops, titles, and live status for this panel.
+              Manage ad creatives, AI image vision crops, titles, and live status.
             </p>
           </div>
 
@@ -579,12 +585,11 @@ export default function AdvertisingPage() {
               <div className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4">
                 <span className="text-xs font-bold text-slate-400 light:text-slate-600">Weekly Featured Carousel</span>
                 <span className="block text-sm font-black text-emerald-400 light:text-emerald-700 mt-2">
-                  {settings.weeklyFeaturedEnabled !== false ? "✓ Active (ON)" : "Disabled"}
+                  {settings.weeklyFeaturedEnabled !== false ? "✓ Active (ON by default)" : "Disabled"}
                 </span>
               </div>
             </div>
 
-            {/* Quick Status Overview */}
             <div className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4 space-y-3">
               <h3 className="text-xs font-bold text-white light:text-slate-900">Current Slot Sources</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
@@ -601,8 +606,10 @@ export default function AdvertisingPage() {
                   <span className="font-bold text-white light:text-slate-900 uppercase">{settings.homepageSpotlightSource}</span>
                 </div>
                 <div className="flex justify-between p-2 rounded-xl bg-white/5 light:bg-black/5">
-                  <span className="text-slate-400 light:text-slate-700">Video Mid-Roll Ads:</span>
-                  <span className="font-bold text-white light:text-slate-900">{settings.midrollEnabled ? "ON" : "OFF"}</span>
+                  <span className="text-slate-400 light:text-slate-700">Weekly Featured Carousel:</span>
+                  <span className="font-bold text-emerald-400 light:text-emerald-700">
+                    {settings.weeklyFeaturedEnabled !== false ? "ON" : "OFF"}
+                  </span>
                 </div>
               </div>
             </div>
@@ -615,14 +622,15 @@ export default function AdvertisingPage() {
           activePanel === "weekly_featured" ||
           activePanel === "homepage_spotlight") && (
           <div className="space-y-4">
-            {/* Slot Control Card */}
             <div className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <span className="text-xs font-bold text-white light:text-slate-900 block">
-                  {PLACEMENT_LABELS[activePanel as Placement]} Source
+                  {PLACEMENT_LABELS[activePanel as Placement]} Status
                 </span>
                 <span className="text-[11px] text-slate-400 light:text-slate-600">
-                  Select how this slot delivers ads to viewers across InPlayer.
+                  {activePanel === "weekly_featured"
+                    ? "Weekly Featured Hero Carousel is ON by default."
+                    : "Select how this slot delivers ads to viewers across InPlayer."}
                 </span>
               </div>
               {activePanel === "weekly_featured" ? (
@@ -638,7 +646,7 @@ export default function AdvertisingPage() {
                       : "bg-white/5 text-slate-400 light:bg-black/5"
                   }`}
                 >
-                  {settings.weeklyFeaturedEnabled !== false ? "ON" : "OFF"}
+                  {settings.weeklyFeaturedEnabled !== false ? "ON (Active)" : "OFF"}
                 </button>
               ) : (
                 <div className="flex items-center gap-1.5">
@@ -676,22 +684,24 @@ export default function AdvertisingPage() {
                 <button
                   type="button"
                   onClick={() => generateMagicAiAd(activePanel as Placement)}
-                  className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-500 to-pink-500 px-3 py-1 text-[11px] font-bold text-white shadow-sm transition hover:opacity-90"
+                  className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-500 to-pink-500 px-3.5 py-1 text-[11px] font-bold text-white shadow-sm transition hover:opacity-90 cursor-pointer"
                 >
-                  <Sparkles size={13} /> Magic AI Full Auto-Generate
+                  <Sparkles size={13} /> Magic AI Auto-Generate
                 </button>
               </div>
 
-              {/* Title & AI Title Button */}
+              {/* Title & Prominent High-Contrast AI Title Button */}
               <div>
-                <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center justify-between mb-1.5">
                   <label className="text-[11px] font-semibold text-slate-400 light:text-slate-600">Ad Title</label>
                   <button
                     type="button"
-                    onClick={() => generateTitle(activePanel, false)}
-                    className="flex items-center gap-1 text-[10px] font-bold text-indigo-400 hover:text-indigo-300"
+                    onClick={() => generateTitleWithAi(activePanel, false)}
+                    disabled={generatingTitleAi}
+                    className="flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white font-bold text-[11px] px-3 py-1 shadow-md hover:opacity-90 transition cursor-pointer light:from-indigo-600 light:to-purple-700 disabled:opacity-50"
                   >
-                    <Wand2 size={11} /> Generate Title with AI
+                    {generatingTitleAi ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />}
+                    Generate Title with AI
                   </button>
                 </div>
                 <input
@@ -727,10 +737,10 @@ export default function AdvertisingPage() {
                 />
               </div>
 
-              {/* File Preview + Remove (X Button) + AI Crop & Redesign Button */}
+              {/* File Preview + X Remove Button + AI Crop & Redesign Button */}
               {uploadPreview && (
                 <div className="space-y-2">
-                  <div className="relative rounded-xl border border-white/10 light:border-black/10 overflow-hidden bg-black/40 max-h-48 flex items-center justify-center">
+                  <div className="relative rounded-xl border border-white/10 light:border-black/10 overflow-hidden bg-black/40 max-h-48 flex items-center justify-center p-1">
                     {uploadFileType === "video" ? (
                       <video src={uploadPreview} controls className="max-h-44 w-auto rounded-lg" />
                     ) : (
@@ -742,7 +752,7 @@ export default function AdvertisingPage() {
                     <button
                       type="button"
                       onClick={() => clearFileSelection(false)}
-                      className="absolute top-2 right-2 rounded-full bg-red-600/90 text-white p-1 shadow-md hover:bg-red-500 transition"
+                      className="absolute top-2 right-2 rounded-full bg-red-600 text-white p-1 shadow-md hover:bg-red-500 transition cursor-pointer"
                       title="Remove / Clear selected file"
                     >
                       <X size={14} />
@@ -759,7 +769,7 @@ export default function AdvertisingPage() {
                       type="button"
                       onClick={() => handleAiCropAndRedesign(activePanel as Placement)}
                       disabled={croppingAi}
-                      className="flex items-center gap-1.5 rounded-xl bg-purple-600/30 border border-purple-500/30 px-3 py-1.5 text-xs font-bold text-purple-300 light:text-purple-900 hover:bg-purple-600/40 transition disabled:opacity-50"
+                      className="flex items-center gap-1.5 rounded-xl bg-purple-600/30 border border-purple-500/40 px-3 py-1.5 text-xs font-bold text-purple-300 light:text-purple-900 hover:bg-purple-600/40 transition disabled:opacity-50 cursor-pointer"
                     >
                       {croppingAi ? <Loader2 size={13} className="animate-spin" /> : <Crop size={13} />}
                       Crop & Redesign with AI
@@ -778,13 +788,13 @@ export default function AdvertisingPage() {
                 type="button"
                 onClick={() => submitCreative(activePanel as Placement)}
                 disabled={!canUploadBanner || uploading}
-                className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-50"
+                className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-50 cursor-pointer"
               >
                 {uploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />} Publish Creative
               </button>
             </div>
 
-            {/* List of Existing Creatives for this Placement */}
+            {/* List of Existing Creatives */}
             <div className="space-y-2">
               <h3 className="text-xs font-bold text-white light:text-slate-900">
                 Active Creatives ({creatives.filter((c) => c.placement === activePanel).length})
@@ -865,21 +875,23 @@ export default function AdvertisingPage() {
                 <button
                   type="button"
                   onClick={generateMagicAiMidroll}
-                  className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-500 to-pink-500 px-3 py-1 text-[11px] font-bold text-white shadow-sm transition hover:opacity-90"
+                  className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-500 to-pink-500 px-3.5 py-1 text-[11px] font-bold text-white shadow-sm transition hover:opacity-90 cursor-pointer"
                 >
                   <Sparkles size={13} /> Magic AI Mid-Roll Generator
                 </button>
               </div>
 
               <div>
-                <div className="flex items-center justify-between mb-1">
+                <div className="flex items-center justify-between mb-1.5">
                   <label className="text-[11px] font-semibold text-slate-400 light:text-slate-600">Ad Title</label>
                   <button
                     type="button"
-                    onClick={() => generateTitle("midroll", true)}
-                    className="flex items-center gap-1 text-[10px] font-bold text-indigo-400 hover:text-indigo-300"
+                    onClick={() => generateTitleWithAi("midroll", true)}
+                    disabled={midrollGeneratingTitleAi}
+                    className="flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white font-bold text-[11px] px-3 py-1 shadow-md hover:opacity-90 transition cursor-pointer light:from-indigo-600 light:to-purple-700 disabled:opacity-50"
                   >
-                    <Wand2 size={11} /> Generate Title with AI
+                    {midrollGeneratingTitleAi ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />}
+                    Generate Title with AI
                   </button>
                 </div>
                 <input
@@ -915,7 +927,7 @@ export default function AdvertisingPage() {
 
               {midrollPreview && (
                 <div className="space-y-2">
-                  <div className="relative rounded-xl border border-white/10 light:border-black/10 overflow-hidden bg-black/40 max-h-48 flex items-center justify-center">
+                  <div className="relative rounded-xl border border-white/10 light:border-black/10 overflow-hidden bg-black/40 max-h-48 flex items-center justify-center p-1">
                     {midrollFileType === "video" ? (
                       <video src={midrollPreview} controls className="max-h-44 w-auto rounded-lg" />
                     ) : (
@@ -927,7 +939,7 @@ export default function AdvertisingPage() {
                     <button
                       type="button"
                       onClick={() => clearFileSelection(true)}
-                      className="absolute top-2 right-2 rounded-full bg-red-600/90 text-white p-1 shadow-md hover:bg-red-500 transition"
+                      className="absolute top-2 right-2 rounded-full bg-red-600 text-white p-1 shadow-md hover:bg-red-500 transition cursor-pointer"
                       title="Remove / Clear selected file"
                     >
                       <X size={14} />
@@ -939,7 +951,7 @@ export default function AdvertisingPage() {
                       type="button"
                       onClick={handleAiCropMidroll}
                       disabled={midrollCroppingAi}
-                      className="flex items-center gap-1.5 rounded-xl bg-purple-600/30 border border-purple-500/30 px-3 py-1.5 text-xs font-bold text-purple-300 light:text-purple-900 hover:bg-purple-600/40 transition disabled:opacity-50"
+                      className="flex items-center gap-1.5 rounded-xl bg-purple-600/30 border border-purple-500/40 px-3 py-1.5 text-xs font-bold text-purple-300 light:text-purple-900 hover:bg-purple-600/40 transition disabled:opacity-50 cursor-pointer"
                     >
                       {midrollCroppingAi ? <Loader2 size={13} className="animate-spin" /> : <Crop size={13} />}
                       Crop & Redesign with AI
@@ -958,7 +970,7 @@ export default function AdvertisingPage() {
                 type="button"
                 onClick={submitMidrollAd}
                 disabled={!canUploadMidroll || midrollUploading}
-                className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-50"
+                className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-50 cursor-pointer"
               >
                 {midrollUploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />} Save Mid-Roll Ad
               </button>
@@ -1023,7 +1035,7 @@ export default function AdvertisingPage() {
                 type="button"
                 onClick={saveSettings}
                 disabled={saving}
-                className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-50"
+                className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-50 cursor-pointer"
               >
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save AdSense Config
               </button>

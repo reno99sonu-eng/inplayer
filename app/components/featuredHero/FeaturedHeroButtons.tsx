@@ -1,14 +1,58 @@
 "use client";
 
 import Link from "next/link";
-import { Play, Plus, Info } from "lucide-react";
+import { Play, Plus, Info, ExternalLink } from "lucide-react";
 
 interface FeaturedHeroButtonsProps {
   videoId: string;
   uploaderUsername: string | null;
+  linkUrl?: string;
 }
 
-export default function FeaturedHeroButtons({ videoId }: FeaturedHeroButtonsProps) {
+export default function FeaturedHeroButtons({ videoId, linkUrl }: FeaturedHeroButtonsProps) {
+  const isExternalAd = Boolean(linkUrl || videoId?.startsWith("http://") || videoId?.startsWith("https://"));
+  const destination = linkUrl || (isExternalAd ? videoId : `/watch/${videoId}`);
+
+  if (isExternalAd) {
+    return (
+      <div className="flex flex-nowrap items-center gap-1.5 sm:gap-2 overflow-x-auto max-w-full no-scrollbar">
+        <a
+          href={destination}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="
+            flex
+            h-7
+            sm:h-9
+            flex-shrink-0
+            items-center
+            gap-1
+            sm:gap-1.5
+            whitespace-nowrap
+            rounded-full
+            bg-gradient-to-r
+            from-orange-500
+            via-amber-400
+            to-yellow-300
+            px-3
+            sm:px-4
+            text-[11px]
+            sm:text-xs
+            font-extrabold
+            text-slate-900
+            shadow-[0_4px_12px_rgba(249,115,22,.30)]
+            transition-all
+            duration-200
+            hover:opacity-95
+          "
+        >
+          <ExternalLink size={12} />
+          Explore Now
+        </a>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-nowrap items-center gap-1.5 sm:gap-2 overflow-x-auto max-w-full no-scrollbar">
       {/* Watch Now */}
@@ -77,7 +121,7 @@ export default function FeaturedHeroButtons({ videoId }: FeaturedHeroButtonsProp
         Watchlist
       </button>
 
-      {/* Details opens the video's dedicated details page */}
+      {/* Details */}
       <Link
         href={`/watch/${videoId}/details`}
         className="
@@ -102,7 +146,7 @@ export default function FeaturedHeroButtons({ videoId }: FeaturedHeroButtonsProp
           backdrop-blur-md
           transition-all
           duration-200
-          hover:border-cyan-400/40
+          hover:border-orange-400/40
           hover:bg-white/15
         "
       >

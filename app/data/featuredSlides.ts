@@ -1,7 +1,6 @@
 // Real data only — see app/components/featuredHero/FeaturedHero.tsx,
 // which fetches these from /api/featured-weekly (backed by
-// app/lib/trendingStore). No example/dummy slides live in this file
-// anymore.
+// app/lib/trendingStore).
 export interface FeaturedSlide {
   videoId: string;
   title: string;
@@ -10,4 +9,5 @@ export interface FeaturedSlide {
   uploaderAvatarUrl: string | null;
   thumbnailUrl: string | null;
   windowViews: number;
+  linkUrl?: string;
 }

@@ -100,9 +100,13 @@ export default function FeaturedHeroContent({
         </span>
       </div>
 
-      {/* Buttons */}
-      <div className="mt-1.5 sm:mt-3">
-        <FeaturedHeroButtons videoId={slide.videoId} uploaderUsername={slide.uploaderUsername} />
+      {/* Action Buttons */}
+      <div className="mt-2 w-full">
+        <FeaturedHeroButtons
+          videoId={slide.videoId}
+          uploaderUsername={slide.uploaderUsername}
+          linkUrl={slide.linkUrl}
+        />
       </div>
     </div>
   );

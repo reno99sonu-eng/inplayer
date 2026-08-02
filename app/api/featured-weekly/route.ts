@@ -8,14 +8,15 @@ import { AD_CREATIVES_TABLE } from "@/app/lib/adCreatives";
 export async function GET() {
   const settings = await getPlatformSettings();
 
+  // Weekly Featured is ON by default (enabled !== false)
   if (settings.weeklyFeaturedEnabled === false) {
     return NextResponse.json({ videos: [], banners: [], enabled: false });
   }
 
-  const videos = await getFeaturedThisWeek(6);
+  const defaultVideos = await getFeaturedThisWeek(6);
 
-  // Fetch active weekly_featured ad banners if uploaded
-  let banners: Record<string, unknown>[] = [];
+  // Fetch active weekly_featured ad banners uploaded by Admin
+  let adSlides: Record<string, unknown>[] = [];
   try {
     const result = await docClient.send(
       new ScanCommand({
@@ -24,12 +25,26 @@ export async function GET() {
         ExpressionAttributeValues: { ":p": "weekly_featured", ":act": true },
       })
     ).catch(() => null);
-    if (result?.Items) {
-      banners = result.Items as Record<string, unknown>[];
+
+    if (result?.Items && result.Items.length > 0) {
+      adSlides = (result.Items as Record<string, unknown>[]).map((b) => ({
+        videoId: (b.linkUrl as string) || (b.adId as string),
+        title: (b.title as string) || "Weekly Featured Banner",
+        uploaderName: "Featured Sponsor",
+        uploaderUsername: "sponsor",
+        uploaderAvatarUrl: null,
+        thumbnailUrl: b.imageUrl as string,
+        windowViews: (b.impressions as number) || 0,
+        linkUrl: b.linkUrl as string,
+      }));
     }
   } catch (err) {
     console.error("Failed to fetch weekly_featured ad banners:", err);
   }
 
-  return NextResponse.json({ videos, banners, enabled: true });
+  // If admin uploaded custom weekly_featured ad posters, serve them in the Weekly Featured banner!
+  // Otherwise, fall back to featured weekly videos.
+  const finalVideos = adSlides.length > 0 ? adSlides : defaultVideos;
+
+  return NextResponse.json({ videos: finalVideos, banners: adSlides, enabled: true });
 }

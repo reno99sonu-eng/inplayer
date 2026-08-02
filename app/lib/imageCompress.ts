@@ -265,7 +265,8 @@ export function compressDataUrlToBanner(
   });
 }
 
-// AI Crop & Redesign Engine — Crops an image to target aspect ratio with visual filter enhancements
+// AI Crop Engine — Intelligently center-crops the image to the exact target aspect ratio
+// with vibrant color enhancement and ZERO darkening or dark vignette overlays!
 export function aiCropAndRedesignImage(
   dataUrl: string,
   aspectRatio = 3.2,
@@ -297,18 +298,11 @@ export function aiCropAndRedesignImage(
         const ctx = canvas.getContext("2d");
         if (!ctx) throw new Error("Canvas is not supported in this browser.");
 
-        ctx.filter = "contrast(1.12) saturate(1.2) brightness(1.02)";
+        // Clear, vibrant filter without any darkening vignette overlay!
+        ctx.filter = "brightness(1.03) contrast(1.05) saturate(1.08)";
         ctx.drawImage(img, cropX, cropY, cropWidth, cropHeight, 0, 0, outWidth, outHeight);
 
-        ctx.filter = "none";
-
-        const vignette = ctx.createLinearGradient(0, outHeight * 0.4, 0, outHeight);
-        vignette.addColorStop(0, "rgba(0,0,0,0)");
-        vignette.addColorStop(1, "rgba(0,0,0,0.45)");
-        ctx.fillStyle = vignette;
-        ctx.fillRect(0, 0, outWidth, outHeight);
-
-        resolve(canvas.toDataURL("image/jpeg", 0.9));
+        resolve(canvas.toDataURL("image/jpeg", 0.92));
       } catch (err) {
         reject(err instanceof Error ? err : new Error("Couldn't process AI crop & redesign."));
       }

@@ -9,43 +9,43 @@ export async function GET() {
   const settings = await getPlatformSettings();
   const defaultVideos = await getFeaturedThisWeek(6);
 
-  // When Weekly Featured is OFF (default state):
-  // Show users' Weekly Featured content/videos!
-  if (!settings.weeklyFeaturedEnabled) {
-    return NextResponse.json({ videos: defaultVideos, banners: [], enabled: false });
-  }
-
-  // When Weekly Featured is ON (Admin Custom Poster mode):
-  // Swap the poster inside the Weekly Featured banner to the admin's uploaded ad posters!
+  // Scan all items from AD_CREATIVES_TABLE (without filter expressions that might fail on attribute type mismatches)
   let adSlides: Record<string, unknown>[] = [];
   try {
     const result = await docClient.send(
       new ScanCommand({
         TableName: AD_CREATIVES_TABLE,
-        FilterExpression: "placement = :p AND active = :act",
-        ExpressionAttributeValues: { ":p": "weekly_featured", ":act": true },
       })
     ).catch(() => null);
 
-    if (result?.Items && result.Items.length > 0) {
-      adSlides = (result.Items as Record<string, unknown>[]).map((b) => ({
-        videoId: (b.linkUrl as string) || (b.adId as string),
-        title: (b.title as string) || "Weekly Featured Banner",
-        uploaderName: "Featured Sponsor",
-        uploaderUsername: "sponsor",
-        uploaderAvatarUrl: null,
-        thumbnailUrl: b.imageUrl as string,
-        windowViews: (b.impressions as number) || 0,
-        linkUrl: b.linkUrl as string,
-      }));
+    if (result?.Items && Array.isArray(result.Items)) {
+      const matching = result.Items.filter(
+        (b) => b && b.placement === "weekly_featured" && b.active !== false && Boolean(b.imageUrl)
+      );
+
+      if (matching.length > 0) {
+        adSlides = matching.map((b) => ({
+          videoId: String(b.linkUrl || b.adId || "ad"),
+          title: String(b.title || "Weekly Featured Sponsor"),
+          uploaderName: "Featured Sponsor",
+          uploaderUsername: "sponsor",
+          uploaderAvatarUrl: null,
+          thumbnailUrl: String(b.imageUrl || ""),
+          windowViews: Number(b.impressions || 0),
+          linkUrl: String(b.linkUrl || ""),
+        }));
+      }
     }
   } catch (err) {
     console.error("Failed to fetch weekly_featured ad banners:", err);
   }
 
-  // If admin has uploaded custom weekly_featured ad posters, display them.
-  // Otherwise, fall back to featured weekly user videos so the section never disappears!
-  const finalVideos = adSlides.length > 0 ? adSlides : defaultVideos;
+  // When Weekly Featured is ON (weeklyFeaturedEnabled === true) OR if custom admin posters exist:
+  // Return the admin's uploaded custom ad posters!
+  if (settings.weeklyFeaturedEnabled && adSlides.length > 0) {
+    return NextResponse.json({ videos: adSlides, banners: adSlides, enabled: true });
+  }
 
-  return NextResponse.json({ videos: finalVideos, banners: adSlides, enabled: true });
+  // If Weekly Featured is OFF (or no admin poster uploaded), return users' Weekly Featured content!
+  return NextResponse.json({ videos: defaultVideos, banners: adSlides, enabled: false });
 }

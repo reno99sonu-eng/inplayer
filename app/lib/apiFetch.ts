@@ -1,28 +1,45 @@
 import { fetchAuthSession } from "aws-amplify/auth";
 import { getStoredSessionId } from "@/app/lib/sessionClient";
 
-// The one shared "call an authenticated InPlayer API route" helper —
-// attaches both the real Cognito ID token (Authorization) and this
-// device's own session id (X-Session-Id, see app/lib/sessionClient.ts and
-// app/lib/sessions.ts) so a "Log out this device" click in Settings >
-// Privacy (or an admin forcing a device to log out) actually takes effect
-// on this device's very next call through here — not just a label change
-// in some list. Throws with a friendly message if there's no signed-in
-// session at all, exactly like every page's previous hand-rolled version
-// of this function did.
+// The shared "call an authenticated InPlayer API route" helper.
+// Attaches Cognito ID token (Authorization) and session id (X-Session-Id).
+// GUARANTEE: Never throws uncaught exceptions. If unauthenticated or token
+// is missing/refreshing, returns an HTTP 401 Response object so components
+// handle errors in-place without crashing the React component tree into
+// Next.js Error Boundaries.
 export async function authedFetch(path: string, options: RequestInit = {}): Promise<Response> {
-  const session = await fetchAuthSession();
-  const idToken = session.tokens?.idToken?.toString();
-  if (!idToken) throw new Error("Session expired — please sign in again.");
+  try {
+    let session = await fetchAuthSession().catch(() => null);
+    let idToken = session?.tokens?.idToken?.toString();
 
-  const sessionId = getStoredSessionId();
+    if (!idToken) {
+      // Retry with forceRefresh once if initial session fetch returned no token
+      session = await fetchAuthSession({ forceRefresh: true }).catch(() => null);
+      idToken = session?.tokens?.idToken?.toString();
+    }
 
-  return fetch(path, {
-    ...options,
-    headers: {
-      ...(options.headers || {}),
-      Authorization: `Bearer ${idToken}`,
-      ...(sessionId ? { "X-Session-Id": sessionId } : {}),
-    },
-  });
+    if (!idToken) {
+      return new Response(
+        JSON.stringify({ error: "Session expired — please sign in again." }),
+        { status: 401, headers: { "Content-Type": "application/json" } }
+      );
+    }
+
+    const sessionId = getStoredSessionId();
+
+    return await fetch(path, {
+      ...options,
+      headers: {
+        ...(options.headers || {}),
+        Authorization: `Bearer ${idToken}`,
+        ...(sessionId ? { "X-Session-Id": sessionId } : {}),
+      },
+    });
+  } catch (err) {
+    console.error("authedFetch error:", err);
+    return new Response(
+      JSON.stringify({ error: err instanceof Error ? err.message : "Network error" }),
+      { status: 500, headers: { "Content-Type": "application/json" } }
+    );
+  }
 }

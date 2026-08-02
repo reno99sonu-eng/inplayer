@@ -45,8 +45,12 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
       }
 
       try {
-        const session = await fetchAuthSession().catch(() => null);
-        const idToken = session?.tokens?.idToken?.toString();
+        let session = await fetchAuthSession().catch(() => null);
+        let idToken = session?.tokens?.idToken?.toString();
+        if (!idToken) {
+          session = await fetchAuthSession({ forceRefresh: true }).catch(() => null);
+          idToken = session?.tokens?.idToken?.toString();
+        }
         if (!idToken) {
           if (!cancelled) {
             setIsAdmin(false);

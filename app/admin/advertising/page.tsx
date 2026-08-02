@@ -121,9 +121,9 @@ export default function AdvertisingPage() {
     if (!q) return creatives;
     return creatives.filter(
       (ad) =>
-        ad.title.toLowerCase().includes(q) ||
-        ad.adId.toLowerCase().includes(q) ||
-        ad.placement.toLowerCase().includes(q)
+        (ad.title || "").toLowerCase().includes(q) ||
+        (ad.adId || "").toLowerCase().includes(q) ||
+        (ad.placement || "").toLowerCase().includes(q)
     );
   }, [creatives, creativeQuery]);
 
@@ -740,10 +740,10 @@ export default function AdvertisingPage() {
                 </div>
                 <div className="mt-1 flex items-center gap-3 text-xs text-slate-500">
                   <span className="flex items-center gap-1">
-                    <Eye size={12} /> {ad.impressions.toLocaleString("en-IN")}
+                    <Eye size={12} /> {Number(ad.impressions || 0).toLocaleString("en-IN")}
                   </span>
                   <span className="flex items-center gap-1">
-                    <MousePointerClick size={12} /> {ad.clicks.toLocaleString("en-IN")}
+                    <MousePointerClick size={12} /> {Number(ad.clicks || 0).toLocaleString("en-IN")}
                   </span>
                 </div>
                 <div className="mt-3 flex items-center gap-2">
@@ -881,12 +881,12 @@ export default function AdvertisingPage() {
                 <p className="mt-2 truncate text-sm font-bold text-white light:text-slate-900">{ad.title}</p>
                 <div className="mt-1 flex items-center gap-3 text-xs text-slate-500">
                   <span className="flex items-center gap-1">
-                    <Eye size={12} /> {ad.impressions.toLocaleString("en-IN")}
+                    <Eye size={12} /> {Number(ad.impressions || 0).toLocaleString("en-IN")}
                   </span>
                   <span className="flex items-center gap-1">
-                    <MousePointerClick size={12} /> {ad.clicks.toLocaleString("en-IN")}
+                    <MousePointerClick size={12} /> {Number(ad.clicks || 0).toLocaleString("en-IN")}
                   </span>
-                  <span className="flex items-center gap-1">Skipped {ad.skips.toLocaleString("en-IN")}</span>
+                  <span className="flex items-center gap-1">Skipped {Number(ad.skips || 0).toLocaleString("en-IN")}</span>
                 </div>
                 <div className="mt-3 flex items-center gap-2">
                   <button

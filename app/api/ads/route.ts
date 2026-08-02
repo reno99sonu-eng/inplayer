@@ -26,7 +26,6 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  // House ad handling: Scan house ad creatives
   try {
     const items: Record<string, unknown>[] = [];
     let exclusiveStartKey: Record<string, unknown> | undefined;
@@ -41,45 +40,28 @@ export async function GET(request: NextRequest) {
       exclusiveStartKey = result.LastEvaluatedKey;
     } while (exclusiveStartKey);
 
-    // Filter active items
     const activeItems = items.filter((item) => item.active !== false);
 
     if (activeItems.length === 0) {
       return NextResponse.json({ source: "off" });
     }
 
-    // Try exact placement match first
     let matching = activeItems.filter((item) => item.placement === placement);
-
-    // Fallback: If no exact placement match, pick any active creative
     if (matching.length === 0) {
       matching = activeItems;
     }
 
-    const pick = matching[Math.floor(Math.random() * matching.length)];
-
-    // Fire impression tracking best-effort
-    if (pick.adId) {
-      docClient
-        .send(
-          new UpdateCommand({
-            TableName: AD_CREATIVES_TABLE,
-            Key: { adId: pick.adId },
-            UpdateExpression: "ADD impressions :one",
-            ExpressionAttributeValues: { ":one": 1 },
-          })
-        )
-        .catch((err) => console.error("ads: impression counter failed:", err));
-    }
+    const formattedCreatives = matching.map((pick) => ({
+      adId: String(pick.adId),
+      imageUrl: String(pick.imageUrl || ""),
+      linkUrl: String(pick.linkUrl || "#"),
+      title: String(pick.title || "Advertisement"),
+    }));
 
     return NextResponse.json({
       source: "house",
-      creative: {
-        adId: pick.adId,
-        imageUrl: pick.imageUrl,
-        linkUrl: pick.linkUrl,
-        title: pick.title,
-      },
+      creatives: formattedCreatives,
+      creative: formattedCreatives[0],
     });
   } catch (err) {
     console.error("Ad creatives lookup failed:", err);

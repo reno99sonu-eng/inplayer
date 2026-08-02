@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { getFeaturedThisWeek } from "@/app/lib/trendingStore";
+import { getPlatformSettings } from "@/app/lib/platformSettings";
 
-// Real "most-viewed over the trailing 7 days" videos, ranked from
-// InPlayer-Video-Daily-Views (see app/lib/trendingStore) — no dummy/
-// example slides. Recomputed on every request from a rolling window, so
-// the lineup naturally shifts day to day rather than only flipping once a
-// week. An empty `videos` array is a real, expected state and the
-// frontend renders an honest empty state for it.
 export async function GET() {
+  const settings = await getPlatformSettings();
+
+  if (settings.weeklyFeaturedEnabled === false) {
+    return NextResponse.json({ videos: [], enabled: false });
+  }
+
   const videos = await getFeaturedThisWeek(6);
-  return NextResponse.json({ videos });
+  return NextResponse.json({ videos, enabled: true });
 }

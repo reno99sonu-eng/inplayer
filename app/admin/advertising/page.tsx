@@ -32,6 +32,7 @@ interface AdSettings {
   homepageBannerSource: AdSlotSource;
   watchPageBannerSource: AdSlotSource;
   homepageSpotlightSource: AdSlotSource;
+  weeklyFeaturedEnabled: boolean;
   midrollEnabled: boolean;
   midrollIntervalSeconds: number;
 }
@@ -134,6 +135,7 @@ export default function AdvertisingPage() {
         homepageBannerSource: data.settings.homepageBannerSource || "off",
         watchPageBannerSource: data.settings.watchPageBannerSource || "off",
         homepageSpotlightSource: data.settings.homepageSpotlightSource || "off",
+        weeklyFeaturedEnabled: data.settings.weeklyFeaturedEnabled !== false,
         midrollEnabled: Boolean(data.settings.midrollEnabled),
         midrollIntervalSeconds: data.settings.midrollIntervalSeconds || 300,
       });
@@ -221,10 +223,20 @@ export default function AdvertisingPage() {
     if (!file) return;
     setUploadError(null);
     try {
-      const compressed = await compressImageToBanner(file);
-      setUploadPreview(compressed);
+      if (file.type.startsWith("video/")) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          if (typeof event.target?.result === "string") {
+            setUploadPreview(event.target.result);
+          }
+        };
+        reader.readAsDataURL(file);
+      } else {
+        const compressed = await compressImageToBanner(file);
+        setUploadPreview(compressed);
+      }
     } catch (err) {
-      setUploadError(err instanceof Error ? err.message : "Couldn't process that image.");
+      setUploadError(err instanceof Error ? err.message : "Couldn't process that file.");
     }
   };
 
@@ -423,6 +435,46 @@ export default function AdvertisingPage() {
           </div>
         </div>
 
+        {/* Weekly Featured Banner Toggle */}
+        <div className="rounded-3xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-5">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <span className="text-sm font-bold text-white light:text-slate-900">
+                Weekly Featured Banner
+              </span>
+              <p className="mt-0.5 text-xs text-slate-400 light:text-slate-600">
+                Switch off the top Weekly Featured video hero carousel to run exclusively with your uploaded ad posters & banners.
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => update("weeklyFeaturedEnabled", !settings.weeklyFeaturedEnabled)}
+              className={`flex-shrink-0 rounded-full px-4 py-1.5 text-xs font-bold transition ${
+                settings.weeklyFeaturedEnabled !== false
+                  ? "bg-emerald-500/20 text-emerald-300"
+                  : "bg-white/5 text-slate-400 hover:bg-white/10"
+              }`}
+            >
+              {settings.weeklyFeaturedEnabled !== false ? "On" : "Off"}
+            </button>
+          </div>
+        </div>
+
+        {/* Ad Poster Specifications & Aspect Ratios */}
+        <div className="rounded-3xl border border-indigo-500/20 bg-indigo-500/10 p-5 text-xs space-y-2">
+          <h3 className="font-bold text-sm text-indigo-300 flex items-center gap-1.5">
+            📐 Recommended Ad Poster Sizes & Aspect Ratios
+          </h3>
+          <p className="text-slate-300">
+            For crisp, responsive rendering across mobile, tablet, and desktop screens:
+          </p>
+          <ul className="list-disc list-inside space-y-1 text-slate-300 font-medium">
+            <li><strong className="text-white">Homepage & Watch Banners:</strong> <code className="text-orange-300">16:5 aspect ratio</code> (Recommended: 1200 × 375 px or 1920 × 600 px image/video).</li>
+            <li><strong className="text-white">Video Player Mid-Roll Ads:</strong> <code className="text-orange-300">16:9 aspect ratio</code> (Recommended: 1920 × 1080 px image or .mp4 video clip up to 30s).</li>
+            <li><strong className="text-white">Homepage Spotlight:</strong> <code className="text-orange-300">16:9 or 4:3 aspect ratio</code> (Recommended: 1200 × 675 px).</li>
+          </ul>
+        </div>
+
         {/* Mid-roll video ads */}
         <div className="rounded-3xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-5">
           <div className="flex items-center justify-between gap-4">
@@ -547,24 +599,29 @@ export default function AdvertisingPage() {
 
           <div className="mt-4">
             <label className="mb-1.5 block text-xs font-semibold text-slate-400 light:text-slate-600">
-              Banner image (wide, ~3.2:1)
+              Ad Poster or Video Media (Images or .mp4 Videos)
             </label>
             <input
               ref={fileInputRef}
               type="file"
-              accept="image/*"
+              accept="image/*,video/*"
               onChange={handleFileChange}
               className="block w-full text-xs text-slate-400 file:mr-3 file:rounded-lg file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-white hover:file:bg-white/20"
             />
             {uploadPreview && (
-              /* eslint-disable-next-line @next/next/no-img-element -- a
-                 freshly compressed in-memory data URL, not a static app
-                 asset next/image can optimize. */
-              <img
-                src={uploadPreview}
-                alt="Preview"
-                className="mt-3 w-full rounded-xl border border-white/10 light:border-black/10 object-cover"
-              />
+              uploadPreview.startsWith("data:video/") ? (
+                <video
+                  src={uploadPreview}
+                  controls
+                  className="mt-3 max-h-44 w-full rounded-xl border border-white/10 object-contain"
+                />
+              ) : (
+                <img
+                  src={uploadPreview}
+                  alt="Preview"
+                  className="mt-3 w-full rounded-xl border border-white/10 light:border-black/10 object-cover max-h-44"
+                />
+              )
             )}
           </div>
 

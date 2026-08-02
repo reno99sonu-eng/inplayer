@@ -896,43 +896,69 @@ export default function VideoPlayer({
           tap-seek/brightness gesture handlers on the container fire while
           it's up (handlePlayerClickCapture/handlePlayerPointerDown also
           bail out early on midrollBreakActive as a backstop). */}
+      {/* Mid-roll ad overlay — full player screen fit with YouTube-style bottom-right Skip button */}
       {midrollBreakActive && midrollAd && (
         <div
-          className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-4 bg-black/95 p-6 text-center"
+          className="absolute inset-0 z-40 bg-black overflow-hidden select-none"
           onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
         >
-          <span className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-wide text-slate-300">
-            Advertisement
-          </span>
+          {/* Full-screen clickable ad container */}
           <a
             href={midrollAd.linkUrl}
             target="_blank"
             rel="noopener noreferrer sponsored"
             onClick={() => trackMidrollEvent("click")}
-            className="block max-h-[55%] max-w-full overflow-hidden rounded-2xl border border-white/10"
+            className="group relative flex h-full w-full items-center justify-center bg-black cursor-pointer"
           >
-            {/* eslint-disable-next-line @next/next/no-img-element -- an
-                admin-uploaded data URL, not a static app asset. */}
-            <img
-              src={midrollAd.imageUrl}
-              alt={midrollAd.title}
-              className="max-h-full max-w-full object-contain"
-            />
+            {midrollAd.imageUrl?.startsWith("data:video/") || /\.mp4|\.webm/i.test(midrollAd.imageUrl || "") ? (
+              <video
+                src={midrollAd.imageUrl}
+                autoPlay
+                loop
+                muted
+                playsInline
+                className="h-full w-full object-contain"
+              />
+            ) : (
+              <img
+                src={midrollAd.imageUrl}
+                alt={midrollAd.title}
+                className="h-full w-full object-contain"
+              />
+            )}
+
+            {/* Top-left Ad indicator */}
+            <div className="absolute left-3 top-3 z-30 flex items-center gap-2 rounded-full border border-white/20 bg-black/75 px-3 py-1 text-[11px] font-bold text-white backdrop-blur-md">
+              <span className="h-2 w-2 rounded-full bg-orange-400 animate-pulse" />
+              <span>Ad • 1 of 1</span>
+            </div>
+
+            {/* Bottom-left Ad title hint */}
+            {midrollAd.title && (
+              <div className="absolute bottom-4 left-4 z-30 max-w-[50%] rounded-xl border border-white/10 bg-black/70 px-3 py-1.5 backdrop-blur-md">
+                <p className="truncate text-xs font-semibold text-white">{midrollAd.title}</p>
+                <p className="text-[10px] text-orange-300">Click to visit site ↗</p>
+              </div>
+            )}
           </a>
-          <p className="max-w-xs text-xs text-slate-400">{midrollAd.title}</p>
-          <button
-            type="button"
-            onClick={skipMidroll}
-            disabled={!midrollSkipUnlocked}
-            className={`rounded-full px-5 py-2.5 text-sm font-bold transition ${
-              midrollSkipUnlocked
-                ? "bg-white text-black hover:bg-white/90"
-                : "cursor-not-allowed bg-white/10 text-slate-400"
-            }`}
-          >
-            {midrollSkipUnlocked ? "Skip Ad" : `Skip in ${midrollCountdown}s`}
-          </button>
+
+          {/* YouTube-style bottom-right Skip Ad button */}
+          <div className="absolute bottom-4 right-4 z-50">
+            <button
+              type="button"
+              onClick={skipMidroll}
+              disabled={!midrollSkipUnlocked}
+              className={`flex items-center gap-1.5 rounded-xl border px-4 py-2 text-xs font-black shadow-2xl transition-all ${
+                midrollSkipUnlocked
+                  ? "border-white/40 bg-black/90 text-white hover:bg-white hover:text-black hover:scale-105 cursor-pointer"
+                  : "border-white/15 bg-black/80 text-slate-400 cursor-not-allowed"
+              }`}
+            >
+              <span>{midrollSkipUnlocked ? "Skip Ad" : `Skip in ${midrollCountdown}s`}</span>
+              {midrollSkipUnlocked && <span className="text-sm">➔</span>}
+            </button>
+          </div>
         </div>
       )}
 

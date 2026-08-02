@@ -66,6 +66,9 @@ export async function PATCH(request: NextRequest) {
   if (AD_SLOT_SOURCES.includes(body.homepageSpotlightSource)) {
     partial.homepageSpotlightSource = body.homepageSpotlightSource;
   }
+  if (typeof body.weeklyFeaturedEnabled === "boolean") {
+    partial.weeklyFeaturedEnabled = body.weeklyFeaturedEnabled;
+  }
   if (typeof body.midrollEnabled === "boolean") partial.midrollEnabled = body.midrollEnabled;
   if (typeof body.midrollIntervalSeconds === "number" && Number.isFinite(body.midrollIntervalSeconds)) {
     // Floor of 60s — anything shorter turns every video into an ad break

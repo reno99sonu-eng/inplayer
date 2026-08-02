@@ -32,6 +32,7 @@ export interface PlatformSettings {
   // union, which now also includes "homepage_spotlight"), just a different
   // spot on the page (see app/page.tsx).
   homepageSpotlightSource: AdSlotSource;
+  weeklyFeaturedEnabled: boolean;
   midrollEnabled: boolean;
   // How often (in seconds of watch time) a new mid-roll break can trigger.
   // See app/components/VideoPlayer.tsx's onTimeUpdate handler for where
@@ -55,6 +56,7 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
   homepageBannerSource: "off",
   watchPageBannerSource: "off",
   homepageSpotlightSource: "off",
+  weeklyFeaturedEnabled: true,
   midrollEnabled: false,
   midrollIntervalSeconds: 300,
   updatedAt: null,
@@ -79,6 +81,7 @@ export type PublicPlatformSettings = Pick<
   | "homepageBannerSource"
   | "watchPageBannerSource"
   | "homepageSpotlightSource"
+  | "weeklyFeaturedEnabled"
   | "midrollEnabled"
   | "midrollIntervalSeconds"
 >;
@@ -108,6 +111,7 @@ export function toPublicSettings(settings: PlatformSettings): PublicPlatformSett
     homepageBannerSource: settings.homepageBannerSource,
     watchPageBannerSource: settings.watchPageBannerSource,
     homepageSpotlightSource: settings.homepageSpotlightSource,
+    weeklyFeaturedEnabled: settings.weeklyFeaturedEnabled !== false,
     midrollEnabled: settings.midrollEnabled,
     midrollIntervalSeconds: settings.midrollIntervalSeconds,
   };

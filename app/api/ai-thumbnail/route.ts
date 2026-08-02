@@ -22,53 +22,68 @@ export async function POST(request: NextRequest) {
     // MODE A: Real DALL-E Image Generation when requested
     if (generateNew || (prompt && typeof prompt === "string" && !frameUrls?.length)) {
       if (process.env.OPENAI_API_KEY) {
-        try {
-          const cleanTitle = (title || prompt || "Vibrant video thumbnail").trim();
-          const imagePrompt = `High quality, cinematic, vibrant video thumbnail for "${cleanTitle}". Category: ${category || "General"}. Professional studio lighting, ultra detailed, eye-catching composition, 16:9 ratio.`;
-          
-          console.log("Generating DALL-E 3 image with prompt:", imagePrompt);
+        const cleanTitle = (title || prompt || "Vibrant video thumbnail").trim();
+        const imagePrompt = `High quality, cinematic, vibrant video thumbnail for "${cleanTitle}". Category: ${category || "General"}. Professional studio lighting, ultra detailed, eye-catching composition, 16:9 ratio.`;
+        
+        const candidateImageModels = ["dall-e-3", "dall-e-2"];
+        let lastDallEError = "AI Image Generation failed.";
+        let lastDallEStatus = 500;
 
-          const dallEResponse = await fetch("https://api.openai.com/v1/images/generations", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
-            },
-            body: JSON.stringify({
-              model: "dall-e-3",
+        for (const model of candidateImageModels) {
+          try {
+            console.log(`Trying DALL-E model (${model}) with prompt:`, imagePrompt);
+
+            const payload: Record<string, unknown> = {
+              model,
               prompt: imagePrompt,
               n: 1,
               size: "1024x1024",
-              quality: "standard",
-            }),
-          });
-
-          const dallEData = await dallEResponse.json();
-
-          if (dallEResponse.ok) {
-            const generatedUrl = dallEData?.data?.[0]?.url;
-            if (generatedUrl) {
-              return NextResponse.json({
-                thumbnailUrl: generatedUrl,
-                generated: true,
-                reason: "Custom AI video thumbnail generated using DALL-E 3.",
-              });
+            };
+            if (model === "dall-e-3") {
+              payload.quality = "standard";
             }
-          } else {
-            console.error("DALL-E 3 generation failed:", dallEData);
-            const apiMsg = dallEData?.error?.message || "DALL-E 3 generation failed.";
-            return NextResponse.json(
-              { error: `AI Image Generation error: ${apiMsg}` },
-              { status: dallEResponse.status || 500 }
-            );
+
+            const dallEResponse = await fetch("https://api.openai.com/v1/images/generations", {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+                Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+              },
+              body: JSON.stringify(payload),
+            });
+
+            const dallEData = await dallEResponse.json();
+
+            if (dallEResponse.ok) {
+              const generatedUrl = dallEData?.data?.[0]?.url;
+              if (generatedUrl) {
+                return NextResponse.json({
+                  thumbnailUrl: generatedUrl,
+                  generated: true,
+                  reason: `Custom AI video thumbnail generated using ${model.toUpperCase()}.`,
+                });
+              }
+            } else {
+              console.error(`DALL-E generation failed (${model}):`, dallEData);
+              lastDallEStatus = dallEResponse.status;
+              lastDallEError = dallEData?.error?.message || `${model} generation failed.`;
+              
+              // If model does not exist or account lacks access to dall-e-3, try dall-e-2
+              if (dallEResponse.status === 404 || dallEData?.error?.code === "model_not_found" || dallEData?.error?.message?.includes("does not exist")) {
+                continue;
+              }
+              break;
+            }
+          } catch (genErr) {
+            console.error(`DALL-E thumbnail exception (${model}):`, genErr);
+            continue;
           }
-        } catch (genErr) {
-          console.error("DALL-E thumbnail generation exception:", genErr);
-          return NextResponse.json(
-            { error: "Couldn't generate AI thumbnail image right now. Please try again." },
-            { status: 500 }
-          );
         }
+
+        return NextResponse.json(
+          { error: `AI Image Generator error: ${lastDallEError}` },
+          { status: lastDallEStatus }
+        );
       } else {
         return NextResponse.json(
           { error: "OPENAI_API_KEY is required for AI Image Generation." },

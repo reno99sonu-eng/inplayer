@@ -1,21 +1,66 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// Groq's only current vision (image-input) capable model — see
-// console.groq.com/docs/vision. Kept as a list, same shape as
-// api/ai-generate's CANDIDATE_MODELS, so a future second vision model (or a
-// replacement if this one is retired) just slots in without another rewrite.
-const VISION_MODELS = ["qwen/qwen3.6-27b"];
-// Groq's vision endpoint caps a single request at 5 images.
+const VISION_MODELS = ["gpt-4o-mini", "gpt-4o"];
 const MAX_FRAMES = 5;
-const PER_CALL_TIMEOUT_MS = 30_000;
+const PER_CALL_TIMEOUT_MS = 45_000;
 
 export async function POST(request: NextRequest) {
   try {
-    const { frameUrls, title, category } = await request.json();
+    const { frameUrls, title, category, prompt, generateNew } = await request.json();
 
+    const apiKey = process.env.OPENAI_API_KEY || process.env.GROQ_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json(
+        {
+          error: "AI is not configured yet. Please contact the site admin.",
+          debug: "OPENAI_API_KEY is missing",
+        },
+        { status: 500 }
+      );
+    }
+
+    // MODE A: Real DALL-E Image Generation when requested
+    if (generateNew || (prompt && typeof prompt === "string" && !frameUrls?.length)) {
+      if (process.env.OPENAI_API_KEY) {
+        try {
+          const imagePrompt = `High quality, cinematic, vibrant YouTube video thumbnail for a video titled "${title || prompt}". Category: ${category || "General"}. Professional lighting, crisp details, no text overlay, 16:9 ratio.`;
+          
+          const dallEResponse = await fetch("https://api.openai.com/v1/images/generations", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
+            },
+            body: JSON.stringify({
+              model: "dall-e-3",
+              prompt: imagePrompt,
+              n: 1,
+              size: "1024x1024",
+              quality: "standard",
+            }),
+          });
+
+          if (dallEResponse.ok) {
+            const data = await dallEResponse.json();
+            const generatedUrl = data?.data?.[0]?.url;
+            if (generatedUrl) {
+              return NextResponse.json({
+                thumbnailUrl: generatedUrl,
+                generated: true,
+                reason: "Custom AI video thumbnail generated using DALL-E 3.",
+              });
+            }
+          }
+        } catch (genErr) {
+          console.error("DALL-E thumbnail generation error:", genErr);
+        }
+      }
+    }
+
+    // MODE B: OpenAI GPT-4o-mini Vision Frame Selection
     if (!Array.isArray(frameUrls) || frameUrls.length === 0) {
       return NextResponse.json(
-        { error: "No candidate thumbnail frames were provided." },
+        { error: "No candidate thumbnail frames or generation prompt provided." },
         { status: 400 }
       );
     }
@@ -28,17 +73,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json(
         { error: "No usable candidate thumbnail frames were provided." },
         { status: 400 }
-      );
-    }
-
-    const apiKey = process.env.GROQ_API_KEY;
-    if (!apiKey) {
-      return NextResponse.json(
-        {
-          error: "AI is not configured yet. Please contact the site admin.",
-          debug: "GROQ_API_KEY is missing",
-        },
-        { status: 500 }
       );
     }
 
@@ -63,22 +97,23 @@ export async function POST(request: NextRequest) {
       const timer = setTimeout(() => controller.abort(), PER_CALL_TIMEOUT_MS);
 
       try {
-        const response = await fetch(
-          "https://api.groq.com/openai/v1/chat/completions",
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${apiKey}`,
-            },
-            body: JSON.stringify({
-              model,
-              messages: [{ role: "user", content }],
-              response_format: { type: "json_object" },
-            }),
-            signal: controller.signal,
-          }
-        );
+        const endpoint = process.env.OPENAI_API_KEY
+          ? "https://api.openai.com/v1/chat/completions"
+          : "https://api.groq.com/openai/v1/chat/completions";
+
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${apiKey}`,
+          },
+          body: JSON.stringify({
+            model: process.env.OPENAI_API_KEY ? model : "qwen/qwen3.6-27b",
+            messages: [{ role: "user", content }],
+            response_format: { type: "json_object" },
+          }),
+          signal: controller.signal,
+        });
 
         if (response.ok) {
           const data = await response.json();
@@ -97,7 +132,7 @@ export async function POST(request: NextRequest) {
                 });
               }
             } catch (parseErr) {
-              console.error("AI thumbnail: couldn't parse Groq response as JSON:", raw, parseErr);
+              console.error("AI thumbnail: couldn't parse response as JSON:", raw, parseErr);
             }
           }
 
@@ -107,7 +142,7 @@ export async function POST(request: NextRequest) {
         }
 
         const errorBody = await response.text();
-        console.error(`Groq vision API error (${model}):`, response.status, errorBody);
+        console.error(`AI vision API error (${model}):`, response.status, errorBody);
         lastErrorStatus = response.status;
 
         if (response.status === 404 || response.status === 429 || response.status >= 500) {
@@ -116,7 +151,7 @@ export async function POST(request: NextRequest) {
 
         break;
       } catch (err) {
-        console.error(`Groq vision request failed (${model}):`, err);
+        console.error(`AI vision request failed (${model}):`, err);
         continue;
       } finally {
         clearTimeout(timer);

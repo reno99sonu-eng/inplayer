@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { Mail, Lock, X, Loader2, Check } from "lucide-react";
 import { signIn, signOut } from "@/app/lib/auth";
-import { signInWithRedirect } from "aws-amplify/auth";
+import { fetchAuthSession, signInWithRedirect } from "aws-amplify/auth";
+import { useRouter } from "next/navigation";
 import { cognitoUserPoolsTokenProvider } from "aws-amplify/auth/cognito";
 import {
   defaultStorage,
@@ -37,6 +38,7 @@ export default function SignInModal({
   onClose,
   onSuccess,
 }: SignInModalProps) {
+  const router = useRouter();
   const { openSignUp, openForgotPassword } = useAuthModal();
 
   const [email, setEmail] = useState("");
@@ -143,10 +145,27 @@ export default function SignInModal({
       }
 
       if (result.isSignedIn) {
-        // A brief success moment before closing feels more confirmed
-        // than instantly disappearing.
         setSuccess(true);
         onSuccess?.();
+
+        try {
+          const session = await fetchAuthSession();
+          const idToken = session.tokens?.idToken?.toString();
+          if (idToken) {
+            const adminRes = await fetch("/api/admin/me", {
+              headers: { Authorization: `Bearer ${idToken}` },
+            });
+            const adminData = await adminRes.json();
+            if (adminData.isAdmin) {
+              onClose();
+              router.push("/admin");
+              return;
+            }
+          }
+        } catch (err) {
+          console.error("Admin redirect check error:", err);
+        }
+
         setTimeout(() => {
           onClose();
         }, 700);

@@ -475,17 +475,29 @@ export default function AdvertisingPage() {
         </div>
 
         {/* Ad Poster Specifications & Aspect Ratios */}
-        <div className="rounded-3xl border border-indigo-500/20 bg-indigo-500/10 p-5 text-xs space-y-2">
-          <h3 className="font-bold text-sm text-indigo-300 flex items-center gap-1.5">
+        <div className="rounded-3xl border border-indigo-500/20 light:border-indigo-600/30 bg-indigo-500/10 light:bg-indigo-500/10 p-5 text-xs space-y-2">
+          <h3 className="font-bold text-sm text-indigo-300 light:text-indigo-950 flex items-center gap-1.5">
             📐 Recommended Ad Poster Sizes & Aspect Ratios
           </h3>
-          <p className="text-slate-300">
+          <p className="text-slate-300 light:text-slate-800 font-medium">
             For crisp, responsive rendering across mobile, tablet, and desktop screens:
           </p>
-          <ul className="list-disc list-inside space-y-1 text-slate-300 font-medium">
-            <li><strong className="text-white">Homepage & Watch Banners:</strong> <code className="text-orange-300">16:5 aspect ratio</code> (Recommended: 1200 × 375 px or 1920 × 600 px image/video).</li>
-            <li><strong className="text-white">Video Player Mid-Roll Ads:</strong> <code className="text-orange-300">16:9 aspect ratio</code> (Recommended: 1920 × 1080 px image or .mp4 video clip up to 30s).</li>
-            <li><strong className="text-white">Homepage Spotlight:</strong> <code className="text-orange-300">16:9 or 4:3 aspect ratio</code> (Recommended: 1200 × 675 px).</li>
+          <ul className="list-disc list-inside space-y-2 text-slate-300 light:text-slate-800 font-medium">
+            <li className="leading-relaxed">
+              <strong className="text-white light:text-slate-900 font-bold">Homepage & Watch Banners:</strong>{" "}
+              <code className="rounded bg-orange-500/20 light:bg-orange-100 px-1.5 py-0.5 font-bold text-orange-300 light:text-amber-900">16:5 aspect ratio</code>{" "}
+              <span className="text-slate-400 light:text-slate-700">(Recommended: 1200 × 375 px or 1920 × 600 px image/video).</span>
+            </li>
+            <li className="leading-relaxed">
+              <strong className="text-white light:text-slate-900 font-bold">Video Player Mid-Roll Ads:</strong>{" "}
+              <code className="rounded bg-orange-500/20 light:bg-orange-100 px-1.5 py-0.5 font-bold text-orange-300 light:text-amber-900">16:9 aspect ratio</code>{" "}
+              <span className="text-slate-400 light:text-slate-700">(Recommended: 1920 × 1080 px image or .mp4 video clip up to 30s).</span>
+            </li>
+            <li className="leading-relaxed">
+              <strong className="text-white light:text-slate-900 font-bold">Homepage Spotlight:</strong>{" "}
+              <code className="rounded bg-orange-500/20 light:bg-orange-100 px-1.5 py-0.5 font-bold text-orange-300 light:text-amber-900">16:9 or 4:3 aspect ratio</code>{" "}
+              <span className="text-slate-400 light:text-slate-700">(Recommended: 1200 × 675 px).</span>
+            </li>
           </ul>
         </div>
 

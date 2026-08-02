@@ -81,11 +81,11 @@ const ACTION_META: Record<
 };
 
 const TONE_CLASSES: Record<string, string> = {
-  red: "bg-red-500/15 text-red-300",
-  amber: "bg-amber-500/15 text-amber-300",
-  emerald: "bg-emerald-500/15 text-emerald-300",
-  sky: "bg-sky-500/15 text-sky-300",
-  purple: "bg-purple-500/15 text-purple-300",
+  red: "bg-red-500/15 text-red-300 light:bg-red-100 light:text-red-700 font-semibold",
+  amber: "bg-amber-500/15 text-amber-300 light:bg-amber-100 light:text-amber-800 font-semibold",
+  emerald: "bg-emerald-500/15 text-emerald-300 light:bg-emerald-100 light:text-emerald-800 font-semibold",
+  sky: "bg-sky-500/15 text-sky-300 light:bg-sky-100 light:text-sky-800 font-semibold",
+  purple: "bg-purple-500/15 text-purple-300 light:bg-purple-100 light:text-purple-800 font-semibold",
 };
 
 const FILTERS = [

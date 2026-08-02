@@ -102,16 +102,7 @@ export default function VideoPlayer({
   const playerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // --- Mid-roll ad breaks -------------------------------------------------
-  // Real ad interruptions, not a stub: on mount, fetch once whether
-  // mid-roll is on platform-wide (Admin Panel -> Advertising) and which
-  // creative to show; then, as playback reports its own currentTime via
-  // onTimeUpdate below, trigger a break every time currentTime crosses a
-  // fresh multiple of the configured interval. midrollBreaksShownRef
-  // tracks which break indices have already fired THIS mount so seeking
-  // back over an old break never re-triggers it. Tiered skip timers (see
-  // MIDROLL_SKIP_TIERS_SECONDS in app/lib/videoAds.ts) escalate with how
-  // many breaks this viewer has already sat through in this video.
+  // --- Video ad breaks (Pre-roll, Mid-roll 15-min repeat, Post-roll & Ad Cycling) ---
   const [midrollConfig, setMidrollConfig] = useState<{
     enabled: boolean;
     intervalSeconds: number;
@@ -126,8 +117,12 @@ export default function VideoPlayer({
   const [midrollBreakActive, setMidrollBreakActive] = useState(false);
   const [midrollSkipUnlocked, setMidrollSkipUnlocked] = useState(false);
   const [midrollCountdown, setMidrollCountdown] = useState(0);
+  const [adImageFailed, setAdImageFailed] = useState(false);
+
   const midrollBreaksShownRef = useRef<Set<number>>(new Set());
   const midrollWasPlayingRef = useRef(false);
+  const midrollAdsListRef = useRef<{ adId: string; imageUrl: string; linkUrl: string; title: string }[]>([]);
+  const midrollAdIndexRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -136,15 +131,19 @@ export default function VideoPlayer({
         const res = await fetch("/api/midroll-ads");
         const data = await res.json().catch(() => ({ enabled: false }));
         if (cancelled) return;
-        if (data.enabled && data.ad) {
+        if (data.enabled) {
+          const adsList = Array.isArray(data.ads) && data.ads.length > 0 ? data.ads : data.ad ? [data.ad] : [];
+          midrollAdsListRef.current = adsList;
           setMidrollConfig({
             enabled: true,
-            intervalSeconds: data.intervalSeconds || 300,
+            intervalSeconds: data.intervalSeconds || 900, // 15-minute repeat default
             skipTiersSeconds: Array.isArray(data.skipTiersSeconds) && data.skipTiersSeconds.length
               ? data.skipTiersSeconds
               : [5, 10, 15],
           });
-          setMidrollAd(data.ad);
+          if (adsList.length > 0) {
+            setMidrollAd(adsList[0]);
+          }
         }
       } catch (err) {
         console.error("VideoPlayer: mid-roll config fetch failed:", err);
@@ -155,22 +154,21 @@ export default function VideoPlayer({
     };
   }, []);
 
-  const handleMidrollTimeUpdate = () => {
+  const triggerAdBreak = (breakKey: number) => {
     const player = playerRef.current;
-    if (!player || !midrollConfig?.enabled || !midrollAd || midrollBreakActive) return;
+    if (!player || !midrollConfig?.enabled || midrollBreakActive) return;
+    if (midrollBreaksShownRef.current.has(breakKey)) return;
 
-    const currentTime = player.currentTime || 0;
-    const duration = player.duration || 0;
-    const breakIndex = Math.floor(currentTime / midrollConfig.intervalSeconds);
+    const adsList = midrollAdsListRef.current;
+    if (!adsList || adsList.length === 0) return;
 
-    // breakIndex 0 covers "before the first interval has elapsed" — never
-    // a real break. Also never trigger in the last few seconds, so a
-    // break can't fire moments before the video ends anyway.
-    if (breakIndex < 1) return;
-    if (duration && duration - currentTime < 5) return;
-    if (midrollBreaksShownRef.current.has(breakIndex)) return;
+    // Cycle to next ad creative in list
+    const nextAd = adsList[midrollAdIndexRef.current % adsList.length];
+    midrollAdIndexRef.current += 1;
+    setMidrollAd(nextAd);
+    setAdImageFailed(false);
 
-    midrollBreaksShownRef.current.add(breakIndex);
+    midrollBreaksShownRef.current.add(breakKey);
     midrollWasPlayingRef.current = !player.paused;
     player.pause();
 
@@ -183,11 +181,36 @@ export default function VideoPlayer({
     setMidrollBreakActive(true);
   };
 
-  // Ticks the skip countdown down to zero, then unlocks the Skip button —
-  // the setState call is wrapped in a nested function (rather than called
-  // bare in the effect body) purely to satisfy
-  // react-hooks/set-state-in-effect, same convention used throughout this
-  // codebase.
+  const handleMidrollTimeUpdate = () => {
+    const player = playerRef.current;
+    if (!player || !midrollConfig?.enabled || midrollBreakActive) return;
+
+    const currentTime = player.currentTime || 0;
+    const duration = player.duration || 0;
+
+    // Pre-roll (start of video t < 1s)
+    if (currentTime < 1.5 && !midrollBreaksShownRef.current.has(-1)) {
+      triggerAdBreak(-1); // -1 index for pre-roll
+      return;
+    }
+
+    // Mid-roll repeating every interval (default 15 minutes / 900s)
+    const breakIndex = Math.floor(currentTime / midrollConfig.intervalSeconds);
+    if (breakIndex >= 1 && (!duration || duration - currentTime >= 5)) {
+      if (!midrollBreaksShownRef.current.has(breakIndex)) {
+        triggerAdBreak(breakIndex);
+      }
+    }
+  };
+
+  const handleEndedAdBreak = () => {
+    // Post-roll (end of video)
+    if (!midrollBreaksShownRef.current.has(-2)) {
+      triggerAdBreak(-2); // -2 index for post-roll
+    }
+  };
+
+  // Ticks skip countdown
   useEffect(() => {
     if (!midrollBreakActive) return;
     const unlockSkip = () => setMidrollSkipUnlocked(true);
@@ -205,9 +228,7 @@ export default function VideoPlayer({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ adId: midrollAd.adId, kind }),
-    }).catch(() => {
-      /* best-effort — never blocks resuming playback */
-    });
+    }).catch(() => {});
   };
 
   const skipMidroll = () => {
@@ -909,21 +930,35 @@ export default function VideoPlayer({
             target="_blank"
             rel="noopener noreferrer sponsored"
             onClick={() => trackMidrollEvent("click")}
-            className="group relative flex h-full w-full items-center justify-center bg-black cursor-pointer"
+            className="group relative flex h-full w-full items-center justify-center bg-[#060D18] cursor-pointer"
           >
-            {midrollAd.imageUrl?.startsWith("data:video/") || /\.mp4|\.webm/i.test(midrollAd.imageUrl || "") ? (
+            {adImageFailed ? (
+              <div className="flex h-full w-full flex-col items-center justify-center bg-gradient-to-br from-[#1E1B4B] via-[#0F172A] to-[#060D18] p-8 text-center">
+                <div className="rounded-full bg-orange-500/20 px-4 py-1 text-xs font-black uppercase tracking-wider text-orange-400 border border-orange-500/30">
+                  Sponsored Advertisement
+                </div>
+                <h3 className="mt-4 max-w-md text-xl sm:text-2xl font-black text-white">
+                  {midrollAd.title || "InPlayer Special Offer"}
+                </h3>
+                <p className="mt-2 text-xs sm:text-sm text-slate-300">
+                  Click anywhere to visit advertiser page ↗
+                </p>
+              </div>
+            ) : midrollAd.imageUrl?.startsWith("data:video/") || /\.mp4|\.webm/i.test(midrollAd.imageUrl || "") ? (
               <video
                 src={midrollAd.imageUrl}
                 autoPlay
                 loop
                 muted
                 playsInline
+                onError={() => setAdImageFailed(true)}
                 className="h-full w-full object-contain"
               />
             ) : (
               <img
                 src={midrollAd.imageUrl}
                 alt={midrollAd.title}
+                onError={() => setAdImageFailed(true)}
                 className="h-full w-full object-contain"
               />
             )}

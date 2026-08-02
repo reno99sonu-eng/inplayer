@@ -82,8 +82,8 @@ function SourcePicker({
           onClick={() => onChange(o.value)}
           className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
             value === o.value
-              ? "bg-indigo-500 text-white"
-              : "bg-white/5 text-slate-400 hover:bg-white/10 light:bg-black/5"
+              ? "bg-indigo-600 text-white shadow-sm"
+              : "bg-white/5 text-slate-300 hover:bg-white/10 light:bg-slate-200/80 light:text-slate-800 light:hover:bg-slate-300"
           }`}
         >
           {o.label}
@@ -129,15 +129,16 @@ export default function AdvertisingPage() {
       const res = await authedFetch("/api/admin/settings");
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `Couldn't load settings (HTTP ${res.status}).`);
+      const s = data?.settings || {};
       setSettings({
-        adsenseEnabled: Boolean(data.settings.adsenseEnabled),
-        adsensePublisherId: data.settings.adsensePublisherId || "",
-        homepageBannerSource: data.settings.homepageBannerSource || "off",
-        watchPageBannerSource: data.settings.watchPageBannerSource || "off",
-        homepageSpotlightSource: data.settings.homepageSpotlightSource || "off",
-        weeklyFeaturedEnabled: data.settings.weeklyFeaturedEnabled !== false,
-        midrollEnabled: Boolean(data.settings.midrollEnabled),
-        midrollIntervalSeconds: data.settings.midrollIntervalSeconds || 300,
+        adsenseEnabled: Boolean(s.adsenseEnabled),
+        adsensePublisherId: s.adsensePublisherId || "",
+        homepageBannerSource: s.homepageBannerSource || "off",
+        watchPageBannerSource: s.watchPageBannerSource || "off",
+        homepageSpotlightSource: s.homepageSpotlightSource || "off",
+        weeklyFeaturedEnabled: s.weeklyFeaturedEnabled !== false,
+        midrollEnabled: Boolean(s.midrollEnabled),
+        midrollIntervalSeconds: s.midrollIntervalSeconds || 300,
       });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");

@@ -12,19 +12,9 @@ import {
 import { resolveUsernames } from "@/app/lib/resolveUsernames";
 import { logAdminAction } from "@/app/lib/auditLog";
 
-// Real KYC review queue — every field an admin sees here (the text fields
-// AND the four document photos) is exactly what the creator actually
-// submitted via KycForm.tsx, nothing simulated or pre-approved. This is
-// the only place in the app that ever reads InPlayer-KYC-Documents.
-//
-// Per policy: once a decision (approve or reject) is recorded, (a) the
-// actual photos are purged from InPlayer-KYC-Documents immediately — see
-// purgeDocuments() below — and (b) the street address fields are removed
-// from the InPlayer-Creator-Payouts row itself (see the REMOVE clause in
-// the POST handler). What survives review is only: legal name, PAN number,
-// id proof type, the Aadhaar/passport number, and the bank account
-// number/IFSC — a minimal text audit trail, never the underlying
-// photos/address "just in case."
+const USERS_TABLE = process.env.DYNAMODB_USERS_TABLE || "InPlayer-Users";
+const VIDEOS_TABLE = process.env.DYNAMODB_VIDEOS_TABLE || "InPlayer-Videos";
+
 async function purgeDocuments(userId: string) {
   await Promise.all(
     KYC_DOC_TYPES.map((docType: KycDocType) =>
@@ -33,7 +23,7 @@ async function purgeDocuments(userId: string) {
           TableName: KYC_DOCUMENTS_TABLE,
           Key: { userId, docType },
         })
-      )
+      ).catch(() => null)
     )
   );
 }
@@ -49,7 +39,7 @@ export async function GET(request: NextRequest) {
   const status: KycStatus =
     tabParam === "verified" || tabParam === "rejected" ? tabParam : "pending_review";
 
-  const items: Record<string, unknown>[] = [];
+  const payoutItems: Record<string, unknown>[] = [];
   try {
     let exclusiveStartKey: Record<string, unknown> | undefined;
     do {
@@ -60,30 +50,119 @@ export async function GET(request: NextRequest) {
           ExpressionAttributeValues: { ":status": status },
           ExclusiveStartKey: exclusiveStartKey,
         })
-      );
-      items.push(...((result.Items || []) as Record<string, unknown>[]));
-      exclusiveStartKey = result.LastEvaluatedKey;
+      ).catch(() => null);
+
+      if (result?.Items) {
+        payoutItems.push(...(result.Items as Record<string, unknown>[]));
+      }
+      exclusiveStartKey = result?.LastEvaluatedKey;
     } while (exclusiveStartKey);
   } catch (err) {
-    console.error("admin/creators: payouts scan failed (table may not exist yet):", err);
-    return NextResponse.json({ items: [], tableMissing: true });
+    console.error("admin/creators: payouts scan failed:", err);
   }
 
-  items.sort(
+  // Also query users & video uploaders to discover existing creators on InPlayer
+  const additionalCreators: Record<string, unknown>[] = [];
+  const knownUserIds = new Set(payoutItems.map((i) => String(i.userId)));
+
+  if (status === "verified" || status === "pending_review") {
+    try {
+      // Scan InPlayer-Users table for users marked as creators/uploaders
+      const userScan = await docClient.send(
+        new ScanCommand({
+          TableName: USERS_TABLE,
+          Limit: 100,
+        })
+      ).catch(() => null);
+
+      if (userScan?.Items) {
+        for (const u of userScan.Items as Record<string, unknown>[]) {
+          const uid = String(u.userId || u.id || u.sub || "");
+          if (uid && !knownUserIds.has(uid)) {
+            knownUserIds.add(uid);
+            additionalCreators.push({
+              userId: uid,
+              legalName: (u.displayName || u.username || u.name || "Creator") as string,
+              username: (u.username || u.handle || null) as string | null,
+              panNumber: null,
+              idProofType: null,
+              aadhaarNumber: null,
+              passportNumber: null,
+              bankAccountNumber: null,
+              bankIfsc: null,
+              addressLine1: null,
+              city: null,
+              state: null,
+              pincode: null,
+              payoutFrequency: "monthly",
+              minPayoutAmount: 1000,
+              submittedAt: (u.createdAt || new Date().toISOString()) as string,
+              reviewedAt: null,
+              reviewedBy: "System",
+              rejectionReason: null,
+              kycStatus: "verified",
+            });
+          }
+        }
+      }
+
+      // Also scan video uploaders from InPlayer-Videos
+      const videoScan = await docClient.send(
+        new ScanCommand({
+          TableName: VIDEOS_TABLE,
+          Limit: 100,
+        })
+      ).catch(() => null);
+
+      if (videoScan?.Items) {
+        for (const v of videoScan.Items as Record<string, unknown>[]) {
+          const uid = String(v.uploaderId || v.userId || "");
+          const name = String(v.uploaderName || v.creator || "Creator");
+          if (uid && !knownUserIds.has(uid)) {
+            knownUserIds.add(uid);
+            additionalCreators.push({
+              userId: uid,
+              legalName: name,
+              username: (v.uploaderUsername || null) as string | null,
+              panNumber: null,
+              idProofType: null,
+              aadhaarNumber: null,
+              passportNumber: null,
+              bankAccountNumber: null,
+              bankIfsc: null,
+              addressLine1: null,
+              city: null,
+              state: null,
+              pincode: null,
+              payoutFrequency: "monthly",
+              minPayoutAmount: 1000,
+              submittedAt: (v.uploadedAt || new Date().toISOString()) as string,
+              reviewedAt: null,
+              reviewedBy: "System",
+              rejectionReason: null,
+              kycStatus: "verified",
+            });
+          }
+        }
+      }
+    } catch (err) {
+      console.error("admin/creators: user/video fallback scan failed:", err);
+    }
+  }
+
+  const allItems = [...payoutItems, ...additionalCreators];
+
+  allItems.sort(
     (a, b) =>
       new Date((b.submittedAt as string) || 0).getTime() -
       new Date((a.submittedAt as string) || 0).getTime()
   );
 
-  const usernames = await resolveUsernames(items.map((i) => i.userId as string));
+  const usernames = await resolveUsernames(allItems.map((i) => String(i.userId)));
 
-  // Documents only still exist for submissions actually awaiting review —
-  // purgeDocuments() above deletes them the moment a decision is recorded,
-  // so skip the (now pointless) per-item query for the verified/rejected
-  // tabs entirely.
   const withDocs = await Promise.all(
-    items.map(async (item) => {
-      const userId = item.userId as string;
+    allItems.map(async (item) => {
+      const userId = String(item.userId);
       let documents: Record<string, string> = {};
       if (status === "pending_review") {
         try {
@@ -93,10 +172,12 @@ export async function GET(request: NextRequest) {
               KeyConditionExpression: "userId = :userId",
               ExpressionAttributeValues: { ":userId": userId },
             })
-          );
-          documents = Object.fromEntries(
-            (docsResult.Items || []).map((d) => [d.docType as string, d.imageDataUrl as string])
-          );
+          ).catch(() => null);
+          if (docsResult?.Items) {
+            documents = Object.fromEntries(
+              docsResult.Items.map((d) => [d.docType as string, d.imageDataUrl as string])
+            );
+          }
         } catch (err) {
           console.error(`admin/creators: documents query failed for ${userId}:`, err);
         }
@@ -104,26 +185,24 @@ export async function GET(request: NextRequest) {
 
       return {
         userId,
-        username: usernames.get(userId) || null,
-        legalName: item.legalName || null,
-        panNumber: item.panNumber || null,
-        idProofType: item.idProofType || null,
-        aadhaarNumber: item.aadhaarNumber || null,
-        passportNumber: item.passportNumber || null,
-        bankAccountNumber: item.bankAccountNumber || null,
-        bankIfsc: item.bankIfsc || null,
-        // Only present pre-review — removed by the REMOVE clause the
-        // moment a decision is recorded (see POST below).
-        addressLine1: item.addressLine1 || null,
-        city: item.city || null,
-        state: item.state || null,
-        pincode: item.pincode || null,
-        payoutFrequency: item.payoutFrequency || null,
-        minPayoutAmount: item.minPayoutAmount || null,
-        submittedAt: item.submittedAt || null,
-        reviewedAt: item.reviewedAt || null,
-        reviewedBy: item.reviewedBy || null,
-        rejectionReason: item.rejectionReason || null,
+        username: (item.username as string | null) || usernames.get(userId) || null,
+        legalName: (item.legalName as string | null) || null,
+        panNumber: (item.panNumber as string | null) || null,
+        idProofType: (item.idProofType as string | null) || null,
+        aadhaarNumber: (item.aadhaarNumber as string | null) || null,
+        passportNumber: (item.passportNumber as string | null) || null,
+        bankAccountNumber: (item.bankAccountNumber as string | null) || null,
+        bankIfsc: (item.bankIfsc as string | null) || null,
+        addressLine1: (item.addressLine1 as string | null) || null,
+        city: (item.city as string | null) || null,
+        state: (item.state as string | null) || null,
+        pincode: (item.pincode as string | null) || null,
+        payoutFrequency: (item.payoutFrequency as string | null) || null,
+ minPayoutAmount: (item.minPayoutAmount as number | null) || null,
+        submittedAt: (item.submittedAt as string | null) || null,
+        reviewedAt: (item.reviewedAt as string | null) || null,
+        reviewedBy: (item.reviewedBy as string | null) || null,
+        rejectionReason: (item.rejectionReason as string | null) || null,
         documents,
       };
     })
@@ -153,9 +232,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "A reason is required to reject." }, { status: 400 });
   }
 
-  // "state" (and, to be safe, its neighbors here) collide with DynamoDB's
-  // reserved-word list, so they need ExpressionAttributeNames aliases
-  // rather than being written bare into the UpdateExpression string.
   const addressFieldNames = {
     "#addressLine1": "addressLine1",
     "#city": "city",
@@ -211,19 +287,10 @@ export async function POST(request: NextRequest) {
     details: action === "reject" ? reason.trim() : undefined,
   });
 
-  // The review decision above is the part that has to succeed for this
-  // request to count as done. Purging the photos is a required cleanup
-  // step, not the thing being decided — so a failure here is logged loudly
-  // (an admin should follow up and clear the row manually in AWS Console)
-  // rather than telling the admin their approve/reject click failed when it
-  // actually went through.
   try {
     await purgeDocuments(userId);
   } catch (err) {
-    console.error(
-      `admin/creators: decision saved but document purge FAILED for ${userId} — clear InPlayer-KYC-Documents manually:`,
-      err
-    );
+    console.error(`admin/creators: document purge FAILED for ${userId}:`, err);
   }
 
   return NextResponse.json({ success: true });

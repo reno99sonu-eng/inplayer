@@ -40,8 +40,8 @@ function statusBadge(status: string | null) {
   if (!status || status === "ready") return null;
   const color =
     status === "errored"
-      ? "bg-red-500/15 text-red-300"
-      : "bg-amber-500/15 text-amber-300";
+      ? "bg-red-500/15 text-red-300 light:bg-red-100 light:text-red-700 font-bold"
+      : "bg-amber-500/15 text-amber-300 light:bg-amber-100 light:text-amber-800 font-bold";
   return (
     <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${color}`}>
       {status}

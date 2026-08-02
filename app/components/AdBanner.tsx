@@ -91,18 +91,18 @@ export default function AdBanner({
 
     return (
       <div
-        className="mx-auto w-full max-w-[1400px] px-2 sm:px-4 my-2 sm:my-3"
+        className="mx-auto w-full max-w-[1800px] px-4 lg:px-8 my-1 sm:my-2"
         onMouseEnter={() => setIsHovered(true)}
         onMouseLeave={() => setIsHovered(false)}
       >
-        <div className="relative overflow-hidden rounded-xl border border-white/10 light:border-black/10 bg-[#060D18] shadow-md">
-          {/* Ad slide link — ultra-sleek horizontal straight line strip */}
+        <div className="relative overflow-hidden rounded-2xl border border-white/10 light:border-black/10 bg-[#060D18] shadow-md">
+          {/* Ad slide link — 16:9 matching video cards on Mobile, slim stretched strip on Desktop */}
           <a
             href={activeCreative.linkUrl}
             target="_blank"
             rel="noopener noreferrer sponsored"
             onClick={() => handleClick(activeCreative)}
-            className="group relative flex h-12 sm:h-16 md:h-20 lg:h-24 w-full items-center justify-center overflow-hidden transition duration-300 bg-[#060D18]"
+            className="group relative flex aspect-video sm:aspect-auto sm:h-16 md:h-20 lg:h-24 w-full items-center justify-center overflow-hidden transition duration-300 bg-[#060D18]"
           >
             {activeCreative.imageUrl?.startsWith("data:video/") ||
             /\.mp4|\.webm/i.test(activeCreative.imageUrl || "") ? (
@@ -123,13 +123,13 @@ export default function AdBanner({
             )}
 
             {/* AD badge */}
-            <span className="absolute right-2 top-2 z-10 rounded-md bg-black/80 backdrop-blur-md px-1.5 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-orange-400 border border-orange-500/30">
+            <span className="absolute right-2 top-2 z-10 rounded-md bg-black/80 backdrop-blur-md px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-orange-400 border border-orange-500/30">
               Ad
             </span>
 
             {/* Title overlay hint */}
             {activeCreative.title && (
-              <div className="absolute left-3 bottom-2 z-10 hidden sm:block rounded-lg bg-black/75 backdrop-blur-md px-2.5 py-0.5 text-[11px] font-semibold text-white border border-white/10">
+              <div className="absolute left-3 bottom-2 z-10 rounded-lg bg-black/75 backdrop-blur-md px-2.5 py-1 text-xs font-semibold text-white border border-white/10">
                 {activeCreative.title}
               </div>
             )}

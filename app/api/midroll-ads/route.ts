@@ -9,7 +9,7 @@ export async function GET() {
   const settings = await getPlatformSettings();
 
   try {
-    // 1. Try dedicated Midroll ads table
+    // 1. Dedicated Midroll ads table
     const items: Record<string, unknown>[] = [];
     let exclusiveStartKey: Record<string, unknown> | undefined;
     do {
@@ -29,9 +29,9 @@ export async function GET() {
     } while (exclusiveStartKey);
 
     let activeItems = items.filter((item) => item.active !== false);
-
-    // 2. Fallback: if no dedicated midroll items, query House Ad Creatives table
     let isHouseFallback = false;
+
+    // 2. Fallback to House Ad Creatives table
     if (activeItems.length === 0) {
       const houseItems: Record<string, unknown>[] = [];
       let houseKey: Record<string, unknown> | undefined;
@@ -56,39 +56,27 @@ export async function GET() {
     }
 
     if (activeItems.length === 0) {
-      return NextResponse.json({ enabled: false });
+      return NextResponse.json({ enabled: false, ads: [] });
     }
 
-    const pick = activeItems[Math.floor(Math.random() * activeItems.length)];
-    const targetTable = isHouseFallback ? AD_CREATIVES_TABLE : MIDROLL_ADS_TABLE;
-
-    if (pick.adId) {
-      docClient
-        .send(
-          new UpdateCommand({
-            TableName: targetTable,
-            Key: { adId: pick.adId },
-            UpdateExpression: "ADD impressions :one",
-            ExpressionAttributeValues: { ":one": 1 },
-          })
-        )
-        .catch((err) => console.error("midroll-ads: impression counter failed:", err));
-    }
+    const formattedAds = activeItems.map((pick) => ({
+      adId: String(pick.adId || ""),
+      imageUrl: String(pick.imageUrl || ""),
+      linkUrl: String(pick.linkUrl || "#"),
+      title: String(pick.title || "Advertisement"),
+    }));
 
     return NextResponse.json({
       enabled: true,
-      intervalSeconds: settings.midrollIntervalSeconds || 180,
+      intervalSeconds: settings.midrollIntervalSeconds || 900, // 15 minutes repeat default
       skipTiersSeconds: MIDROLL_SKIP_TIERS_SECONDS,
-      ad: {
-        adId: pick.adId,
-        imageUrl: pick.imageUrl,
-        linkUrl: pick.linkUrl,
-        title: pick.title,
-      },
+      ads: formattedAds,
+      ad: formattedAds[0],
+      isHouseFallback,
     });
   } catch (err) {
     console.error("Midroll ad lookup failed:", err);
-    return NextResponse.json({ enabled: false });
+    return NextResponse.json({ enabled: false, ads: [] });
   }
 }
 
@@ -109,7 +97,6 @@ export async function POST(request: NextRequest) {
         ExpressionAttributeValues: { ":one": 1 },
       })
     ).catch(async () => {
-      // Best effort fallback to AD_CREATIVES_TABLE
       await docClient.send(
         new UpdateCommand({
           TableName: AD_CREATIVES_TABLE,

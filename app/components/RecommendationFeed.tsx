@@ -440,8 +440,8 @@ export default function RecommendationFeed({
 
         return (
           <div key={`feed-block-${index}`}>
-            <section className="mx-auto max-w-[1800px] px-4 py-4 lg:py-6 lg:px-8">
-              <div className="grid grid-cols-1 gap-x-6 gap-y-8 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-6">
+            <section className="mx-auto max-w-[1800px] px-4 py-2 sm:py-3 lg:py-4 lg:px-8">
+              <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-6">
                 {videos.map(renderCard)}
               </div>
             </section>
@@ -449,7 +449,7 @@ export default function RecommendationFeed({
             {/* Repeating sleek ad banner after every 6 videos */}
             <AdBanner placement="homepage" seed={index} />
 
-            {/* Alternating Shorts shelf */}
+            {/* Alternating Shorts shelf (Raftaar) */}
             {shelfShorts.length > 0 && index % 2 === 0 && <ShortsShelf items={shelfShorts} />}
           </div>
         );

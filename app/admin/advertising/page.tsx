@@ -723,7 +723,7 @@ export default function AdvertisingPage() {
                   type="file"
                   accept="image/*,video/*"
                   onChange={handleFileChange}
-                  className="block w-full text-[11px] text-slate-400 file:mr-2 file:rounded-lg file:border-0 file:bg-white/10 file:px-2.5 file:py-1 file:text-[11px] file:font-bold file:text-white hover:file:bg-white/20"
+                  className="block w-full text-[11px] text-slate-400 light:text-slate-700 file:mr-2.5 file:rounded-xl file:border file:border-indigo-500/30 file:bg-indigo-600 file:px-3 file:py-1.5 file:text-[11px] file:font-bold file:text-white hover:file:bg-indigo-500 cursor-pointer shadow-sm"
                 />
               </div>
 
@@ -909,7 +909,7 @@ export default function AdvertisingPage() {
                   type="file"
                   accept="image/*,video/*"
                   onChange={handleMidrollFileChange}
-                  className="block w-full text-[11px] text-slate-400 file:mr-2 file:rounded-lg file:border-0 file:bg-white/10 file:px-2.5 file:py-1 file:text-[11px] file:font-bold file:text-white hover:file:bg-white/20"
+                  className="block w-full text-[11px] text-slate-400 light:text-slate-700 file:mr-2.5 file:rounded-xl file:border file:border-indigo-500/30 file:bg-indigo-600 file:px-3 file:py-1.5 file:text-[11px] file:font-bold file:text-white hover:file:bg-indigo-500 cursor-pointer shadow-sm"
                 />
               </div>
 

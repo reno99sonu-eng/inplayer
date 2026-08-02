@@ -47,6 +47,8 @@ export interface ThumbnailPickerProps {
   muxFrames?: string[];
   selectedMuxThumbnail?: string | null;
   onMuxThumbnailSelected?: (url: string) => void;
+  onGenerateAIThumbnail?: () => void;
+  aiThumbnailBusy?: boolean;
 }
 
 interface VideoMetadataFieldsProps {
@@ -251,31 +253,48 @@ export default function VideoMetadataFields({
 
           {/* Thumbnail Selector Section */}
           {thumbnail && (
-            <div className="rounded-xl border border-white/10 bg-[#060D18] p-2.5 light:border-black/10 light:bg-white space-y-2.5">
-              <label className="block text-xs font-bold text-slate-300 light:text-slate-700">
-                Thumbnail
-              </label>
+            <div className="rounded-xl border border-white/10 bg-[#060D18] p-3 light:border-black/10 light:bg-white space-y-3">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-bold text-slate-300 light:text-slate-700">
+                  Thumbnail
+                </label>
+                {thumbnail.onGenerateAIThumbnail && (
+                  <button
+                    type="button"
+                    onClick={thumbnail.onGenerateAIThumbnail}
+                    disabled={thumbnail.aiThumbnailBusy}
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-orange-500/15 px-2.5 py-1 text-[11px] font-bold text-orange-400 transition hover:bg-orange-500 hover:text-white disabled:opacity-50"
+                  >
+                    {thumbnail.aiThumbnailBusy ? (
+                      <Loader2 size={12} className="animate-spin" />
+                    ) : (
+                      <Sparkles size={12} />
+                    )}
+                    <span>{thumbnail.aiThumbnailBusy ? "Generating AI Image..." : "✨ Generate AI Thumbnail"}</span>
+                  </button>
+                )}
+              </div>
 
-              {muxFrames.length > 0 && (
+              {muxFrames && muxFrames.length > 0 && (
                 <div>
-                  <p className="mb-1 text-[11px] font-semibold text-slate-400 light:text-slate-600">
+                  <p className="mb-1.5 text-[11px] font-semibold text-slate-400 light:text-slate-600">
                     🎬 Pick from Video Frames
                   </p>
-                  <div className="grid grid-cols-4 gap-1.5">
-                    {muxFrames.map((frameUrl) => {
-                      const selected = thumbnail?.selectedMuxThumbnail === frameUrl;
+                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                    {muxFrames.map((frameUrl, idx) => {
+                      const selected = thumbnail?.previewUrl === frameUrl || thumbnail?.selectedMuxThumbnail === frameUrl;
                       return (
                         <button
-                          key={frameUrl}
+                          key={idx}
                           type="button"
                           onClick={() => thumbnail?.onMuxThumbnailSelected?.(frameUrl)}
-                          className={`aspect-video overflow-hidden rounded-lg border transition-all ${
+                          className={`aspect-video overflow-hidden rounded-xl border transition-all ${
                             selected
-                              ? "border-orange-500 ring-2 ring-orange-500/80"
+                              ? "border-orange-500 ring-2 ring-orange-500"
                               : "border-white/10 hover:border-orange-400/50"
                           }`}
                         >
-                          <img src={frameUrl} alt="Frame" className="h-full w-full object-cover" />
+                          <img src={frameUrl} alt={`Frame ${idx + 1}`} className="h-full w-full object-cover" />
                         </button>
                       );
                     })}
@@ -283,18 +302,18 @@ export default function VideoMetadataFields({
                 </div>
               )}
 
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-3">
                 <div
                   onClick={() => thumbInputRef.current?.click()}
                   role="button"
-                  className="group relative flex aspect-video h-12 cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-white/15 bg-black/20"
+                  className="group relative flex aspect-video h-14 cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-dashed border-white/20 bg-black/20 hover:border-orange-400/50"
                 >
-                  {thumbnail.previewUrl ? (
+                  {thumbnail.previewUrl && (!muxFrames || !muxFrames.includes(thumbnail.previewUrl)) ? (
                     <img src={thumbnail.previewUrl} alt="Custom" className="h-full w-full object-cover" />
                   ) : (
-                    <div className="flex items-center gap-1 text-slate-400 px-2.5 text-center">
-                      <UploadCloud size={14} />
-                      <span className="text-[10px] font-semibold">Custom Image</span>
+                    <div className="flex items-center gap-1.5 text-slate-400 px-3 text-center">
+                      <UploadCloud size={16} className="text-orange-400" />
+                      <span className="text-[11px] font-semibold">Upload Custom Image</span>
                     </div>
                   )}
                   <input
@@ -309,18 +328,6 @@ export default function VideoMetadataFields({
                     }}
                   />
                 </div>
-
-                {muxFrames.length > 0 && (
-                  <button
-                    type="button"
-                    onClick={runAIThumbnail}
-                    disabled={aiThumbBusy}
-                    className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-2.5 py-1.5 text-xs font-semibold text-white transition hover:bg-white/10 light:border-black/10 light:text-slate-800 disabled:opacity-50"
-                  >
-                    <Sparkles size={13} className="text-orange-400" />
-                    <span>{aiThumbBusy ? "Analyzing..." : "AI Frame"}</span>
-                  </button>
-                )}
               </div>
               {thumbnail.error && <p className="mt-1 text-xs text-red-400">{thumbnail.error}</p>}
             </div>

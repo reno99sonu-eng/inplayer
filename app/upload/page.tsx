@@ -18,6 +18,7 @@ import VideoMetadataFields, {
 } from "@/app/components/VideoMetadataFields";
 import AITitleAssistModal from "@/app/components/AITitleAssistModal";
 import ShortCreationTools, { ShortSettings } from "@/app/components/ShortCreationTools";
+import { extractLocalVideoThumbnails } from "@/app/lib/videoThumbnailExtractor";
 
 // Same categories as the nav bar's category chips (shared source).
 const CATEGORIES = CONTENT_CATEGORIES;
@@ -53,9 +54,11 @@ export default function UploadPage() {
   const [tagInput, setTagInput] = useState("");
 
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+  const [localVideoFrames, setLocalVideoFrames] = useState<string[]>([]);
   const [thumbnailBusy, setThumbnailBusy] = useState(false);
   const [thumbnailError, setThumbnailError] = useState<string | null>(null);
   const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiThumbnailBusy, setAiThumbnailBusy] = useState(false);
 
   const [aiSuggestions, setAiSuggestions] = useState<string[]>([]);
   const [aiType, setAiType] = useState<"title" | "description" | "tags" | null>(null);
@@ -157,7 +160,7 @@ export default function UploadPage() {
   const [uploadedVideoId, setUploadedVideoId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-  const handleFile = (selected: File | null) => {
+  const handleFile = async (selected: File | null) => {
     if (!selected) return;
 
     if (!selected.type.startsWith("video/")) {
@@ -172,6 +175,45 @@ export default function UploadPage() {
     setTitle(nameWithoutExt);
 
     setStage("details");
+
+    // Instantly extract 4 candidate frame snapshots from the local video file!
+    try {
+      const frames = await extractLocalVideoThumbnails(selected, 4);
+      if (frames.length > 0) {
+        setLocalVideoFrames(frames);
+        setThumbnailPreview(frames[0]);
+      }
+    } catch (err) {
+      console.error("Failed to extract video frame thumbnails:", err);
+    }
+  };
+
+  const handleGenerateAIThumbnail = async () => {
+    if (aiThumbnailBusy) return;
+    setAiThumbnailBusy(true);
+    setThumbnailError(null);
+
+    try {
+      const res = await fetch("/api/ai-thumbnail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: title || description || "Video thumbnail",
+          title,
+          category,
+          generateNew: true,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "AI thumbnail generation failed.");
+      if (data.thumbnailUrl) {
+        setThumbnailPreview(data.thumbnailUrl);
+      }
+    } catch (err) {
+      setThumbnailError(err instanceof Error ? err.message : "Couldn't generate AI thumbnail.");
+    } finally {
+      setAiThumbnailBusy(false);
+    }
   };
 
   const handleDrop = (e: React.DragEvent) => {
@@ -493,6 +535,10 @@ export default function UploadPage() {
                 onFileSelected: handleThumbnailSelected,
                 busy: thumbnailBusy,
                 error: thumbnailError,
+                muxFrames: localVideoFrames,
+                onMuxThumbnailSelected: (url) => setThumbnailPreview(url),
+                onGenerateAIThumbnail: handleGenerateAIThumbnail,
+                aiThumbnailBusy: aiThumbnailBusy,
               }}
               tagInput={tagInput}
               onTagInputChange={setTagInput}

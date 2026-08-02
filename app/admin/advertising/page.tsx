@@ -5,12 +5,9 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Loader2,
   AlertTriangle,
-  CheckCircle2,
   Save,
   Upload,
   Trash2,
-  Eye,
-  MousePointerClick,
   Wand2,
   Sparkles,
   Video,
@@ -23,6 +20,7 @@ import {
   BarChart3,
   X,
   Crop,
+  RefreshCw,
 } from "lucide-react";
 import { compressImageToBanner, aiCropAndRedesignImage, extractVideoFramePoster } from "@/app/lib/imageCompress";
 import { generateAiAdData, analyzeImageAndGenerateTitle } from "@/app/lib/aiAdGenerator";
@@ -102,8 +100,6 @@ export default function AdvertisingPage() {
   const [settings, setSettings] = useState<AdSettings>(DEFAULT_SETTINGS);
 
   const [creatives, setCreatives] = useState<AdCreative[]>([]);
-  const [creativesLoading, setCreativesLoading] = useState(true);
-
   const [midrollAds, setMidrollAds] = useState<MidrollAdCreative[]>([]);
 
   // Banner Upload Form State
@@ -131,59 +127,101 @@ export default function AdvertisingPage() {
   const loadSettings = async () => {
     try {
       const res = await authedFetch("/api/admin/settings");
+      if (!res.ok) {
+        if (res.status === 401) {
+          setError("Your session expired. Please refresh the page to sign back in.");
+        } else {
+          setError(`Couldn't load settings (HTTP ${res.status}).`);
+        }
+        return;
+      }
       const data = await res.json().catch(() => ({}));
-      if (res.ok && data?.settings) {
+      if (data?.settings && typeof data.settings === "object") {
         const s = data.settings;
         setSettings({
           adsenseEnabled: Boolean(s.adsenseEnabled),
-          adsensePublisherId: s.adsensePublisherId || "",
-          homepageBannerSource: s.homepageBannerSource || "house",
-          watchPageBannerSource: s.watchPageBannerSource || "house",
-          homepageSpotlightSource: s.homepageSpotlightSource || "off",
+          adsensePublisherId: String(s.adsensePublisherId || ""),
+          homepageBannerSource: (s.homepageBannerSource as AdSlotSource) || "house",
+          watchPageBannerSource: (s.watchPageBannerSource as AdSlotSource) || "house",
+          homepageSpotlightSource: (s.homepageSpotlightSource as AdSlotSource) || "off",
           weeklyFeaturedEnabled: Boolean(s.weeklyFeaturedEnabled),
           midrollEnabled: Boolean(s.midrollEnabled),
-          midrollIntervalSeconds: s.midrollIntervalSeconds || 900,
+          midrollIntervalSeconds: Number(s.midrollIntervalSeconds) || 900,
         });
-      } else if (!res.ok) {
-        setError(data?.error || `Couldn't load settings (HTTP ${res.status}).`);
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong loading settings.");
+      console.error("Advertising settings load error:", err);
+      setError(err instanceof Error ? err.message : "Failed to load advertising settings.");
     } finally {
       setLoading(false);
     }
   };
 
   const loadCreatives = async () => {
-    setCreativesLoading(true);
     try {
       const res = await authedFetch("/api/admin/ads");
+      if (!res.ok) return;
       const data = await res.json().catch(() => ({}));
-      if (res.ok) setCreatives(data.items || []);
-    } catch {
-      // safe fallback
-    } finally {
-      setCreativesLoading(false);
+      if (Array.isArray(data?.items)) {
+        const sanitized: AdCreative[] = data.items
+          .filter((item: unknown) => item && typeof item === "object" && "adId" in item)
+          .map((item: Record<string, unknown>) => ({
+            adId: String(item.adId || ""),
+            placement: (item.placement as Placement) || "homepage",
+            imageUrl: String(item.imageUrl || ""),
+            linkUrl: String(item.linkUrl || ""),
+            title: String(item.title || ""),
+            active: Boolean(item.active),
+            createdAt: String(item.createdAt || ""),
+            impressions: Number(item.impressions || 0),
+            clicks: Number(item.clicks || 0),
+          }));
+        setCreatives(sanitized);
+      }
+    } catch (err) {
+      console.error("Ad creatives load error:", err);
     }
   };
 
   const loadMidrollAds = async () => {
     try {
       const res = await authedFetch("/api/admin/midroll-ads");
+      if (!res.ok) return;
       const data = await res.json().catch(() => ({}));
-      if (res.ok) setMidrollAds(data.items || []);
-    } catch {
-      // safe fallback
+      if (Array.isArray(data?.items)) {
+        const sanitized: MidrollAdCreative[] = data.items
+          .filter((item: unknown) => item && typeof item === "object" && "adId" in item)
+          .map((item: Record<string, unknown>) => ({
+            adId: String(item.adId || ""),
+            imageUrl: String(item.imageUrl || ""),
+            linkUrl: String(item.linkUrl || ""),
+            title: String(item.title || ""),
+            active: Boolean(item.active),
+            createdAt: String(item.createdAt || ""),
+            impressions: Number(item.impressions || 0),
+            clicks: Number(item.clicks || 0),
+            skips: Number(item.skips || 0),
+          }));
+        setMidrollAds(sanitized);
+      }
+    } catch (err) {
+      console.error("Midroll ads load error:", err);
     }
   };
 
+  const reloadAll = async () => {
+    setLoading(true);
+    setError(null);
+    await Promise.all([loadSettings(), loadCreatives(), loadMidrollAds()]);
+    setLoading(false);
+  };
+
   useEffect(() => {
-    (async () => {
-      await loadSettings();
-      await loadCreatives();
-      await loadMidrollAds();
-    })();
+    reloadAll();
   }, []);
+
+  const safeCreatives = useMemo(() => (Array.isArray(creatives) ? creatives.filter(Boolean) : []), [creatives]);
+  const safeMidrollAds = useMemo(() => (Array.isArray(midrollAds) ? midrollAds.filter(Boolean) : []), [midrollAds]);
 
   const updateSettings = <K extends keyof AdSettings>(key: K, value: AdSettings[K]) => {
     setSettings((prev) => ({ ...prev, [key]: value }));
@@ -202,16 +240,15 @@ export default function AdvertisingPage() {
         body: JSON.stringify(settings),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `Couldn't save (HTTP ${res.status}).`);
+      if (!res.ok) throw new Error(data.error || `Couldn't save settings (HTTP ${res.status}).`);
       setSaved(true);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      setError(err instanceof Error ? err.message : "Something went wrong saving settings.");
     } finally {
       setSaving(false);
     }
   };
 
-  // Clear File Selection (X Button)
   const clearFileSelection = (isMidroll = false) => {
     if (isMidroll) {
       setMidrollPreview(null);
@@ -284,7 +321,6 @@ export default function AdvertisingPage() {
     }
   };
 
-  // AI Title Generator — Vision-Assisted Analysis of Uploaded Image
   const generateTitleWithAi = async (targetPlacement: string, isMidroll = false) => {
     if (isMidroll) {
       setMidrollGeneratingTitleAi(true);
@@ -307,7 +343,6 @@ export default function AdvertisingPage() {
     }
   };
 
-  // AI Crop & Redesign Engine
   const handleAiCropAndRedesign = async (placement: Placement) => {
     if (!uploadPreview || uploadFileType === "video") return;
     setCroppingAi(true);
@@ -335,7 +370,6 @@ export default function AdvertisingPage() {
     }
   };
 
-  // Magic AI Full Auto-Generate
   const generateMagicAiAd = async (placement: Placement) => {
     if (uploadPreview) {
       await generateTitleWithAi(placement, false);
@@ -381,8 +415,10 @@ export default function AdvertisingPage() {
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Couldn't create that ad.");
-      setCreatives((prev) => [data.ad, ...prev]);
+      if (!res.ok) throw new Error(data.error || "Couldn't create that ad creative.");
+      if (data?.ad) {
+        setCreatives((prev) => [data.ad, ...prev]);
+      }
       clearFileSelection(false);
       setUploadTitle("");
       setUploadLink("");
@@ -411,8 +447,10 @@ export default function AdvertisingPage() {
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Couldn't create that ad.");
-      setMidrollAds((prev) => [data.ad, ...prev]);
+      if (!res.ok) throw new Error(data.error || "Couldn't create that ad creative.");
+      if (data?.ad) {
+        setMidrollAds((prev) => [data.ad, ...prev]);
+      }
       clearFileSelection(true);
       setMidrollTitle("");
       setMidrollLink("");
@@ -424,6 +462,7 @@ export default function AdvertisingPage() {
   };
 
   const toggleActive = async (ad: AdCreative) => {
+    if (!ad?.adId) return;
     try {
       const res = await authedFetch(`/api/admin/ads/${ad.adId}`, {
         method: "PATCH",
@@ -431,9 +470,7 @@ export default function AdvertisingPage() {
         body: JSON.stringify({ active: !ad.active }),
       });
       if (res.ok) {
-        setCreatives((prev) =>
-          prev.map((c) => (c.adId === ad.adId ? { ...c, active: !c.active } : c))
-        );
+        setCreatives((prev) => prev.map((c) => (c.adId === ad.adId ? { ...c, active: !c.active } : c)));
       }
     } catch (err) {
       window.alert(err instanceof Error ? err.message : "Something went wrong.");
@@ -441,7 +478,8 @@ export default function AdvertisingPage() {
   };
 
   const deleteCreative = async (ad: AdCreative) => {
-    if (!window.confirm(`Delete "${ad.title}"? This can't be undone.`)) return;
+    if (!ad?.adId) return;
+    if (!window.confirm(`Delete "${ad.title || "this ad"}"? This can't be undone.`)) return;
     try {
       const res = await authedFetch(`/api/admin/ads/${ad.adId}`, { method: "DELETE" });
       if (res.ok) setCreatives((prev) => prev.filter((c) => c.adId !== ad.adId));
@@ -451,6 +489,7 @@ export default function AdvertisingPage() {
   };
 
   const toggleMidrollActive = async (ad: MidrollAdCreative) => {
+    if (!ad?.adId) return;
     try {
       const res = await authedFetch(`/api/admin/midroll-ads/${ad.adId}`, {
         method: "PATCH",
@@ -466,7 +505,8 @@ export default function AdvertisingPage() {
   };
 
   const deleteMidrollAd = async (ad: MidrollAdCreative) => {
-    if (!window.confirm(`Delete "${ad.title}"? This can't be undone.`)) return;
+    if (!ad?.adId) return;
+    if (!window.confirm(`Delete "${ad.title || "this mid-roll"}"? This can't be undone.`)) return;
     try {
       const res = await authedFetch(`/api/admin/midroll-ads/${ad.adId}`, { method: "DELETE" });
       if (res.ok) setMidrollAds((prev) => prev.filter((c) => c.adId !== ad.adId));
@@ -477,27 +517,27 @@ export default function AdvertisingPage() {
 
   const totalImpressions = useMemo(
     () =>
-      creatives.reduce((acc, c) => acc + (c.impressions || 0), 0) +
-      midrollAds.reduce((acc, m) => acc + (m.impressions || 0), 0),
-    [creatives, midrollAds]
+      safeCreatives.reduce((acc, c) => acc + (Number(c.impressions) || 0), 0) +
+      safeMidrollAds.reduce((acc, m) => acc + (Number(m.impressions) || 0), 0),
+    [safeCreatives, safeMidrollAds]
   );
 
   const totalClicks = useMemo(
     () =>
-      creatives.reduce((acc, c) => acc + (c.clicks || 0), 0) +
-      midrollAds.reduce((acc, m) => acc + (m.clicks || 0), 0),
-    [creatives, midrollAds]
+      safeCreatives.reduce((acc, c) => acc + (Number(c.clicks) || 0), 0) +
+      safeMidrollAds.reduce((acc, m) => acc + (Number(m.clicks) || 0), 0),
+    [safeCreatives, safeMidrollAds]
   );
 
   const ctr = totalImpressions > 0 ? ((totalClicks / totalImpressions) * 100).toFixed(2) : "0.00";
 
   const navItems: { id: SidePanel; label: string; icon: React.ElementType; badge?: string }[] = [
     { id: "overview", label: "Overview & Stats", icon: BarChart3 },
-    { id: "homepage", label: "Homepage Banner", icon: Home, badge: String(creatives.filter((c) => c.placement === "homepage").length) },
-    { id: "watch", label: "Watch Page Banner", icon: Tv, badge: String(creatives.filter((c) => c.placement === "watch").length) },
-    { id: "weekly_featured", label: "Weekly Featured Banner", icon: Star, badge: String(creatives.filter((c) => c.placement === "weekly_featured").length) },
-    { id: "homepage_spotlight", label: "Homepage Spotlight", icon: Film, badge: String(creatives.filter((c) => c.placement === "homepage_spotlight").length) },
-    { id: "midroll", label: "Video Mid-Roll Ads", icon: Video, badge: String(midrollAds.length) },
+    { id: "homepage", label: "Homepage Banner", icon: Home, badge: String(safeCreatives.filter((c) => c.placement === "homepage").length) },
+    { id: "watch", label: "Watch Page Banner", icon: Tv, badge: String(safeCreatives.filter((c) => c.placement === "watch").length) },
+    { id: "weekly_featured", label: "Weekly Featured Banner", icon: Star, badge: String(safeCreatives.filter((c) => c.placement === "weekly_featured").length) },
+    { id: "homepage_spotlight", label: "Homepage Spotlight", icon: Film, badge: String(safeCreatives.filter((c) => c.placement === "homepage_spotlight").length) },
+    { id: "midroll", label: "Video Mid-Roll Ads", icon: Video, badge: String(safeMidrollAds.length) },
     { id: "adsense", label: "Google AdSense", icon: Globe },
     { id: "specs", label: "Poster Specs & Ratios", icon: Ruler },
   ];
@@ -578,6 +618,21 @@ export default function AdvertisingPage() {
           </div>
         </div>
 
+        {error && (
+          <div className="flex items-center justify-between rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-300 light:text-red-700">
+            <div className="flex items-center gap-2">
+              <AlertTriangle size={15} /> <span>{error}</span>
+            </div>
+            <button
+              type="button"
+              onClick={reloadAll}
+              className="flex items-center gap-1 rounded-lg bg-red-500/20 px-2.5 py-1 text-[11px] font-bold text-red-200 hover:bg-red-500/30 transition cursor-pointer"
+            >
+              <RefreshCw size={12} /> Reload Section
+            </button>
+          </div>
+        )}
+
         {/* 1. OVERVIEW & STATS PANEL */}
         {activePanel === "overview" && (
           <div className="space-y-4 max-w-3xl">
@@ -585,19 +640,19 @@ export default function AdvertisingPage() {
               <div className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4">
                 <span className="text-xs font-bold text-slate-400 light:text-slate-600">Total Active Banner Creatives</span>
                 <span className="block text-2xl font-black text-white light:text-slate-900 mt-1">
-                  {creatives.filter((c) => c.active).length}
+                  {safeCreatives.filter((c) => c.active).length}
                 </span>
               </div>
               <div className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4">
                 <span className="text-xs font-bold text-slate-400 light:text-slate-600">Active Mid-Roll Video Ads</span>
                 <span className="block text-2xl font-black text-white light:text-slate-900 mt-1">
-                  {midrollAds.filter((m) => m.active).length}
+                  {safeMidrollAds.filter((m) => m.active).length}
                 </span>
               </div>
               <div className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4">
                 <span className="text-xs font-bold text-slate-400 light:text-slate-600">Weekly Featured Carousel</span>
                 <span className="block text-sm font-black text-emerald-400 light:text-emerald-700 mt-2">
-                  {settings.weeklyFeaturedEnabled !== false ? "✓ Active (ON by default)" : "Disabled"}
+                  {settings.weeklyFeaturedEnabled ? "ON (Custom Ad Poster)" : "OFF (User Videos Mode - Default)"}
                 </span>
               </div>
             </div>
@@ -753,7 +808,7 @@ export default function AdvertisingPage() {
               {uploadPreview && (
                 <div className="space-y-2">
                   <div className="relative rounded-xl border border-white/10 light:border-black/10 overflow-hidden bg-black/40 max-h-48 flex items-center justify-center p-1">
-                    {uploadFileType === "video" ? (
+                    {uploadFileType === "video" || uploadPreview.startsWith("data:video/") ? (
                       <video src={uploadPreview} controls className="max-h-44 w-auto rounded-lg" />
                     ) : (
                       /* eslint-disable-next-line @next/next/no-img-element */
@@ -776,7 +831,7 @@ export default function AdvertisingPage() {
                   </div>
 
                   {/* AI Crop & Redesign Image Button */}
-                  {uploadFileType !== "video" && (
+                  {uploadFileType !== "video" && !uploadPreview.startsWith("data:video/") && (
                     <button
                       type="button"
                       onClick={() => handleAiCropAndRedesign(activePanel as Placement)}
@@ -809,45 +864,49 @@ export default function AdvertisingPage() {
             {/* List of Existing Creatives */}
             <div className="space-y-2">
               <h3 className="text-xs font-bold text-white light:text-slate-900">
-                Active Creatives ({creatives.filter((c) => c.placement === activePanel).length})
+                Active Creatives ({safeCreatives.filter((c) => c?.placement === activePanel).length})
               </h3>
-              {creatives.filter((c) => c.placement === activePanel).length === 0 ? (
+              {safeCreatives.filter((c) => c?.placement === activePanel).length === 0 ? (
                 <p className="text-xs text-slate-500 py-4 text-center">No ad creatives uploaded for this placement yet.</p>
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {creatives
-                    .filter((c) => c.placement === activePanel)
-                    .map((ad) => (
-                      <div key={ad.adId} className="rounded-xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-3 space-y-2">
-                        <div className="relative h-28 overflow-hidden rounded-lg border border-white/10 light:border-black/10 bg-black/40 flex items-center justify-center">
-                          {ad.imageUrl.startsWith("data:video/") || ad.imageUrl.endsWith(".mp4") ? (
-                            <video src={ad.imageUrl} controls className="h-full w-auto" />
-                          ) : (
-                            /* eslint-disable-next-line @next/next/no-img-element */
-                            <img src={ad.imageUrl} alt={ad.title} className="h-full w-full object-cover" />
-                          )}
+                  {safeCreatives
+                    .filter((c) => c?.placement === activePanel)
+                    .map((ad) => {
+                      const imgUrl = String(ad?.imageUrl || "");
+                      const isVideo = imgUrl.startsWith("data:video/") || imgUrl.endsWith(".mp4");
+                      return (
+                        <div key={ad.adId} className="rounded-xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-3 space-y-2">
+                          <div className="relative h-28 overflow-hidden rounded-lg border border-white/10 light:border-black/10 bg-black/40 flex items-center justify-center">
+                            {isVideo ? (
+                              <video src={imgUrl} controls className="h-full w-auto" />
+                            ) : (
+                              /* eslint-disable-next-line @next/next/no-img-element */
+                              <img src={imgUrl} alt={ad.title || "Ad"} className="h-full w-full object-cover" />
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between text-xs">
+                            <p className="truncate font-bold text-white light:text-slate-900">{ad.title || "Untitled Ad"}</p>
+                            <button
+                              type="button"
+                              onClick={() => toggleActive(ad)}
+                              className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                                ad.active ? "bg-emerald-500/20 text-emerald-300" : "bg-white/5 text-slate-400"
+                              }`}
+                            >
+                              {ad.active ? "Active" : "Paused"}
+                            </button>
+                          </div>
+                          <div className="flex items-center justify-between text-[11px] text-slate-500">
+                            <span>Imps: {Number(ad.impressions || 0).toLocaleString("en-IN")}</span>
+                            <span>Clicks: {Number(ad.clicks || 0).toLocaleString("en-IN")}</span>
+                            <button type="button" onClick={() => deleteCreative(ad)} className="text-red-400 hover:text-red-300">
+                              <Trash2 size={13} />
+                            </button>
+                          </div>
                         </div>
-                        <div className="flex items-center justify-between text-xs">
-                          <p className="truncate font-bold text-white light:text-slate-900">{ad.title || "Untitled Ad"}</p>
-                          <button
-                            type="button"
-                            onClick={() => toggleActive(ad)}
-                            className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                              ad.active ? "bg-emerald-500/20 text-emerald-300" : "bg-white/5 text-slate-400"
-                            }`}
-                          >
-                            {ad.active ? "Active" : "Paused"}
-                          </button>
-                        </div>
-                        <div className="flex items-center justify-between text-[11px] text-slate-500">
-                          <span>Imps: {Number(ad.impressions || 0).toLocaleString("en-IN")}</span>
-                          <span>Clicks: {Number(ad.clicks || 0).toLocaleString("en-IN")}</span>
-                          <button type="button" onClick={() => deleteCreative(ad)} className="text-red-400 hover:text-red-300">
-                            <Trash2 size={13} />
-                          </button>
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                 </div>
               )}
             </div>
@@ -940,7 +999,7 @@ export default function AdvertisingPage() {
               {midrollPreview && (
                 <div className="space-y-2">
                   <div className="relative rounded-xl border border-white/10 light:border-black/10 overflow-hidden bg-black/40 max-h-48 flex items-center justify-center p-1">
-                    {midrollFileType === "video" ? (
+                    {midrollFileType === "video" || midrollPreview.startsWith("data:video/") ? (
                       <video src={midrollPreview} controls className="max-h-44 w-auto rounded-lg" />
                     ) : (
                       /* eslint-disable-next-line @next/next/no-img-element */
@@ -958,7 +1017,7 @@ export default function AdvertisingPage() {
                     </button>
                   </div>
 
-                  {midrollFileType !== "video" && (
+                  {midrollFileType !== "video" && !midrollPreview.startsWith("data:video/") && (
                     <button
                       type="button"
                       onClick={handleAiCropMidroll}
@@ -990,37 +1049,41 @@ export default function AdvertisingPage() {
 
             {/* List */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {midrollAds.map((ad) => (
-                <div key={ad.adId} className="rounded-xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-3 space-y-2">
-                  <div className="relative h-28 overflow-hidden rounded-lg border border-white/10 light:border-black/10 bg-black/40 flex items-center justify-center">
-                    {ad.imageUrl.startsWith("data:video/") || ad.imageUrl.endsWith(".mp4") ? (
-                      <video src={ad.imageUrl} controls className="h-full w-auto" />
-                    ) : (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={ad.imageUrl} alt={ad.title} className="h-full w-full object-cover" />
-                    )}
+              {safeMidrollAds.map((ad) => {
+                const imgUrl = String(ad?.imageUrl || "");
+                const isVideo = imgUrl.startsWith("data:video/") || imgUrl.endsWith(".mp4");
+                return (
+                  <div key={ad.adId} className="rounded-xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-3 space-y-2">
+                    <div className="relative h-28 overflow-hidden rounded-lg border border-white/10 light:border-black/10 bg-black/40 flex items-center justify-center">
+                      {isVideo ? (
+                        <video src={imgUrl} controls className="h-full w-auto" />
+                      ) : (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img src={imgUrl} alt={ad.title || "Midroll"} className="h-full w-full object-cover" />
+                      )}
+                    </div>
+                    <div className="flex items-center justify-between text-xs">
+                      <p className="truncate font-bold text-white light:text-slate-900">{ad.title || "Untitled Mid-Roll"}</p>
+                      <button
+                        type="button"
+                        onClick={() => toggleMidrollActive(ad)}
+                        className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
+                          ad.active ? "bg-emerald-500/20 text-emerald-300" : "bg-white/5 text-slate-400"
+                        }`}
+                      >
+                        {ad.active ? "Active" : "Paused"}
+                      </button>
+                    </div>
+                    <div className="flex items-center justify-between text-[11px] text-slate-500">
+                      <span>Imps: {Number(ad.impressions || 0).toLocaleString("en-IN")}</span>
+                      <span>Clicks: {Number(ad.clicks || 0).toLocaleString("en-IN")}</span>
+                      <button type="button" onClick={() => deleteMidrollAd(ad)} className="text-red-400 hover:text-red-300">
+                        <Trash2 size={13} />
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <p className="truncate font-bold text-white light:text-slate-900">{ad.title || "Untitled Mid-Roll"}</p>
-                    <button
-                      type="button"
-                      onClick={() => toggleMidrollActive(ad)}
-                      className={`rounded-full px-2.5 py-0.5 text-[10px] font-bold ${
-                        ad.active ? "bg-emerald-500/20 text-emerald-300" : "bg-white/5 text-slate-400"
-                      }`}
-                    >
-                      {ad.active ? "Active" : "Paused"}
-                    </button>
-                  </div>
-                  <div className="flex items-center justify-between text-[11px] text-slate-500">
-                    <span>Imps: {Number(ad.impressions || 0).toLocaleString("en-IN")}</span>
-                    <span>Clicks: {Number(ad.clicks || 0).toLocaleString("en-IN")}</span>
-                    <button type="button" onClick={() => deleteMidrollAd(ad)} className="text-red-400 hover:text-red-300">
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
         )}

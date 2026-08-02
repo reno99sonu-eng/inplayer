@@ -202,6 +202,7 @@ export default function UploadPage() {
           title,
           category,
           generateNew: true,
+          frameUrls: localVideoFrames,
         }),
       });
       const data = await res.json();

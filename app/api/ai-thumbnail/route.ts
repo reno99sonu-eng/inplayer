@@ -23,8 +23,11 @@ export async function POST(request: NextRequest) {
     if (generateNew || (prompt && typeof prompt === "string" && !frameUrls?.length)) {
       if (process.env.OPENAI_API_KEY) {
         try {
-          const imagePrompt = `High quality, cinematic, vibrant YouTube video thumbnail for a video titled "${title || prompt}". Category: ${category || "General"}. Professional lighting, crisp details, no text overlay, 16:9 ratio.`;
+          const cleanTitle = (title || prompt || "Vibrant video thumbnail").trim();
+          const imagePrompt = `High quality, cinematic, vibrant video thumbnail for "${cleanTitle}". Category: ${category || "General"}. Professional studio lighting, ultra detailed, eye-catching composition, 16:9 ratio.`;
           
+          console.log("Generating DALL-E 3 image with prompt:", imagePrompt);
+
           const dallEResponse = await fetch("https://api.openai.com/v1/images/generations", {
             method: "POST",
             headers: {
@@ -40,9 +43,10 @@ export async function POST(request: NextRequest) {
             }),
           });
 
+          const dallEData = await dallEResponse.json();
+
           if (dallEResponse.ok) {
-            const data = await dallEResponse.json();
-            const generatedUrl = data?.data?.[0]?.url;
+            const generatedUrl = dallEData?.data?.[0]?.url;
             if (generatedUrl) {
               return NextResponse.json({
                 thumbnailUrl: generatedUrl,
@@ -50,23 +54,39 @@ export async function POST(request: NextRequest) {
                 reason: "Custom AI video thumbnail generated using DALL-E 3.",
               });
             }
+          } else {
+            console.error("DALL-E 3 generation failed:", dallEData);
+            const apiMsg = dallEData?.error?.message || "DALL-E 3 generation failed.";
+            return NextResponse.json(
+              { error: `AI Image Generation error: ${apiMsg}` },
+              { status: dallEResponse.status || 500 }
+            );
           }
         } catch (genErr) {
-          console.error("DALL-E thumbnail generation error:", genErr);
+          console.error("DALL-E thumbnail generation exception:", genErr);
+          return NextResponse.json(
+            { error: "Couldn't generate AI thumbnail image right now. Please try again." },
+            { status: 500 }
+          );
         }
+      } else {
+        return NextResponse.json(
+          { error: "OPENAI_API_KEY is required for AI Image Generation." },
+          { status: 500 }
+        );
       }
     }
 
     // MODE B: OpenAI GPT-4o-mini Vision Frame Selection
     if (!Array.isArray(frameUrls) || frameUrls.length === 0) {
       return NextResponse.json(
-        { error: "No candidate thumbnail frames or generation prompt provided." },
+        { error: "No candidate thumbnail frames provided." },
         { status: 400 }
       );
     }
 
     const candidates = frameUrls
-      .filter((u): u is string => typeof u === "string" && u.startsWith("https://"))
+      .filter((u): u is string => typeof u === "string" && (u.startsWith("https://") || u.startsWith("data:image/")))
       .slice(0, MAX_FRAMES);
 
     if (candidates.length === 0) {

@@ -93,12 +93,23 @@ function SourcePicker({
   );
 }
 
+const DEFAULT_SETTINGS: AdSettings = {
+  adsenseEnabled: false,
+  adsensePublisherId: "",
+  homepageBannerSource: "house",
+  watchPageBannerSource: "house",
+  homepageSpotlightSource: "off",
+  weeklyFeaturedEnabled: true,
+  midrollEnabled: true,
+  midrollIntervalSeconds: 900,
+};
+
 export default function AdvertisingPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-  const [settings, setSettings] = useState<AdSettings | null>(null);
+  const [settings, setSettings] = useState<AdSettings>(DEFAULT_SETTINGS);
 
   const [creatives, setCreatives] = useState<AdCreative[]>([]);
   const [creativesLoading, setCreativesLoading] = useState(true);
@@ -128,20 +139,23 @@ export default function AdvertisingPage() {
     try {
       const res = await authedFetch("/api/admin/settings");
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `Couldn't load settings (HTTP ${res.status}).`);
-      const s = data?.settings || {};
-      setSettings({
-        adsenseEnabled: Boolean(s.adsenseEnabled),
-        adsensePublisherId: s.adsensePublisherId || "",
-        homepageBannerSource: s.homepageBannerSource || "off",
-        watchPageBannerSource: s.watchPageBannerSource || "off",
-        homepageSpotlightSource: s.homepageSpotlightSource || "off",
-        weeklyFeaturedEnabled: s.weeklyFeaturedEnabled !== false,
-        midrollEnabled: Boolean(s.midrollEnabled),
-        midrollIntervalSeconds: s.midrollIntervalSeconds || 300,
-      });
+      if (res.ok && data?.settings) {
+        const s = data.settings;
+        setSettings({
+          adsenseEnabled: Boolean(s.adsenseEnabled),
+          adsensePublisherId: s.adsensePublisherId || "",
+          homepageBannerSource: s.homepageBannerSource || "house",
+          watchPageBannerSource: s.watchPageBannerSource || "house",
+          homepageSpotlightSource: s.homepageSpotlightSource || "off",
+          weeklyFeaturedEnabled: s.weeklyFeaturedEnabled !== false,
+          midrollEnabled: Boolean(s.midrollEnabled),
+          midrollIntervalSeconds: s.midrollIntervalSeconds || 900,
+        });
+      } else if (!res.ok) {
+        setError(data?.error || `Couldn't load settings (HTTP ${res.status}).`);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      setError(err instanceof Error ? err.message : "Something went wrong loading settings.");
     } finally {
       setLoading(false);
     }
@@ -152,10 +166,13 @@ export default function AdvertisingPage() {
     try {
       const res = await authedFetch("/api/admin/ads");
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `Couldn't load ad creatives (HTTP ${res.status}).`);
-      setCreatives(data.items || []);
+      if (res.ok) {
+        setCreatives(data.items || []);
+      } else {
+        setCreativesError(data?.error || `Couldn't load ad creatives (HTTP ${res.status}).`);
+      }
     } catch (err) {
-      setCreativesError(err instanceof Error ? err.message : "Something went wrong.");
+      setCreativesError(err instanceof Error ? err.message : "Something went wrong loading ad creatives.");
     } finally {
       setCreativesLoading(false);
     }
@@ -176,10 +193,13 @@ export default function AdvertisingPage() {
     try {
       const res = await authedFetch("/api/admin/midroll-ads");
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `Couldn't load mid-roll creatives (HTTP ${res.status}).`);
-      setMidrollAds(data.items || []);
+      if (res.ok) {
+        setMidrollAds(data.items || []);
+      } else {
+        setMidrollError(data?.error || `Couldn't load mid-roll creatives (HTTP ${res.status}).`);
+      }
     } catch (err) {
-      setMidrollError(err instanceof Error ? err.message : "Something went wrong.");
+      setMidrollError(err instanceof Error ? err.message : "Something went wrong loading mid-roll creatives.");
     } finally {
       setMidrollLoading(false);
     }
@@ -376,14 +396,7 @@ export default function AdvertisingPage() {
     );
   }
 
-  if (!settings) {
-    return (
-      <div className="flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300 light:text-red-700">
-        <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
-        <span>{error || "Couldn't load Advertising."}</span>
-      </div>
-    );
-  }
+
 
   return (
     <div>

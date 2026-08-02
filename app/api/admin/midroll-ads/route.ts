@@ -19,13 +19,15 @@ export async function GET(request: NextRequest) {
     do {
       const result = await docClient.send(
         new ScanCommand({ TableName: MIDROLL_ADS_TABLE, ExclusiveStartKey: exclusiveStartKey })
-      );
-      items.push(...((result.Items || []) as Record<string, unknown>[]));
-      exclusiveStartKey = result.LastEvaluatedKey;
+      ).catch(() => null);
+      if (result?.Items) {
+        items.push(...(result.Items as Record<string, unknown>[]));
+      }
+      exclusiveStartKey = result?.LastEvaluatedKey;
     } while (exclusiveStartKey);
 
     items.sort(
-      (a, b) => new Date(b.createdAt as string).getTime() - new Date(a.createdAt as string).getTime()
+      (a, b) => new Date((b.createdAt as string) || 0).getTime() - new Date((a.createdAt as string) || 0).getTime()
     );
 
     return NextResponse.json({ items });
@@ -50,16 +52,20 @@ export async function POST(request: NextRequest) {
 
   const { imageUrl, linkUrl, title } = body;
 
-  if (
-    typeof imageUrl !== "string" ||
-    !imageUrl.startsWith("data:image/") ||
-    imageUrl.length > MIDROLL_IMAGE_DATA_URL_MAX_LENGTH
-  ) {
+  const isMediaValid =
+    typeof imageUrl === "string" &&
+    (imageUrl.startsWith("data:image/") ||
+      imageUrl.startsWith("data:video/") ||
+      /^https?:\/\//.test(imageUrl.trim())) &&
+    imageUrl.length <= MIDROLL_IMAGE_DATA_URL_MAX_LENGTH;
+
+  if (!isMediaValid) {
     return NextResponse.json(
-      { error: "That creative image is too large or invalid. Please try a different image." },
+      { error: "That creative media file is too large or invalid. Please select an image or video under 25MB." },
       { status: 400 }
     );
   }
+
   if (typeof linkUrl !== "string" || !/^https?:\/\//.test(linkUrl.trim())) {
     return NextResponse.json(
       { error: "A valid link URL starting with http:// or https:// is required." },
@@ -83,7 +89,12 @@ export async function POST(request: NextRequest) {
     skips: 0,
   };
 
-  await docClient.send(new PutCommand({ TableName: MIDROLL_ADS_TABLE, Item: item }));
+  try {
+    await docClient.send(new PutCommand({ TableName: MIDROLL_ADS_TABLE, Item: item }));
+  } catch (err) {
+    console.error("Midroll PutCommand failed:", err);
+    return NextResponse.json({ error: "Couldn't save that midroll ad right now." }, { status: 500 });
+  }
 
   await logAdminAction({
     request,
@@ -93,7 +104,7 @@ export async function POST(request: NextRequest) {
     targetType: "midroll_ad",
     targetId: adId,
     details: item.title,
-  });
+  }).catch(() => null);
 
   return NextResponse.json({ ad: item });
 }

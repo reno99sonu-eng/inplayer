@@ -58,6 +58,7 @@ export async function POST(request: NextRequest) {
         title: video?.title || "Unknown video",
         thumbnailUrl: video?.thumbnailUrl || "",
         category: video?.category || "",
+        contentType: video?.contentType || "video",
         watchedAt: new Date().toISOString(),
       },
     })

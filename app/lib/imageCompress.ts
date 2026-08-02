@@ -251,8 +251,8 @@ function cropAndCompressToBanner(
     return canvas.toDataURL("image/jpeg", quality);
   };
 
-  const widths = [960, 720, 480, 320];
-  const qualities = [0.7, 0.5, 0.35, 0.22];
+  const widths = [1440, 1280, 1024, 768];
+  const qualities = [0.85, 0.75, 0.65, 0.5];
 
   let best = renderAt(widths[0], qualities[0]);
   for (const width of widths) {
@@ -272,7 +272,7 @@ function cropAndCompressToBanner(
 
 export function compressImageToBanner(
   file: File,
-  targetMaxLength = 45_000,
+  targetMaxLength = 140_000,
   aspectRatio = 3.2
 ): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -304,7 +304,7 @@ export function compressImageToBanner(
 // needed since there's nothing on disk to read.
 export function compressDataUrlToBanner(
   dataUrl: string,
-  targetMaxLength = 45_000,
+  targetMaxLength = 140_000,
   aspectRatio = 3.2
 ): Promise<string> {
   return new Promise((resolve, reject) => {

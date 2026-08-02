@@ -10,7 +10,7 @@ import { verifyAuth } from "@/app/lib/verifyAuth";
 // DynamoDB's single hard 400KB-per-item limit alongside username,
 // socialLinks, description, etc. — a generous cap here could silently
 // break the avatar save (or vice versa) for someone who's maxed out both.
-const COVER_PHOTO_MAX_LENGTH = 45_000;
+const COVER_PHOTO_MAX_LENGTH = 150_000;
 // Headroom deliberately left, on top of that, for every other attribute
 // this item carries — checked below against whatever avatarUrl already
 // exists, so the two images can never combine to blow past the real

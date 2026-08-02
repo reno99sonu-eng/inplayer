@@ -430,28 +430,19 @@ export default function ShortsPageContent({
   // which is exactly the bug where sound only ever worked after clicking
   // mute then unmute (only that second click landed as a genuine
   // in-the-moment gesture).
-  const toggleMuted = () => {
-    setMuted((m) => {
-      const next = !m;
-      const player = playerRef.current;
-      if (player) {
-        player.muted = next;
-        if (!next) {
-          player.play?.().catch(() => {});
-        }
+  const togglePlayPause = () => {
+    const player = playerRef.current;
+    if (player) {
+      if (player.paused) {
+        player.play?.().catch(() => {});
+      } else {
+        player.pause?.();
       }
-      return next;
-    });
+    }
   };
 
-  // A tap on the video: always toggles mute immediately (synchronously,
-  // see toggleMuted above). If a second tap follows quickly, ALSO treat
-  // it as a double-tap (like), same as Instagram/TikTok — mute getting
-  // toggled twice during a double-tap is harmless, it just ends back
-  // where it started. Works identically for mouse clicks and touch taps
-  // since it's driven by the ordinary "click" event, not dblclick.
   const handleVideoTap = (short: Short, index: number) => {
-    toggleMuted();
+    togglePlayPause();
 
     if (tapTimerRef.current) {
       clearTimeout(tapTimerRef.current);
@@ -665,7 +656,7 @@ export default function ShortsPageContent({
         </button>
 
         <h1 className="text-sm font-black text-white lg:text-base">
-          Shorts
+          Raftaar
         </h1>
 
         <button
@@ -1102,15 +1093,6 @@ export default function ShortsPageContent({
                       Save
                     </span>
                   </button>
-
-                  {short.videoId && (
-                    <Link
-                      href={`/watch/${short.videoId}`}
-                      className="mt-1 text-[9px] font-semibold text-slate-300 underline underline-offset-2"
-                    >
-                      Full page
-                    </Link>
-                  )}
                 </div>
               </div>
             </div>

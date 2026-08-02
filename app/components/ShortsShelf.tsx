@@ -12,11 +12,11 @@ interface ShortsShelfProps {
 
 export default function ShortsShelf({ items, renderFooter }: ShortsShelfProps) {
   return (
-    <section className="mx-auto max-w-[1800px] px-3 lg:px-8 py-3 lg:py-8">
-      <div className="mb-3 lg:mb-6 flex items-center gap-2 lg:gap-3">
-        <span className="text-3xl">🔥</span>
+    <section className="mx-auto max-w-[1800px] px-3 py-1.5 lg:px-8 lg:py-3">
+      <div className="mb-2 flex items-center gap-2 lg:mb-3">
+        <span className="text-xl sm:text-2xl">🔥</span>
 
-        <h2 className="text-3xl font-bold text-white light:text-slate-900">
+        <h2 className="text-xl font-black text-white sm:text-2xl light:text-slate-900">
           Raftaar
         </h2>
       </div>

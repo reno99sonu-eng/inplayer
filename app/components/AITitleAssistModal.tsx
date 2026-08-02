@@ -46,8 +46,8 @@ export default function AITitleAssistModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/75 p-4 backdrop-blur-md">
-      <div className="w-full max-w-lg rounded-3xl border border-orange-400/25 bg-[#08111F] p-5 shadow-[0_25px_90px_rgba(0,0,0,.55)] light:bg-[#F5EEDC] sm:p-6">
+    <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/75 p-3 backdrop-blur-md sm:p-4">
+      <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-3xl border border-orange-400/25 bg-[#08111F] p-4 shadow-[0_25px_90px_rgba(0,0,0,.55)] light:bg-[#F5EEDC] sm:p-6 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <div className="flex items-start justify-between gap-3">
           <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-orange-500/15 text-orange-300">
             <Sparkles size={20} />

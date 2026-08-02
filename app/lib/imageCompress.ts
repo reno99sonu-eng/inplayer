@@ -1,5 +1,4 @@
-// Resizes and compresses an image file entirely in the browser before
-// upload, using a canvas.
+// Resizes and compresses an image file entirely in the browser before upload using canvas.
 export function compressImage(
   file: File,
   maxSize = 200,
@@ -257,7 +256,7 @@ export function compressDataUrlToBanner(
       try {
         resolve(cropAndCompressToBanner(img, targetMaxLength, aspectRatio));
       } catch (err) {
-        reject(err instanceof Error ? err : new Error("Couldn't process that image."));
+        reject(err instanceof Error ? err : new Error("Couldn't process the generated image."));
       }
     };
 
@@ -266,8 +265,7 @@ export function compressDataUrlToBanner(
   });
 }
 
-// AI Crop & Redesign Engine — Crops an image to the exact target aspect ratio
-// and applies AI canvas redesign filters (contrast boost, saturation, soft vignette)
+// AI Crop & Redesign Engine — Crops an image to target aspect ratio with visual filter enhancements
 export function aiCropAndRedesignImage(
   dataUrl: string,
   aspectRatio = 3.2,
@@ -299,14 +297,11 @@ export function aiCropAndRedesignImage(
         const ctx = canvas.getContext("2d");
         if (!ctx) throw new Error("Canvas is not supported in this browser.");
 
-        // AI Redesign Filters: Boost contrast, saturation, and crispness
         ctx.filter = "contrast(1.12) saturate(1.2) brightness(1.02)";
         ctx.drawImage(img, cropX, cropY, cropWidth, cropHeight, 0, 0, outWidth, outHeight);
 
-        // Reset filter for vignette overlay
         ctx.filter = "none";
 
-        // Soft Gradient Vignette Overlay for Premium Ad Finish
         const vignette = ctx.createLinearGradient(0, outHeight * 0.4, 0, outHeight);
         vignette.addColorStop(0, "rgba(0,0,0,0)");
         vignette.addColorStop(1, "rgba(0,0,0,0.45)");
@@ -320,5 +315,49 @@ export function aiCropAndRedesignImage(
     };
     img.onerror = () => reject(new Error("Couldn't load source image for AI crop."));
     img.src = dataUrl;
+  });
+}
+
+// Extract Video Hero Frame & Compress to Poster Image Data URL (<100KB)
+export function extractVideoFramePoster(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    video.playsInline = true;
+    video.muted = true;
+
+    const url = URL.createObjectURL(file);
+    video.src = url;
+
+    video.onloadedmetadata = () => {
+      video.currentTime = Math.min(1, (video.duration || 2) / 2);
+    };
+
+    video.onseeked = () => {
+      try {
+        const canvas = document.createElement("canvas");
+        canvas.width = Math.min(1200, video.videoWidth || 640);
+        canvas.height = canvas.width / ((video.videoWidth || 16) / (video.videoHeight || 9));
+
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          URL.revokeObjectURL(url);
+          reject(new Error("Canvas context unavailable."));
+          return;
+        }
+
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        URL.revokeObjectURL(url);
+        resolve(canvas.toDataURL("image/jpeg", 0.82));
+      } catch (err) {
+        URL.revokeObjectURL(url);
+        reject(err instanceof Error ? err : new Error("Failed to extract video poster frame."));
+      }
+    };
+
+    video.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Couldn't read video file for poster extraction."));
+    };
   });
 }

@@ -4,9 +4,10 @@ import { randomUUID } from "crypto";
 import { docClient } from "@/app/lib/dynamodb";
 import { requireAdmin } from "@/app/lib/isAdmin";
 import { logAdminAction } from "@/app/lib/auditLog";
-import { AD_CREATIVES_TABLE, AD_IMAGE_DATA_URL_MAX_LENGTH, AdPlacement } from "@/app/lib/adCreatives";
+import { AD_CREATIVES_TABLE, AdPlacement } from "@/app/lib/adCreatives";
 
 const VALID_PLACEMENTS: AdPlacement[] = ["homepage", "watch", "homepage_spotlight", "weekly_featured"];
+const MAX_ITEM_PAYLOAD_LENGTH = 350_000;
 
 export async function GET(request: NextRequest) {
   try {
@@ -62,12 +63,21 @@ export async function POST(request: NextRequest) {
     typeof imageUrl === "string" &&
     (imageUrl.startsWith("data:image/") ||
       imageUrl.startsWith("data:video/") ||
-      /^https?:\/\//.test(imageUrl.trim())) &&
-    imageUrl.length <= AD_IMAGE_DATA_URL_MAX_LENGTH;
+      /^https?:\/\//.test(imageUrl.trim()));
 
   if (!isMediaValid) {
     return NextResponse.json(
-      { error: "That creative media file is too large or invalid. Please select an image or video under 25MB." },
+      { error: "A valid image or video media file is required." },
+      { status: 400 }
+    );
+  }
+
+  if (imageUrl.length > MAX_ITEM_PAYLOAD_LENGTH) {
+    return NextResponse.json(
+      {
+        error:
+          "That video or media file exceeds the database item limit. Please select an image poster or a smaller video clip.",
+      },
       { status: 400 }
     );
   }

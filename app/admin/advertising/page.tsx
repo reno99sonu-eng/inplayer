@@ -24,7 +24,7 @@ import {
   X,
   Crop,
 } from "lucide-react";
-import { compressImageToBanner, aiCropAndRedesignImage } from "@/app/lib/imageCompress";
+import { compressImageToBanner, aiCropAndRedesignImage, extractVideoFramePoster } from "@/app/lib/imageCompress";
 import { generateAiAdData, analyzeImageAndGenerateTitle } from "@/app/lib/aiAdGenerator";
 
 type AdSlotSource = "house" | "adsense" | "off";
@@ -230,14 +230,20 @@ export default function AdvertisingPage() {
     setUploadError(null);
     try {
       if (file.type.startsWith("video/")) {
-        setUploadFileType("video");
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          if (typeof event.target?.result === "string") {
-            setUploadPreview(event.target.result);
-          }
-        };
-        reader.readAsDataURL(file);
+        if (file.size <= 250_000) {
+          setUploadFileType("video");
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            if (typeof event.target?.result === "string") {
+              setUploadPreview(event.target.result);
+            }
+          };
+          reader.readAsDataURL(file);
+        } else {
+          setUploadFileType("image");
+          const poster = await extractVideoFramePoster(file);
+          setUploadPreview(poster);
+        }
       } else {
         setUploadFileType("image");
         const compressed = await compressImageToBanner(file);
@@ -254,14 +260,20 @@ export default function AdvertisingPage() {
     setMidrollUploadError(null);
     try {
       if (file.type.startsWith("video/")) {
-        setMidrollFileType("video");
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          if (typeof event.target?.result === "string") {
-            setMidrollPreview(event.target.result);
-          }
-        };
-        reader.readAsDataURL(file);
+        if (file.size <= 250_000) {
+          setMidrollFileType("video");
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            if (typeof event.target?.result === "string") {
+              setMidrollPreview(event.target.result);
+            }
+          };
+          reader.readAsDataURL(file);
+        } else {
+          setMidrollFileType("image");
+          const poster = await extractVideoFramePoster(file);
+          setMidrollPreview(poster);
+        }
       } else {
         setMidrollFileType("image");
         const compressed = await compressImageToBanner(file);

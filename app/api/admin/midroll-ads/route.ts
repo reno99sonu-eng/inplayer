@@ -4,7 +4,10 @@ import { randomUUID } from "crypto";
 import { docClient } from "@/app/lib/dynamodb";
 import { requireAdmin } from "@/app/lib/isAdmin";
 import { logAdminAction } from "@/app/lib/auditLog";
-import { MIDROLL_ADS_TABLE, MIDROLL_IMAGE_DATA_URL_MAX_LENGTH } from "@/app/lib/videoAds";
+import { MIDROLL_ADS_TABLE } from "@/app/lib/videoAds";
+
+// Safe maximum item size budget for DynamoDB (DynamoDB hard limit is 400KB)
+const MAX_ITEM_PAYLOAD_LENGTH = 350_000;
 
 export async function GET(request: NextRequest) {
   try {
@@ -56,12 +59,21 @@ export async function POST(request: NextRequest) {
     typeof imageUrl === "string" &&
     (imageUrl.startsWith("data:image/") ||
       imageUrl.startsWith("data:video/") ||
-      /^https?:\/\//.test(imageUrl.trim())) &&
-    imageUrl.length <= MIDROLL_IMAGE_DATA_URL_MAX_LENGTH;
+      /^https?:\/\//.test(imageUrl.trim()));
 
   if (!isMediaValid) {
     return NextResponse.json(
-      { error: "That creative media file is too large or invalid. Please select an image or video under 25MB." },
+      { error: "A valid image or video media file is required." },
+      { status: 400 }
+    );
+  }
+
+  if (imageUrl.length > MAX_ITEM_PAYLOAD_LENGTH) {
+    return NextResponse.json(
+      {
+        error:
+          "That video or media file exceeds the database item limit. Please select an image poster or a smaller video clip.",
+      },
       { status: 400 }
     );
   }
@@ -93,7 +105,10 @@ export async function POST(request: NextRequest) {
     await docClient.send(new PutCommand({ TableName: MIDROLL_ADS_TABLE, Item: item }));
   } catch (err) {
     console.error("Midroll PutCommand failed:", err);
-    return NextResponse.json({ error: "Couldn't save that midroll ad right now." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Couldn't save that midroll ad right now. Please compress or choose a smaller media file." },
+      { status: 500 }
+    );
   }
 
   await logAdminAction({

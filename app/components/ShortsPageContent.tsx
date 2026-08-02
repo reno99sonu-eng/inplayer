@@ -430,6 +430,20 @@ export default function ShortsPageContent({
   // which is exactly the bug where sound only ever worked after clicking
   // mute then unmute (only that second click landed as a genuine
   // in-the-moment gesture).
+  const toggleMuted = () => {
+    setMuted((m) => {
+      const next = !m;
+      const player = playerRef.current;
+      if (player) {
+        player.muted = next;
+        if (!next) {
+          player.play?.().catch(() => {});
+        }
+      }
+      return next;
+    });
+  };
+
   const togglePlayPause = () => {
     const player = playerRef.current;
     if (player) {

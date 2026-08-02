@@ -13,17 +13,23 @@ import {
   MousePointerClick,
   ImagePlus,
   Search,
+  Wand2,
+  Sparkles,
+  SlidersHorizontal,
+  LayoutGrid,
+  Video,
 } from "lucide-react";
 import { compressImageToBanner } from "@/app/lib/imageCompress";
-
+import { generateAiAdData } from "@/app/lib/aiAdGenerator";
 
 type AdSlotSource = "house" | "adsense" | "off";
-type Placement = "homepage" | "watch" | "homepage_spotlight";
+type Placement = "homepage" | "watch" | "homepage_spotlight" | "weekly_featured";
 
 const PLACEMENT_LABELS: Record<Placement, string> = {
   homepage: "Homepage banner",
-  watch: "Watch page",
+  watch: "Watch page banner",
   homepage_spotlight: "Homepage spotlight",
+  weekly_featured: "Weekly Featured banner",
 };
 
 interface AdSettings {
@@ -74,16 +80,16 @@ function SourcePicker({
     { value: "adsense", label: "AdSense" },
   ];
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex items-center gap-1">
       {options.map((o) => (
         <button
           key={o.value}
           type="button"
           onClick={() => onChange(o.value)}
-          className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
+          className={`rounded-full px-2.5 py-1 text-xs font-bold transition ${
             value === o.value
               ? "bg-indigo-600 text-white shadow-sm"
-              : "bg-white/5 text-slate-300 hover:bg-white/10 light:bg-slate-200/80 light:text-slate-800 light:hover:bg-slate-300"
+              : "bg-white/5 text-slate-300 hover:bg-white/10 light:bg-slate-200 light:text-slate-800 light:hover:bg-slate-300"
           }`}
         >
           {o.label}
@@ -105,6 +111,7 @@ const DEFAULT_SETTINGS: AdSettings = {
 };
 
 export default function AdvertisingPage() {
+  const [activeTab, setActiveTab] = useState<"settings" | "banners" | "midrolls">("settings");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -134,6 +141,16 @@ export default function AdvertisingPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [midrollAds, setMidrollAds] = useState<MidrollAdCreative[]>([]);
+  const [midrollLoading, setMidrollLoading] = useState(true);
+  const [midrollError, setMidrollError] = useState<string | null>(null);
+  const [midrollTitle, setMidrollTitle] = useState("");
+  const [midrollLink, setMidrollLink] = useState("");
+  const [midrollPreview, setMidrollPreview] = useState<string | null>(null);
+  const [midrollUploading, setMidrollUploading] = useState(false);
+  const [midrollUploadError, setMidrollUploadError] = useState<string | null>(null);
+  const midrollFileInputRef = useRef<HTMLInputElement>(null);
 
   const loadSettings = async () => {
     try {
@@ -178,16 +195,6 @@ export default function AdvertisingPage() {
     }
   };
 
-  const [midrollAds, setMidrollAds] = useState<MidrollAdCreative[]>([]);
-  const [midrollLoading, setMidrollLoading] = useState(true);
-  const [midrollError, setMidrollError] = useState<string | null>(null);
-  const [midrollTitle, setMidrollTitle] = useState("");
-  const [midrollLink, setMidrollLink] = useState("");
-  const [midrollPreview, setMidrollPreview] = useState<string | null>(null);
-  const [midrollUploading, setMidrollUploading] = useState(false);
-  const [midrollUploadError, setMidrollUploadError] = useState<string | null>(null);
-  const midrollFileInputRef = useRef<HTMLInputElement>(null);
-
   const loadMidrollAds = async () => {
     setMidrollLoading(true);
     try {
@@ -214,12 +221,12 @@ export default function AdvertisingPage() {
   }, []);
 
   const update = <K extends keyof AdSettings>(key: K, value: AdSettings[K]) => {
-    setSettings((prev) => (prev ? { ...prev, [key]: value } : prev));
+    setSettings((prev) => ({ ...prev, [key]: value }));
     setSaved(false);
   };
 
   const saveSettings = async () => {
-    if (!settings || saving) return;
+    if (saving) return;
     setSaving(true);
     setError(null);
     setSaved(false);
@@ -259,6 +266,20 @@ export default function AdvertisingPage() {
     } catch (err) {
       setUploadError(err instanceof Error ? err.message : "Couldn't process that file.");
     }
+  };
+
+  const generateAiBannerAd = () => {
+    const aiData = generateAiAdData(uploadPlacement);
+    setUploadTitle(aiData.title);
+    setUploadLink(aiData.linkUrl);
+    setUploadPreview(aiData.imageUrl);
+  };
+
+  const generateAiMidrollAd = () => {
+    const aiData = generateAiAdData("midroll");
+    setMidrollTitle(aiData.title);
+    setMidrollLink(aiData.linkUrl);
+    setMidrollPreview(aiData.imageUrl);
   };
 
   const canUpload =
@@ -388,6 +409,22 @@ export default function AdvertisingPage() {
     }
   };
 
+  const totalImpressions = useMemo(
+    () =>
+      creatives.reduce((acc, c) => acc + (c.impressions || 0), 0) +
+      midrollAds.reduce((acc, m) => acc + (m.impressions || 0), 0),
+    [creatives, midrollAds]
+  );
+
+  const totalClicks = useMemo(
+    () =>
+      creatives.reduce((acc, c) => acc + (c.clicks || 0), 0) +
+      midrollAds.reduce((acc, m) => acc + (m.clicks || 0), 0),
+    [creatives, midrollAds]
+  );
+
+  const ctr = totalImpressions > 0 ? ((totalClicks / totalImpressions) * 100).toFixed(2) : "0.00";
+
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20 text-slate-400">
@@ -396,170 +433,160 @@ export default function AdvertisingPage() {
     );
   }
 
-
-
   return (
-    <div>
-      <div>
-        <h2 className="text-xl font-black text-white light:text-slate-900">Advertising</h2>
-        <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
-          Real ad slots on the homepage and watch page — each can show your own house creative, a
-          real Google AdSense unit, or nothing at all.
-        </p>
+    <div className="space-y-4">
+      {/* Header & Compact Stats Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-white/10 light:border-black/10 pb-3">
+        <div>
+          <h2 className="text-xl font-black text-white light:text-slate-900 flex items-center gap-2">
+            Advertising Console
+          </h2>
+          <p className="text-xs text-slate-400 light:text-slate-600">
+            Manage banner placements, weekly featured ads, and video player mid-roll ads.
+          </p>
+        </div>
+
+        {/* Compact Stat Cards */}
+        <div className="flex items-center gap-2 text-xs">
+          <div className="rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-1.5 text-center">
+            <span className="block text-[10px] uppercase font-bold text-slate-400 light:text-slate-500">Active Ads</span>
+            <span className="font-extrabold text-white light:text-slate-900">
+              {creatives.filter((c) => c.active).length + midrollAds.filter((m) => m.active).length}
+            </span>
+          </div>
+          <div className="rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-1.5 text-center">
+            <span className="block text-[10px] uppercase font-bold text-slate-400 light:text-slate-500">Impressions</span>
+            <span className="font-extrabold text-white light:text-slate-900">{totalImpressions.toLocaleString("en-IN")}</span>
+          </div>
+          <div className="rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-1.5 text-center">
+            <span className="block text-[10px] uppercase font-bold text-slate-400 light:text-slate-500">Avg CTR</span>
+            <span className="font-extrabold text-indigo-400 light:text-indigo-600">{ctr}%</span>
+          </div>
+        </div>
       </div>
 
-      {/* Per-slot source pickers */}
-      <div className="mt-5 max-w-2xl space-y-3">
-        <div className="rounded-3xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-5">
-          <div className="flex items-center justify-between gap-4">
-            <span className="text-sm font-bold text-white light:text-slate-900">
-              Homepage banner
-            </span>
-            <SourcePicker
-              value={settings.homepageBannerSource}
-              onChange={(v) => update("homepageBannerSource", v)}
-            />
-          </div>
-        </div>
-        <div className="rounded-3xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-5">
-          <div className="flex items-center justify-between gap-4">
-            <span className="text-sm font-bold text-white light:text-slate-900">
-              Watch page banner
-            </span>
-            <SourcePicker
-              value={settings.watchPageBannerSource}
-              onChange={(v) => update("watchPageBannerSource", v)}
-            />
-          </div>
-        </div>
-        <div className="rounded-3xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-5">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <span className="text-sm font-bold text-white light:text-slate-900">
-                Homepage spotlight
-              </span>
-              <p className="mt-0.5 text-xs text-slate-400 light:text-slate-600">
-                A second, static homepage slot — shown below the feed, in both Horizontal and Shorts view.
-              </p>
-            </div>
-            <SourcePicker
-              value={settings.homepageSpotlightSource}
-              onChange={(v) => update("homepageSpotlightSource", v)}
-            />
-          </div>
-        </div>
+      {/* Sub-Tab Navigation Bar */}
+      <div className="flex items-center gap-1.5 border-b border-white/10 light:border-black/10 pb-2">
+        <button
+          type="button"
+          onClick={() => setActiveTab("settings")}
+          className={`flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition ${
+            activeTab === "settings"
+              ? "bg-indigo-600 text-white shadow-sm"
+              : "bg-white/5 text-slate-400 hover:bg-white/10 light:bg-black/5 light:text-slate-700"
+          }`}
+        >
+          <SlidersHorizontal size={13} /> Slot Controls & Specs
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("banners")}
+          className={`flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition ${
+            activeTab === "banners"
+              ? "bg-indigo-600 text-white shadow-sm"
+              : "bg-white/5 text-slate-400 hover:bg-white/10 light:bg-black/5 light:text-slate-700"
+          }`}
+        >
+          <LayoutGrid size={13} /> Banner & Weekly Featured ({creatives.length})
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("midrolls")}
+          className={`flex items-center gap-1.5 rounded-xl px-3.5 py-1.5 text-xs font-bold transition ${
+            activeTab === "midrolls"
+              ? "bg-indigo-600 text-white shadow-sm"
+              : "bg-white/5 text-slate-400 hover:bg-white/10 light:bg-black/5 light:text-slate-700"
+          }`}
+        >
+          <Video size={13} /> Mid-Roll Video Ads ({midrollAds.length})
+        </button>
+      </div>
 
-        {/* Weekly Featured Banner Toggle */}
-        <div className="rounded-3xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-5">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <span className="text-sm font-bold text-white light:text-slate-900">
-                Weekly Featured Banner
-              </span>
-              <p className="mt-0.5 text-xs text-slate-400 light:text-slate-600">
-                Switch off the top Weekly Featured video hero carousel to run exclusively with your uploaded ad posters & banners.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => update("weeklyFeaturedEnabled", !settings.weeklyFeaturedEnabled)}
-              className={`flex-shrink-0 rounded-full px-4 py-1.5 text-xs font-bold transition ${
-                settings.weeklyFeaturedEnabled !== false
-                  ? "bg-emerald-500/20 text-emerald-300"
-                  : "bg-white/5 text-slate-400 hover:bg-white/10"
-              }`}
-            >
-              {settings.weeklyFeaturedEnabled !== false ? "On" : "Off"}
-            </button>
-          </div>
-        </div>
-
-        {/* Ad Poster Specifications & Aspect Ratios */}
-        <div className="rounded-3xl border border-indigo-500/20 light:border-indigo-600/30 bg-indigo-500/10 light:bg-indigo-500/10 p-5 text-xs space-y-2">
-          <h3 className="font-bold text-sm text-indigo-300 light:text-indigo-950 flex items-center gap-1.5">
-            📐 Recommended Ad Poster Sizes & Aspect Ratios
-          </h3>
-          <p className="text-slate-300 light:text-slate-800 font-medium">
-            For crisp, responsive rendering across mobile, tablet, and desktop screens:
-          </p>
-          <ul className="list-disc list-inside space-y-2 text-slate-300 light:text-slate-800 font-medium">
-            <li className="leading-relaxed">
-              <strong className="text-white light:text-slate-900 font-bold">Homepage & Watch Banners:</strong>{" "}
-              <code className="rounded bg-orange-500/20 light:bg-orange-100 px-1.5 py-0.5 font-bold text-orange-300 light:text-amber-900">16:5 aspect ratio</code>{" "}
-              <span className="text-slate-400 light:text-slate-700">(Recommended: 1200 × 375 px or 1920 × 600 px image/video).</span>
-            </li>
-            <li className="leading-relaxed">
-              <strong className="text-white light:text-slate-900 font-bold">Video Player Mid-Roll Ads:</strong>{" "}
-              <code className="rounded bg-orange-500/20 light:bg-orange-100 px-1.5 py-0.5 font-bold text-orange-300 light:text-amber-900">16:9 aspect ratio</code>{" "}
-              <span className="text-slate-400 light:text-slate-700">(Recommended: 1920 × 1080 px image or .mp4 video clip up to 30s).</span>
-            </li>
-            <li className="leading-relaxed">
-              <strong className="text-white light:text-slate-900 font-bold">Homepage Spotlight:</strong>{" "}
-              <code className="rounded bg-orange-500/20 light:bg-orange-100 px-1.5 py-0.5 font-bold text-orange-300 light:text-amber-900">16:9 or 4:3 aspect ratio</code>{" "}
-              <span className="text-slate-400 light:text-slate-700">(Recommended: 1200 × 675 px).</span>
-            </li>
-          </ul>
-        </div>
-
-        {/* Mid-roll video ads */}
-        <div className="rounded-3xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-5">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h3 className="text-sm font-bold text-white light:text-slate-900">Mid-roll video ads</h3>
-              <p className="mt-0.5 text-xs text-slate-400 light:text-slate-600">
-                A real ad break interrupts playback at the interval below. Skip timers escalate the
-                longer a viewer keeps watching the same video: 5s on the first break, 10s on the
-                second, 15s on the third and every one after that.
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => update("midrollEnabled", !settings.midrollEnabled)}
-              className={`flex-shrink-0 rounded-full px-4 py-1.5 text-xs font-bold transition ${
-                settings.midrollEnabled
-                  ? "bg-emerald-500/20 text-emerald-300"
-                  : "bg-white/5 text-slate-400 hover:bg-white/10"
-              }`}
-            >
-              {settings.midrollEnabled ? "On" : "Off"}
-            </button>
-          </div>
-          {settings.midrollEnabled && (
-            <div className="mt-3">
-              <label className="mb-1.5 block text-xs font-semibold text-slate-400 light:text-slate-600">
-                Minimum seconds of watch time between breaks
-              </label>
-              <input
-                type="number"
-                min={60}
-                max={3600}
-                value={settings.midrollIntervalSeconds}
-                onChange={(e) =>
-                  update("midrollIntervalSeconds", Math.max(60, Math.min(3600, Number(e.target.value) || 300)))
-                }
-                className="w-40 rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-indigo-400/50"
+      {/* TAB 1: Slot Controls & Specs */}
+      {activeTab === "settings" && (
+        <div className="max-w-3xl space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4 flex items-center justify-between gap-3">
+              <div>
+                <span className="text-xs font-bold text-white light:text-slate-900 block">Homepage Banner</span>
+                <span className="text-[11px] text-slate-400 light:text-slate-600">Top feed recommendation slot</span>
+              </div>
+              <SourcePicker
+                value={settings.homepageBannerSource}
+                onChange={(v) => update("homepageBannerSource", v)}
               />
-              <p className="mt-1.5 text-[11px] text-slate-500">
-                A short video may never reach the first break — that&apos;s expected, not a bug.
-              </p>
             </div>
-          )}
-        </div>
 
-        {/* AdSense config */}
-        <div className="rounded-3xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-5">
-          <div className="flex items-center justify-between gap-4">
-            <div>
-              <h3 className="text-sm font-bold text-white light:text-slate-900">Google AdSense</h3>
-              <p className="mt-0.5 text-xs text-slate-400 light:text-slate-600">
-                Real AdSense integration — requires your own AdSense publisher account.
-              </p>
+            <div className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4 flex items-center justify-between gap-3">
+              <div>
+                <span className="text-xs font-bold text-white light:text-slate-900 block">Watch Page Banner</span>
+                <span className="text-[11px] text-slate-400 light:text-slate-600">Under video player sidebar</span>
+              </div>
+              <SourcePicker
+                value={settings.watchPageBannerSource}
+                onChange={(v) => update("watchPageBannerSource", v)}
+              />
+            </div>
+
+            <div className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4 flex items-center justify-between gap-3">
+              <div>
+                <span className="text-xs font-bold text-white light:text-slate-900 block">Homepage Spotlight</span>
+                <span className="text-[11px] text-slate-400 light:text-slate-600">Secondary bottom feed ad</span>
+              </div>
+              <SourcePicker
+                value={settings.homepageSpotlightSource}
+                onChange={(v) => update("homepageSpotlightSource", v)}
+              />
+            </div>
+
+            {/* Weekly Featured Banner Toggle */}
+            <div className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4 flex items-center justify-between gap-3">
+              <div>
+                <span className="text-xs font-bold text-white light:text-slate-900 block">Weekly Featured Carousel</span>
+                <span className="text-[11px] text-slate-400 light:text-slate-600">Enable/disable hero banner carousel</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => update("weeklyFeaturedEnabled", !settings.weeklyFeaturedEnabled)}
+                className={`rounded-full px-3 py-1 text-xs font-bold transition ${
+                  settings.weeklyFeaturedEnabled !== false
+                    ? "bg-emerald-500/20 text-emerald-300 light:bg-emerald-100 light:text-emerald-800"
+                    : "bg-white/5 text-slate-400 light:bg-black/5"
+                }`}
+              >
+                {settings.weeklyFeaturedEnabled !== false ? "On" : "Off"}
+              </button>
             </div>
           </div>
-          <div className="mt-3">
-            <label className="mb-1.5 block text-xs font-semibold text-slate-400 light:text-slate-600">
-              Publisher ID (e.g. pub-1234567890123456)
-            </label>
+
+          {/* Specifications Card */}
+          <div className="rounded-2xl border border-indigo-500/20 light:border-indigo-600/30 bg-indigo-500/10 p-4 text-xs space-y-2">
+            <h3 className="font-bold text-sm text-indigo-300 light:text-indigo-950 flex items-center gap-1.5">
+              📐 Recommended Ad Poster Specs & Aspect Ratios
+            </h3>
+            <ul className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-slate-300 light:text-slate-800 font-medium text-[11px]">
+              <li className="rounded-xl border border-white/5 light:border-black/5 bg-white/5 light:bg-black/5 p-2.5">
+                <strong className="block text-white light:text-slate-900 font-bold">Homepage & Watch Banners</strong>
+                <code className="inline-block mt-1 rounded bg-orange-500/20 light:bg-orange-100 px-1.5 py-0.5 font-bold text-orange-300 light:text-amber-900">16:5 ratio</code> (1200 × 375 px)
+              </li>
+              <li className="rounded-xl border border-white/5 light:border-black/5 bg-white/5 light:bg-black/5 p-2.5">
+                <strong className="block text-white light:text-slate-900 font-bold">Weekly Featured Banner</strong>
+                <code className="inline-block mt-1 rounded bg-orange-500/20 light:bg-orange-100 px-1.5 py-0.5 font-bold text-orange-300 light:text-amber-900">16:5 ratio</code> (1920 × 600 px)
+              </li>
+              <li className="rounded-xl border border-white/5 light:border-black/5 bg-white/5 light:bg-black/5 p-2.5">
+                <strong className="block text-white light:text-slate-900 font-bold">Video Mid-Roll Ads</strong>
+                <code className="inline-block mt-1 rounded bg-orange-500/20 light:bg-orange-100 px-1.5 py-0.5 font-bold text-orange-300 light:text-amber-900">16:9 ratio</code> (1920 × 1080 px)
+              </li>
+              <li className="rounded-xl border border-white/5 light:border-black/5 bg-white/5 light:bg-black/5 p-2.5">
+                <strong className="block text-white light:text-slate-900 font-bold">Homepage Spotlight</strong>
+                <code className="inline-block mt-1 rounded bg-orange-500/20 light:bg-orange-100 px-1.5 py-0.5 font-bold text-orange-300 light:text-amber-900">16:9 or 4:3</code> (1200 × 675 px)
+              </li>
+            </ul>
+          </div>
+
+          {/* AdSense Settings */}
+          <div className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4 space-y-2">
+            <h3 className="text-xs font-bold text-white light:text-slate-900">Google AdSense Configuration</h3>
             <input
               type="text"
               value={settings.adsensePublisherId}
@@ -567,364 +594,266 @@ export default function AdvertisingPage() {
                 update("adsensePublisherId", e.target.value.trim());
                 update("adsenseEnabled", e.target.value.trim().length > 0);
               }}
-              placeholder="pub-1234567890123456"
-              className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-indigo-400/50"
+              placeholder="Publisher ID (pub-1234567890123456)"
+              className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-1.5 text-xs text-white light:text-slate-900 outline-none focus:border-indigo-400"
             />
           </div>
+
+          {error && (
+            <div className="flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 p-2.5 text-xs text-red-300 light:text-red-700">
+              <AlertTriangle size={14} /> <span>{error}</span>
+            </div>
+          )}
+          {saved && (
+            <div className="flex items-center gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-2.5 text-xs text-emerald-300 light:text-emerald-700">
+              <CheckCircle2 size={14} /> <span>Saved — live platform settings updated.</span>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={saveSettings}
+            disabled={saving}
+            className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-50"
+          >
+            {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save Settings
+          </button>
         </div>
+      )}
 
-        {error && (
-          <div className="flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-300 light:text-red-700">
-            <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
-            <span>{error}</span>
-          </div>
-        )}
-        {saved && (
-          <div className="flex items-start gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs text-emerald-300 light:text-emerald-700">
-            <CheckCircle2 size={14} className="mt-0.5 flex-shrink-0" />
-            <span>Saved — changes are already live.</span>
-          </div>
-        )}
+      {/* TAB 2: Banner & Weekly Featured Creatives */}
+      {activeTab === "banners" && (
+        <div className="space-y-4">
+          {/* Compact Upload & AI Form */}
+          <div className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4 space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-white/10 light:border-black/10 pb-2">
+              <div className="flex flex-wrap items-center gap-1.5">
+                {(["homepage", "watch", "homepage_spotlight", "weekly_featured"] as Placement[]).map((p) => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setUploadPlacement(p)}
+                    className={`rounded-full px-2.5 py-1 text-[11px] font-bold transition ${
+                      uploadPlacement === p
+                        ? "bg-indigo-600 text-white"
+                        : "bg-white/5 text-slate-300 light:bg-black/5 light:text-slate-700 hover:bg-white/10"
+                    }`}
+                  >
+                    {PLACEMENT_LABELS[p]}
+                  </button>
+                ))}
+              </div>
 
-        <button
-          type="button"
-          onClick={saveSettings}
-          disabled={saving}
-          className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#6366F1] via-[#8B5CF6] to-[#A855F7] px-5 py-2.5 text-sm font-bold text-white shadow-[0_10px_25px_rgba(139,92,246,.25)] transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
-        >
-          {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
-          Save slot settings
-        </button>
-      </div>
-
-      {/* House ad creatives */}
-      <div className="mt-8">
-        <h3 className="text-sm font-bold text-white light:text-slate-900">House ad creatives</h3>
-        <p className="mt-1 text-xs text-slate-400 light:text-slate-600">
-          Upload your own banner image with a link — shown whenever a slot above is set to
-          &ldquo;House ad&rdquo;. Multiple active creatives for the same slot rotate randomly.
-        </p>
-
-        <div className="mt-4 max-w-2xl rounded-3xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-5">
-          <div className="flex flex-wrap items-center gap-2">
-            {(["homepage", "watch", "homepage_spotlight"] as Placement[]).map((p) => (
+              {/* Magic AI Generator Button */}
               <button
-                key={p}
                 type="button"
-                onClick={() => setUploadPlacement(p)}
-                className={`rounded-full px-4 py-1.5 text-xs font-bold transition ${
-                  uploadPlacement === p
-                    ? "bg-indigo-500 text-white"
-                    : "bg-white/5 text-slate-400 hover:bg-white/10 light:bg-black/5"
-                }`}
+                onClick={generateAiBannerAd}
+                className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-500 to-pink-500 px-3 py-1 text-[11px] font-bold text-white shadow-sm transition hover:opacity-90"
               >
-                {PLACEMENT_LABELS[p]}
+                <Sparkles size={13} /> Magic AI Generate Ad
               </button>
-            ))}
-          </div>
+            </div>
 
-          <div className="mt-4">
-            <label className="mb-1.5 block text-xs font-semibold text-slate-400 light:text-slate-600">
-              Ad Poster or Video Media (Images or .mp4 Videos)
-            </label>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept="image/*,video/*"
-              onChange={handleFileChange}
-              className="block w-full text-xs text-slate-400 file:mr-3 file:rounded-lg file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-white hover:file:bg-white/20"
-            />
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-400 light:text-slate-600 mb-1">Ad Title</label>
+                <input
+                  type="text"
+                  value={uploadTitle}
+                  onChange={(e) => setUploadTitle(e.target.value)}
+                  placeholder="e.g. InPlayer Pro Pass Promo"
+                  className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-1.5 text-xs text-white light:text-slate-900 outline-none focus:border-indigo-400"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-400 light:text-slate-600 mb-1">Target Link URL</label>
+                <input
+                  type="text"
+                  value={uploadLink}
+                  onChange={(e) => setUploadLink(e.target.value)}
+                  placeholder="https://inplayer.in/pro"
+                  className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-1.5 text-xs text-white light:text-slate-900 outline-none focus:border-indigo-400"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-400 light:text-slate-600 mb-1">Upload File (Image/Video)</label>
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,video/*"
+                  onChange={handleFileChange}
+                  className="block w-full text-[11px] text-slate-400 file:mr-2 file:rounded-lg file:border-0 file:bg-white/10 file:px-2.5 file:py-1 file:text-[11px] file:font-bold file:text-white hover:file:bg-white/20"
+                />
+              </div>
+            </div>
+
             {uploadPreview && (
-              uploadPreview.startsWith("data:video/") ? (
-                <video
-                  src={uploadPreview}
-                  controls
-                  className="mt-3 max-h-44 w-full rounded-xl border border-white/10 object-contain"
-                />
-              ) : (
-                <img
-                  src={uploadPreview}
-                  alt="Preview"
-                  className="mt-3 w-full rounded-xl border border-white/10 light:border-black/10 object-cover max-h-44"
-                />
-              )
+              <div className="relative rounded-xl border border-white/10 light:border-black/10 overflow-hidden bg-black/20 max-h-40">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={uploadPreview} alt="Preview" className="w-full h-36 object-cover" />
+                <span className="absolute top-2 left-2 rounded-full bg-black/60 px-2 py-0.5 text-[10px] font-bold text-white">Preview</span>
+              </div>
             )}
+
+            {uploadError && (
+              <div className="flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 p-2 text-xs text-red-300 light:text-red-700">
+                <AlertTriangle size={14} /> <span>{uploadError}</span>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={submitCreative}
+              disabled={!canUpload || uploading}
+              className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-50"
+            >
+              {uploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />} Save & Publish Banner
+            </button>
           </div>
 
-          <div className="mt-3">
-            <label className="mb-1.5 block text-xs font-semibold text-slate-400 light:text-slate-600">
-              Title (internal label)
-            </label>
-            <input
-              type="text"
-              value={uploadTitle}
-              onChange={(e) => setUploadTitle(e.target.value)}
-              placeholder="e.g. Diwali membership promo"
-              className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-indigo-400/50"
-            />
-          </div>
-
-          <div className="mt-3">
-            <label className="mb-1.5 block text-xs font-semibold text-slate-400 light:text-slate-600">
-              Link URL
-            </label>
-            <input
-              type="text"
-              value={uploadLink}
-              onChange={(e) => setUploadLink(e.target.value)}
-              placeholder="https://..."
-              className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-indigo-400/50"
-            />
-          </div>
-
-          {uploadError && (
-            <div className="mt-3 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-300 light:text-red-700">
-              <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
-              <span>{uploadError}</span>
+          {/* Creatives List */}
+          {filteredCreatives.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {filteredCreatives.map((ad) => (
+                <div key={ad.adId} className="rounded-xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-2.5 space-y-2">
+                  <div className="relative h-24 overflow-hidden rounded-lg border border-white/10 light:border-black/10 bg-black/40">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={ad.imageUrl} alt={ad.title} className="w-full h-full object-cover" />
+                    <span className="absolute top-1.5 right-1.5 rounded-full bg-black/70 px-2 py-0.5 text-[9px] font-bold text-white uppercase">
+                      {PLACEMENT_LABELS[ad.placement] || ad.placement}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <p className="truncate font-bold text-white light:text-slate-900">{ad.title || "Untitled Ad"}</p>
+                    <button
+                      type="button"
+                      onClick={() => toggleActive(ad)}
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                        ad.active ? "bg-emerald-500/20 text-emerald-300" : "bg-white/5 text-slate-400"
+                      }`}
+                    >
+                      {ad.active ? "Active" : "Paused"}
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-slate-500">
+                    <span>Imps: {Number(ad.impressions || 0).toLocaleString("en-IN")}</span>
+                    <span>Clicks: {Number(ad.clicks || 0).toLocaleString("en-IN")}</span>
+                    <button type="button" onClick={() => deleteCreative(ad)} className="text-red-400 hover:text-red-300">
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
-
-          <button
-            type="button"
-            onClick={submitCreative}
-            disabled={!canUpload || uploading}
-            className="mt-4 flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#6366F1] via-[#8B5CF6] to-[#A855F7] px-5 py-2.5 text-sm font-bold text-white shadow-[0_10px_25px_rgba(139,92,246,.25)] transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
-          >
-            {uploading ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
-            Add creative
-          </button>
         </div>
+      )}
 
-        {creativesError && (
-          <div className="mt-4 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300 light:text-red-700">
-            <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
-            <span>{creativesError}</span>
-          </div>
-        )}
-
-        {creatives.length > 0 && (
-          <div className="mt-4 flex items-center gap-2 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] px-4 py-3">
-            <Search size={16} className="text-slate-500" />
-            <input
-              type="text"
-              value={creativeQuery}
-              onChange={(e) => setCreativeQuery(e.target.value)}
-              placeholder="Search by title, ad ID, or placement…"
-              className="w-full bg-transparent text-sm text-white light:text-slate-900 outline-none placeholder:text-slate-500"
-            />
-          </div>
-        )}
-
-        {creativesLoading ? (
-          <div className="flex min-h-[15vh] items-center justify-center">
-            <Loader2 size={20} className="animate-spin text-indigo-400" />
-          </div>
-        ) : creatives.length === 0 ? (
-          <div className="mt-6 flex flex-col items-center gap-2 py-6 text-center">
-            <ImagePlus size={26} className="text-slate-600" />
-            <p className="text-sm text-slate-500">No creatives uploaded yet.</p>
-          </div>
-        ) : filteredCreatives.length === 0 ? (
-          <p className="mt-6 text-center text-sm text-slate-500">
-            Nothing matches &quot;{creativeQuery}&quot;.
-          </p>
-        ) : (
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {filteredCreatives.map((ad) => (
-              <div
-                key={ad.adId}
-                className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-3"
+      {/* TAB 3: Mid-Roll Video Ads */}
+      {activeTab === "midrolls" && (
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4 space-y-3">
+            <div className="flex items-center justify-between border-b border-white/10 light:border-black/10 pb-2">
+              <span className="text-xs font-bold text-white light:text-slate-900">Add Video Player Mid-Roll Ad</span>
+              <button
+                type="button"
+                onClick={generateAiMidrollAd}
+                className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-500 to-pink-500 px-3 py-1 text-[11px] font-bold text-white shadow-sm transition hover:opacity-90"
               >
-                {/* eslint-disable-next-line @next/next/no-img-element --
-                    admin-uploaded data URL, not a static app asset. */}
-                <img
-                  src={ad.imageUrl}
-                  alt={ad.title}
-                  className="w-full rounded-xl border border-white/10 light:border-black/10 object-cover"
+                <Wand2 size={13} /> Magic AI Mid-Roll Generator
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-400 light:text-slate-600 mb-1">Ad Title</label>
+                <input
+                  type="text"
+                  value={midrollTitle}
+                  onChange={(e) => setMidrollTitle(e.target.value)}
+                  placeholder="e.g. InPlayer Pro Upgrade"
+                  className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-1.5 text-xs text-white light:text-slate-900 outline-none focus:border-indigo-400"
                 />
-                <div className="mt-2 flex items-center justify-between gap-2">
-                  <p className="truncate text-sm font-bold text-white light:text-slate-900">
-                    {ad.title}
-                  </p>
-                  <span className="flex-shrink-0 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-300">
-                    {PLACEMENT_LABELS[ad.placement] || ad.placement}
-                  </span>
-                </div>
-                <div className="mt-1 flex items-center gap-3 text-xs text-slate-500">
-                  <span className="flex items-center gap-1">
-                    <Eye size={12} /> {Number(ad.impressions || 0).toLocaleString("en-IN")}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <MousePointerClick size={12} /> {Number(ad.clicks || 0).toLocaleString("en-IN")}
-                  </span>
-                </div>
-                <div className="mt-3 flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => toggleActive(ad)}
-                    className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${
-                      ad.active
-                        ? "bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"
-                        : "bg-white/5 text-slate-400 hover:bg-white/10"
-                    }`}
-                  >
-                    {ad.active ? "Active" : "Paused"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => deleteCreative(ad)}
-                    className="flex items-center gap-1.5 rounded-xl bg-red-500/15 px-3 py-1.5 text-xs font-bold text-red-300 transition hover:bg-red-500/25"
-                  >
-                    <Trash2 size={13} /> Delete
-                  </button>
-                </div>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-400 light:text-slate-600 mb-1">Target Link URL</label>
+                <input
+                  type="text"
+                  value={midrollLink}
+                  onChange={(e) => setMidrollLink(e.target.value)}
+                  placeholder="https://inplayer.in/pro"
+                  className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-1.5 text-xs text-white light:text-slate-900 outline-none focus:border-indigo-400"
+                />
+              </div>
+              <div>
+                <label className="block text-[11px] font-semibold text-slate-400 light:text-slate-600 mb-1">Select Media File</label>
+                <input
+                  ref={midrollFileInputRef}
+                  type="file"
+                  accept="image/*,video/*"
+                  onChange={handleMidrollFileChange}
+                  className="block w-full text-[11px] text-slate-400 file:mr-2 file:rounded-lg file:border-0 file:bg-white/10 file:px-2.5 file:py-1 file:text-[11px] file:font-bold file:text-white hover:file:bg-white/20"
+                />
+              </div>
+            </div>
 
-      {/* Mid-roll ad creatives */}
-      <div className="mt-8">
-        <h3 className="text-sm font-bold text-white light:text-slate-900">Mid-roll ad creatives</h3>
-        <p className="mt-1 text-xs text-slate-400 light:text-slate-600">
-          Shown full-screen over a paused player when a viewer hits a mid-roll break (see the toggle
-          above). Multiple active creatives rotate randomly, same as banner slots.
-        </p>
-
-        <div className="mt-4 max-w-2xl rounded-3xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-5">
-          <div>
-            <label className="mb-1.5 block text-xs font-semibold text-slate-400 light:text-slate-600">
-              Ad image (any aspect — shown centered over the player)
-            </label>
-            <input
-              ref={midrollFileInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleMidrollFileChange}
-              className="block w-full text-xs text-slate-400 file:mr-3 file:rounded-lg file:border-0 file:bg-white/10 file:px-3 file:py-1.5 file:text-xs file:font-bold file:text-white hover:file:bg-white/20"
-            />
             {midrollPreview && (
-              /* eslint-disable-next-line @next/next/no-img-element -- a
-                 freshly compressed in-memory data URL, not a static app
-                 asset next/image can optimize. */
-              <img
-                src={midrollPreview}
-                alt="Preview"
-                className="mt-3 w-full rounded-xl border border-white/10 light:border-black/10 object-cover"
-              />
+              <div className="relative rounded-xl border border-white/10 light:border-black/10 overflow-hidden bg-black/20 max-h-40">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={midrollPreview} alt="Preview" className="w-full h-36 object-cover" />
+              </div>
             )}
+
+            {midrollUploadError && (
+              <div className="flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 p-2 text-xs text-red-300 light:text-red-700">
+                <AlertTriangle size={14} /> <span>{midrollUploadError}</span>
+              </div>
+            )}
+
+            <button
+              type="button"
+              onClick={submitMidrollAd}
+              disabled={!canUploadMidroll || midrollUploading}
+              className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-1.5 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-50"
+            >
+              {midrollUploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />} Save Mid-Roll Ad
+            </button>
           </div>
 
-          <div className="mt-3">
-            <label className="mb-1.5 block text-xs font-semibold text-slate-400 light:text-slate-600">
-              Title (internal label)
-            </label>
-            <input
-              type="text"
-              value={midrollTitle}
-              onChange={(e) => setMidrollTitle(e.target.value)}
-              placeholder="e.g. Membership push"
-              className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-indigo-400/50"
-            />
-          </div>
-
-          <div className="mt-3">
-            <label className="mb-1.5 block text-xs font-semibold text-slate-400 light:text-slate-600">
-              Link URL
-            </label>
-            <input
-              type="text"
-              value={midrollLink}
-              onChange={(e) => setMidrollLink(e.target.value)}
-              placeholder="https://..."
-              className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-indigo-400/50"
-            />
-          </div>
-
-          {midrollUploadError && (
-            <div className="mt-3 flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-300 light:text-red-700">
-              <AlertTriangle size={14} className="mt-0.5 flex-shrink-0" />
-              <span>{midrollUploadError}</span>
+          {/* Midroll Ad Cards */}
+          {midrollAds.length > 0 && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {midrollAds.map((ad) => (
+                <div key={ad.adId} className="rounded-xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-2.5 space-y-2">
+                  <div className="relative h-24 overflow-hidden rounded-lg border border-white/10 light:border-black/10 bg-black/40">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={ad.imageUrl} alt={ad.title} className="w-full h-full object-cover" />
+                  </div>
+                  <div className="flex items-center justify-between text-xs">
+                    <p className="truncate font-bold text-white light:text-slate-900">{ad.title || "Untitled Mid-Roll"}</p>
+                    <button
+                      type="button"
+                      onClick={() => toggleMidrollActive(ad)}
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${
+                        ad.active ? "bg-emerald-500/20 text-emerald-300" : "bg-white/5 text-slate-400"
+                      }`}
+                    >
+                      {ad.active ? "Active" : "Paused"}
+                    </button>
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-slate-500">
+                    <span>Imps: {Number(ad.impressions || 0).toLocaleString("en-IN")}</span>
+                    <span>Clicks: {Number(ad.clicks || 0).toLocaleString("en-IN")}</span>
+                    <button type="button" onClick={() => deleteMidrollAd(ad)} className="text-red-400 hover:text-red-300">
+                      <Trash2 size={12} />
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
-
-          <button
-            type="button"
-            onClick={submitMidrollAd}
-            disabled={!canUploadMidroll || midrollUploading}
-            className="mt-4 flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#6366F1] via-[#8B5CF6] to-[#A855F7] px-5 py-2.5 text-sm font-bold text-white shadow-[0_10px_25px_rgba(139,92,246,.25)] transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
-          >
-            {midrollUploading ? <Loader2 size={15} className="animate-spin" /> : <Upload size={15} />}
-            Add creative
-          </button>
         </div>
-
-        {midrollError && (
-          <div className="mt-4 flex items-start gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300 light:text-red-700">
-            <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
-            <span>{midrollError}</span>
-          </div>
-        )}
-
-        {midrollLoading ? (
-          <div className="flex min-h-[15vh] items-center justify-center">
-            <Loader2 size={20} className="animate-spin text-indigo-400" />
-          </div>
-        ) : midrollAds.length === 0 ? (
-          <div className="mt-6 flex flex-col items-center gap-2 py-6 text-center">
-            <ImagePlus size={26} className="text-slate-600" />
-            <p className="text-sm text-slate-500">No mid-roll creatives uploaded yet.</p>
-          </div>
-        ) : (
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {midrollAds.map((ad) => (
-              <div
-                key={ad.adId}
-                className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-3"
-              >
-                {/* eslint-disable-next-line @next/next/no-img-element --
-                    admin-uploaded data URL, not a static app asset. */}
-                <img
-                  src={ad.imageUrl}
-                  alt={ad.title}
-                  className="w-full rounded-xl border border-white/10 light:border-black/10 object-cover"
-                />
-                <p className="mt-2 truncate text-sm font-bold text-white light:text-slate-900">{ad.title}</p>
-                <div className="mt-1 flex items-center gap-3 text-xs text-slate-500">
-                  <span className="flex items-center gap-1">
-                    <Eye size={12} /> {Number(ad.impressions || 0).toLocaleString("en-IN")}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <MousePointerClick size={12} /> {Number(ad.clicks || 0).toLocaleString("en-IN")}
-                  </span>
-                  <span className="flex items-center gap-1">Skipped {Number(ad.skips || 0).toLocaleString("en-IN")}</span>
-                </div>
-                <div className="mt-3 flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => toggleMidrollActive(ad)}
-                    className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${
-                      ad.active
-                        ? "bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"
-                        : "bg-white/5 text-slate-400 hover:bg-white/10"
-                    }`}
-                  >
-                    {ad.active ? "Active" : "Paused"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => deleteMidrollAd(ad)}
-                    className="flex items-center gap-1.5 rounded-xl bg-red-500/15 px-3 py-1.5 text-xs font-bold text-red-300 transition hover:bg-red-500/25"
-                  >
-                    <Trash2 size={13} /> Delete
-                  </button>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      )}
     </div>
   );
 }

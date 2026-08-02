@@ -4,6 +4,35 @@ export interface GeneratedAiAd {
   imageUrl: string;
 }
 
+const PLACEMENT_TITLES: Record<string, string[]> = {
+  homepage: [
+    "InPlayer Pro Pass — Stream Unlimited 4K Ad-Free",
+    "Discover Top Trending Creators Across India",
+    "Join the InPlayer Creator Monetization Program",
+    "Watch Premieres Live in 1080p60 Low Latency",
+  ],
+  watch: [
+    "Upgrade to InPlayer Premium — No Playback Interruptions",
+    "Support Creator Channels Directly with Super Thanks",
+    "Stream Official Music Videos & Originals in HD",
+  ],
+  weekly_featured: [
+    "Weekly Featured Showcase — Top Rated Films of the Week",
+    "Curated Independent Filmmakers Spotlight",
+    "Weekly Blockbuster Premiere — Watch Now Exclusively",
+  ],
+  homepage_spotlight: [
+    "InPlayer Shorts Festival — Watch Trending Clips Now",
+    "Live Gaming Arenas & Esports Streams",
+    "Official Studio Releases & Exclusive Documentaries",
+  ],
+  midroll: [
+    "InPlayer Pro — Skip All Mid-Roll Ads Forever",
+    "Download Videos for Offline Playback on Mobile",
+    "Support Your Favorite Creators with Monthly Memberships",
+  ],
+};
+
 const SAMPLE_PROMOS = [
   {
     title: "InPlayer Pro Pass — Watch 4K Ad-Free",
@@ -47,6 +76,11 @@ const SAMPLE_PROMOS = [
   },
 ];
 
+export function generateAiTitle(placement: string): string {
+  const titles = PLACEMENT_TITLES[placement] || PLACEMENT_TITLES.homepage;
+  return titles[Math.floor(Math.random() * titles.length)];
+}
+
 export function generateAiAdData(placement: "homepage" | "watch" | "homepage_spotlight" | "weekly_featured" | "midroll"): GeneratedAiAd {
   const promo = SAMPLE_PROMOS[Math.floor(Math.random() * SAMPLE_PROMOS.length)];
   
@@ -74,20 +108,15 @@ export function generateAiAdData(placement: "homepage" | "watch" | "homepage_spo
     <rect width="${width}" height="${height}" fill="url(#grad)" />
     <rect width="${width}" height="${height}" fill="url(#grid)" />
     
-    <!-- Decorative Glow Bulbs -->
     <circle cx="${width * 0.85}" cy="${height * 0.3}" r="${height * 0.4}" fill="rgba(255,255,255,0.08)" filter="blur(20px)" />
     
-    <!-- Badge -->
     <rect x="${width * 0.08}" y="${height * 0.18}" width="120" height="32" rx="16" fill="rgba(255,255,255,0.2)" />
     <text x="${width * 0.08 + 60}" y="${height * 0.18 + 21}" font-family="system-ui, sans-serif" font-weight="900" font-size="12" fill="#FFFFFF" text-anchor="middle" letter-spacing="1">${promo.badge}</text>
     
-    <!-- Title / Tagline -->
     <text x="${width * 0.08}" y="${height * 0.48}" font-family="system-ui, sans-serif" font-weight="900" font-size="${height * 0.12}" fill="#FFFFFF" letter-spacing="-1">${promo.tagline}</text>
     
-    <!-- Subtext -->
     <text x="${width * 0.08}" y="${height * 0.68}" font-family="system-ui, sans-serif" font-weight="500" font-size="${height * 0.055}" fill="rgba(255,255,255,0.85)">${promo.subtext}</text>
     
-    <!-- CTA Button Graphic -->
     <rect x="${width * 0.08}" y="${height * 0.78}" width="160" height="42" rx="21" fill="#FFFFFF" />
     <text x="${width * 0.08 + 80}" y="${height * 0.78 + 26}" font-family="system-ui, sans-serif" font-weight="800" font-size="14" fill="#111827" text-anchor="middle">EXPLORE NOW →</text>
   </svg>`;
@@ -96,7 +125,7 @@ export function generateAiAdData(placement: "homepage" | "watch" | "homepage_spo
   const dataUrl = `data:image/svg+xml;base64,${svgBase64}`;
 
   return {
-    title: promo.title,
+    title: generateAiTitle(placement),
     linkUrl: promo.linkUrl,
     imageUrl: dataUrl,
   };

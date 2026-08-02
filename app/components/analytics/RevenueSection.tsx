@@ -391,9 +391,7 @@ export default function RevenueSection({
           <p className="text-xs text-slate-500 light:text-slate-500">
             The KYC form (and your revenue balance) unlocks right here once
             you reach {ELIGIBILITY_THRESHOLD.subscribers} In-Family members
-            and {ELIGIBILITY_THRESHOLD.views.toLocaleString()} views on{" "}
-            {contentLabel.toLowerCase()} — this isn't hidden or broken, you're
-            just not there yet:
+            and {ELIGIBILITY_THRESHOLD.views.toLocaleString()} views on channel — So keep going!
           </p>
 
           <div>

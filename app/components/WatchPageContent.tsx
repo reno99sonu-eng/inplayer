@@ -88,22 +88,14 @@ export default function WatchPageContent({ video, relatedVideos: initialRelatedV
     return () => { cancelled = true; };
   }, [video.videoId, video.category, signedIn]);
 
+  const isShort = video.contentType === "short" || video.category?.toLowerCase().includes("raftaar") || video.category?.toLowerCase().includes("short");
+
   return (
     <div className="relative space-y-6 lg:space-y-8">
       <div className={`grid grid-cols-1 gap-6 transition-all duration-500 ${theaterMode ? "" : "xl:grid-cols-[minmax(0,1fr)_360px]"}`}>
         <div className="min-w-0">
-          {/* The player is the very first thing on the page — no banner
-              above it (there used to be a large cinematic hero here that
-              pushed the actual player down and shrank it). -mx-3/lg:mx-0
-              cancels the shared page container's horizontal padding
-              (app/watch/[videoId]/page.tsx) so the player alone runs
-              edge-to-edge on mobile/tablet portrait, like YouTube —
-              everything else on this page (title, actions, comments,
-              sidebar) keeps its normal inset. Card look (rounded corners,
-              border, shadow) returns at lg: (desktop/tablet landscape),
-              matching this app's existing mobile-vs-desktop breakpoint. */}
-          <div id="watch-player" className="group relative scroll-mt-5 -mx-3 lg:mx-0">
-            <div className={`overflow-hidden rounded-none border-0 border-white/10 bg-black shadow-none light:border-black/10 lg:rounded-[28px] lg:border lg:shadow-[0_25px_70px_rgba(0,0,0,.4)] ${theaterMode ? "mx-auto max-w-[1300px]" : ""}`}>
+          <div id="watch-player" className={`group relative scroll-mt-5 ${isShort ? "mx-auto max-w-[420px]" : "-mx-3 lg:mx-0"}`}>
+            <div className={`overflow-hidden border-white/10 bg-black light:border-black/10 ${isShort ? "aspect-[9/16] rounded-3xl border shadow-2xl" : "rounded-none border-0 shadow-none lg:rounded-[28px] lg:border lg:shadow-[0_25px_70px_rgba(0,0,0,.4)]"} ${theaterMode ? "mx-auto max-w-[1300px]" : ""}`}>
               {showPlayer ? (
                 video.membersOnly ? (
                   <MembersOnlyVideoPlayer

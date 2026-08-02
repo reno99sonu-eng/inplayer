@@ -21,6 +21,7 @@ import {
   UserCheck,
   Globe,
   Sparkles,
+  User,
 } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { formatViews, formatTimeAgo } from "@/app/lib/formatters";
@@ -79,7 +80,7 @@ const emptyContentStats: ContentStats = {
   shares: 0,
 };
 
-type ActivePanel = "dashboard" | "videos" | "shorts" | "edit" | "revenue" | "how-it-works";
+type ActivePanel = "dashboard" | "videos" | "shorts" | "edit" | "profile" | "revenue" | "how-it-works";
 
 export default function MyVideosPage() {
   const { signedIn, authLoading, openSignIn, user } = useAuthModal();
@@ -429,8 +430,9 @@ export default function MyVideosPage() {
   const sidebarNavItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
     { id: "videos", label: "Videos Library", icon: Film, count: videoItems.length },
-    { id: "shorts", label: "Shorts Library", icon: PlaySquare, count: shortItems.length },
+    { id: "shorts", label: "Raftaar Library", icon: PlaySquare, count: shortItems.length },
     { id: "edit", label: "Edit Content", icon: Pencil, disabled: false },
+    { id: "profile", label: "Profile & Settings", icon: User },
     { id: "revenue", label: "Revenue & KYC", icon: DollarSign },
     { id: "how-it-works", label: "How It Works?", icon: HelpCircle },
   ] as const;
@@ -1013,6 +1015,55 @@ export default function MyVideosPage() {
                   </div>
                 </div>
               )}
+            </div>
+          )}
+
+          {/* PANEL: PROFILE & SETTINGS */}
+          {activeTab === "profile" && (
+            <div className="space-y-4 rounded-2xl border border-white/10 bg-white/[0.02] p-4 sm:p-6 light:border-black/10 light:bg-black/[0.015]">
+              <div className="flex items-center justify-between border-b border-white/10 pb-4 light:border-black/10">
+                <div>
+                  <h3 className="text-lg font-black text-white light:text-slate-900">Profile & Channel Settings</h3>
+                  <p className="text-xs text-slate-400 light:text-slate-600">Customize your public channel identity, avatar, handle, and bio.</p>
+                </div>
+                <Link
+                  href="/profile"
+                  className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-orange-500 to-amber-400 px-4 py-2 text-xs font-bold text-slate-900 shadow hover:scale-105 transition"
+                >
+                  <Pencil size={14} /> Full Profile Editor
+                </Link>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="flex items-center gap-4 rounded-xl border border-white/10 p-3 light:border-black/10">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={user?.avatarUrl || "/avatars/avatar.png"} alt="" className="h-14 w-14 rounded-full object-cover ring-2 ring-orange-400/40" />
+                  <div>
+                    <p className="text-sm font-bold text-white light:text-slate-900">{user?.name || "Your Name"}</p>
+                    <p className="text-xs text-slate-400 light:text-slate-600">@{user?.handle || "handle"}</p>
+                  </div>
+                </div>
+
+                <div className="space-y-2 rounded-xl border border-white/10 p-3 light:border-black/10">
+                  <label className="text-xs font-semibold text-slate-400 light:text-slate-600">Channel Bio / Description</label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="text"
+                      value={channelBio}
+                      onChange={(e) => setChannelBio(e.target.value)}
+                      placeholder="Tell viewers about your channel..."
+                      className="min-w-0 flex-1 rounded-lg border border-white/10 bg-[#07111F] px-3 py-1.5 text-xs text-white outline-none focus:border-orange-400/50 light:border-black/10 light:bg-white light:text-slate-900"
+                    />
+                    <button
+                      onClick={handleSaveBio}
+                      disabled={savingBio}
+                      className="rounded-lg bg-orange-500 px-3 py-1.5 text-xs font-bold text-white disabled:opacity-60"
+                    >
+                      {savingBio ? "Saving..." : bioSaved ? "Saved!" : "Save"}
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
           )}
 

@@ -18,7 +18,7 @@ import {
 const links = [
   { icon: Home, title: "Home", href: "/" },
   { icon: Compass, title: "Explore", href: "/explore" },
-  { icon: PlaySquare, title: "Shorts", href: "/shorts" },
+  { icon: PlaySquare, title: "Raftaar", href: "/shorts" },
   { icon: Radio, title: "Live", href: "/live" },
   { icon: Users, title: "Creators", href: "/creators" },
   { icon: Sparkles, title: "AI Studio", href: "/ai-studio" },

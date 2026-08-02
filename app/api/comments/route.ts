@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Please sign in to comment." }, { status: 401 });
   }
 
-  const { videoId, text } = await request.json();
+  const { videoId, text, parentUserId } = await request.json();
 
   if (!videoId || !text?.trim()) {
     return NextResponse.json({ error: "Comment text is required." }, { status: 400 });
@@ -143,17 +143,30 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ comment, flagged: true });
   }
 
-  // Notify the video owner, unless they're commenting on their own video
+  // Notify the video owner and/or parent comment author
   try {
     const videoResult = await docClient.send(
       new GetCommand({ TableName: "InPlayer-Videos", Key: { videoId } })
     );
     const video = videoResult.Item;
+    const preview = text.trim().length > 60 ? text.trim().slice(0, 60) + "..." : text.trim();
 
-    if (video && video.uploaderId !== user.userId) {
-      const preview =
-        text.trim().length > 60 ? text.trim().slice(0, 60) + "..." : text.trim();
-
+    if (parentUserId && parentUserId !== user.userId) {
+      await docClient.send(
+        new PutCommand({
+          TableName: "InPlayer-Notifications",
+          Item: {
+            userId: parentUserId,
+            notificationId: randomUUID(),
+            type: "comment_reply",
+            message: `${user.name || "Someone"} replied to your comment on "${video?.title || "video"}": "${preview}"`,
+            videoId,
+            read: false,
+            createdAt: new Date().toISOString(),
+          },
+        })
+      );
+    } else if (video && video.uploaderId !== user.userId) {
       await docClient.send(
         new PutCommand({
           TableName: "InPlayer-Notifications",

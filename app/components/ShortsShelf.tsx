@@ -17,7 +17,7 @@ export default function ShortsShelf({ items, renderFooter }: ShortsShelfProps) {
         <span className="text-3xl">🔥</span>
 
         <h2 className="text-3xl font-bold text-white light:text-slate-900">
-          Shorts
+          Raftaar
         </h2>
       </div>
 

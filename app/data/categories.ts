@@ -6,7 +6,7 @@ export const CONTENT_CATEGORIES = [
   "Entertainment",
   "Movies",
   "Web Series",
-  "Shorts (Vertical Videos)",
+  "Raftaar (Vertical Videos)",
   "Music",
   "Podcasts",
   "Gaming",

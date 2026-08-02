@@ -146,17 +146,13 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
   const handleSignUp = async () => {
     setError(null);
 
-    if (!name.trim() || !email.trim() || !password || !age) {
-      triggerError("Please fill in your name, age, email, and password.");
+    if (!name.trim() || !email.trim() || !password) {
+      triggerError("Please fill in your name, email, and password.");
       return;
     }
 
     if (!isValidEmail(email)) {
       triggerError("Please enter a valid email address.");
-      return;
-    }
-    if (!Number.isInteger(Number(age)) || Number(age) < 13 || Number(age) > 120) {
-      triggerError("You must enter an age from 13 to 120.");
       return;
     }
 
@@ -590,11 +586,6 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
                   />
                 )}
               </div>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-xs font-medium text-slate-400 light:text-slate-600">Age</label>
-              <input type="number" min="13" max="120" value={age} onChange={(event) => setAge(event.target.value)} className="w-full rounded-2xl border border-white/10 bg-[#07111F] px-4 py-2.5 text-white caret-orange-400 outline-none transition focus:border-orange-400/50 light:border-black/10 light:bg-black/[0.03] light:text-slate-900" placeholder="You must be 13 or older" />
             </div>
 
             <div>

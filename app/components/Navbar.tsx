@@ -446,7 +446,7 @@ lg:right-auto
                 "
               >
                 <PlaySquare size={19} />
-                <span className="text-sm font-semibold">Shorts</span>
+                <span className="text-sm font-semibold">Raftaar</span>
               </button>
             </div>
 

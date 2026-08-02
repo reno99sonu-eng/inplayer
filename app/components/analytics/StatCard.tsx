@@ -29,13 +29,13 @@ export default function StatCard({
     >
       <div
         className="
-          absolute -right-4 -top-4 flex h-16 w-16 items-center justify-center rounded-2xl
-          bg-gradient-to-br from-orange-500/15 to-amber-400/5
-          text-orange-400/40
+          absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-xl
+          bg-gradient-to-br from-orange-500/20 to-amber-400/10
+          text-orange-400
           transition-transform duration-300 group-hover:scale-110
         "
       >
-        <Icon size={22} className="mb-6 ml-1" />
+        <Icon size={16} />
       </div>
 
       <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-slate-500 light:text-slate-500">

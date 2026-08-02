@@ -69,7 +69,7 @@ export default function MobileBottomNav() {
         "
       >
         <PlaySquare size={22} />
-        <span className="text-[11px] font-medium">Shorts</span>
+        <span className="text-[11px] font-medium">Raftaar</span>
       </Link>
 
       <div className="flex flex-col items-center justify-center px-2">

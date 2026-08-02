@@ -1,7 +1,7 @@
 "use client";
 
+import React, { Component, ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { authedFetch } from "@/app/lib/apiFetch";
-import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Loader2,
   AlertTriangle,
@@ -91,7 +91,60 @@ const DEFAULT_SETTINGS: AdSettings = {
   midrollIntervalSeconds: 900,
 };
 
-export default function AdvertisingPage() {
+// In-Page Error Boundary to prevent bubble-up to global Admin Panel Error
+interface BoundaryProps {
+  children: ReactNode;
+}
+
+interface BoundaryState {
+  hasError: boolean;
+  errorMsg: string;
+}
+
+class AdvertisingErrorBoundary extends Component<BoundaryProps, BoundaryState> {
+  constructor(props: BoundaryProps) {
+    super(props);
+    this.state = { hasError: false, errorMsg: "" };
+  }
+
+  static getDerivedStateFromError(error: Error): BoundaryState {
+    return {
+      hasError: true,
+      errorMsg: error?.message || "An unexpected error occurred while rendering the Advertising Console.",
+    };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error("Advertising Console Boundary caught error:", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-6 text-center space-y-3 my-8 max-w-xl mx-auto">
+          <div className="flex justify-center">
+            <AlertTriangle size={32} className="text-red-400" />
+          </div>
+          <h3 className="text-lg font-bold text-white light:text-slate-900">Advertising Console Recovery</h3>
+          <p className="text-xs text-red-300 light:text-red-700 max-w-md mx-auto">{this.state.errorMsg}</p>
+          <button
+            type="button"
+            onClick={() => {
+              this.setState({ hasError: false, errorMsg: "" });
+              window.location.reload();
+            }}
+            className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow hover:bg-indigo-500 transition cursor-pointer"
+          >
+            <RefreshCw size={14} /> Reload Console
+          </button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
+
+function AdvertisingPage() {
   const [activePanel, setActivePanel] = useState<SidePanel>("overview");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -692,7 +745,7 @@ export default function AdvertisingPage() {
             <div className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4 flex flex-wrap items-center justify-between gap-3">
               <div>
                 <span className="text-xs font-bold text-white light:text-slate-900 block">
-                  {PLACEMENT_LABELS[activePanel as Placement]} Status
+                  {PLACEMENT_LABELS[activePanel as Placement] || "Ad Placement"} Status
                 </span>
                 <span className="text-[11px] text-slate-400 light:text-slate-600">
                   {activePanel === "weekly_featured"
@@ -775,7 +828,7 @@ export default function AdvertisingPage() {
                   type="text"
                   value={uploadTitle}
                   onChange={(e) => setUploadTitle(e.target.value)}
-                  placeholder={`Title for ${PLACEMENT_LABELS[activePanel as Placement]}`}
+                  placeholder={`Title for ${PLACEMENT_LABELS[activePanel as Placement] || "Ad Placement"}`}
                   className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-1.5 text-xs text-white light:text-slate-900 outline-none focus:border-indigo-400"
                 />
               </div>
@@ -1150,5 +1203,13 @@ export default function AdvertisingPage() {
         )}
       </div>
     </div>
+  );
+}
+
+export default function AdvertisingPageWrapper() {
+  return (
+    <AdvertisingErrorBoundary>
+      <AdvertisingPage />
+    </AdvertisingErrorBoundary>
   );
 }

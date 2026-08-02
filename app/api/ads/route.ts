@@ -4,7 +4,7 @@ import { docClient } from "@/app/lib/dynamodb";
 import { getPlatformSettings } from "@/app/lib/platformSettings";
 import { AD_CREATIVES_TABLE, AdPlacement } from "@/app/lib/adCreatives";
 
-const VALID_PLACEMENTS: AdPlacement[] = ["homepage", "watch", "homepage_spotlight"];
+const VALID_PLACEMENTS: AdPlacement[] = ["homepage", "watch", "homepage_spotlight", "weekly_featured"];
 
 export async function GET(request: NextRequest) {
   const placement = request.nextUrl.searchParams.get("placement") as AdPlacement | null;
@@ -42,13 +42,12 @@ export async function GET(request: NextRequest) {
 
     const activeItems = items.filter((item) => item.active !== false);
 
-    if (activeItems.length === 0) {
-      return NextResponse.json({ source: "off" });
-    }
+    // STRICT ISOLATION: Only return creatives created EXCLUSIVELY for this placement.
+    // Never fall back to mixing ads from other placements.
+    const matching = activeItems.filter((item) => item.placement === placement && Boolean(item.imageUrl));
 
-    let matching = activeItems.filter((item) => item.placement === placement);
     if (matching.length === 0) {
-      matching = activeItems;
+      return NextResponse.json({ source: "off" });
     }
 
     const formattedCreatives = matching.map((pick) => ({
@@ -58,36 +57,28 @@ export async function GET(request: NextRequest) {
       title: String(pick.title || "Advertisement"),
     }));
 
+    // Record impression for the first delivered item asynchronously
+    const deliveredItem = matching[0];
+    if (deliveredItem?.adId) {
+      docClient
+        .send(
+          new UpdateCommand({
+            TableName: AD_CREATIVES_TABLE,
+            Key: { adId: deliveredItem.adId },
+            UpdateExpression: "ADD impressions :inc",
+            ExpressionAttributeValues: { ":inc": 1 },
+          })
+        )
+        .catch(() => null);
+    }
+
     return NextResponse.json({
       source: "house",
       creatives: formattedCreatives,
       creative: formattedCreatives[0],
     });
   } catch (err) {
-    console.error("Ad creatives lookup failed:", err);
+    console.error("Failed to fetch ad creative:", err);
     return NextResponse.json({ source: "off" });
-  }
-}
-
-export async function POST(request: NextRequest) {
-  const body = await request.json().catch(() => null);
-  const adId = body?.adId;
-  if (!adId || typeof adId !== "string") {
-    return NextResponse.json({ error: "adId is required." }, { status: 400 });
-  }
-
-  try {
-    await docClient.send(
-      new UpdateCommand({
-        TableName: AD_CREATIVES_TABLE,
-        Key: { adId },
-        UpdateExpression: "ADD clicks :one",
-        ExpressionAttributeValues: { ":one": 1 },
-      })
-    );
-    return NextResponse.json({ success: true });
-  } catch (err) {
-    console.error("Ad click tracking failed:", err);
-    return NextResponse.json({ success: false });
   }
 }

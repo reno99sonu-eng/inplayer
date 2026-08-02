@@ -19,13 +19,11 @@ export async function GET() {
     ).catch(() => null);
 
     if (result?.Items && Array.isArray(result.Items)) {
-      // Prioritize active "weekly_featured" and "homepage" placement items
+      // STRICT FILTERING: EXCLUSIVELY fetch active "weekly_featured" placement ad creatives.
+      // Homepage, watch page, and spotlight ads are strictly excluded so placements never mix up.
       const matching = result.Items.filter(
-        (b) => b && (b.placement === "weekly_featured" || b.placement === "homepage") && b.active !== false && Boolean(b.imageUrl)
+        (b) => b && b.placement === "weekly_featured" && b.active !== false && Boolean(b.imageUrl)
       );
-
-      // Sort so weekly_featured items come first
-      matching.sort((a, b) => (a.placement === "weekly_featured" ? -1 : 1));
 
       if (matching.length > 0) {
         adSlides = matching.map((b) => ({
@@ -44,16 +42,16 @@ export async function GET() {
     console.error("Failed to fetch weekly_featured ad banners:", err);
   }
 
-  // 1. If the admin has uploaded custom ad posters (adSlides exist), AUTOMATICALLY serve the admin's uploaded poster!
+  // 1. If active weekly_featured ad posters exist, EXCLUSIVELY serve those weekly_featured posters!
   if (adSlides.length > 0) {
     return NextResponse.json({ videos: adSlides, banners: adSlides, enabled: true });
   }
 
-  // 2. If weeklyFeaturedEnabled setting is explicitly false, return default videos
+  // 2. If weeklyFeaturedEnabled setting is explicitly false, return default user videos
   if (settings.weeklyFeaturedEnabled === false) {
     return NextResponse.json({ videos: defaultVideos, banners: [], enabled: false });
   }
 
   // 3. Fallback to default user videos
-  return NextResponse.json({ videos: defaultVideos, banners: adSlides, enabled: true });
+  return NextResponse.json({ videos: defaultVideos, banners: [], enabled: true });
 }

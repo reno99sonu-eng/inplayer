@@ -52,12 +52,11 @@ export default function MobileProfileMenu({ isActive }: MobileProfileMenuProps) 
           gap-0.5
           px-3
           py-1
-          rounded-2xl
           transition-all
           duration-200
           ${
             isActive
-              ? "bg-gradient-to-b from-orange-500/20 to-amber-500/10 border border-orange-500/40 text-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.3)] scale-105 font-black"
+              ? "text-orange-400 font-black scale-105"
               : "text-slate-300 light:text-slate-600 hover:text-orange-300 light:hover:text-orange-600"
           }
         `}
@@ -66,11 +65,15 @@ export default function MobileProfileMenu({ isActive }: MobileProfileMenuProps) 
         <img
           src={user?.avatarUrl || "/avatars/avatar.png"}
           alt=""
-          className={`h-[22px] w-[22px] rounded-full object-cover ${
-            isActive ? "ring-2 ring-orange-400 drop-shadow-[0_0_8px_rgba(249,115,22,0.6)]" : "ring-1 ring-orange-400/50"
+          className={`h-[21px] w-[21px] rounded-full object-cover transition-all ${
+            isActive
+              ? "ring-2 ring-orange-400 drop-shadow-[0_0_10px_rgba(249,115,22,0.85)] filter"
+              : "ring-1 ring-orange-400/50"
           }`}
         />
-        <span className={`text-[10px] ${isActive ? "font-black text-orange-400" : "font-medium"}`}>You</span>
+        <span className={`text-[10px] ${isActive ? "font-black text-orange-400 drop-shadow-[0_0_8px_rgba(249,115,22,0.7)]" : "font-medium"}`}>
+          You
+        </span>
       </button>
 
       {open && (

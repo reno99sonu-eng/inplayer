@@ -243,23 +243,31 @@ export default function Navbar() {
   {/* Pure Clean Logo */}
   <NavbarLogo />
 
-  {/* Pure Transparent Occasion Graphic with Vertical Animated Watermark Text strictly behind the graphic */}
+  {/* Pure Transparent Occasion Graphic with Stacked Top-to-Bottom Animated Watermark Text strictly behind the graphic */}
   {navbarTheme?.active && navbarTheme.imageUrl && (
     <div className="relative ml-3 sm:ml-3.5 inline-flex items-center flex-shrink-0">
-      {/* Vertical Animated Transparent Text Behind Festive Graphic */}
-      <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex items-center justify-center">
-        <span className="whitespace-nowrap [writing-mode:vertical-rl] rotate-180 text-[8px] lg:text-[9px] font-black uppercase tracking-[0.25em] bg-gradient-to-b from-orange-400 via-amber-200 to-pink-500 bg-clip-text text-transparent opacity-45 animate-pulse blur-[0.2px] max-h-full">
-          {(() => {
-            const occId = navbarTheme.occasionId;
-            if (occId === "independence_day") return "HAPPY INDEPENDENCE DAY";
-            if (occId === "diwali") return "HAPPY DIWALI";
-            if (occId === "holi") return "HAPPY HOLI";
-            if (occId === "republic_day") return "HAPPY REPUBLIC DAY";
-            if (occId === "new_year") return "HAPPY NEW YEAR 2026";
-            if (occId === "cyberpunk") return "CYBERPUNK MODE";
-            return navbarTheme.title ? navbarTheme.title.toUpperCase() : "HAPPY CELEBRATION";
-          })()}
-        </span>
+      {/* Stacked Top-to-Bottom Animated Transparent Text Behind Festive Graphic */}
+      <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex flex-col items-center justify-center text-center leading-[0.95] max-h-full py-0.5">
+        {(() => {
+          const occId = navbarTheme.occasionId;
+          let lines: string[] = ["HAPPY", "CELEBRATION"];
+          if (occId === "independence_day") lines = ["HAPPY", "INDEPENDENCE", "DAY"];
+          else if (occId === "diwali") lines = ["HAPPY", "DIWALI"];
+          else if (occId === "holi") lines = ["HAPPY", "HOLI"];
+          else if (occId === "republic_day") lines = ["HAPPY", "REPUBLIC DAY"];
+          else if (occId === "new_year") lines = ["HAPPY", "NEW YEAR"];
+          else if (occId === "cyberpunk") lines = ["CYBERPUNK", "MODE"];
+          else if (navbarTheme.title) lines = navbarTheme.title.toUpperCase().split(" ");
+
+          return lines.slice(0, 3).map((line, idx) => (
+            <span
+              key={idx}
+              className="whitespace-nowrap truncate max-w-full text-[7px] sm:text-[8px] lg:text-[9px] font-black uppercase tracking-wider bg-gradient-to-r from-orange-400 via-amber-200 to-pink-500 bg-clip-text text-transparent opacity-50 animate-pulse blur-[0.2px]"
+            >
+              {line}
+            </span>
+          ));
+        })()}
       </div>
 
       {/* Festive Graphic Image */}
@@ -326,23 +334,31 @@ export default function Navbar() {
     {/* Pure Clean Mobile Logo */}
     <NavbarLogo />
 
-    {/* Pure Transparent Occasion Graphic with Vertical Animated Watermark Text strictly behind the graphic */}
+    {/* Pure Transparent Occasion Graphic with Stacked Top-to-Bottom Animated Watermark Text strictly behind the graphic */}
     {navbarTheme?.active && navbarTheme.imageUrl && (
       <div className="relative ml-2 sm:ml-2.5 inline-flex items-center flex-shrink-0">
-        {/* Vertical Animated Transparent Text Behind Mobile Festive Graphic */}
-        <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex items-center justify-center">
-          <span className="whitespace-nowrap [writing-mode:vertical-rl] rotate-180 text-[7px] sm:text-[8px] font-black uppercase tracking-[0.2em] bg-gradient-to-b from-orange-400 via-amber-200 to-pink-500 bg-clip-text text-transparent opacity-45 animate-pulse blur-[0.2px] max-h-full">
-            {(() => {
-              const occId = navbarTheme.occasionId;
-              if (occId === "independence_day") return "HAPPY INDEPENDENCE DAY";
-              if (occId === "diwali") return "HAPPY DIWALI";
-              if (occId === "holi") return "HAPPY HOLI";
-              if (occId === "republic_day") return "HAPPY REPUBLIC DAY";
-              if (occId === "new_year") return "HAPPY NEW YEAR 2026";
-              if (occId === "cyberpunk") return "CYBERPUNK MODE";
-              return navbarTheme.title ? navbarTheme.title.toUpperCase() : "HAPPY CELEBRATION";
-            })()}
-          </span>
+        {/* Stacked Top-to-Bottom Animated Transparent Text Behind Mobile Festive Graphic */}
+        <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex flex-col items-center justify-center text-center leading-[0.95] max-h-full py-0.5">
+          {(() => {
+            const occId = navbarTheme.occasionId;
+            let lines: string[] = ["HAPPY", "CELEBRATION"];
+            if (occId === "independence_day") lines = ["HAPPY", "INDEPENDENCE", "DAY"];
+            else if (occId === "diwali") lines = ["HAPPY", "DIWALI"];
+            else if (occId === "holi") lines = ["HAPPY", "HOLI"];
+            else if (occId === "republic_day") lines = ["HAPPY", "REPUBLIC DAY"];
+            else if (occId === "new_year") lines = ["HAPPY", "NEW YEAR"];
+            else if (occId === "cyberpunk") lines = ["CYBERPUNK", "MODE"];
+            else if (navbarTheme.title) lines = navbarTheme.title.toUpperCase().split(" ");
+
+            return lines.slice(0, 3).map((line, idx) => (
+              <span
+                key={idx}
+                className="whitespace-nowrap truncate max-w-full text-[6.5px] sm:text-[7.5px] font-black uppercase tracking-wider bg-gradient-to-r from-orange-400 via-amber-200 to-pink-500 bg-clip-text text-transparent opacity-50 animate-pulse blur-[0.2px]"
+              >
+                {line}
+              </span>
+            ));
+          })()}
         </div>
 
         {/* Festive Graphic Image */}

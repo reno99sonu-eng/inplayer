@@ -402,14 +402,23 @@ function NavbarThemeManagerContent() {
                     <span>INPLAYER</span>
                   </div>
 
-                  {/* Pure Floating Occasion Graphic with Vertical Animated Watermark Text strictly behind the graphic */}
+                  {/* Pure Floating Occasion Graphic with Stacked Top-to-Bottom Animated Watermark Text strictly behind the graphic */}
                   {previewImageUrl && (
                     <div className="relative ml-2 inline-flex items-center flex-shrink-0">
-                      {/* Vertical Animated Transparent Text Behind Mock Graphic */}
-                      <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex items-center justify-center">
-                        <span className="whitespace-nowrap [writing-mode:vertical-rl] rotate-180 text-[8px] sm:text-[9px] font-black uppercase tracking-[0.25em] bg-gradient-to-b from-orange-400 via-amber-200 to-pink-500 bg-clip-text text-transparent opacity-45 animate-pulse blur-[0.2px] max-h-full">
-                          {generatedTitle.toUpperCase()}
-                        </span>
+                      {/* Stacked Top-to-Bottom Animated Transparent Text Behind Mock Graphic */}
+                      <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex flex-col items-center justify-center text-center leading-[0.95] max-h-full py-0.5">
+                        {generatedTitle
+                          .toUpperCase()
+                          .split(" ")
+                          .slice(0, 3)
+                          .map((word, idx) => (
+                            <span
+                              key={idx}
+                              className="whitespace-nowrap truncate max-w-full text-[7px] sm:text-[8px] font-black uppercase tracking-wider bg-gradient-to-r from-orange-400 via-amber-200 to-pink-500 bg-clip-text text-transparent opacity-50 animate-pulse blur-[0.2px]"
+                            >
+                              {word}
+                            </span>
+                          ))}
                       </div>
 
                       {/* Graphic Image */}

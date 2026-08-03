@@ -42,7 +42,7 @@ export default function MobileBottomNav() {
         light:bg-[#F5EEDC]/95
         backdrop-blur-2xl
         px-2
-        py-1.5
+        py-2
         pb-[calc(0.5rem+env(safe-area-inset-bottom))]
         shadow-[0_-4px_25px_rgba(0,0,0,0.4)]
       "
@@ -57,18 +57,19 @@ export default function MobileBottomNav() {
           gap-0.5
           px-3
           py-1
-          rounded-2xl
           transition-all
           duration-200
           ${
             isHomeActive
-              ? "bg-gradient-to-b from-orange-500/20 to-amber-500/10 border border-orange-500/40 text-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.3)] scale-105 font-black"
+              ? "text-orange-400 font-black scale-105"
               : "text-slate-300 light:text-slate-600 hover:text-orange-300 light:hover:text-orange-600"
           }
         `}
       >
-        <Home size={isHomeActive ? 22 : 20} className={isHomeActive ? "text-orange-400 drop-shadow-[0_0_8px_rgba(249,115,22,0.5)]" : ""} />
-        <span className={`text-[10px] ${isHomeActive ? "font-black text-orange-400" : "font-medium"}`}>Home</span>
+        <Home size={21} className={isHomeActive ? "text-orange-400 drop-shadow-[0_0_12px_rgba(249,115,22,0.85)] filter" : ""} />
+        <span className={`text-[10px] ${isHomeActive ? "font-black text-orange-400 drop-shadow-[0_0_8px_rgba(249,115,22,0.7)]" : "font-medium"}`}>
+          Home
+        </span>
       </Link>
 
       {/* Raftaar / Shorts */}
@@ -81,18 +82,19 @@ export default function MobileBottomNav() {
           gap-0.5
           px-3
           py-1
-          rounded-2xl
           transition-all
           duration-200
           ${
             isRaftaarActive
-              ? "bg-gradient-to-b from-orange-500/20 to-amber-500/10 border border-orange-500/40 text-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.3)] scale-105 font-black"
+              ? "text-orange-400 font-black scale-105"
               : "text-slate-300 light:text-slate-600 hover:text-orange-300 light:hover:text-orange-600"
           }
         `}
       >
-        <PlaySquare size={isRaftaarActive ? 22 : 20} className={isRaftaarActive ? "text-orange-400 drop-shadow-[0_0_8px_rgba(249,115,22,0.5)]" : ""} />
-        <span className={`text-[10px] ${isRaftaarActive ? "font-black text-orange-400" : "font-medium"}`}>Raftaar</span>
+        <PlaySquare size={21} className={isRaftaarActive ? "text-orange-400 drop-shadow-[0_0_12px_rgba(249,115,22,0.85)] filter" : ""} />
+        <span className={`text-[10px] ${isRaftaarActive ? "font-black text-orange-400 drop-shadow-[0_0_8px_rgba(249,115,22,0.7)]" : "font-medium"}`}>
+          Raftaar
+        </span>
       </Link>
 
       {/* Watchlist */}
@@ -105,18 +107,19 @@ export default function MobileBottomNav() {
           gap-0.5
           px-3
           py-1
-          rounded-2xl
           transition-all
           duration-200
           ${
             isWatchlistActive
-              ? "bg-gradient-to-b from-orange-500/20 to-amber-500/10 border border-orange-500/40 text-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.3)] scale-105 font-black"
+              ? "text-orange-400 font-black scale-105"
               : "text-slate-300 light:text-slate-600 hover:text-orange-300 light:hover:text-orange-600"
           }
         `}
       >
-        <Heart size={isWatchlistActive ? 22 : 20} className={isWatchlistActive ? "text-orange-400 fill-orange-400 drop-shadow-[0_0_8px_rgba(249,115,22,0.5)]" : ""} />
-        <span className={`text-[10px] ${isWatchlistActive ? "font-black text-orange-400" : "font-medium"}`}>Watchlist</span>
+        <Heart size={21} className={isWatchlistActive ? "text-orange-400 fill-orange-400 drop-shadow-[0_0_12px_rgba(249,115,22,0.85)] filter" : ""} />
+        <span className={`text-[10px] ${isWatchlistActive ? "font-black text-orange-400 drop-shadow-[0_0_8px_rgba(249,115,22,0.7)]" : "font-medium"}`}>
+          Watchlist
+        </span>
       </Link>
 
       {/* + Create Button */}
@@ -134,18 +137,19 @@ export default function MobileBottomNav() {
           gap-0.5
           px-3
           py-1
-          rounded-2xl
           transition-all
           duration-200
           ${
             isSubscriptionsActive
-              ? "bg-gradient-to-b from-orange-500/20 to-amber-500/10 border border-orange-500/40 text-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.3)] scale-105 font-black"
+              ? "text-orange-400 font-black scale-105"
               : "text-slate-300 light:text-slate-600 hover:text-orange-300 light:hover:text-orange-600"
           }
         `}
       >
-        <Rss size={isSubscriptionsActive ? 22 : 20} className={isSubscriptionsActive ? "text-orange-400 drop-shadow-[0_0_8px_rgba(249,115,22,0.5)]" : ""} />
-        <span className={`text-[10px] ${isSubscriptionsActive ? "font-black text-orange-400" : "font-medium"}`}>In-Family</span>
+        <Rss size={21} className={isSubscriptionsActive ? "text-orange-400 drop-shadow-[0_0_12px_rgba(249,115,22,0.85)] filter" : ""} />
+        <span className={`text-[10px] ${isSubscriptionsActive ? "font-black text-orange-400 drop-shadow-[0_0_8px_rgba(249,115,22,0.7)]" : "font-medium"}`}>
+          In-Family
+        </span>
       </Link>
 
       {/* My Profile */}

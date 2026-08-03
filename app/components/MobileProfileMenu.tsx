@@ -6,7 +6,11 @@ import { Heart, ListMusic, LogOut, MessageSquare, Settings, ThumbsUp, User } fro
 
 import { useAuthModal } from "./auth/AuthProvider";
 
-export default function MobileProfileMenu() {
+interface MobileProfileMenuProps {
+  isActive?: boolean;
+}
+
+export default function MobileProfileMenu({ isActive }: MobileProfileMenuProps) {
   const router = useRouter();
   const { user, signedIn, openSignIn, signOut } = useAuthModal();
   const [open, setOpen] = useState(false);
@@ -41,11 +45,32 @@ export default function MobileProfileMenu() {
         onClick={() => (signedIn ? setOpen((current) => !current) : openSignIn())}
         aria-expanded={open}
         aria-label={signedIn ? "Open account menu" : "Sign in"}
-        className="flex flex-col items-center gap-1 px-3 py-1 text-slate-300 transition-colors hover:text-orange-300 light:text-slate-600 light:hover:text-orange-600"
+        className={`
+          flex
+          flex-col
+          items-center
+          gap-0.5
+          px-3
+          py-1
+          rounded-2xl
+          transition-all
+          duration-200
+          ${
+            isActive
+              ? "bg-gradient-to-b from-orange-500/20 to-amber-500/10 border border-orange-500/40 text-orange-400 shadow-[0_0_15px_rgba(249,115,22,0.3)] scale-105 font-black"
+              : "text-slate-300 light:text-slate-600 hover:text-orange-300 light:hover:text-orange-600"
+          }
+        `}
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- user avatars can be data URLs. */}
-        <img src={user?.avatarUrl || "/avatars/avatar.png"} alt="" className="h-[22px] w-[22px] rounded-full object-cover ring-1 ring-orange-400/50" />
-        <span className="text-[11px] font-medium">You</span>
+        <img
+          src={user?.avatarUrl || "/avatars/avatar.png"}
+          alt=""
+          className={`h-[22px] w-[22px] rounded-full object-cover ${
+            isActive ? "ring-2 ring-orange-400 drop-shadow-[0_0_8px_rgba(249,115,22,0.6)]" : "ring-1 ring-orange-400/50"
+          }`}
+        />
+        <span className={`text-[10px] ${isActive ? "font-black text-orange-400" : "font-medium"}`}>You</span>
       </button>
 
       {open && (
@@ -53,15 +78,38 @@ export default function MobileProfileMenu() {
           <div className="flex items-center gap-3 border-b border-white/10 px-3 py-3 light:border-black/10">
             {/* eslint-disable-next-line @next/next/no-img-element -- user avatars can be data URLs. */}
             <img src={user?.avatarUrl || "/avatars/avatar.png"} alt="" className="h-10 w-10 rounded-full object-cover" />
-            <div className="min-w-0"><p className="truncate text-sm font-black text-white light:text-slate-900">{user?.name}</p><p className="truncate text-xs text-slate-400 light:text-slate-600">{user?.email}</p></div>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-black text-white light:text-slate-900">{user?.name}</p>
+              <p className="truncate text-xs text-slate-400 light:text-slate-600">{user?.email}</p>
+            </div>
           </div>
           <div className="pt-2">
             {items.map((item) => {
               const Icon = item.icon;
-              return <button key={item.label} type="button" onClick={() => go(item.href)} className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm font-semibold text-white transition hover:bg-white/10 light:text-slate-900 light:hover:bg-black/5"><Icon size={17} className="text-orange-400" />{item.label}</button>;
+              return (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => go(item.href)}
+                  className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm font-semibold text-white transition hover:bg-white/10 light:text-slate-900 light:hover:bg-black/5"
+                >
+                  <Icon size={17} className="text-orange-400" />
+                  {item.label}
+                </button>
+              );
             })}
             <div className="my-2 border-t border-white/10 light:border-black/10" />
-            <button type="button" onClick={async () => { setOpen(false); await signOut(); }} className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm font-semibold text-red-400 transition hover:bg-red-500/10"><LogOut size={17} />Sign Out</button>
+            <button
+              type="button"
+              onClick={async () => {
+                setOpen(false);
+                await signOut();
+              }}
+              className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm font-semibold text-red-400 transition hover:bg-red-500/10"
+            >
+              <LogOut size={17} />
+              Sign Out
+            </button>
           </div>
         </div>
       )}

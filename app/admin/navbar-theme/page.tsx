@@ -396,30 +396,28 @@ function NavbarThemeManagerContent() {
                     <Menu size={18} />
                   </div>
 
-                  {/* Logo with strict clipped background text container */}
-                  <div className="relative inline-flex items-center overflow-hidden max-w-[140px] sm:max-w-[170px] rounded-md">
-                    {previewImageUrl && (
-                      <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex items-center justify-center p-0.5">
-                        <span className="whitespace-nowrap truncate max-w-full text-[10px] sm:text-xs font-black uppercase tracking-wider bg-gradient-to-r from-orange-400 via-amber-200 to-pink-500 bg-clip-text text-transparent opacity-35 animate-pulse blur-[0.2px]">
+                  {/* Clean Logo */}
+                  <div className="flex items-center gap-1 text-white font-black text-sm tracking-wider flex-shrink-0">
+                    <Flame size={18} className="text-orange-500 fill-orange-500" />
+                    <span>INPLAYER</span>
+                  </div>
+
+                  {/* Pure Floating Occasion Graphic with Animated Watermark Text strictly behind the graphic */}
+                  {previewImageUrl && (
+                    <div className="relative ml-2 inline-flex items-center flex-shrink-0">
+                      {/* Animated Transparent Text Behind Mock Graphic */}
+                      <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex items-center justify-center scale-125">
+                        <span className="whitespace-nowrap truncate max-w-full text-[10px] sm:text-xs font-black uppercase tracking-widest bg-gradient-to-r from-orange-400 via-amber-200 to-pink-500 bg-clip-text text-transparent opacity-40 animate-pulse blur-[0.3px]">
                           {generatedTitle.toUpperCase()}
                         </span>
                       </div>
-                    )}
 
-                    <div className="relative z-10 flex items-center gap-1 text-white font-black text-sm tracking-wider flex-shrink-0">
-                      <Flame size={18} className="text-orange-500 fill-orange-500" />
-                      <span>INPLAYER</span>
-                    </div>
-                  </div>
-
-                  {/* Pure Floating Occasion Graphic */}
-                  {previewImageUrl && (
-                    <div className="ml-2 inline-flex items-center flex-shrink-0">
+                      {/* Graphic Image */}
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={previewImageUrl}
                         alt="Occasion Graphic"
-                        className="h-8 sm:h-9 md:h-10 w-auto object-contain drop-shadow-[0_2px_10px_rgba(255,165,0,0.4)]"
+                        className="relative z-10 h-8 sm:h-9 md:h-10 w-auto object-contain drop-shadow-[0_2px_10px_rgba(255,165,0,0.4)]"
                       />
                     </div>
                   )}

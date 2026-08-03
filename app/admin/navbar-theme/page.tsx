@@ -391,28 +391,30 @@ function NavbarThemeManagerContent() {
               {/* Navbar Foreground Elements (Logo, Theme Badge, Search, Buttons) */}
               <div className="relative z-10 flex items-center justify-between gap-3">
                 {/* Logo, Menu, Animated Watermark Text & Occasion Graphic */}
-                <div className="relative flex items-center gap-2">
+                <div className="flex items-center gap-2">
                   <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 border border-white/15 text-white backdrop-blur-md">
                     <Menu size={18} />
                   </div>
 
-                  {/* Animated Transparent Text Behind Mock Logo */}
-                  {previewImageUrl && (
-                    <div className="absolute left-10 -right-12 top-1/2 -translate-y-1/2 pointer-events-none select-none z-0 overflow-hidden flex items-center justify-center">
-                      <span className="whitespace-nowrap text-lg sm:text-xl font-black uppercase tracking-[0.2em] bg-gradient-to-r from-orange-400 via-amber-200 to-pink-500 bg-clip-text text-transparent opacity-25 animate-pulse blur-[0.4px]">
-                        {generatedTitle.toUpperCase()}
-                      </span>
-                    </div>
-                  )}
+                  {/* Logo with strict background text container */}
+                  <div className="relative inline-flex items-center">
+                    {previewImageUrl && (
+                      <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex items-center justify-center scale-110">
+                        <span className="whitespace-nowrap text-xs sm:text-sm font-black uppercase tracking-wider bg-gradient-to-r from-orange-400 via-amber-200 to-pink-500 bg-clip-text text-transparent opacity-30 animate-pulse blur-[0.3px]">
+                          {generatedTitle.toUpperCase()}
+                        </span>
+                      </div>
+                    )}
 
-                  <div className="relative z-10 flex items-center gap-1 text-white font-black text-sm tracking-wider">
-                    <Flame size={18} className="text-orange-500 fill-orange-500" />
-                    <span>INPLAYER</span>
+                    <div className="relative z-10 flex items-center gap-1 text-white font-black text-sm tracking-wider">
+                      <Flame size={18} className="text-orange-500 fill-orange-500" />
+                      <span>INPLAYER</span>
+                    </div>
                   </div>
 
                   {/* Pure Floating Occasion Graphic */}
                   {previewImageUrl && (
-                    <div className="relative z-10 ml-2 inline-flex items-center flex-shrink-0">
+                    <div className="ml-2 inline-flex items-center flex-shrink-0">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img
                         src={previewImageUrl}

@@ -115,9 +115,9 @@ export default function NavigationCategories() {
         backdrop-blur-2xl
       "
     >
-      {/* Left Scroll Arrow Overlay */}
+      {/* Left Scroll Arrow Overlay (Desktop only — mobile uses touch swipe scroll) */}
       {showLeftArrow && (
-        <div className="absolute left-0 top-0 bottom-0 z-10 flex items-center pl-2 pr-6 bg-gradient-to-r from-[#06101D] via-[#06101D]/90 to-transparent light:from-[#F5EEDC] light:via-[#F5EEDC]/90 light:to-transparent pointer-events-none">
+        <div className="hidden lg:flex absolute left-0 top-0 bottom-0 z-10 items-center pl-2 pr-6 bg-gradient-to-r from-[#06101D] via-[#06101D]/90 to-transparent light:from-[#F5EEDC] light:via-[#F5EEDC]/90 light:to-transparent pointer-events-none">
           <button
             type="button"
             onClick={() => handleScroll("left")}
@@ -129,9 +129,9 @@ export default function NavigationCategories() {
         </div>
       )}
 
-      {/* Right Scroll Arrow Overlay */}
+      {/* Right Scroll Arrow Overlay (Desktop only — mobile uses touch swipe scroll) */}
       {showRightArrow && (
-        <div className="absolute right-0 top-0 bottom-0 z-10 flex items-center pr-2 pl-6 bg-gradient-to-l from-[#06101D] via-[#06101D]/90 to-transparent light:from-[#F5EEDC] light:via-[#F5EEDC]/90 light:to-transparent pointer-events-none">
+        <div className="hidden lg:flex absolute right-0 top-0 bottom-0 z-10 items-center pr-2 pl-6 bg-gradient-to-l from-[#06101D] via-[#06101D]/90 to-transparent light:from-[#F5EEDC] light:via-[#F5EEDC]/90 light:to-transparent pointer-events-none">
           <button
             type="button"
             onClick={() => handleScroll("right")}

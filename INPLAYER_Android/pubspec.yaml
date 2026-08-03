@@ -1,0 +1,70 @@
+name: inplayer_android
+description: "INPLAYER Android Application"
+
+publish_to: "none"
+
+version: 1.0.0+1
+
+environment:
+  sdk: ^3.12.2
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  cupertino_icons: ^1.0.8
+
+  # AWS Amplify
+  amplify_flutter: ^2.11.0
+  amplify_auth_cognito: ^2.11.0
+
+  # State Management
+  flutter_riverpod: ^2.6.1
+
+  # Routing
+  go_router: ^16.3.0
+
+  # Networking
+  dio: ^5.11.0
+
+  # Secure Storage
+  flutter_secure_storage: ^9.2.4
+
+  # Local Storage
+  shared_preferences: ^2.5.5
+
+  # Images
+  cached_network_image: ^3.4.1
+
+  # SVG Support
+  flutter_svg: ^2.3.0
+
+  # Date & Time Formatting
+  intl: ^0.20.3
+
+  # Equality
+  equatable: ^2.1.0
+
+  # UUID Generator
+  uuid: ^4.6.0
+
+  # Logging
+  logger: ^2.7.0
+
+  # Internet Connectivity
+  connectivity_plus: ^7.3.1
+
+  # App Information
+  package_info_plus: ^9.0.1
+
+  # Device Information
+  device_info_plus: ^12.4.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+
+  flutter_lints: ^6.0.0
+
+flutter:
+  uses-material-design: true

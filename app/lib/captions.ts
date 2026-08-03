@@ -74,7 +74,7 @@ export async function buildCaptionSet(
 
   const targets = CAPTION_TARGETS.filter((t) => t.code !== sourceLang);
   const results = await Promise.all(
-    targets.map((t) => translateVtt(sourceVtt, t.name))
+    targets.map((t) => translateVtt(sourceVtt, t.name, t.code))
   );
   targets.forEach((t, i) => {
     const translated = results[i];

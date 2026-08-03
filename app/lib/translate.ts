@@ -73,10 +73,26 @@ async function runVttTransform(userPrompt: string, systemPrompt?: string): Promi
   return cleaned;
 }
 
+import { translateVttWithGoogle } from "./googleTranslate";
+
 export async function translateVtt(
   vtt: string,
-  targetLanguageName: string
+  targetLanguageName: string,
+  targetLangCode?: string
 ): Promise<string | null> {
+  // Primary option: If Google Translate API key is configured, use Google Cloud Translation NMT
+  if (targetLangCode && (process.env.GOOGLE_TRANSLATE_API_KEY || process.env.NEXT_PUBLIC_MAPS_API_KEY)) {
+    try {
+      const googleResult = await translateVttWithGoogle(vtt, targetLangCode);
+      if (googleResult && googleResult.startsWith("WEBVTT")) {
+        return googleResult;
+      }
+    } catch (err) {
+      console.error("Google Translate failed — falling back to OpenAI/Groq:", err);
+    }
+  }
+
+  // Fallback option: High-grade OpenAI / Groq LLM Localization Engine
   const systemPrompt = `You are an expert native translator and localization specialist for Indian regional languages (Tamil, Telugu, Marathi, Gujarati, Kannada, Malayalam, Punjabi, Odia, Hindi, Bengali).
 Your mission is to translate video subtitles into natural, accurate, and contextually rich ${targetLanguageName}.
 

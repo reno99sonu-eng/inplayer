@@ -243,11 +243,11 @@ export default function Navbar() {
   {/* Pure Clean Logo */}
   <NavbarLogo />
 
-  {/* Pure Transparent Occasion Graphic with Stacked Top-to-Bottom Animated Watermark Text strictly behind the graphic */}
+  {/* Pure Transparent Occasion Graphic shifted right with larger graphic & watermark text */}
   {navbarTheme?.active && navbarTheme.imageUrl && (
-    <div className="relative ml-3 sm:ml-3.5 inline-flex items-center flex-shrink-0">
+    <div className="relative ml-6 sm:ml-8 lg:ml-10 xl:ml-12 inline-flex items-center flex-shrink-0">
       {/* Stacked Top-to-Bottom Animated Transparent Text Behind Festive Graphic */}
-      <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex flex-col items-center justify-center text-center leading-[0.9] max-h-full py-0.5">
+      <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex flex-col items-center justify-center text-center leading-[0.88] max-h-full py-0.5 scale-110">
         {(() => {
           const occId = navbarTheme.occasionId;
           let lines: string[] = ["OCCASION", "CELEBRATION", "THEME"];
@@ -265,7 +265,7 @@ export default function Navbar() {
           return lines.map((line, idx) => (
             <span
               key={idx}
-              className="whitespace-nowrap truncate max-w-full text-[9px] sm:text-[10px] lg:text-[11px] xl:text-[12px] font-black uppercase tracking-widest bg-gradient-to-r from-amber-300 via-orange-400 to-pink-400 bg-clip-text text-transparent opacity-75 animate-pulse drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]"
+              className="whitespace-nowrap truncate max-w-full text-[10px] sm:text-[11px] lg:text-[12px] xl:text-[13px] font-black uppercase tracking-widest bg-gradient-to-r from-amber-300 via-orange-400 to-pink-400 bg-clip-text text-transparent opacity-85 animate-pulse drop-shadow-[0_1.5px_4px_rgba(0,0,0,0.85)]"
             >
               {line}
             </span>
@@ -273,19 +273,19 @@ export default function Navbar() {
         })()}
       </div>
 
-      {/* Festive Graphic Image */}
+      {/* Festive Graphic Image - Larger size */}
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={navbarTheme.imageUrl}
         alt="Occasion Graphic"
-        className="relative z-10 h-10 lg:h-11 xl:h-12 w-auto object-contain drop-shadow-[0_2px_12px_rgba(255,165,0,0.4)]"
+        className="relative z-10 h-12 lg:h-13 xl:h-14 w-auto object-contain drop-shadow-[0_2px_14px_rgba(255,165,0,0.5)]"
       />
     </div>
   )}
 </div>
 
 {/* Desktop Search */}
-<div className="hidden lg:flex flex-1 justify-center px-10 min-w-0">
+<div className="hidden lg:flex flex-1 justify-center px-8 min-w-0">
   <NavbarSearch />
 </div>
 
@@ -337,11 +337,11 @@ export default function Navbar() {
     {/* Pure Clean Mobile Logo */}
     <NavbarLogo />
 
-    {/* Pure Transparent Occasion Graphic with Stacked Top-to-Bottom Animated Watermark Text strictly behind the graphic */}
+    {/* Pure Transparent Occasion Graphic shifted right with larger graphic & watermark text */}
     {navbarTheme?.active && navbarTheme.imageUrl && (
-      <div className="relative ml-2 sm:ml-2.5 inline-flex items-center flex-shrink-0">
+      <div className="relative ml-4 sm:ml-6 inline-flex items-center flex-shrink-0">
         {/* Stacked Top-to-Bottom Animated Transparent Text Behind Mobile Festive Graphic */}
-        <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex flex-col items-center justify-center text-center leading-[0.9] max-h-full py-0.5">
+        <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex flex-col items-center justify-center text-center leading-[0.88] max-h-full py-0.5 scale-110">
           {(() => {
             const occId = navbarTheme.occasionId;
             let lines: string[] = ["OCCASION", "CELEBRATION", "THEME"];
@@ -359,7 +359,7 @@ export default function Navbar() {
             return lines.map((line, idx) => (
               <span
                 key={idx}
-                className="whitespace-nowrap truncate max-w-full text-[8px] sm:text-[9px] font-black uppercase tracking-wider bg-gradient-to-r from-amber-300 via-orange-400 to-pink-400 bg-clip-text text-transparent opacity-75 animate-pulse drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]"
+                className="whitespace-nowrap truncate max-w-full text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-amber-300 via-orange-400 to-pink-400 bg-clip-text text-transparent opacity-85 animate-pulse drop-shadow-[0_1.5px_4px_rgba(0,0,0,0.85)]"
               >
                 {line}
               </span>
@@ -367,12 +367,12 @@ export default function Navbar() {
           })()}
         </div>
 
-        {/* Festive Graphic Image */}
+        {/* Festive Graphic Image - Larger size */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
           src={navbarTheme.imageUrl}
           alt="Occasion Graphic"
-          className="relative z-10 h-7 sm:h-8 md:h-9 w-auto object-contain drop-shadow-[0_2px_10px_rgba(255,165,0,0.35)]"
+          className="relative z-10 h-8 sm:h-9 md:h-10 w-auto object-contain drop-shadow-[0_2px_12px_rgba(255,165,0,0.45)]"
         />
       </div>
     )}

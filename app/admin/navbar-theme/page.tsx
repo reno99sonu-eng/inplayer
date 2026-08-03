@@ -402,18 +402,18 @@ function NavbarThemeManagerContent() {
                     <span>INPLAYER</span>
                   </div>
 
-                  {/* Pure Floating Occasion Graphic with Stacked Top-to-Bottom Animated Watermark Text strictly behind the graphic */}
+                  {/* Pure Floating Occasion Graphic shifted right with larger graphic & watermark text */}
                   {previewImageUrl && (
-                    <div className="relative ml-2 inline-flex items-center flex-shrink-0">
+                    <div className="relative ml-5 sm:ml-7 inline-flex items-center flex-shrink-0">
                       {/* Stacked Top-to-Bottom Animated Transparent Text Behind Mock Graphic */}
-                      <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex flex-col items-center justify-center text-center leading-[0.9] max-h-full py-0.5">
+                      <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex flex-col items-center justify-center text-center leading-[0.88] max-h-full py-0.5 scale-110">
                         {(() => {
                           const parts = generatedTitle.toUpperCase().split(" ");
                           const lines = parts.length >= 3 ? parts.slice(0, 3) : [parts[0] || "OCCASION", parts[1] || "CELEBRATION", parts[2] || "THEME"];
                           return lines.map((word, idx) => (
                             <span
                               key={idx}
-                              className="whitespace-nowrap truncate max-w-full text-[8px] sm:text-[9px] font-black uppercase tracking-wider bg-gradient-to-r from-amber-300 via-orange-400 to-pink-400 bg-clip-text text-transparent opacity-75 animate-pulse drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]"
+                              className="whitespace-nowrap truncate max-w-full text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-amber-300 via-orange-400 to-pink-400 bg-clip-text text-transparent opacity-85 animate-pulse drop-shadow-[0_1.5px_4px_rgba(0,0,0,0.85)]"
                             >
                               {word}
                             </span>
@@ -426,7 +426,7 @@ function NavbarThemeManagerContent() {
                       <img
                         src={previewImageUrl}
                         alt="Occasion Graphic"
-                        className="relative z-10 h-8 sm:h-9 md:h-10 w-auto object-contain drop-shadow-[0_2px_10px_rgba(255,165,0,0.4)]"
+                        className="relative z-10 h-10 sm:h-11 md:h-12 w-auto object-contain drop-shadow-[0_2px_12px_rgba(255,165,0,0.45)]"
                       />
                     </div>
                   )}

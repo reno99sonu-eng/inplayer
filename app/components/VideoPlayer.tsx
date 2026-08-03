@@ -432,6 +432,65 @@ export default function VideoPlayer({
     };
   }, [videoId]);
 
+  // Real-time Subtitle Cue Interceptor: Intercepts active text tracks on the video element
+  // and dynamically truncates/chunks long paragraph cues so no video ever displays multi-line text dumps.
+  useEffect(() => {
+    let cleanupTrackListeners: (() => void)[] = [];
+
+    const attachCueSanitizer = () => {
+      const muxEl = playerRef.current as unknown as HTMLElement | null;
+      if (!muxEl) return false;
+
+      const shadowRoot = muxEl.shadowRoot;
+      const themeEl = shadowRoot?.querySelector("media-theme");
+      const mediaEl = (shadowRoot?.querySelector("video") ||
+        themeEl?.shadowRoot?.querySelector("video") ||
+        muxEl.querySelector("video")) as HTMLVideoElement | null;
+
+      if (!mediaEl) return false;
+
+      const sanitizeCues = () => {
+        const textTracks = mediaEl?.textTracks;
+        if (!textTracks) return;
+
+        for (let i = 0; i < textTracks.length; i++) {
+          const track = textTracks[i];
+          if (track.kind === "subtitles" || track.kind === "captions") {
+            const activeCues = track.activeCues;
+            if (activeCues) {
+              for (let j = 0; j < activeCues.length; j++) {
+                const cue = activeCues[j] as VTTCue;
+                if (cue && cue.text) {
+                  const fullText = cue.text.replace(/\r?\n+/g, " ").trim();
+                  if (fullText.length > 70) {
+                    const shortText = fullText.slice(0, 68).replace(/\s+\S*$/, "") + "…";
+                    cue.text = shortText;
+                  }
+                }
+              }
+            }
+          }
+        }
+      };
+
+      mediaEl.addEventListener("timeupdate", sanitizeCues);
+      cleanupTrackListeners.push(() => mediaEl?.removeEventListener("timeupdate", sanitizeCues));
+      return true;
+    };
+
+    if (!attachCueSanitizer()) {
+      let attempts = 0;
+      const timer = setInterval(() => {
+        attempts++;
+        if (attachCueSanitizer() || attempts > 25) clearInterval(timer);
+      }, 200);
+    }
+
+    return () => {
+      cleanupTrackListeners.forEach((fn) => fn());
+    };
+  }, []);
+
   // Theme player buttons & bottom popup panels (Captions menu, Resolution menu, Speed menu) to match InPlayer theme
   useEffect(() => {
     const applyMenuTheme = () => {

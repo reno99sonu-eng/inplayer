@@ -1003,7 +1003,7 @@ animation: aiGlassSweep 5.5s linear infinite;
 /* Subtitle / Caption Text WebVTT Cue Display Bounds */
 media-captions-display,
 media-text-display {
-  max-height: 22% !important;
+  max-height: 52px !important;
   bottom: 48px !important;
   overflow: hidden !important;
 }

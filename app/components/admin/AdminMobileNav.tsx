@@ -21,6 +21,7 @@ const inplayerItems = [
   { id: "copyright", label: "Copyright", href: "/admin/copyright" },
   { id: "revenue", label: "Revenue", href: "/admin/revenue" },
   { id: "ads", label: "Advertising", href: "/admin/advertising" },
+  { id: "navbar-theme", label: "Navbar Theme", href: "/admin/navbar-theme" },
   { id: "analytics", label: "Analytics", href: "/admin/analytics" },
   { id: "ai-moderation", label: "AI Moderation", href: "/admin/ai-moderation" },
   { id: "notifications", label: "Notifications", href: "/admin/notifications" },

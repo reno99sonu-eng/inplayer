@@ -38,6 +38,27 @@ export default function Navbar() {
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const { signedIn, user, signOut, openSignIn, openSignUp } = useAuthModal();
+  const [navbarTheme, setNavbarTheme] = useState<{ active: boolean; imageUrl: string } | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/navbar-theme");
+        if (!res.ok) return;
+        const data = await res.json().catch(() => ({ active: false }));
+        if (!cancelled && data?.active && data?.theme?.imageUrl) {
+          setNavbarTheme({ active: true, imageUrl: data.theme.imageUrl });
+        }
+      } catch (err) {
+        console.error("Navbar theme fetch error:", err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   useEffect(() => {
     if (!signedIn) {
       setSubscribedChannels([]);
@@ -115,9 +136,9 @@ export default function Navbar() {
   return (
     <>
       <header
-  className="
-    relative
-    sticky
+        className="
+          relative
+          sticky
           top-0
           z-50
           border-b
@@ -128,8 +149,21 @@ export default function Navbar() {
           backdrop-blur-[28px]
           shadow-[0_12px_40px_rgba(0,0,0,.35)]
           light:shadow-[0_12px_40px_rgba(0,0,0,.08)]
+          overflow-hidden
         "
       >
+        {/* AI Occasion Background Theme Layer */}
+        {navbarTheme?.active && navbarTheme.imageUrl && (
+          <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={navbarTheme.imageUrl}
+              alt="Navbar Occasion Theme"
+              className="h-full w-full object-cover opacity-90 transition-opacity duration-500"
+            />
+            <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/30 to-black/50 backdrop-blur-[1px]" />
+          </div>
+        )}
       {/* Mobile / Tablet Background Branding */}
 <div
   className="

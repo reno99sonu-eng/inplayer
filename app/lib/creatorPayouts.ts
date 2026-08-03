@@ -40,6 +40,8 @@ export const PLATFORM_SHARE = 0.2;
 // (videos + Shorts combined) unlocks the KYC / revenue flow.
 export const ELIGIBILITY_THRESHOLD = {
   subscribers: 100,
+  videoViews: 10000,
+  shortViews: 1000000, // 1 Million views required for Reels/Raftaar monetization
   views: 10000,
 };
 

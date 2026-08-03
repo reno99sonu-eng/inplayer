@@ -12,6 +12,7 @@ import {
   Landmark,
   Check,
   AlertTriangle,
+  PlaySquare,
 } from "lucide-react";
 import {
   ELIGIBILITY_THRESHOLD,
@@ -87,7 +88,7 @@ export default function RevenueSection({
 
   const meetsThreshold =
     subscriberCount >= ELIGIBILITY_THRESHOLD.subscribers &&
-    totalViews >= ELIGIBILITY_THRESHOLD.views;
+    (totalViews >= ELIGIBILITY_THRESHOLD.videoViews || totalViews >= ELIGIBILITY_THRESHOLD.shortViews);
 
   // Real number now: lifetimeEarnedInr is credited by the Razorpay webhook
   // handler on every confirmed paid-membership charge (this creator's 80%
@@ -389,9 +390,8 @@ export default function RevenueSection({
       ) : (
         <div className="mt-4 space-y-4">
           <p className="text-xs text-slate-500 light:text-slate-500">
-            The KYC form (and your revenue balance) unlocks right here once
-            you reach {ELIGIBILITY_THRESHOLD.subscribers} In-Family members
-            and {ELIGIBILITY_THRESHOLD.views.toLocaleString()} views on channel — So keep going!
+            Monetization unlocks automatically when you reach {ELIGIBILITY_THRESHOLD.subscribers} In-Family members
+            AND either {ELIGIBILITY_THRESHOLD.videoViews.toLocaleString()} video views or 1,000,000 (1 Million) Raftaar reels views on your channel!
           </p>
 
           <div>
@@ -409,13 +409,25 @@ export default function RevenueSection({
           <div>
             <div className="mb-1 flex items-center justify-between text-xs">
               <span className="flex items-center gap-1.5 font-semibold text-slate-300 light:text-slate-700">
-                <Eye size={13} /> Total views
+                <Eye size={13} /> Longform Video Views
               </span>
               <span className="text-slate-500">
-                {totalViews.toLocaleString()} / {ELIGIBILITY_THRESHOLD.views.toLocaleString()}
+                {totalViews.toLocaleString()} / {ELIGIBILITY_THRESHOLD.videoViews.toLocaleString()}
               </span>
             </div>
-            <ProgressBar value={totalViews} max={ELIGIBILITY_THRESHOLD.views} />
+            <ProgressBar value={totalViews} max={ELIGIBILITY_THRESHOLD.videoViews} />
+          </div>
+
+          <div>
+            <div className="mb-1 flex items-center justify-between text-xs">
+              <span className="flex items-center gap-1.5 font-semibold text-slate-300 light:text-slate-700">
+                <PlaySquare size={13} /> Raftaar Reels Views (1M Requirement)
+              </span>
+              <span className="text-slate-500">
+                {totalViews.toLocaleString()} / {ELIGIBILITY_THRESHOLD.shortViews.toLocaleString()} (1M)
+              </span>
+            </div>
+            <ProgressBar value={totalViews} max={ELIGIBILITY_THRESHOLD.shortViews} />
           </div>
         </div>
       )}

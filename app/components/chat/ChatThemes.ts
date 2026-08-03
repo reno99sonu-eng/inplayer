@@ -6,6 +6,7 @@ export interface ChatTheme {
   bubbleMine: string;
   bubbleOther: string;
   texturePattern: string; // CSS background-image or SVG texture Data URI
+  backgroundImageUrl?: string; // High-resolution rich background wallpaper image
 }
 
 // High-definition SVG Wallpaper Textures
@@ -28,8 +29,9 @@ export const CHAT_THEMES: Record<string, ChatTheme> = {
     previewBg: "bg-[#060D17] border-orange-500/50",
     containerClass: "bg-[#060D17] text-white",
     bubbleMine: "bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-slate-950 font-semibold shadow-lg shadow-orange-500/20",
-    bubbleOther: "border border-white/10 bg-[#0E1A2B] text-slate-100 shadow-md",
+    bubbleOther: "border border-white/10 bg-[#0E1A2B]/90 backdrop-blur-md text-slate-100 shadow-md",
     texturePattern: OBSIDIAN_TEXTURE,
+    backgroundImageUrl: "https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?auto=format&fit=crop&w=1920&q=80",
   },
   emerald: {
     id: "emerald",
@@ -37,8 +39,9 @@ export const CHAT_THEMES: Record<string, ChatTheme> = {
     previewBg: "bg-[#0B141A] border-emerald-500",
     containerClass: "bg-[#0B141A] text-white",
     bubbleMine: "bg-[#005C4B] text-white shadow-md border border-emerald-500/30",
-    bubbleOther: "bg-[#202C33] text-slate-100 shadow-md border border-white/10",
+    bubbleOther: "bg-[#202C33]/90 backdrop-blur-md text-slate-100 shadow-md border border-white/10",
     texturePattern: WHATSAPP_DOODLE_TEXTURE,
+    backgroundImageUrl: "https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?auto=format&fit=crop&w=1920&q=80",
   },
   cyberpunk: {
     id: "cyberpunk",
@@ -46,8 +49,9 @@ export const CHAT_THEMES: Record<string, ChatTheme> = {
     previewBg: "bg-[#070214] border-cyan-400",
     containerClass: "bg-[#070214] text-cyan-100",
     bubbleMine: "bg-gradient-to-r from-cyan-500 via-sky-500 to-fuchsia-600 text-white shadow-[0_0_18px_rgba(6,182,212,0.4)] border border-cyan-300/40 font-semibold",
-    bubbleOther: "border border-cyan-500/30 bg-[#12082A] text-cyan-100 shadow-lg",
+    bubbleOther: "border border-cyan-500/30 bg-[#12082A]/90 backdrop-blur-md text-cyan-100 shadow-lg",
     texturePattern: CYBERPUNK_TEXTURE,
+    backgroundImageUrl: "https://images.unsplash.com/photo-1509198397868-475647b2a1e5?auto=format&fit=crop&w=1920&q=80",
   },
   midnight: {
     id: "midnight",
@@ -55,8 +59,9 @@ export const CHAT_THEMES: Record<string, ChatTheme> = {
     previewBg: "bg-[#0A071B] border-purple-500",
     containerClass: "bg-[#0A071B] text-purple-100",
     bubbleMine: "bg-gradient-to-r from-purple-600 via-indigo-600 to-purple-500 text-white shadow-lg border border-purple-400/30 font-semibold",
-    bubbleOther: "border border-purple-500/20 bg-[#150F2E] text-purple-100 shadow-md",
+    bubbleOther: "border border-purple-500/20 bg-[#150F2E]/90 backdrop-blur-md text-purple-100 shadow-md",
     texturePattern: STARDUST_TEXTURE,
+    backgroundImageUrl: "https://images.unsplash.com/photo-1506703719100-a0f3a48c0f86?auto=format&fit=crop&w=1920&q=80",
   },
   sunset: {
     id: "sunset",
@@ -64,8 +69,9 @@ export const CHAT_THEMES: Record<string, ChatTheme> = {
     previewBg: "bg-[#160B04] border-amber-500",
     containerClass: "bg-[#160B04] text-amber-100",
     bubbleMine: "bg-gradient-to-r from-amber-500 via-orange-500 to-rose-500 text-slate-950 font-semibold shadow-lg shadow-orange-500/20 border border-amber-300/40",
-    bubbleOther: "border border-amber-500/25 bg-[#261308] text-amber-100 shadow-md",
+    bubbleOther: "border border-amber-500/25 bg-[#261308]/90 backdrop-blur-md text-amber-100 shadow-md",
     texturePattern: DAMASK_TEXTURE,
+    backgroundImageUrl: "https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=1920&q=80",
   },
   minimal: {
     id: "minimal",
@@ -73,7 +79,8 @@ export const CHAT_THEMES: Record<string, ChatTheme> = {
     previewBg: "bg-[#0B1220] border-slate-500",
     containerClass: "bg-[#0B1220] text-slate-100",
     bubbleMine: "bg-[#1D4ED8] text-white font-medium shadow-md border border-blue-400/30",
-    bubbleOther: "bg-[#1E293B] text-slate-200 shadow-md border border-slate-700/60",
+    bubbleOther: "bg-[#1E293B]/90 backdrop-blur-md text-slate-200 shadow-md border border-slate-700/60",
     texturePattern: CARBON_TEXTURE,
+    backgroundImageUrl: "https://images.unsplash.com/photo-1550684848-fac1c5b4e853?auto=format&fit=crop&w=1920&q=80",
   },
 };

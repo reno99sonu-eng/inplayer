@@ -388,10 +388,18 @@ export default function ConversationThreadPage() {
 
   return (
     <div className={`fixed inset-x-0 top-[64px] bottom-[64px] sm:bottom-0 z-20 flex flex-col overflow-hidden ${activeTheme.containerClass} text-white transition-colors duration-500`}>
+      {/* High-Resolution Rich Background Image Layer */}
+      {activeTheme.backgroundImageUrl && (
+        <div
+          className="absolute inset-0 pointer-events-none bg-cover bg-center transition-all duration-700 opacity-45 mix-blend-luminosity scale-105"
+          style={{ backgroundImage: `url("${activeTheme.backgroundImageUrl}")` }}
+        />
+      )}
+
       {/* SVG Textured Wallpaper Background Layer */}
       {activeTheme.texturePattern && (
         <div
-          className="absolute inset-0 pointer-events-none opacity-30 mix-blend-overlay transition-all duration-500 bg-repeat"
+          className="absolute inset-0 pointer-events-none opacity-50 mix-blend-overlay transition-all duration-500 bg-repeat"
           style={{ backgroundImage: activeTheme.texturePattern }}
         />
       )}
@@ -406,12 +414,14 @@ export default function ConversationThreadPage() {
       />
 
       {/* Top Header Bar */}
-      <div className="flex-shrink-0 z-30 flex items-center gap-3 border-b border-white/10 bg-[#060D17]/95 backdrop-blur-md px-4 py-2.5 shadow-md">
+      <div className="flex-shrink-0 z-30 flex items-center gap-3 border-b border-white/10 bg-[#060D17]/95 backdrop-blur-md px-3.5 py-2.5 shadow-md">
+        {/* Mobile & Desktop Back Button */}
         <button
           onClick={() => router.push("/messages")}
-          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 transition hover:bg-white/15"
+          aria-label="Back to messages"
+          className="flex h-9 w-9 sm:h-10 sm:w-10 flex-shrink-0 items-center justify-center rounded-2xl border border-white/15 bg-white/10 text-white shadow-sm transition-all active:scale-95 hover:bg-orange-500/20 hover:border-orange-400/40"
         >
-          <ArrowLeft size={18} />
+          <ArrowLeft size={20} className="text-white" />
         </button>
 
         {/* User Info Header Button -> Opens Profile Drawer */}

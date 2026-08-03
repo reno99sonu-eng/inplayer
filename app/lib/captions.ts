@@ -47,13 +47,18 @@ export function resolveSourceLang(
   return normalizeLangCode(detectedRaw);
 }
 
-import { splitLongVttCues } from "./vttChunker";
+import { splitLongVttCues, isMeaningfulSpeechTranscript } from "./vttChunker";
 
 // Turns a single raw source-language VTT into the full regional languages set.
 export async function buildCaptionSet(
   rawSourceVtt: string,
   sourceLang: string
 ): Promise<Record<string, string>> {
+  // If the video has no real spoken dialogue (silent background music, noise, or silence), skip captions!
+  if (!isMeaningfulSpeechTranscript(rawSourceVtt)) {
+    return {};
+  }
+
   const sourceTarget = CAPTION_TARGETS.find((t) => t.code === sourceLang);
 
   // Chunk long cues into short 1-line/2-line YouTube-style subtitle items

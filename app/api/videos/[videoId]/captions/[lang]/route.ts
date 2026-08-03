@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
-import { splitLongVttCues } from "@/app/lib/vttChunker";
+import { splitLongVttCues, isMeaningfulSpeechTranscript } from "@/app/lib/vttChunker";
 
 interface Params {
   params: Promise<{ videoId: string; lang: string }>;
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest, { params }: Params) {
 
   const rawVtt = result.Item?.captionsVtt?.[lang];
 
-  if (typeof rawVtt !== "string" || !rawVtt.startsWith("WEBVTT")) {
+  if (typeof rawVtt !== "string" || !rawVtt.startsWith("WEBVTT") || !isMeaningfulSpeechTranscript(rawVtt)) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
 

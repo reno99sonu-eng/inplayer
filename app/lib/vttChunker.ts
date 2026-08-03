@@ -1,4 +1,37 @@
 /**
+ * Detects whether a WebVTT string actually contains real spoken dialogue,
+ * or if it is just ASR hallucinated noise, silent background audio, music tags, or gibberish.
+ */
+export function isMeaningfulSpeechTranscript(vttContent: string): boolean {
+  if (!vttContent || !vttContent.includes("-->")) return false;
+
+  const lines = vttContent.split(/\r?\n/);
+  const textLines: string[] = [];
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    if (trimmed.startsWith("WEBVTT") || trimmed.includes("-->") || /^\d+$/.test(trimmed)) {
+      continue;
+    }
+    textLines.push(trimmed);
+  }
+
+  const combinedText = textLines.join(" ").trim();
+  if (!combinedText) return false;
+
+  // Filter out pure noise / music / hallucinated silence markers
+  const cleanSpeech = combinedText
+    .replace(/\[[^\]]+\]/g, "") // Remove [Music], [Applause], [Silence]
+    .replace(/\([^)]+\)/g, "") // Remove (music), (sighs)
+    .replace(/[♪♫#…._\-\s]+/g, " ") // Remove music symbols, dots, dashes
+    .trim();
+
+  const words = cleanSpeech.split(/\s+/).filter((w) => w.length > 1);
+  return words.length >= 3;
+}
+
+/**
  * Intelligent WebVTT cue chunker.
  * Takes any WebVTT content (even if Mux or AI dumped a massive 8-line paragraph into a single cue)
  * and automatically splits long cues into clean, short 1-line or 2-line YouTube-style subtitle chunks (max 8-10 words per cue).

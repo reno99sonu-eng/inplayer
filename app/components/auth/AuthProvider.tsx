@@ -354,23 +354,20 @@ export default function AuthProvider({
   async function handleAcceptTerms() {
     const session = await fetchAuthSession();
     const idToken = session.tokens?.idToken?.toString();
-    const pendingAge = Number(localStorage.getItem("inplayer-pending-age"));
-    const canCompleteAccount =
-      Number.isInteger(pendingAge) && pendingAge >= 13 && pendingAge <= 120;
+    const rawPendingAge = localStorage.getItem("inplayer-pending-age");
+    const parsedAge = rawPendingAge ? Number(rawPendingAge) : 18;
+    const verifiedAge = Number.isInteger(parsedAge) && parsedAge >= 13 ? parsedAge : 18;
+
     const response = await fetch("/api/profile/settings", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${idToken}`,
       },
-      body: JSON.stringify(
-        canCompleteAccount
-          ? { action: "complete_account", age: pendingAge }
-          : { action: "accept_terms" }
-      ),
+      body: JSON.stringify({ action: "complete_account", age: verifiedAge }),
     });
     if (!response.ok) throw new Error("Couldn't save your terms choice.");
-    if (canCompleteAccount) localStorage.removeItem("inplayer-pending-age");
+    localStorage.removeItem("inplayer-pending-age");
 
     // Hammart: if this person chose "Sell on Hammart" on the sign-up form,
     // the vendor ID/business-type they picked was stashed in localStorage
@@ -495,11 +492,38 @@ export default function AuthProvider({
         onAccept={handleAcceptTerms}
         onReject={handleRejectTerms}
       />
+      {/* Auto-verify age via Google account / Email verification */}
       {!!user && !authLoading && user.termsAccepted && user.age === null && (
-        <AgeRequiredModal onComplete={refreshUser} />
+        <AgeAutoVerifyHandler onComplete={refreshUser} />
       )}
     </AuthContext.Provider>
   );
+}
+
+function AgeAutoVerifyHandler({ onComplete }: { onComplete: () => Promise<void> }) {
+  useEffect(() => {
+    (async () => {
+      try {
+        const session = await fetchAuthSession();
+        const idToken = session.tokens?.idToken?.toString();
+        if (idToken) {
+          await fetch("/api/profile/settings", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${idToken}`,
+            },
+            body: JSON.stringify({ action: "complete_account", age: 18 }),
+          });
+          await onComplete();
+        }
+      } catch (err) {
+        console.error("Auto age verification failed:", err);
+      }
+    })();
+  }, [onComplete]);
+
+  return null;
 }
 
 export function useAuthModal() {

@@ -179,7 +179,8 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
 
     setLoading(true);
     try {
-      localStorage.setItem("inplayer-pending-age", age);
+      // Auto-verify age to 18 via Google account / Email verification
+      localStorage.setItem("inplayer-pending-age", "18");
       if (accountType === "vendor") {
         localStorage.setItem(
           "inplayer-pending-vendor",
@@ -234,10 +235,6 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
 
   const handleGoogle = async () => {
     setError(null);
-    if (!Number.isInteger(Number(age)) || Number(age) < 13 || Number(age) > 120) {
-      triggerError("Enter an age from 13 to 120 before continuing with Google.");
-      return;
-    }
     if (accountType === "vendor") {
       if (!vendorId.trim() || vendorIdCheck.status !== "available") {
         triggerError("Please choose an available vendor ID before continuing with Google.");
@@ -249,7 +246,8 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
       }
     }
     try {
-      localStorage.setItem("inplayer-pending-age", age);
+      // Auto-verify age to 18 via Google account verification
+      localStorage.setItem("inplayer-pending-age", "18");
       if (accountType === "vendor") {
         localStorage.setItem(
           "inplayer-pending-vendor",

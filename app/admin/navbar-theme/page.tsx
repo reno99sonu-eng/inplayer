@@ -388,24 +388,9 @@ function NavbarThemeManagerContent() {
 
             {/* Mock Top Navbar Frame */}
             <div className="relative overflow-hidden rounded-2xl border border-white/20 light:border-slate-400 bg-[#06101D] shadow-2xl min-h-[90px] flex flex-col justify-center px-4 py-3">
-              {/* Background Theme Layer */}
-              {previewImageUrl ? (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
-                  src={previewImageUrl}
-                  alt="Navbar Theme Background"
-                  className="absolute inset-0 h-full w-full object-cover opacity-90 pointer-events-none z-0"
-                />
-              ) : (
-                <div className="absolute inset-0 bg-[#06101D] z-0" />
-              )}
-
-              {/* Automatic Contrast Overlay */}
-              <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/30 to-black/50 backdrop-blur-[2px] z-0" />
-
-              {/* Navbar Foreground Elements (Logo, Search, Buttons) */}
+              {/* Navbar Foreground Elements (Logo, Theme Badge, Search, Buttons) */}
               <div className="relative z-10 flex items-center justify-between gap-3">
-                {/* Logo & Menu */}
+                {/* Logo, Menu & Occasion Theme Pill Badge */}
                 <div className="flex items-center gap-2">
                   <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/10 border border-white/15 text-white backdrop-blur-md">
                     <Menu size={18} />
@@ -414,6 +399,20 @@ function NavbarThemeManagerContent() {
                     <Flame size={18} className="text-orange-500 fill-orange-500" />
                     <span>INPLAYER</span>
                   </div>
+
+                  {/* Occasion Theme Pill Badge */}
+                  {previewImageUrl && (
+                    <div className="ml-2 inline-flex items-center">
+                      <div className="relative overflow-hidden rounded-full border border-orange-400/30 bg-black/40 shadow-sm ring-1 ring-orange-500/20 backdrop-blur-md px-1.5 py-0.5 flex items-center">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={previewImageUrl}
+                          alt="Occasion Theme Badge"
+                          className="h-6 sm:h-7 w-auto max-w-[140px] sm:max-w-[200px] rounded-full object-cover"
+                        />
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Search Bar */}

@@ -144,26 +144,13 @@ export default function Navbar() {
           border-b
           border-white/5
           light:border-black/10
-          bg-[#06101D]/70
-          light:bg-[#F5EEDC]/85
+          bg-[#06101D]/90
+          light:bg-[#F5EEDC]/95
           backdrop-blur-[28px]
           shadow-[0_12px_40px_rgba(0,0,0,.35)]
           light:shadow-[0_12px_40px_rgba(0,0,0,.08)]
-          overflow-hidden
         "
       >
-        {/* AI Occasion Background Theme Layer */}
-        {navbarTheme?.active && navbarTheme.imageUrl && (
-          <div className="absolute inset-0 pointer-events-none overflow-hidden z-0">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
-              src={navbarTheme.imageUrl}
-              alt="Navbar Occasion Theme"
-              className="h-full w-full object-cover opacity-90 transition-opacity duration-500"
-            />
-            <div className="absolute inset-0 bg-gradient-to-r from-black/50 via-black/30 to-black/50 backdrop-blur-[1px]" />
-          </div>
-        )}
       {/* Mobile / Tablet Background Branding */}
 <div
   className="
@@ -247,8 +234,20 @@ export default function Navbar() {
 </div>
 
 {/* Desktop Logo Only */}
-<div className="hidden lg:flex flex-shrink-0">
+<div className="hidden lg:flex flex-shrink-0 items-center">
   <NavbarLogo />
+  {navbarTheme?.active && navbarTheme.imageUrl && (
+    <div className="ml-3 inline-flex items-center">
+      <div className="relative overflow-hidden rounded-full border border-orange-400/30 bg-black/40 shadow-[0_2px_12px_rgba(249,115,22,0.25)] ring-1 ring-orange-500/20 backdrop-blur-md px-1.5 py-0.5 flex items-center transition duration-300 hover:scale-[1.03]">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={navbarTheme.imageUrl}
+          alt="Occasion Theme"
+          className="h-8 lg:h-9 w-auto max-w-[260px] rounded-full object-cover"
+        />
+      </div>
+    </div>
+  )}
 </div>
 
 {/* Desktop Search */}
@@ -299,9 +298,21 @@ export default function Navbar() {
     </button>
   </div>
 
-  {/* Mobile / tablet logo — same animated mark as desktop */}
-  <div className="flex-shrink-0 ml-2">
+  {/* Mobile / tablet logo + Occasion Theme Badge */}
+  <div className="flex-shrink-0 ml-2 flex items-center min-w-0">
     <NavbarLogo />
+    {navbarTheme?.active && navbarTheme.imageUrl && (
+      <div className="ml-2 inline-flex items-center flex-shrink min-w-0">
+        <div className="relative overflow-hidden rounded-full border border-orange-400/30 bg-black/40 shadow-sm ring-1 ring-orange-500/20 backdrop-blur-md px-1 py-0.5 flex items-center transition">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={navbarTheme.imageUrl}
+            alt="Occasion Theme"
+            className="h-5 sm:h-6 md:h-7 w-auto max-w-[110px] sm:max-w-[160px] rounded-full object-cover"
+          />
+        </div>
+      </div>
+    )}
   </div>
 
 </div>

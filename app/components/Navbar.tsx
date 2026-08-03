@@ -243,12 +243,12 @@ export default function Navbar() {
   {/* Pure Clean Logo */}
   <NavbarLogo />
 
-  {/* Pure Transparent Occasion Graphic with Animated Watermark Text strictly behind the graphic */}
+  {/* Pure Transparent Occasion Graphic with Vertical Animated Watermark Text strictly behind the graphic */}
   {navbarTheme?.active && navbarTheme.imageUrl && (
     <div className="relative ml-3 sm:ml-3.5 inline-flex items-center flex-shrink-0">
-      {/* Animated Transparent Text Behind Festive Graphic */}
-      <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex items-center justify-center scale-125">
-        <span className="whitespace-nowrap truncate max-w-full text-[10px] lg:text-xs font-black uppercase tracking-widest bg-gradient-to-r from-orange-400 via-amber-200 to-pink-500 bg-clip-text text-transparent opacity-40 animate-pulse blur-[0.3px]">
+      {/* Vertical Animated Transparent Text Behind Festive Graphic */}
+      <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex items-center justify-center">
+        <span className="whitespace-nowrap [writing-mode:vertical-rl] rotate-180 text-[8px] lg:text-[9px] font-black uppercase tracking-[0.25em] bg-gradient-to-b from-orange-400 via-amber-200 to-pink-500 bg-clip-text text-transparent opacity-45 animate-pulse blur-[0.2px] max-h-full">
           {(() => {
             const occId = navbarTheme.occasionId;
             if (occId === "independence_day") return "HAPPY INDEPENDENCE DAY";
@@ -326,12 +326,12 @@ export default function Navbar() {
     {/* Pure Clean Mobile Logo */}
     <NavbarLogo />
 
-    {/* Pure Transparent Occasion Graphic with Animated Watermark Text strictly behind the graphic */}
+    {/* Pure Transparent Occasion Graphic with Vertical Animated Watermark Text strictly behind the graphic */}
     {navbarTheme?.active && navbarTheme.imageUrl && (
       <div className="relative ml-2 sm:ml-2.5 inline-flex items-center flex-shrink-0">
-        {/* Animated Transparent Text Behind Mobile Festive Graphic */}
-        <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex items-center justify-center scale-125">
-          <span className="whitespace-nowrap truncate max-w-full text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-orange-400 via-amber-200 to-pink-500 bg-clip-text text-transparent opacity-40 animate-pulse blur-[0.3px]">
+        {/* Vertical Animated Transparent Text Behind Mobile Festive Graphic */}
+        <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex items-center justify-center">
+          <span className="whitespace-nowrap [writing-mode:vertical-rl] rotate-180 text-[7px] sm:text-[8px] font-black uppercase tracking-[0.2em] bg-gradient-to-b from-orange-400 via-amber-200 to-pink-500 bg-clip-text text-transparent opacity-45 animate-pulse blur-[0.2px] max-h-full">
             {(() => {
               const occId = navbarTheme.occasionId;
               if (occId === "independence_day") return "HAPPY INDEPENDENCE DAY";

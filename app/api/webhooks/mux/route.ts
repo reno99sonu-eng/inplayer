@@ -248,7 +248,7 @@ export async function POST(request: NextRequest) {
     if (track.text_source === "generated_vod" && track.id) {
       const match = await findVideoByAssetId(assetId);
 
-      if (match && !match.captionsTranslated && match.muxPlaybackId) {
+      if (match && match.contentType !== "short" && !match.captionsTranslated && match.muxPlaybackId) {
         const origin = request.nextUrl.origin;
         const trackId = track.id;
         const playbackId = match.muxPlaybackId;

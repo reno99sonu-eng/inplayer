@@ -1008,6 +1008,19 @@ media-text-display {
   overflow: hidden !important;
 }
 
+/* Shorts / Raftaar player — 100% turn off & hide captions and CC button */
+.shorts-player media-captions-button,
+.shorts-player media-captions-display,
+.shorts-player media-text-display,
+.shorts-player ::cue,
+.shorts-player video::cue,
+.shorts-player mux-player::cue {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
 ::cue,
 video::cue,
 mux-player::cue {

@@ -16,12 +16,25 @@ import {
   CheckCheck,
   X,
   Loader2,
+  Paperclip,
+  Mic,
+  Palette,
+  FileText,
+  Image as ImageIcon,
+  Film,
+  Download,
+  Info,
+  ChevronDown,
 } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { formatTimeAgo } from "@/app/lib/formatters";
 import { otherParticipant } from "@/app/lib/conversationId";
 import ReportButton from "@/app/components/ReportButton";
 import MessageActionsMenu from "@/app/components/MessageActionsMenu";
+import UserProfileDrawer from "@/app/components/chat/UserProfileDrawer";
+import VoiceRecorder from "@/app/components/chat/VoiceRecorder";
+import VoiceMessageBubble from "@/app/components/chat/VoiceMessageBubble";
+import { CHAT_THEMES, type ChatTheme } from "@/app/components/chat/ChatThemes";
 
 interface ConversationDetail {
   conversationId: string;
@@ -52,6 +65,23 @@ const DISAPPEARING_OPTIONS = [
   { seconds: 604800, label: "1 week" },
 ];
 
+function parseMessagePayload(rawText: string) {
+  if (rawText.startsWith("[VOICE_NOTE]:")) {
+    return { type: "voice", url: rawText.replace("[VOICE_NOTE]:", ""), text: "" };
+  }
+  if (rawText.startsWith("[ATTACHMENT_IMAGE]:")) {
+    return { type: "image", url: rawText.replace("[ATTACHMENT_IMAGE]:", ""), text: "" };
+  }
+  if (rawText.startsWith("[ATTACHMENT_VIDEO]:")) {
+    return { type: "video", url: rawText.replace("[ATTACHMENT_VIDEO]:", ""), text: "" };
+  }
+  if (rawText.startsWith("[ATTACHMENT_FILE]:")) {
+    const parts = rawText.replace("[ATTACHMENT_FILE]:", "").split("|||");
+    return { type: "file", url: parts[0], fileName: parts[1] || "Document", text: "" };
+  }
+  return { type: "text", url: null, text: rawText };
+}
+
 export default function ConversationThreadPage() {
   const params = useParams<{ conversationId: string }>();
   const searchParams = useSearchParams();
@@ -68,13 +98,50 @@ export default function ConversationThreadPage() {
   const [messages, setMessages] = useState<MessageItem[]>([]);
   const [otherLastReadAt, setOtherLastReadAt] = useState<string | null>(null);
   const [otherIsTyping, setOtherIsTyping] = useState(false);
+
+  // Input states
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [sendError, setSendError] = useState<string | null>(null);
+
+  // Attachment & Voice Recording
+  const [showAttachmentMenu, setShowAttachmentMenu] = useState(false);
+  const [pendingAttachment, setPendingAttachment] = useState<{
+    type: "image" | "video" | "file";
+    dataUrl: string;
+    name: string;
+  } | null>(null);
+  const [isRecordingVoice, setIsRecordingVoice] = useState(false);
+
+  // Theme & Profile Drawer
+  const [selectedThemeId, setSelectedThemeId] = useState<string>("default");
+  const [showThemePicker, setShowThemePicker] = useState(false);
+  const [showProfileDrawer, setShowProfileDrawer] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastTypingPingRef = useRef(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Load wallpaper preference
+  useEffect(() => {
+    try {
+      const savedTheme = localStorage.getItem(`inplayer_chat_theme_${params.conversationId}`);
+      if (savedTheme && CHAT_THEMES[savedTheme]) {
+        setSelectedThemeId(savedTheme);
+      }
+    } catch { /* ignore */ }
+  }, [params.conversationId]);
+
+  const handleSelectTheme = (themeId: string) => {
+    setSelectedThemeId(themeId);
+    setShowThemePicker(false);
+    setSettingsOpen(false);
+    try {
+      localStorage.setItem(`inplayer_chat_theme_${params.conversationId}`, themeId);
+    } catch { /* ignore */ }
+  };
 
   async function authHeaders() {
     const session = await fetchAuthSession();
@@ -94,7 +161,7 @@ export default function ConversationThreadPage() {
       }
     } catch (err) {
       console.error("Failed to load conversation:", err);
-    } finally {
+    } fontally: {
       setConversationLoaded(true);
     }
   }
@@ -114,11 +181,6 @@ export default function ConversationThreadPage() {
     }
   }
 
-  // Typing indicator ping (app/api/messages/[conversationId]/typing) —
-  // throttled to at most once every 2s of active typing so a fast typist
-  // doesn't fire a request per keystroke. The route's own TTL (6s) means
-  // the indicator naturally clears on the other side shortly after
-  // whoever's typing stops or navigates away.
   async function pingTyping() {
     const nowMs = Date.now();
     if (nowMs - lastTypingPingRef.current < 2000) return;
@@ -142,53 +204,64 @@ export default function ConversationThreadPage() {
     refetchConversation();
     fetchMessages();
 
-    // Simple polling while the thread is open — no WebSocket
-    // infrastructure here, but this keeps the thread genuinely live
-    // (real fetches, real new messages) rather than static.
-    const interval = setInterval(fetchMessages, 4000);
+    const interval = setInterval(fetchMessages, 3500);
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [params.conversationId, signedIn]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages.length]);
+  }, [messages.length, otherIsTyping]);
 
-  const handleSend = async () => {
-    const trimmed = text.trim();
-    if (!trimmed || sending || !targetUserId || !user) return;
+  const handleSend = async (overrideText?: string) => {
+    let payloadText = overrideText !== undefined ? overrideText : text.trim();
+
+    if (pendingAttachment) {
+      if (pendingAttachment.type === "image") {
+        payloadText = `[ATTACHMENT_IMAGE]:${pendingAttachment.dataUrl}`;
+      } else if (pendingAttachment.type === "video") {
+        payloadText = `[ATTACHMENT_VIDEO]:${pendingAttachment.dataUrl}`;
+      } else {
+        payloadText = `[ATTACHMENT_FILE]:${pendingAttachment.dataUrl}|||${pendingAttachment.name}`;
+      }
+    }
+
+    if (!payloadText || sending || !targetUserId || !user) return;
 
     setSending(true);
     setSendError(null);
     const optimisticId = `optimistic-${Date.now()}`;
+
     setMessages((prev) => [
       ...prev,
-      { conversationId: params.conversationId, messageId: optimisticId, senderId: user.userId, text: trimmed, createdAt: new Date().toISOString() },
+      {
+        conversationId: params.conversationId,
+        messageId: optimisticId,
+        senderId: user.userId,
+        text: payloadText,
+        createdAt: new Date().toISOString(),
+      },
     ]);
+
     setText("");
+    setPendingAttachment(null);
+    setShowAttachmentMenu(false);
 
     try {
       const headers = await authHeaders();
       const res = await fetch("/api/messages", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...headers },
-        body: JSON.stringify({ otherUserId: targetUserId, text: trimmed }),
+        body: JSON.stringify({ otherUserId: targetUserId, text: payloadText }),
       });
       const data = await res.json();
 
       if (!res.ok) {
         setMessages((prev) => prev.filter((m) => m.messageId !== optimisticId));
         setSendError(data.error || "Couldn't send that message.");
-        setText(trimmed);
         return;
       }
 
-      // Auto-moderation (app/lib/moderation.ts, via app/api/messages) held
-      // this one back — it's saved and in the admin review queue, but the
-      // recipient never sees it. fetchMessages() below won't include it
-      // (the GET filters hidden messages out), which would otherwise make
-      // it look like it silently vanished — this makes sure the sender
-      // actually finds out what happened instead.
       if (data.flagged) {
         setMessages((prev) => prev.filter((m) => m.messageId !== optimisticId));
         setSendError("This message was flagged for review and wasn't delivered.");
@@ -200,10 +273,36 @@ export default function ConversationThreadPage() {
       console.error("Failed to send message:", err);
       setMessages((prev) => prev.filter((m) => m.messageId !== optimisticId));
       setSendError("Something went wrong. Please try again.");
-      setText(trimmed);
     } finally {
       setSending(false);
     }
+  };
+
+  const handleSendVoiceNote = (audioDataUrl: string) => {
+    setIsRecordingVoice(false);
+    handleSend(`[VOICE_NOTE]:${audioDataUrl}`);
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 10 * 1024 * 1024) {
+      setSendError("Please select a file smaller than 10MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const dataUrl = reader.result as string;
+      let type: "image" | "video" | "file" = "file";
+      if (file.type.startsWith("image/")) type = "image";
+      else if (file.type.startsWith("video/")) type = "video";
+
+      setPendingAttachment({ type, dataUrl, name: file.name });
+      setShowAttachmentMenu(false);
+    };
+    reader.readAsDataURL(file);
   };
 
   const handleAction = async (action: string, extra?: Record<string, unknown>) => {
@@ -268,71 +367,140 @@ export default function ConversationThreadPage() {
     conversation?.requestStatus === "pending" && conversation?.initiatedBy !== user?.userId;
   const isBlocked = !!(conversation?.blocked || conversation?.blockedByOther);
 
+  const activeTheme = CHAT_THEMES[selectedThemeId] || CHAT_THEMES.default;
+
+  // Extract shared media files for UserProfileDrawer
+  const sharedMediaItems = messages
+    .map((m) => {
+      const parsed = parseMessagePayload(m.text);
+      if (parsed.type !== "text" && parsed.url) {
+        return {
+          id: m.messageId,
+          type: parsed.type as "image" | "video" | "file" | "voice",
+          url: parsed.url,
+          name: parsed.fileName,
+          createdAt: m.createdAt,
+        };
+      }
+      return null;
+    })
+    .filter((item): item is NonNullable<typeof item> => item !== null);
+
   return (
-    <div className="flex min-h-screen flex-col bg-[#06101D] light:bg-[#FAF5E9] text-white light:text-slate-900">
-      <div className="flex items-center gap-3 border-b border-white/10 light:border-black/10 px-4 py-3">
+    <div className={`flex min-h-screen flex-col ${activeTheme.containerClass} transition-colors duration-500 text-white light:text-slate-900`}>
+      {/* Hidden File Input */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileSelect}
+        className="hidden"
+        accept="image/*,video/*,.pdf,.doc,.docx,.txt,.zip"
+      />
+
+      {/* Top Header Bar */}
+      <div className="sticky top-0 z-30 flex items-center gap-3 border-b border-white/10 light:border-black/10 bg-[#06101D]/90 light:bg-white/90 backdrop-blur-md px-4 py-2.5 shadow-md">
         <button
           onClick={() => router.push("/messages")}
-          className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 transition hover:bg-white/15 light:hover:bg-black/10"
+          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 transition hover:bg-white/15 light:hover:bg-black/10"
         >
-          <ArrowLeft size={20} />
+          <ArrowLeft size={18} />
         </button>
 
-        <Link
-          href={`/u/${encodeURIComponent(displayUsername)}`}
-          className="flex min-w-0 flex-1 items-center gap-3"
+        {/* User Info Header Button -> Opens Profile Drawer */}
+        <button
+          onClick={() => setShowProfileDrawer(true)}
+          className="flex min-w-0 flex-1 items-center gap-3 text-left transition opacity-90 hover:opacity-100"
         >
           <div className="relative flex-shrink-0">
-            {/* eslint-disable-next-line @next/next/no-img-element -- avatar may be a data URL. */}
-            <img src={displayAvatar} alt={displayUsername} className="h-10 w-10 rounded-full object-cover" />
+            <img
+              src={displayAvatar}
+              alt={displayUsername}
+              className="h-10 w-10 rounded-full object-cover border border-white/10"
+            />
             {otherIsOnline && (
-              <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[#06101D] light:border-[#FAF5E9] bg-emerald-400" />
+              <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[#06101D] light:border-white bg-emerald-400" />
             )}
           </div>
           <div className="min-w-0">
-            <span className="block truncate font-bold">@{displayUsername}</span>
+            <span className="block truncate font-bold text-sm">@{displayUsername}</span>
             <span className="block truncate text-[11px] text-slate-400 light:text-slate-600">
-              {otherIsTyping
-                ? "typing..."
-                : otherIsOnline
-                ? "Online"
-                : otherLastActiveAt
-                ? `Last seen ${formatTimeAgo(otherLastActiveAt)}`
-                : ""}
+              {otherIsTyping ? (
+                <span className="font-semibold text-emerald-400 animate-pulse">typing...</span>
+              ) : otherIsOnline ? (
+                <span className="text-emerald-400 font-semibold">Online</span>
+              ) : otherLastActiveAt ? (
+                `Last seen ${formatTimeAgo(otherLastActiveAt)}`
+              ) : (
+                "Tap to view profile"
+              )}
             </span>
           </div>
-        </Link>
+        </button>
 
-        <div className="relative flex-shrink-0">
+        {/* Action Controls */}
+        <div className="relative flex items-center gap-1 flex-shrink-0">
+          {/* Wallpaper Theme Quick Button */}
+          <button
+            onClick={() => setShowThemePicker((v) => !v)}
+            title="Change Chat Wallpaper"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 transition hover:bg-white/15 light:hover:bg-black/10 text-orange-400"
+          >
+            <Palette size={18} />
+          </button>
+
+          {/* Settings Dropdown */}
           <button
             onClick={() => setSettingsOpen((v) => !v)}
-            className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 transition hover:bg-white/15 light:hover:bg-black/10"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 transition hover:bg-white/15 light:hover:bg-black/10"
           >
             <MoreVertical size={18} />
           </button>
 
+          {/* Settings Dropdown Menu */}
           {settingsOpen && (
-            <div className="absolute right-0 z-20 mt-2 w-64 overflow-hidden rounded-2xl border border-white/10 light:border-black/10 bg-[#0B1524] light:bg-white shadow-[0_20px_50px_rgba(0,0,0,.4)]">
+            <div className="absolute right-0 top-11 z-40 w-64 overflow-hidden rounded-2xl border border-white/10 light:border-black/10 bg-[#0B1524] light:bg-white shadow-[0_20px_50px_rgba(0,0,0,.5)] transition-all">
+              <button
+                onClick={() => {
+                  setSettingsOpen(false);
+                  setShowProfileDrawer(true);
+                }}
+                className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-xs font-semibold text-slate-200 light:text-slate-800 transition hover:bg-white/5 light:hover:bg-black/5"
+              >
+                <Info size={15} className="text-orange-400" />
+                Contact Profile Info
+              </button>
+
+              <button
+                onClick={() => {
+                  setSettingsOpen(false);
+                  setShowThemePicker(true);
+                }}
+                className="flex w-full items-center gap-2.5 border-t border-white/10 light:border-black/10 px-4 py-3 text-left text-xs font-semibold text-slate-200 light:text-slate-800 transition hover:bg-white/5 light:hover:bg-black/5"
+              >
+                <Palette size={15} className="text-amber-400" />
+                Change Chat Wallpaper Theme
+              </button>
+
               <button
                 onClick={() => handleAction(conversation?.muted ? "unmute" : "mute")}
                 disabled={actionBusy}
-                className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-sm font-semibold text-slate-200 light:text-slate-800 transition hover:bg-white/5 light:hover:bg-black/5 disabled:opacity-50"
+                className="flex w-full items-center gap-2.5 border-t border-white/10 light:border-black/10 px-4 py-3 text-left text-xs font-semibold text-slate-200 light:text-slate-800 transition hover:bg-white/5 light:hover:bg-black/5 disabled:opacity-50"
               >
                 {conversation?.muted ? <Bell size={15} /> : <BellOff size={15} />}
-                {conversation?.muted ? "Unmute notifications" : "Mute notifications"}
+                {conversation?.muted ? "Unmute Notifications" : "Mute Notifications"}
               </button>
 
               <div className="border-t border-white/10 light:border-black/10 px-4 py-3">
-                <p className="mb-1.5 flex items-center gap-2 text-sm font-semibold text-slate-200 light:text-slate-800">
-                  <Timer size={15} /> Disappearing messages
+                <p className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-slate-200 light:text-slate-800">
+                  <Timer size={15} /> Disappearing Messages
                 </p>
                 {conversation?.disappearingEnabled ? (
                   <button
                     onClick={() => handleAction("toggle_disappearing")}
                     disabled={actionBusy}
-                    className="text-xs font-semibold text-orange-400 disabled:opacity-50"
+                    className="text-[11px] font-semibold text-orange-400 disabled:opacity-50"
                   >
-                    On ({DISAPPEARING_OPTIONS.find((o) => o.seconds === conversation.disappearingSeconds)?.label || "1 day"}) — turn off
+                    On ({DISAPPEARING_OPTIONS.find((o) => o.seconds === conversation.disappearingSeconds)?.label || "1 day"}) — Turn Off
                   </button>
                 ) : (
                   <div className="flex flex-wrap gap-1.5">
@@ -341,7 +509,7 @@ export default function ConversationThreadPage() {
                         key={opt.seconds}
                         onClick={() => handleAction("toggle_disappearing", { seconds: opt.seconds })}
                         disabled={actionBusy}
-                        className="rounded-full border border-white/10 light:border-black/10 px-2.5 py-1 text-[11px] font-semibold text-slate-300 light:text-slate-700 transition hover:border-orange-400/40 disabled:opacity-50"
+                        className="rounded-full border border-white/10 light:border-black/10 px-2 py-0.5 text-[10px] font-semibold text-slate-300 light:text-slate-700 transition hover:border-orange-400/40 disabled:opacity-50"
                       >
                         {opt.label}
                       </button>
@@ -353,7 +521,7 @@ export default function ConversationThreadPage() {
               <button
                 onClick={() => handleAction(conversation?.blocked ? "unblock" : "block")}
                 disabled={actionBusy}
-                className="flex w-full items-center gap-2.5 border-t border-white/10 light:border-black/10 px-4 py-3 text-left text-sm font-semibold text-red-400 transition hover:bg-red-500/10 disabled:opacity-50"
+                className="flex w-full items-center gap-2.5 border-t border-white/10 light:border-black/10 px-4 py-3 text-left text-xs font-semibold text-red-400 transition hover:bg-red-500/10 disabled:opacity-50"
               >
                 <Ban size={15} />
                 {conversation?.blocked ? "Unblock" : "Block"} @{displayUsername}
@@ -363,8 +531,48 @@ export default function ConversationThreadPage() {
         </div>
       </div>
 
+      {/* Wallpaper Theme Picker Modal Popover */}
+      {showThemePicker && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="w-full max-w-sm rounded-3xl border border-white/15 bg-[#0B1626] light:bg-white p-5 shadow-2xl">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-bold text-white light:text-slate-900 flex items-center gap-2">
+                <Palette size={18} className="text-orange-400" />
+                Select Chat Theme
+              </h3>
+              <button
+                onClick={() => setShowThemePicker(false)}
+                className="rounded-full p-1 text-slate-400 hover:text-white"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3">
+              {Object.values(CHAT_THEMES).map((theme) => (
+                <button
+                  key={theme.id}
+                  onClick={() => handleSelectTheme(theme.id)}
+                  className={`flex flex-col items-center gap-2 rounded-2xl border p-3 transition ${
+                    selectedThemeId === theme.id
+                      ? "border-orange-400 bg-orange-500/10 ring-2 ring-orange-400/30"
+                      : "border-white/10 light:border-slate-200 bg-white/[0.03] hover:bg-white/10"
+                  }`}
+                >
+                  <div className={`h-12 w-full rounded-xl ${theme.previewBg} border`} />
+                  <span className="text-xs font-semibold text-slate-200 light:text-slate-800 text-center">
+                    {theme.name}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Message Request Notification Header */}
       {isPendingIncoming && (
-        <div className="flex items-center justify-between gap-3 border-b border-orange-400/20 bg-orange-500/[0.06] px-5 py-3">
+        <div className="flex items-center justify-between gap-3 border-b border-orange-400/20 bg-orange-500/[0.06] px-5 py-2.5">
           <p className="text-xs text-slate-300 light:text-slate-700">
             @{displayUsername} wants to message you. Accept to start chatting freely.
           </p>
@@ -372,14 +580,14 @@ export default function ConversationThreadPage() {
             <button
               onClick={() => handleAction("accept")}
               disabled={actionBusy}
-              className="flex items-center gap-1 rounded-full bg-emerald-500/15 px-3 py-1.5 text-xs font-bold text-emerald-400 transition hover:bg-emerald-500/25 disabled:opacity-50"
+              className="flex items-center gap-1 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-bold text-emerald-400 transition hover:bg-emerald-500/25 disabled:opacity-50"
             >
               <Check size={13} /> Accept
             </button>
             <button
               onClick={() => handleAction("decline")}
               disabled={actionBusy}
-              className="flex items-center gap-1 rounded-full bg-red-500/15 px-3 py-1.5 text-xs font-bold text-red-400 transition hover:bg-red-500/25 disabled:opacity-50"
+              className="flex items-center gap-1 rounded-full bg-red-500/15 px-3 py-1 text-xs font-bold text-red-400 transition hover:bg-red-500/25 disabled:opacity-50"
             >
               <X size={13} /> Decline
             </button>
@@ -387,159 +595,309 @@ export default function ConversationThreadPage() {
         </div>
       )}
 
-<div className="mx-auto w-full max-w-3xl flex-1 space-y-2 overflow-y-auto px-4 py-4">
+      {/* Chat Messages Body Container */}
+      <div className="mx-auto w-full max-w-3xl flex-1 space-y-3 overflow-y-auto px-4 py-4 scrollbar-thin">
         {messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center py-16 text-center">
-            <p className="text-sm text-slate-400 light:text-slate-800">
-  This is the start of your conversation with @{displayUsername}.
-</p>
+            <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-orange-500/10 border border-orange-400/20">
+              <img
+                src={displayAvatar}
+                alt={displayUsername}
+                className="h-12 w-12 rounded-full object-cover"
+              />
+            </div>
+            <p className="text-sm font-bold text-slate-300 light:text-slate-800">
+              This is the start of your encrypted conversation with @{displayUsername}.
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Say hello or share a voice note to break the ice!
+            </p>
           </div>
         ) : (
           messages.map((m, index) => {
             const mine = m.senderId === user?.userId;
             const previous = messages[index - 1];
+            const showAvatar = !mine && (!previous || previous.senderId !== m.senderId);
+            const parsed = parseMessagePayload(m.text);
 
-const showAvatar =
-  !mine &&
-  (!previous || previous.senderId !== m.senderId);
             return (
               <div
-  key={m.messageId}
-  className={`flex items-end gap-2 ${
-    mine ? "justify-end" : "justify-start"
-  }`}
->
-  {!mine &&
-    (showAvatar ? (
-      <img
-        src={displayAvatar}
-        alt={displayUsername}
-        className="h-8 w-8 flex-shrink-0 rounded-full object-cover"
-      />
-    ) : (
-      <div className="w-8 flex-shrink-0" />
-    ))}
+                key={m.messageId}
+                className={`flex items-end gap-2 transition-all duration-300 animate-fadeIn ${
+                  mine ? "justify-end" : "justify-start"
+                }`}
+              >
+                {!mine &&
+                  (showAvatar ? (
+                    <button onClick={() => setShowProfileDrawer(true)}>
+                      <img
+                        src={displayAvatar}
+                        alt={displayUsername}
+                        className="h-8 w-8 flex-shrink-0 rounded-full object-cover border border-white/10 hover:opacity-80 transition"
+                      />
+                    </button>
+                  ) : (
+                    <div className="w-8 flex-shrink-0" />
+                  ))}
 
-  <div className={`flex max-w-[72%] items-end gap-1.5 ${mine ? "flex-row-reverse" : ""}`}>
-    <div
-      className={`rounded-2xl px-3.5 py-2 text-sm ${
-        m.deletedForEveryone
-          ? "border border-dashed border-white/15 light:border-black/15 text-slate-500 italic"
-          : mine
-          ? "bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white"
-          : "border border-white/10 light:border-black/10 bg-white/[0.04] light:bg-slate-100 text-slate-100 light:text-slate-900"
-      }`}
-    >
-      <p className="whitespace-pre-wrap break-words">{m.text}</p>
+                <div className={`flex max-w-[78%] sm:max-w-[70%] items-end gap-1.5 ${mine ? "flex-row-reverse" : ""}`}>
+                  <div
+                    className={`group relative rounded-2xl px-3.5 py-2 text-sm shadow-md transition-all ${
+                      m.deletedForEveryone
+                        ? "border border-dashed border-white/15 text-slate-500 italic"
+                        : mine
+                        ? activeTheme.bubbleMine
+                        : activeTheme.bubbleOther
+                    }`}
+                  >
+                    {/* Render Content Payload */}
+                    {m.deletedForEveryone ? (
+                      <p className="text-xs italic">This message was deleted.</p>
+                    ) : parsed.type === "voice" ? (
+                      <VoiceMessageBubble audioUrl={parsed.url!} mine={mine} />
+                    ) : parsed.type === "image" ? (
+                      <div className="space-y-1">
+                        <img
+                          src={parsed.url!}
+                          alt="Attachment"
+                          className="max-h-60 w-full rounded-xl object-cover"
+                        />
+                      </div>
+                    ) : parsed.type === "video" ? (
+                      <div className="space-y-1">
+                        <video
+                          src={parsed.url!}
+                          controls
+                          className="max-h-60 w-full rounded-xl"
+                        />
+                      </div>
+                    ) : parsed.type === "file" ? (
+                      <a
+                        href={parsed.url!}
+                        download={parsed.fileName}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 p-2.5 text-xs hover:bg-black/30 transition"
+                      >
+                        <FileText size={22} className="text-orange-400 flex-shrink-0" />
+                        <div className="min-w-0 flex-1">
+                          <p className="font-semibold truncate">{parsed.fileName}</p>
+                          <span className="text-[10px] text-slate-400">Download Attachment</span>
+                        </div>
+                        <Download size={16} className="text-slate-300" />
+                      </a>
+                    ) : (
+                      <p className="whitespace-pre-wrap break-words leading-relaxed">{parsed.text}</p>
+                    )}
 
-      <p
-        className={`mt-0.5 flex items-center gap-1 text-[10px] ${
-          m.deletedForEveryone
-            ? "text-slate-500"
-            : mine
-            ? "text-white/70"
-            : "light:text-slate-600 text-slate-500"
-        }`}
-      >
-        {formatTimeAgo(m.createdAt)}
-        {mine && !m.deletedForEveryone && (
-          <>
-            {m.messageId.startsWith("optimistic-") ? (
-              // Sent, not yet confirmed persisted by the server.
-              <Check size={11} className="text-white/70" />
-            ) : otherLastReadAt && m.createdAt <= otherLastReadAt ? (
-              // Read — the other participant has polled the thread since
-              // this message's timestamp (see the messages GET route).
-              <CheckCheck size={12} className="text-sky-300" />
-            ) : (
-              // Delivered — saved to the server, not yet read.
-              <CheckCheck size={12} className="text-white/70" />
-            )}
-          </>
-        )}
-      </p>
-    </div>
+                    {/* Time & Delivery Status Ticks (Sent, Delivered, Seen) */}
+                    <div className="mt-1 flex items-center justify-end gap-1 text-[10px] opacity-80">
+                      <span>{formatTimeAgo(m.createdAt)}</span>
+                      {mine && !m.deletedForEveryone && (
+                        <span title={otherLastReadAt && m.createdAt <= otherLastReadAt ? "Seen by recipient" : "Delivered"}>
+                          {m.messageId.startsWith("optimistic-") ? (
+                            // Sent
+                            <Check size={12} className="text-white/60" />
+                          ) : otherLastReadAt && m.createdAt <= otherLastReadAt ? (
+                            // Seen / Read (Double Cyan Ticks with Glow)
+                            <CheckCheck size={13} className="text-sky-300 drop-shadow-[0_0_6px_rgba(56,189,248,0.8)] font-bold" />
+                          ) : (
+                            // Delivered (Double Grey Ticks)
+                            <CheckCheck size={13} className="text-white/70" />
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  </div>
 
-    {!m.messageId.startsWith("optimistic-") && !m.deletedForEveryone && (
-      <div className="mb-1 flex flex-shrink-0 items-center gap-2">
-        {!mine && (
-          <ReportButton
-            target={{ targetType: "message", conversationId: m.conversationId, messageId: m.messageId }}
-            className="text-slate-500 transition hover:text-red-400"
-          />
-        )}
-        <MessageActionsMenu
-          conversationId={m.conversationId}
-          messageId={m.messageId}
-          mine={mine}
-          onDeleted={(mode) => {
-            if (mode === "delete_for_everyone") {
-              setMessages((prev) =>
-                prev.map((msg) =>
-                  msg.messageId === m.messageId ? { ...msg, deletedForEveryone: true } : msg
-                )
-              );
-            } else {
-              setMessages((prev) => prev.filter((msg) => msg.messageId !== m.messageId));
-            }
-          }}
-        />
-      </div>
-    )}
-  </div>
-</div>
+                  {/* Message Action Menu */}
+                  {!m.messageId.startsWith("optimistic-") && !m.deletedForEveryone && (
+                    <div className="mb-1 flex flex-shrink-0 items-center gap-1">
+                      {!mine && (
+                        <ReportButton
+                          target={{ targetType: "message", conversationId: m.conversationId, messageId: m.messageId }}
+                          className="text-slate-500 hover:text-red-400 transition"
+                        />
+                      )}
+                      <MessageActionsMenu
+                        conversationId={m.conversationId}
+                        messageId={m.messageId}
+                        mine={mine}
+                        onDeleted={(mode) => {
+                          if (mode === "delete_for_everyone") {
+                            setMessages((prev) =>
+                              prev.map((msg) =>
+                                msg.messageId === m.messageId ? { ...msg, deletedForEveryone: true } : msg
+                              )
+                            );
+                          } else {
+                            setMessages((prev) => prev.filter((msg) => msg.messageId !== m.messageId));
+                          }
+                        }}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
             );
           })
         )}
+
+        {/* Typing Indicator Card */}
         {otherIsTyping && (
-          <div className="flex items-end gap-2">
-            {/* eslint-disable-next-line @next/next/no-img-element -- avatar may be a data URL. */}
-            <img src={displayAvatar} alt={displayUsername} className="h-8 w-8 flex-shrink-0 rounded-full object-cover" />
-            <div className="flex items-center gap-1 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.04] light:bg-slate-100 px-4 py-3">
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.3s]" />
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400 [animation-delay:-0.15s]" />
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-slate-400" />
+          <div className="flex items-end gap-2 animate-fadeIn">
+            <img
+              src={displayAvatar}
+              alt={displayUsername}
+              className="h-8 w-8 flex-shrink-0 rounded-full object-cover border border-white/10"
+            />
+            <div className="flex items-center gap-1.5 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-2.5 shadow-sm">
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-emerald-400 [animation-delay:-0.3s]" />
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-emerald-400 [animation-delay:-0.15s]" />
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-emerald-400" />
+              <span className="ml-1 text-[11px] font-bold text-emerald-400">@{displayUsername} is typing...</span>
             </div>
           </div>
         )}
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="border-t border-white/10 light:border-black/10 px-4 py-3">
+      {/* Bottom Interactive Typing Input Bar */}
+      <div className="sticky bottom-0 z-30 border-t border-white/10 light:border-black/10 bg-[#06101D]/95 light:bg-white/95 backdrop-blur-md px-4 py-3">
         {isBlocked ? (
           <p className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.02] light:bg-black/[0.02] px-4 py-3 text-center text-xs text-slate-400 light:text-slate-600">
             {conversation?.blocked
               ? "You've blocked this user — unblock them to send a message."
               : "You can't message this user."}
           </p>
-        ) : (
-          <div className="mx-auto flex w-full max-w-3xl items-center gap-2.5">
-            <input
-              value={text}
-              onChange={(e) => {
-                setText(e.target.value);
-                if (e.target.value.trim()) pingTyping();
-              }}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSend();
-                }
-              }}
-              placeholder="Message..."
-              className="min-w-0 flex-1 rounded-full border border-white/10 light:border-slate-300 bg-white/[0.03] light:bg-white px-4 py-2.5 text-sm text-white light:text-slate-900 placeholder:text-slate-500 caret-orange-500 shadow-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-300/30"
+        ) : isRecordingVoice ? (
+          /* Live Voice Recorder Bar */
+          <div className="mx-auto w-full max-w-3xl">
+            <VoiceRecorder
+              onSend={handleSendVoiceNote}
+              onCancel={() => setIsRecordingVoice(false)}
             />
-            <button
-              onClick={handleSend}
-              disabled={sending || !text.trim()}
-              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white transition hover:-translate-y-0.5 disabled:opacity-50"
-            >
-              {sending ? <Loader2 size={17} className="animate-spin" /> : <Send size={17} />}
-            </button>
+          </div>
+        ) : (
+          <div className="mx-auto flex w-full max-w-3xl flex-col gap-2">
+            {/* Attachment Preview Card */}
+            {pendingAttachment && (
+              <div className="flex items-center justify-between gap-3 rounded-2xl border border-orange-500/30 bg-orange-500/10 p-2.5 text-xs text-white">
+                <div className="flex items-center gap-2 min-w-0">
+                  {pendingAttachment.type === "image" ? (
+                    <ImageIcon size={18} className="text-orange-400 flex-shrink-0" />
+                  ) : pendingAttachment.type === "video" ? (
+                    <Film size={18} className="text-orange-400 flex-shrink-0" />
+                  ) : (
+                    <FileText size={18} className="text-orange-400 flex-shrink-0" />
+                  )}
+                  <span className="truncate font-semibold">{pendingAttachment.name}</span>
+                </div>
+                <button
+                  onClick={() => setPendingAttachment(null)}
+                  className="rounded-full p-1 text-slate-400 hover:text-white"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            )}
+
+            <div className="relative flex items-center gap-2">
+              {/* Attachment Plus / Paperclip Button */}
+              <div className="relative">
+                <button
+                  onClick={() => setShowAttachmentMenu((v) => !v)}
+                  title="Attach Media or Document"
+                  className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 text-slate-300 hover:text-white transition hover:scale-105"
+                >
+                  <Paperclip size={18} />
+                </button>
+
+                {/* Attachment Menu Popover */}
+                {showAttachmentMenu && (
+                  <div className="absolute bottom-12 left-0 z-40 flex flex-col gap-1 w-44 rounded-2xl border border-white/10 bg-[#0B1524] p-2 shadow-2xl animate-fadeIn">
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-white/10 transition"
+                    >
+                      <ImageIcon size={16} className="text-sky-400" />
+                      Photos & Videos
+                    </button>
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-white/10 transition"
+                    >
+                      <FileText size={16} className="text-amber-400" />
+                      Documents
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* Text Input Box */}
+              <input
+                value={text}
+                onChange={(e) => {
+                  setText(e.target.value);
+                  if (e.target.value.trim()) pingTyping();
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend();
+                  }
+                }}
+                placeholder="Message..."
+                className="min-w-0 flex-1 rounded-full border border-white/10 light:border-slate-300 bg-white/[0.04] light:bg-white px-4 py-2.5 text-sm text-white light:text-slate-900 placeholder:text-slate-500 caret-orange-500 shadow-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-400/30"
+              />
+
+              {/* Dynamic Mic vs Send Button */}
+              {!text.trim() && !pendingAttachment ? (
+                /* Mic Option for Voice Messages */
+                <button
+                  onClick={() => setIsRecordingVoice(true)}
+                  title="Record Voice Note"
+                  className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-orange-500 text-white shadow-lg transition hover:scale-105"
+                >
+                  <Mic size={18} />
+                </button>
+              ) : (
+                /* Send Button */
+                <button
+                  onClick={() => handleSend()}
+                  disabled={sending}
+                  title="Send Message"
+                  className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white shadow-lg transition hover:scale-105 disabled:opacity-50"
+                >
+                  {sending ? <Loader2 size={17} className="animate-spin" /> : <Send size={17} />}
+                </button>
+              )}
+            </div>
           </div>
         )}
         {sendError && <p className="mt-2 text-center text-xs text-red-400">{sendError}</p>}
       </div>
+
+      {/* WhatsApp-style Contact Profile Drawer */}
+      <UserProfileDrawer
+        open={showProfileDrawer}
+        onClose={() => setShowProfileDrawer(false)}
+        username={displayUsername}
+        avatarUrl={displayAvatar}
+        online={otherIsOnline}
+        lastActiveAt={otherLastActiveAt}
+        conversationId={params.conversationId}
+        muted={conversation?.muted}
+        blocked={conversation?.blocked}
+        disappearingEnabled={conversation?.disappearingEnabled}
+        disappearingLabel={
+          DISAPPEARING_OPTIONS.find((o) => o.seconds === conversation?.disappearingSeconds)?.label
+        }
+        onToggleMute={() => handleAction(conversation?.muted ? "unmute" : "mute")}
+        onToggleBlock={() => handleAction(conversation?.blocked ? "unblock" : "block")}
+        onToggleDisappearing={() => handleAction("toggle_disappearing", { seconds: 86400 })}
+        sharedMedia={sharedMediaItems}
+      />
     </div>
   );
 }

@@ -1,0 +1,177 @@
+"use client";
+
+import { useEffect, useRef, useState } from "react";
+import { Mic, Trash2, Send, Loader2, Square } from "lucide-react";
+
+interface VoiceRecorderProps {
+  onSend: (audioDataUrl: string, durationSec: number) => void;
+  onCancel: () => void;
+}
+
+export default function VoiceRecorder({ onSend, onCancel }: VoiceRecorderProps) {
+  const [recording, setRecording] = useState(false);
+  const [duration, setDuration] = useState(0);
+  const [processing, setProcessing] = useState(false);
+  const [micError, setMicError] = useState<string | null>(null);
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    startRecording();
+    return () => {
+      stopTimer();
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        mediaRecorderRef.current.stop();
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const stopTimer = () => {
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+  };
+
+  const startRecording = async () => {
+    setMicError(null);
+    setDuration(0);
+    audioChunksRef.current = [];
+
+    try {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+        setMicError("Microphone recording is not supported in this browser.");
+        return;
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+
+      mediaRecorder.start(100);
+      setRecording(true);
+
+      timerRef.current = setInterval(() => {
+        setDuration((prev) => prev + 1);
+      }, 1000);
+    } catch (err) {
+      console.error("Failed to access microphone:", err);
+      setMicError("Microphone access denied. Please enable mic permissions.");
+    }
+  };
+
+  const handleStopAndSend = () => {
+    const mediaRecorder = mediaRecorderRef.current;
+    if (!mediaRecorder) return;
+
+    setProcessing(true);
+    stopTimer();
+
+    mediaRecorder.onstop = () => {
+      const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64Data = reader.result as string;
+        onSend(base64Data, duration);
+        // Stop stream tracks
+        mediaRecorder.stream.getTracks().forEach((track) => track.stop());
+      };
+      reader.readAsDataURL(audioBlob);
+    };
+
+    if (mediaRecorder.state !== "inactive") {
+      mediaRecorder.stop();
+    }
+  };
+
+  const handleCancel = () => {
+    stopTimer();
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+      mediaRecorderRef.current.stream.getTracks().forEach((track) => track.stop());
+    }
+    onCancel();
+  };
+
+  const formatTimer = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs < 10 ? "0" : ""}${secs}`;
+  };
+
+  if (micError) {
+    return (
+      <div className="flex items-center justify-between gap-3 rounded-full border border-red-500/30 bg-red-500/10 px-4 py-2 text-xs text-red-300">
+        <span>{micError}</span>
+        <button
+          onClick={onCancel}
+          className="rounded-full bg-white/10 p-1 hover:bg-white/20"
+        >
+          <Trash2 size={14} />
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-1 items-center gap-3 rounded-full border border-red-500/40 bg-red-500/10 px-4 py-2 shadow-inner transition-all animate-pulseOnce">
+      {/* Pulse Recording Dot */}
+      <div className="flex items-center gap-2">
+        <span className="relative flex h-3 w-3">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75" />
+          <span className="relative inline-flex h-3 w-3 rounded-full bg-red-500" />
+        </span>
+        <span className="font-mono text-xs font-bold text-red-400">
+          {formatTimer(duration)}
+        </span>
+      </div>
+
+      {/* Live Animated Waveform Bar Graphic */}
+      <div className="flex flex-1 items-center justify-center gap-1 overflow-hidden px-2">
+        {[40, 70, 30, 90, 50, 80, 40, 100, 60, 30, 85, 45, 75, 35].map((height, i) => (
+          <span
+            key={i}
+            className="w-1 rounded-full bg-red-400/70 animate-bounce"
+            style={{
+              height: `${Math.max(10, (height * (duration % 2 ? 1 : 0.6)))}%`,
+              animationDelay: `${(i % 5) * 0.1}s`,
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Action Buttons */}
+      <div className="flex items-center gap-2">
+        <button
+          onClick={handleCancel}
+          title="Cancel Recording"
+          className="flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-300 hover:bg-red-500/20 hover:text-red-400 transition"
+        >
+          <Trash2 size={16} />
+        </button>
+
+        <button
+          onClick={handleStopAndSend}
+          disabled={processing || duration < 1}
+          title="Send Voice Note"
+          className="flex h-9 w-9 items-center justify-center rounded-full bg-gradient-to-r from-red-500 to-orange-500 text-white shadow-lg transition hover:scale-105 disabled:opacity-50"
+        >
+          {processing ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <Send size={16} />
+          )}
+        </button>
+      </div>
+    </div>
+  );
+}

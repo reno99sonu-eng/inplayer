@@ -387,7 +387,15 @@ export default function ConversationThreadPage() {
     .filter((item): item is NonNullable<typeof item> => item !== null);
 
   return (
-    <div className={`fixed inset-x-0 bottom-0 top-[64px] z-20 flex flex-col overflow-hidden ${activeTheme.containerClass} text-white transition-colors duration-500`}>
+    <div className={`fixed inset-x-0 top-[64px] bottom-[64px] sm:bottom-0 z-20 flex flex-col overflow-hidden ${activeTheme.containerClass} text-white transition-colors duration-500`}>
+      {/* SVG Textured Wallpaper Background Layer */}
+      {activeTheme.texturePattern && (
+        <div
+          className="absolute inset-0 pointer-events-none opacity-30 mix-blend-overlay transition-all duration-500 bg-repeat"
+          style={{ backgroundImage: activeTheme.texturePattern }}
+        />
+      )}
+
       {/* Hidden File Input */}
       <input
         type="file"

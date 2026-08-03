@@ -23,6 +23,12 @@ const categories = CONTENT_CATEGORIES;
 export default function NavigationCategories() {
   const searchParams = useSearchParams();
   const pathname = usePathname();
+
+  // Hide category bar on chat screens and admin panel for clean full-height layout
+  if (pathname.startsWith("/messages") || pathname.startsWith("/admin")) {
+    return null;
+  }
+
   const activeCategory = searchParams.get("category");
 
   // On the home page the orientation is driven by ?view=; anywhere else

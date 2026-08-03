@@ -16,6 +16,7 @@ import {
   Menu,
   Bell,
   User,
+  ImageIcon,
 } from "lucide-react";
 import {
   PRESET_OCCASIONS,
@@ -135,26 +136,21 @@ function NavbarThemeManagerContent() {
     loadActiveTheme();
   }, []);
 
-  // Initial preview image generation if empty
-  useEffect(() => {
-    if (!previewImageUrl && !loading) {
-      handleAiGenerate();
-    }
-  }, [loading]);
-
-  const handleAiGenerate = () => {
+  // Generate theme graphic image when occasion is switched
+  const handleSelectOccasion = (occId: string) => {
+    setSelectedOccasion(occId);
     setGenerating(true);
     setError(null);
     try {
-      const preset = PRESET_OCCASIONS.find((o) => o.id === selectedOccasion);
-      const title = selectedOccasion === "custom" && customPrompt.trim()
+      const preset = PRESET_OCCASIONS.find((o) => o.id === occId);
+      const title = occId === "custom" && customPrompt.trim()
         ? customPrompt.trim()
         : preset?.name || "Occasion Celebration Theme";
 
-      const generatedUrl = generateAiNavbarThemeImage(selectedOccasion, customPrompt);
+      const generatedUrl = generateAiNavbarThemeImage(occId, customPrompt);
       setPreviewImageUrl(generatedUrl);
       setGeneratedTitle(title);
-      setSuccessMsg("AI generated new navbar theme pattern successfully!");
+      setSuccessMsg(`AI generated new ${title} graphic pattern!`);
       setTimeout(() => setSuccessMsg(null), 3000);
     } catch (err) {
       console.error("Failed to generate AI theme:", err);
@@ -162,6 +158,10 @@ function NavbarThemeManagerContent() {
     } finally {
       setGenerating(false);
     }
+  };
+
+  const handleAiGenerate = () => {
+    handleSelectOccasion(selectedOccasion);
   };
 
   const handlePublishTheme = async () => {
@@ -241,7 +241,7 @@ function NavbarThemeManagerContent() {
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-white">Top Navbar Occasion Themes</h1>
             <p className="text-xs sm:text-sm text-slate-200 font-medium">
-              Auto-generate and apply background occasion themes (Independence Day 🇮🇳, Diwali 🪔, Holi 🎨, etc.) without affecting top navbar layout, buttons, logos, or contrast across devices.
+              Auto-generate and apply background occasion themes (Independence Day 🇮🇳, Diwali 🪔, Holi 🎨, etc.) with real artistic festive graphics without affecting top navbar layout, buttons, logos, or contrast across devices.
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -289,7 +289,7 @@ function NavbarThemeManagerContent() {
                 <button
                   key={occ.id}
                   type="button"
-                  onClick={() => setSelectedOccasion(occ.id)}
+                  onClick={() => handleSelectOccasion(occ.id)}
                   className={`w-full flex items-center justify-between rounded-2xl border px-4 py-3 text-xs font-black transition text-left cursor-pointer ${
                     selectedOccasion === occ.id
                       ? "border-indigo-500 bg-indigo-500/20 light:bg-indigo-100 text-white light:text-indigo-950 shadow-[0_0_20px_rgba(99,102,241,0.2)]"
@@ -303,7 +303,7 @@ function NavbarThemeManagerContent() {
 
               <button
                 type="button"
-                onClick={() => setSelectedOccasion("custom")}
+                onClick={() => handleSelectOccasion("custom")}
                 className={`w-full flex items-center justify-between rounded-2xl border px-4 py-3 text-xs font-black transition text-left cursor-pointer ${
                   selectedOccasion === "custom"
                     ? "border-pink-500 bg-pink-500/20 light:bg-pink-100 text-white light:text-pink-950 shadow-[0_0_20px_rgba(236,72,153,0.2)]"
@@ -337,7 +337,7 @@ function NavbarThemeManagerContent() {
                 className="w-full flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-pink-500 px-5 py-3 text-xs font-black text-slate-950 shadow-lg hover:opacity-95 transition cursor-pointer disabled:opacity-50"
               >
                 <Sparkles size={16} className={generating ? "animate-spin" : ""} />
-                {generating ? "AI Generating Background Graphic..." : "Magic AI Auto-Generate Theme"}
+                {generating ? "AI Generating Festive Graphic..." : "Magic AI Auto-Generate Theme"}
               </button>
 
               <button
@@ -353,7 +353,7 @@ function NavbarThemeManagerContent() {
           </div>
         </div>
 
-        {/* Right Column — Live Interactive Mockup */}
+        {/* Right Column — Live Interactive Mockup & Image Showcase */}
         <div className="lg:col-span-7 space-y-6">
           <div className="rounded-3xl border border-white/10 light:border-slate-300 bg-white/[0.03] light:bg-white/90 p-5 space-y-4 backdrop-blur-xl shadow-lg light:shadow-md">
             <div className="flex items-center justify-between">
@@ -369,6 +369,22 @@ function NavbarThemeManagerContent() {
             <p className="text-xs text-slate-400 light:text-slate-700 font-semibold">
               Verify how the generated theme background sits behind the top navbar logo, search bar, and action buttons without overlapping or reducing legibility.
             </p>
+
+            {/* AI Generated Graphic Pattern Showcase */}
+            {previewImageUrl && (
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-[11px] font-bold text-indigo-300 light:text-indigo-800">
+                  <span className="flex items-center gap-1">
+                    <ImageIcon size={13} /> Generated Festive Graphic Artwork (1920x160)
+                  </span>
+                  <span>{generatedTitle}</span>
+                </div>
+                <div className="overflow-hidden rounded-xl border border-white/20 light:border-slate-300 bg-black/60 shadow-inner">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={previewImageUrl} alt="Generated Festive Graphic" className="h-16 w-full object-cover" />
+                </div>
+              </div>
+            )}
 
             {/* Mock Top Navbar Frame */}
             <div className="relative overflow-hidden rounded-2xl border border-white/20 light:border-slate-400 bg-[#06101D] shadow-2xl min-h-[90px] flex flex-col justify-center px-4 py-3">

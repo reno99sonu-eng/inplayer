@@ -17,140 +17,312 @@ export const PRESET_OCCASIONS = [
 
 export function generateAiNavbarThemeImage(occasionId: string, customPrompt?: string): string {
   const width = 1920;
-  const height = 120;
-  const occasion = PRESET_OCCASIONS.find((o) => o.id === occasionId) || {
-    id: "custom",
-    name: customPrompt || "Custom Celebration",
-    color: "from-indigo-600 via-purple-600 to-pink-600",
-  };
+  const height = 160;
 
   let themeGraphicSvg = "";
 
-  if (occasionId === "independence_day" || occasionId === "republic_day") {
+  if (occasionId === "independence_day") {
+    // Independence Day Tiranga Flag, Ashoka Chakra, Flying Doves & Fireworks
     themeGraphicSvg = `
       <defs>
-        <linearGradient id="flagGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stop-color="#FF9933" stop-opacity="0.9" />
-          <stop offset="35%" stop-color="#FF9933" stop-opacity="0.3" />
-          <stop offset="50%" stop-color="#FFFFFF" stop-opacity="0.15" />
-          <stop offset="65%" stop-color="#138808" stop-opacity="0.3" />
-          <stop offset="100%" stop-color="#138808" stop-opacity="0.9" />
+        <linearGradient id="flagBg" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#FF9933" />
+          <stop offset="32%" stop-color="#FF9933" />
+          <stop offset="48%" stop-color="#FFFFFF" />
+          <stop offset="68%" stop-color="#138808" />
+          <stop offset="100%" stop-color="#138808" />
         </linearGradient>
-        <filter id="glow">
-          <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+        <radialGradient id="sunGlow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#FFFFFF" stop-opacity="0.9" />
+          <stop offset="60%" stop-color="#FFD700" stop-opacity="0.4" />
+          <stop offset="100%" stop-color="#000080" stop-opacity="0" />
+        </radialGradient>
+        <filter id="glowEffect" x="-20%" y="-20%" width="140%" height="140%">
+          <feGaussianBlur stdDeviation="4" result="blur" />
+          <feComposite in="SourceGraphic" in2="blur" operator="over" />
+        </filter>
+      </defs>
+
+      <!-- Indian Flag Backdrop Wave -->
+      <rect width="${width}" height="${height}" fill="url(#flagBg)" opacity="0.92" />
+      <path d="M 0 0 Q 480 80, 960 20 T 1920 40 L 1920 160 L 0 160 Z" fill="#138808" opacity="0.4" />
+      <path d="M 0 0 Q 480 30, 960 70 T 1920 20 L 1920 0 L 0 0 Z" fill="#FF9933" opacity="0.4" />
+
+      <!-- Glowing Central Ashoka Chakra -->
+      <g transform="translate(960, 80)">
+        <circle r="65" fill="url(#sunGlow)" />
+        <circle r="52" fill="none" stroke="#000080" stroke-width="4" filter="url(#glowEffect)" />
+        <circle r="46" fill="none" stroke="#000080" stroke-width="2" />
+        <circle r="9" fill="#000080" />
+        ${Array.from({ length: 24 })
+          .map(
+            (_, i) =>
+              `<line x1="0" y1="0" x2="${46 * Math.cos((i * 15 * Math.PI) / 180)}" y2="${
+                46 * Math.sin((i * 15 * Math.PI) / 180)
+              }" stroke="#000080" stroke-width="2.5" />`
+          )
+          .join("")}
+      </g>
+
+      <!-- Side Ashoka Chakras -->
+      <g transform="translate(250, 80)" opacity="0.25">
+        <circle r="40" fill="none" stroke="#000080" stroke-width="3" />
+        ${Array.from({ length: 24 })
+          .map(
+            (_, i) =>
+              `<line x1="0" y1="0" x2="${35 * Math.cos((i * 15 * Math.PI) / 180)}" y2="${
+                35 * Math.sin((i * 15 * Math.PI) / 180)
+              }" stroke="#000080" stroke-width="2" />`
+          )
+          .join("")}
+      </g>
+      <g transform="translate(1670, 80)" opacity="0.25">
+        <circle r="40" fill="none" stroke="#000080" stroke-width="3" />
+        ${Array.from({ length: 24 })
+          .map(
+            (_, i) =>
+              `<line x1="0" y1="0" x2="${35 * Math.cos((i * 15 * Math.PI) / 180)}" y2="${
+                35 * Math.sin((i * 15 * Math.PI) / 180)
+              }" stroke="#000080" stroke-width="2" />`
+          )
+          .join("")}
+      </g>
+
+      <!-- Flying Tricolor Doves Silhouette -->
+      <path d="M 450 40 C 470 30, 490 35, 510 50 C 495 52, 480 60, 470 70 C 465 58, 455 48, 450 40 Z" fill="#FFFFFF" opacity="0.8" />
+      <path d="M 1450 45 C 1470 35, 1490 40, 1510 55 C 1495 57, 1480 65, 1470 75 C 1465 63, 1455 53, 1450 45 Z" fill="#FFFFFF" opacity="0.8" />
+
+      <!-- Fireworks & Celebration Lights -->
+      <circle cx="120" cy="40" r="4" fill="#FFF" opacity="0.9" />
+      <circle cx="380" cy="120" r="3" fill="#FFD700" opacity="0.8" />
+      <circle cx="780" cy="30" r="5" fill="#FFF" opacity="0.9" filter="url(#glowEffect)" />
+      <circle cx="1180" cy="130" r="4" fill="#FF9933" opacity="0.8" />
+      <circle cx="1520" cy="35" r="4" fill="#138808" opacity="0.9" />
+      <circle cx="1800" cy="110" r="3" fill="#FFF" opacity="0.9" />
+
+      <!-- Banner Watermark Text -->
+      <text x="960" y="148" font-family="system-ui, sans-serif" font-weight="900" font-size="14" fill="#000080" text-anchor="middle" letter-spacing="4" opacity="0.7">HAPPY INDEPENDENCE DAY • INDIA 🇮🇳</text>
+    `;
+  } else if (occasionId === "diwali") {
+    // Diwali Real Diya Lamps, Golden Rangoli Mandalas & Sky Fireworks
+    themeGraphicSvg = `
+      <defs>
+        <linearGradient id="diwaliBg" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#1A0222" />
+          <stop offset="35%" stop-color="#4C0519" />
+          <stop offset="70%" stop-color="#701A75" />
+          <stop offset="100%" stop-color="#310E5A" />
+        </linearGradient>
+        <radialGradient id="flameGlow" cx="50%" cy="50%" r="50%">
+          <stop offset="0%" stop-color="#FFFF00" />
+          <stop offset="40%" stop-color="#FF5500" />
+          <stop offset="100%" stop-color="#FF5500" stop-opacity="0" />
+        </radialGradient>
+        <filter id="diyaLight">
+          <feGaussianBlur stdDeviation="6" result="blur" />
           <feMerge>
-            <feMergeNode in="coloredBlur"/>
-            <feMergeNode in="SourceGraphic"/>
+            <feMergeNode in="blur" />
+            <feMergeNode in="SourceGraphic" />
           </feMerge>
         </filter>
       </defs>
-      <rect width="${width}" height="${height}" fill="url(#flagGrad)" />
-      
-      <!-- Ashoka Chakra Watermark Elements -->
-      <g opacity="0.15" transform="translate(960, 60)">
-        <circle r="45" fill="none" stroke="#000080" stroke-width="2.5" />
-        <circle r="8" fill="#000080" />
-        ${Array.from({ length: 24 })
-          .map((_, i) => `<line x1="0" y1="0" x2="${45 * Math.cos((i * 15 * Math.PI) / 180)}" y2="${45 * Math.sin((i * 15 * Math.PI) / 180)}" stroke="#000080" stroke-width="1.5" />`)
-          .join("")}
+
+      <rect width="${width}" height="${height}" fill="url(#diwaliBg)" opacity="0.95" />
+
+      <!-- Golden Rangoli Mandalas Backdrop -->
+      <g transform="translate(300, 80)" opacity="0.2">
+        <circle r="70" fill="none" stroke="#FFD700" stroke-width="2" stroke-dasharray="8 4" />
+        <circle r="50" fill="none" stroke="#FFD700" stroke-width="1.5" />
       </g>
-      <g opacity="0.12" transform="translate(200, 60)">
-        <circle r="35" fill="none" stroke="#000080" stroke-width="2" />
-      </g>
-      <g opacity="0.12" transform="translate(1720, 60)">
-        <circle r="35" fill="none" stroke="#000080" stroke-width="2" />
+      <g transform="translate(1620, 80)" opacity="0.2">
+        <circle r="70" fill="none" stroke="#FFD700" stroke-width="2" stroke-dasharray="8 4" />
+        <circle r="50" fill="none" stroke="#FFD700" stroke-width="1.5" />
       </g>
 
-      <!-- Sparkling Stars & Fireworks -->
-      <circle cx="150" cy="30" r="3" fill="#FFF" opacity="0.8" />
-      <circle cx="380" cy="80" r="2.5" fill="#FFD700" opacity="0.7" />
-      <circle cx="820" cy="25" r="3.5" fill="#FFF" opacity="0.9" filter="url(#glow)" />
-      <circle cx="1150" cy="90" r="2" fill="#FF9933" opacity="0.8" />
-      <circle cx="1540" cy="35" r="3" fill="#138808" opacity="0.8" />
-      <circle cx="1780" cy="85" r="2" fill="#FFF" opacity="0.9" />
-    `;
-  } else if (occasionId === "diwali") {
-    themeGraphicSvg = `
-      <defs>
-        <linearGradient id="diwaliGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#31103F" />
-          <stop offset="30%" stop-color="#701A75" />
-          <stop offset="60%" stop-color="#C026D3" />
-          <stop offset="85%" stop-color="#EA580C" />
-          <stop offset="100%" stop-color="#CA8A04" />
-        </linearGradient>
-        <radialGradient id="diyaGlow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stop-color="#FDE047" stop-opacity="1" />
-          <stop offset="50%" stop-color="#F97316" stop-opacity="0.5" />
-          <stop offset="100%" stop-color="#F97316" stop-opacity="0" />
-        </radialGradient>
-      </defs>
-      <rect width="${width}" height="${height}" fill="url(#diwaliGrad)" opacity="0.85" />
-      
-      <!-- Diya Sparks & Rangoli Bokeh Circles -->
-      <circle cx="250" cy="60" r="40" fill="url(#diyaGlow)" opacity="0.6" />
-      <circle cx="960" cy="60" r="60" fill="url(#diyaGlow)" opacity="0.5" />
-      <circle cx="1670" cy="60" r="40" fill="url(#diyaGlow)" opacity="0.6" />
-
-      <!-- Sparkling Light Particles -->
-      ${Array.from({ length: 30 })
+      <!-- Real Glowing Diya Lamps (Left, Center, Right) -->
+      ${[350, 960, 1570]
         .map(
-          (_, i) =>
-            `<circle cx="${(i * 65 + 40) % 1920}" cy="${(i * 23 + 15) % 120}" r="${(i % 3) + 1.5}" fill="#FDE047" opacity="${0.4 + (i % 5) * 0.12}" />`
+          (cx) => `
+        <g transform="translate(${cx}, 100)">
+          <!-- Flame Glow Radius -->
+          <circle cx="0" cy="-35" r="45" fill="url(#flameGlow)" filter="url(#diyaLight)" opacity="0.85" />
+          <!-- Diya Clay Bowl -->
+          <path d="M -40 0 C -40 25, 40 25, 40 0 C 25 -5, -25 -5, -40 0 Z" fill="#D97706" stroke="#FEF08A" stroke-width="2" />
+          <ellipse cx="0" cy="0" rx="36" ry="7" fill="#B45309" />
+          <!-- Diya Flame -->
+          <path d="M 0 -45 C 12 -25, 10 -5, 0 0 C -10 -5, -12 -25, 0 -45 Z" fill="#FACC15" filter="url(#diyaLight)" />
+          <path d="M 0 -35 C 6 -20, 5 -5, 0 0 C -5 -5, -6 -20, 0 -35 Z" fill="#FFFFFF" />
+        </g>
+      `
         )
         .join("")}
+
+      <!-- Sparkling Fireworks Burst -->
+      ${Array.from({ length: 40 })
+        .map(
+          (_, i) =>
+            `<circle cx="${(i * 48 + 30) % 1920}" cy="${(i * 27 + 10) % 160}" r="${(i % 3) + 1.5}" fill="#FDE047" opacity="${
+              0.4 + (i % 6) * 0.1
+            }" />`
+        )
+        .join("")}
+
+      <!-- Watermark Title -->
+      <text x="960" y="148" font-family="system-ui, sans-serif" font-weight="900" font-size="13" fill="#FDE047" text-anchor="middle" letter-spacing="4" opacity="0.8">HAPPY DIWALI • FESTIVAL OF LIGHTS 🪔</text>
     `;
   } else if (occasionId === "holi") {
+    // Holi Vibrant Color Splash Gulal Explosion
     themeGraphicSvg = `
       <defs>
-        <linearGradient id="holiGrad" x1="0%" y1="0%" x2="100%" y2="0%">
-          <stop offset="0%" stop-color="#DB2777" />
-          <stop offset="25%" stop-color="#9333EA" />
-          <stop offset="50%" stop-color="#2563EB" />
-          <stop offset="75%" stop-color="#059669" />
-          <stop offset="100%" stop-color="#D97706" />
+        <linearGradient id="holiBg" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#BE185D" />
+          <stop offset="25%" stop-color="#6B21A8" />
+          <stop offset="50%" stop-color="#1D4ED8" />
+          <stop offset="75%" stop-color="#047857" />
+          <stop offset="100%" stop-color="#B45309" />
+        </linearGradient>
+        <filter id="splashBlur">
+          <feGaussianBlur stdDeviation="8" />
+        </filter>
+      </defs>
+
+      <rect width="${width}" height="${height}" fill="url(#holiBg)" opacity="0.9" />
+
+      <!-- Powder Splash Explosions -->
+      <circle cx="320" cy="80" r="100" fill="#EC4899" opacity="0.6" filter="url(#splashBlur)" />
+      <circle cx="700" cy="60" r="110" fill="#FACC15" opacity="0.5" filter="url(#splashBlur)" />
+      <circle cx="1200" cy="100" r="120" fill="#06B6D4" opacity="0.6" filter="url(#splashBlur)" />
+      <circle cx="1650" cy="70" r="100" fill="#10B981" opacity="0.5" filter="url(#splashBlur)" />
+
+      <!-- Splatter Drops -->
+      ${Array.from({ length: 50 })
+        .map(
+          (_, i) =>
+            `<circle cx="${(i * 38 + 15) % 1920}" cy="${(i * 19 + 20) % 160}" r="${(i % 5) + 2}" fill="${
+              ["#F43F5E", "#A855F7", "#3B82F6", "#10B981", "#F59E0B"][i % 5]
+            }" opacity="${0.6 + (i % 4) * 0.1}" />`
+        )
+        .join("")}
+
+      <!-- Watermark Title -->
+      <text x="960" y="148" font-family="system-ui, sans-serif" font-weight="900" font-size="13" fill="#FFFFFF" text-anchor="middle" letter-spacing="4" opacity="0.9">HAPPY HOLI • FESTIVAL OF COLORS 🎨</text>
+    `;
+  } else if (occasionId === "republic_day") {
+    // Republic Day Airforce Jet Smoke Trails & Ashoka Emblem
+    themeGraphicSvg = `
+      <defs>
+        <linearGradient id="repBg" x1="0%" y1="0%" x2="100%" y2="0%">
+          <stop offset="0%" stop-color="#FF9933" />
+          <stop offset="35%" stop-color="#FF9933" />
+          <stop offset="50%" stop-color="#FFFFFF" />
+          <stop offset="65%" stop-color="#138808" />
+          <stop offset="100%" stop-color="#138808" />
         </linearGradient>
       </defs>
-      <rect width="${width}" height="${height}" fill="url(#holiGrad)" opacity="0.75" />
-      
-      <!-- Color Powder Splashes -->
-      <ellipse cx="300" cy="60" rx="90" ry="40" fill="#EC4899" opacity="0.4" filter="blur(10px)" />
-      <ellipse cx="850" cy="40" rx="110" ry="50" fill="#8B5CF6" opacity="0.4" filter="blur(12px)" />
-      <ellipse cx="1400" cy="80" rx="100" ry="45" fill="#06B6D4" opacity="0.4" filter="blur(10px)" />
+
+      <rect width="${width}" height="${height}" fill="url(#repBg)" opacity="0.9" />
+
+      <!-- IAF Fighter Jet Smoke Trails -->
+      <path d="M 0 40 Q 600 120, 1920 30" fill="none" stroke="#FF9933" stroke-width="12" opacity="0.4" />
+      <path d="M 0 80 Q 600 140, 1920 70" fill="none" stroke="#FFFFFF" stroke-width="12" opacity="0.5" />
+      <path d="M 0 120 Q 600 160, 1920 110" fill="none" stroke="#138808" stroke-width="12" opacity="0.4" />
+
+      <!-- Central Ashoka Chakra -->
+      <g transform="translate(960, 80)">
+        <circle r="50" fill="none" stroke="#000080" stroke-width="3" />
+        <circle r="8" fill="#000080" />
+        ${Array.from({ length: 24 })
+          .map(
+            (_, i) =>
+              `<line x1="0" y1="0" x2="${42 * Math.cos((i * 15 * Math.PI) / 180)}" y2="${
+                42 * Math.sin((i * 15 * Math.PI) / 180)
+              }" stroke="#000080" stroke-width="2" />`
+          )
+          .join("")}
+      </g>
+
+      <!-- Watermark Title -->
+      <text x="960" y="148" font-family="system-ui, sans-serif" font-weight="900" font-size="13" fill="#000080" text-anchor="middle" letter-spacing="4" opacity="0.8">HAPPY REPUBLIC DAY 🇮🇳</text>
     `;
-  } else if (occasionId === "cyberpunk") {
+  } else if (occasionId === "new_year") {
+    // New Year Golden Fireworks & 2026 Celebration Streamers
     themeGraphicSvg = `
       <defs>
-        <linearGradient id="cyberGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+        <linearGradient id="nyBg" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#0F172A" />
+          <stop offset="50%" stop-color="#31103F" />
+          <stop offset="100%" stop-color="#020617" />
+        </linearGradient>
+      </defs>
+
+      <rect width="${width}" height="${height}" fill="url(#nyBg)" opacity="0.95" />
+
+      <!-- Golden Fireworks Stars -->
+      ${Array.from({ length: 45 })
+        .map(
+          (_, i) =>
+            `<circle cx="${(i * 43 + 20) % 1920}" cy="${(i * 29 + 15) % 160}" r="${(i % 4) + 1.5}" fill="#FBBF24" opacity="${
+              0.5 + (i % 5) * 0.1
+            }" />`
+        )
+        .join("")}
+
+      <!-- Streamers -->
+      <path d="M 150 0 Q 300 160, 450 0" fill="none" stroke="#F43F5E" stroke-width="2" opacity="0.6" />
+      <path d="M 1400 0 Q 1550 160, 1700 0" fill="none" stroke="#3B82F6" stroke-width="2" opacity="0.6" />
+
+      <!-- Watermark Title -->
+      <text x="960" y="100" font-family="system-ui, sans-serif" font-weight="900" font-size="36" fill="#FBBF24" text-anchor="middle" letter-spacing="6" opacity="0.85">WELCOME 2026 🎉</text>
+    `;
+  } else if (occasionId === "cyberpunk") {
+    // Cyberpunk Synthwave Grid & Neon Lasers
+    themeGraphicSvg = `
+      <defs>
+        <linearGradient id="cybBg" x1="0%" y1="0%" x2="100%" y2="0%">
           <stop offset="0%" stop-color="#030712" />
-          <stop offset="40%" stop-color="#083344" />
-          <stop offset="70%" stop-color="#31103F" />
+          <stop offset="50%" stop-color="#0B132B" />
           <stop offset="100%" stop-color="#030712" />
         </linearGradient>
       </defs>
-      <rect width="${width}" height="${height}" fill="url(#cyberGrad)" />
-      
-      <!-- Cyber Neon Lines -->
-      <path d="M 0 30 Q 400 90, 960 30 T 1920 60" fill="none" stroke="#06B6D4" stroke-width="2" opacity="0.6" />
-      <path d="M 0 90 Q 600 20, 1200 100 T 1920 40" fill="none" stroke="#EC4899" stroke-width="2" opacity="0.5" />
+
+      <rect width="${width}" height="${height}" fill="url(#cybBg)" />
+
+      <!-- Cyber Neon Perspective Lines -->
+      <path d="M 0 40 L 1920 40 M 0 80 L 1920 80 M 0 120 L 1920 120" stroke="#06B6D4" stroke-width="1" opacity="0.3" />
+      <path d="M 0 0 L 960 160 L 1920 0" fill="none" stroke="#EC4899" stroke-width="2" opacity="0.6" />
+
+      <!-- Laser Beam Node -->
+      <circle cx="960" cy="80" r="50" fill="none" stroke="#06B6D4" stroke-width="2" opacity="0.7" />
+
+      <!-- Watermark Title -->
+      <text x="960" y="148" font-family="system-ui, sans-serif" font-weight="900" font-size="13" fill="#06B6D4" text-anchor="middle" letter-spacing="5" opacity="0.85">INPLAYER CYBERPUNK TECH MODE ⚡</text>
     `;
   } else {
-    // New Year / Custom
+    // Custom Celebration Prompt
+    const customTitle = (customPrompt || "Custom Celebration").toUpperCase();
     themeGraphicSvg = `
       <defs>
-        <linearGradient id="festiveGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+        <linearGradient id="customBg" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stop-color="#1E1B4B" />
-          <stop offset="50%" stop-color="#4C1D95" />
+          <stop offset="50%" stop-color="#581C87" />
           <stop offset="100%" stop-color="#831843" />
         </linearGradient>
       </defs>
-      <rect width="${width}" height="${height}" fill="url(#festiveGrad)" opacity="0.8" />
-      ${Array.from({ length: 25 })
+
+      <rect width="${width}" height="${height}" fill="url(#customBg)" opacity="0.95" />
+
+      <!-- Sparkling Light Flares -->
+      ${Array.from({ length: 40 })
         .map(
           (_, i) =>
-            `<circle cx="${(i * 77 + 20) % 1920}" cy="${(i * 19 + 10) % 120}" r="${(i % 4) + 1.5}" fill="#F43F5E" opacity="${0.4 + (i % 4) * 0.15}" />`
+            `<circle cx="${(i * 48 + 20) % 1920}" cy="${(i * 23 + 15) % 160}" r="${(i % 4) + 2}" fill="#F43F5E" opacity="${
+              0.4 + (i % 5) * 0.12
+            }" />`
         )
         .join("")}
+
+      <!-- Custom Watermark Title -->
+      <text x="960" y="100" font-family="system-ui, sans-serif" font-weight="900" font-size="28" fill="#FFFFFF" text-anchor="middle" letter-spacing="4" opacity="0.9">${customTitle} ✨</text>
     `;
   }
 

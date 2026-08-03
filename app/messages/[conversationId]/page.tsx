@@ -24,7 +24,7 @@ import {
   Film,
   Download,
   Info,
-  ChevronDown,
+  Sparkles,
 } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { formatTimeAgo } from "@/app/lib/formatters";
@@ -161,7 +161,7 @@ export default function ConversationThreadPage() {
       }
     } catch (err) {
       console.error("Failed to load conversation:", err);
-    } fontally: {
+    } finally {
       setConversationLoaded(true);
     }
   }
@@ -330,7 +330,7 @@ export default function ConversationThreadPage() {
 
   if (authLoading || !conversationLoaded) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-[#06101D] light:bg-[#FAF5E9]">
+      <div className="flex h-[calc(100vh-64px)] items-center justify-center bg-[#060D17]">
         <Loader2 size={28} className="animate-spin text-orange-400" />
       </div>
     );
@@ -338,11 +338,11 @@ export default function ConversationThreadPage() {
 
   if (!signedIn) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[#06101D] light:bg-[#FAF5E9] px-6 text-center text-white light:text-slate-900">
+      <div className="flex h-[calc(100vh-64px)] flex-col items-center justify-center bg-[#060D17] px-6 text-center text-white">
         <h2 className="text-2xl font-black">Sign in to view this conversation</h2>
         <button
           onClick={openSignIn}
-          className="mt-6 rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-8 py-3 font-bold text-white shadow-[0_15px_35px_rgba(255,153,0,.3)] transition-all hover:-translate-y-0.5"
+          className="mt-6 rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-8 py-3 font-bold text-slate-950 shadow-lg hover:-translate-y-0.5 transition"
         >
           Sign In
         </button>
@@ -352,7 +352,7 @@ export default function ConversationThreadPage() {
 
   if (!targetUserId) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center bg-[#06101D] light:bg-[#FAF5E9] px-6 text-center text-white light:text-slate-900">
+      <div className="flex h-[calc(100vh-64px)] flex-col items-center justify-center bg-[#060D17] px-6 text-center text-white">
         <p className="font-semibold">That conversation link isn&apos;t valid.</p>
         <Link href="/messages" className="mt-4 text-sm font-semibold text-orange-400">
           Back to Messages
@@ -387,7 +387,7 @@ export default function ConversationThreadPage() {
     .filter((item): item is NonNullable<typeof item> => item !== null);
 
   return (
-    <div className={`flex min-h-screen flex-col ${activeTheme.containerClass} transition-colors duration-500 text-white light:text-slate-900`}>
+    <div className={`fixed inset-x-0 bottom-0 top-[64px] z-20 flex flex-col overflow-hidden ${activeTheme.containerClass} text-white transition-colors duration-500`}>
       {/* Hidden File Input */}
       <input
         type="file"
@@ -398,10 +398,10 @@ export default function ConversationThreadPage() {
       />
 
       {/* Top Header Bar */}
-      <div className="sticky top-0 z-30 flex items-center gap-3 border-b border-white/10 light:border-black/10 bg-[#06101D]/90 light:bg-white/90 backdrop-blur-md px-4 py-2.5 shadow-md">
+      <div className="flex-shrink-0 z-30 flex items-center gap-3 border-b border-white/10 bg-[#060D17]/95 backdrop-blur-md px-4 py-2.5 shadow-md">
         <button
           onClick={() => router.push("/messages")}
-          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 transition hover:bg-white/15 light:hover:bg-black/10"
+          className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/5 transition hover:bg-white/15"
         >
           <ArrowLeft size={18} />
         </button>
@@ -415,15 +415,15 @@ export default function ConversationThreadPage() {
             <img
               src={displayAvatar}
               alt={displayUsername}
-              className="h-10 w-10 rounded-full object-cover border border-white/10"
+              className="h-10 w-10 rounded-full object-cover border border-white/10 shadow"
             />
             {otherIsOnline && (
-              <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[#06101D] light:border-white bg-emerald-400" />
+              <span className="absolute bottom-0 right-0 h-2.5 w-2.5 rounded-full border-2 border-[#060D17] bg-emerald-400" />
             )}
           </div>
           <div className="min-w-0">
             <span className="block truncate font-bold text-sm">@{displayUsername}</span>
-            <span className="block truncate text-[11px] text-slate-400 light:text-slate-600">
+            <span className="block truncate text-[11px] text-slate-400">
               {otherIsTyping ? (
                 <span className="font-semibold text-emerald-400 animate-pulse">typing...</span>
               ) : otherIsOnline ? (
@@ -431,19 +431,19 @@ export default function ConversationThreadPage() {
               ) : otherLastActiveAt ? (
                 `Last seen ${formatTimeAgo(otherLastActiveAt)}`
               ) : (
-                "Tap to view profile"
+                "Tap to view contact info"
               )}
             </span>
           </div>
         </button>
 
         {/* Action Controls */}
-        <div className="relative flex items-center gap-1 flex-shrink-0">
+        <div className="relative flex items-center gap-1.5 flex-shrink-0">
           {/* Wallpaper Theme Quick Button */}
           <button
             onClick={() => setShowThemePicker((v) => !v)}
             title="Change Chat Wallpaper"
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 transition hover:bg-white/15 light:hover:bg-black/10 text-orange-400"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 transition hover:bg-white/15 text-orange-400"
           >
             <Palette size={18} />
           </button>
@@ -451,20 +451,20 @@ export default function ConversationThreadPage() {
           {/* Settings Dropdown */}
           <button
             onClick={() => setSettingsOpen((v) => !v)}
-            className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 transition hover:bg-white/15 light:hover:bg-black/10"
+            className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 transition hover:bg-white/15"
           >
             <MoreVertical size={18} />
           </button>
 
           {/* Settings Dropdown Menu */}
           {settingsOpen && (
-            <div className="absolute right-0 top-11 z-40 w-64 overflow-hidden rounded-2xl border border-white/10 light:border-black/10 bg-[#0B1524] light:bg-white shadow-[0_20px_50px_rgba(0,0,0,.5)] transition-all">
+            <div className="absolute right-0 top-11 z-40 w-64 overflow-hidden rounded-2xl border border-white/10 bg-[#0B1524] shadow-[0_20px_50px_rgba(0,0,0,.6)] transition-all">
               <button
                 onClick={() => {
                   setSettingsOpen(false);
                   setShowProfileDrawer(true);
                 }}
-                className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-xs font-semibold text-slate-200 light:text-slate-800 transition hover:bg-white/5 light:hover:bg-black/5"
+                className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-xs font-semibold text-slate-200 transition hover:bg-white/5"
               >
                 <Info size={15} className="text-orange-400" />
                 Contact Profile Info
@@ -475,7 +475,7 @@ export default function ConversationThreadPage() {
                   setSettingsOpen(false);
                   setShowThemePicker(true);
                 }}
-                className="flex w-full items-center gap-2.5 border-t border-white/10 light:border-black/10 px-4 py-3 text-left text-xs font-semibold text-slate-200 light:text-slate-800 transition hover:bg-white/5 light:hover:bg-black/5"
+                className="flex w-full items-center gap-2.5 border-t border-white/10 px-4 py-3 text-left text-xs font-semibold text-slate-200 transition hover:bg-white/5"
               >
                 <Palette size={15} className="text-amber-400" />
                 Change Chat Wallpaper Theme
@@ -484,14 +484,14 @@ export default function ConversationThreadPage() {
               <button
                 onClick={() => handleAction(conversation?.muted ? "unmute" : "mute")}
                 disabled={actionBusy}
-                className="flex w-full items-center gap-2.5 border-t border-white/10 light:border-black/10 px-4 py-3 text-left text-xs font-semibold text-slate-200 light:text-slate-800 transition hover:bg-white/5 light:hover:bg-black/5 disabled:opacity-50"
+                className="flex w-full items-center gap-2.5 border-t border-white/10 px-4 py-3 text-left text-xs font-semibold text-slate-200 transition hover:bg-white/5 disabled:opacity-50"
               >
                 {conversation?.muted ? <Bell size={15} /> : <BellOff size={15} />}
                 {conversation?.muted ? "Unmute Notifications" : "Mute Notifications"}
               </button>
 
-              <div className="border-t border-white/10 light:border-black/10 px-4 py-3">
-                <p className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-slate-200 light:text-slate-800">
+              <div className="border-t border-white/10 px-4 py-3">
+                <p className="mb-1.5 flex items-center gap-2 text-xs font-semibold text-slate-200">
                   <Timer size={15} /> Disappearing Messages
                 </p>
                 {conversation?.disappearingEnabled ? (
@@ -509,7 +509,7 @@ export default function ConversationThreadPage() {
                         key={opt.seconds}
                         onClick={() => handleAction("toggle_disappearing", { seconds: opt.seconds })}
                         disabled={actionBusy}
-                        className="rounded-full border border-white/10 light:border-black/10 px-2 py-0.5 text-[10px] font-semibold text-slate-300 light:text-slate-700 transition hover:border-orange-400/40 disabled:opacity-50"
+                        className="rounded-full border border-white/10 px-2 py-0.5 text-[10px] font-semibold text-slate-300 transition hover:border-orange-400/40 disabled:opacity-50"
                       >
                         {opt.label}
                       </button>
@@ -521,7 +521,7 @@ export default function ConversationThreadPage() {
               <button
                 onClick={() => handleAction(conversation?.blocked ? "unblock" : "block")}
                 disabled={actionBusy}
-                className="flex w-full items-center gap-2.5 border-t border-white/10 light:border-black/10 px-4 py-3 text-left text-xs font-semibold text-red-400 transition hover:bg-red-500/10 disabled:opacity-50"
+                className="flex w-full items-center gap-2.5 border-t border-white/10 px-4 py-3 text-left text-xs font-semibold text-red-400 transition hover:bg-red-500/10 disabled:opacity-50"
               >
                 <Ban size={15} />
                 {conversation?.blocked ? "Unblock" : "Block"} @{displayUsername}
@@ -531,14 +531,14 @@ export default function ConversationThreadPage() {
         </div>
       </div>
 
-      {/* Wallpaper Theme Picker Modal Popover */}
+      {/* Wallpaper Theme Picker Modal */}
       {showThemePicker && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fadeIn">
-          <div className="w-full max-w-sm rounded-3xl border border-white/15 bg-[#0B1626] light:bg-white p-5 shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="w-full max-w-sm rounded-3xl border border-white/15 bg-[#0B1626] p-5 shadow-2xl">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-bold text-white light:text-slate-900 flex items-center gap-2">
+              <h3 className="text-base font-bold text-white flex items-center gap-2">
                 <Palette size={18} className="text-orange-400" />
-                Select Chat Theme
+                Select Premium Theme Wallpaper
               </h3>
               <button
                 onClick={() => setShowThemePicker(false)}
@@ -555,12 +555,12 @@ export default function ConversationThreadPage() {
                   onClick={() => handleSelectTheme(theme.id)}
                   className={`flex flex-col items-center gap-2 rounded-2xl border p-3 transition ${
                     selectedThemeId === theme.id
-                      ? "border-orange-400 bg-orange-500/10 ring-2 ring-orange-400/30"
-                      : "border-white/10 light:border-slate-200 bg-white/[0.03] hover:bg-white/10"
+                      ? "border-orange-400 bg-orange-500/15 ring-2 ring-orange-400/40"
+                      : "border-white/10 bg-white/[0.03] hover:bg-white/10"
                   }`}
                 >
                   <div className={`h-12 w-full rounded-xl ${theme.previewBg} border`} />
-                  <span className="text-xs font-semibold text-slate-200 light:text-slate-800 text-center">
+                  <span className="text-xs font-semibold text-slate-200 text-center">
                     {theme.name}
                   </span>
                 </button>
@@ -570,24 +570,24 @@ export default function ConversationThreadPage() {
         </div>
       )}
 
-      {/* Message Request Notification Header */}
+      {/* Message Request Banner */}
       {isPendingIncoming && (
-        <div className="flex items-center justify-between gap-3 border-b border-orange-400/20 bg-orange-500/[0.06] px-5 py-2.5">
-          <p className="text-xs text-slate-300 light:text-slate-700">
-            @{displayUsername} wants to message you. Accept to start chatting freely.
+        <div className="flex-shrink-0 flex items-center justify-between gap-3 border-b border-orange-400/20 bg-orange-500/[0.08] px-5 py-2">
+          <p className="text-xs text-slate-300">
+            @{displayUsername} wants to message you. Accept to start chatting.
           </p>
           <div className="flex flex-shrink-0 gap-1.5">
             <button
               onClick={() => handleAction("accept")}
               disabled={actionBusy}
-              className="flex items-center gap-1 rounded-full bg-emerald-500/15 px-3 py-1 text-xs font-bold text-emerald-400 transition hover:bg-emerald-500/25 disabled:opacity-50"
+              className="flex items-center gap-1 rounded-full bg-emerald-500/20 px-3 py-1 text-xs font-bold text-emerald-400 hover:bg-emerald-500/30 transition"
             >
               <Check size={13} /> Accept
             </button>
             <button
               onClick={() => handleAction("decline")}
               disabled={actionBusy}
-              className="flex items-center gap-1 rounded-full bg-red-500/15 px-3 py-1 text-xs font-bold text-red-400 transition hover:bg-red-500/25 disabled:opacity-50"
+              className="flex items-center gap-1 rounded-full bg-red-500/20 px-3 py-1 text-xs font-bold text-red-400 hover:bg-red-500/30 transition"
             >
               <X size={13} /> Decline
             </button>
@@ -595,10 +595,10 @@ export default function ConversationThreadPage() {
         </div>
       )}
 
-      {/* Chat Messages Body Container */}
-      <div className="mx-auto w-full max-w-3xl flex-1 space-y-3 overflow-y-auto px-4 py-4 scrollbar-thin">
+      {/* Scrollable Messages Area */}
+      <div className="flex-1 min-h-0 overflow-y-auto px-4 py-3 space-y-2.5 max-w-3xl mx-auto w-full">
         {messages.length === 0 ? (
-          <div className="flex h-full flex-col items-center justify-center py-16 text-center">
+          <div className="flex h-full flex-col items-center justify-center py-12 text-center">
             <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-full bg-orange-500/10 border border-orange-400/20">
               <img
                 src={displayAvatar}
@@ -606,11 +606,11 @@ export default function ConversationThreadPage() {
                 className="h-12 w-12 rounded-full object-cover"
               />
             </div>
-            <p className="text-sm font-bold text-slate-300 light:text-slate-800">
-              This is the start of your encrypted conversation with @{displayUsername}.
+            <p className="text-sm font-bold text-slate-200">
+              This is the start of your encrypted chat with @{displayUsername}.
             </p>
-            <p className="mt-1 text-xs text-slate-500">
-              Say hello or share a voice note to break the ice!
+            <p className="mt-1 text-xs text-slate-400">
+              Say hello or send a voice note to start talking!
             </p>
           </div>
         ) : (
@@ -623,7 +623,7 @@ export default function ConversationThreadPage() {
             return (
               <div
                 key={m.messageId}
-                className={`flex items-end gap-2 transition-all duration-300 animate-fadeIn ${
+                className={`flex items-end gap-2 transition-all duration-200 ${
                   mine ? "justify-end" : "justify-start"
                 }`}
               >
@@ -633,16 +633,16 @@ export default function ConversationThreadPage() {
                       <img
                         src={displayAvatar}
                         alt={displayUsername}
-                        className="h-8 w-8 flex-shrink-0 rounded-full object-cover border border-white/10 hover:opacity-80 transition"
+                        className="h-7 w-7 flex-shrink-0 rounded-full object-cover border border-white/10 hover:opacity-80 transition"
                       />
                     </button>
                   ) : (
-                    <div className="w-8 flex-shrink-0" />
+                    <div className="w-7 flex-shrink-0" />
                   ))}
 
-                <div className={`flex max-w-[78%] sm:max-w-[70%] items-end gap-1.5 ${mine ? "flex-row-reverse" : ""}`}>
+                <div className={`flex max-w-[82%] sm:max-w-[72%] items-end gap-1.5 ${mine ? "flex-row-reverse" : ""}`}>
                   <div
-                    className={`group relative rounded-2xl px-3.5 py-2 text-sm shadow-md transition-all ${
+                    className={`group relative rounded-2xl px-3.5 py-2 text-xs sm:text-sm shadow-md transition-all ${
                       m.deletedForEveryone
                         ? "border border-dashed border-white/15 text-slate-500 italic"
                         : mine
@@ -660,7 +660,7 @@ export default function ConversationThreadPage() {
                         <img
                           src={parsed.url!}
                           alt="Attachment"
-                          className="max-h-60 w-full rounded-xl object-cover"
+                          className="max-h-56 w-full rounded-xl object-cover"
                         />
                       </div>
                     ) : parsed.type === "video" ? (
@@ -668,7 +668,7 @@ export default function ConversationThreadPage() {
                         <video
                           src={parsed.url!}
                           controls
-                          className="max-h-60 w-full rounded-xl"
+                          className="max-h-56 w-full rounded-xl"
                         />
                       </div>
                     ) : parsed.type === "file" ? (
@@ -677,40 +677,37 @@ export default function ConversationThreadPage() {
                         download={parsed.fileName}
                         target="_blank"
                         rel="noreferrer"
-                        className="flex items-center gap-3 rounded-xl border border-white/10 bg-black/20 p-2.5 text-xs hover:bg-black/30 transition"
+                        className="flex items-center gap-2.5 rounded-xl border border-white/10 bg-black/20 p-2 text-xs hover:bg-black/30 transition"
                       >
-                        <FileText size={22} className="text-orange-400 flex-shrink-0" />
+                        <FileText size={20} className="text-orange-400 flex-shrink-0" />
                         <div className="min-w-0 flex-1">
                           <p className="font-semibold truncate">{parsed.fileName}</p>
                           <span className="text-[10px] text-slate-400">Download Attachment</span>
                         </div>
-                        <Download size={16} className="text-slate-300" />
+                        <Download size={15} className="text-slate-300" />
                       </a>
                     ) : (
                       <p className="whitespace-pre-wrap break-words leading-relaxed">{parsed.text}</p>
                     )}
 
-                    {/* Time & Delivery Status Ticks (Sent, Delivered, Seen) */}
+                    {/* Time & Delivery Status Ticks */}
                     <div className="mt-1 flex items-center justify-end gap-1 text-[10px] opacity-80">
                       <span>{formatTimeAgo(m.createdAt)}</span>
                       {mine && !m.deletedForEveryone && (
                         <span title={otherLastReadAt && m.createdAt <= otherLastReadAt ? "Seen by recipient" : "Delivered"}>
                           {m.messageId.startsWith("optimistic-") ? (
-                            // Sent
-                            <Check size={12} className="text-white/60" />
+                            <Check size={12} className="text-slate-400" />
                           ) : otherLastReadAt && m.createdAt <= otherLastReadAt ? (
-                            // Seen / Read (Double Cyan Ticks with Glow)
-                            <CheckCheck size={13} className="text-sky-300 drop-shadow-[0_0_6px_rgba(56,189,248,0.8)] font-bold" />
+                            <CheckCheck size={13} className="text-sky-400 drop-shadow-[0_0_6px_rgba(56,189,248,0.8)] font-bold" />
                           ) : (
-                            // Delivered (Double Grey Ticks)
-                            <CheckCheck size={13} className="text-white/70" />
+                            <CheckCheck size={13} className="text-slate-300" />
                           )}
                         </span>
                       )}
                     </div>
                   </div>
 
-                  {/* Message Action Menu */}
+                  {/* Actions Menu */}
                   {!m.messageId.startsWith("optimistic-") && !m.deletedForEveryone && (
                     <div className="mb-1 flex flex-shrink-0 items-center gap-1">
                       {!mine && (
@@ -749,9 +746,9 @@ export default function ConversationThreadPage() {
             <img
               src={displayAvatar}
               alt={displayUsername}
-              className="h-8 w-8 flex-shrink-0 rounded-full object-cover border border-white/10"
+              className="h-7 w-7 flex-shrink-0 rounded-full object-cover border border-white/10"
             />
-            <div className="flex items-center gap-1.5 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-2.5 shadow-sm">
+            <div className="flex items-center gap-1.5 rounded-2xl border border-emerald-500/20 bg-emerald-500/10 px-3.5 py-2 shadow-sm">
               <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-emerald-400 [animation-delay:-0.3s]" />
               <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-emerald-400 [animation-delay:-0.15s]" />
               <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-emerald-400" />
@@ -762,34 +759,32 @@ export default function ConversationThreadPage() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Bottom Interactive Typing Input Bar */}
-      <div className="sticky bottom-0 z-30 border-t border-white/10 light:border-black/10 bg-[#06101D]/95 light:bg-white/95 backdrop-blur-md px-4 py-3">
+      {/* Pinned Bottom Interactive Input Bar */}
+      <div className="flex-shrink-0 z-30 border-t border-white/10 bg-[#060D17]/95 backdrop-blur-md px-3 py-2.5 shadow-2xl max-w-3xl mx-auto w-full">
         {isBlocked ? (
-          <p className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.02] light:bg-black/[0.02] px-4 py-3 text-center text-xs text-slate-400 light:text-slate-600">
+          <p className="rounded-2xl border border-white/10 bg-white/[0.02] px-4 py-2.5 text-center text-xs text-slate-400">
             {conversation?.blocked
               ? "You've blocked this user — unblock them to send a message."
               : "You can't message this user."}
           </p>
         ) : isRecordingVoice ? (
           /* Live Voice Recorder Bar */
-          <div className="mx-auto w-full max-w-3xl">
-            <VoiceRecorder
-              onSend={handleSendVoiceNote}
-              onCancel={() => setIsRecordingVoice(false)}
-            />
-          </div>
+          <VoiceRecorder
+            onSend={handleSendVoiceNote}
+            onCancel={() => setIsRecordingVoice(false)}
+          />
         ) : (
-          <div className="mx-auto flex w-full max-w-3xl flex-col gap-2">
+          <div className="flex flex-col gap-2">
             {/* Attachment Preview Card */}
             {pendingAttachment && (
-              <div className="flex items-center justify-between gap-3 rounded-2xl border border-orange-500/30 bg-orange-500/10 p-2.5 text-xs text-white">
+              <div className="flex items-center justify-between gap-3 rounded-2xl border border-orange-500/30 bg-orange-500/10 p-2 text-xs text-white">
                 <div className="flex items-center gap-2 min-w-0">
                   {pendingAttachment.type === "image" ? (
-                    <ImageIcon size={18} className="text-orange-400 flex-shrink-0" />
+                    <ImageIcon size={16} className="text-orange-400 flex-shrink-0" />
                   ) : pendingAttachment.type === "video" ? (
-                    <Film size={18} className="text-orange-400 flex-shrink-0" />
+                    <Film size={16} className="text-orange-400 flex-shrink-0" />
                   ) : (
-                    <FileText size={18} className="text-orange-400 flex-shrink-0" />
+                    <FileText size={16} className="text-orange-400 flex-shrink-0" />
                   )}
                   <span className="truncate font-semibold">{pendingAttachment.name}</span>
                 </div>
@@ -797,7 +792,7 @@ export default function ConversationThreadPage() {
                   onClick={() => setPendingAttachment(null)}
                   className="rounded-full p-1 text-slate-400 hover:text-white"
                 >
-                  <X size={16} />
+                  <X size={15} />
                 </button>
               </div>
             )}
@@ -808,14 +803,14 @@ export default function ConversationThreadPage() {
                 <button
                   onClick={() => setShowAttachmentMenu((v) => !v)}
                   title="Attach Media or Document"
-                  className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 text-slate-300 hover:text-white transition hover:scale-105"
+                  className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/5 text-slate-300 hover:text-white transition hover:scale-105"
                 >
                   <Paperclip size={18} />
                 </button>
 
                 {/* Attachment Menu Popover */}
                 {showAttachmentMenu && (
-                  <div className="absolute bottom-12 left-0 z-40 flex flex-col gap-1 w-44 rounded-2xl border border-white/10 bg-[#0B1524] p-2 shadow-2xl animate-fadeIn">
+                  <div className="absolute bottom-11 left-0 z-40 flex flex-col gap-1 w-44 rounded-2xl border border-white/10 bg-[#0B1524] p-2 shadow-2xl animate-fadeIn">
                     <button
                       onClick={() => fileInputRef.current?.click()}
                       className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-xs font-semibold text-slate-200 hover:bg-white/10 transition"
@@ -848,7 +843,7 @@ export default function ConversationThreadPage() {
                   }
                 }}
                 placeholder="Message..."
-                className="min-w-0 flex-1 rounded-full border border-white/10 light:border-slate-300 bg-white/[0.04] light:bg-white px-4 py-2.5 text-sm text-white light:text-slate-900 placeholder:text-slate-500 caret-orange-500 shadow-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-400/30"
+                className="min-w-0 flex-1 rounded-full border border-white/10 bg-white/[0.04] px-4 py-2 text-xs sm:text-sm text-white placeholder:text-slate-500 caret-orange-500 shadow-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-400/30"
               />
 
               {/* Dynamic Mic vs Send Button */}
@@ -857,9 +852,9 @@ export default function ConversationThreadPage() {
                 <button
                   onClick={() => setIsRecordingVoice(true)}
                   title="Record Voice Note"
-                  className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-orange-500 text-white shadow-lg transition hover:scale-105"
+                  className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-orange-500 text-white shadow-lg transition hover:scale-105"
                 >
-                  <Mic size={18} />
+                  <Mic size={17} />
                 </button>
               ) : (
                 /* Send Button */
@@ -867,18 +862,18 @@ export default function ConversationThreadPage() {
                   onClick={() => handleSend()}
                   disabled={sending}
                   title="Send Message"
-                  className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white shadow-lg transition hover:scale-105 disabled:opacity-50"
+                  className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-slate-950 shadow-lg transition hover:scale-105 disabled:opacity-50"
                 >
-                  {sending ? <Loader2 size={17} className="animate-spin" /> : <Send size={17} />}
+                  {sending ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
                 </button>
               )}
             </div>
           </div>
         )}
-        {sendError && <p className="mt-2 text-center text-xs text-red-400">{sendError}</p>}
+        {sendError && <p className="mt-1 text-center text-xs text-red-400">{sendError}</p>}
       </div>
 
-      {/* WhatsApp-style Contact Profile Drawer */}
+      {/* WhatsApp-Style Contact Profile Drawer */}
       <UserProfileDrawer
         open={showProfileDrawer}
         onClose={() => setShowProfileDrawer(false)}

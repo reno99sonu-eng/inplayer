@@ -406,19 +406,19 @@ function NavbarThemeManagerContent() {
                   {previewImageUrl && (
                     <div className="relative ml-2 inline-flex items-center flex-shrink-0">
                       {/* Stacked Top-to-Bottom Animated Transparent Text Behind Mock Graphic */}
-                      <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex flex-col items-center justify-center text-center leading-[0.95] max-h-full py-0.5">
-                        {generatedTitle
-                          .toUpperCase()
-                          .split(" ")
-                          .slice(0, 3)
-                          .map((word, idx) => (
+                      <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex flex-col items-center justify-center text-center leading-[0.9] max-h-full py-0.5">
+                        {(() => {
+                          const parts = generatedTitle.toUpperCase().split(" ");
+                          const lines = parts.length >= 3 ? parts.slice(0, 3) : [parts[0] || "OCCASION", parts[1] || "CELEBRATION", parts[2] || "THEME"];
+                          return lines.map((word, idx) => (
                             <span
                               key={idx}
-                              className="whitespace-nowrap truncate max-w-full text-[7px] sm:text-[8px] font-black uppercase tracking-wider bg-gradient-to-r from-orange-400 via-amber-200 to-pink-500 bg-clip-text text-transparent opacity-50 animate-pulse blur-[0.2px]"
+                              className="whitespace-nowrap truncate max-w-full text-[8px] sm:text-[9px] font-black uppercase tracking-wider bg-gradient-to-r from-amber-300 via-orange-400 to-pink-400 bg-clip-text text-transparent opacity-75 animate-pulse drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]"
                             >
                               {word}
                             </span>
-                          ))}
+                          ));
+                        })()}
                       </div>
 
                       {/* Graphic Image */}

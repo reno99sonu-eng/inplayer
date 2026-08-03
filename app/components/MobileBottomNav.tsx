@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, PlaySquare, Rss, Heart } from "lucide-react";
+import { Home, PlaySquare, Rss } from "lucide-react";
 
 import MobileCreateButton from "./MobileCreateButton";
 import MobileProfileMenu from "./MobileProfileMenu";
@@ -12,7 +12,6 @@ export default function MobileBottomNav() {
 
   const isHomeActive = pathname === "/";
   const isRaftaarActive = pathname.startsWith("/shorts");
-  const isWatchlistActive = pathname.startsWith("/watchlist");
   const isSubscriptionsActive = pathname.startsWith("/subscriptions") || pathname.startsWith("/in-family");
   const isProfileActive =
     pathname.startsWith("/profile") ||
@@ -21,7 +20,8 @@ export default function MobileBottomNav() {
     pathname.startsWith("/liked-videos") ||
     pathname.startsWith("/settings") ||
     pathname.startsWith("/messages") ||
-    pathname.startsWith("/channel");
+    pathname.startsWith("/channel") ||
+    pathname.startsWith("/watchlist");
 
   return (
     <nav
@@ -97,31 +97,6 @@ export default function MobileBottomNav() {
         </span>
       </Link>
 
-      {/* Watchlist */}
-      <Link
-        href="/watchlist"
-        className={`
-          flex
-          flex-col
-          items-center
-          gap-0.5
-          px-3
-          py-1
-          transition-all
-          duration-200
-          ${
-            isWatchlistActive
-              ? "text-orange-400 font-black scale-105"
-              : "text-slate-300 light:text-slate-600 hover:text-orange-300 light:hover:text-orange-600"
-          }
-        `}
-      >
-        <Heart size={21} className={isWatchlistActive ? "text-orange-400 fill-orange-400 drop-shadow-[0_0_12px_rgba(249,115,22,0.85)] filter" : ""} />
-        <span className={`text-[10px] ${isWatchlistActive ? "font-black text-orange-400 drop-shadow-[0_0_8px_rgba(249,115,22,0.7)]" : "font-medium"}`}>
-          Watchlist
-        </span>
-      </Link>
-
       {/* + Create Button */}
       <div className="flex flex-col items-center justify-center px-1">
         <MobileCreateButton />
@@ -152,7 +127,7 @@ export default function MobileBottomNav() {
         </span>
       </Link>
 
-      {/* My Profile */}
+      {/* My Profile / You */}
       <MobileProfileMenu isActive={isProfileActive} />
     </nav>
   );

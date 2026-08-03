@@ -247,22 +247,25 @@ export default function Navbar() {
   {navbarTheme?.active && navbarTheme.imageUrl && (
     <div className="relative ml-3 sm:ml-3.5 inline-flex items-center flex-shrink-0">
       {/* Stacked Top-to-Bottom Animated Transparent Text Behind Festive Graphic */}
-      <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex flex-col items-center justify-center text-center leading-[0.95] max-h-full py-0.5">
+      <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex flex-col items-center justify-center text-center leading-[0.9] max-h-full py-0.5">
         {(() => {
           const occId = navbarTheme.occasionId;
-          let lines: string[] = ["HAPPY", "CELEBRATION"];
+          let lines: string[] = ["OCCASION", "CELEBRATION", "THEME"];
           if (occId === "independence_day") lines = ["HAPPY", "INDEPENDENCE", "DAY"];
-          else if (occId === "diwali") lines = ["HAPPY", "DIWALI"];
-          else if (occId === "holi") lines = ["HAPPY", "HOLI"];
-          else if (occId === "republic_day") lines = ["HAPPY", "REPUBLIC DAY"];
-          else if (occId === "new_year") lines = ["HAPPY", "NEW YEAR"];
-          else if (occId === "cyberpunk") lines = ["CYBERPUNK", "MODE"];
-          else if (navbarTheme.title) lines = navbarTheme.title.toUpperCase().split(" ");
+          else if (occId === "diwali") lines = ["HAPPY", "DIWALI", "FESTIVAL"];
+          else if (occId === "holi") lines = ["HAPPY", "HOLI", "FESTIVAL"];
+          else if (occId === "republic_day") lines = ["HAPPY", "REPUBLIC", "DAY"];
+          else if (occId === "new_year") lines = ["HAPPY", "NEW YEAR", "2026"];
+          else if (occId === "cyberpunk") lines = ["CYBERPUNK", "TECH", "MODE"];
+          else if (navbarTheme.title) {
+            const parts = navbarTheme.title.toUpperCase().split(" ");
+            lines = parts.length >= 3 ? parts.slice(0, 3) : [parts[0] || "OCCASION", parts[1] || "CELEBRATION", parts[2] || "THEME"];
+          }
 
-          return lines.slice(0, 3).map((line, idx) => (
+          return lines.map((line, idx) => (
             <span
               key={idx}
-              className="whitespace-nowrap truncate max-w-full text-[7px] sm:text-[8px] lg:text-[9px] font-black uppercase tracking-wider bg-gradient-to-r from-orange-400 via-amber-200 to-pink-500 bg-clip-text text-transparent opacity-50 animate-pulse blur-[0.2px]"
+              className="whitespace-nowrap truncate max-w-full text-[9px] sm:text-[10px] lg:text-[11px] xl:text-[12px] font-black uppercase tracking-widest bg-gradient-to-r from-amber-300 via-orange-400 to-pink-400 bg-clip-text text-transparent opacity-75 animate-pulse drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]"
             >
               {line}
             </span>
@@ -338,22 +341,25 @@ export default function Navbar() {
     {navbarTheme?.active && navbarTheme.imageUrl && (
       <div className="relative ml-2 sm:ml-2.5 inline-flex items-center flex-shrink-0">
         {/* Stacked Top-to-Bottom Animated Transparent Text Behind Mobile Festive Graphic */}
-        <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex flex-col items-center justify-center text-center leading-[0.95] max-h-full py-0.5">
+        <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex flex-col items-center justify-center text-center leading-[0.9] max-h-full py-0.5">
           {(() => {
             const occId = navbarTheme.occasionId;
-            let lines: string[] = ["HAPPY", "CELEBRATION"];
+            let lines: string[] = ["OCCASION", "CELEBRATION", "THEME"];
             if (occId === "independence_day") lines = ["HAPPY", "INDEPENDENCE", "DAY"];
-            else if (occId === "diwali") lines = ["HAPPY", "DIWALI"];
-            else if (occId === "holi") lines = ["HAPPY", "HOLI"];
-            else if (occId === "republic_day") lines = ["HAPPY", "REPUBLIC DAY"];
-            else if (occId === "new_year") lines = ["HAPPY", "NEW YEAR"];
-            else if (occId === "cyberpunk") lines = ["CYBERPUNK", "MODE"];
-            else if (navbarTheme.title) lines = navbarTheme.title.toUpperCase().split(" ");
+            else if (occId === "diwali") lines = ["HAPPY", "DIWALI", "FESTIVAL"];
+            else if (occId === "holi") lines = ["HAPPY", "HOLI", "FESTIVAL"];
+            else if (occId === "republic_day") lines = ["HAPPY", "REPUBLIC", "DAY"];
+            else if (occId === "new_year") lines = ["HAPPY", "NEW YEAR", "2026"];
+            else if (occId === "cyberpunk") lines = ["CYBERPUNK", "TECH", "MODE"];
+            else if (navbarTheme.title) {
+              const parts = navbarTheme.title.toUpperCase().split(" ");
+              lines = parts.length >= 3 ? parts.slice(0, 3) : [parts[0] || "OCCASION", parts[1] || "CELEBRATION", parts[2] || "THEME"];
+            }
 
-            return lines.slice(0, 3).map((line, idx) => (
+            return lines.map((line, idx) => (
               <span
                 key={idx}
-                className="whitespace-nowrap truncate max-w-full text-[6.5px] sm:text-[7.5px] font-black uppercase tracking-wider bg-gradient-to-r from-orange-400 via-amber-200 to-pink-500 bg-clip-text text-transparent opacity-50 animate-pulse blur-[0.2px]"
+                className="whitespace-nowrap truncate max-w-full text-[8px] sm:text-[9px] font-black uppercase tracking-wider bg-gradient-to-r from-amber-300 via-orange-400 to-pink-400 bg-clip-text text-transparent opacity-75 animate-pulse drop-shadow-[0_1px_3px_rgba(0,0,0,0.8)]"
               >
                 {line}
               </span>

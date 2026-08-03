@@ -957,7 +957,7 @@ export default function MyVideosPage() {
                     onOpenAITitleAssist={() => setAiTitleAssistOpen(true)}
                     aiError={aiError}
                     aiSuggestions={aiSuggestions}
-                    thumbnail={{
+                    thumbnail={editValue.contentType === "short" ? undefined : {
                       previewUrl: editThumbnailPreview || activeEditingVideo.thumbnailUrl || null,
                       onFileSelected: handleEditThumbnailSelected,
                       busy: editThumbnailBusy,

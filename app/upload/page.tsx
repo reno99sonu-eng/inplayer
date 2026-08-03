@@ -531,7 +531,7 @@ export default function UploadPage() {
               onOpenAITitleAssist={() => setAiTitleAssistOpen(true)}
               aiError={aiType === "title" ? aiError : null}
               aiSuggestions={aiType === "title" ? aiSuggestions : []}
-              thumbnail={{
+              thumbnail={contentType === "short" ? undefined : {
                 previewUrl: thumbnailPreview,
                 onFileSelected: handleThumbnailSelected,
                 busy: thumbnailBusy,
@@ -615,21 +615,27 @@ export default function UploadPage() {
           <div>
             <ProcessingStatus
               videoId={uploadedVideoId}
-              renderReady={(info) => (
-                <UploadThumbnailStep
-                  videoId={uploadedVideoId}
-                  muxPlaybackId={info.muxPlaybackId}
-                  duration={info.duration}
-                  defaultThumbnailUrl={info.thumbnailUrl}
-                  onDone={() =>
-                    router.push(
-                      contentType === "short"
-                        ? `/shorts?v=${uploadedVideoId}`
-                        : `/watch/${uploadedVideoId}`
-                    )
-                  }
-                />
-              )}
+              renderReady={(info) =>
+                contentType === "short" ? (
+                  <div className="py-8 text-center">
+                    <p className="text-lg font-bold text-white">Your Short is published! 🎉</p>
+                    <button
+                      onClick={() => router.push(`/shorts?v=${uploadedVideoId}`)}
+                      className="mt-4 rounded-2xl bg-gradient-to-r from-[#FF7A18] to-[#FFD54A] px-6 py-2.5 font-bold text-white shadow"
+                    >
+                      Watch Short
+                    </button>
+                  </div>
+                ) : (
+                  <UploadThumbnailStep
+                    videoId={uploadedVideoId}
+                    muxPlaybackId={info.muxPlaybackId}
+                    duration={info.duration}
+                    defaultThumbnailUrl={info.thumbnailUrl}
+                    onDone={() => router.push(`/watch/${uploadedVideoId}`)}
+                  />
+                )
+              }
             />
             <div className="mt-2 flex justify-center">
               <button

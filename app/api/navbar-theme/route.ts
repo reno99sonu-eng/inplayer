@@ -1,15 +1,14 @@
 import { NextResponse } from "next/server";
 import { docClient } from "@/app/lib/dynamodb";
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
-
-export const NAVBAR_THEME_TABLE = "InPlayer-Navbar-Themes";
+import { PLATFORM_SETTINGS_TABLE } from "@/app/lib/platformSettings";
 
 export async function GET() {
   try {
     const result = await docClient.send(
       new GetCommand({
-        TableName: NAVBAR_THEME_TABLE,
-        Key: { themeId: "active_theme" },
+        TableName: PLATFORM_SETTINGS_TABLE,
+        Key: { settingsId: "navbar_theme" },
       })
     ).catch(() => null);
 

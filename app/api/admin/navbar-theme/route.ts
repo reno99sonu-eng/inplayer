@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/app/lib/isAdmin";
 import { docClient } from "@/app/lib/dynamodb";
 import { GetCommand, PutCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
-
-export const NAVBAR_THEME_TABLE = "InPlayer-Navbar-Themes";
+import { PLATFORM_SETTINGS_TABLE } from "@/app/lib/platformSettings";
 
 export async function GET(request: NextRequest) {
   try {
@@ -15,8 +14,8 @@ export async function GET(request: NextRequest) {
   try {
     const result = await docClient.send(
       new GetCommand({
-        TableName: NAVBAR_THEME_TABLE,
-        Key: { themeId: "active_theme" },
+        TableName: PLATFORM_SETTINGS_TABLE,
+        Key: { settingsId: "navbar_theme" },
       })
     ).catch(() => null);
 
@@ -57,6 +56,7 @@ export async function POST(request: NextRequest) {
   }
 
   const themeItem = {
+    settingsId: "navbar_theme",
     themeId: "active_theme",
     occasionId: String(occasionId || "custom"),
     occasionName: String(occasionName || "Occasion Theme"),
@@ -69,7 +69,7 @@ export async function POST(request: NextRequest) {
   try {
     await docClient.send(
       new PutCommand({
-        TableName: NAVBAR_THEME_TABLE,
+        TableName: PLATFORM_SETTINGS_TABLE,
         Item: themeItem,
       })
     );
@@ -90,8 +90,8 @@ export async function DELETE(request: NextRequest) {
   try {
     await docClient.send(
       new DeleteCommand({
-        TableName: NAVBAR_THEME_TABLE,
-        Key: { themeId: "active_theme" },
+        TableName: PLATFORM_SETTINGS_TABLE,
+        Key: { settingsId: "navbar_theme" },
       })
     ).catch(() => null);
 

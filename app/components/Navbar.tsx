@@ -38,7 +38,7 @@ export default function Navbar() {
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const { signedIn, user, signOut, openSignIn, openSignUp } = useAuthModal();
-  const [navbarTheme, setNavbarTheme] = useState<{ active: boolean; imageUrl: string } | null>(null);
+  const [navbarTheme, setNavbarTheme] = useState<{ active: boolean; imageUrl: string; occasionId?: string; title?: string } | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -48,7 +48,12 @@ export default function Navbar() {
         if (!res.ok) return;
         const data = await res.json().catch(() => ({ active: false }));
         if (!cancelled && data?.active && data?.theme?.imageUrl) {
-          setNavbarTheme({ active: true, imageUrl: data.theme.imageUrl });
+          setNavbarTheme({
+            active: true,
+            imageUrl: data.theme.imageUrl,
+            occasionId: data.theme.occasionId,
+            title: data.theme.title,
+          });
         }
       } catch (err) {
         console.error("Navbar theme fetch error:", err);
@@ -233,19 +238,38 @@ export default function Navbar() {
   </button>
 </div>
 
-{/* Desktop Logo Only */}
-<div className="hidden lg:flex flex-shrink-0 items-center">
-  <NavbarLogo />
-  {navbarTheme?.active && navbarTheme.imageUrl && (
-    <div className="ml-2.5 sm:ml-3 inline-flex items-center flex-shrink-0">
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img
-        src={navbarTheme.imageUrl}
-        alt="Occasion Graphic"
-        className="h-8 lg:h-9 w-auto object-contain drop-shadow-[0_2px_10px_rgba(255,165,0,0.35)]"
-      />
+{/* Desktop Logo & Animated Watermark Text Behind Logo */}
+<div className="relative hidden lg:flex flex-shrink-0 items-center">
+  {navbarTheme?.active && (
+    <div className="absolute -left-4 -right-16 top-1/2 -translate-y-1/2 pointer-events-none select-none z-0 overflow-hidden flex items-center justify-center">
+      <span className="whitespace-nowrap text-xl lg:text-2xl font-black uppercase tracking-[0.25em] bg-gradient-to-r from-orange-400 via-amber-200 to-pink-500 bg-clip-text text-transparent opacity-25 animate-pulse blur-[0.4px]">
+        {(() => {
+          const occId = navbarTheme.occasionId;
+          if (occId === "independence_day") return "HAPPY INDEPENDENCE DAY";
+          if (occId === "diwali") return "HAPPY DIWALI";
+          if (occId === "holi") return "HAPPY HOLI";
+          if (occId === "republic_day") return "HAPPY REPUBLIC DAY";
+          if (occId === "new_year") return "HAPPY NEW YEAR 2026";
+          if (occId === "cyberpunk") return "CYBERPUNK MODE";
+          return navbarTheme.title ? navbarTheme.title.toUpperCase() : "HAPPY CELEBRATION";
+        })()}
+      </span>
     </div>
   )}
+
+  <div className="relative z-10 flex items-center">
+    <NavbarLogo />
+    {navbarTheme?.active && navbarTheme.imageUrl && (
+      <div className="ml-3 sm:ml-3.5 inline-flex items-center flex-shrink-0">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={navbarTheme.imageUrl}
+          alt="Occasion Graphic"
+          className="h-10 lg:h-11 xl:h-12 w-auto object-contain drop-shadow-[0_2px_12px_rgba(255,165,0,0.4)]"
+        />
+      </div>
+    )}
+  </div>
 </div>
 
 {/* Desktop Search */}
@@ -296,19 +320,38 @@ export default function Navbar() {
     </button>
   </div>
 
-  {/* Mobile / tablet logo + Pure Transparent Occasion Graphic */}
-  <div className="flex-shrink-0 ml-2 flex items-center min-w-0">
-    <NavbarLogo />
-    {navbarTheme?.active && navbarTheme.imageUrl && (
-      <div className="ml-2 inline-flex items-center flex-shrink-0">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={navbarTheme.imageUrl}
-          alt="Occasion Graphic"
-          className="h-6 sm:h-7 md:h-8 w-auto object-contain drop-shadow-[0_2px_8px_rgba(255,165,0,0.3)]"
-        />
+  {/* Mobile / tablet logo + Animated Watermark Text Behind Mobile Logo */}
+  <div className="relative flex-shrink-0 ml-2 flex items-center min-w-0">
+    {navbarTheme?.active && (
+      <div className="absolute -left-2 -right-8 top-1/2 -translate-y-1/2 pointer-events-none select-none z-0 overflow-hidden flex items-center justify-center">
+        <span className="whitespace-nowrap text-sm sm:text-base font-black uppercase tracking-[0.2em] bg-gradient-to-r from-orange-400 via-amber-200 to-pink-500 bg-clip-text text-transparent opacity-25 animate-pulse blur-[0.4px]">
+          {(() => {
+            const occId = navbarTheme.occasionId;
+            if (occId === "independence_day") return "HAPPY INDEPENDENCE DAY";
+            if (occId === "diwali") return "HAPPY DIWALI";
+            if (occId === "holi") return "HAPPY HOLI";
+            if (occId === "republic_day") return "HAPPY REPUBLIC DAY";
+            if (occId === "new_year") return "HAPPY NEW YEAR 2026";
+            if (occId === "cyberpunk") return "CYBERPUNK MODE";
+            return navbarTheme.title ? navbarTheme.title.toUpperCase() : "HAPPY CELEBRATION";
+          })()}
+        </span>
       </div>
     )}
+
+    <div className="relative z-10 flex items-center min-w-0">
+      <NavbarLogo />
+      {navbarTheme?.active && navbarTheme.imageUrl && (
+        <div className="ml-2 sm:ml-2.5 inline-flex items-center flex-shrink-0">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={navbarTheme.imageUrl}
+            alt="Occasion Graphic"
+            className="h-7 sm:h-8 md:h-9 w-auto object-contain drop-shadow-[0_2px_10px_rgba(255,165,0,0.35)]"
+          />
+        </div>
+      )}
+    </div>
   </div>
 
 </div>

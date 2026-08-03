@@ -47,30 +47,21 @@ export function resolveSourceLang(
   return normalizeLangCode(detectedRaw);
 }
 
-// Turns a single raw source-language VTT into the full {en, hi, bn} set.
-//
-// Two things make this reliable enough to run inside a 60s serverless
-// function, which the previous sequential version was not:
-//   1. For Hindi/Bengali sources (which Mux transcribes badly — see
-//      cleanupVtt) the raw transcript is proofread ONCE, and every
-//      translation is built from that cleaned text.
-//   2. All target-language translations run CONCURRENTLY (Promise.all),
-//      so total wall-clock is one model round-trip, not one per language.
-//
-// Any individual language that fails to translate is simply omitted — the
-// caller decides whether the partial set is enough. The source language
-// always gets its own (cleaned) entry so a video is never left with only
-// Mux's raw, mislabeled auto track.
+import { splitLongVttCues } from "./vttChunker";
+
+// Turns a single raw source-language VTT into the full regional languages set.
 export async function buildCaptionSet(
   rawSourceVtt: string,
   sourceLang: string
 ): Promise<Record<string, string>> {
   const sourceTarget = CAPTION_TARGETS.find((t) => t.code === sourceLang);
 
-  let sourceVtt = rawSourceVtt;
+  // Chunk long cues into short 1-line/2-line YouTube-style subtitle items
+  let sourceVtt = splitLongVttCues(rawSourceVtt);
+
   if (sourceTarget && (sourceLang === "hi" || sourceLang === "bn")) {
-    const cleaned = await cleanupVtt(rawSourceVtt, sourceTarget.name);
-    if (cleaned) sourceVtt = cleaned;
+    const cleaned = await cleanupVtt(sourceVtt, sourceTarget.name);
+    if (cleaned) sourceVtt = splitLongVttCues(cleaned);
   }
 
   const out: Record<string, string> = {};
@@ -82,7 +73,7 @@ export async function buildCaptionSet(
   );
   targets.forEach((t, i) => {
     const translated = results[i];
-    if (translated) out[t.code] = translated;
+    if (translated) out[t.code] = splitLongVttCues(translated);
   });
 
   return out;

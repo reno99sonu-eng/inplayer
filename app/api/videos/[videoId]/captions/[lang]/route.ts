@@ -1,15 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
+import { splitLongVttCues } from "@/app/lib/vttChunker";
 
 interface Params {
   params: Promise<{ videoId: string; lang: string }>;
 }
 
-// Serves a translated subtitle file (WebVTT) for a video. Mux fetches
-// this URL once when the track is registered via createTrack (see the
-// webhook), after which the captions live inside Mux's own playback
-// manifest like any native subtitle track.
+// Serves a translated subtitle file (WebVTT) for a video. Automatically
+// chunks long paragraph text into short 1-line/2-line YouTube-style cues.
 export async function GET(request: NextRequest, { params }: Params) {
   const { videoId, lang } = await params;
 
@@ -20,17 +19,19 @@ export async function GET(request: NextRequest, { params }: Params) {
     })
   );
 
-  const vtt = result.Item?.captionsVtt?.[lang];
+  const rawVtt = result.Item?.captionsVtt?.[lang];
 
-  if (typeof vtt !== "string" || !vtt.startsWith("WEBVTT")) {
+  if (typeof rawVtt !== "string" || !rawVtt.startsWith("WEBVTT")) {
     return NextResponse.json({ error: "Not found." }, { status: 404 });
   }
 
-  return new NextResponse(vtt, {
+  // Chunk long cues into short 1-2 line subtitle items
+  const cleanVtt = splitLongVttCues(rawVtt);
+
+  return new NextResponse(cleanVtt, {
     headers: {
       "Content-Type": "text/vtt; charset=utf-8",
-      // Immutable once generated — cache aggressively.
-      "Cache-Control": "public, max-age=86400",
+      "Cache-Control": "public, max-age=3600",
       "Access-Control-Allow-Origin": "*",
     },
   });

@@ -1001,32 +1001,45 @@ animation: aiGlassSweep 5.5s linear infinite;
 }
 
 /* Subtitle / Caption Text WebVTT Cue Rendering & Layout Fitting */
+media-captions-display,
+media-text-display,
+mux-player::part(captions) {
+  max-height: 22% !important;
+  bottom: 48px !important;
+  overflow: hidden !important;
+}
+
 ::cue,
 video::cue,
 mux-player::cue {
-  background-color: rgba(6, 12, 22, 0.82) !important;
+  background-color: rgba(6, 12, 22, 0.85) !important;
   color: #ffffff !important;
   font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
-  font-size: 0.88rem !important;
-  line-height: 1.35 !important;
+  font-size: 0.84rem !important;
+  line-height: 1.3 !important;
   font-weight: 600 !important;
   text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9) !important;
   border-radius: 6px !important;
   padding: 3px 8px !important;
   box-decoration-break: clone !important;
   -webkit-box-decoration-break: clone !important;
-  max-width: 80% !important;
+  max-width: 75% !important;
   text-align: center !important;
 }
 
 @media (max-width: 768px) {
+  media-captions-display,
+  media-text-display {
+    max-height: 20% !important;
+    bottom: 40px !important;
+  }
   ::cue,
   video::cue,
   mux-player::cue {
-    font-size: 0.75rem !important;
+    font-size: 0.72rem !important;
     line-height: 1.25 !important;
     padding: 2px 6px !important;
-    max-width: 90% !important;
+    max-width: 85% !important;
   }
 }
 

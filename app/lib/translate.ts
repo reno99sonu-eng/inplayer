@@ -70,11 +70,12 @@ export async function translateVtt(
   vtt: string,
   targetLanguageName: string
 ): Promise<string | null> {
-  const prompt = `You are a professional subtitle translator. Translate the TEXT LINES of the following WebVTT subtitle file into ${targetLanguageName}.
+  const prompt = `You are a professional video subtitle translator. Translate the TEXT LINES of the following WebVTT subtitle file into ${targetLanguageName}.
 
 STRICT RULES:
 - Keep the exact same VTT structure: the "WEBVTT" header, every timestamp line (e.g. "00:00:01.000 --> 00:00:04.000"), cue ordering, and blank lines must remain EXACTLY as they are.
-- Translate ONLY the subtitle text lines.
+- Translate ONLY the subtitle text lines into natural, concise ${targetLanguageName}.
+- CRITICAL CAPTION LENGTH RULE: Keep every subtitle cue SHORT (maximum 2 lines per cue, max 45 characters per line). Do NOT generate long multi-line text blocks.
 - Do not add any commentary, notes, numbering, or markdown/code fences.
 - Output the complete translated VTT file and nothing else.
 
@@ -94,6 +95,7 @@ Rewrite ONLY the subtitle text lines so the whole file reads as natural, correct
 
 STRICT RULES:
 - Keep the exact same VTT structure: the "WEBVTT" header, every timestamp line (e.g. "00:00:01.000 --> 00:00:04.000"), cue ordering, and blank lines must remain EXACTLY as they are.
+- CRITICAL CAPTION LENGTH RULE: Keep every subtitle cue SHORT (maximum 2 lines per cue, max 45 characters per line). Do NOT generate long multi-line text blocks.
 - Only rewrite the subtitle text lines themselves.
 - Do not add any commentary, notes, numbering, or markdown/code fences.
 - Output the complete corrected VTT file and nothing else.

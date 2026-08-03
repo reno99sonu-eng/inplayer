@@ -1000,30 +1000,33 @@ animation: aiGlassSweep 5.5s linear infinite;
   --media-font-family: inherit;
 }
 
-/* Subtitle / Caption Text WebVTT Cue Rendering & Typography Fitting */
+/* Subtitle / Caption Text WebVTT Cue Rendering & Layout Fitting */
 ::cue,
 video::cue,
 mux-player::cue {
-  background-color: rgba(6, 12, 22, 0.85) !important;
+  background-color: rgba(6, 12, 22, 0.82) !important;
   color: #ffffff !important;
   font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
-  font-size: 1.05rem !important;
-  line-height: 1.45 !important;
+  font-size: 0.88rem !important;
+  line-height: 1.35 !important;
   font-weight: 600 !important;
-  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9) !important;
-  border-radius: 8px !important;
-  padding: 4px 10px !important;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9) !important;
+  border-radius: 6px !important;
+  padding: 3px 8px !important;
   box-decoration-break: clone !important;
   -webkit-box-decoration-break: clone !important;
+  max-width: 80% !important;
+  text-align: center !important;
 }
 
 @media (max-width: 768px) {
   ::cue,
   video::cue,
   mux-player::cue {
-    font-size: 0.88rem !important;
-    line-height: 1.35 !important;
-    padding: 3px 8px !important;
+    font-size: 0.75rem !important;
+    line-height: 1.25 !important;
+    padding: 2px 6px !important;
+    max-width: 90% !important;
   }
 }
 

@@ -400,17 +400,15 @@ function NavbarThemeManagerContent() {
                     <span>INPLAYER</span>
                   </div>
 
-                  {/* Occasion Theme Pill Badge */}
+                  {/* Pure Floating Occasion Graphic */}
                   {previewImageUrl && (
-                    <div className="ml-2 inline-flex items-center">
-                      <div className="relative overflow-hidden rounded-full border border-orange-400/30 bg-black/40 shadow-sm ring-1 ring-orange-500/20 backdrop-blur-md px-1.5 py-0.5 flex items-center">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img
-                          src={previewImageUrl}
-                          alt="Occasion Theme Badge"
-                          className="h-6 sm:h-7 w-auto max-w-[140px] sm:max-w-[200px] rounded-full object-cover"
-                        />
-                      </div>
+                    <div className="ml-2 inline-flex items-center flex-shrink-0">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={previewImageUrl}
+                        alt="Occasion Graphic"
+                        className="h-7 sm:h-8 w-auto object-contain drop-shadow-[0_2px_8px_rgba(255,165,0,0.35)]"
+                      />
                     </div>
                   )}
                 </div>

@@ -237,15 +237,13 @@ export default function Navbar() {
 <div className="hidden lg:flex flex-shrink-0 items-center">
   <NavbarLogo />
   {navbarTheme?.active && navbarTheme.imageUrl && (
-    <div className="ml-3 inline-flex items-center">
-      <div className="relative overflow-hidden rounded-full border border-orange-400/30 bg-black/40 shadow-[0_2px_12px_rgba(249,115,22,0.25)] ring-1 ring-orange-500/20 backdrop-blur-md px-1.5 py-0.5 flex items-center transition duration-300 hover:scale-[1.03]">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={navbarTheme.imageUrl}
-          alt="Occasion Theme"
-          className="h-8 lg:h-9 w-auto max-w-[260px] rounded-full object-cover"
-        />
-      </div>
+    <div className="ml-2.5 sm:ml-3 inline-flex items-center flex-shrink-0">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={navbarTheme.imageUrl}
+        alt="Occasion Graphic"
+        className="h-8 lg:h-9 w-auto object-contain drop-shadow-[0_2px_10px_rgba(255,165,0,0.35)]"
+      />
     </div>
   )}
 </div>
@@ -298,19 +296,17 @@ export default function Navbar() {
     </button>
   </div>
 
-  {/* Mobile / tablet logo + Occasion Theme Badge */}
+  {/* Mobile / tablet logo + Pure Transparent Occasion Graphic */}
   <div className="flex-shrink-0 ml-2 flex items-center min-w-0">
     <NavbarLogo />
     {navbarTheme?.active && navbarTheme.imageUrl && (
-      <div className="ml-2 inline-flex items-center flex-shrink min-w-0">
-        <div className="relative overflow-hidden rounded-full border border-orange-400/30 bg-black/40 shadow-sm ring-1 ring-orange-500/20 backdrop-blur-md px-1 py-0.5 flex items-center transition">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={navbarTheme.imageUrl}
-            alt="Occasion Theme"
-            className="h-5 sm:h-6 md:h-7 w-auto max-w-[110px] sm:max-w-[160px] rounded-full object-cover"
-          />
-        </div>
+      <div className="ml-2 inline-flex items-center flex-shrink-0">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={navbarTheme.imageUrl}
+          alt="Occasion Graphic"
+          className="h-6 sm:h-7 md:h-8 w-auto object-contain drop-shadow-[0_2px_8px_rgba(255,165,0,0.3)]"
+        />
       </div>
     )}
   </div>

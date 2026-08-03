@@ -229,50 +229,37 @@ export default function TrendingNow() {
   }
 
   return (
-    <section className="mx-auto max-w-[1800px] px-4 pb-2 pt-3 lg:px-8 lg:pb-3 lg:pt-4">
-      <div className="mb-2 flex items-end justify-between lg:mb-3">
+    <section className="mx-auto max-w-[1800px] px-3 py-1.5 lg:px-6 lg:py-2">
+      <div className="mb-1.5 flex items-end justify-between lg:mb-2">
         <div>
-          <span className="rounded-full border border-red-500/20 bg-red-500/10 px-2.5 lg:px-3 py-0.5 text-[10px] font-bold uppercase tracking-[0.2em] text-red-300 light:text-red-600 backdrop-blur-sm">
+          <span className="rounded-full border border-red-500/20 bg-red-500/10 px-2 lg:px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.2em] text-red-300 light:text-red-600 backdrop-blur-sm">
             Trending today
           </span>
 
-          <h2 className="mt-1 text-lg font-black tracking-tight text-white light:text-slate-900">
+          <h2 className="mt-0.5 text-base lg:text-lg font-black tracking-tight text-white light:text-slate-900">
             Trending Creators
           </h2>
         </div>
       </div>
 
-      <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.035] light:border-black/10 light:bg-black/[0.025]">
-        <div className="pointer-events-none absolute left-0 top-0 z-20 h-full w-8 bg-gradient-to-r from-[#0b1220] via-[#0b1220]/80 to-transparent light:from-[#FBF6EA] light:via-[#FBF6EA]/80 lg:w-12" />
-
-        <div className="pointer-events-none absolute right-0 top-0 z-20 h-full w-8 bg-gradient-to-l from-[#0b1220] via-[#0b1220]/80 to-transparent light:from-[#FBF6EA] light:via-[#FBF6EA]/80 lg:w-12" />
-
+      <div className="relative">
         {items === null ? (
-          <div
-            className="
-              flex
-              gap-2
-              px-4
-              py-3
-              lg:gap-3
-              lg:px-6
-            "
-          >
-            {Array.from({ length: 6 }).map((_, i) => (
+          <div className="flex gap-2 px-1 py-1 lg:gap-3">
+            {Array.from({ length: 7 }).map((_, i) => (
               <div
                 key={i}
-                className="flex w-28 flex-shrink-0 flex-col items-center gap-1.5 lg:w-32"
+                className="flex w-20 flex-shrink-0 flex-col items-center gap-1 sm:w-22 lg:w-24"
               >
-                <div className="h-20 w-20 animate-pulse rounded-full bg-white/[0.06] lg:h-24 lg:w-24" />
-                <div className="h-2.5 w-12 animate-pulse rounded-full bg-white/[0.06]" />
-                <div className="h-2 w-8 animate-pulse rounded-full bg-white/[0.05]" />
+                <div className="h-14 w-14 animate-pulse rounded-full bg-white/[0.06] sm:h-16 sm:w-16 lg:h-16 lg:w-16" />
+                <div className="h-2 w-10 animate-pulse rounded-full bg-white/[0.06]" />
+                <div className="h-1.5 w-6 animate-pulse rounded-full bg-white/[0.05]" />
               </div>
             ))}
           </div>
         ) : (
           <div
             ref={carouselRef}
-            className="cursor-grab touch-pan-y select-none overflow-x-scroll px-4 py-3 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden active:cursor-grabbing lg:px-6"
+            className="cursor-grab touch-pan-y select-none overflow-x-scroll py-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden active:cursor-grabbing"
             onPointerEnter={() => {
               isHoveringRef.current = true;
             }}
@@ -359,13 +346,13 @@ export default function TrendingNow() {
               }
             }}
           >
-            <div className="flex w-max gap-3 lg:gap-4">
+            <div className="flex w-max gap-2 lg:gap-3">
               {[0, 1].map((groupIndex) => (
                 <div
                   key={groupIndex}
                   ref={groupIndex === 0 ? firstGroupRef : secondGroupRef}
                   aria-hidden={groupIndex === 1}
-                  className="flex w-max gap-3 lg:gap-4"
+                  className="flex w-max gap-2 lg:gap-3"
                 >
                   {loopItems.map((item, index) => (
                     <Link
@@ -373,12 +360,10 @@ export default function TrendingNow() {
                       href={`/u/${encodeURIComponent(item.username)}`}
                       tabIndex={groupIndex === 1 ? -1 : undefined}
                       aria-label={`Open ${item.name}'s channel`}
-                      className="group flex w-28 flex-shrink-0 flex-col items-center gap-1.5 text-center lg:w-32"
+                      className="group flex w-20 flex-shrink-0 flex-col items-center gap-1 text-center sm:w-22 lg:w-24"
                     >
-                      {/* Plain circular avatar — no ring/border/card, just the
-                          image itself, a little bigger than before, matching
-                          a Stories-style trending row. */}
-                      <div className="relative h-20 w-20 flex-shrink-0 transition duration-200 group-hover:scale-105 group-active:scale-95 lg:h-24 lg:w-24">
+                      {/* Compact clean circular avatar with hover zoom */}
+                      <div className="relative h-14 w-14 flex-shrink-0 transition duration-200 group-hover:scale-105 group-active:scale-95 sm:h-16 sm:w-16 lg:h-16 lg:w-16">
                         {/* eslint-disable-next-line @next/next/no-img-element -- creator avatars can be data URLs. */}
                         <img
                           src={getAvatarSrc(item.avatarUrl)}
@@ -392,14 +377,14 @@ export default function TrendingNow() {
                         />
                         {item.isVerified && (
                           <BadgeCheck
-                            size={18}
+                            size={16}
                             className="absolute -bottom-0.5 -right-0.5 rounded-full fill-orange-400 text-[#101827] ring-2 ring-[#0b1220] light:ring-[#FBF6EA]"
                             aria-label="Verified creator"
                           />
                         )}
                       </div>
-                      <p className="w-full truncate text-xs font-bold text-white light:text-slate-900">{item.name}</p>
-                      <p className="w-full truncate text-[10px] font-medium text-slate-400 light:text-slate-600">{formatViews(item.windowViews)} views</p>
+                      <p className="w-full truncate text-[11px] font-bold text-white light:text-slate-900">{item.name}</p>
+                      <p className="w-full truncate text-[9.5px] font-medium text-slate-400 light:text-slate-600">{formatViews(item.windowViews)} views</p>
                     </Link>
                   ))}
                 </div>

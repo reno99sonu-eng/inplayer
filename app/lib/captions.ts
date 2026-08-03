@@ -12,6 +12,14 @@ export const CAPTION_TARGETS: Array<{
   { code: "en", name: "English", label: "English" },
   { code: "hi", name: "Hindi", label: "हिन्दी" },
   { code: "bn", name: "Bengali", label: "বাংলা" },
+  { code: "ta", name: "Tamil", label: "தமிழ்" },
+  { code: "te", name: "Telugu", label: "తెలుగు" },
+  { code: "mr", name: "Marathi", label: "मराठी" },
+  { code: "gu", name: "Gujarati", label: "ગુજરાતી" },
+  { code: "kn", name: "Kannada", label: "ಕನ್ನಡ" },
+  { code: "ml", name: "Malayalam", label: "മലയാളം" },
+  { code: "pa", name: "Punjabi", label: "ਪੰਜਾਬੀ" },
+  { code: "or", name: "Odia", label: "ଓଡ଼ିଆ" },
 ];
 
 // Collapses a Mux-detected BCP-47 code down to its base language, folding

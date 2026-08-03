@@ -977,12 +977,13 @@ animation: aiGlassSweep 5.5s linear infinite;
   --media-menu-border-radius: 18px;
   --media-settings-menu-background: rgba(9, 17, 31, 0.98);
   --media-settings-menu-min-width: 230px;
-  --media-menu-item-hover-background: rgba(255, 154, 0, 0.16);
-  --media-menu-item-checked-background: rgba(255, 154, 0, 0.24);
+  --media-menu-item-hover-background: rgba(255, 122, 24, 0.2);
+  --media-menu-item-checked-background: rgba(255, 122, 24, 0.32);
   --media-primary-color: #ffffff;
-  --media-secondary-color: #ffb454;
-  --media-text-color: #f1f5f9;
-  --media-icon-color: #f1f5f9;
+  --media-secondary-color: #ff9a00;
+  --media-text-color: #f8fafc;
+  --media-icon-color: #f8fafc;
+  --media-font-family: inherit;
 }
 
 .light .premium-player {
@@ -996,5 +997,33 @@ animation: aiGlassSweep 5.5s linear infinite;
   --media-secondary-color: #c2410c;
   --media-text-color: #1e293b;
   --media-icon-color: #1e293b;
+  --media-font-family: inherit;
+}
+
+/* Subtitle / Caption Text WebVTT Cue Rendering & Typography Fitting */
+::cue,
+video::cue,
+mux-player::cue {
+  background-color: rgba(6, 12, 22, 0.85) !important;
+  color: #ffffff !important;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+  font-size: 1.05rem !important;
+  line-height: 1.45 !important;
+  font-weight: 600 !important;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.9) !important;
+  border-radius: 8px !important;
+  padding: 4px 10px !important;
+  box-decoration-break: clone !important;
+  -webkit-box-decoration-break: clone !important;
+}
+
+@media (max-width: 768px) {
+  ::cue,
+  video::cue,
+  mux-player::cue {
+    font-size: 0.88rem !important;
+    line-height: 1.35 !important;
+    padding: 3px 8px !important;
+  }
 }
 

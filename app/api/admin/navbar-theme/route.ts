@@ -6,8 +6,11 @@ import { GetCommand, PutCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 export const NAVBAR_THEME_TABLE = "InPlayer-Navbar-Themes";
 
 export async function GET(request: NextRequest) {
-  const adminRes = await requireAdmin(request);
-  if (adminRes) return adminRes;
+  try {
+    await requireAdmin(request);
+  } catch {
+    return NextResponse.json({ error: "Unauthorized admin access." }, { status: 401 });
+  }
 
   try {
     const result = await docClient.send(
@@ -37,8 +40,11 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const adminRes = await requireAdmin(request);
-  if (adminRes) return adminRes;
+  try {
+    await requireAdmin(request);
+  } catch {
+    return NextResponse.json({ error: "Unauthorized admin access." }, { status: 401 });
+  }
 
   const body = await request.json().catch(() => null);
   if (!body || typeof body !== "object") {
@@ -75,8 +81,11 @@ export async function POST(request: NextRequest) {
 }
 
 export async function DELETE(request: NextRequest) {
-  const adminRes = await requireAdmin(request);
-  if (adminRes) return adminRes;
+  try {
+    await requireAdmin(request);
+  } catch {
+    return NextResponse.json({ error: "Unauthorized admin access." }, { status: 401 });
+  }
 
   try {
     await docClient.send(

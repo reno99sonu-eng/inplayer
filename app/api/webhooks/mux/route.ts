@@ -176,6 +176,22 @@ export async function POST(request: NextRequest) {
     // it's what Next's own upgrade codemod inserts for plain tag busts.)
     revalidateTag(READY_VIDEOS_TAG, "max");
 
+    // Automatically broadcast email notifications to all channel subscribers
+    const videoAttributes = updateResult.Attributes;
+    if (videoAttributes && videoAttributes.uploaderId) {
+      const { broadcastNewVideoToSubscribers } = await import("@/app/lib/subscriptionBroadcast");
+      void broadcastNewVideoToSubscribers({
+        videoId: uploadId,
+        title: videoAttributes.title || "New Video",
+        description: videoAttributes.description || "",
+        thumbnailUrl: videoAttributes.thumbnailUrl || thumbnailUrl,
+        uploaderId: videoAttributes.uploaderId,
+        uploaderName: videoAttributes.uploaderName || "Creator",
+        uploaderAvatarUrl: videoAttributes.uploaderAvatarUrl,
+        contentType: videoAttributes.contentType === "short" ? "short" : "video",
+      }).catch((err) => console.error("Failed to broadcast new video email to subscribers:", err));
+    }
+
     // Kick off automatic caption generation on the asset's primary audio
     // track — Shorts are explicitly excluded, they should never get
     // captions. Mux runs speech recognition against the track and, once

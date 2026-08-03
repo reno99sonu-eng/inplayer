@@ -1,4 +1,4 @@
-// Server-side AI helper for caption translation using OpenAI gpt-4o-mini
+// Server-side AI helper for caption translation using OpenAI / Groq
 const CANDIDATE_MODELS = [
   "gpt-4o-mini",
   "gpt-4o",
@@ -6,9 +6,15 @@ const CANDIDATE_MODELS = [
 
 const PER_CALL_TIMEOUT_MS = 60_000;
 
-async function aiGenerateText(prompt: string): Promise<string | null> {
+async function aiGenerateText(userPrompt: string, systemPrompt?: string): Promise<string | null> {
   const apiKey = process.env.OPENAI_API_KEY || process.env.GROQ_API_KEY;
   if (!apiKey) return null;
+
+  const messages: Array<{ role: string; content: string }> = [];
+  if (systemPrompt) {
+    messages.push({ role: "system", content: systemPrompt });
+  }
+  messages.push({ role: "user", content: userPrompt });
 
   for (const model of CANDIDATE_MODELS) {
     const controller = new AbortController();
@@ -26,7 +32,8 @@ async function aiGenerateText(prompt: string): Promise<string | null> {
         },
         body: JSON.stringify({
           model: process.env.OPENAI_API_KEY ? model : "llama-3.3-70b-versatile",
-          messages: [{ role: "user", content: prompt }],
+          temperature: 0.3,
+          messages,
         }),
         signal: controller.signal,
       });
@@ -51,8 +58,8 @@ async function aiGenerateText(prompt: string): Promise<string | null> {
   return null;
 }
 
-async function runVttTransform(prompt: string): Promise<string | null> {
-  const result = await aiGenerateText(prompt);
+async function runVttTransform(userPrompt: string, systemPrompt?: string): Promise<string | null> {
+  const result = await aiGenerateText(userPrompt, systemPrompt);
   if (!result) return null;
 
   let cleaned = result.trim();
@@ -70,38 +77,41 @@ export async function translateVtt(
   vtt: string,
   targetLanguageName: string
 ): Promise<string | null> {
-  const prompt = `You are a professional video subtitle translator. Translate the TEXT LINES of the following WebVTT subtitle file into ${targetLanguageName}.
+  const systemPrompt = `You are an expert native translator and localization specialist for Indian regional languages (Tamil, Telugu, Marathi, Gujarati, Kannada, Malayalam, Punjabi, Odia, Hindi, Bengali).
+Your mission is to translate video subtitles into natural, accurate, and contextually rich ${targetLanguageName}.
 
-STRICT RULES:
-- Keep the exact same VTT structure: the "WEBVTT" header, every timestamp line (e.g. "00:00:01.000 --> 00:00:04.000"), cue ordering, and blank lines must remain EXACTLY as they are.
-- Translate ONLY the subtitle text lines into natural, concise ${targetLanguageName}.
-- CRITICAL CAPTION LENGTH RULE: Keep every subtitle cue SHORT (maximum 2 lines per cue, max 45 characters per line). Do NOT generate long multi-line text blocks.
-- Do not add any commentary, notes, numbering, or markdown/code fences.
-- Output the complete translated VTT file and nothing else.
+CRITICAL LOCALIZATION & MEANING RULES:
+1. MEANING OVER LITERAL WORDS: Do NOT do word-for-word machine translation. Translate the TRUE CONTEXTUAL MEANING, emotion, and intent of the speech as a native ${targetLanguageName} speaker would naturally express it.
+2. NATURAL COLLOQUIAL GRAMMAR: Use standard native script with accurate grammar, proper verb tenses, and natural conversational phrasing in ${targetLanguageName}.
+3. LOANWORDS & MODERN TERMS: Keep common English technical terms, brand names, or modern words naturally transliterated or as spoken in modern ${targetLanguageName} conversations.
+4. PRESERVE VTT FORMAT: Keep all WebVTT headers ("WEBVTT"), timestamps (e.g. "00:00:01.000 --> 00:00:04.000"), and cue numbers exactly intact.
+5. SHORT CUE LENGTH: Keep each cue short (maximum 2 lines per cue, max 45 characters per line).`;
 
-VTT FILE:
+  const userPrompt = `Translate the text lines of the following WebVTT file into natural, contextually accurate ${targetLanguageName}:
+
+WebVTT File:
 ${vtt}`;
 
-  return runVttTransform(prompt);
+  return runVttTransform(userPrompt, systemPrompt);
 }
 
 export async function cleanupVtt(
   vtt: string,
   languageName: string
 ): Promise<string | null> {
-  const prompt = `You are proofreading an automatically-generated WebVTT subtitle file. The audio is spoken in ${languageName}, but the speech-recognition system that produced this file does not fully support ${languageName} and may have output text in the wrong script, the wrong language, or a garbled mix of languages.
+  const systemPrompt = `You are a professional audio proofreader and native language expert in ${languageName}.
+Your task is to fix automatically-generated speech-recognition subtitles so they read as natural, grammatically correct ${languageName}.
 
-Rewrite ONLY the subtitle text lines so the whole file reads as natural, correct ${languageName} — EXCEPT for words the speaker genuinely said in another language (e.g. English brand names, loanwords, or intentionally code-switched phrases), which should stay as spoken.
+PROOFREADING RULES:
+1. FIX ASR ERRORS: Correct phonetically misheard words, garbled script, or incorrect auto-generated words into proper ${languageName}.
+2. CONTEXTUAL ACCURACY: Ensure every sentence accurately reflects what the speaker intended to say.
+3. PRESERVE INTENDED LOANWORDS: Keep English terms or brand names that the speaker genuinely uttered in English.
+4. PRESERVE VTT FORMAT: Keep all WebVTT headers, timestamps, and cue structures identical.`;
 
-STRICT RULES:
-- Keep the exact same VTT structure: the "WEBVTT" header, every timestamp line (e.g. "00:00:01.000 --> 00:00:04.000"), cue ordering, and blank lines must remain EXACTLY as they are.
-- CRITICAL CAPTION LENGTH RULE: Keep every subtitle cue SHORT (maximum 2 lines per cue, max 45 characters per line). Do NOT generate long multi-line text blocks.
-- Only rewrite the subtitle text lines themselves.
-- Do not add any commentary, notes, numbering, or markdown/code fences.
-- Output the complete corrected VTT file and nothing else.
+  const userPrompt = `Proofread and correct the text lines of the following WebVTT file into clean ${languageName}:
 
-VTT FILE:
+WebVTT File:
 ${vtt}`;
 
-  return runVttTransform(prompt);
+  return runVttTransform(userPrompt, systemPrompt);
 }

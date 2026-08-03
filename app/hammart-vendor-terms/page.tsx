@@ -113,13 +113,11 @@ export default function HammartVendorTermsPage() {
         </p>
       </Section>
 
-      <Section title="8. Fees">
+      <Section title="8. Fees & Listing Charges">
         <p>
-          Your first 10 published listings are free. Publishing additional listings requires an active Hammart
-          vendor subscription at ₹249/month, billed through Razorpay. InPlayer does not take a commission on
-          individual sales — see Section 4, we never touch that payment. This subscription can be cancelled at any
-          time; cancelling stops future billing but does not remove listings you&apos;ve already published within
-          your free quota.
+          Verified vendors enjoy unlimited product listings on the Hammart marketplace. A flat platform listing fee
+          of ₹0.50 (50 paise) applies per published product listing. InPlayer does not take a commission on individual
+          sales — payments for items are received directly by the vendor.
         </p>
       </Section>
 

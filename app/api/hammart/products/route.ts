@@ -41,14 +41,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Complete business verification (KYC) before publishing listings." }, { status: 403 });
   }
 
-  const withinFreeQuota = vendor.freeListingsUsed < FREE_LISTINGS_LIMIT;
-  const hasActiveSubscription = vendor.subscriptionStatus === "active";
-  if (!withinFreeQuota && !hasActiveSubscription) {
-    return NextResponse.json(
-      { error: `You've used all ${FREE_LISTINGS_LIMIT} free listings. Subscribe for ₹249/month to publish more.`, quotaExceeded: true },
-      { status: 402 }
-    );
-  }
+  // Hammart Listing Model: Unlimited listings for all verified vendors at ₹0.50 per product listing fee
 
   const body = await request.json().catch(() => ({}));
   const title = typeof body.title === "string" ? body.title.trim().slice(0, 150) : "";
@@ -86,19 +79,15 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Listings aren't available yet — please try again shortly.", tableMissing: result.tableMissing }, { status: 503 });
   }
 
-  // Only counts against the free quota once a listing actually exists —
-  // increment happens here, not before, so a failed create never burns a
-  // free slot.
-  if (withinFreeQuota) {
-    await docClient.send(
-      new UpdateCommand({
-        TableName: VENDORS_TABLE,
-        Key: { userId: user.userId },
-        UpdateExpression: "ADD freeListingsUsed :one SET updatedAt = :now",
-        ExpressionAttributeValues: { ":one": 1, ":now": new Date().toISOString() },
-      })
-    ).catch((err) => console.error("Failed to increment freeListingsUsed:", err));
-  }
+  // Increment total listings count for the vendor profile
+  await docClient.send(
+    new UpdateCommand({
+      TableName: VENDORS_TABLE,
+      Key: { userId: user.userId },
+      UpdateExpression: "ADD freeListingsUsed :one SET updatedAt = :now",
+      ExpressionAttributeValues: { ":one": 1, ":now": new Date().toISOString() },
+    })
+  ).catch((err) => console.error("Failed to increment vendor listings count:", err));
 
   return NextResponse.json({
     success: true,

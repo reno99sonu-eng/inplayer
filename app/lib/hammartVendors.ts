@@ -25,8 +25,10 @@ export const VENDOR_IDS_TABLE = "Hammart-Vendor-Ids"; // PK: vendorIdLower — u
 // "key on Razorpay's own payment id" pattern as InPlayer-Revenue-Ledger.
 export const VENDOR_SUBSCRIPTION_LEDGER_TABLE = "Hammart-Vendor-Subscription-Ledger"; // PK: razorpayPaymentId
 
-export const FREE_LISTINGS_LIMIT = 10;
-export const VENDOR_SUBSCRIPTION_PRICE_INR = 249;
+export const PRODUCT_LISTING_FEE_INR = 0.50; // ₹0.50 per product listing for InPlayer platform
+export const UNLIMITED_LISTINGS = true;
+export const FREE_LISTINGS_LIMIT = Infinity; // Unlimited listings model
+export const VENDOR_SUBSCRIPTION_PRICE_INR = 0.50;
 
 export type BusinessType = "individual" | "business";
 export type VendorKycStatus = "not_started" | "pending_review" | "verified" | "rejected";

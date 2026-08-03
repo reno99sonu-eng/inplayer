@@ -229,15 +229,10 @@ export default function VendorDashboardPage() {
         <div className="mt-6 flex flex-col items-center gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-500/[0.06] p-6">
           <CheckCircle2 size={24} className="text-emerald-400" />
           <p className="text-sm font-semibold text-white light:text-slate-900">You&apos;re verified, {vendor.vendorId}!</p>
-          <p className="flex items-center gap-1 text-[11px] text-slate-500">
+          <p className="flex items-center gap-1 text-[11px] text-emerald-300">
             <ShieldCheck size={12} />
-            {vendor.subscriptionStatus === "active"
-              ? "Subscription active — publish as many listings as you like."
-              : `${vendor.freeListingsUsed}/${FREE_LISTINGS_LIMIT} free listings used.`}
+            Unlimited Product Listings Enabled (₹0.50 platform listing fee per product).
           </p>
-          {vendor.subscriptionStatus !== "active" && vendor.freeListingsUsed >= FREE_LISTINGS_LIMIT && (
-            <VendorSubscribeButton onPossiblyActivated={load} />
-          )}
           <div className="mt-1 flex gap-2">
             <Link href="/shop/vendor/listings" className="rounded-xl border border-white/10 light:border-black/10 px-4 py-2 text-xs font-bold text-slate-200 light:text-slate-800 hover:bg-white/5">
               My Listings

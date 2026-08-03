@@ -1000,10 +1000,9 @@ animation: aiGlassSweep 5.5s linear infinite;
   --media-font-family: inherit;
 }
 
-/* Subtitle / Caption Text WebVTT Cue Rendering & Layout Fitting */
+/* Subtitle / Caption Text WebVTT Cue Display Bounds */
 media-captions-display,
-media-text-display,
-mux-player::part(captions) {
+media-text-display {
   max-height: 22% !important;
   bottom: 48px !important;
   overflow: hidden !important;

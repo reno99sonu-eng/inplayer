@@ -15,6 +15,21 @@ export const PRESET_OCCASIONS = [
   { id: "cyberpunk", name: "Cyberpunk Tech Mode ⚡", color: "from-[#06B6D4] via-[#3B82F6] to-[#EC4899]" },
 ] as const;
 
+function safeBase64Encode(str: string): string {
+  try {
+    if (typeof window !== "undefined" && typeof btoa !== "undefined") {
+      return btoa(
+        encodeURIComponent(str).replace(/%([0-9A-F]{2})/g, (_, p1) =>
+          String.fromCharCode(parseInt(p1, 16))
+        )
+      );
+    }
+  } catch {
+    /* fallback to Buffer */
+  }
+  return Buffer.from(str, "utf-8").toString("base64");
+}
+
 export function generateAiNavbarThemeImage(occasionId: string, customPrompt?: string): string {
   const width = 1920;
   const height = 160;
@@ -101,7 +116,7 @@ export function generateAiNavbarThemeImage(occasionId: string, customPrompt?: st
       <circle cx="1800" cy="110" r="3" fill="#FFF" opacity="0.9" />
 
       <!-- Banner Watermark Text -->
-      <text x="960" y="148" font-family="system-ui, sans-serif" font-weight="900" font-size="14" fill="#000080" text-anchor="middle" letter-spacing="4" opacity="0.7">HAPPY INDEPENDENCE DAY • INDIA 🇮🇳</text>
+      <text x="960" y="148" font-family="system-ui, sans-serif" font-weight="900" font-size="14" fill="#000080" text-anchor="middle" letter-spacing="4" opacity="0.7">HAPPY INDEPENDENCE DAY • INDIA</text>
     `;
   } else if (occasionId === "diwali") {
     // Diwali Real Diya Lamps, Golden Rangoli Mandalas & Sky Fireworks
@@ -168,7 +183,7 @@ export function generateAiNavbarThemeImage(occasionId: string, customPrompt?: st
         .join("")}
 
       <!-- Watermark Title -->
-      <text x="960" y="148" font-family="system-ui, sans-serif" font-weight="900" font-size="13" fill="#FDE047" text-anchor="middle" letter-spacing="4" opacity="0.8">HAPPY DIWALI • FESTIVAL OF LIGHTS 🪔</text>
+      <text x="960" y="148" font-family="system-ui, sans-serif" font-weight="900" font-size="13" fill="#FDE047" text-anchor="middle" letter-spacing="4" opacity="0.8">HAPPY DIWALI • FESTIVAL OF LIGHTS</text>
     `;
   } else if (occasionId === "holi") {
     // Holi Vibrant Color Splash Gulal Explosion
@@ -205,7 +220,7 @@ export function generateAiNavbarThemeImage(occasionId: string, customPrompt?: st
         .join("")}
 
       <!-- Watermark Title -->
-      <text x="960" y="148" font-family="system-ui, sans-serif" font-weight="900" font-size="13" fill="#FFFFFF" text-anchor="middle" letter-spacing="4" opacity="0.9">HAPPY HOLI • FESTIVAL OF COLORS 🎨</text>
+      <text x="960" y="148" font-family="system-ui, sans-serif" font-weight="900" font-size="13" fill="#FFFFFF" text-anchor="middle" letter-spacing="4" opacity="0.9">HAPPY HOLI • FESTIVAL OF COLORS</text>
     `;
   } else if (occasionId === "republic_day") {
     // Republic Day Airforce Jet Smoke Trails & Ashoka Emblem
@@ -242,7 +257,7 @@ export function generateAiNavbarThemeImage(occasionId: string, customPrompt?: st
       </g>
 
       <!-- Watermark Title -->
-      <text x="960" y="148" font-family="system-ui, sans-serif" font-weight="900" font-size="13" fill="#000080" text-anchor="middle" letter-spacing="4" opacity="0.8">HAPPY REPUBLIC DAY 🇮🇳</text>
+      <text x="960" y="148" font-family="system-ui, sans-serif" font-weight="900" font-size="13" fill="#000080" text-anchor="middle" letter-spacing="4" opacity="0.8">HAPPY REPUBLIC DAY</text>
     `;
   } else if (occasionId === "new_year") {
     // New Year Golden Fireworks & 2026 Celebration Streamers
@@ -272,7 +287,7 @@ export function generateAiNavbarThemeImage(occasionId: string, customPrompt?: st
       <path d="M 1400 0 Q 1550 160, 1700 0" fill="none" stroke="#3B82F6" stroke-width="2" opacity="0.6" />
 
       <!-- Watermark Title -->
-      <text x="960" y="100" font-family="system-ui, sans-serif" font-weight="900" font-size="36" fill="#FBBF24" text-anchor="middle" letter-spacing="6" opacity="0.85">WELCOME 2026 🎉</text>
+      <text x="960" y="100" font-family="system-ui, sans-serif" font-weight="900" font-size="36" fill="#FBBF24" text-anchor="middle" letter-spacing="6" opacity="0.85">WELCOME 2026</text>
     `;
   } else if (occasionId === "cyberpunk") {
     // Cyberpunk Synthwave Grid & Neon Lasers
@@ -295,11 +310,13 @@ export function generateAiNavbarThemeImage(occasionId: string, customPrompt?: st
       <circle cx="960" cy="80" r="50" fill="none" stroke="#06B6D4" stroke-width="2" opacity="0.7" />
 
       <!-- Watermark Title -->
-      <text x="960" y="148" font-family="system-ui, sans-serif" font-weight="900" font-size="13" fill="#06B6D4" text-anchor="middle" letter-spacing="5" opacity="0.85">INPLAYER CYBERPUNK TECH MODE ⚡</text>
+      <text x="960" y="148" font-family="system-ui, sans-serif" font-weight="900" font-size="13" fill="#06B6D4" text-anchor="middle" letter-spacing="5" opacity="0.85">INPLAYER CYBERPUNK TECH MODE</text>
     `;
   } else {
     // Custom Celebration Prompt
-    const customTitle = (customPrompt || "Custom Celebration").toUpperCase();
+    const customTitle = (customPrompt || "Custom Celebration")
+      .replace(/[^\w\s-]/gi, "")
+      .toUpperCase();
     themeGraphicSvg = `
       <defs>
         <linearGradient id="customBg" x1="0%" y1="0%" x2="100%" y2="100%">
@@ -322,7 +339,7 @@ export function generateAiNavbarThemeImage(occasionId: string, customPrompt?: st
         .join("")}
 
       <!-- Custom Watermark Title -->
-      <text x="960" y="100" font-family="system-ui, sans-serif" font-weight="900" font-size="28" fill="#FFFFFF" text-anchor="middle" letter-spacing="4" opacity="0.9">${customTitle} ✨</text>
+      <text x="960" y="100" font-family="system-ui, sans-serif" font-weight="900" font-size="28" fill="#FFFFFF" text-anchor="middle" letter-spacing="4" opacity="0.9">${customTitle}</text>
     `;
   }
 
@@ -330,6 +347,6 @@ export function generateAiNavbarThemeImage(occasionId: string, customPrompt?: st
     ${themeGraphicSvg}
   </svg>`;
 
-  const base64 = typeof btoa !== "undefined" ? btoa(fullSvg) : Buffer.from(fullSvg).toString("base64");
+  const base64 = safeBase64Encode(fullSvg);
   return `data:image/svg+xml;base64,${base64}`;
 }

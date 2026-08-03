@@ -123,10 +123,7 @@ export default function AdminCaptionsPage() {
       </h1>
       <p className="mt-2 text-sm leading-relaxed text-slate-400 light:text-slate-600">
         Applies the fixed caption pipeline to everything already published:
-        removes captions from Shorts entirely, and rebuilds clean English,
-        हिन्दी, and বাংলা tracks on videos from each one&apos;s existing
-        transcript. You can run this more than once — it skips anything
-        already done.
+        removes captions from Shorts entirely, and rebuilds clean English, हिन्दी, বাংলা, தமிழ், తెలుగు, मराठी, ગુજરાતી, ಕನ್ನಡ, മലയാളം, ਪੰਜਾਬੀ, and ଓଡ଼ିଆ tracks on videos from each one&apos;s existing transcript. You can run this more than once — it skips anything already done.
       </p>
 
       <button

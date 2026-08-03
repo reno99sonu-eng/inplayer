@@ -173,7 +173,13 @@ export async function POST(request: NextRequest) {
     const playbackId = item.muxPlaybackId as string | undefined;
     if (!videoId || !assetId) continue;
 
-    if (item.captionsBackfilled === true) {
+    const captionsVttObj = item.captionsVtt as Record<string, string> | undefined;
+    const hasAllLanguages =
+      captionsVttObj &&
+      typeof captionsVttObj === "object" &&
+      CAPTION_TARGETS.every((t) => typeof captionsVttObj[t.code] === "string");
+
+    if (item.captionsBackfilled === true && hasAllLanguages) {
       videos.skipped++;
       continue;
     }

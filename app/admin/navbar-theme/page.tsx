@@ -59,8 +59,8 @@ class NavbarThemeErrorBoundary extends Component<BoundaryProps, BoundaryState> {
       return (
         <div className="rounded-2xl border border-red-500/20 bg-red-500/10 p-6 text-center space-y-3 my-8 max-w-xl mx-auto">
           <AlertTriangle size={32} className="text-red-400 mx-auto" />
-          <h3 className="text-lg font-bold text-white">Navbar Theme Manager Recovery</h3>
-          <p className="text-xs text-red-300 max-w-md mx-auto">{this.state.errorMsg}</p>
+          <h3 className="text-lg font-bold text-white light:text-slate-900">Navbar Theme Manager Recovery</h3>
+          <p className="text-xs text-red-300 light:text-red-700 max-w-md mx-auto">{this.state.errorMsg}</p>
           <button
             type="button"
             onClick={() => {
@@ -233,14 +233,14 @@ function NavbarThemeManagerContent() {
   return (
     <div className="space-y-6 max-w-6xl mx-auto pb-12">
       {/* Header Banner */}
-      <div className="rounded-3xl border border-indigo-500/20 bg-gradient-to-r from-indigo-950/60 via-purple-950/40 to-slate-950/80 p-6 backdrop-blur-xl shadow-xl">
+      <div className="rounded-3xl border border-indigo-500/20 light:border-slate-300 bg-gradient-to-r from-indigo-950/60 via-purple-950/40 to-slate-950/80 light:from-indigo-900 light:to-purple-900 p-6 backdrop-blur-xl shadow-xl">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
           <div className="space-y-1">
-            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-400/30 bg-indigo-500/10 px-3 py-1 text-xs font-bold text-indigo-300">
-              <Sparkles size={14} className="animate-spin" /> AI OCCASION THEME MANAGER
+            <div className="inline-flex items-center gap-2 rounded-full border border-indigo-400/30 bg-indigo-500/20 px-3 py-1 text-xs font-black text-indigo-200">
+              <Sparkles size={14} className="animate-spin text-amber-300" /> AI OCCASION THEME MANAGER
             </div>
             <h1 className="text-2xl sm:text-3xl font-black text-white">Top Navbar Occasion Themes</h1>
-            <p className="text-xs sm:text-sm text-slate-300">
+            <p className="text-xs sm:text-sm text-slate-200 font-medium">
               Auto-generate and apply background occasion themes (Independence Day 🇮🇳, Diwali 🪔, Holi 🎨, etc.) without affecting top navbar layout, buttons, logos, or contrast across devices.
             </p>
           </div>
@@ -249,7 +249,7 @@ function NavbarThemeManagerContent() {
               type="button"
               onClick={handleResetTheme}
               disabled={saving}
-              className="inline-flex items-center gap-2 rounded-2xl border border-red-500/30 bg-red-500/10 px-4 py-2.5 text-xs font-bold text-red-300 hover:bg-red-500/20 transition cursor-pointer"
+              className="inline-flex items-center gap-2 rounded-2xl border border-red-500/30 bg-red-500/20 px-4 py-2.5 text-xs font-bold text-red-200 hover:bg-red-500/30 transition cursor-pointer"
             >
               <Trash2 size={14} /> Clear Active Theme
             </button>
@@ -259,17 +259,17 @@ function NavbarThemeManagerContent() {
 
       {/* Alerts */}
       {error && (
-        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-xs font-bold text-red-300 flex items-center justify-between">
+        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 light:bg-red-100 p-4 text-xs font-bold text-red-300 light:text-red-800 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <AlertTriangle size={16} />
             <span>{error}</span>
           </div>
-          <button onClick={() => setError(null)} className="text-red-400 hover:text-white">✕</button>
+          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-700">✕</button>
         </div>
       )}
 
       {successMsg && (
-        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-xs font-bold text-emerald-300 flex items-center gap-2">
+        <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 light:bg-emerald-100 p-4 text-xs font-bold text-emerald-300 light:text-emerald-900 flex items-center gap-2">
           <CheckCircle2 size={16} />
           <span>{successMsg}</span>
         </div>
@@ -279,9 +279,9 @@ function NavbarThemeManagerContent() {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column — Occasion Controls */}
         <div className="lg:col-span-5 space-y-6">
-          <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 space-y-5 backdrop-blur-xl">
-            <h2 className="text-base font-bold text-white flex items-center gap-2">
-              <Palette size={18} className="text-indigo-400" /> Choose Festive Occasion
+          <div className="rounded-3xl border border-white/10 light:border-slate-300 bg-white/[0.03] light:bg-white/90 p-5 space-y-5 backdrop-blur-xl shadow-lg light:shadow-md">
+            <h2 className="text-base font-black text-white light:text-slate-900 flex items-center gap-2">
+              <Palette size={18} className="text-indigo-400 light:text-indigo-600" /> Choose Festive Occasion
             </h2>
 
             <div className="space-y-2">
@@ -290,40 +290,40 @@ function NavbarThemeManagerContent() {
                   key={occ.id}
                   type="button"
                   onClick={() => setSelectedOccasion(occ.id)}
-                  className={`w-full flex items-center justify-between rounded-2xl border px-4 py-3 text-xs font-bold transition text-left cursor-pointer ${
+                  className={`w-full flex items-center justify-between rounded-2xl border px-4 py-3 text-xs font-black transition text-left cursor-pointer ${
                     selectedOccasion === occ.id
-                      ? "border-indigo-400 bg-indigo-500/20 text-white shadow-[0_0_20px_rgba(99,102,241,0.2)]"
-                      : "border-white/10 bg-black/20 text-slate-300 hover:bg-white/5"
+                      ? "border-indigo-500 bg-indigo-500/20 light:bg-indigo-100 text-white light:text-indigo-950 shadow-[0_0_20px_rgba(99,102,241,0.2)]"
+                      : "border-white/10 light:border-slate-300 bg-black/20 light:bg-slate-100/90 text-slate-300 light:text-slate-800 hover:bg-white/10 light:hover:bg-slate-200"
                   }`}
                 >
                   <span>{occ.name}</span>
-                  {selectedOccasion === occ.id && <CheckCircle2 size={16} className="text-indigo-400" />}
+                  {selectedOccasion === occ.id && <CheckCircle2 size={16} className="text-indigo-400 light:text-indigo-600" />}
                 </button>
               ))}
 
               <button
                 type="button"
                 onClick={() => setSelectedOccasion("custom")}
-                className={`w-full flex items-center justify-between rounded-2xl border px-4 py-3 text-xs font-bold transition text-left cursor-pointer ${
+                className={`w-full flex items-center justify-between rounded-2xl border px-4 py-3 text-xs font-black transition text-left cursor-pointer ${
                   selectedOccasion === "custom"
-                    ? "border-pink-400 bg-pink-500/20 text-white shadow-[0_0_20px_rgba(236,72,153,0.2)]"
-                    : "border-white/10 bg-black/20 text-slate-300 hover:bg-white/5"
+                    ? "border-pink-500 bg-pink-500/20 light:bg-pink-100 text-white light:text-pink-950 shadow-[0_0_20px_rgba(236,72,153,0.2)]"
+                    : "border-white/10 light:border-slate-300 bg-black/20 light:bg-slate-100/90 text-slate-300 light:text-slate-800 hover:bg-white/10 light:hover:bg-slate-200"
                 }`}
               >
                 <span>Custom Occasion Prompt ✨</span>
-                {selectedOccasion === "custom" && <CheckCircle2 size={16} className="text-pink-400" />}
+                {selectedOccasion === "custom" && <CheckCircle2 size={16} className="text-pink-400 light:text-pink-600" />}
               </button>
             </div>
 
             {selectedOccasion === "custom" && (
               <div className="space-y-2 pt-1">
-                <label className="text-xs font-bold text-slate-300">Custom Celebration Prompt</label>
+                <label className="text-xs font-bold text-slate-300 light:text-slate-800">Custom Celebration Prompt</label>
                 <input
                   type="text"
                   value={customPrompt}
                   onChange={(e) => setCustomPrompt(e.target.value)}
                   placeholder="e.g., Grand Musical Concert Festival"
-                  className="w-full rounded-xl border border-white/10 bg-black/40 px-3.5 py-2.5 text-xs font-medium text-white placeholder-slate-500 focus:border-indigo-400 focus:outline-none"
+                  className="w-full rounded-xl border border-white/10 light:border-slate-300 bg-black/40 light:bg-white px-3.5 py-2.5 text-xs font-bold text-white light:text-slate-900 placeholder-slate-500 focus:border-indigo-400 focus:outline-none"
                 />
               </div>
             )}
@@ -355,23 +355,23 @@ function NavbarThemeManagerContent() {
 
         {/* Right Column — Live Interactive Mockup */}
         <div className="lg:col-span-7 space-y-6">
-          <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5 space-y-4 backdrop-blur-xl">
+          <div className="rounded-3xl border border-white/10 light:border-slate-300 bg-white/[0.03] light:bg-white/90 p-5 space-y-4 backdrop-blur-xl shadow-lg light:shadow-md">
             <div className="flex items-center justify-between">
-              <h2 className="text-base font-bold text-white flex items-center gap-2">
-                <Eye size={18} className="text-amber-400" /> Live Top Navbar Mockup & Preview
+              <h2 className="text-base font-black text-white light:text-slate-900 flex items-center gap-2">
+                <Eye size={18} className="text-amber-400 light:text-amber-600" /> Live Top Navbar Mockup & Preview
               </h2>
               {activeTheme && (
-                <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-[10px] font-black text-emerald-400 border border-emerald-500/30">
+                <span className="rounded-full bg-emerald-500/20 light:bg-emerald-100 px-3 py-1 text-[10px] font-black text-emerald-400 light:text-emerald-800 border border-emerald-500/30 light:border-emerald-300">
                   LIVE ON PLATFORM
                 </span>
               )}
             </div>
-            <p className="text-xs text-slate-400">
+            <p className="text-xs text-slate-400 light:text-slate-700 font-semibold">
               Verify how the generated theme background sits behind the top navbar logo, search bar, and action buttons without overlapping or reducing legibility.
             </p>
 
             {/* Mock Top Navbar Frame */}
-            <div className="relative overflow-hidden rounded-2xl border border-white/20 bg-[#06101D] shadow-2xl min-h-[90px] flex flex-col justify-center px-4 py-3">
+            <div className="relative overflow-hidden rounded-2xl border border-white/20 light:border-slate-400 bg-[#06101D] shadow-2xl min-h-[90px] flex flex-col justify-center px-4 py-3">
               {/* Background Theme Layer */}
               {previewImageUrl ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
@@ -419,18 +419,18 @@ function NavbarThemeManagerContent() {
             </div>
 
             {/* Details Summary */}
-            <div className="rounded-2xl border border-white/10 bg-black/30 p-4 space-y-2 text-xs">
+            <div className="rounded-2xl border border-white/10 light:border-slate-300 bg-black/30 light:bg-slate-100 p-4 space-y-2 text-xs">
               <div className="flex justify-between">
-                <span className="text-slate-400">Current Theme Title:</span>
-                <span className="font-bold text-white">{generatedTitle}</span>
+                <span className="text-slate-400 light:text-slate-600 font-bold">Current Theme Title:</span>
+                <span className="font-bold text-white light:text-slate-900">{generatedTitle}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Occasion Preset:</span>
-                <span className="font-bold text-indigo-300">{selectedOccasion.toUpperCase()}</span>
+                <span className="text-slate-400 light:text-slate-600 font-bold">Occasion Preset:</span>
+                <span className="font-bold text-indigo-300 light:text-indigo-700">{selectedOccasion.toUpperCase()}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-slate-400">Layout Safety:</span>
-                <span className="font-bold text-emerald-400">Protected (Z-Index 0 + Contrast Blur)</span>
+                <span className="text-slate-400 light:text-slate-600 font-bold">Layout Safety:</span>
+                <span className="font-bold text-emerald-400 light:text-emerald-700">Protected (Z-Index 0 + Contrast Blur)</span>
               </div>
             </div>
           </div>

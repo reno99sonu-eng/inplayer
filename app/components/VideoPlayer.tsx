@@ -380,40 +380,109 @@ export default function VideoPlayer({
   // right after mount is enough; a short retry loop only covers the rare
   // case where the custom element's shadow tree hasn't upgraded yet on the
   // very first tick.
+  // Fetch available regional language subtitle tracks & inject into player's internal video element
+  useEffect(() => {
+    if (!videoId) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        const res = await fetch(`/api/videos/${videoId}/captions-list`);
+        const data = await res.json().catch(() => ({ languages: [] }));
+        if (cancelled || !Array.isArray(data.languages) || data.languages.length === 0) return;
+
+        const attachTracks = () => {
+          const muxEl = playerRef.current as unknown as HTMLElement | null;
+          const shadowRoot = muxEl?.shadowRoot;
+          const themeEl = shadowRoot?.querySelector("media-theme");
+          const mediaEl = (shadowRoot?.querySelector("video") ||
+            themeEl?.shadowRoot?.querySelector("video") ||
+            muxEl?.querySelector("video")) as HTMLVideoElement | null;
+          if (!mediaEl) return false;
+
+          data.languages.forEach((lang: { code: string; label: string }) => {
+            const trackId = `inplayer-caption-${lang.code}`;
+            if (!mediaEl.querySelector(`#${trackId}`)) {
+              const track = document.createElement("track");
+              track.id = trackId;
+              track.kind = "subtitles";
+              track.label = lang.label;
+              track.srclang = lang.code;
+              track.src = `/api/videos/${videoId}/captions/${lang.code}`;
+              mediaEl.appendChild(track);
+            }
+          });
+          return true;
+        };
+
+        if (!attachTracks()) {
+          let attempts = 0;
+          const timer = setInterval(() => {
+            attempts++;
+            if (attachTracks() || attempts > 20) clearInterval(timer);
+          }, 200);
+        }
+      } catch (err) {
+        console.error("Failed to load regional caption tracks:", err);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [videoId]);
+
+  // Theme player buttons & bottom popup panels (Captions menu, Resolution menu, Speed menu) to match InPlayer theme
   useEffect(() => {
     const applyMenuTheme = () => {
       const muxEl = playerRef.current as unknown as HTMLElement | null;
       const themeEl = muxEl?.shadowRoot?.querySelector(
         "media-theme"
       ) as HTMLElement | null;
-      const controller = themeEl?.shadowRoot?.querySelector(
+      const controller = (themeEl?.shadowRoot?.querySelector(
         "media-controller"
-      ) as HTMLElement | null;
+      ) || muxEl?.shadowRoot?.querySelector("media-controller")) as HTMLElement | null;
       if (!controller) return false;
 
+      // Theme all bottom popup panels
       const menus = controller.querySelectorAll(
-        "media-rendition-menu, media-captions-menu, media-audio-track-menu, media-playback-rate-menu"
+        "media-rendition-menu, media-captions-menu, media-audio-track-menu, media-playback-rate-menu, media-settings-menu"
       );
-      if (menus.length === 0) return false;
-
       menus.forEach((node) => {
         const style = (node as HTMLElement).style;
-        style.setProperty("--media-menu-background", PLAYER_DARK_SURFACE);
-        style.setProperty("--media-text-color", PLAYER_MENU_TEXT_COLOR);
+        style.setProperty("--media-menu-background", "rgba(9, 17, 31, 0.98)");
+        style.setProperty("--media-menu-border", "1px solid rgba(255, 255, 255, 0.15)");
+        style.setProperty("--media-menu-border-radius", "16px");
+        style.setProperty("--media-text-color", "#F8FAFC");
+        style.setProperty("--media-font-family", "Inter, system-ui, sans-serif");
         style.setProperty(
           "--media-menu-item-hover-background",
-          PLAYER_MENU_HOVER_BACKGROUND
+          "linear-gradient(135deg, rgba(255, 122, 24, 0.25), rgba(255, 154, 0, 0.15))"
         );
         style.setProperty(
           "--media-menu-item-checked-background",
-          PLAYER_MENU_CHECKED_BACKGROUND
+          "linear-gradient(135deg, rgba(255, 122, 24, 0.4), rgba(255, 154, 0, 0.25))"
         );
         style.setProperty(
           "--media-menu-item-hover-outline",
-          PLAYER_MENU_HOVER_OUTLINE
+          "1px solid rgba(255, 122, 24, 0.6)"
         );
       });
-      return true;
+
+      // Theme all control bar buttons (CC, Resolution, Playback Speed, Volume)
+      const buttons = controller.querySelectorAll(
+        "media-captions-button, media-rendition-button, media-playback-rate-button, media-volume-button, media-play-button, media-fullscreen-button"
+      );
+      buttons.forEach((btn) => {
+        const style = (btn as HTMLElement).style;
+        style.setProperty("--media-button-icon-color", "#F8FAFC");
+        style.setProperty("--media-control-background", "transparent");
+        style.setProperty("--media-control-hover-background", "rgba(255, 122, 24, 0.18)");
+        style.setProperty("--media-icon-color", "#F8FAFC");
+        style.setProperty("transition", "transform 0.2s ease, filter 0.2s ease");
+      });
+
+      return menus.length > 0;
     };
 
     if (applyMenuTheme()) return;
@@ -421,7 +490,7 @@ export default function VideoPlayer({
     let attempts = 0;
     const id = window.setInterval(() => {
       attempts += 1;
-      if (applyMenuTheme() || attempts > 20) window.clearInterval(id);
+      if (applyMenuTheme() || attempts > 25) window.clearInterval(id);
     }, 150);
     return () => window.clearInterval(id);
   }, []);

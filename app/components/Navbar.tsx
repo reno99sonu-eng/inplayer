@@ -240,26 +240,26 @@ export default function Navbar() {
 
 {/* Desktop Logo & Occasion Graphic */}
 <div className="hidden lg:flex flex-shrink-0 items-center">
-  {/* Logo with strict background text container */}
-  <div className="relative inline-flex items-center flex-shrink-0">
+  {/* Logo with strict clipped background text container */}
+  <div className="relative inline-flex items-center flex-shrink-0 overflow-hidden max-w-[170px] lg:max-w-[210px] rounded-lg">
     {navbarTheme?.active && (
-      <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex items-center justify-center scale-110">
-        <span className="whitespace-nowrap text-sm lg:text-base font-black uppercase tracking-widest bg-gradient-to-r from-orange-400 via-amber-200 to-pink-500 bg-clip-text text-transparent opacity-30 animate-pulse blur-[0.3px]">
+      <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex items-center justify-center p-0.5">
+        <span className="whitespace-nowrap truncate max-w-full text-[10px] lg:text-xs font-black uppercase tracking-wider bg-gradient-to-r from-orange-400 via-amber-200 to-pink-500 bg-clip-text text-transparent opacity-35 animate-pulse blur-[0.2px]">
           {(() => {
             const occId = navbarTheme.occasionId;
-            if (occId === "independence_day") return "HAPPY INDEPENDENCE DAY";
+            if (occId === "independence_day") return "INDEPENDENCE DAY";
             if (occId === "diwali") return "HAPPY DIWALI";
             if (occId === "holi") return "HAPPY HOLI";
-            if (occId === "republic_day") return "HAPPY REPUBLIC DAY";
-            if (occId === "new_year") return "HAPPY NEW YEAR 2026";
-            if (occId === "cyberpunk") return "CYBERPUNK MODE";
-            return navbarTheme.title ? navbarTheme.title.toUpperCase() : "HAPPY CELEBRATION";
+            if (occId === "republic_day") return "REPUBLIC DAY";
+            if (occId === "new_year") return "HAPPY NEW YEAR";
+            if (occId === "cyberpunk") return "CYBERPUNK";
+            return navbarTheme.title ? navbarTheme.title.toUpperCase() : "CELEBRATION";
           })()}
         </span>
       </div>
     )}
 
-    <div className="relative z-10">
+    <div className="relative z-10 flex-shrink-0">
       <NavbarLogo />
     </div>
   </div>
@@ -327,26 +327,26 @@ export default function Navbar() {
 
   {/* Mobile / tablet logo + Pure Transparent Occasion Graphic */}
   <div className="flex-shrink-0 ml-2 flex items-center min-w-0">
-    {/* Logo with strict background text container */}
-    <div className="relative inline-flex items-center flex-shrink-0">
+    {/* Logo with strict clipped background text container */}
+    <div className="relative inline-flex items-center flex-shrink-0 overflow-hidden max-w-[130px] sm:max-w-[160px] rounded-md">
       {navbarTheme?.active && (
-        <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex items-center justify-center scale-110">
-          <span className="whitespace-nowrap text-[11px] sm:text-xs font-black uppercase tracking-wider bg-gradient-to-r from-orange-400 via-amber-200 to-pink-500 bg-clip-text text-transparent opacity-30 animate-pulse blur-[0.3px]">
+        <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex items-center justify-center p-0.5">
+          <span className="whitespace-nowrap truncate max-w-full text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-orange-400 via-amber-200 to-pink-500 bg-clip-text text-transparent opacity-35 animate-pulse blur-[0.2px]">
             {(() => {
               const occId = navbarTheme.occasionId;
-              if (occId === "independence_day") return "HAPPY INDEPENDENCE DAY";
+              if (occId === "independence_day") return "INDEPENDENCE DAY";
               if (occId === "diwali") return "HAPPY DIWALI";
               if (occId === "holi") return "HAPPY HOLI";
-              if (occId === "republic_day") return "HAPPY REPUBLIC DAY";
-              if (occId === "new_year") return "HAPPY NEW YEAR 2026";
-              if (occId === "cyberpunk") return "CYBERPUNK MODE";
-              return navbarTheme.title ? navbarTheme.title.toUpperCase() : "HAPPY CELEBRATION";
+              if (occId === "republic_day") return "REPUBLIC DAY";
+              if (occId === "new_year") return "HAPPY NEW YEAR";
+              if (occId === "cyberpunk") return "CYBERPUNK";
+              return navbarTheme.title ? navbarTheme.title.toUpperCase() : "CELEBRATION";
             })()}
           </span>
         </div>
       )}
 
-      <div className="relative z-10">
+      <div className="relative z-10 flex-shrink-0">
         <NavbarLogo />
       </div>
     </div>

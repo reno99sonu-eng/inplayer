@@ -396,17 +396,17 @@ function NavbarThemeManagerContent() {
                     <Menu size={18} />
                   </div>
 
-                  {/* Logo with strict background text container */}
-                  <div className="relative inline-flex items-center">
+                  {/* Logo with strict clipped background text container */}
+                  <div className="relative inline-flex items-center overflow-hidden max-w-[140px] sm:max-w-[170px] rounded-md">
                     {previewImageUrl && (
-                      <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex items-center justify-center scale-110">
-                        <span className="whitespace-nowrap text-xs sm:text-sm font-black uppercase tracking-wider bg-gradient-to-r from-orange-400 via-amber-200 to-pink-500 bg-clip-text text-transparent opacity-30 animate-pulse blur-[0.3px]">
+                      <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex items-center justify-center p-0.5">
+                        <span className="whitespace-nowrap truncate max-w-full text-[10px] sm:text-xs font-black uppercase tracking-wider bg-gradient-to-r from-orange-400 via-amber-200 to-pink-500 bg-clip-text text-transparent opacity-35 animate-pulse blur-[0.2px]">
                           {generatedTitle.toUpperCase()}
                         </span>
                       </div>
                     )}
 
-                    <div className="relative z-10 flex items-center gap-1 text-white font-black text-sm tracking-wider">
+                    <div className="relative z-10 flex items-center gap-1 text-white font-black text-sm tracking-wider flex-shrink-0">
                       <Flame size={18} className="text-orange-500 fill-orange-500" />
                       <span>INPLAYER</span>
                     </div>

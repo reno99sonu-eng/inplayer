@@ -27,6 +27,11 @@ export interface HammartOrder {
   buyerUserId: string;
   buyerName: string;
   buyerEmail: string;
+  buyerPhone?: string | null;
+  deliveryAddress?: string | null;
+  city?: string | null;
+  state?: string | null;
+  pincode?: string | null;
   vendorUserId: string;
   vendorId: string;
   vendorUpiId: string;

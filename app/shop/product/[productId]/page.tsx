@@ -49,17 +49,44 @@ export default function ProductPage() {
     })();
   }, [productId]);
 
+  const [showAddressModal, setShowAddressModal] = useState(false);
+  const [buyerNameInput, setBuyerNameInput] = useState(user?.name || "");
+  const [buyerPhone, setBuyerPhone] = useState("");
+  const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [city, setCity] = useState("");
+  const [stateName, setStateName] = useState("");
+  const [pincode, setPincode] = useState("");
+
   const handleBuy = async () => {
     if (!signedIn) {
       openSignIn();
       return;
     }
+    setBuyerNameInput(user?.name || "");
+    setShowAddressModal(true);
+  };
+
+  const handleConfirmOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!deliveryAddress.trim() || !buyerPhone.trim()) {
+      setError("Please provide your phone number and delivery address.");
+      return;
+    }
+
     setError(null);
     setPlacing(true);
     try {
       const res = await authedFetch("/api/hammart/orders", {
         method: "POST",
-        body: JSON.stringify({ productId }),
+        body: JSON.stringify({
+          productId,
+          buyerName: buyerNameInput,
+          buyerPhone,
+          deliveryAddress,
+          city,
+          state: stateName,
+          pincode,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -67,6 +94,7 @@ export default function ProductPage() {
         return;
       }
       setOrder(data.order);
+      setShowAddressModal(false);
       const link = buildUpiLink({
         vpa: data.order.vendorUpiId,
         payeeName: data.order.vendorId,
@@ -174,6 +202,114 @@ export default function ProductPage() {
           >
             View my orders <ExternalLink size={11} />
           </a>
+        </div>
+      )}
+
+      {/* Delivery Address & Phone Modal */}
+      {showAddressModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-fadeIn">
+          <div className="w-full max-w-md rounded-3xl border border-white/15 bg-[#0A1220] p-6 shadow-2xl text-white">
+            <h3 className="text-lg font-black text-white flex items-center gap-2">
+              <ShoppingBag className="text-orange-400" size={20} />
+              Shipping & Delivery Details
+            </h3>
+            <p className="mt-1 text-xs text-slate-400">
+              Your contact & address details will be emailed directly to vendor @{product.vendorId} for fulfillment.
+            </p>
+
+            <form onSubmit={handleConfirmOrder} className="mt-4 space-y-3">
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 uppercase">Full Name</label>
+                <input
+                  type="text"
+                  required
+                  value={buyerNameInput}
+                  onChange={(e) => setBuyerNameInput(e.target.value)}
+                  placeholder="Your Name"
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none focus:border-orange-400"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 uppercase">Phone / Mobile Number</label>
+                <input
+                  type="tel"
+                  required
+                  value={buyerPhone}
+                  onChange={(e) => setBuyerPhone(e.target.value)}
+                  placeholder="+91 98765 43210"
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none focus:border-orange-400"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 uppercase">Delivery Address</label>
+                <textarea
+                  required
+                  rows={2}
+                  value={deliveryAddress}
+                  onChange={(e) => setDeliveryAddress(e.target.value)}
+                  placeholder="House/Flat No., Street, Landmark"
+                  className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none focus:border-orange-400"
+                />
+              </div>
+
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <label className="text-[11px] font-bold text-slate-300 uppercase">City</label>
+                  <input
+                    type="text"
+                    required
+                    value={city}
+                    onChange={(e) => setCity(e.target.value)}
+                    placeholder="City"
+                    className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none focus:border-orange-400"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-300 uppercase">State</label>
+                  <input
+                    type="text"
+                    required
+                    value={stateName}
+                    onChange={(e) => setStateName(e.target.value)}
+                    placeholder="State"
+                    className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none focus:border-orange-400"
+                  />
+                </div>
+                <div>
+                  <label className="text-[11px] font-bold text-slate-300 uppercase">Pincode</label>
+                  <input
+                    type="text"
+                    required
+                    value={pincode}
+                    onChange={(e) => setPincode(e.target.value)}
+                    placeholder="110001"
+                    className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none focus:border-orange-400"
+                  />
+                </div>
+              </div>
+
+              {error && <p className="text-xs text-red-400">{error}</p>}
+
+              <div className="mt-5 flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddressModal(false)}
+                  className="flex-1 rounded-xl border border-white/10 bg-white/5 py-2.5 text-xs font-bold text-slate-300 hover:bg-white/10"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={placing}
+                  className="flex-1 rounded-xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] py-2.5 text-xs font-bold text-slate-950 disabled:opacity-50"
+                >
+                  {placing ? "Sending..." : "Confirm & Send Order"}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

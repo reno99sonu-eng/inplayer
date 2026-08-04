@@ -6,7 +6,14 @@ import { Heart, LogOut, MessageSquare, Settings, User } from "lucide-react";
 
 import { useAuthModal } from "./auth/AuthProvider";
 
-export default function MobileProfileMenu() {
+export default function MobileProfileMenu({
+  isActive = false,
+}: {
+  // Passed by MobileBottomNav.tsx so the "You" tab glows the same way the
+  // Home/Raftaar/In-Family tabs do when the current page belongs to the
+  // signed-in user's own area (profile, settings, watchlist, etc.).
+  isActive?: boolean;
+}) {
   const router = useRouter();
   const { user, signedIn, openSignIn, signOut } = useAuthModal();
   const [open, setOpen] = useState(false);
@@ -42,11 +49,25 @@ export default function MobileProfileMenu() {
         onClick={() => (signedIn ? setOpen((current) => !current) : openSignIn())}
         aria-expanded={open}
         aria-label={signedIn ? "Open account menu" : "Sign in"}
-        className="flex flex-col items-center gap-1 px-3 py-1 text-slate-300 transition-colors hover:text-orange-300 light:text-slate-600 light:hover:text-orange-600"
+        className={`flex flex-col items-center gap-1 px-3 py-1 transition-all duration-200 ${
+          isActive
+            ? "text-orange-400 font-black scale-105"
+            : "text-slate-300 light:text-slate-600 hover:text-orange-300 light:hover:text-orange-600"
+        }`}
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- user avatars can be data URLs. */}
-        <img src={user?.avatarUrl || "/avatars/avatar.png"} alt="" className="h-[22px] w-[22px] rounded-full object-cover ring-1 ring-orange-400/50" />
-        <span className="text-[11px] font-medium">You</span>
+        <img
+          src={user?.avatarUrl || "/avatars/avatar.png"}
+          alt=""
+          className={`h-[22px] w-[22px] rounded-full object-cover ring-1 ${
+            isActive
+              ? "ring-orange-400 drop-shadow-[0_0_10px_rgba(249,115,22,0.85)] filter"
+              : "ring-orange-400/50"
+          }`}
+        />
+        <span className={`text-[11px] ${isActive ? "font-black text-orange-400 drop-shadow-[0_0_8px_rgba(249,115,22,0.7)]" : "font-medium"}`}>
+          You
+        </span>
       </button>
 
       {open && (

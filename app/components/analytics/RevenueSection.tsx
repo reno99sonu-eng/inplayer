@@ -300,7 +300,7 @@ export default function RevenueSection({
               <p className="mt-1.5 text-[11px] text-red-400">{amountError}</p>
             )}
             <p className="mt-1.5 text-[11px] text-slate-500">
-              We'll hold your balance until it reaches this amount, then pay
+              We&apos;ll hold your balance until it reaches this amount, then pay
               it out on your chosen frequency above.
             </p>
           </div>
@@ -321,8 +321,8 @@ export default function RevenueSection({
           </p>
           <p className="mt-1 text-xs leading-relaxed text-slate-400 light:text-slate-600">
             A real person on the InPlayer team is reviewing what{" "}
-            {payoutStatus.legalName} submitted — we'll unlock live revenue
-            tracking as soon as it's approved.
+            {payoutStatus.legalName} submitted — we&apos;ll unlock live revenue
+            tracking as soon as it&apos;s approved.
           </p>
         </div>
       ) : payoutStatus.kycStatus === "rejected" ? (
@@ -372,10 +372,10 @@ export default function RevenueSection({
         ) : (
           <div className="mt-4 rounded-xl border border-orange-400/20 bg-orange-500/[0.06] px-3 py-3">
             <p className="flex items-center gap-1.5 text-sm font-bold text-orange-300 light:text-orange-700">
-              <CheckCircle2 size={16} /> You've unlocked monetization
+              <CheckCircle2 size={16} /> You&apos;ve unlocked monetization
             </p>
             <p className="mt-1 text-xs leading-relaxed text-slate-400 light:text-slate-600">
-              You're past {ELIGIBILITY_THRESHOLD.subscribers} In-Family members
+              You&apos;re past {ELIGIBILITY_THRESHOLD.subscribers} In-Family members
               and {ELIGIBILITY_THRESHOLD.views.toLocaleString()} views. Complete
               a short KYC to start generating revenue.
             </p>

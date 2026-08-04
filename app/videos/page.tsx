@@ -11,6 +11,19 @@ interface VideosPageProps {
   searchParams: Promise<{ category?: string; search?: string }>;
 }
 
+// The fields this listing page actually reads off a raw ready-video item
+// (see app/lib/videoStore.ts, which returns Record<string, unknown>[] —
+// the real shape isn't a formal DynamoDB item interface, so the known
+// fields are cast once here rather than scattering `as string` everywhere
+// below).
+interface VideoCard {
+  videoId: string;
+  title: string;
+  uploaderName: string;
+  category: string;
+  thumbnailUrl?: string;
+}
+
 export default async function VideosPage({ searchParams }: VideosPageProps) {
   const { category, search } = await searchParams;
 
@@ -21,10 +34,17 @@ export default async function VideosPage({ searchParams }: VideosPageProps) {
 
   // Shared 30-second cached list (see lib/videoStore) — no per-request
   // table Scan. Already sorted newest-first.
-  let videos = (await getReadyVideos())
+  let videos: VideoCard[] = (await getReadyVideos())
     // Only public videos appear in listings (unlisted stays link-only,
     // private stays hidden from discovery).
-    .filter((v) => !v.visibility || v.visibility === "public");
+    .filter((v) => !v.visibility || v.visibility === "public")
+    .map((v) => ({
+      videoId: v.videoId as string,
+      title: v.title as string,
+      uploaderName: v.uploaderName as string,
+      category: v.category as string,
+      thumbnailUrl: v.thumbnailUrl as string | undefined,
+    }));
 
   if (category) {
     videos = videos.filter((v) => v.category === category);

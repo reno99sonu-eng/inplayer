@@ -115,9 +115,10 @@ export default function HammartVendorTermsPage() {
 
       <Section title="8. Fees & Listing Charges">
         <p>
-          Verified vendors enjoy unlimited product listings on the Hammart marketplace. A flat platform listing fee
-          of ₹0.50 (50 paise) applies per published product listing. InPlayer does not take a commission on individual
-          sales — payments for items are received directly by the vendor.
+          Verified vendors enjoy unlimited, free product listings on the Hammart marketplace — InPlayer does not
+          currently charge a per-listing fee. InPlayer also does not take a commission on individual sales — payments
+          for items are received directly by the vendor. If this changes in the future, we&apos;ll update this page
+          and give existing vendors advance notice before any fee applies.
         </p>
       </Section>
 

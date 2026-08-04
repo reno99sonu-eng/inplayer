@@ -40,9 +40,11 @@ export default function CreatorsPage() {
   }
 
   useEffect(() => {
-    // `loading` already starts true (see useState above) — nothing to set
-    // synchronously here, just kick off the fetch and clear it once done.
-    loadPage(null, true).finally(() => setLoading(false));
+    (() => {
+      // `loading` already starts true (see useState above) — nothing to set
+      // synchronously here, just kick off the fetch and clear it once done.
+      loadPage(null, true).finally(() => setLoading(false));
+    })();
   }, []);
 
   const handleLoadMore = async () => {

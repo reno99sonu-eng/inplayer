@@ -5,6 +5,7 @@ import MuxPlayer from "@mux/mux-player-react";
 import { fetchAuthSession } from "aws-amplify/auth";
 import { Radio, Copy, Check, Eye, EyeOff, Loader2, Info } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
+import { useSettings } from "@/app/components/settings/SettingsProvider";
 
 interface LiveCreds {
   streamKey: string;
@@ -75,6 +76,11 @@ function CopyField({
 
 export default function LivePage() {
   const { signedIn, authLoading, openSignIn } = useAuthModal();
+  // Real Settings → Playback → "Closed Captions" toggle now actually
+  // controls this, instead of always forcing captions off. Off (the
+  // shared default until a viewer opts in — see SettingsProvider.tsx)
+  // still matches "captions default off unless a viewer turns them on."
+  const { playback } = useSettings();
   const [creds, setCreds] = useState<LiveCreds | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -203,7 +209,7 @@ export default function LivePage() {
                 streamType="live"
                 playbackId={creds.playbackId}
                 accentColor="#EA580C"
-                defaultHiddenCaptions={true}
+                defaultHiddenCaptions={!playback.captions}
                 style={{ width: "100%", aspectRatio: "16 / 9" }}
               />
             ) : (

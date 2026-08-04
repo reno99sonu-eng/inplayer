@@ -53,11 +53,13 @@ export function ThemeProvider({
   const [theme, setThemeState] = useState<ThemeChoice>("system");
 
   useEffect(() => {
-    const saved =
-      (localStorage.getItem(STORAGE_KEY) as ThemeChoice | null) ?? "system";
+    (() => {
+      const saved =
+        (localStorage.getItem(STORAGE_KEY) as ThemeChoice | null) ?? "system";
 
-    setThemeState(saved);
-    applyTheme(saved);
+      setThemeState(saved);
+      applyTheme(saved);
+    })();
 
     // While in Auto mode, re-check every minute so the theme flips on its
     // own when the local time crosses the day/night boundary — even if the

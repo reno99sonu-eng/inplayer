@@ -231,7 +231,7 @@ export default function VendorDashboardPage() {
           <p className="text-sm font-semibold text-white light:text-slate-900">You&apos;re verified, {vendor.vendorId}!</p>
           <p className="flex items-center gap-1 text-[11px] text-emerald-300">
             <ShieldCheck size={12} />
-            Unlimited Product Listings Enabled (₹0.50 platform listing fee per product).
+            Unlimited Product Listings Enabled.
           </p>
           <div className="mt-1 flex gap-2">
             <Link href="/shop/vendor/listings" className="rounded-xl border border-white/10 light:border-black/10 px-4 py-2 text-xs font-bold text-slate-200 light:text-slate-800 hover:bg-white/5">

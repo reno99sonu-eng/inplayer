@@ -1,13 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ScanCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { randomUUID } from "crypto";
+import { revalidateTag } from "next/cache";
 import { docClient } from "@/app/lib/dynamodb";
 import { requireAdmin } from "@/app/lib/isAdmin";
 import { logAdminAction } from "@/app/lib/auditLog";
-import { AD_CREATIVES_TABLE, AdPlacement } from "@/app/lib/adCreatives";
+import {
+  AD_CREATIVES_TABLE,
+  AD_CREATIVES_TAG,
+  AD_IMAGE_DATA_URL_MAX_LENGTH,
+  AdPlacement,
+} from "@/app/lib/adCreatives";
 
-const VALID_PLACEMENTS: AdPlacement[] = ["homepage", "watch", "homepage_spotlight", "weekly_featured"];
-const MAX_ITEM_PAYLOAD_LENGTH = 350_000;
+const VALID_PLACEMENTS: AdPlacement[] = ["homepage", "watch", "homepage_spotlight"];
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,15 +27,13 @@ export async function GET(request: NextRequest) {
     do {
       const result = await docClient.send(
         new ScanCommand({ TableName: AD_CREATIVES_TABLE, ExclusiveStartKey: exclusiveStartKey })
-      ).catch(() => null);
-      if (result?.Items) {
-        items.push(...(result.Items as Record<string, unknown>[]));
-      }
-      exclusiveStartKey = result?.LastEvaluatedKey;
+      );
+      items.push(...((result.Items || []) as Record<string, unknown>[]));
+      exclusiveStartKey = result.LastEvaluatedKey;
     } while (exclusiveStartKey);
 
     items.sort(
-      (a, b) => new Date((b.createdAt as string) || 0).getTime() - new Date((a.createdAt as string) || 0).getTime()
+      (a, b) => new Date(b.createdAt as string).getTime() - new Date(a.createdAt as string).getTime()
     );
 
     return NextResponse.json({ items });
@@ -58,30 +61,16 @@ export async function POST(request: NextRequest) {
   if (!VALID_PLACEMENTS.includes(placement)) {
     return NextResponse.json({ error: "Invalid placement." }, { status: 400 });
   }
-
-  const isMediaValid =
-    typeof imageUrl === "string" &&
-    (imageUrl.startsWith("data:image/") ||
-      imageUrl.startsWith("data:video/") ||
-      /^https?:\/\//.test(imageUrl.trim()));
-
-  if (!isMediaValid) {
+  if (
+    typeof imageUrl !== "string" ||
+    !imageUrl.startsWith("data:image/") ||
+    imageUrl.length > AD_IMAGE_DATA_URL_MAX_LENGTH
+  ) {
     return NextResponse.json(
-      { error: "A valid image or video media file is required." },
+      { error: "That creative image is too large or invalid. Please try a different image." },
       { status: 400 }
     );
   }
-
-  if (imageUrl.length > MAX_ITEM_PAYLOAD_LENGTH) {
-    return NextResponse.json(
-      {
-        error:
-          "That video or media file exceeds the database item limit. Please select an image poster or a smaller video clip.",
-      },
-      { status: 400 }
-    );
-  }
-
   if (typeof linkUrl !== "string" || !/^https?:\/\//.test(linkUrl.trim())) {
     return NextResponse.json(
       { error: "A valid link URL starting with http:// or https:// is required." },
@@ -105,12 +94,12 @@ export async function POST(request: NextRequest) {
     clicks: 0,
   };
 
-  try {
-    await docClient.send(new PutCommand({ TableName: AD_CREATIVES_TABLE, Item: item }));
-  } catch (err) {
-    console.error("Ad creation PutCommand failed:", err);
-    return NextResponse.json({ error: "Couldn't save that ad creative right now." }, { status: 500 });
-  }
+  await docClient.send(new PutCommand({ TableName: AD_CREATIVES_TABLE, Item: item }));
+
+  // Public /api/ads reads a 30-second cache of this table (see
+  // getAllAdCreatives in app/lib/adCreatives.ts) — without this, a newly
+  // published ad wouldn't show up on the live site for up to 30s.
+  revalidateTag(AD_CREATIVES_TAG, "max");
 
   await logAdminAction({
     request,
@@ -120,7 +109,7 @@ export async function POST(request: NextRequest) {
     targetType: "ad",
     targetId: adId,
     details: `${placement}: ${item.title}`,
-  }).catch(() => null);
+  });
 
   return NextResponse.json({ ad: item });
 }

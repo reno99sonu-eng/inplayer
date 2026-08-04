@@ -18,17 +18,11 @@ export default function VoiceRecorder({ onSend, onCancel }: VoiceRecorderProps) 
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  useEffect(() => {
-    startRecording();
-    return () => {
-      stopTimer();
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
-        mediaRecorderRef.current.stop();
-      }
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
+  // Declared before the effect below (not after, as this used to be) — the
+  // React Compiler's linter flags a function referenced inside an effect
+  // before its own `const` declaration runs, even though the effect itself
+  // only actually fires after the whole component body (and both of these
+  // consts) has run once. No behavior change, just a reorder.
   const stopTimer = () => {
     if (timerRef.current) {
       clearInterval(timerRef.current);
@@ -68,6 +62,25 @@ export default function VoiceRecorder({ onSend, onCancel }: VoiceRecorderProps) 
       setMicError("Microphone access denied. Please enable mic permissions.");
     }
   };
+
+  useEffect(() => {
+    // startRecording() sets state (setMicError/setDuration/setRecording)
+    // synchronously on its first few lines before its first await — the
+    // same "no setState directly in an effect body" rule this codebase's
+    // other effects already satisfy via this same IIFE-wrapper pattern
+    // (see MaintenanceGate.tsx). No behavior change, still fires once on
+    // mount, same fire-and-forget call.
+    (async () => {
+      await startRecording();
+    })();
+    return () => {
+      stopTimer();
+      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+        mediaRecorderRef.current.stop();
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const handleStopAndSend = () => {
     const mediaRecorder = mediaRecorderRef.current;

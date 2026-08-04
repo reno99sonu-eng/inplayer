@@ -27,26 +27,48 @@ async function getShorts(startVideoId?: string): Promise<Short[]> {
     // uploaderIds only) — see app/lib/resolveUsernames — rather than once
     // per short, so the channel name in the feed can link to a real
     // profile.
-    const usernames = await resolveUsernames(items.map((v) => v.uploaderId));
+    const usernames = await resolveUsernames(
+      items.map((v) => v.uploaderId as string | null | undefined)
+    );
 
-    const mapped = items.map((video) => ({
-      id: video.videoId,
-      videoId: video.videoId,
-      muxPlaybackId: video.muxPlaybackId,
-      title: video.title,
-      description: video.description,
-      creator: video.uploaderName || "Unknown",
-      uploaderId: video.uploaderId,
-      uploaderUsername: usernames.get(video.uploaderId),
-      uploaderAvatarUrl: video.uploaderAvatarUrl,
-      poster: video.thumbnailUrl || "/shorts/1.jpg",
-      views: `${video.views || 0} views`,
-      likes: "0",
-      comments: "0",
-      soundtrack: video.shortSettings?.soundtrack ?? null,
-      soundtrackId: video.shortSettings?.soundtrackId ?? null,
-      musicClipSeconds: (video.shortSettings?.musicClipSeconds === 20 ? 20 : 30) as 20 | 30,
-    }));
+    const mapped = items.map((video) => {
+      const videoId = video.videoId as string;
+      const uploaderId = video.uploaderId as string | undefined;
+      // Loosely-shaped, only-known-at-a-point structure stored on the raw
+      // DynamoDB item — cast just the fields this feed actually reads,
+      // matching the real shape of app/data/shorts.ts's Short soundtrack
+      // fields.
+      const shortSettings = video.shortSettings as
+        | {
+            soundtrack?: Short["soundtrack"];
+            soundtrackId?: string | null;
+            musicClipSeconds?: 20 | 30;
+          }
+        | undefined;
+
+      return {
+        id: videoId,
+        videoId,
+        muxPlaybackId: video.muxPlaybackId as string | undefined,
+        title: video.title as string,
+        description: video.description as string | undefined,
+        creator: (video.uploaderName as string) || "Unknown",
+        uploaderId,
+        uploaderUsername: uploaderId
+          ? usernames.get(uploaderId)
+          : undefined,
+        uploaderAvatarUrl: video.uploaderAvatarUrl as string | undefined,
+        poster: (video.thumbnailUrl as string) || "/shorts/1.jpg",
+        views: `${(video.views as number) || 0} views`,
+        likes: "0",
+        comments: "0",
+        soundtrack: shortSettings?.soundtrack ?? null,
+        soundtrackId: shortSettings?.soundtrackId ?? null,
+        musicClipSeconds: (shortSettings?.musicClipSeconds === 20
+          ? 20
+          : 30) as 20 | 30,
+      };
+    });
 
     // Move the requested short to the front so the feed opens on it
     // directly, instead of always starting from the newest upload.

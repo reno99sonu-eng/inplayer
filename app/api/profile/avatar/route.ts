@@ -41,6 +41,12 @@ const result = await docClient.send(
     coverPhotoUrl: result.Item?.coverPhotoUrl || null,
     username: result.Item?.username || null,
     usernamePrivacy: result.Item?.usernamePrivacy || "public",
+    // Real channel bio/description — saved via POST /api/profile/settings
+    // (action: "update_bio") and shown publicly on the channel page
+    // (app/api/users/[username]/route.ts reads the same "description"
+    // field). "bio" is read too since that's the field name the public
+    // channel route already falls back to.
+    description: result.Item?.description || result.Item?.bio || "",
     socialLinks: result.Item?.socialLinks || DEFAULT_SOCIAL_LINKS,
     age: typeof result.Item?.age === "number" ? result.Item.age : null,
     termsAccepted: Boolean(result.Item?.termsAcceptedAt),

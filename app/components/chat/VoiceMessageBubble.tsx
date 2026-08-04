@@ -12,6 +12,7 @@ export default function VoiceMessageBubble({ audioUrl, mine }: VoiceMessageBubbl
   const [isPlaying, setIsPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
@@ -24,6 +25,7 @@ export default function VoiceMessageBubble({ audioUrl, mine }: VoiceMessageBubbl
     };
 
     audio.ontimeupdate = () => {
+      setCurrentTime(audio.currentTime || 0);
       if (audio.duration) {
         setProgress((audio.currentTime / audio.duration) * 100);
       }
@@ -32,6 +34,7 @@ export default function VoiceMessageBubble({ audioUrl, mine }: VoiceMessageBubbl
     audio.onended = () => {
       setIsPlaying(false);
       setProgress(0);
+      setCurrentTime(0);
     };
 
     return () => {
@@ -88,7 +91,7 @@ export default function VoiceMessageBubble({ audioUrl, mine }: VoiceMessageBubbl
 
         {/* Timer stamp */}
         <div className="flex justify-between text-[10px] opacity-80 font-mono">
-          <span>{isPlaying ? formatSecs(audioRef.current?.currentTime || 0) : formatSecs(duration)}</span>
+          <span>{isPlaying ? formatSecs(currentTime) : formatSecs(duration)}</span>
           <span>Voice Note</span>
         </div>
       </div>

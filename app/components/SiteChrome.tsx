@@ -6,6 +6,7 @@ import Navbar from "./Navbar";
 import AnnouncementBanner from "./AnnouncementBanner";
 import MobileBottomNav from "./MobileBottomNav";
 import MaintenanceGate from "./MaintenanceGate";
+import SplashScreen from "./SplashScreen";
 
 // Splits the public site's chrome (top navbar/search/categories, the
 // site-wide announcement banner, the mobile bottom tab bar, and the
@@ -30,11 +31,17 @@ export default function SiteChrome({ children }: { children: ReactNode }) {
   }
 
   return (
-    <MaintenanceGate>
-      <Navbar />
-      <AnnouncementBanner />
-      <div className="pb-20 lg:pb-0">{children}</div>
-      <MobileBottomNav />
-    </MaintenanceGate>
+    <>
+      {/* Overlay only — the real chrome/content below still mounts and
+          loads normally underneath it, so the splash never delays the
+          actual page. */}
+      <SplashScreen />
+      <MaintenanceGate>
+        <Navbar />
+        <AnnouncementBanner />
+        <div className="pb-20 lg:pb-0">{children}</div>
+        <MobileBottomNav />
+      </MaintenanceGate>
+    </>
   );
 }

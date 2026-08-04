@@ -31,12 +31,20 @@ export interface PlaybackSettings {
   dataSaver: boolean;
   rememberPosition: boolean;
   skipIntro: boolean;
-  mobileDownloads: boolean;
+  // mobileDownloads intentionally removed — Downloads is an app-only
+  // feature, not offered on the website at all (see app/downloads/page.tsx
+  // and PlaybackSection.tsx), so there's no "over mobile data" toggle to
+  // control here.
   backgroundPlayback: boolean;
 }
 
 export interface PrivacySettings {
-  privateAccount: boolean;
+  // NOTE: account visibility itself ("Private Account") is NOT stored
+  // here — it's real, server-side state (InPlayer-Users.usernamePrivacy,
+  // set via the Profile page's Public/Connections/Private control and
+  // POST /api/profile/settings' "update_privacy" action) surfaced through
+  // AuthProvider's `user.usernamePrivacy`, not this localStorage-only
+  // provider. See app/components/settings/sections/PrivacySection.tsx.
   watchHistory: boolean;
   personalizedAds: boolean;
 }
@@ -63,11 +71,9 @@ const DEFAULTS: SettingsState = {
     dataSaver: false,
     rememberPosition: true,
     skipIntro: false,
-    mobileDownloads: false,
     backgroundPlayback: true,
   },
   privacy: {
-    privateAccount: false,
     watchHistory: true,
     personalizedAds: true,
   },
@@ -110,8 +116,10 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
   const [ready, setReady] = useState(false);
 
   useEffect(() => {
-    setState(loadSettings());
-    setReady(true);
+    (() => {
+      setState(loadSettings());
+      setReady(true);
+    })();
   }, []);
 
   useEffect(() => {

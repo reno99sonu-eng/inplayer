@@ -55,7 +55,7 @@ export async function GET(request: NextRequest) {
     const weight = categoryWeight; // non-null for TS inside the closure below
     ranked = [...candidates].sort((a, b) => {
       const scoreOf = (v: (typeof candidates)[number]) => {
-        let score = weight.get(v.category) || 0;
+        let score = weight.get(v.category as string) || 0;
         if (v.category === category) score += 3; // still favor "more of this exact video"
         return score;
       };
@@ -66,7 +66,8 @@ export async function GET(request: NextRequest) {
       // Tie-break by recency (candidates already arrive newest-first from
       // getReadyVideos, but re-assert it explicitly post-sort for safety).
       return (
-        new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+        new Date(b.uploadedAt as string).getTime() -
+        new Date(a.uploadedAt as string).getTime()
       );
     });
   } else {

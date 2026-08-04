@@ -12,21 +12,23 @@ export default function Greeting({ name = "there" }: GreetingProps) {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    const hour = new Date().getHours();
+    (() => {
+      const hour = new Date().getHours();
 
-    if (hour >= 5 && hour < 12) {
-      setGreeting("Morning");
-      setIcon("☀️");
-    } else if (hour >= 12 && hour < 17) {
-      setGreeting("Afternoon");
-      setIcon("🌤️");
-    } else if (hour >= 17 && hour < 21) {
-      setGreeting("Evening");
-      setIcon("🌇");
-    } else {
-      setGreeting("Night");
-      setIcon("🌙");
-    }
+      if (hour >= 5 && hour < 12) {
+        setGreeting("Morning");
+        setIcon("☀️");
+      } else if (hour >= 12 && hour < 17) {
+        setGreeting("Afternoon");
+        setIcon("🌤️");
+      } else if (hour >= 17 && hour < 21) {
+        setGreeting("Evening");
+        setIcon("🌇");
+      } else {
+        setGreeting("Night");
+        setIcon("🌙");
+      }
+    })();
 
     const timer = setTimeout(() => {
       setLoaded(true);

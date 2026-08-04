@@ -48,48 +48,64 @@ async function getRealContent(): Promise<RealContent> {
       (v) => !v.visibility || v.visibility === "public"
     );
     const usernames = await resolveUsernames(
-      items.map((video) => video.uploaderId)
+      items.map((video) => video.uploaderId as string | null | undefined)
     );
 
     const realVideos: Recommendation[] = items
       .filter((video) => video.contentType !== "short")
-      .map((video) => ({
-        id: video.videoId,
-        videoId: video.videoId,
-        // Withheld for a members-only video — this feeds the homepage's
-        // hover-preview (see RecommendationFeed.tsx), which would
-        // otherwise play the actual video for anyone hovering the card,
-        // members-only or not. The card still shows and links to /watch,
-        // it just can't preview on hover.
-        muxPlaybackId: video.membersOnly ? undefined : video.muxPlaybackId,
-        title: video.title,
-        creator: video.uploaderName || "Unknown",
-        uploaderUsername: usernames.get(video.uploaderId),
-        avatar: video.uploaderAvatarUrl || "/avatars/avatar.png",
-        thumbnail: video.thumbnailUrl || "/recommendations/thumbnails/1.jpg",
-        views: `${video.views || 0} views`,
-        uploaded: formatTimeAgo(video.uploadedAt),
-        duration: formatDuration(video.duration),
-        verified: false,
-      }));
+      .map((video) => {
+        const videoId = video.videoId as string;
+        const uploaderId = video.uploaderId as string | undefined;
+        return {
+          id: videoId,
+          videoId,
+          // Withheld for a members-only video — this feeds the homepage's
+          // hover-preview (see RecommendationFeed.tsx), which would
+          // otherwise play the actual video for anyone hovering the card,
+          // members-only or not. The card still shows and links to /watch,
+          // it just can't preview on hover.
+          muxPlaybackId: video.membersOnly
+            ? undefined
+            : (video.muxPlaybackId as string | undefined),
+          title: video.title as string,
+          creator: (video.uploaderName as string) || "Unknown",
+          uploaderUsername: uploaderId
+            ? usernames.get(uploaderId)
+            : undefined,
+          avatar: (video.uploaderAvatarUrl as string) || "/avatars/avatar.png",
+          thumbnail:
+            (video.thumbnailUrl as string) ||
+            "/recommendations/thumbnails/1.jpg",
+          views: `${(video.views as number) || 0} views`,
+          uploaded: formatTimeAgo(video.uploadedAt as string),
+          duration: formatDuration(video.duration as number),
+          verified: false,
+        };
+      });
 
     const realShorts: Short[] = items
       .filter((video) => video.contentType === "short")
-      .map((video) => ({
-        id: video.videoId,
-        videoId: video.videoId,
-        muxPlaybackId: video.muxPlaybackId,
-        title: video.title,
-        description: video.description,
-        creator: video.uploaderName || "Unknown",
-        uploaderId: video.uploaderId,
-        uploaderUsername: usernames.get(video.uploaderId),
-        uploaderAvatarUrl: video.uploaderAvatarUrl,
-        poster: video.thumbnailUrl || "/shorts/1.jpg",
-        views: `${video.views || 0} views`,
-        likes: "0",
-        comments: "0",
-      }));
+      .map((video) => {
+        const videoId = video.videoId as string;
+        const uploaderId = video.uploaderId as string | undefined;
+        return {
+          id: videoId,
+          videoId,
+          muxPlaybackId: video.muxPlaybackId as string | undefined,
+          title: video.title as string,
+          description: video.description as string | undefined,
+          creator: (video.uploaderName as string) || "Unknown",
+          uploaderId,
+          uploaderUsername: uploaderId
+            ? usernames.get(uploaderId)
+            : undefined,
+          uploaderAvatarUrl: video.uploaderAvatarUrl as string | undefined,
+          poster: (video.thumbnailUrl as string) || "/shorts/1.jpg",
+          views: `${(video.views as number) || 0} views`,
+          likes: "0",
+          comments: "0",
+        };
+      });
 
     return { realVideos, realShorts };
   } catch (err) {
@@ -161,6 +177,10 @@ export default async function Home({ searchParams }: HomeProps) {
               <div className="mx-auto h-px w-[92%] bg-gradient-to-r from-transparent via-white/10 to-transparent light:via-black/10" />
 
               <TrendingNow />
+
+              <div className="mx-auto h-px w-[92%] bg-gradient-to-r from-transparent via-white/10 to-transparent light:via-black/10" />
+
+              <AdBanner placement="homepage" />
             </>
           )}
 
@@ -169,6 +189,13 @@ export default async function Home({ searchParams }: HomeProps) {
             realShorts={realShorts}
             view={activeView}
           />
+
+          {/* Second, static homepage ad slot — its own admin-configurable
+              source (Admin Panel -> Advertising -> Homepage Spotlight),
+              independent of the banner above. Shown in both Horizontal and
+              Vertical (Shorts) views, unlike the hero-row banner above,
+              which only makes sense alongside the horizontal showcases. */}
+          <AdBanner placement="homepage_spotlight" />
         </div>
       </div>
 

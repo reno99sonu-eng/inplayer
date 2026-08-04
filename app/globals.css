@@ -977,13 +977,12 @@ animation: aiGlassSweep 5.5s linear infinite;
   --media-menu-border-radius: 18px;
   --media-settings-menu-background: rgba(9, 17, 31, 0.98);
   --media-settings-menu-min-width: 230px;
-  --media-menu-item-hover-background: rgba(255, 122, 24, 0.2);
-  --media-menu-item-checked-background: rgba(255, 122, 24, 0.32);
+  --media-menu-item-hover-background: rgba(255, 154, 0, 0.16);
+  --media-menu-item-checked-background: rgba(255, 154, 0, 0.24);
   --media-primary-color: #ffffff;
-  --media-secondary-color: #ff9a00;
-  --media-text-color: #f8fafc;
-  --media-icon-color: #f8fafc;
-  --media-font-family: inherit;
+  --media-secondary-color: #ffb454;
+  --media-text-color: #f1f5f9;
+  --media-icon-color: #f1f5f9;
 }
 
 .light .premium-player {
@@ -997,61 +996,121 @@ animation: aiGlassSweep 5.5s linear infinite;
   --media-secondary-color: #c2410c;
   --media-text-color: #1e293b;
   --media-icon-color: #1e293b;
-  --media-font-family: inherit;
 }
 
-/* Subtitle / Caption Text WebVTT Cue Display Bounds */
-media-captions-display,
-media-text-display {
-  max-height: 52px !important;
-  bottom: 48px !important;
-  overflow: hidden !important;
-}
+/* ---------- Intro splash screen (app/components/SplashScreen.tsx) ---------- */
+/* Shown once per fresh page load, before the site's own already-rendered
+   content is revealed. The fade-OUT is a plain Tailwind opacity transition
+   driven by React state (see SplashScreen.tsx); everything below is the
+   fade-IN burst, which autoplays the moment each element mounts so it needs
+   no JS timing of its own. */
 
-/* Shorts / Raftaar player — 100% turn off & hide captions and CC button */
-.shorts-player media-captions-button,
-.shorts-player media-captions-display,
-.shorts-player media-text-display,
-.shorts-player ::cue,
-.shorts-player video::cue,
-.shorts-player mux-player::cue {
-  display: none !important;
-  opacity: 0 !important;
-  visibility: hidden !important;
-  pointer-events: none !important;
-}
-
-::cue,
-video::cue,
-mux-player::cue {
-  background-color: rgba(6, 12, 22, 0.85) !important;
-  color: #ffffff !important;
-  font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
-  font-size: 0.84rem !important;
-  line-height: 1.3 !important;
-  font-weight: 600 !important;
-  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.9) !important;
-  border-radius: 6px !important;
-  padding: 3px 8px !important;
-  box-decoration-break: clone !important;
-  -webkit-box-decoration-break: clone !important;
-  max-width: 75% !important;
-  text-align: center !important;
-}
-
-@media (max-width: 768px) {
-  media-captions-display,
-  media-text-display {
-    max-height: 20% !important;
-    bottom: 40px !important;
+@keyframes splashLogoIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.35) rotate(-14deg);
+    filter: blur(6px);
   }
-  ::cue,
-  video::cue,
-  mux-player::cue {
-    font-size: 0.72rem !important;
-    line-height: 1.25 !important;
-    padding: 2px 6px !important;
-    max-width: 85% !important;
+  55% {
+    opacity: 1;
+    transform: scale(1.08) rotate(3deg);
+    filter: blur(0);
+  }
+  75% {
+    transform: scale(0.97) rotate(-1deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) rotate(0deg);
+    filter: blur(0);
+  }
+}
+.animate-splash-logo-in {
+  animation: splashLogoIn 1.1s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes splashGlowPulse {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.85;
+    transform: scale(1.18);
+  }
+}
+.animate-splash-glow-pulse {
+  animation: splashGlowPulse 2.6s ease-in-out infinite;
+}
+
+@keyframes splashRingSpin {
+  0% {
+    opacity: 0;
+    transform: rotate(0deg) scale(0.8);
+  }
+  20% {
+    opacity: 0.9;
+  }
+  100% {
+    opacity: 0.55;
+    transform: rotate(360deg) scale(1);
+  }
+}
+.animate-splash-ring-spin {
+  animation: splashRingSpin 3.2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+}
+
+@keyframes splashTaglineIn {
+  0% {
+    opacity: 0;
+    transform: translateY(14px);
+    letter-spacing: 0.35em;
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+    letter-spacing: 0.12em;
+  }
+}
+.animate-splash-tagline-in {
+  animation: splashTaglineIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.55s both;
+}
+
+@keyframes splashParticleDrift {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) scale(0.6);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(var(--splash-particle-x, 40px), var(--splash-particle-y, -60px)) scale(1);
+  }
+}
+.animate-splash-particle {
+  animation: splashParticleDrift 2.4s ease-out infinite;
+}
+
+/* Users who've asked their OS/browser to reduce motion still get the logo
+   and tagline, just as a plain fade — no spin, no scale punch, no drifting
+   particles. */
+@media (prefers-reduced-motion: reduce) {
+  .animate-splash-logo-in,
+  .animate-splash-glow-pulse,
+  .animate-splash-ring-spin,
+  .animate-splash-tagline-in,
+  .animate-splash-particle {
+    animation: none;
+  }
+  .animate-splash-logo-in {
+    opacity: 1;
+  }
+  .animate-splash-tagline-in {
+    opacity: 1;
+    letter-spacing: 0.12em;
   }
 }
 

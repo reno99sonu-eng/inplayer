@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
+import { revalidateTag } from "next/cache";
 import { docClient } from "@/app/lib/dynamodb";
 import { requireAdmin } from "@/app/lib/isAdmin";
 import { logAdminAction } from "@/app/lib/auditLog";
-import { AD_CREATIVES_TABLE } from "@/app/lib/adCreatives";
+import { AD_CREATIVES_TABLE, AD_CREATIVES_TAG } from "@/app/lib/adCreatives";
 
 export async function PATCH(
   request: NextRequest,
@@ -51,6 +52,8 @@ export async function PATCH(
     })
   );
 
+  revalidateTag(AD_CREATIVES_TAG, "max");
+
   await logAdminAction({
     request,
     adminId: admin.userId,
@@ -78,6 +81,8 @@ export async function DELETE(
   const { adId } = await params;
 
   await docClient.send(new DeleteCommand({ TableName: AD_CREATIVES_TABLE, Key: { adId } }));
+
+  revalidateTag(AD_CREATIVES_TAG, "max");
 
   await logAdminAction({
     request,

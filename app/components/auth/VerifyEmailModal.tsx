@@ -26,14 +26,16 @@ export default function VerifyEmailModal({
   const [verified, setVerified] = useState(false);
 
   useEffect(() => {
-    if (!open) {
-      setCode("");
-      setLoading(false);
-      setResending(false);
-      setError(null);
-      setResendMessage(null);
-      setVerified(false);
-    }
+    (() => {
+      if (!open) {
+        setCode("");
+        setLoading(false);
+        setResending(false);
+        setError(null);
+        setResendMessage(null);
+        setVerified(false);
+      }
+    })();
   }, [open]);
 
   // Shows a clear "Verified!" success screen for a beat before switching to

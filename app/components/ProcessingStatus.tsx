@@ -103,7 +103,7 @@ export default function ProcessingStatus({
             Your video is ready!
           </p>
           <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
-            It's now live on InPlayer.
+            It&apos;s now live on InPlayer.
           </p>
         </div>
         <Link
@@ -138,7 +138,7 @@ export default function ProcessingStatus({
         </p>
         <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
           Elapsed: {minutes}:{seconds.toString().padStart(2, "0")} — this
-          updates automatically once it's ready, no need to check manually.
+          updates automatically once it&apos;s ready, no need to check manually.
         </p>
       </div>
     </div>

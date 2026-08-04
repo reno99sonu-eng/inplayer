@@ -95,10 +95,12 @@ export function HomeVideoCard({ video }: { video: Recommendation }) {
   // touch devices "hover" is either unsupported or fires unreliably on
   // first tap, which would make thumbnails flicker/misbehave.
   useEffect(() => {
-    setCanHover(
-      typeof window !== "undefined" &&
-        window.matchMedia("(hover: hover) and (pointer: fine)").matches
-    );
+    (() => {
+      setCanHover(
+        typeof window !== "undefined" &&
+          window.matchMedia("(hover: hover) and (pointer: fine)").matches
+      );
+    })();
   }, []);
 
   // Touch devices have no hover state at all, so the preview never had a
@@ -175,6 +177,12 @@ export function HomeVideoCard({ video }: { video: Recommendation }) {
               muted
               loop
               thumbnailTime={0}
+              // Deliberately NOT wired to Settings → Playback → "Closed
+              // Captions" — this is a silent, muted hover-preview loop, not
+              // real playback, so captions here would just overlay text on
+              // a tiny thumbnail nobody asked to read. The real watch page
+              // (VideoPlayer.tsx), Shorts feed, and live stream player all
+              // do respect the real setting.
               defaultHiddenCaptions={true}
               style={{ width: "100%", height: "100%" }}
             />
@@ -371,22 +379,24 @@ export default function RecommendationFeed({
   ]);
 
   useEffect(() => {
-    const shuffledRecs = [...recommendations];
-    for (let i = shuffledRecs.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffledRecs[i], shuffledRecs[j]] = [shuffledRecs[j], shuffledRecs[i]];
-    }
-    setItems([...realVideos, ...shuffledRecs]);
+    (() => {
+      const shuffledRecs = [...recommendations];
+      for (let i = shuffledRecs.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffledRecs[i], shuffledRecs[j]] = [shuffledRecs[j], shuffledRecs[i]];
+      }
+      setItems([...realVideos, ...shuffledRecs]);
 
-    const shuffledShortsArr = [...shorts];
-    for (let i = shuffledShortsArr.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffledShortsArr[i], shuffledShortsArr[j]] = [
-        shuffledShortsArr[j],
-        shuffledShortsArr[i],
-      ];
-    }
-    setShuffledShorts([...realShorts, ...shuffledShortsArr]);
+      const shuffledShortsArr = [...shorts];
+      for (let i = shuffledShortsArr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shuffledShortsArr[i], shuffledShortsArr[j]] = [
+          shuffledShortsArr[j],
+          shuffledShortsArr[i],
+        ];
+      }
+      setShuffledShorts([...realShorts, ...shuffledShortsArr]);
+    })();
   }, [realVideos, realShorts]);
 
   // Keep the discovery feed in repeating YouTube-style blocks: exactly four

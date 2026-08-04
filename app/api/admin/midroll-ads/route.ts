@@ -1,13 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ScanCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { randomUUID } from "crypto";
+import { revalidateTag } from "next/cache";
 import { docClient } from "@/app/lib/dynamodb";
 import { requireAdmin } from "@/app/lib/isAdmin";
 import { logAdminAction } from "@/app/lib/auditLog";
-import { MIDROLL_ADS_TABLE } from "@/app/lib/videoAds";
-
-// Safe maximum item size budget for DynamoDB (DynamoDB hard limit is 400KB)
-const MAX_ITEM_PAYLOAD_LENGTH = 350_000;
+import {
+  MIDROLL_ADS_TABLE,
+  MIDROLL_ADS_TAG,
+  MIDROLL_IMAGE_DATA_URL_MAX_LENGTH,
+} from "@/app/lib/videoAds";
 
 export async function GET(request: NextRequest) {
   try {
@@ -22,15 +24,13 @@ export async function GET(request: NextRequest) {
     do {
       const result = await docClient.send(
         new ScanCommand({ TableName: MIDROLL_ADS_TABLE, ExclusiveStartKey: exclusiveStartKey })
-      ).catch(() => null);
-      if (result?.Items) {
-        items.push(...(result.Items as Record<string, unknown>[]));
-      }
-      exclusiveStartKey = result?.LastEvaluatedKey;
+      );
+      items.push(...((result.Items || []) as Record<string, unknown>[]));
+      exclusiveStartKey = result.LastEvaluatedKey;
     } while (exclusiveStartKey);
 
     items.sort(
-      (a, b) => new Date((b.createdAt as string) || 0).getTime() - new Date((a.createdAt as string) || 0).getTime()
+      (a, b) => new Date(b.createdAt as string).getTime() - new Date(a.createdAt as string).getTime()
     );
 
     return NextResponse.json({ items });
@@ -55,29 +55,16 @@ export async function POST(request: NextRequest) {
 
   const { imageUrl, linkUrl, title } = body;
 
-  const isMediaValid =
-    typeof imageUrl === "string" &&
-    (imageUrl.startsWith("data:image/") ||
-      imageUrl.startsWith("data:video/") ||
-      /^https?:\/\//.test(imageUrl.trim()));
-
-  if (!isMediaValid) {
+  if (
+    typeof imageUrl !== "string" ||
+    !imageUrl.startsWith("data:image/") ||
+    imageUrl.length > MIDROLL_IMAGE_DATA_URL_MAX_LENGTH
+  ) {
     return NextResponse.json(
-      { error: "A valid image or video media file is required." },
+      { error: "That creative image is too large or invalid. Please try a different image." },
       { status: 400 }
     );
   }
-
-  if (imageUrl.length > MAX_ITEM_PAYLOAD_LENGTH) {
-    return NextResponse.json(
-      {
-        error:
-          "That video or media file exceeds the database item limit. Please select an image poster or a smaller video clip.",
-      },
-      { status: 400 }
-    );
-  }
-
   if (typeof linkUrl !== "string" || !/^https?:\/\//.test(linkUrl.trim())) {
     return NextResponse.json(
       { error: "A valid link URL starting with http:// or https:// is required." },
@@ -101,15 +88,9 @@ export async function POST(request: NextRequest) {
     skips: 0,
   };
 
-  try {
-    await docClient.send(new PutCommand({ TableName: MIDROLL_ADS_TABLE, Item: item }));
-  } catch (err) {
-    console.error("Midroll PutCommand failed:", err);
-    return NextResponse.json(
-      { error: "Couldn't save that midroll ad right now. Please compress or choose a smaller media file." },
-      { status: 500 }
-    );
-  }
+  await docClient.send(new PutCommand({ TableName: MIDROLL_ADS_TABLE, Item: item }));
+
+  revalidateTag(MIDROLL_ADS_TAG, "max");
 
   await logAdminAction({
     request,
@@ -119,7 +100,7 @@ export async function POST(request: NextRequest) {
     targetType: "midroll_ad",
     targetId: adId,
     details: item.title,
-  }).catch(() => null);
+  });
 
   return NextResponse.json({ ad: item });
 }

@@ -20,12 +20,41 @@ const mobilePlaceholders = [
   "Music...",
 ];
 
+// Minimal shape of the Web Speech API's SpeechRecognition — not part of
+// TypeScript's DOM lib (it's still vendor-prefixed/experimental), so we
+// declare just the bits this component actually uses instead of reaching
+// for `any`.
+interface SpeechRecognitionResultLike {
+  transcript: string;
+}
+
+interface SpeechRecognitionEventLike {
+  results?: SpeechRecognitionResultLike[][];
+}
+
+interface SpeechRecognitionLike {
+  lang: string;
+  interimResults: boolean;
+  maxAlternatives: number;
+  onstart: (() => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  start: () => void;
+  stop: () => void;
+}
+
+interface WindowWithSpeechRecognition extends Window {
+  SpeechRecognition?: new () => SpeechRecognitionLike;
+  webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+}
+
 export default function NavbarSearch() {
   const router = useRouter();
   const [isMobile, setIsMobile] = useState(false);
   const [query, setQuery] = useState("");
   const [listening, setListening] = useState(false);
-  const recognitionRef = useRef<any>(null);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
 
   useEffect(() => {
     const update = () => setIsMobile(window.innerWidth < 1024);
@@ -60,9 +89,9 @@ export default function NavbarSearch() {
   // Voice search via the Web Speech API. Supported in Chrome/Edge/Safari;
   // where it isn't, the mic simply focuses the field instead of erroring.
   const startVoice = () => {
+    const win = window as WindowWithSpeechRecognition;
     const SpeechRecognition =
-      (window as any).SpeechRecognition ||
-      (window as any).webkitSpeechRecognition;
+      win.SpeechRecognition || win.webkitSpeechRecognition;
 
     if (!SpeechRecognition) return;
 
@@ -80,7 +109,7 @@ export default function NavbarSearch() {
     recognition.onstart = () => setListening(true);
     recognition.onend = () => setListening(false);
     recognition.onerror = () => setListening(false);
-    recognition.onresult = (event: any) => {
+    recognition.onresult = (event: SpeechRecognitionEventLike) => {
       const transcript = event.results?.[0]?.[0]?.transcript || "";
       if (transcript) {
         setQuery(transcript);

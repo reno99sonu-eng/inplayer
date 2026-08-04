@@ -89,6 +89,9 @@ export interface AuthUser {
   // they've set one.
   handle: string | null;
   usernamePrivacy: UsernamePrivacy;
+  // Real channel bio/description (see app/api/profile/settings.ts's
+  // "update_bio" action) — shown publicly on app/u/[username].
+  bio: string;
   socialLinks: SocialLinks;
   age: number | null;
   termsAccepted: boolean;
@@ -148,6 +151,7 @@ export default function AuthProvider({
       let coverPhotoUrl: string | null = null;
       let handle: string | null = null;
       let usernamePrivacy: UsernamePrivacy = "public";
+      let bio = "";
       let socialLinks: SocialLinks = { social: {}, other: [] };
       let age: number | null = null;
       let termsAccepted = false;
@@ -176,6 +180,7 @@ export default function AuthProvider({
             coverPhotoUrl = data.coverPhotoUrl || null;
             handle = data.username || null;
             usernamePrivacy = data.usernamePrivacy || "public";
+            bio = data.description || "";
             socialLinks = data.socialLinks || { social: {}, other: [] };
             age = typeof data.age === "number" ? data.age : null;
             termsAccepted = Boolean(data.termsAccepted);
@@ -198,6 +203,7 @@ export default function AuthProvider({
         coverPhotoUrl,
         handle,
         usernamePrivacy,
+        bio,
         socialLinks,
         age,
         termsAccepted,
@@ -354,20 +360,23 @@ export default function AuthProvider({
   async function handleAcceptTerms() {
     const session = await fetchAuthSession();
     const idToken = session.tokens?.idToken?.toString();
-    const rawPendingAge = localStorage.getItem("inplayer-pending-age");
-    const parsedAge = rawPendingAge ? Number(rawPendingAge) : 18;
-    const verifiedAge = Number.isInteger(parsedAge) && parsedAge >= 13 ? parsedAge : 18;
-
+    const pendingAge = Number(localStorage.getItem("inplayer-pending-age"));
+    const canCompleteAccount =
+      Number.isInteger(pendingAge) && pendingAge >= 13 && pendingAge <= 120;
     const response = await fetch("/api/profile/settings", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${idToken}`,
       },
-      body: JSON.stringify({ action: "complete_account", age: verifiedAge }),
+      body: JSON.stringify(
+        canCompleteAccount
+          ? { action: "complete_account", age: pendingAge }
+          : { action: "accept_terms" }
+      ),
     });
     if (!response.ok) throw new Error("Couldn't save your terms choice.");
-    localStorage.removeItem("inplayer-pending-age");
+    if (canCompleteAccount) localStorage.removeItem("inplayer-pending-age");
 
     // Hammart: if this person chose "Sell on Hammart" on the sign-up form,
     // the vendor ID/business-type they picked was stashed in localStorage
@@ -492,38 +501,11 @@ export default function AuthProvider({
         onAccept={handleAcceptTerms}
         onReject={handleRejectTerms}
       />
-      {/* Auto-verify age via Google account / Email verification */}
       {!!user && !authLoading && user.termsAccepted && user.age === null && (
-        <AgeAutoVerifyHandler onComplete={refreshUser} />
+        <AgeRequiredModal onComplete={refreshUser} />
       )}
     </AuthContext.Provider>
   );
-}
-
-function AgeAutoVerifyHandler({ onComplete }: { onComplete: () => Promise<void> }) {
-  useEffect(() => {
-    (async () => {
-      try {
-        const session = await fetchAuthSession();
-        const idToken = session.tokens?.idToken?.toString();
-        if (idToken) {
-          await fetch("/api/profile/settings", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-              Authorization: `Bearer ${idToken}`,
-            },
-            body: JSON.stringify({ action: "complete_account", age: 18 }),
-          });
-          await onComplete();
-        }
-      } catch (err) {
-        console.error("Auto age verification failed:", err);
-      }
-    })();
-  }, [onComplete]);
-
-  return null;
 }
 
 export function useAuthModal() {

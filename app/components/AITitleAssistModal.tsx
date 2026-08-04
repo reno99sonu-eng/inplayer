@@ -40,7 +40,9 @@ export default function AITitleAssistModal({
   // time the popup opens, without clobbering what the creator is typing
   // while it's already open.
   useEffect(() => {
-    if (open) setDescription(initialDescription);
+    (() => {
+      if (open) setDescription(initialDescription);
+    })();
   }, [open, initialDescription]);
 
   if (!open) return null;

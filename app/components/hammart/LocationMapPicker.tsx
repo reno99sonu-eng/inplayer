@@ -1,7 +1,25 @@
 "use client";
 
-import { useState } from "react";
-import { MapPin, Navigation, Check, X, Building, Home, Briefcase, ArrowLeft, Plus, Minus, Move } from "lucide-react";
+import { useCallback, useRef, useState } from "react";
+import dynamic from "next/dynamic";
+import { MapPin, Navigation, Check, X, Building, Home, Briefcase, ArrowLeft, Plus, Minus } from "lucide-react";
+import type { Map as LeafletMap } from "leaflet";
+
+// Leaflet reads `window` at import time, so the actual map can only render
+// in the browser — loaded client-only here rather than at the top of the
+// file. See HammartMapCanvas.tsx for why this replaced the old embedded
+// Google Maps iframe: an `output=embed` iframe can't be dragged or read
+// from JavaScript at all, which is exactly why the previous version had to
+// fake panning with four "North/South/East/West" step buttons instead of
+// letting you actually drag the map.
+const HammartMapCanvas = dynamic(() => import("./HammartMapCanvas"), {
+  ssr: false,
+  loading: () => (
+    <div className="flex h-full w-full items-center justify-center text-xs font-bold text-slate-500">
+      Loading map…
+    </div>
+  ),
+});
 
 export interface LocationAddress {
   flatNo: string;
@@ -26,7 +44,12 @@ export default function LocationMapPicker({ onSelectAddress, onClose }: Location
   const [coords, setCoords] = useState<{ lat: number; lng: number }>({ lat: 28.6273, lng: 77.3725 });
   const [zoom, setZoom] = useState(15);
   const [detectSuccess, setDetectSuccess] = useState(false);
-  const [isDraggingMap, setIsDraggingMap] = useState(false);
+  // Bumped whenever something OUTSIDE a user drag needs to move the map
+  // (right now, just GPS auto-detect) — HammartMapCanvas watches this and
+  // flies to (coords.lat, coords.lng) only when it changes, so it never
+  // fights a drag that's already in progress.
+  const [flyToSignal, setFlyToSignal] = useState(0);
+  const mapRef = useRef<LeafletMap | null>(null);
 
   const fetchAddressForCoords = async (lat: number, lng: number) => {
     try {
@@ -56,6 +79,7 @@ export default function LocationMapPicker({ onSelectAddress, onClose }: Location
         const lat = pos.coords.latitude;
         const lng = pos.coords.longitude;
         setCoords({ lat, lng });
+        setFlyToSignal((n) => n + 1);
         await fetchAddressForCoords(lat, lng);
         setDetecting(false);
         setDetectSuccess(true);
@@ -69,13 +93,22 @@ export default function LocationMapPicker({ onSelectAddress, onClose }: Location
     );
   };
 
-  // Draggable Map Pan Handlers
-  const handleMapPan = (dLat: number, dLng: number) => {
-    const newLat = coords.lat + dLat;
-    const newLng = coords.lng + dLng;
-    setCoords({ lat: newLat, lng: newLng });
-    fetchAddressForCoords(newLat, newLng);
-  };
+  // Real drag/zoom handlers — called by HammartMapCanvas from Leaflet's own
+  // moveend/zoomend events, i.e. only after an actual mouse/touch drag or
+  // pinch/scroll gesture finishes. This is what replaced the old fixed-step
+  // "North/South/East/West" buttons.
+  const handleMapReady = useCallback((map: LeafletMap) => {
+    mapRef.current = map;
+  }, []);
+
+  const handleMoveEnd = useCallback((lat: number, lng: number) => {
+    setCoords({ lat, lng });
+    fetchAddressForCoords(lat, lng);
+  }, []);
+
+  const handleZoomEnd = useCallback((z: number) => {
+    setZoom(z);
+  }, []);
 
   const handleConfirm = () => {
     if (!formattedAddress) {
@@ -137,39 +170,48 @@ export default function LocationMapPicker({ onSelectAddress, onClose }: Location
           )}
         </div>
 
-        {/* Interactive Draggable Map Container */}
-        <div className="relative mt-3 h-48 w-full overflow-hidden rounded-2xl border border-white/10 light:border-slate-300 bg-slate-950 light:bg-slate-100 group">
-          <iframe
-            title="Location Map"
-            width="100%"
-            height="100%"
-            frameBorder="0"
-            scrolling="no"
-            src={`https://maps.google.com/maps?q=${coords.lat},${coords.lng}&z=${zoom}&output=embed`}
-            className="filter brightness-95 contrast-105 pointer-events-none"
+        {/* Real, drag-to-pan interactive map (Leaflet + OpenStreetMap) — the
+            pin stays fixed in the center of the view and the map itself
+            moves underneath it as you drag, same pattern as most delivery
+            apps' address pickers. Replaces the old embedded Google Maps
+            iframe, which couldn't be dragged at all (embed iframes ignore
+            all mouse/touch input), so it had to fake panning with four
+            step buttons instead. */}
+        <div className="relative mt-3 h-48 w-full overflow-hidden rounded-2xl border border-white/10 light:border-slate-300 bg-slate-950 light:bg-slate-100">
+          <HammartMapCanvas
+            lat={coords.lat}
+            lng={coords.lng}
+            zoom={zoom}
+            flyToSignal={flyToSignal}
+            onMapReady={handleMapReady}
+            onMoveEnd={handleMoveEnd}
+            onZoomEnd={handleZoomEnd}
           />
 
-          {/* Center Draggable Location Target Marker */}
-          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-            <div className="relative flex flex-col items-center">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-500 shadow-xl shadow-orange-500/50 text-white animate-bounce">
+          {/* Center Location Target Marker — fixed in place; it's the map
+              underneath that moves when you drag. */}
+          <div className="pointer-events-none absolute inset-0 z-[500] flex items-center justify-center">
+            <div className="relative flex flex-col items-center -translate-y-3">
+              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-500 shadow-xl shadow-orange-500/50 text-white">
                 <MapPin size={22} />
               </div>
               <div className="h-2 w-2 rounded-full bg-orange-500/80 blur-xs" />
             </div>
           </div>
 
-          {/* Interactive Map Pan & Drag Controls */}
-          <div className="absolute top-2 right-2 flex flex-col gap-1 z-10">
+          {/* Zoom Controls */}
+          <div className="absolute top-2 right-2 z-[500] flex flex-col gap-1">
             <button
-              onClick={() => setZoom((z) => Math.min(z + 1, 19))}
+              type="button"
+              onClick={() => mapRef.current?.zoomIn()}
               className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-900/90 light:bg-white border border-white/20 light:border-slate-300 text-white light:text-slate-900 shadow-md font-bold hover:bg-slate-800"
               title="Zoom In"
             >
               <Plus size={14} />
             </button>
             <button
-              onClick={() => setZoom((z) => Math.max(z - 1, 3))}
+              type="button"
+              onClick={() => mapRef.current?.zoomOut()}
               className="flex h-7 w-7 items-center justify-center rounded-lg bg-slate-900/90 light:bg-white border border-white/20 light:border-slate-300 text-white light:text-slate-900 shadow-md font-bold hover:bg-slate-800"
               title="Zoom Out"
             >
@@ -177,15 +219,9 @@ export default function LocationMapPicker({ onSelectAddress, onClose }: Location
             </button>
           </div>
 
-          {/* Directional Drag Controls Overlay */}
-          <div className="absolute bottom-2 right-2 flex items-center gap-1 z-10 bg-slate-900/80 light:bg-white/90 backdrop-blur-md p-1 rounded-xl border border-white/10 light:border-slate-300 text-[10px] font-bold text-slate-300 light:text-slate-800">
-            <Move size={12} className="text-orange-400" />
-            <span>Pan Map:</span>
-            <button onClick={() => handleMapPan(0.002, 0)} className="px-1.5 py-0.5 rounded bg-white/10 light:bg-slate-200 hover:bg-orange-500 hover:text-white">▲ North</button>
-            <button onClick={() => handleMapPan(-0.002, 0)} className="px-1.5 py-0.5 rounded bg-white/10 light:bg-slate-200 hover:bg-orange-500 hover:text-white">▼ South</button>
-            <button onClick={() => handleMapPan(0, -0.002)} className="px-1.5 py-0.5 rounded bg-white/10 light:bg-slate-200 hover:bg-orange-500 hover:text-white">◄ West</button>
-            <button onClick={() => handleMapPan(0, 0.002)} className="px-1.5 py-0.5 rounded bg-white/10 light:bg-slate-200 hover:bg-orange-500 hover:text-white">► East</button>
-          </div>
+          <p className="pointer-events-none absolute bottom-1 left-2 z-[500] text-[9px] font-semibold text-white/70 drop-shadow">
+            Drag the map to move the pin
+          </p>
         </div>
 
         {/* Selected Address Display */}

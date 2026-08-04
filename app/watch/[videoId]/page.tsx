@@ -187,12 +187,12 @@ export default async function WatchPage({ params }: WatchPageProps) {
           ageRestricted: video.ageRestricted,
         }}
         relatedVideos={relatedVideos.map((v) => ({
-          videoId: v.videoId,
-          title: v.title,
-          uploaderName: v.uploaderName,
-          views: v.views || 0,
-          uploadedAt: v.uploadedAt,
-          thumbnailUrl: v.thumbnailUrl,
+          videoId: v.videoId as string,
+          title: v.title as string,
+          uploaderName: v.uploaderName as string,
+          views: (v.views as number) || 0,
+          uploadedAt: v.uploadedAt as string,
+          thumbnailUrl: v.thumbnailUrl as string | undefined,
         }))}
       />
     </div>

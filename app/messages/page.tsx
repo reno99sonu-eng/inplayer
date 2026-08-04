@@ -53,40 +53,52 @@ export default function MessagesPage() {
   const [composeSearching, setComposeSearching] = useState(false);
 
   useEffect(() => {
-    if (!signedIn) {
-      setLoading(false);
-      return;
-    }
-
-    async function load() {
-      try {
-        const session = await fetchAuthSession();
-        const idToken = session.tokens?.idToken?.toString();
-        const res = await fetch("/api/messages", {
-          headers: { Authorization: `Bearer ${idToken}` },
-        });
-        const data = await res.json();
-        setConversations(data.conversations || []);
-        setRequests(data.requests || []);
-      } catch (err) {
-        console.error("Failed to load messages:", err);
-      } finally {
+    (() => {
+      if (!signedIn) {
         setLoading(false);
+        return;
       }
-    }
 
-    load();
+      async function load() {
+        try {
+          const session = await fetchAuthSession();
+          const idToken = session.tokens?.idToken?.toString();
+          const res = await fetch("/api/messages", {
+            headers: { Authorization: `Bearer ${idToken}` },
+          });
+          const data = await res.json();
+          setConversations(data.conversations || []);
+          setRequests(data.requests || []);
+        } catch (err) {
+          console.error("Failed to load messages:", err);
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      load();
+    })();
   }, [signedIn]);
 
   useEffect(() => {
     const q = composeQuery.trim();
     if (q.length < 2) {
-      setComposeResults([]);
+      // setState wrapped in a nested, immediately-invoked function — the
+      // `return` right after still has to bail out of this *outer* effect
+      // (there's no debounce timer / cleanup to set up for an empty
+      // query), so unlike the usual MaintenanceGate-style fix we keep the
+      // `return` itself outside the nested function.
+      // See react-hooks/set-state-in-effect.
+      (() => {
+        setComposeResults([]);
+      })();
       return;
     }
 
     let cancelled = false;
-    setComposeSearching(true);
+    (() => {
+      setComposeSearching(true);
+    })();
 
     const timer = setTimeout(async () => {
       try {

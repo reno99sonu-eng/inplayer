@@ -217,7 +217,7 @@ export default function TrendChart({
             <div className="flex flex-col items-center text-center">
               <TrendingUp size={22} className="mb-2 text-orange-400/70" />
               <p className="text-sm font-semibold text-slate-300 light:text-slate-700">
-                Trend history isn't set up yet
+                Trend history isn&apos;t set up yet
               </p>
               <p className="mt-1 max-w-xs text-xs text-slate-500 light:text-slate-500">
                 Ask your developer to finish the analytics setup for day-by-day trends.

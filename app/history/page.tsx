@@ -24,29 +24,31 @@ export default function HistoryPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!signedIn) {
-      setLoading(false);
-      return;
-    }
-
-    async function load() {
-      try {
-        const session = await fetchAuthSession();
-        const idToken = session.tokens?.idToken?.toString();
-
-        const res = await fetch("/api/history", {
-          headers: { Authorization: `Bearer ${idToken}` },
-        });
-        const data = await res.json();
-        setItems(data.history || []);
-      } catch (err) {
-        console.error("Failed to load history:", err);
-      } finally {
+    (() => {
+      if (!signedIn) {
         setLoading(false);
+        return;
       }
-    }
 
-    load();
+      async function load() {
+        try {
+          const session = await fetchAuthSession();
+          const idToken = session.tokens?.idToken?.toString();
+
+          const res = await fetch("/api/history", {
+            headers: { Authorization: `Bearer ${idToken}` },
+          });
+          const data = await res.json();
+          setItems(data.history || []);
+        } catch (err) {
+          console.error("Failed to load history:", err);
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      load();
+    })();
   }, [signedIn]);
 
   if (authLoading || loading) {

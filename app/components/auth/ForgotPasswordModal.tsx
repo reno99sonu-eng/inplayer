@@ -25,15 +25,17 @@ export default function ForgotPasswordModal({
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    if (!open) {
-      setStep("request");
-      setEmail("");
-      setCode("");
-      setNewPassword("");
-      setLoading(false);
-      setError(null);
-      setSuccess(false);
-    }
+    (() => {
+      if (!open) {
+        setStep("request");
+        setEmail("");
+        setCode("");
+        setNewPassword("");
+        setLoading(false);
+        setError(null);
+        setSuccess(false);
+      }
+    })();
   }, [open]);
 
   const handleRequestCode = async () => {

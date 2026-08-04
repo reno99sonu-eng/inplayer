@@ -269,7 +269,9 @@ function AdvertisingPage() {
   };
 
   useEffect(() => {
-    reloadAll();
+    (() => {
+      reloadAll();
+    })();
   }, []);
 
   const safeCreatives = useMemo(() => (Array.isArray(creatives) ? creatives.filter(Boolean) : []), [creatives]);

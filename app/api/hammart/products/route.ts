@@ -15,10 +15,10 @@ export async function GET(request: NextRequest) {
   const category = request.nextUrl.searchParams.get("category") || undefined;
   const vendorId = request.nextUrl.searchParams.get("vendorId") || undefined;
 
-  let { products, tableMissing } = await listActiveProducts({ category });
-  if (vendorId) {
-    products = products.filter((p) => p.vendorId === vendorId || p.vendorUserId === vendorId);
-  }
+  const { products: allProducts, tableMissing } = await listActiveProducts({ category });
+  const products = vendorId
+    ? allProducts.filter((p) => p.vendorId === vendorId || p.vendorUserId === vendorId)
+    : allProducts;
   return NextResponse.json({ products, tableMissing });
 }
 

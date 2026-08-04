@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
+import { revalidateTag } from "next/cache";
 import { docClient } from "@/app/lib/dynamodb";
 import { requireAdmin } from "@/app/lib/isAdmin";
 import { logAdminAction } from "@/app/lib/auditLog";
-import { MIDROLL_ADS_TABLE } from "@/app/lib/videoAds";
+import { MIDROLL_ADS_TABLE, MIDROLL_ADS_TAG } from "@/app/lib/videoAds";
 
 export async function PATCH(
   request: NextRequest,
@@ -51,6 +52,8 @@ export async function PATCH(
     })
   );
 
+  revalidateTag(MIDROLL_ADS_TAG, "max");
+
   await logAdminAction({
     request,
     adminId: admin.userId,
@@ -78,6 +81,8 @@ export async function DELETE(
   const { adId } = await params;
 
   await docClient.send(new DeleteCommand({ TableName: MIDROLL_ADS_TABLE, Key: { adId } }));
+
+  revalidateTag(MIDROLL_ADS_TAG, "max");
 
   await logAdminAction({
     request,

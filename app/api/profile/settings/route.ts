@@ -88,6 +88,29 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: true });
   }
 
+  if (action === "update_bio") {
+    const { description } = body;
+    const trimmed = typeof description === "string" ? description.trim().slice(0, 500) : "";
+
+    // This is the real, persisted channel bio — the public channel page
+    // (app/api/users/[username]/route.ts) reads this same "description"
+    // field, so saving here is what actually makes a creator's bio show up
+    // at app/u/[username], not just on their own My Videos → Profile tab.
+    await docClient.send(
+      new UpdateCommand({
+        TableName: "InPlayer-Users",
+        Key: { userId: user.userId },
+        UpdateExpression: "SET description = :d, updatedAt = :u",
+        ExpressionAttributeValues: {
+          ":d": trimmed,
+          ":u": new Date().toISOString(),
+        },
+      })
+    );
+
+    return NextResponse.json({ success: true });
+  }
+
   if (action === "complete_account") {
     const age = Number(body.age);
     if (!Number.isInteger(age) || age < 13 || age > 120) {

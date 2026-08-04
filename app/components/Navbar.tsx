@@ -65,39 +65,37 @@ export default function Navbar() {
   }, []);
 
   useEffect(() => {
-    if (!signedIn) {
-      setSubscribedChannels([]);
-      return;
-    }
-  
-    async function loadSubscriptions() {
+    (async () => {
+      if (!signedIn) {
+        setSubscribedChannels([]);
+        return;
+      }
+
       try {
         const session = await fetchAuthSession();
         const idToken = session.tokens?.idToken?.toString();
-    
+
         if (!idToken) {
           return;
         }
-    
+
         const res = await fetch("/api/subscriptions/list", {
           headers: {
             Authorization: `Bearer ${idToken}`,
           },
         });
-    
+
         if (!res.ok) {
           console.error(await res.text());
           return;
         }
-    
+
         const data = await res.json();
         setSubscribedChannels(data.subscriptions ?? []);
       } catch (err) {
         console.error("Failed to load subscriptions:", err);
       }
-    }
-  
-    loadSubscriptions();
+    })();
   }, [signedIn]);
 
   const copyEmail = async (address: string) => {
@@ -728,11 +726,11 @@ lg:right-auto
   {subscribedChannels.length === 0 ? (
     <div className="rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-4 text-center">
       <p className="text-sm font-medium text-slate-200 light:text-slate-700">
-        You don't have any subscribed channels yet.
+        You don&apos;t have any subscribed channels yet.
       </p>
 
       <p className="mt-1 text-xs text-slate-400 light:text-slate-500">
-        Subscribe to your favourite creators and they'll appear here.
+        Subscribe to your favourite creators and they&apos;ll appear here.
       </p>
 
       <button

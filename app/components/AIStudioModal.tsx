@@ -70,13 +70,15 @@ export default function AIStudioModal({
 
   // Reset everything when the popup closes, so it's fresh next time it opens
   useEffect(() => {
-    if (!open) {
-      setPrompt("");
-      setResult(null);
-      setError(null);
-      setLoading(false);
-      setView("prompt");
-    }
+    (() => {
+      if (!open) {
+        setPrompt("");
+        setResult(null);
+        setError(null);
+        setLoading(false);
+        setView("prompt");
+      }
+    })();
   }, [open]);
 
   const handleGenerate = async () => {

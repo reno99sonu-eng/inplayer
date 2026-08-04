@@ -26,6 +26,14 @@ function emptyStats(): EmptyStats {
   return { count: 0, reach: 0, views: 0, likes: 0, comments: 0, shares: 0 };
 }
 
+interface TrendPoint {
+  date: string;
+  views: number;
+  likes: number;
+  comments: number;
+  shares: number;
+}
+
 const DAILY_STATS_TABLE = "InPlayer-Channel-Daily-Stats";
 const TREND_DAYS = 30;
 
@@ -144,7 +152,10 @@ export async function GET(request: NextRequest) {
   // Needs the InPlayer-Channel-Daily-Stats table to exist (userId partition
   // key, date sort key) — if it doesn't yet, the rest of this response is
   // still fully real; only the trend arrays come back empty.
-  let trend: { videos: any[]; shorts: any[] } = { videos: [], shorts: [] };
+  let trend: { videos: TrendPoint[]; shorts: TrendPoint[] } = {
+    videos: [],
+    shorts: [],
+  };
   let trendAvailable = true;
 
   try {
@@ -187,18 +198,18 @@ export async function GET(request: NextRequest) {
     );
     trend = {
       videos: points.map((p) => ({
-        date: p.date,
-        views: p.videoViews || 0,
-        likes: p.videoLikes || 0,
-        comments: p.videoComments || 0,
-        shares: p.videoShares || 0,
+        date: p.date as string,
+        views: (p.videoViews as number) || 0,
+        likes: (p.videoLikes as number) || 0,
+        comments: (p.videoComments as number) || 0,
+        shares: (p.videoShares as number) || 0,
       })),
       shorts: points.map((p) => ({
-        date: p.date,
-        views: p.shortViews || 0,
-        likes: p.shortLikes || 0,
-        comments: p.shortComments || 0,
-        shares: p.shortShares || 0,
+        date: p.date as string,
+        views: (p.shortViews as number) || 0,
+        likes: (p.shortLikes as number) || 0,
+        comments: (p.shortComments as number) || 0,
+        shares: (p.shortShares as number) || 0,
       })),
     };
   } catch (err) {

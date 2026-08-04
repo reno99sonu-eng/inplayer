@@ -27,14 +27,16 @@ export default function TermsAcceptanceModal({
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    if (open) {
-      setMounted(true);
-      const raf = requestAnimationFrame(() => setVisible(true));
-      return () => cancelAnimationFrame(raf);
-    }
-    setVisible(false);
-    const timeout = setTimeout(() => setMounted(false), 220);
-    return () => clearTimeout(timeout);
+    return (() => {
+      if (open) {
+        setMounted(true);
+        const raf = requestAnimationFrame(() => setVisible(true));
+        return () => cancelAnimationFrame(raf);
+      }
+      setVisible(false);
+      const timeout = setTimeout(() => setMounted(false), 220);
+      return () => clearTimeout(timeout);
+    })();
   }, [open]);
 
   const run = async (choice: "accept" | "reject") => {

@@ -12,8 +12,8 @@ export const READY_VIDEOS_TAG = "ready-videos";
 // library grows) and pre-sorted newest-first, since every consumer wants
 // that ordering anyway.
 async function scanReadyVideos() {
-  const items: Record<string, any>[] = [];
-  let exclusiveStartKey: Record<string, any> | undefined;
+  const items: Record<string, unknown>[] = [];
+  let exclusiveStartKey: Record<string, unknown> | undefined;
 
   do {
     const result = await docClient.send(
@@ -41,13 +41,14 @@ async function scanReadyVideos() {
 
     items.push(...(result.Items || []));
     exclusiveStartKey = result.LastEvaluatedKey as
-      | Record<string, any>
+      | Record<string, unknown>
       | undefined;
   } while (exclusiveStartKey);
 
   items.sort(
     (a, b) =>
-      new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
+      new Date(b.uploadedAt as string).getTime() -
+      new Date(a.uploadedAt as string).getTime()
   );
 
   return items;

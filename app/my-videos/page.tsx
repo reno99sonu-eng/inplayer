@@ -117,71 +117,92 @@ export default function MyVideosPage() {
   const [payoutStatus, setPayoutStatus] = useState<PayoutStatus | null>(null);
   const [payoutLoading, setPayoutLoading] = useState(true);
 
-  // Load Channel Bio from localStorage
+  // Load Channel Bio — real, persisted value from InPlayer-Users
+  // (AuthProvider fetches it via GET /api/profile/avatar), not a
+  // browser-only localStorage copy. This is what makes the bio actually
+  // show up on the public channel page (app/u/[username]) instead of only
+  // ever being visible on this device, in this browser.
   useEffect(() => {
-    try {
-      const savedBio = localStorage.getItem(`inplayer-channel-bio-${user?.userId || "me"}`);
-      if (savedBio) setChannelBio(savedBio);
-    } catch {
-      /* ignore */
-    }
-  }, [user?.userId]);
+    (() => {
+      setChannelBio(user?.bio || "");
+    })();
+  }, [user?.bio]);
 
-  const handleSaveBio = () => {
+  const handleSaveBio = async () => {
     setSavingBio(true);
     try {
-      localStorage.setItem(`inplayer-channel-bio-${user?.userId || "me"}`, channelBio);
+      const session = await fetchAuthSession();
+      const idToken = session.tokens?.idToken?.toString();
+
+      const res = await fetch("/api/profile/settings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({ action: "update_bio", description: channelBio }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        setError(data.error || "Couldn't save your bio right now.");
+        return;
+      }
+
       setBioSaved(true);
       setTimeout(() => setBioSaved(false), 2200);
     } catch (err) {
       console.error("Failed to save bio:", err);
+      setError("Couldn't save your bio right now.");
     } finally {
       setSavingBio(false);
     }
   };
 
   useEffect(() => {
-    if (!signedIn) {
-      setLoading(false);
-      setAnalyticsLoading(false);
-      setPayoutLoading(false);
-      return;
-    }
-
-    async function load() {
-      try {
-        const session = await fetchAuthSession();
-        const idToken = session.tokens?.idToken?.toString();
-        const headers = { Authorization: `Bearer ${idToken}` };
-
-        const [videosRes, analyticsRes, payoutRes] = await Promise.all([
-          fetch("/api/my-videos", { headers }),
-          fetch("/api/my-videos/analytics", { headers }),
-          fetch("/api/creator/payout-status", { headers }),
-        ]);
-
-        const videosData = await videosRes.json();
-        setVideos(videosData.videos || []);
-        setLoading(false);
-
-        if (analyticsRes.ok) {
-          setAnalytics(await analyticsRes.json());
-        }
-        setAnalyticsLoading(false);
-
-        if (payoutRes.ok) {
-          setPayoutStatus(await payoutRes.json());
-        }
-        setPayoutLoading(false);
-      } catch (err) {
-        console.error("Failed to load your channel:", err);
+    (() => {
+      if (!signedIn) {
         setLoading(false);
         setAnalyticsLoading(false);
         setPayoutLoading(false);
+        return;
       }
-    }
 
-    load();
+      async function load() {
+        try {
+          const session = await fetchAuthSession();
+          const idToken = session.tokens?.idToken?.toString();
+          const headers = { Authorization: `Bearer ${idToken}` };
+
+          const [videosRes, analyticsRes, payoutRes] = await Promise.all([
+            fetch("/api/my-videos", { headers }),
+            fetch("/api/my-videos/analytics", { headers }),
+            fetch("/api/creator/payout-status", { headers }),
+          ]);
+
+          const videosData = await videosRes.json();
+          setVideos(videosData.videos || []);
+          setLoading(false);
+
+          if (analyticsRes.ok) {
+            setAnalytics(await analyticsRes.json());
+          }
+          setAnalyticsLoading(false);
+
+          if (payoutRes.ok) {
+            setPayoutStatus(await payoutRes.json());
+          }
+          setPayoutLoading(false);
+        } catch (err) {
+          console.error("Failed to load your channel:", err);
+          setLoading(false);
+          setAnalyticsLoading(false);
+          setPayoutLoading(false);
+        }
+      }
+
+      load();
+    })();
   }, [signedIn]);
 
   const startEditing = (video: MyVideo) => {

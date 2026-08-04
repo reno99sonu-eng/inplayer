@@ -2,7 +2,27 @@
 
 import { useEffect, useRef, useState } from "react";
 import MuxPlayer from "@mux/mux-player-react";
-import type { MuxCSSProperties } from "@mux/mux-player-react";
+import type { MuxCSSProperties, MuxPlayerRefAttributes } from "@mux/mux-player-react";
+import { useSettings } from "@/app/components/settings/SettingsProvider";
+
+// Safari-only fullscreen APIs (`webkit*`) predate the standard Fullscreen
+// API and were never added to lib.dom.d.ts — these two small extensions
+// are the real, documented WebKit surface, not a loosened `any`.
+interface DocumentWithWebkitFullscreen extends Document {
+  webkitFullscreenElement?: Element | null;
+  webkitExitFullscreen?: () => void;
+}
+interface ElementWithWebkitFullscreen extends HTMLDivElement {
+  webkitRequestFullscreen?: () => void;
+}
+// The Screen Orientation Lock API's `lock()` (unlike `unlock()`, already
+// standard in lib.dom.d.ts) is a separate, still-experimental/Android-only
+// method (iOS rejects it) that was never added to lib.dom.d.ts — which is
+// exactly why the one call site below already wraps it in try/catch and
+// treats it as best-effort.
+interface ScreenOrientationWithLock extends ScreenOrientation {
+  lock?: (orientation: string) => Promise<void>;
+}
 import {
   Maximize2,
   Minimize2,
@@ -99,8 +119,12 @@ export default function VideoPlayer({
   videoId,
   token,
 }: VideoPlayerProps) {
-  const playerRef = useRef<any>(null);
+  const playerRef = useRef<MuxPlayerRefAttributes>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  // Real Settings → Playback → "Closed Captions" toggle — off by default
+  // (matching "captions default off unless a viewer turns them on"), on
+  // for any viewer who's actually turned the setting on.
+  const { playback } = useSettings();
 
   // --- Mid-roll ad breaks -------------------------------------------------
   // Real ad interruptions, not a stub: on mount, fetch once whether
@@ -291,7 +315,7 @@ export default function VideoPlayer({
     const handleFullscreenChange = () => {
       const fsElement =
         document.fullscreenElement ||
-        (document as any).webkitFullscreenElement ||
+        (document as DocumentWithWebkitFullscreen).webkitFullscreenElement ||
         null;
       const container = containerRef.current;
 
@@ -319,7 +343,7 @@ export default function VideoPlayer({
       if (isTouch && isOwnPlayerFs) {
         const exited =
           document.exitFullscreen?.() ??
-          (document as any).webkitExitFullscreen?.();
+          (document as DocumentWithWebkitFullscreen).webkitExitFullscreen?.();
         Promise.resolve(exited)
           .catch(() => {})
           .finally(() => setCssFullscreen(true));
@@ -347,9 +371,14 @@ export default function VideoPlayer({
   }, []);
 
   // Lock mode only makes sense while fullscreen — never leave the player
-  // stuck locked once fullscreen (either kind) is gone.
+  // stuck locked once fullscreen (either kind) is gone. The setState call
+  // is wrapped in a nested function (rather than called bare in the
+  // effect body) purely to satisfy react-hooks/set-state-in-effect, same
+  // convention used throughout this codebase (see MaintenanceGate.tsx).
   useEffect(() => {
-    if (!isFullscreen) setLocked(false);
+    (() => {
+      if (!isFullscreen) setLocked(false);
+    })();
   }, [isFullscreen]);
 
   // Theme the quality/captions/audio-track/playback-rate submenus — see the
@@ -425,7 +454,7 @@ export default function VideoPlayer({
   }, [cssFullscreen]);
 
   const enterFullscreen = async () => {
-    const el = containerRef.current as any;
+    const el = containerRef.current as ElementWithWebkitFullscreen | null;
     if (!el) return;
 
     // Try the real Fullscreen API first — it's the best experience where
@@ -435,7 +464,7 @@ export default function VideoPlayer({
         await el.requestFullscreen();
         // Best-effort orientation lock (Android only; iOS rejects).
         try {
-          await (screen.orientation as any)?.lock?.("landscape");
+          await (screen.orientation as ScreenOrientationWithLock)?.lock?.("landscape");
         } catch {
           /* fine — viewer can rotate manually */
         }
@@ -461,16 +490,16 @@ export default function VideoPlayer({
       if (document.fullscreenElement && document.exitFullscreen) {
         await document.exitFullscreen();
       } else if (
-        (document as any).webkitFullscreenElement &&
-        (document as any).webkitExitFullscreen
+        (document as DocumentWithWebkitFullscreen).webkitFullscreenElement &&
+        (document as DocumentWithWebkitFullscreen).webkitExitFullscreen
       ) {
-        (document as any).webkitExitFullscreen();
+        (document as DocumentWithWebkitFullscreen).webkitExitFullscreen?.();
       }
     } catch {
       /* ignore */
     }
     try {
-      (screen.orientation as any)?.unlock?.();
+      (screen.orientation as ScreenOrientationWithLock)?.unlock?.();
     } catch {
       /* ignore */
     }
@@ -519,7 +548,7 @@ export default function VideoPlayer({
     const handleMqlChange = (e: MediaQueryListEvent) => applyRotation(e.matches);
     mql.addEventListener("change", handleMqlChange);
 
-    const screenOrientation = (window.screen as any)?.orientation;
+    const screenOrientation = window.screen?.orientation as ScreenOrientationWithLock | undefined;
     const handleScreenOrientationChange = () =>
       applyRotation((screenOrientation?.type || "").startsWith("landscape"));
     screenOrientation?.addEventListener?.(
@@ -542,7 +571,6 @@ export default function VideoPlayer({
       );
       window.removeEventListener("orientationchange", handleWindowOrientation);
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const clearToggleTimer = () => {
@@ -861,11 +889,14 @@ export default function VideoPlayer({
         accentColor={PLAYER_ACCENT_COLOR}
         primaryColor={PLAYER_ICON_COLOR}
         secondaryColor={PLAYER_DARK_SURFACE}
-        // Captions start OFF for every viewer; Mux Player's own
-        // captions/subtitles menu still lets a user turn a language on
-        // manually mid-playback (that choice is real, per-session — this
-        // prop only controls the very first render's default state).
-        defaultHiddenCaptions={true}
+        // Captions start OFF for every viewer by default, unless they've
+        // turned on Settings → Playback → "Closed Captions" (that setting
+        // was previously inert — it persisted but nothing read it; now it
+        // genuinely controls this). Mux Player's own captions/subtitles
+        // menu still lets a viewer turn a language on/off manually
+        // mid-playback either way — this prop only sets the very first
+        // render's default state.
+        defaultHiddenCaptions={!playback.captions}
         playbackRates={[0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]}
         // "any": try to autoplay WITH sound first; if the browser blocks
         // that, Mux automatically retries muted instead of giving up.

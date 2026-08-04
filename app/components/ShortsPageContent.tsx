@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import MuxPlayer from "@mux/mux-player-react";
+import MuxPlayer, { type MuxPlayerRefAttributes } from "@mux/mux-player-react";
 import { useRouter } from "next/navigation";
 import { fetchAuthSession } from "aws-amplify/auth";
 import {
@@ -21,6 +21,7 @@ import {
 import type { Short } from "../data/shorts";
 import { getSoundtrackById } from "../data/soundtracks";
 import { useAuthModal } from "./auth/AuthProvider";
+import { useSettings } from "./settings/SettingsProvider";
 import CommentSection from "./CommentSection";
 import { recordShare } from "./ShareButton";
 
@@ -57,9 +58,12 @@ export default function ShortsPageContent({
 }: ShortsPageContentProps) {
   const router = useRouter();
   const { signedIn, user, openSignIn } = useAuthModal();
+  // Real Settings → Playback → "Closed Captions" toggle — off by default
+  // (matching "captions default off unless a viewer turns them on"), on
+  // for any viewer who's actually turned the setting on.
+  const { playback } = useSettings();
 
   const shorts = initialShorts;
-  console.log(initialShorts);
   const [activeIndex, setActiveIndex] = useState(0);
   // Try for sound from the very first frame (matches the watch page) —
   // paired with autoPlay="any" below, which attempts unmuted playback
@@ -90,7 +94,7 @@ export default function ShortsPageContent({
   >({});
 
   const slideRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const playerRef = useRef<any>(null);
+  const playerRef = useRef<MuxPlayerRefAttributes | null>(null);
   // Background soundtrack (see app/data/soundtracks.ts) chosen at upload
   // time for whichever Short is active — a single shared <audio> element,
   // same idea as the one shared MuxPlayer instance below, kept and driven
@@ -112,7 +116,7 @@ export default function ShortsPageContent({
   // mute/like.
   const [speedBoost, setSpeedBoost] = useState(false);
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const holdPlayerRef = useRef<any>(null);
+  const holdPlayerRef = useRef<MuxPlayerRefAttributes | null>(null);
   const suppressClickRef = useRef(false);
 
   const startHold = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -128,7 +132,9 @@ export default function ShortsPageContent({
     if (holdTimerRef.current) clearTimeout(holdTimerRef.current);
     holdTimerRef.current = setTimeout(() => {
       holdTimerRef.current = null;
-      const playerEl = container.querySelector("mux-player") as any;
+      const playerEl = container.querySelector(
+        "mux-player"
+      ) as MuxPlayerRefAttributes | null;
       if (playerEl) {
         holdPlayerRef.current = playerEl;
         playerEl.playbackRate = 2;
@@ -183,6 +189,7 @@ export default function ShortsPageContent({
     if (!player) return;
 
     function handleTimeUpdate() {
+      if (!player) return;
       if (player.duration) {
         setProgress((player.currentTime / player.duration) * 100);
       }
@@ -205,6 +212,7 @@ export default function ShortsPageContent({
     if (!player) return;
 
     function syncMuted() {
+      if (!player) return;
       setMuted(player.muted);
     }
 
@@ -861,9 +869,11 @@ export default function ShortsPageContent({
                         loop
                         muted={muted}
                         thumbnailTime={0}
-                        // Captions start OFF; Mux Player's own captions
-                        // menu still lets a viewer turn a language on.
-                        defaultHiddenCaptions={true}
+                        // Real Settings → Playback → "Closed Captions"
+                        // toggle — off by default; Mux Player's own
+                        // captions menu still lets a viewer turn a
+                        // language on manually either way.
+                        defaultHiddenCaptions={!playback.captions}
                         style={{ height: "100%", width: "100%" }}
                       />
                     </div>

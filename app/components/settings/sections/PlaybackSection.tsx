@@ -10,7 +10,6 @@ import {
   BadgeHelp,
   Volume2,
   Database,
-  Download,
   History,
   FastForward,
 } from "lucide-react";
@@ -26,7 +25,19 @@ import { useSettings } from "../SettingsProvider";
 // most deceptive stub in the app: RecommendationFeed.tsx already reads
 // settings.playback.dataSaver for real (to gate autoplaying previews), but
 // this toggle never called updatePlayback(), so flipping it on screen had
-// zero effect on that downstream behavior.
+// zero effect on that downstream behavior. Closed Captions is likewise
+// real now (see VideoPlayer.tsx / ShortsPageContent.tsx / live/page.tsx).
+//
+// The rest of the controls below (quality selects, autoplay, PiP, resume
+// position, skip intro, mobile downloads, background playback) would each
+// need real player-level engineering — adaptive bitrate selection,
+// picture-in-picture wiring, a saved-position store, intro-detection,
+// offline downloads, a background-audio session — none of which exist
+// yet. Rather than let them keep silently doing nothing when touched,
+// they're marked disabled/"Coming soon" here, matching the same honest
+// pattern already used for Premium billing (PlansSection.tsx) and the
+// removed "Earn Stars" row (GeneralSection.tsx) — no dummy controls that
+// look functional but aren't.
 export default function PlaybackSection() {
   const { playback, updatePlayback } = useSettings();
 
@@ -45,7 +56,7 @@ export default function PlaybackSection() {
         <SettingsRow
           icon={<Smartphone size={20} />}
           title="Mobile Streaming"
-          description="Quality while using mobile data."
+          description="Coming soon — quality while using mobile data."
         >
           <SettingsSelect
             value={playback.mobileQuality}
@@ -56,13 +67,14 @@ export default function PlaybackSection() {
               "720p",
               "1080p",
             ]}
+            disabled
           />
         </SettingsRow>
 
         <SettingsRow
           icon={<Wifi size={20} />}
           title="Wi-Fi Streaming"
-          description="Quality while connected to Wi-Fi."
+          description="Coming soon — quality while connected to Wi-Fi."
         >
           <SettingsSelect
             value={playback.wifiQuality}
@@ -73,13 +85,14 @@ export default function PlaybackSection() {
               "1440p",
               "Ultra HD (4K)",
             ]}
+            disabled
           />
         </SettingsRow>
 
         <SettingsRow
           icon={<Volume2 size={20} />}
           title="Audio Quality"
-          description="Preferred streaming audio quality."
+          description="Coming soon — preferred streaming audio quality."
         >
           <SettingsSelect
             value={playback.audioQuality}
@@ -90,6 +103,7 @@ export default function PlaybackSection() {
               "High",
               "Lossless",
             ]}
+            disabled
           />
         </SettingsRow>
         <SettingsSectionTitle
@@ -99,22 +113,24 @@ export default function PlaybackSection() {
         <SettingsRow
           icon={<PlayCircle size={20} />}
           title="Autoplay Next Video"
-          description="Automatically continue watching."
+          description="Coming soon — automatically continue watching."
         >
           <SettingsToggle
             checked={playback.autoplay}
             onChange={(checked) => updatePlayback({ autoplay: checked })}
+            disabled
           />
         </SettingsRow>
 
         <SettingsRow
           icon={<PictureInPicture2 size={20} />}
           title="Picture in Picture"
-          description="Continue watching while using other apps."
+          description="Coming soon — continue watching while using other apps."
         >
           <SettingsToggle
             checked={playback.pip}
             onChange={(checked) => updatePlayback({ pip: checked })}
+            disabled
           />
         </SettingsRow>
         <SettingsSectionTitle
@@ -133,7 +149,7 @@ export default function PlaybackSection() {
         </SettingsRow>
         <SettingsSectionTitle
   title="Data"
-  subtitle="Manage downloads and data usage."
+  subtitle="Manage data usage."
 />
 
 <SettingsRow
@@ -150,44 +166,36 @@ export default function PlaybackSection() {
 <SettingsRow
   icon={<History size={20} />}
   title="Remember Playback Position"
-  description="Resume videos where you left off."
+  description="Coming soon — resume videos where you left off."
 >
   <SettingsToggle
     checked={playback.rememberPosition}
     onChange={(checked) => updatePlayback({ rememberPosition: checked })}
+    disabled
   />
 </SettingsRow>
 
 <SettingsRow
   icon={<FastForward size={20} />}
   title="Skip Intro Automatically"
-  description="Skip intros when available."
+  description="Coming soon — skip intros when available."
 >
   <SettingsToggle
     checked={playback.skipIntro}
     onChange={(checked) => updatePlayback({ skipIntro: checked })}
-  />
-</SettingsRow>
-
-<SettingsRow
-  icon={<Download size={20} />}
-  title="Downloads over Mobile Data"
-  description="Allow downloads without Wi-Fi."
->
-  <SettingsToggle
-    checked={playback.mobileDownloads}
-    onChange={(checked) => updatePlayback({ mobileDownloads: checked })}
+    disabled
   />
 </SettingsRow>
 
 <SettingsRow
   icon={<PlayCircle size={20} />}
   title="Background Playback"
-  description="Continue playing while using other apps."
+  description="Coming soon — continue playing while using other apps."
 >
   <SettingsToggle
     checked={playback.backgroundPlayback}
     onChange={(checked) => updatePlayback({ backgroundPlayback: checked })}
+    disabled
   />
 </SettingsRow>
 

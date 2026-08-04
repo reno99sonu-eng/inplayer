@@ -6,18 +6,21 @@ interface SettingsSelectProps {
   value: string;
   options: string[];
   onChange: (value: string) => void;
+  disabled?: boolean;
 }
 
 export default function SettingsSelect({
   value,
   options,
   onChange,
+  disabled = false,
 }: SettingsSelectProps) {
   return (
     <div className="relative">
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
         className="
           appearance-none
           rounded-xl
@@ -37,6 +40,9 @@ export default function SettingsSelect({
           focus:border-orange-400
           focus:bg-white/[0.06] light:focus:bg-black/[0.06]
           cursor-pointer
+          disabled:cursor-not-allowed
+          disabled:opacity-50
+          disabled:hover:border-white/10
         "
       >
         {options.map((option) => (

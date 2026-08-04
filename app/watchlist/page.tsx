@@ -22,29 +22,31 @@ export default function WatchlistPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!signedIn) {
-      setLoading(false);
-      return;
-    }
-
-    async function load() {
-      try {
-        const session = await fetchAuthSession();
-        const idToken = session.tokens?.idToken?.toString();
-
-        const res = await fetch("/api/watchlist", {
-          headers: { Authorization: `Bearer ${idToken}` },
-        });
-        const data = await res.json();
-        setItems(data.items || []);
-      } catch (err) {
-        console.error("Failed to load watchlist:", err);
-      } finally {
+    (() => {
+      if (!signedIn) {
         setLoading(false);
+        return;
       }
-    }
 
-    load();
+      async function load() {
+        try {
+          const session = await fetchAuthSession();
+          const idToken = session.tokens?.idToken?.toString();
+
+          const res = await fetch("/api/watchlist", {
+            headers: { Authorization: `Bearer ${idToken}` },
+          });
+          const data = await res.json();
+          setItems(data.items || []);
+        } catch (err) {
+          console.error("Failed to load watchlist:", err);
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      load();
+    })();
   }, [signedIn]);
 
   if (authLoading || loading) {
@@ -79,7 +81,7 @@ export default function WatchlistPage() {
 
       {items.length === 0 ? (
         <p className="mt-8 text-sm text-slate-400 light:text-slate-500">
-          Nothing saved yet — tap "Watch Later" on any video to add it here.
+          Nothing saved yet — tap &quot;Watch Later&quot; on any video to add it here.
         </p>
       ) : (
         <div className="mt-8 space-y-3">

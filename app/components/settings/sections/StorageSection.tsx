@@ -26,29 +26,31 @@ export default function StorageSection() {
   useEffect(() => {
     if (authLoading) return;
 
-    if (!signedIn) {
-      setLoading(false);
-      return;
-    }
-
-    async function load() {
-      try {
-        const session = await fetchAuthSession();
-        const idToken = session.tokens?.idToken?.toString();
-
-        const res = await fetch("/api/my-videos", {
-          headers: { Authorization: `Bearer ${idToken}` },
-        });
-        const data = await res.json();
-        setVideos(data.videos || []);
-      } catch (err) {
-        console.error("Failed to load storage overview:", err);
-      } finally {
+    (() => {
+      if (!signedIn) {
         setLoading(false);
+        return;
       }
-    }
 
-    load();
+      async function load() {
+        try {
+          const session = await fetchAuthSession();
+          const idToken = session.tokens?.idToken?.toString();
+
+          const res = await fetch("/api/my-videos", {
+            headers: { Authorization: `Bearer ${idToken}` },
+          });
+          const data = await res.json();
+          setVideos(data.videos || []);
+        } catch (err) {
+          console.error("Failed to load storage overview:", err);
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      load();
+    })();
   }, [signedIn, authLoading]);
 
   const longform = videos.filter((v) => v.contentType !== "short");

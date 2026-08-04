@@ -64,14 +64,18 @@ export async function listProductReviews(
     reviews.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
     const totalReviews = reviews.length;
+    // 0, not 5.0, when there are no real reviews yet — a brand-new product
+    // with zero ratings should never render as if it already has a
+    // real 5-star track record. The product page treats 0 as "not yet
+    // rated" and shows an honest "No ratings yet" state instead of stars.
     const averageRating =
       totalReviews > 0
         ? Math.round((reviews.reduce((sum, r) => sum + r.rating, 0) / totalReviews) * 10) / 10
-        : 5.0;
+        : 0;
 
     return { reviews, averageRating, totalReviews, tableMissing: false };
   } catch (err) {
     console.error("listProductReviews failed (table may not exist yet):", err);
-    return { reviews: [], averageRating: 5.0, totalReviews: 0, tableMissing: true };
+    return { reviews: [], averageRating: 0, totalReviews: 0, tableMissing: true };
   }
 }

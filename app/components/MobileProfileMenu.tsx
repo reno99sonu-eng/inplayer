@@ -2,15 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Heart, ListMusic, LogOut, MessageSquare, Settings, ThumbsUp, User } from "lucide-react";
+import { Heart, LogOut, MessageSquare, Settings, User } from "lucide-react";
 
 import { useAuthModal } from "./auth/AuthProvider";
 
-interface MobileProfileMenuProps {
-  isActive?: boolean;
-}
-
-export default function MobileProfileMenu({ isActive }: MobileProfileMenuProps) {
+export default function MobileProfileMenu() {
   const router = useRouter();
   const { user, signedIn, openSignIn, signOut } = useAuthModal();
   const [open, setOpen] = useState(false);
@@ -29,10 +25,11 @@ export default function MobileProfileMenu({ isActive }: MobileProfileMenuProps) 
     router.push(href);
   };
 
+  // Downloads is intentionally not linked here — it's an app-only feature
+  // (see app/downloads/page.tsx), not offered on the website.
   const items = [
-    { label: "Your Channel", icon: User, href: "/my-videos" },
-    { label: "Playlists", icon: ListMusic, href: "/playlists" },
-    { label: "Liked Videos", icon: ThumbsUp, href: "/liked-videos" },
+    { label: "Your Channel", icon: User, href: user?.handle ? `/u/${encodeURIComponent(user.handle)}` : "/my-videos" },
+    { label: "My Profile", icon: User, href: "/profile" },
     { label: "Watchlist", icon: Heart, href: "/watchlist" },
     { label: "Messages", icon: MessageSquare, href: "/messages" },
     { label: "Settings", icon: Settings, href: "/settings" },
@@ -45,35 +42,11 @@ export default function MobileProfileMenu({ isActive }: MobileProfileMenuProps) 
         onClick={() => (signedIn ? setOpen((current) => !current) : openSignIn())}
         aria-expanded={open}
         aria-label={signedIn ? "Open account menu" : "Sign in"}
-        className={`
-          flex
-          flex-col
-          items-center
-          gap-0.5
-          px-3
-          py-1
-          transition-all
-          duration-200
-          ${
-            isActive
-              ? "text-orange-400 font-black scale-105"
-              : "text-slate-300 light:text-slate-600 hover:text-orange-300 light:hover:text-orange-600"
-          }
-        `}
+        className="flex flex-col items-center gap-1 px-3 py-1 text-slate-300 transition-colors hover:text-orange-300 light:text-slate-600 light:hover:text-orange-600"
       >
         {/* eslint-disable-next-line @next/next/no-img-element -- user avatars can be data URLs. */}
-        <img
-          src={user?.avatarUrl || "/avatars/avatar.png"}
-          alt=""
-          className={`h-[21px] w-[21px] rounded-full object-cover transition-all ${
-            isActive
-              ? "ring-2 ring-orange-400 drop-shadow-[0_0_10px_rgba(249,115,22,0.85)] filter"
-              : "ring-1 ring-orange-400/50"
-          }`}
-        />
-        <span className={`text-[10px] ${isActive ? "font-black text-orange-400 drop-shadow-[0_0_8px_rgba(249,115,22,0.7)]" : "font-medium"}`}>
-          You
-        </span>
+        <img src={user?.avatarUrl || "/avatars/avatar.png"} alt="" className="h-[22px] w-[22px] rounded-full object-cover ring-1 ring-orange-400/50" />
+        <span className="text-[11px] font-medium">You</span>
       </button>
 
       {open && (
@@ -81,38 +54,15 @@ export default function MobileProfileMenu({ isActive }: MobileProfileMenuProps) 
           <div className="flex items-center gap-3 border-b border-white/10 px-3 py-3 light:border-black/10">
             {/* eslint-disable-next-line @next/next/no-img-element -- user avatars can be data URLs. */}
             <img src={user?.avatarUrl || "/avatars/avatar.png"} alt="" className="h-10 w-10 rounded-full object-cover" />
-            <div className="min-w-0">
-              <p className="truncate text-sm font-black text-white light:text-slate-900">{user?.name}</p>
-              <p className="truncate text-xs text-slate-400 light:text-slate-600">{user?.email}</p>
-            </div>
+            <div className="min-w-0"><p className="truncate text-sm font-black text-white light:text-slate-900">{user?.name}</p><p className="truncate text-xs text-slate-400 light:text-slate-600">{user?.email}</p></div>
           </div>
           <div className="pt-2">
             {items.map((item) => {
               const Icon = item.icon;
-              return (
-                <button
-                  key={item.label}
-                  type="button"
-                  onClick={() => go(item.href)}
-                  className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm font-semibold text-white transition hover:bg-white/10 light:text-slate-900 light:hover:bg-black/5"
-                >
-                  <Icon size={17} className="text-orange-400" />
-                  {item.label}
-                </button>
-              );
+              return <button key={item.label} type="button" onClick={() => go(item.href)} className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm font-semibold text-white transition hover:bg-white/10 light:text-slate-900 light:hover:bg-black/5"><Icon size={17} className="text-orange-400" />{item.label}</button>;
             })}
             <div className="my-2 border-t border-white/10 light:border-black/10" />
-            <button
-              type="button"
-              onClick={async () => {
-                setOpen(false);
-                await signOut();
-              }}
-              className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm font-semibold text-red-400 transition hover:bg-red-500/10"
-            >
-              <LogOut size={17} />
-              Sign Out
-            </button>
+            <button type="button" onClick={async () => { setOpen(false); await signOut(); }} className="flex w-full items-center gap-3 rounded-2xl px-3 py-2.5 text-left text-sm font-semibold text-red-400 transition hover:bg-red-500/10"><LogOut size={17} />Sign Out</button>
           </div>
         </div>
       )}

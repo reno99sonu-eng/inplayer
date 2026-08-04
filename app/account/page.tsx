@@ -6,7 +6,6 @@ import {
   UserCog,
   User,
   MessageCircle,
-  Download,
   Settings,
   HelpCircle,
   LogOut,
@@ -18,11 +17,12 @@ export default function AccountPage() {
   const router = useRouter();
   const { signedIn, authLoading, user, openSignIn, signOut } = useAuthModal();
 
+  // Downloads is intentionally not linked here — it's an app-only feature
+  // (see app/downloads/page.tsx), not offered on the website.
   const menu = [
     { icon: UserCog, title: "Edit Profile", href: "/profile" },
     { icon: User, title: "Your Channel", href: "/my-videos" },
     { icon: MessageCircle, title: "My Messages", href: "/messages" },
-    { icon: Download, title: "Downloads", href: "/downloads" },
     { icon: Settings, title: "Settings", href: "/settings" },
     { icon: HelpCircle, title: "Help & Support", href: "/help" },
   ];

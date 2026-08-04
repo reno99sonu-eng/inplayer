@@ -1,16 +1,19 @@
 "use client";
 
+import { useState } from "react";
 import {
   Shield,
   Eye,
   Lock,
   UserCheck,
 } from "lucide-react";
+import { fetchAuthSession } from "aws-amplify/auth";
 
 import SettingsCard from "../common/SettingsCard";
 import SettingsRow from "../common/SettingsRow";
 import SettingsToggle from "../common/SettingsToggle";
 import { useSettings } from "../SettingsProvider";
+import { useAuthModal } from "../../auth/AuthProvider";
 import DeleteAccountCard from "./DeleteAccountCard";
 import SessionsCard from "./SessionsCard";
 
@@ -19,8 +22,52 @@ import SessionsCard from "./SessionsCard";
 // live consumer) instead of local-only useState. Every toggle here used
 // to reset to its default on every refresh/navigation and had zero
 // effect anywhere else in the app.
+//
+// Exception: "Private Account" below is NOT one of those localStorage
+// settings — account visibility is real, server-side state
+// (InPlayer-Users.usernamePrivacy), the same field the Profile page's
+// Public/Connections/Private control already sets for real (it gates
+// what app/api/users/[username]/route.ts returns to other visitors). This
+// toggle is a simplified on/off view onto that same real value: OFF saves
+// "public", ON saves "private". A creator who wants the middle
+// "Connections" option uses the fuller control on the Profile page — this
+// toggle will show as ON for that case too, since anything other than
+// fully public counts as "on" here.
 export default function PrivacySection() {
   const { privacy, updatePrivacy } = useSettings();
+  const { user, refreshUser } = useAuthModal();
+  const [savingPrivacy, setSavingPrivacy] = useState(false);
+
+  const isPrivate = (user?.usernamePrivacy || "public") !== "public";
+
+  const handlePrivateAccountToggle = async (checked: boolean) => {
+    if (savingPrivacy) return;
+    setSavingPrivacy(true);
+    try {
+      const session = await fetchAuthSession();
+      const idToken = session.tokens?.idToken?.toString();
+
+      const res = await fetch("/api/profile/settings", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${idToken}`,
+        },
+        body: JSON.stringify({
+          action: "update_privacy",
+          usernamePrivacy: checked ? "private" : "public",
+        }),
+      });
+
+      if (res.ok) {
+        await refreshUser();
+      }
+    } catch (err) {
+      console.error("Failed to update account privacy:", err);
+    } finally {
+      setSavingPrivacy(false);
+    }
+  };
 
   return (
     <SettingsCard
@@ -36,8 +83,9 @@ export default function PrivacySection() {
           description="Only approved followers can view your profile."
         >
           <SettingsToggle
-            checked={privacy.privateAccount}
-            onChange={(checked) => updatePrivacy({ privateAccount: checked })}
+            checked={isPrivate}
+            onChange={handlePrivateAccountToggle}
+            disabled={savingPrivacy}
           />
         </SettingsRow>
 
@@ -55,11 +103,12 @@ export default function PrivacySection() {
         <SettingsRow
           icon={<Lock size={20} />}
           title="Personalized Ads"
-          description="Use your activity to improve recommendations."
+          description="Coming soon — use your activity to improve recommendations."
         >
           <SettingsToggle
             checked={privacy.personalizedAds}
             onChange={(checked) => updatePrivacy({ personalizedAds: checked })}
+            disabled
           />
         </SettingsRow>
 

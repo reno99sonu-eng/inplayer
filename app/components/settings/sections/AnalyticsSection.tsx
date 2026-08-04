@@ -42,29 +42,31 @@ export default function AnalyticsSection() {
   useEffect(() => {
     if (authLoading) return;
 
-    if (!signedIn) {
-      setLoading(false);
-      return;
-    }
-
-    async function load() {
-      try {
-        const session = await fetchAuthSession();
-        const idToken = session.tokens?.idToken?.toString();
-
-        const res = await fetch("/api/my-videos", {
-          headers: { Authorization: `Bearer ${idToken}` },
-        });
-        const data = await res.json();
-        setVideos(data.videos || []);
-      } catch (err) {
-        console.error("Failed to load analytics:", err);
-      } finally {
+    (() => {
+      if (!signedIn) {
         setLoading(false);
+        return;
       }
-    }
 
-    load();
+      async function load() {
+        try {
+          const session = await fetchAuthSession();
+          const idToken = session.tokens?.idToken?.toString();
+
+          const res = await fetch("/api/my-videos", {
+            headers: { Authorization: `Bearer ${idToken}` },
+          });
+          const data = await res.json();
+          setVideos(data.videos || []);
+        } catch (err) {
+          console.error("Failed to load analytics:", err);
+        } finally {
+          setLoading(false);
+        }
+      }
+
+      load();
+    })();
   }, [signedIn, authLoading]);
 
   const totalViews = videos.reduce((sum, v) => sum + (v.views || 0), 0);

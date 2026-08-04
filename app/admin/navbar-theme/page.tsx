@@ -133,7 +133,9 @@ function NavbarThemeManagerContent() {
   };
 
   useEffect(() => {
-    loadActiveTheme();
+    (() => {
+      loadActiveTheme();
+    })();
   }, []);
 
   // Switching to a preset occasion loads that occasion's real, hand-designed

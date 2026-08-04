@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Loader2, Music2, Pause, Play, SlidersHorizontal, Wand2 } from "lucide-react";
 import { searchSoundtracks, toResolvedSoundtrack, ResolvedSoundtrack } from "@/app/data/soundtracks";
 
@@ -100,24 +100,40 @@ export default function ShortCreationTools({
     };
   }, []);
 
-  const togglePreview = (trackId: string, url: string) => {
-    const audio = previewAudioRef.current;
-    if (!audio) return;
+  // Reads which track to preview from the clicked button's own
+  // data-track-id/data-url attributes (via currentTarget), and is passed
+  // straight to onClick below with no per-item wrapper arrow. The React
+  // Compiler ESLint rule flags a ref-touching function when it's invoked
+  // through an inline closure created fresh on every render (as the old
+  // `onClick={() => togglePreview(track.id, track.url)}` did) — passing
+  // the handler directly, with the per-track data read off the event
+  // instead of closed over, is what the rule can positively verify never
+  // runs during render. No behavior change, same audio element, same
+  // play/pause logic.
+  const handlePreviewClick = useCallback(
+    (event: React.MouseEvent<HTMLButtonElement>) => {
+      const { trackId, url } = event.currentTarget.dataset;
+      if (!trackId || !url) return;
 
-    if (previewingId === trackId) {
-      audio.pause();
-      setPreviewingId(null);
-      return;
-    }
+      const audio = previewAudioRef.current;
+      if (!audio) return;
 
-    audio.src = url;
-    audio.currentTime = 0;
-    void audio.play().catch(() => {
-      // Blocked-autoplay rejection can't actually happen off a direct click
-      // like this one, but fail quietly rather than throw either way.
-    });
-    setPreviewingId(trackId);
-  };
+      if (previewingId === trackId) {
+        audio.pause();
+        setPreviewingId(null);
+        return;
+      }
+
+      audio.src = url;
+      audio.currentTime = 0;
+      void audio.play().catch(() => {
+        // Blocked-autoplay rejection can't actually happen off a direct click
+        // like this one, but fail quietly rather than throw either way.
+      });
+      setPreviewingId(trackId);
+    },
+    [previewingId]
+  );
 
   return (
     <section className="rounded-3xl border border-orange-400/20 bg-orange-500/[0.04] p-4 sm:p-5">
@@ -183,7 +199,9 @@ export default function ShortCreationTools({
                 >
                   <button
                     type="button"
-                    onClick={() => togglePreview(track.id, track.url)}
+                    data-track-id={track.id}
+                    data-url={track.url}
+                    onClick={handlePreviewClick}
                     aria-label={previewing ? `Pause preview of ${track.title}` : `Preview ${track.title}`}
                     className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 light:bg-black/10 light:text-slate-900"
                   >

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { fetchAuthSession } from "aws-amplify/auth";
@@ -8,9 +8,7 @@ import {
   MoreVertical,
   ChevronLeft,
   X,
-  Download,
   Loader2,
-  AlertCircle,
   Clock,
   Check,
   ListMusic,
@@ -20,9 +18,7 @@ import {
 } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 
-type DownloadStatus = "unavailable" | "preparing" | "ready" | "errored";
-type Renditions = Record<string, string>;
-type PanelView = "main" | "download" | "playlists" | "report";
+type PanelView = "main" | "playlists" | "report";
 
 interface PlaylistItem {
   playlistId: string;
@@ -34,33 +30,15 @@ interface PlaylistItem {
 interface VideoOptionsMenuProps {
   videoId: string;
   contentType?: string;
-  downloadStatus?: DownloadStatus;
-  downloadRenditions?: Renditions;
-}
-
-const POLL_INTERVAL_MS = 4000;
-// Comfortably longer than prepare-download's own STUCK_THRESHOLD_MS
-// (3 minutes) — see the original DownloadButton for the full reasoning,
-// ported unchanged here.
-const POLL_GIVE_UP_MS = 4 * 60 * 1000;
-
-const QUALITY_ORDER = [
-  "highest",
-  "2160p",
-  "1440p",
-  "1080p",
-  "720p",
-  "540p",
-  "480p",
-  "360p",
-  "270p",
-];
-
-function orderedQualities(renditions: Renditions): string[] {
-  const present = Object.keys(renditions);
-  const known = QUALITY_ORDER.filter((q) => present.includes(q));
-  const extras = present.filter((q) => !QUALITY_ORDER.includes(q));
-  return [...known, ...extras];
+  // downloadStatus/downloadRenditions are still passed in by
+  // WatchActions.tsx (sourced from real Mux rendition data) but are no
+  // longer used here — Download was removed from this menu entirely.
+  // Downloads is an app-only feature now, not offered on the website (see
+  // app/downloads/page.tsx). Left un-destructured below rather than
+  // ripping the props out of every caller, since the underlying data is
+  // still genuinely real and may be worth reusing once the app exists.
+  downloadStatus?: "unavailable" | "preparing" | "ready" | "errored";
+  downloadRenditions?: Record<string, string>;
 }
 
 const REPORT_REASONS: { value: string; label: string }[] = [
@@ -112,19 +90,11 @@ function MenuRow({
 export default function VideoOptionsMenu({
   videoId,
   contentType,
-  downloadStatus,
-  downloadRenditions,
 }: VideoOptionsMenuProps) {
   const { signedIn, openSignIn } = useAuthModal();
 
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<PanelView>("main");
-
-  // Download
-  const [dlStatus, setDlStatus] = useState<DownloadStatus>(downloadStatus || "unavailable");
-  const [dlRenditions, setDlRenditions] = useState<Renditions>(downloadRenditions || {});
-  const [dlRequesting, setDlRequesting] = useState(false);
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Watch Later
   const [watchLater, setWatchLater] = useState(false);
@@ -147,51 +117,6 @@ export default function VideoOptionsMenu({
   const [reportDetails, setReportDetails] = useState("");
   const [reportSubmitting, setReportSubmitting] = useState(false);
   const [reportSubmitted, setReportSubmitted] = useState(false);
-
-  const stopPolling = () => {
-    if (pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
-  };
-
-  const startPolling = () => {
-    stopPolling();
-    const startedAt = Date.now();
-
-    pollRef.current = setInterval(async () => {
-      if (Date.now() - startedAt > POLL_GIVE_UP_MS) {
-        setDlStatus("errored");
-        stopPolling();
-        return;
-      }
-
-      try {
-        const res = await fetch(`/api/videos/${videoId}/status`);
-        const data = await res.json();
-
-        if (data.downloadStatus === "ready") {
-          setDlStatus("ready");
-          setDlRenditions(data.downloadRenditions || {});
-          stopPolling();
-        } else if (data.downloadStatus === "errored") {
-          setDlStatus("errored");
-          stopPolling();
-        }
-      } catch (err) {
-        console.error("Failed to poll download status:", err);
-      }
-    }, POLL_INTERVAL_MS);
-  };
-
-  // Resume polling if a previous visit already kicked off preparation —
-  // independent of whether the panel is open, same as the old
-  // DownloadButton.
-  useEffect(() => {
-    if (dlStatus === "preparing") startPolling();
-    return stopPolling;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   async function authHeaders(): Promise<HeadersInit> {
     const session = await fetchAuthSession();
@@ -246,89 +171,6 @@ export default function VideoOptionsMenu({
     setReportDetails("");
     setReportSubmitted(false);
   };
-
-  // ---------------- Download ----------------
-
-  const startDownload = (quality?: string) => {
-    const q = quality ? `?quality=${encodeURIComponent(quality)}` : "";
-
-    if (signedIn) {
-      fetchAuthSession()
-        .then((session) => {
-          const idToken = session.tokens?.idToken?.toString();
-          if (!idToken) return;
-          fetch("/api/downloads", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
-            body: JSON.stringify({ videoId, quality: quality || "default" }),
-          }).catch(() => {});
-        })
-        .catch(() => {});
-    }
-
-    // Same-origin route with Content-Disposition: attachment — the browser
-    // downloads it and stays on this page, no navigation.
-    window.location.href = `/api/videos/${videoId}/download${q}`;
-    closeAll();
-  };
-
-  const qualities = orderedQualities(dlRenditions);
-
-  const handleDownloadClick = async () => {
-    if (dlStatus === "ready") {
-      if (qualities.length > 0) {
-        setView("download");
-      } else {
-        startDownload();
-      }
-      return;
-    }
-
-    if (dlStatus === "preparing" || dlRequesting) return;
-
-    if (!signedIn) {
-      openSignIn();
-      return;
-    }
-
-    setDlRequesting(true);
-
-    try {
-      const headers = await authHeaders();
-      const res = await fetch(`/api/videos/${videoId}/prepare-download`, {
-        method: "POST",
-        headers,
-      });
-      const data = await res.json();
-
-      if (res.ok) {
-        setDlStatus(data.status);
-        if (data.status === "ready") {
-          setDlRenditions(data.renditions || {});
-          if (orderedQualities(data.renditions || {}).length > 0) setView("download");
-          else startDownload();
-        } else if (data.status === "preparing") {
-          startPolling();
-        }
-      } else {
-        setDlStatus("errored");
-      }
-    } catch (err) {
-      console.error("Failed to start download preparation:", err);
-      setDlStatus("errored");
-    } finally {
-      setDlRequesting(false);
-    }
-  };
-
-  const downloadLabel =
-    dlStatus === "ready"
-      ? "Download"
-      : dlStatus === "preparing" || dlRequesting
-        ? "Preparing…"
-        : dlStatus === "errored"
-          ? "Download failed — retry"
-          : "Download";
 
   // ---------------- Watch Later ----------------
 
@@ -510,7 +352,6 @@ export default function VideoOptionsMenu({
                   )}
                   <p className="text-xs font-bold uppercase tracking-wide text-slate-400 light:text-slate-600">
                     {view === "main" && "More options"}
-                    {view === "download" && "Download quality"}
                     {view === "playlists" && "Save to playlist"}
                     {view === "report" && "Report this video"}
                   </p>
@@ -549,21 +390,6 @@ export default function VideoOptionsMenu({
                     onClick={() => !reported && setView("report")}
                     disabled={reported}
                   />
-                </div>
-              )}
-
-              {view === "download" && (
-                <div className="max-h-72 space-y-0.5 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                  {qualities.map((q) => (
-                    <button
-                      key={q}
-                      onClick={() => startDownload(q)}
-                      className="flex w-full items-center justify-between rounded-xl px-3 py-3 text-left text-sm font-semibold text-slate-200 light:text-slate-800 transition hover:bg-white/5 light:hover:bg-black/5"
-                    >
-                      <span>{q === "highest" ? "Highest" : q}</span>
-                      <Download size={14} className="text-slate-400 light:text-slate-600" />
-                    </button>
-                  ))}
                 </div>
               )}
 

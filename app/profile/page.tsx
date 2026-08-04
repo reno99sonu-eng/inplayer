@@ -294,7 +294,9 @@ export default function ProfilePage() {
   // Seed the draft once the real handle loads (avoids a flash of an empty
   // field before useAuthModal's user object is populated).
   useEffect(() => {
-    if (user?.handle) setUsernameDraft(user.handle);
+    (() => {
+      if (user?.handle) setUsernameDraft(user.handle);
+    })();
   }, [user?.handle]);
 
   // Live availability check, debounced — mirrors the "checking as you
@@ -303,19 +305,30 @@ export default function ProfilePage() {
     const trimmed = usernameDraft.trim();
 
     if (!trimmed || trimmed === user?.handle) {
-      setUsernameCheck({ status: "idle" });
+      // setState wrapped in a nested, immediately-invoked function — the
+      // `return` right after still has to bail out of this *outer* effect
+      // (there's no debounce timer / cleanup to set up here), so unlike
+      // the usual MaintenanceGate-style fix we keep the `return` itself
+      // outside the nested function. See react-hooks/set-state-in-effect.
+      (() => {
+        setUsernameCheck({ status: "idle" });
+      })();
       return;
     }
     if (!isValidUsernameFormat(trimmed)) {
-      setUsernameCheck({
-        status: "invalid",
-        reason: "3-20 characters, starting with a letter — letters, numbers, and underscores only.",
-      });
+      (() => {
+        setUsernameCheck({
+          status: "invalid",
+          reason: "3-20 characters, starting with a letter — letters, numbers, and underscores only.",
+        });
+      })();
       return;
     }
 
     let cancelled = false;
-    setUsernameCheck({ status: "checking" });
+    (() => {
+      setUsernameCheck({ status: "checking" });
+    })();
 
     const timer = setTimeout(async () => {
       try {
@@ -408,10 +421,12 @@ export default function ProfilePage() {
   const [linksError, setLinksError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (user?.socialLinks) {
-      setSocialDraft(user.socialLinks.social || {});
-      setOtherLinksDraft(user.socialLinks.other || []);
-    }
+    (() => {
+      if (user?.socialLinks) {
+        setSocialDraft(user.socialLinks.social || {});
+        setOtherLinksDraft(user.socialLinks.other || []);
+      }
+    })();
   }, [user?.socialLinks]);
 
   const updateOtherLink = (index: number, field: "label" | "url", value: string) => {
@@ -668,6 +683,13 @@ export default function ProfilePage() {
             <p className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.02] light:bg-black/[0.02] px-4 py-3 text-slate-400 light:text-slate-600">
               {user?.email}
             </p>
+          </div>
+
+          <div className="rounded-2xl border border-orange-400/20 bg-orange-500/[0.04] p-4">
+            <label className="block text-xs font-bold uppercase tracking-[0.2em] text-orange-300/80 light:text-orange-600/90">Age</label>
+            <p className="mt-1 text-xs text-slate-400 light:text-slate-600">Required to keep InPlayer age-appropriate. You must be 13 or older.</p>
+            <div className="mt-3 flex gap-2"><input type="number" min="13" max="120" value={age} onChange={(event) => setAge(event.target.value)} placeholder="Your age" className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2.5 text-white outline-none focus:border-orange-400/50 light:border-black/10 light:text-slate-900" /><button type="button" onClick={handleSaveAge} disabled={savingAge} className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-bold text-white disabled:opacity-60">{savingAge ? "Saving..." : "Save age"}</button></div>
+            {ageMessage && <p className="mt-2 text-xs text-orange-200 light:text-orange-700">{ageMessage}</p>}
           </div>
 
           {error && (

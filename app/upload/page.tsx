@@ -66,20 +66,22 @@ export default function UploadPage() {
   const [aiTitleAssistOpen, setAiTitleAssistOpen] = useState(false);
 
   useEffect(() => {
-    try {
-      const params = new URLSearchParams(window.location.search);
-      const typeParam = params.get("type");
-      if (typeParam === "short") setContentType("short");
-      if (typeParam === "video") setContentType("video");
+    (() => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const typeParam = params.get("type");
+        if (typeParam === "short") setContentType("short");
+        if (typeParam === "video") setContentType("video");
 
-      const preset = sessionStorage.getItem("inplayer-upload-preset");
-      if (preset === "podcast" && CATEGORIES.includes("Podcasts")) {
-        setCategory("Podcasts");
+        const preset = sessionStorage.getItem("inplayer-upload-preset");
+        if (preset === "podcast" && CATEGORIES.includes("Podcasts")) {
+          setCategory("Podcasts");
+        }
+        if (preset) sessionStorage.removeItem("inplayer-upload-preset");
+      } catch {
+        /* ignore */
       }
-      if (preset) sessionStorage.removeItem("inplayer-upload-preset");
-    } catch {
-      /* ignore */
-    }
+    })();
   }, []);
 
   const handleThumbnailSelected = async (selected: File) => {

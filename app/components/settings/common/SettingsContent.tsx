@@ -6,6 +6,7 @@ import PrivacySection from "../sections/PrivacySection";
 import AnalyticsSection from "../sections/AnalyticsSection";
 import StorageSection from "../sections/StorageSection";
 import AboutSection from "../sections/AboutSection";
+import PlansSection from "../sections/PlansSection";
 
 type Section =
   | "appearance"
@@ -21,27 +22,6 @@ interface SettingsContentProps {
   active: Section;
   appearance: ReactNode;
   general: ReactNode;
-}
-
-function ComingSoon({ title }: { title: string }) {
-  return (
-    <div className="rounded-[32px] border border-white/10 light:border-black/10 bg-[#101826] light:bg-[#FBF6EA] p-10">
-      <div className="mx-auto max-w-xl text-center">
-        <div className="mb-5 inline-flex rounded-full border border-orange-400/20 bg-orange-500/10 px-4 py-1 text-xs font-bold uppercase tracking-[0.25em] text-orange-300">
-          Coming Soon
-        </div>
-
-        <h2 className="text-3xl font-black text-white light:text-slate-900">
-          {title}
-        </h2>
-
-        <p className="mt-4 text-base leading-7 text-slate-400 light:text-slate-600">
-          This section is currently being built and will be available in the
-          next phase of the Settings redesign.
-        </p>
-      </div>
-    </div>
-  );
 }
 
 export default function SettingsContent({
@@ -63,7 +43,13 @@ export default function SettingsContent({
           return <PrivacySection />;
 
     case "payments":
-      return <ComingSoon title="Plans & Purchases" />;
+      // A real, fully-built Plans & Purchases section (real free-vs-Premium
+      // feature comparison, honest "Premium billing launches soon" state on
+      // the actual paid tier — see PlansSection.tsx) existed in the codebase
+      // but was never wired up here, so every visitor saw this generic,
+      // contentless placeholder instead. Not a "coming soon" case at all —
+      // the section was done, just not connected.
+      return <PlansSection />;
 
     case "analytics":
       return <AnalyticsSection />;

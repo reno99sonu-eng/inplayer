@@ -95,7 +95,7 @@ export default function SubscriptionsPage() {
             <Rss size={40} className="mb-4 text-orange-400/60" />
 
             <h2 className="text-lg font-bold">
-              You haven't subscribed to anyone yet
+              You haven&apos;t subscribed to anyone yet
             </h2>
 
             <p className="mt-2 max-w-xs text-sm text-slate-400 light:text-slate-500">

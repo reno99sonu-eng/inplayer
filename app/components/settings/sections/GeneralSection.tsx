@@ -16,6 +16,13 @@ import { useSettings } from "../SettingsProvider";
 // removed outright rather than wired up: it had no onClick, no destination
 // page, and no backing feature anywhere in the app, so it was a dead link
 // dressed up to look like a real settings row (chevron and all).
+//
+// Restricted Mode / Child Mode below are marked "Coming soon" and
+// disabled rather than wired up — actually hiding mature content or
+// creating a safer child experience needs a real content-classification
+// system (per-video maturity ratings, moderation review) that doesn't
+// exist yet. Flipping the switch used to just flip a localStorage flag
+// nothing else ever read.
 export default function GeneralSection() {
   const { general, updateGeneral } = useSettings();
 
@@ -37,22 +44,24 @@ export default function GeneralSection() {
         <SettingsRow
           icon={<Shield size={20} />}
           title="Restricted Mode"
-          description="Hide potentially mature content."
+          description="Coming soon — hide potentially mature content."
         >
           <SettingsToggle
             checked={general.restrictedMode}
             onChange={(checked) => updateGeneral({ restrictedMode: checked })}
+            disabled
           />
         </SettingsRow>
 
         <SettingsRow
           icon={<Baby size={20} />}
           title="Child Mode"
-          description="Create a safer experience for children."
+          description="Coming soon — create a safer experience for children."
         >
           <SettingsToggle
             checked={general.childMode}
             onChange={(checked) => updateGeneral({ childMode: checked })}
+            disabled
           />
         </SettingsRow>
 

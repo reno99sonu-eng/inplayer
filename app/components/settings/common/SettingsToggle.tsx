@@ -3,16 +3,19 @@
 interface SettingsToggleProps {
   checked: boolean;
   onChange: (checked: boolean) => void;
+  disabled?: boolean;
 }
 
 export default function SettingsToggle({
   checked,
   onChange,
+  disabled = false,
 }: SettingsToggleProps) {
   return (
     <button
       type="button"
       aria-pressed={checked}
+      disabled={disabled}
       onClick={() => onChange(!checked)}
       className={`
         relative
@@ -23,6 +26,8 @@ export default function SettingsToggle({
         rounded-full
         transition-all
         duration-300
+        disabled:cursor-not-allowed
+        disabled:opacity-50
         ${
           checked
             ? "bg-gradient-to-r from-orange-500 to-amber-400 shadow-[0_0_20px_rgba(249,115,22,.35)]"

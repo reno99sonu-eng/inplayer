@@ -29,14 +29,18 @@ export interface FilterOption {
   label: string;
 }
 
+// "Best Sellers" / "Popular" / "Discounts & Deals" / "Top Rated" used to be
+// listed here but weren't real — there's no real order-count data behind
+// "popular" (it just reversed the list), no real discount/sale field
+// behind "discounts" (it just filtered on an arbitrary <₹500 price cutoff
+// with no actual discount involved), and no per-listing rating data
+// available on the shop grid to back "Top Rated" honestly. Removed rather
+// than left in place pretending to sort by something real. Only the two
+// filters that genuinely do what they say (real price sort) stay.
 const FILTER_OPTIONS: FilterOption[] = [
   { id: "all", label: "All Items" },
-  { id: "bestsellers", label: "Best Sellers" },
-  { id: "popular", label: "Popular" },
-  { id: "discounts", label: "Discounts & Deals" },
   { id: "price_low", label: "Price: Low to High" },
   { id: "price_high", label: "Price: High to Low" },
-  { id: "top_rated", label: "Top Rated (4+ Stars)" },
 ];
 
 export default function ShopPage() {
@@ -114,10 +118,6 @@ export default function ShopPage() {
       result.sort((a, b) => a.priceInr - b.priceInr);
     } else if (activeFilter === "price_high") {
       result.sort((a, b) => b.priceInr - a.priceInr);
-    } else if (activeFilter === "bestsellers" || activeFilter === "popular") {
-      result.reverse();
-    } else if (activeFilter === "discounts") {
-      result = result.filter((p) => p.priceInr < 500);
     }
 
     return result;

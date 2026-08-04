@@ -24,7 +24,9 @@ export default function ProductPage() {
   const [notFound, setNotFound] = useState(false);
 
   const [reviews, setReviews] = useState<HammartReview[]>([]);
-  const [avgRating, setAvgRating] = useState(5.0);
+  // 0, not 5.0 — a product starts with NO real ratings, and the badge
+  // below renders "No ratings yet" instead of stars until totalReviews > 0.
+  const [avgRating, setAvgRating] = useState(0);
   const [totalReviews, setTotalReviews] = useState(0);
   const [userRating, setUserRating] = useState(5);
   const [userComment, setUserComment] = useState("");
@@ -57,7 +59,10 @@ export default function ProductPage() {
         if (revRes.ok) {
           const revData = await revRes.json();
           setReviews(revData.reviews || []);
-          setAvgRating(revData.averageRating || 5.0);
+          // `??` (not `||`) — a genuine average of 0 must not get
+          // overwritten by the fallback, only a missing/undefined value
+          // should.
+          setAvgRating(revData.averageRating ?? 0);
           setTotalReviews(revData.totalReviews || 0);
         }
       } catch (err) {
@@ -261,15 +266,23 @@ export default function ProductPage() {
 
             <h1 className="mt-2 text-2xl font-black text-white light:text-slate-900">{product.title}</h1>
 
-            {/* Star Rating Badge */}
+            {/* Star Rating Badge — an honest "no ratings yet" state
+                instead of a hollow 5-star badge when nobody has actually
+                reviewed this product. */}
             <div className="mt-2 flex items-center gap-2">
-              <div className="flex items-center text-amber-400">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <Star key={star} size={15} className={star <= Math.round(avgRating) ? "fill-amber-400" : "text-slate-600 light:text-slate-400"} />
-                ))}
-              </div>
-              <span className="text-xs font-bold text-slate-200 light:text-slate-900">{avgRating.toFixed(1)}</span>
-              <span className="text-xs font-bold text-slate-400 light:text-slate-700">({totalReviews} ratings)</span>
+              {totalReviews > 0 ? (
+                <>
+                  <div className="flex items-center text-amber-400">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Star key={star} size={15} className={star <= Math.round(avgRating) ? "fill-amber-400" : "text-slate-600 light:text-slate-400"} />
+                    ))}
+                  </div>
+                  <span className="text-xs font-bold text-slate-200 light:text-slate-900">{avgRating.toFixed(1)}</span>
+                  <span className="text-xs font-bold text-slate-400 light:text-slate-700">({totalReviews} ratings)</span>
+                </>
+              ) : (
+                <span className="text-xs font-bold text-slate-400 light:text-slate-700">No ratings yet</span>
+              )}
             </div>
 
             <p className="mt-3 flex items-center gap-1 text-3xl font-black text-orange-400 light:text-orange-600">

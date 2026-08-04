@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Info, HelpCircle, Mail, ShieldCheck, Sparkles } from "lucide-react";
+import { Info, HelpCircle, Mail, ShieldCheck, Sparkles, FileText, Lock } from "lucide-react";
 import SettingsCard from "../common/SettingsCard";
 import SettingsRow from "../common/SettingsRow";
 import ReportProblemCard from "./ReportProblemCard";
@@ -26,7 +26,7 @@ export default function AboutSection() {
           <Sparkles size={18} className="text-orange-300" />
           <div>
             <p className="text-sm font-bold text-white light:text-slate-900">InPlayer</p>
-            <p className="text-xs text-slate-500 light:text-slate-500">Version 0.1.0 · Beta</p>
+            <p className="text-xs text-slate-500 light:text-slate-600">Version 0.1.0 · Beta</p>
           </div>
         </div>
       </SettingsCard>
@@ -47,10 +47,24 @@ export default function AboutSection() {
           <SettingsRow
             icon={<Mail size={20} />}
             title="Contact Support"
-            description="support@inplayer.app"
+            description="support@inplayer.in"
             onClick={() => {
-              window.location.href = "mailto:support@inplayer.app";
+              window.location.href = "mailto:support@inplayer.in";
             }}
+          />
+
+          <SettingsRow
+            icon={<FileText size={20} />}
+            title="Terms of Service"
+            description="Includes our IT Rules Grievance Officer contact."
+            onClick={() => router.push("/terms")}
+          />
+
+          <SettingsRow
+            icon={<Lock size={20} />}
+            title="Privacy Policy"
+            description="What data we collect and your rights over it."
+            onClick={() => router.push("/privacy")}
           />
 
           <ReportProblemCard />

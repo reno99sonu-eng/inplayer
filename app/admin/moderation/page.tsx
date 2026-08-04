@@ -273,7 +273,7 @@ export default function AdminModerationPage() {
           className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${
             tab === "reports"
               ? "bg-indigo-500 text-white"
-              : "bg-white/5 text-slate-400 hover:bg-white/10 light:bg-black/5"
+              : "bg-white/5 text-slate-400 light:text-slate-700 hover:bg-white/10 light:bg-black/5"
           }`}
         >
           <Flag size={12} /> Reports
@@ -284,7 +284,7 @@ export default function AdminModerationPage() {
           className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${
             tab === "autoflagged"
               ? "bg-indigo-500 text-white"
-              : "bg-white/5 text-slate-400 hover:bg-white/10 light:bg-black/5"
+              : "bg-white/5 text-slate-400 light:text-slate-700 hover:bg-white/10 light:bg-black/5"
           }`}
         >
           <Bot size={12} /> Auto-flagged by AI
@@ -295,7 +295,7 @@ export default function AdminModerationPage() {
           className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${
             tab === "strikes"
               ? "bg-indigo-500 text-white"
-              : "bg-white/5 text-slate-400 hover:bg-white/10 light:bg-black/5"
+              : "bg-white/5 text-slate-400 light:text-slate-700 hover:bg-white/10 light:bg-black/5"
           }`}
         >
           <Gavel size={12} /> Strikes
@@ -347,7 +347,7 @@ export default function AdminModerationPage() {
                 className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4"
               >
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-300">
+                  <span className="rounded-full bg-white/10 light:bg-black/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-300 light:text-slate-700">
                     {r.targetType}
                   </span>
                   <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-red-300">
@@ -479,7 +479,7 @@ export default function AdminModerationPage() {
               className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4"
             >
               <div className="flex flex-wrap items-center gap-2">
-                <span className="rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-300">
+                <span className="rounded-full bg-white/10 light:bg-black/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-300 light:text-slate-700">
                   {item.contentType}
                 </span>
                 {item.categories.map((c) => (

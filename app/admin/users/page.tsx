@@ -97,7 +97,7 @@ function DeleteUserModal({
         </p>
 
         <p className="mt-3 text-xs font-semibold text-slate-300 light:text-slate-700">
-          Type <span className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-indigo-300">{expected}</span>{" "}
+          Type <span className="rounded bg-white/10 light:bg-black/10 px-1.5 py-0.5 font-mono text-indigo-300 light:text-indigo-700">{expected}</span>{" "}
           to confirm:
         </p>
         <input
@@ -111,7 +111,7 @@ function DeleteUserModal({
           <button
             type="button"
             onClick={onCancel}
-            className="rounded-xl px-4 py-2 text-xs font-semibold text-slate-400 hover:bg-white/5"
+            className="rounded-xl px-4 py-2 text-xs font-semibold text-slate-400 light:text-slate-600 hover:bg-white/5 light:hover:bg-black/5"
           >
             Cancel
           </button>
@@ -224,7 +224,7 @@ function UserSessionsPanel({ userId }: { userId: string }) {
               type="button"
               onClick={logOutAll}
               disabled={loggingOutAll}
-              className="flex items-center gap-1 rounded-lg bg-red-500/15 px-2.5 py-1 text-[11px] font-bold text-red-300 hover:bg-red-500/25 disabled:opacity-60"
+              className="flex items-center gap-1 rounded-lg bg-red-500/15 px-2.5 py-1 text-[11px] font-bold text-red-300 light:text-red-700 hover:bg-red-500/25 disabled:opacity-60"
             >
               {loggingOutAll ? <Loader2 size={11} className="animate-spin" /> : <LogOut size={11} />}
               Log out all
@@ -236,7 +236,7 @@ function UserSessionsPanel({ userId }: { userId: string }) {
                 key={s.sessionId}
                 className="flex items-center justify-between gap-2 rounded-lg bg-white/[0.03] px-2.5 py-1.5"
               >
-                <div className="min-w-0 text-xs text-slate-300">
+                <div className="min-w-0 text-xs text-slate-300 light:text-slate-700">
                   <span className="inline-flex items-center gap-1">
                     <Monitor size={11} /> {s.device || "Unknown device"}
                   </span>
@@ -499,7 +499,7 @@ export default function AdminUsersPage() {
                   type="button"
                   onClick={() => setDeletingUser(u)}
                   disabled={actioningId === u.userId}
-                  className="flex items-center gap-1.5 rounded-xl bg-white/5 light:bg-black/5 px-3 py-2 text-xs font-bold text-slate-400 transition hover:bg-red-500/15 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex items-center gap-1.5 rounded-xl bg-white/5 light:bg-black/5 px-3 py-2 text-xs font-bold text-slate-400 light:text-slate-600 transition hover:bg-red-500/15 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Trash2 size={13} />
                   Delete
@@ -507,7 +507,7 @@ export default function AdminUsersPage() {
                 <button
                   type="button"
                   onClick={() => setExpandedUserId(expandedUserId === u.userId ? null : u.userId)}
-                  className="flex items-center gap-1.5 rounded-xl bg-white/5 light:bg-black/5 px-3 py-2 text-xs font-bold text-slate-400 transition hover:bg-white/10 light:hover:bg-black/10"
+                  className="flex items-center gap-1.5 rounded-xl bg-white/5 light:bg-black/5 px-3 py-2 text-xs font-bold text-slate-400 light:text-slate-600 transition hover:bg-white/10 light:hover:bg-black/10"
                 >
                   <Monitor size={13} />
                   Sessions

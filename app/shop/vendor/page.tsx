@@ -84,10 +84,10 @@ function BecomeVendorForm({ onRegistered }: { onRegistered: () => void }) {
   return (
     <form onSubmit={handleSubmit} className="mx-auto mt-6 max-w-md space-y-3 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.02] p-5 text-left">
       <div className="grid grid-cols-2 gap-2">
-        <button type="button" onClick={() => setBusinessType("individual")} className={`rounded-xl border py-2 text-xs font-bold transition ${businessType === "individual" ? "border-orange-400/50 bg-orange-500/15 text-orange-300" : "border-white/10 light:border-black/10 text-slate-400"}`}>
+        <button type="button" onClick={() => setBusinessType("individual")} className={`rounded-xl border py-2 text-xs font-bold transition ${businessType === "individual" ? "border-orange-400/50 bg-orange-500/15 text-orange-300" : "border-white/10 light:border-black/10 text-slate-400 light:text-slate-700"}`}>
           Individual Seller
         </button>
-        <button type="button" onClick={() => setBusinessType("business")} className={`rounded-xl border py-2 text-xs font-bold transition ${businessType === "business" ? "border-orange-400/50 bg-orange-500/15 text-orange-300" : "border-white/10 light:border-black/10 text-slate-400"}`}>
+        <button type="button" onClick={() => setBusinessType("business")} className={`rounded-xl border py-2 text-xs font-bold transition ${businessType === "business" ? "border-orange-400/50 bg-orange-500/15 text-orange-300" : "border-white/10 light:border-black/10 text-slate-400 light:text-slate-700"}`}>
           Registered Business
         </button>
       </div>
@@ -172,7 +172,7 @@ export default function VendorDashboardPage() {
   if (tableMissing) {
     return (
       <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 text-center">
-        <p className="text-sm text-slate-400">Vendor accounts aren&apos;t set up yet. Please check back shortly.</p>
+        <p className="text-sm text-slate-400 light:text-slate-600">Vendor accounts aren&apos;t set up yet. Please check back shortly.</p>
       </div>
     );
   }

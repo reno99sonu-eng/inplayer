@@ -165,7 +165,7 @@ export default function AdminVideosPage() {
             className={`rounded-full px-4 py-1.5 text-xs font-bold transition ${
               type === t.id
                 ? "bg-indigo-500 text-white"
-                : "bg-white/5 text-slate-400 hover:bg-white/10 light:bg-black/5"
+                : "bg-white/5 text-slate-400 light:text-slate-700 hover:bg-white/10 light:bg-black/5"
             }`}
           >
             {t.label}
@@ -227,7 +227,7 @@ export default function AdminVideosPage() {
                     </p>
                     {statusBadge(row.status)}
                     {row.visibility && row.visibility !== "public" && (
-                      <span className="shrink-0 rounded-full bg-white/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-300">
+                      <span className="shrink-0 rounded-full bg-white/10 light:bg-black/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-300 light:text-slate-700">
                         {row.visibility}
                       </span>
                     )}

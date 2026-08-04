@@ -227,7 +227,7 @@ export default function RevenueSection({
                 </p>
               </div>
             </div>
-            <p className="mt-2.5 text-xs leading-relaxed text-slate-500 light:text-slate-500">
+            <p className="mt-2.5 text-xs leading-relaxed text-slate-500 light:text-slate-600">
               Your {Math.round(CREATOR_SHARE * 100)}% share of every paid
               InPlayer membership (₹{MEMBERSHIP_PRICE_INR}/month per member) —{" "}
               {meetsPayoutThreshold
@@ -308,7 +308,7 @@ export default function RevenueSection({
           <button
             disabled
             title="Connect a Razorpay account to enable this"
-            className="flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-2xl border border-dashed border-white/15 light:border-black/15 py-2.5 text-sm font-semibold text-slate-500 light:text-slate-500"
+            className="flex w-full cursor-not-allowed items-center justify-center gap-2 rounded-2xl border border-dashed border-white/15 light:border-black/15 py-2.5 text-sm font-semibold text-slate-500 light:text-slate-600"
           >
             <Landmark size={16} />
             Connect bank account via Razorpay — coming soon
@@ -389,7 +389,7 @@ export default function RevenueSection({
         )
       ) : (
         <div className="mt-4 space-y-4">
-          <p className="text-xs text-slate-500 light:text-slate-500">
+          <p className="text-xs text-slate-500 light:text-slate-600">
             Monetization unlocks automatically when you reach {ELIGIBILITY_THRESHOLD.subscribers} In-Family members
             AND either {ELIGIBILITY_THRESHOLD.videoViews.toLocaleString()} video views or 1,000,000 (1 Million) Raftaar reels views on your channel!
           </p>

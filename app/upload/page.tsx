@@ -620,7 +620,7 @@ export default function UploadPage() {
               renderReady={(info) =>
                 contentType === "short" ? (
                   <div className="py-8 text-center">
-                    <p className="text-lg font-bold text-white">Your Short is published! 🎉</p>
+                    <p className="text-lg font-bold text-white light:text-slate-900">Your Short is published! 🎉</p>
                     <button
                       onClick={() => router.push(`/shorts?v=${uploadedVideoId}`)}
                       className="mt-4 rounded-2xl bg-gradient-to-r from-[#FF7A18] to-[#FFD54A] px-6 py-2.5 font-bold text-white shadow"

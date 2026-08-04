@@ -112,7 +112,7 @@ function AddListingForm({ onCreated }: { onCreated: () => void }) {
   return (
     <form onSubmit={handleSubmit} className="space-y-3.5 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.02] p-4 text-left">
       <div>
-        <label className="block text-xs font-semibold text-slate-300 mb-1">
+        <label className="block text-xs font-semibold text-slate-300 light:text-slate-700 mb-1">
           Product Photos (Upload up to 5 photos)
         </label>
         
@@ -153,7 +153,7 @@ function AddListingForm({ onCreated }: { onCreated: () => void }) {
               ) : (
                 <>
                   <Plus size={20} className="text-orange-400" />
-                  <span className="mt-1 text-[10px] text-slate-400">Add Photo</span>
+                  <span className="mt-1 text-[10px] text-slate-400 light:text-slate-600">Add Photo</span>
                 </>
               )}
             </label>
@@ -186,7 +186,7 @@ function AddListingForm({ onCreated }: { onCreated: () => void }) {
 
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className="block text-[11px] font-semibold text-slate-400 mb-1">HS Code (Trade Classification)</label>
+          <label className="block text-[11px] font-semibold text-slate-400 light:text-slate-700 mb-1">HS Code (Trade Classification)</label>
           <input
             value={hsCode}
             onChange={(e) => setHsCode(e.target.value)}
@@ -196,7 +196,7 @@ function AddListingForm({ onCreated }: { onCreated: () => void }) {
         </div>
 
         <div>
-          <label className="block text-[11px] font-semibold text-slate-400 mb-1">Country of Origin</label>
+          <label className="block text-[11px] font-semibold text-slate-400 light:text-slate-700 mb-1">Country of Origin</label>
           <select
             value={countryOfOrigin}
             onChange={(e) => setCountryOfOrigin(e.target.value)}
@@ -211,7 +211,7 @@ function AddListingForm({ onCreated }: { onCreated: () => void }) {
 
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className="block text-[11px] font-semibold text-slate-400 mb-1">Category</label>
+          <label className="block text-[11px] font-semibold text-slate-400 light:text-slate-700 mb-1">Category</label>
           <select
             value={category}
             onChange={(e) => setCategory(e.target.value)}
@@ -224,7 +224,7 @@ function AddListingForm({ onCreated }: { onCreated: () => void }) {
         </div>
 
         <div>
-          <label className="block text-[11px] font-semibold text-slate-400 mb-1">Price (₹ INR)</label>
+          <label className="block text-[11px] font-semibold text-slate-400 light:text-slate-700 mb-1">Price (₹ INR)</label>
           <div className="relative">
             <IndianRupee size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
             <input
@@ -369,7 +369,7 @@ export default function VendorListingsPage() {
               )}
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-white light:text-slate-900">{p.title}</p>
-                <p className="text-xs text-slate-400">₹{p.priceInr.toLocaleString("en-IN")} · {p.category}</p>
+                <p className="text-xs text-slate-400 light:text-slate-600">₹{p.priceInr.toLocaleString("en-IN")} · {p.category}</p>
                 {p.flagged && (
                   <p className="mt-0.5 flex items-center gap-1 text-[11px] text-amber-400">
                     <AlertTriangle size={11} /> Flagged — hidden from buyers
@@ -383,7 +383,7 @@ export default function VendorListingsPage() {
                     disabled={busyId === p.productId}
                     onClick={() => toggleVisibility(p)}
                     title={p.status === "active" ? "Hide from buyers" : "Show to buyers"}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 light:border-black/10 text-slate-300 hover:bg-white/5 disabled:opacity-50"
+                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/10 light:border-black/10 text-slate-300 light:text-slate-600 hover:bg-white/5 disabled:opacity-50"
                   >
                     {p.status === "active" ? <Eye size={14} /> : <EyeOff size={14} />}
                   </button>

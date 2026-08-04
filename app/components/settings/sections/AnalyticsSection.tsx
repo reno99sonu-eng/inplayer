@@ -29,7 +29,7 @@ function StatCard({
         {icon}
       </div>
       <p className="text-xl font-black text-white light:text-slate-900">{value}</p>
-      <p className="mt-0.5 text-[11px] font-medium text-slate-500 light:text-slate-500">{label}</p>
+      <p className="mt-0.5 text-[11px] font-medium text-slate-500 light:text-slate-600">{label}</p>
     </div>
   );
 }
@@ -131,7 +131,7 @@ export default function AnalyticsSection() {
 
           {topVideo && (
             <div className="mt-6 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.03] p-5">
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 light:text-slate-500">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 light:text-slate-600">
                 Top Performer
               </p>
               <p className="mt-2 line-clamp-1 text-lg font-bold text-white light:text-slate-900">

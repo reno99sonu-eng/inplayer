@@ -434,7 +434,7 @@ const showAvatar =
     <div
       className={`rounded-2xl px-3.5 py-2 text-sm ${
         m.deletedForEveryone
-          ? "border border-dashed border-white/15 light:border-black/15 text-slate-500 italic"
+          ? "border border-dashed border-white/15 light:border-black/15 text-slate-500 light:text-slate-600 italic"
           : mine
           ? "bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white"
           : "border border-white/10 light:border-black/10 bg-white/[0.04] light:bg-slate-100 text-slate-100 light:text-slate-900"
@@ -445,7 +445,7 @@ const showAvatar =
       <p
         className={`mt-0.5 flex items-center gap-1 text-[10px] ${
           m.deletedForEveryone
-            ? "text-slate-500"
+            ? "text-slate-500 light:text-slate-600"
             : mine
             ? "text-white/70"
             : "light:text-slate-600 text-slate-500"

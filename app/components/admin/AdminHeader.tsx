@@ -118,8 +118,8 @@ export default function AdminHeader({ email }: { email: string | null }) {
         </div>
 
         <div className="flex items-center gap-3 sm:gap-4">
-          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-indigo-400/30 bg-indigo-500/10 sm:h-11 sm:w-11">
-            <ShieldCheck size={18} className="text-indigo-300" />
+          <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full border border-indigo-400/30 bg-indigo-500/10 light:bg-indigo-500/15 sm:h-11 sm:w-11">
+            <ShieldCheck size={18} className="text-indigo-300 light:text-indigo-700" />
           </div>
 
           <div className="min-w-0">

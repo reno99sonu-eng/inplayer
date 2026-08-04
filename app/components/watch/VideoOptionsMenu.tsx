@@ -359,7 +359,7 @@ export default function VideoOptionsMenu({
                 <button
                   onClick={closeAll}
                   aria-label="Close"
-                  className="text-slate-400 transition hover:text-white light:hover:text-slate-900"
+                  className="text-slate-400 transition hover:text-white light:text-slate-600 light:hover:text-slate-900"
                 >
                   <X size={15} />
                 </button>

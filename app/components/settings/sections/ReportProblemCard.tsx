@@ -92,7 +92,7 @@ export default function ReportProblemCard() {
               <>
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-bold text-white light:text-slate-900">Report a Problem</p>
-                  <button type="button" onClick={() => setOpen(false)} className="text-slate-400 hover:text-white">
+                  <button type="button" onClick={() => setOpen(false)} className="text-slate-400 hover:text-white light:text-slate-600 light:hover:text-slate-900">
                     <X size={16} />
                   </button>
                 </div>

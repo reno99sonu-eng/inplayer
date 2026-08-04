@@ -28,7 +28,7 @@ export default function SettingsSectionTitle({
       </div>
 
       {subtitle && (
-        <p className="mt-2 ml-13 text-sm leading-6 text-slate-500 light:text-slate-500">
+        <p className="mt-2 ml-13 text-sm leading-6 text-slate-500 light:text-slate-600">
           {subtitle}
         </p>
       )}

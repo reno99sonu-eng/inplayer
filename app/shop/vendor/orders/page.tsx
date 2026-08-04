@@ -54,7 +54,7 @@ export default function VendorOrdersPage() {
   }
 
   if (!user) {
-    return <div className="mx-auto max-w-md px-6 py-16 text-center text-sm text-slate-400">Sign in to see your orders.</div>;
+    return <div className="mx-auto max-w-md px-6 py-16 text-center text-sm text-slate-400 light:text-slate-600">Sign in to see your orders.</div>;
   }
 
   return (
@@ -82,7 +82,7 @@ export default function VendorOrdersPage() {
                 )}
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold text-white light:text-slate-900">{o.productTitle}</p>
-                  <p className="flex items-center gap-1 text-xs text-slate-400">
+                  <p className="flex items-center gap-1 text-xs text-slate-400 light:text-slate-600">
                     <IndianRupee size={11} /> {o.priceInr.toLocaleString("en-IN")} · {o.buyerName}
                   </p>
                 </div>

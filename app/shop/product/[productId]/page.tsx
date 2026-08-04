@@ -438,7 +438,7 @@ export default function ProductPage() {
                 <button
                   type="button"
                   onClick={() => setShowAddressModal(false)}
-                  className="rounded-full p-1 text-slate-400 hover:text-white light:hover:text-slate-900 transition mr-1"
+                  className="rounded-full p-1 text-slate-400 light:text-slate-600 hover:text-white light:hover:text-slate-900 transition mr-1"
                   title="Back"
                 >
                   <ArrowLeft size={18} />

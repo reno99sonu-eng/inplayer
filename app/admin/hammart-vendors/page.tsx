@@ -333,7 +333,7 @@ export default function AdminHammartVendorsPage() {
                             setRejectingId(null);
                             setRejectReason("");
                           }}
-                          className="rounded-xl px-3 py-2 text-xs font-semibold text-slate-400 hover:bg-white/5"
+                          className="rounded-xl px-3 py-2 text-xs font-semibold text-slate-400 light:text-slate-600 hover:bg-white/5 light:hover:bg-black/5"
                         >
                           Cancel
                         </button>

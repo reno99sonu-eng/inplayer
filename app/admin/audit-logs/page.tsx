@@ -197,7 +197,7 @@ export default function AuditLogsPage() {
             className={`rounded-full px-4 py-1.5 text-xs font-bold transition ${
               filter === f.id
                 ? "bg-indigo-500 text-white"
-                : "bg-white/5 text-slate-400 hover:bg-white/10 light:bg-black/5"
+                : "bg-white/5 text-slate-400 light:text-slate-700 hover:bg-white/10 light:bg-black/5"
             }`}
           >
             {f.label}

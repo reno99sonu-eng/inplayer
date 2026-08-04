@@ -13,7 +13,7 @@ export const metadata = {
   title: "Terms of Service — InPlayer",
 };
 
-const LAST_UPDATED = "29 July 2026";
+const LAST_UPDATED = "4 August 2026";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -83,12 +83,22 @@ export default function TermsPage() {
         </p>
         <p>You agree not to post content that:</p>
         <ul className="list-disc space-y-1.5 pl-5">
-          <li>Infringes someone else&apos;s copyright or other rights</li>
+          <li>Infringes someone else&apos;s copyright, trademark, or other rights</li>
           <li>Contains hate speech, harassment, or threats of violence</li>
           <li>Sexually exploits or endangers a minor, in any form</li>
+          <li>Is sexually explicit, or shows someone in an intimate act or state of undress without their consent</li>
+          <li>Impersonates another person or organization, or misrepresents your identity or affiliation</li>
+          <li>Invades another person&apos;s privacy, including sharing someone&apos;s private information without their consent</li>
+          <li>Is patently false or misleading in a way likely to cause public harm or panic</li>
+          <li>Threatens India&apos;s sovereignty, integrity, security, or friendly relations with other countries, or incites an offence relating to any of these</li>
           <li>Is spam, scam, or deliberately misleading</li>
           <li>Violates any applicable law</li>
         </ul>
+        <p className="text-xs text-slate-500">
+          This list reflects the categories of content Indian law (the IT Rules, 2021) requires platforms
+          like InPlayer to prohibit — see &quot;Grievance Officer&quot; below for how to report content
+          that violates it.
+        </p>
         <p>
           To help enforce this, InPlayer automatically scans new comments, direct messages, and
           upload titles/descriptions for likely policy violations at the moment they&apos;re
@@ -116,7 +126,35 @@ export default function TermsPage() {
         </p>
       </Section>
 
-      <Section title="5. Suspension and removal">
+      <Section title="5. Buying and selling on HamMart">
+        <p>
+          HamMart is InPlayer&apos;s marketplace where independent vendors list and sell their own
+          products. When you buy through HamMart, your contract for that product is with the
+          vendor, not with InPlayer — in line with India&apos;s Consumer Protection (E-Commerce)
+          Rules, 2020, InPlayer acts as a marketplace connecting you with vendors and is not itself
+          the seller of vendor-listed products.
+        </p>
+        <p>
+          Each vendor is responsible for the accuracy of their own listings (including country of
+          origin, price, and description), for the legality and quality of what they sell, and for
+          fulfilling orders. Return, refund, and cancellation terms are set by the vendor and shown
+          on the product/order page; where a vendor hasn&apos;t stated one, contact{" "}
+          <a href="mailto:support@inplayer.in" className="text-orange-400 hover:underline">
+            support@inplayer.in
+          </a>{" "}
+          and we&apos;ll help resolve it. Report a counterfeit, unsafe, or otherwise problematic
+          product or vendor the same way — see &quot;Grievance Officer&quot; below.
+        </p>
+        <p>
+          If you sell on HamMart as a vendor, the separate{" "}
+          <Link href="/hammart-vendor-terms" className="text-orange-400 hover:underline">
+            HamMart Vendor Terms
+          </Link>{" "}
+          apply to you as well.
+        </p>
+      </Section>
+
+      <Section title="6. Suspension and removal">
         <p>
           We may remove content or suspend an account that violates these Terms, including
           content our automated moderation flags as a serious violation (which is hidden
@@ -129,7 +167,7 @@ export default function TermsPage() {
         </p>
       </Section>
 
-      <Section title="6. Disclaimers">
+      <Section title="7. Disclaimers">
         <p>
           InPlayer is provided &quot;as is.&quot; We work to keep the service reliable and
           content appropriately moderated, but we don&apos;t guarantee the service will be
@@ -138,7 +176,31 @@ export default function TermsPage() {
         </p>
       </Section>
 
-      <Section title="7. Changes to these Terms">
+      <Section title="8. Grievance Officer">
+        <p>
+          In accordance with the Information Technology (Intermediary Guidelines and Digital
+          Media Ethics Code) Rules, 2021, complaints about content on InPlayer — including under
+          &quot;Content you post&quot; above — can be raised with our Grievance Officer:
+        </p>
+        <p>
+          Grievance Officer: Reno
+          <br />
+          Email:{" "}
+          <a href="mailto:support@inplayer.in" className="text-orange-400 hover:underline">
+            support@inplayer.in
+          </a>
+          <br />
+          Homox Prime Pvt Ltd
+        </p>
+        <p>
+          We acknowledge complaints within 24 hours and aim to resolve them within 15 days, as
+          required by the Rules. For content that must legally be removed faster — for example
+          non-consensual intimate imagery or impersonation — we act within 24 hours of a valid
+          complaint.
+        </p>
+      </Section>
+
+      <Section title="9. Changes to these Terms">
         <p>
           We may update these Terms as InPlayer changes. If we make a material change, we&apos;ll
           update the &quot;Last updated&quot; date above. Continuing to use InPlayer after a
@@ -146,7 +208,7 @@ export default function TermsPage() {
         </p>
       </Section>
 
-      <Section title="8. Contact">
+      <Section title="10. Contact">
         <p>
           Questions about these Terms? Email{" "}
           <a href="mailto:contact@inplayer.in" className="text-orange-400 hover:underline">

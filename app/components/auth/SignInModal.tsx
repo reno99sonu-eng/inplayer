@@ -341,7 +341,7 @@ export default function SignInModal({
                         py-2.5 pl-11 pr-4
                         text-white light:text-slate-900 caret-orange-400
                         outline-none transition-all duration-300
-                        placeholder:text-slate-500 light:placeholder:text-slate-400
+                        placeholder:text-slate-500 light:placeholder:text-slate-600
                         focus:border-orange-400/50 focus:shadow-[0_0_0_3px_rgba(249,115,22,.1)]
                       "
                       placeholder="you@example.com"
@@ -371,7 +371,7 @@ export default function SignInModal({
                         py-2.5 pl-11 pr-16
                         text-white light:text-slate-900 caret-orange-400
                         outline-none transition-all duration-300
-                        placeholder:text-slate-500 light:placeholder:text-slate-400
+                        placeholder:text-slate-500 light:placeholder:text-slate-600
                         focus:border-orange-400/50 focus:shadow-[0_0_0_3px_rgba(249,115,22,.1)]
                       "
                       placeholder="••••••••"

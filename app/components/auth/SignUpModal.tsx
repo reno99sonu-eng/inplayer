@@ -539,7 +539,7 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
                     py-2.5 pl-11 pr-10
                     text-white light:text-slate-900 caret-orange-400
                     outline-none transition-all duration-300
-                    placeholder:text-slate-500 light:placeholder:text-slate-400
+                    placeholder:text-slate-500 light:placeholder:text-slate-600
                     focus:border-orange-400/50 focus:shadow-[0_0_0_3px_rgba(249,115,22,.1)]
                   "
                   placeholder="Ram Kumar"
@@ -572,7 +572,7 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
                     py-2.5 pl-11 pr-10
                     text-white light:text-slate-900 caret-orange-400
                     outline-none transition-all duration-300
-                    placeholder:text-slate-500 light:placeholder:text-slate-400
+                    placeholder:text-slate-500 light:placeholder:text-slate-600
                     focus:border-orange-400/50 focus:shadow-[0_0_0_3px_rgba(249,115,22,.1)]
                   "
                   placeholder="you@example.com"
@@ -608,7 +608,7 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
                     py-2.5 pl-11 pr-4
                     text-white light:text-slate-900 caret-orange-400
                     outline-none transition-all duration-300
-                    placeholder:text-slate-500 light:placeholder:text-slate-400
+                    placeholder:text-slate-500 light:placeholder:text-slate-600
                     focus:border-orange-400/50 focus:shadow-[0_0_0_3px_rgba(249,115,22,.1)]
                   "
                   placeholder="At least 8 characters"
@@ -664,7 +664,7 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
                     py-2.5 pl-11 pr-10
                     text-white light:text-slate-900 caret-orange-400
                     outline-none transition-all duration-300
-                    placeholder:text-slate-500 light:placeholder:text-slate-400
+                    placeholder:text-slate-500 light:placeholder:text-slate-600
                     focus:shadow-[0_0_0_3px_rgba(249,115,22,.1)]
                     ${
                       passwordsMismatch
@@ -693,7 +693,7 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
               )}
             </div>
 
-            <p className="text-center text-[11px] leading-relaxed text-slate-500 light:text-slate-500">
+            <p className="text-center text-[11px] leading-relaxed text-slate-500 light:text-slate-600">
               By creating an account, you agree to InPlayer&apos;s{" "}
               <a
                 href="/terms"

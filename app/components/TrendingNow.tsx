@@ -250,9 +250,9 @@ export default function TrendingNow() {
                 key={i}
                 className="flex w-20 flex-shrink-0 flex-col items-center gap-1 sm:w-22 lg:w-24"
               >
-                <div className="h-14 w-14 animate-pulse rounded-full bg-white/[0.06] sm:h-16 sm:w-16 lg:h-16 lg:w-16" />
-                <div className="h-2 w-10 animate-pulse rounded-full bg-white/[0.06]" />
-                <div className="h-1.5 w-6 animate-pulse rounded-full bg-white/[0.05]" />
+                <div className="h-14 w-14 animate-pulse rounded-full bg-white/[0.06] light:bg-black/5 sm:h-16 sm:w-16 lg:h-16 lg:w-16" />
+                <div className="h-2 w-10 animate-pulse rounded-full bg-white/[0.06] light:bg-black/5" />
+                <div className="h-1.5 w-6 animate-pulse rounded-full bg-white/[0.05] light:bg-black/5" />
               </div>
             ))}
           </div>

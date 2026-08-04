@@ -52,7 +52,7 @@ function CopyField({
             type="button"
             onClick={() => setRevealed((v) => !v)}
             aria-label={revealed ? "Hide" : "Reveal"}
-            className="flex-shrink-0 text-slate-400 transition hover:text-white light:hover:text-slate-900"
+            className="flex-shrink-0 text-slate-400 light:text-slate-600 transition hover:text-white light:hover:text-slate-900"
           >
             {revealed ? <EyeOff size={16} /> : <Eye size={16} />}
           </button>
@@ -61,7 +61,7 @@ function CopyField({
           type="button"
           onClick={copy}
           aria-label="Copy"
-          className="flex-shrink-0 text-slate-400 transition hover:text-orange-400"
+          className="flex-shrink-0 text-slate-400 light:text-slate-600 transition hover:text-orange-400"
         >
           {copied ? (
             <Check size={16} className="text-emerald-400" />

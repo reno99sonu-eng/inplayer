@@ -103,7 +103,20 @@ export default function AdBanner({
             target="_blank"
             rel="noopener noreferrer sponsored"
             onClick={() => handleClick(activeCreative)}
-            className="group relative flex aspect-video sm:aspect-auto sm:h-16 md:h-20 lg:h-24 w-full items-center justify-center overflow-hidden transition duration-300 bg-[#060D18]"
+            className={`group relative flex aspect-video sm:aspect-[10/1] w-full items-center justify-center overflow-hidden transition duration-300 bg-[#060D18] ${
+              // "watch" is the one placement whose box isn't always
+              // full-row width — WatchPageContent.tsx moves it into a
+              // narrower 360px sidebar column at the xl breakpoint. A
+              // single fixed height/aspect ratio for the whole component
+              // used to mean this box's crop ratio silently changed with
+              // screen width (no upload size was ever crop-proof). Now
+              // every placement has one exact, fixed, documented ratio per
+              // context instead: 16:9 on mobile, 10:1 on tablet/desktop,
+              // and — for "watch" only — 4:1 once it narrows into the
+              // sidebar at xl+, matching that column's real proportions
+              // instead of squashing to a sliver.
+              placement === "watch" ? "xl:aspect-[4/1]" : ""
+            }`}
           >
             {isImageBroken ? (
               <div className="flex h-full w-full items-center justify-between bg-gradient-to-r from-indigo-900 via-purple-900 to-pink-900 px-6 py-2">

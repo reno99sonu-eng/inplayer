@@ -415,11 +415,16 @@ function AdvertisingPage() {
     }
   };
 
-  const handleAiCropAndRedesign = async (placement: Placement) => {
+  const handleAiCropAndRedesign = async () => {
     if (!uploadPreview || uploadFileType === "video") return;
     setCroppingAi(true);
     try {
-      const ratio = placement === "weekly_featured" ? 3.2 : placement === "homepage_spotlight" ? 1.77 : 3.2;
+      // Matches AdBanner.tsx's real rendered box exactly (10:1 on tablet/
+      // desktop for every placement — see app/components/AdBanner.tsx) so
+      // an AI-cropped poster actually displays edge-to-edge with zero
+      // cropping once it's live, instead of being cropped to a ratio the
+      // banner never actually renders at.
+      const ratio = 10;
       const redesigned = await aiCropAndRedesignImage(uploadPreview, ratio, 1200);
       setUploadPreview(redesigned);
     } catch (err) {
@@ -445,13 +450,18 @@ function AdvertisingPage() {
   const generateMagicAiAd = async (placement: Placement) => {
     if (uploadPreview) {
       await generateTitleWithAi(placement, false);
-      await handleAiCropAndRedesign(placement);
+      await handleAiCropAndRedesign();
       return;
     }
     setGeneratingTitleAi(true);
     setUploadError(null);
     try {
-      const ratio = placement === "weekly_featured" ? 3.2 : placement === "homepage_spotlight" ? 1.77 : 3.2;
+      // Matches AdBanner.tsx's real rendered box exactly (10:1 on tablet/
+      // desktop for every placement — see app/components/AdBanner.tsx) so
+      // an AI-cropped poster actually displays edge-to-edge with zero
+      // cropping once it's live, instead of being cropped to a ratio the
+      // banner never actually renders at.
+      const ratio = 10;
       const { title, imageUrl } = await callAiAdGenerate({ mode: "full", placement });
       if (!imageUrl) throw new Error("AI didn't return a banner image.");
       const banner = await compressDataUrlToBanner(imageUrl, 140_000, ratio);
@@ -801,7 +811,7 @@ function AdvertisingPage() {
                   className={`rounded-full px-3.5 py-1 text-xs font-bold transition ${
                     settings.weeklyFeaturedEnabled
                       ? "bg-emerald-500/20 text-emerald-300 light:bg-emerald-100 light:text-emerald-800"
-                      : "bg-white/5 text-slate-400 light:bg-black/5"
+                      : "bg-white/5 text-slate-400 light:text-slate-700 light:bg-black/5"
                   }`}
                 >
                   {settings.weeklyFeaturedEnabled ? "ON (Custom Ad Poster Mode)" : "OFF (User Videos Mode - Default)"}
@@ -925,7 +935,7 @@ function AdvertisingPage() {
                   {uploadFileType !== "video" && !uploadPreview.startsWith("data:video/") && (
                     <button
                       type="button"
-                      onClick={() => handleAiCropAndRedesign(activePanel as Placement)}
+                      onClick={() => handleAiCropAndRedesign()}
                       disabled={croppingAi}
                       className="flex items-center gap-1.5 rounded-xl bg-purple-600/30 border border-purple-500/40 px-3 py-1.5 text-xs font-bold text-purple-300 light:text-purple-900 hover:bg-purple-600/40 transition disabled:opacity-50 cursor-pointer"
                     >
@@ -1023,7 +1033,7 @@ function AdvertisingPage() {
                 className={`rounded-full px-3.5 py-1 text-xs font-bold transition ${
                   settings.midrollEnabled
                     ? "bg-emerald-500/20 text-emerald-300 light:bg-emerald-100 light:text-emerald-800"
-                    : "bg-white/5 text-slate-400 light:bg-black/5"
+                    : "bg-white/5 text-slate-400 light:text-slate-700 light:bg-black/5"
                 }`}
               >
                 {settings.midrollEnabled ? "ON" : "OFF"}
@@ -1215,26 +1225,34 @@ function AdvertisingPage() {
             <h3 className="font-bold text-sm text-indigo-300 light:text-indigo-950 flex items-center gap-1.5">
               📐 Recommended Ad Poster Specifications & Aspect Ratios
             </h3>
+            <p className="text-[11px] text-slate-400 light:text-slate-600 -mt-1">
+              Verified directly against how each banner actually renders on the live site — upload at the exact size shown and the poster fills its slot completely with zero cropping and zero bleed.
+            </p>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-slate-300 light:text-slate-800 font-medium">
               <div className="rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 p-3 space-y-1">
-                <strong className="block text-white light:text-slate-900 font-bold">Homepage Feed Ad Card (Slots 13 & 16)</strong>
-                <code className="inline-block rounded bg-orange-500/20 light:bg-orange-100 px-1.5 py-0.5 font-bold text-orange-300 light:text-amber-900">16:9 Native Video Card ratio</code>
-                <p className="text-[11px] text-slate-400 light:text-slate-600">Blends natively into the homepage 4-column grid as a video thumbnail card (1920 × 1080 px or 1200 × 675 px image/video with Sponsored Ad tag).</p>
+                <strong className="block text-white light:text-slate-900 font-bold">Homepage Banner</strong>
+                <code className="inline-block rounded bg-orange-500/20 light:bg-orange-100 px-1.5 py-0.5 font-bold text-orange-300 light:text-amber-900">10:1 on tablet/desktop · 16:9 on mobile</code>
+                <p className="text-[11px] text-slate-400 light:text-slate-600">Full-width strip near the top of the homepage. Recommended: 1800 × 180 px (any 10:1-ratio image scales cleanly). On phones it switches to a 16:9 box instead — e.g. 1200 × 675 px — so a single upload can&apos;t be crop-proof on every device; the AI crop tool below targets the 10:1 desktop size.</p>
               </div>
-              <div className="rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 p-3 space-y-1">
+              <div className="rounded-xl border border-amber-500/30 light:border-amber-600/40 bg-amber-500/10 light:bg-amber-100/60 p-3 space-y-1">
                 <strong className="block text-white light:text-slate-900 font-bold">Weekly Featured Banner</strong>
-                <code className="inline-block rounded bg-orange-500/20 light:bg-orange-100 px-1.5 py-0.5 font-bold text-orange-300 light:text-amber-900">16:5 aspect ratio</code>
-                <p className="text-[11px] text-slate-400 light:text-slate-600">Recommended: 1920 × 600 px image or .mp4 video clip.</p>
+                <code className="inline-block rounded bg-red-500/20 light:bg-red-100 px-1.5 py-0.5 font-bold text-red-300 light:text-red-800">⚠ Not shown on the website yet</code>
+                <p className="text-[11px] text-slate-400 light:text-slate-600">This slot exists in the admin panel but there&apos;s no matching placement on the site yet — anything uploaded here won&apos;t be visible to visitors until that&apos;s built. Ask to have it wired up, or skip this tab for now.</p>
               </div>
               <div className="rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 p-3 space-y-1">
                 <strong className="block text-white light:text-slate-900 font-bold">Video Player Mid-Roll Ads</strong>
                 <code className="inline-block rounded bg-orange-500/20 light:bg-orange-100 px-1.5 py-0.5 font-bold text-orange-300 light:text-amber-900">16:9 aspect ratio</code>
-                <p className="text-[11px] text-slate-400 light:text-slate-600">Recommended: 1920 × 1080 px image or .mp4 clip (up to 30s).</p>
+                <p className="text-[11px] text-slate-400 light:text-slate-600">Shown inside the video player, which fits the whole image/video without cropping (letterboxed if it isn&apos;t 16:9). Recommended: 1920 × 1080 px image or .mp4 clip (up to 30s).</p>
               </div>
               <div className="rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 p-3 space-y-1">
                 <strong className="block text-white light:text-slate-900 font-bold">Homepage Spotlight</strong>
-                <code className="inline-block rounded bg-orange-500/20 light:bg-orange-100 px-1.5 py-0.5 font-bold text-orange-300 light:text-amber-900">16:9 or 4:3 aspect ratio</code>
-                <p className="text-[11px] text-slate-400 light:text-slate-600">Recommended: 1200 × 675 px.</p>
+                <code className="inline-block rounded bg-orange-500/20 light:bg-orange-100 px-1.5 py-0.5 font-bold text-orange-300 light:text-amber-900">10:1 on tablet/desktop · 16:9 on mobile</code>
+                <p className="text-[11px] text-slate-400 light:text-slate-600">Same banner strip as the Homepage placement, shown lower on the page. Recommended: 1800 × 180 px (10:1 ratio); 1200 × 675 px (16:9) on mobile.</p>
+              </div>
+              <div className="rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 p-3 space-y-1 sm:col-span-2">
+                <strong className="block text-white light:text-slate-900 font-bold">Watch Page Banner</strong>
+                <code className="inline-block rounded bg-orange-500/20 light:bg-orange-100 px-1.5 py-0.5 font-bold text-orange-300 light:text-amber-900">10:1 on most screens · 4:1 on wide desktop (≥1280px) · 16:9 on mobile</code>
+                <p className="text-[11px] text-slate-400 light:text-slate-600">Sits below the video. Recommended: 1800 × 180 px (10:1). On wide desktop screens the video moves into a two-column layout and this banner narrows into a sidebar, switching to a shorter 4:1 box (e.g. 800 × 200 px) so it never looks squashed to a sliver; on phones it&apos;s 16:9 (e.g. 1200 × 675 px). No single upload covers all three — the AI crop tool targets the 10:1 default size, which is correct for the majority of visitors.</p>
               </div>
             </div>
           </div>

@@ -232,7 +232,7 @@ export default function ForgotPasswordModal({
                         py-3 pl-11 pr-4
                         text-white light:text-slate-900 caret-orange-400
                         outline-none transition-all duration-300
-                        placeholder:text-slate-500 light:placeholder:text-slate-400
+                        placeholder:text-slate-500 light:placeholder:text-slate-600
                         focus:border-orange-400/50
                       "
                       placeholder="you@example.com"
@@ -303,7 +303,7 @@ export default function ForgotPasswordModal({
                         py-3 pl-11 pr-4
                         text-white light:text-slate-900 caret-orange-400
                         outline-none transition-all duration-300
-                        placeholder:text-slate-500 light:placeholder:text-slate-400
+                        placeholder:text-slate-500 light:placeholder:text-slate-600
                         focus:border-orange-400/50
                       "
                       placeholder="123456"
@@ -333,7 +333,7 @@ export default function ForgotPasswordModal({
                         py-3 pl-11 pr-4
                         text-white light:text-slate-900 caret-orange-400
                         outline-none transition-all duration-300
-                        placeholder:text-slate-500 light:placeholder:text-slate-400
+                        placeholder:text-slate-500 light:placeholder:text-slate-600
                         focus:border-orange-400/50
                       "
                       placeholder="At least 8 characters"

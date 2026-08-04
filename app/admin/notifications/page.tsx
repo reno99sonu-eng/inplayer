@@ -76,7 +76,7 @@ export default function AdminNotificationsPage() {
             className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${
               target === "all"
                 ? "bg-indigo-500 text-white"
-                : "bg-white/5 text-slate-400 hover:bg-white/10 light:bg-black/5"
+                : "bg-white/5 text-slate-400 light:text-slate-700 hover:bg-white/10 light:bg-black/5"
             }`}
           >
             <Users size={12} /> All users
@@ -87,7 +87,7 @@ export default function AdminNotificationsPage() {
             className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${
               target === "user"
                 ? "bg-indigo-500 text-white"
-                : "bg-white/5 text-slate-400 hover:bg-white/10 light:bg-black/5"
+                : "bg-white/5 text-slate-400 light:text-slate-700 hover:bg-white/10 light:bg-black/5"
             }`}
           >
             <User size={12} /> Specific user

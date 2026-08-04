@@ -29,7 +29,7 @@ export default function PlansSection() {
         <div className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.03] p-5">
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 light:text-slate-500">
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-slate-500 light:text-slate-600">
                 Current Plan
               </p>
               <p className="mt-1 text-2xl font-black text-white light:text-slate-900">
@@ -94,7 +94,7 @@ export default function PlansSection() {
             Premium billing launches soon
           </button>
 
-          <p className="mt-3 text-center text-xs text-slate-500 light:text-slate-500">
+          <p className="mt-3 text-center text-xs text-slate-500 light:text-slate-600">
             We&apos;ll let you know the moment it&apos;s ready — no action
             needed from you.
           </p>

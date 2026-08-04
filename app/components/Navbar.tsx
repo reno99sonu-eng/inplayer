@@ -243,9 +243,16 @@ export default function Navbar() {
 
   {/* Pure Transparent Occasion Graphic shifted right with larger graphic & watermark text */}
   {navbarTheme?.active && navbarTheme.imageUrl && (
-    <div className="relative ml-6 sm:ml-8 lg:ml-10 xl:ml-12 inline-flex items-center flex-shrink-0">
-      {/* Stacked Top-to-Bottom Animated Transparent Text Behind Festive Graphic */}
-      <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex flex-col items-center justify-center text-center leading-[0.88] max-h-full py-0.5 scale-110">
+    <div className="relative ml-6 sm:ml-8 lg:ml-10 xl:ml-12 inline-flex items-center flex-shrink-0 min-w-[140px] sm:min-w-[160px] lg:min-w-[185px] xl:min-w-[210px]">
+      {/* Stacked Top-to-Bottom Animated Transparent Text Behind Festive Graphic.
+          The box this text sits in is now sized independently of the graphic
+          (min-w above) instead of being clipped to exactly the image's
+          width — previously "HAPPY"/"INDEPENDENCE"/"FESTIVAL" etc. were
+          forced into a box only as wide as the image itself and cut off
+          mid-word with `truncate`. Now every word gets room to render in
+          full; `truncate` is gone since there's no longer anything to
+          truncate. */}
+      <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-visible flex flex-col items-center justify-center text-center leading-[0.95] max-h-full py-0.5">
         {(() => {
           const occId = navbarTheme.occasionId;
           let lines: string[] = ["OCCASION", "CELEBRATION", "THEME"];
@@ -263,7 +270,7 @@ export default function Navbar() {
           return lines.map((line, idx) => (
             <span
               key={idx}
-              className="whitespace-nowrap truncate max-w-full text-[10px] sm:text-[11px] lg:text-[12px] xl:text-[13px] font-black uppercase tracking-widest bg-gradient-to-r from-amber-300 via-orange-400 to-pink-400 bg-clip-text text-transparent opacity-85 animate-pulse drop-shadow-[0_1.5px_4px_rgba(0,0,0,0.85)]"
+              className="whitespace-nowrap text-[10px] sm:text-[11px] lg:text-[12px] xl:text-[13px] font-black uppercase tracking-wide bg-gradient-to-r from-amber-300 via-orange-400 to-pink-400 bg-clip-text text-transparent opacity-90 animate-pulse drop-shadow-[0_1.5px_4px_rgba(0,0,0,0.85)]"
             >
               {line}
             </span>
@@ -276,7 +283,7 @@ export default function Navbar() {
       <img
         src={navbarTheme.imageUrl}
         alt="Occasion Graphic"
-        className="relative z-10 h-12 lg:h-13 xl:h-14 w-auto object-contain drop-shadow-[0_2px_14px_rgba(255,165,0,0.5)]"
+        className="relative z-10 mx-auto h-12 lg:h-13 xl:h-14 w-auto object-contain drop-shadow-[0_2px_14px_rgba(255,165,0,0.5)]"
       />
     </div>
   )}
@@ -337,9 +344,13 @@ export default function Navbar() {
 
     {/* Pure Transparent Occasion Graphic shifted right with larger graphic & watermark text */}
     {navbarTheme?.active && navbarTheme.imageUrl && (
-      <div className="relative ml-4 sm:ml-6 inline-flex items-center flex-shrink-0">
-        {/* Stacked Top-to-Bottom Animated Transparent Text Behind Mobile Festive Graphic */}
-        <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-hidden flex flex-col items-center justify-center text-center leading-[0.88] max-h-full py-0.5 scale-110">
+      <div className="relative ml-4 sm:ml-6 inline-flex items-center flex-shrink-0 min-w-[100px] sm:min-w-[120px]">
+        {/* Stacked Top-to-Bottom Animated Transparent Text Behind Mobile
+            Festive Graphic — same width fix as the desktop block above:
+            the box is now wider than the graphic itself so words like
+            "INDEPENDENCE" or "FESTIVAL" render in full instead of getting
+            cut off by `truncate` inside a box only as wide as the image. */}
+        <div className="absolute inset-0 pointer-events-none select-none z-0 overflow-visible flex flex-col items-center justify-center text-center leading-[0.95] max-h-full py-0.5">
           {(() => {
             const occId = navbarTheme.occasionId;
             let lines: string[] = ["OCCASION", "CELEBRATION", "THEME"];
@@ -357,7 +368,7 @@ export default function Navbar() {
             return lines.map((line, idx) => (
               <span
                 key={idx}
-                className="whitespace-nowrap truncate max-w-full text-[9px] sm:text-[10px] font-black uppercase tracking-wider bg-gradient-to-r from-amber-300 via-orange-400 to-pink-400 bg-clip-text text-transparent opacity-85 animate-pulse drop-shadow-[0_1.5px_4px_rgba(0,0,0,0.85)]"
+                className="whitespace-nowrap text-[9px] sm:text-[10px] font-black uppercase tracking-tight bg-gradient-to-r from-amber-300 via-orange-400 to-pink-400 bg-clip-text text-transparent opacity-90 animate-pulse drop-shadow-[0_1.5px_4px_rgba(0,0,0,0.85)]"
               >
                 {line}
               </span>
@@ -370,7 +381,7 @@ export default function Navbar() {
         <img
           src={navbarTheme.imageUrl}
           alt="Occasion Graphic"
-          className="relative z-10 h-8 sm:h-9 md:h-10 w-auto object-contain drop-shadow-[0_2px_12px_rgba(255,165,0,0.45)]"
+          className="relative z-10 mx-auto h-8 sm:h-9 md:h-10 w-auto object-contain drop-shadow-[0_2px_12px_rgba(255,165,0,0.45)]"
         />
       </div>
     )}

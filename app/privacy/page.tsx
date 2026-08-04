@@ -9,7 +9,7 @@ export const metadata = {
   title: "Privacy Policy — InPlayer",
 };
 
-const LAST_UPDATED = "29 July 2026";
+const LAST_UPDATED = "4 August 2026";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -65,6 +65,19 @@ export default function PrivacyPage() {
             <strong className="text-white light:text-slate-900">Technical info:</strong> basic
             device and usage data (like error logs) used to keep the service running.
           </li>
+          <li>
+            <strong className="text-white light:text-slate-900">Payment info:</strong> if you
+            subscribe to InPlayer Premium or a HamMart vendor plan, or buy a HamMart product, your
+            payment details are collected and processed directly by Razorpay — see
+            &quot;Who we share data with&quot; below. InPlayer never sees or stores your card,
+            UPI, or bank details itself.
+          </li>
+          <li>
+            <strong className="text-white light:text-slate-900">HamMart vendor info:</strong> if
+            you register as a HamMart vendor, we collect the business details and identity/KYC
+            documents (such as a PAN or Aadhaar-based ID) required to verify you as a seller, plus
+            your product listings and order history.
+          </li>
         </ul>
       </Section>
 
@@ -117,10 +130,26 @@ export default function PrivacyPage() {
             <strong className="text-white light:text-slate-900">Vercel</strong> — hosts the
             InPlayer website itself.
           </li>
+          <li>
+            <strong className="text-white light:text-slate-900">Razorpay</strong> — processes
+            payments for Premium subscriptions, HamMart vendor plans, and HamMart product
+            purchases. Razorpay receives your payment details directly (card/UPI/bank info);
+            InPlayer only receives confirmation that a payment succeeded, not the underlying
+            payment details.
+          </li>
+          <li>
+            <strong className="text-white light:text-slate-900">Amazon SES</strong> — sends
+            account emails (verification codes, notifications) on our behalf.
+          </li>
         </ul>
         <p>
-          We don&apos;t currently process real payments on InPlayer — no payment provider
-          receives your data today. If that changes, we&apos;ll update this policy first.
+          If you buy a product on HamMart, the vendor you bought from also receives what they
+          need to fulfil your order (such as your shipping details and order contents) — see
+          &quot;Buying and selling on HamMart&quot; in our{" "}
+          <Link href="/terms" className="text-orange-400 hover:underline">
+            Terms of Service
+          </Link>
+          .
         </p>
       </Section>
 
@@ -144,24 +173,57 @@ export default function PrivacyPage() {
 
       <Section title="6. Children's privacy">
         <p>
-          InPlayer requires all accounts to be 13 or older. We don&apos;t knowingly collect data
-          from anyone under 13. If you believe a child under 13 has created an account, contact
-          us at{" "}
+          InPlayer requires all accounts to be 13 or older, and if you&apos;re under 18 we ask
+          you to confirm you have your parent or guardian&apos;s permission at signup. India&apos;s
+          Digital Personal Data Protection Act, 2023 defines a &quot;child&quot; as anyone under
+          18 and calls for verifiable parental consent before processing a child&apos;s data — our
+          current under-18 signup flow is a self-declared confirmation, not yet a verified
+          parental-consent flow. We&apos;re working towards full compliance as that law&apos;s
+          rules come into effect. We don&apos;t knowingly collect data from anyone under 13, don&apos;t
+          show targeted ads to any account that&apos;s declared itself under 18, and don&apos;t
+          build ad-targeting profiles of minors. If you believe a child under 13 has created an
+          account, or that a minor&apos;s account needs attention, contact{" "}
           <a href="mailto:contact@inplayer.in" className="text-orange-400 hover:underline">
             contact@inplayer.in
           </a>{" "}
-          and we&apos;ll remove it.
+          and we&apos;ll act on it.
         </p>
       </Section>
 
-      <Section title="7. Changes to this policy">
+      <Section title="7. Your rights &amp; grievance officer">
+        <p>
+          Under India&apos;s Digital Personal Data Protection Act, 2023, you can ask us to: tell
+          you what personal data we hold about you, correct it if it&apos;s wrong or incomplete,
+          or erase it (subject to what we&apos;re legally required to keep, like security logs).
+          Email{" "}
+          <a href="mailto:support@inplayer.in" className="text-orange-400 hover:underline">
+            support@inplayer.in
+          </a>{" "}
+          to make any of these requests — we aim to respond within 30 days and, at most, 90 days.
+        </p>
+        <p>
+          For complaints about how we handle your data, contact our Grievance Officer — the same
+          contact listed in our{" "}
+          <Link href="/terms" className="text-orange-400 hover:underline">
+            Terms of Service
+          </Link>
+          . If a data breach affects your account, we&apos;ll notify you without undue delay.
+        </p>
+        <p>
+          We keep your data only as long as your account is active or as needed for the purposes
+          above; when you delete your account, we delete your personal data except where the law
+          requires us to retain certain records (such as security/audit logs) for a limited time.
+        </p>
+      </Section>
+
+      <Section title="8. Changes to this policy">
         <p>
           If we make a material change to how we handle your data, we&apos;ll update the
           &quot;Last updated&quot; date above.
         </p>
       </Section>
 
-      <Section title="8. Contact">
+      <Section title="9. Contact">
         <p>
           Questions about your data? Email{" "}
           <a href="mailto:contact@inplayer.in" className="text-orange-400 hover:underline">

@@ -97,7 +97,7 @@ export default function SettingsRow({
           <ChevronRight
             size={18}
             className="
-              text-slate-500 light:text-slate-500
+              text-slate-500 light:text-slate-600
               transition-transform
               duration-300
               group-hover:translate-x-1

@@ -189,7 +189,7 @@ export default function CopyrightCenterPage() {
                   className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${
                     item.currentStrikes >= threshold - 1
                       ? "bg-red-500/15 text-red-300"
-                      : "bg-white/10 text-slate-300"
+                      : "bg-white/10 light:bg-black/10 text-slate-300 light:text-slate-700"
                   }`}
                 >
                   {item.currentStrikes >= threshold - 1 && <ShieldAlert size={10} />}

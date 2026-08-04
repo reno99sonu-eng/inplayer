@@ -71,7 +71,7 @@ function DocThumb({ label, src }: { label: string; src?: string }) {
           alt={label}
           className="h-20 w-20 flex-shrink-0 rounded-xl border border-white/10 object-cover transition group-hover:border-indigo-400/50"
         />
-        <span className="text-[10px] font-semibold text-slate-400">{label}</span>
+        <span className="text-[10px] font-semibold text-slate-400 light:text-slate-600">{label}</span>
       </button>
 
       {open && (
@@ -212,7 +212,7 @@ export default function AdminCreatorsPage() {
             className={`rounded-full px-4 py-1.5 text-xs font-bold transition ${
               tab === t.key
                 ? "bg-indigo-500 text-white"
-                : "bg-white/5 text-slate-400 hover:bg-white/10 light:bg-black/5"
+                : "bg-white/5 text-slate-400 light:text-slate-700 hover:bg-white/10 light:bg-black/5"
             }`}
           >
             {t.label}
@@ -360,7 +360,7 @@ export default function AdminCreatorsPage() {
                             setRejectingId(null);
                             setRejectReason("");
                           }}
-                          className="rounded-xl px-3 py-2 text-xs font-semibold text-slate-400 hover:bg-white/5"
+                          className="rounded-xl px-3 py-2 text-xs font-semibold text-slate-400 light:text-slate-600 hover:bg-white/5 light:hover:bg-black/5"
                         >
                           Cancel
                         </button>

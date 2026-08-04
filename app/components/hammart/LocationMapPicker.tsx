@@ -136,7 +136,7 @@ export default function LocationMapPicker({ onSelectAddress, onClose }: Location
           <div className="flex items-center gap-2">
             <button
               onClick={onClose}
-              className="rounded-full p-1 text-slate-400 hover:text-white light:hover:text-slate-900 transition mr-1"
+              className="rounded-full p-1 text-slate-400 light:text-slate-600 hover:text-white light:hover:text-slate-900 transition mr-1"
               title="Back"
             >
               <ArrowLeft size={18} />
@@ -219,7 +219,7 @@ export default function LocationMapPicker({ onSelectAddress, onClose }: Location
             </button>
           </div>
 
-          <p className="pointer-events-none absolute bottom-1 left-2 z-[500] text-[9px] font-semibold text-white/70 drop-shadow">
+          <p className="pointer-events-none absolute bottom-1 left-2 z-[500] text-[9px] font-semibold text-white/70 light:text-slate-600 drop-shadow">
             Drag the map to move the pin
           </p>
         </div>

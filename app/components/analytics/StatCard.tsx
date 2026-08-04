@@ -38,7 +38,7 @@ export default function StatCard({
         <Icon size={16} />
       </div>
 
-      <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-slate-500 light:text-slate-500">
+      <p className="text-[11px] font-bold uppercase tracking-[0.15em] text-slate-500 light:text-slate-600">
         {label}
       </p>
       <p

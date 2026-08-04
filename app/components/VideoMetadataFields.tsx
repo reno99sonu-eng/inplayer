@@ -172,7 +172,7 @@ export default function VideoMetadataFields({
           className={`flex-1 py-1.5 text-center text-xs font-bold rounded-lg transition-all ${
             mobileTab === "details"
               ? "bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white shadow"
-              : "text-slate-400 hover:text-white light:text-slate-600"
+              : "text-slate-400 hover:text-white light:text-slate-600 light:hover:text-slate-900"
           }`}
         >
           1. Details & Thumbnail
@@ -183,7 +183,7 @@ export default function VideoMetadataFields({
           className={`flex-1 py-1.5 text-center text-xs font-bold rounded-lg transition-all ${
             mobileTab === "settings"
               ? "bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white shadow"
-              : "text-slate-400 hover:text-white light:text-slate-600"
+              : "text-slate-400 hover:text-white light:text-slate-600 light:hover:text-slate-900"
           }`}
         >
           2. Visibility & Settings

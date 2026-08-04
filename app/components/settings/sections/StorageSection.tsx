@@ -84,13 +84,13 @@ export default function StorageSection() {
               <p className="text-xl font-black text-white light:text-slate-900">
                 {longform.length}
               </p>
-              <p className="text-[11px] text-slate-500 light:text-slate-500">Videos</p>
+              <p className="text-[11px] text-slate-500 light:text-slate-600">Videos</p>
             </div>
 
             <div className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.03] p-4 text-center">
               <Clapperboard size={18} className="mx-auto mb-2 text-slate-300 light:text-slate-700" />
               <p className="text-xl font-black text-white light:text-slate-900">{shorts.length}</p>
-              <p className="text-[11px] text-slate-500 light:text-slate-500">Shorts</p>
+              <p className="text-[11px] text-slate-500 light:text-slate-600">Shorts</p>
             </div>
 
             <div className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.03] p-4 text-center">
@@ -98,7 +98,7 @@ export default function StorageSection() {
               <p className="text-xl font-black text-white light:text-slate-900">
                 {processing.length}
               </p>
-              <p className="text-[11px] text-slate-500 light:text-slate-500">Processing</p>
+              <p className="text-[11px] text-slate-500 light:text-slate-600">Processing</p>
             </div>
           </div>
 

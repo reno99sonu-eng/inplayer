@@ -161,7 +161,7 @@ export default function TrendChart({
             ))}
           </svg>
 
-          <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500 light:text-slate-500">
+          <div className="mt-1 flex items-center justify-between text-[11px] text-slate-500 light:text-slate-600">
             <span>{formatShortDate(data[0].date)}</span>
             <span className="font-semibold text-slate-300 light:text-slate-600">
               peak {maxValue.toLocaleString()}
@@ -207,7 +207,7 @@ export default function TrendChart({
                 />
               </svg>
 
-              <p className="mt-4 max-w-xs text-xs text-slate-500 light:text-slate-500">
+              <p className="mt-4 max-w-xs text-xs text-slate-500 light:text-slate-600">
                 {data.length >= 1
                   ? "One real day logged. This line draws itself in the moment there's a second day to compare it to — no waiting on us, just on tomorrow."
                   : "Nothing logged yet today. Check back once today's numbers come in."}
@@ -219,7 +219,7 @@ export default function TrendChart({
               <p className="text-sm font-semibold text-slate-300 light:text-slate-700">
                 Trend history isn&apos;t set up yet
               </p>
-              <p className="mt-1 max-w-xs text-xs text-slate-500 light:text-slate-500">
+              <p className="mt-1 max-w-xs text-xs text-slate-500 light:text-slate-600">
                 Ask your developer to finish the analytics setup for day-by-day trends.
               </p>
             </div>

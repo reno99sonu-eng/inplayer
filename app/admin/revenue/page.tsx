@@ -44,9 +44,9 @@ function inr(n: number): string {
 }
 
 const KYC_BADGE: Record<string, string> = {
-  verified: "bg-emerald-500/15 text-emerald-300",
-  pending_review: "bg-amber-500/15 text-amber-300",
-  rejected: "bg-red-500/15 text-red-300",
+  verified: "bg-emerald-500/15 text-emerald-300 light:text-emerald-700",
+  pending_review: "bg-amber-500/15 text-amber-300 light:text-amber-700",
+  rejected: "bg-red-500/15 text-red-300 light:text-red-700",
 };
 
 function SummaryCard({
@@ -209,7 +209,7 @@ export default function AdminRevenuePage() {
           ) : (
             <div className="mt-4 overflow-x-auto rounded-2xl border border-white/10 light:border-black/10">
               <table className="w-full text-left text-sm">
-                <thead className="bg-white/[0.03] light:bg-black/[0.03] text-xs font-bold uppercase tracking-wide text-slate-400">
+                <thead className="bg-white/[0.03] light:bg-black/[0.03] text-xs font-bold uppercase tracking-wide text-slate-400 light:text-slate-600">
                   <tr>
                     <th className="px-4 py-3">Creator</th>
                     <th className="px-4 py-3">KYC</th>
@@ -232,7 +232,7 @@ export default function AdminRevenuePage() {
                       <td className="px-4 py-3">
                         <span
                           className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${
-                            KYC_BADGE[c.kycStatus] || "bg-white/10 text-slate-300"
+                            KYC_BADGE[c.kycStatus] || "bg-white/10 light:bg-black/10 text-slate-300 light:text-slate-700"
                           }`}
                         >
                           {c.kycStatus.replace(/_/g, " ")}
@@ -241,23 +241,23 @@ export default function AdminRevenuePage() {
                       <td className="px-4 py-3 text-slate-200 light:text-slate-800">
                         {inr(c.lifetimeEarnedInr)}
                       </td>
-                      <td className="px-4 py-3 text-slate-400">{inr(c.lifetimePaidOutInr)}</td>
+                      <td className="px-4 py-3 text-slate-400 light:text-slate-600">{inr(c.lifetimePaidOutInr)}</td>
                       <td className="px-4 py-3">
                         {c.pendingPayoutInr === null ? (
-                          <span className="text-slate-500">—</span>
+                          <span className="text-slate-500 light:text-slate-600">—</span>
                         ) : (
                           <span
-                            className={c.payoutEligible ? "text-emerald-300" : "text-slate-400"}
+                            className={c.payoutEligible ? "text-emerald-300 light:text-emerald-700" : "text-slate-400 light:text-slate-600"}
                           >
                             {inr(c.pendingPayoutInr)}
                             {c.payoutEligible && " · eligible"}
                           </span>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-slate-400 capitalize">
+                      <td className="px-4 py-3 text-slate-400 light:text-slate-600 capitalize">
                         {c.payoutFrequency || "—"}
                       </td>
-                      <td className="px-4 py-3 text-slate-500">
+                      <td className="px-4 py-3 text-slate-500 light:text-slate-600">
                         {c.lastChargeAt ? formatTimeAgo(c.lastChargeAt) : "—"}
                       </td>
                     </tr>

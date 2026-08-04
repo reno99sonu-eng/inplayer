@@ -1026,7 +1026,7 @@ animation: aiGlassSweep 5.5s linear infinite;
   }
 }
 .animate-splash-logo-in {
-  animation: splashLogoIn 1.1s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: splashLogoIn 1.4s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes splashGlowPulse {
@@ -1042,6 +1042,43 @@ animation: aiGlassSweep 5.5s linear infinite;
 }
 .animate-splash-glow-pulse {
   animation: splashGlowPulse 2.6s ease-in-out infinite;
+}
+
+/* Second glow layer behind the splash logo (see SplashScreen.tsx) — same
+   pulsing shape as the primary orange glow but on its own opacity/scale
+   curve and offset position, so the warm and cool color layers don't pulse
+   in lockstep. That's what makes the backdrop read as alive and multi-hued
+   rather than a single orange blob breathing in and out. */
+@keyframes splashGlowPulseAlt {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: scale(0.92);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.12);
+  }
+}
+.animate-splash-glow-pulse-alt {
+  animation: splashGlowPulseAlt 3.1s ease-in-out infinite;
+}
+
+/* Slowly cycles the spinning accent ring's hue through the brand's
+   warm-to-pink range instead of sitting at one flat orange the whole time. */
+@keyframes splashHueCycle {
+  0% {
+    filter: hue-rotate(0deg);
+  }
+  50% {
+    filter: hue-rotate(45deg);
+  }
+  100% {
+    filter: hue-rotate(0deg);
+  }
+}
+.animate-splash-hue-cycle {
+  animation: splashHueCycle 3.2s ease-in-out infinite;
 }
 
 @keyframes splashRingSpin {
@@ -1074,7 +1111,7 @@ animation: aiGlassSweep 5.5s linear infinite;
   }
 }
 .animate-splash-tagline-in {
-  animation: splashTaglineIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.55s both;
+  animation: splashTaglineIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.75s both;
 }
 
 @keyframes splashParticleDrift {
@@ -1100,6 +1137,8 @@ animation: aiGlassSweep 5.5s linear infinite;
 @media (prefers-reduced-motion: reduce) {
   .animate-splash-logo-in,
   .animate-splash-glow-pulse,
+  .animate-splash-glow-pulse-alt,
+  .animate-splash-hue-cycle,
   .animate-splash-ring-spin,
   .animate-splash-tagline-in,
   .animate-splash-particle {

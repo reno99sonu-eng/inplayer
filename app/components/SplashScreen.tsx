@@ -19,13 +19,18 @@ import { useEffect, useState } from "react";
 // Math.random()) on purpose: this is a client component, and randomizing
 // on every render would make the server-rendered markup and the first
 // client render disagree, which React flags as a hydration mismatch.
+// Each particle now also carries a color so the burst reads as multi-hued
+// (orange/pink/violet) instead of a single flat orange tone — alternating
+// down the list keeps the mix visually even in both corners of the screen.
 const PARTICLES = [
-  { top: "22%", left: "28%", x: "-46px", y: "-58px", delay: "0s", size: 6 },
-  { top: "30%", left: "72%", x: "54px", y: "-40px", delay: "0.3s", size: 4 },
-  { top: "68%", left: "24%", x: "-38px", y: "50px", delay: "0.6s", size: 5 },
-  { top: "72%", left: "76%", x: "42px", y: "56px", delay: "0.15s", size: 4 },
-  { top: "50%", left: "12%", x: "-60px", y: "6px", delay: "0.45s", size: 3 },
-  { top: "48%", left: "88%", x: "60px", y: "-4px", delay: "0.75s", size: 3 },
+  { top: "22%", left: "28%", x: "-46px", y: "-58px", delay: "0s", size: 6, color: "bg-orange-300 light:bg-orange-500" },
+  { top: "30%", left: "72%", x: "54px", y: "-40px", delay: "0.3s", size: 5, color: "bg-pink-300 light:bg-pink-500" },
+  { top: "68%", left: "24%", x: "-38px", y: "50px", delay: "0.6s", size: 5, color: "bg-violet-300 light:bg-violet-500" },
+  { top: "72%", left: "76%", x: "42px", y: "56px", delay: "0.15s", size: 4, color: "bg-amber-300 light:bg-amber-500" },
+  { top: "50%", left: "12%", x: "-60px", y: "6px", delay: "0.45s", size: 4, color: "bg-rose-300 light:bg-rose-500" },
+  { top: "48%", left: "88%", x: "60px", y: "-4px", delay: "0.75s", size: 4, color: "bg-orange-300 light:bg-orange-500" },
+  { top: "38%", left: "50%", x: "0px", y: "-70px", delay: "0.9s", size: 3, color: "bg-fuchsia-300 light:bg-fuchsia-500" },
+  { top: "60%", left: "50%", x: "0px", y: "70px", delay: "1.05s", size: 3, color: "bg-amber-200 light:bg-amber-400" },
 ];
 
 const TAGLINE = "The Future of Entertainment";
@@ -45,8 +50,13 @@ export default function SplashScreen() {
     // multi-second animated sequence — same content, far less time on
     // screen, no spinning/drifting elements (those are also disabled via
     // the prefers-reduced-motion CSS block in globals.css).
-    const holdMs = reducedMotion ? 500 : 1650;
-    const fadeOutMs = reducedMotion ? 250 : 700;
+    //
+    // Slowed down and given a longer, gentler fade-out per Reno's feedback
+    // that the previous timing (1.65s hold + 0.7s fade) felt rushed — the
+    // intro now holds noticeably longer and eases out over a full second
+    // instead of snapping away.
+    const holdMs = reducedMotion ? 500 : 2500;
+    const fadeOutMs = reducedMotion ? 250 : 1000;
 
     // Lock scroll while the curtain is up so the already-rendered page
     // underneath can't be scrolled/interacted with mid-animation. Restored
@@ -84,21 +94,27 @@ export default function SplashScreen() {
   return (
     <div
       aria-hidden="true"
-      className={`fixed inset-0 z-[999999] flex items-center justify-center overflow-hidden bg-[#05070D] light:bg-[#F1E7D0] transition-opacity duration-700 ease-out ${
+      className={`fixed inset-0 z-[999999] flex items-center justify-center overflow-hidden bg-[#05070D] light:bg-[#F1E7D0] transition-opacity duration-1000 ease-out ${
         leaving ? "pointer-events-none opacity-0" : "opacity-100"
       }`}
     >
-      {/* Ambient glow behind the mark */}
+      {/* Ambient glow behind the mark — two overlapping, differently-hued
+          blurs (warm orange + a cooler violet/pink layer) pulsing slightly
+          out of phase, so the backdrop reads as genuinely colorful instead
+          of a single flat orange wash. */}
       <div className="animate-splash-glow-pulse pointer-events-none absolute h-[340px] w-[340px] rounded-full bg-orange-500/30 blur-[90px] light:bg-orange-400/25 sm:h-[460px] sm:w-[460px]" />
+      <div className="animate-splash-glow-pulse-alt pointer-events-none absolute h-[300px] w-[300px] translate-x-16 -translate-y-6 rounded-full bg-fuchsia-500/20 blur-[100px] light:bg-fuchsia-400/15 sm:h-[400px] sm:w-[400px]" />
+      <div className="animate-splash-glow-pulse-alt pointer-events-none absolute h-[280px] w-[280px] -translate-x-16 translate-y-10 rounded-full bg-violet-500/20 blur-[100px] light:bg-violet-400/15 sm:h-[380px] sm:w-[380px]" style={{ animationDelay: "0.6s" }} />
 
-      {/* Spinning accent ring */}
-      <div className="animate-splash-ring-spin pointer-events-none absolute h-[220px] w-[220px] rounded-full border-2 border-dashed border-orange-400/40 sm:h-[300px] sm:w-[300px]" />
+      {/* Spinning accent ring, now slowly cycling hue so it doesn't stay a
+          single flat orange for the whole intro */}
+      <div className="animate-splash-ring-spin animate-splash-hue-cycle pointer-events-none absolute h-[220px] w-[220px] rounded-full border-2 border-dashed border-orange-400/40 sm:h-[300px] sm:w-[300px]" />
 
-      {/* Drifting particles */}
+      {/* Drifting multi-color particles */}
       {PARTICLES.map((particle, index) => (
         <span
           key={index}
-          className="animate-splash-particle pointer-events-none absolute rounded-full bg-orange-300 light:bg-orange-500"
+          className={`animate-splash-particle pointer-events-none absolute rounded-full ${particle.color}`}
           style={
             {
               top: particle.top,

@@ -203,6 +203,7 @@ export default function LivePage() {
                 streamType="live"
                 playbackId={creds.playbackId}
                 accentColor="#EA580C"
+                defaultHiddenCaptions={true}
                 style={{ width: "100%", aspectRatio: "16 / 9" }}
               />
             ) : (

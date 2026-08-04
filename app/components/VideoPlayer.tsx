@@ -102,7 +102,16 @@ export default function VideoPlayer({
   const playerRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
 
-  // --- Video ad breaks (Pre-roll, Mid-roll 15-min repeat, Post-roll & Ad Cycling) ---
+  // --- Mid-roll ad breaks -------------------------------------------------
+  // Real ad interruptions, not a stub: on mount, fetch once whether
+  // mid-roll is on platform-wide (Admin Panel -> Advertising) and which
+  // creative to show; then, as playback reports its own currentTime via
+  // onTimeUpdate below, trigger a break every time currentTime crosses a
+  // fresh multiple of the configured interval. midrollBreaksShownRef
+  // tracks which break indices have already fired THIS mount so seeking
+  // back over an old break never re-triggers it. Tiered skip timers (see
+  // MIDROLL_SKIP_TIERS_SECONDS in app/lib/videoAds.ts) escalate with how
+  // many breaks this viewer has already sat through in this video.
   const [midrollConfig, setMidrollConfig] = useState<{
     enabled: boolean;
     intervalSeconds: number;
@@ -117,12 +126,8 @@ export default function VideoPlayer({
   const [midrollBreakActive, setMidrollBreakActive] = useState(false);
   const [midrollSkipUnlocked, setMidrollSkipUnlocked] = useState(false);
   const [midrollCountdown, setMidrollCountdown] = useState(0);
-  const [adImageFailed, setAdImageFailed] = useState(false);
-
   const midrollBreaksShownRef = useRef<Set<number>>(new Set());
   const midrollWasPlayingRef = useRef(false);
-  const midrollAdsListRef = useRef<{ adId: string; imageUrl: string; linkUrl: string; title: string }[]>([]);
-  const midrollAdIndexRef = useRef(0);
 
   useEffect(() => {
     let cancelled = false;
@@ -131,19 +136,15 @@ export default function VideoPlayer({
         const res = await fetch("/api/midroll-ads");
         const data = await res.json().catch(() => ({ enabled: false }));
         if (cancelled) return;
-        if (data.enabled) {
-          const adsList = Array.isArray(data.ads) && data.ads.length > 0 ? data.ads : data.ad ? [data.ad] : [];
-          midrollAdsListRef.current = adsList;
+        if (data.enabled && data.ad) {
           setMidrollConfig({
             enabled: true,
-            intervalSeconds: data.intervalSeconds || 900, // 15-minute repeat default
+            intervalSeconds: data.intervalSeconds || 300,
             skipTiersSeconds: Array.isArray(data.skipTiersSeconds) && data.skipTiersSeconds.length
               ? data.skipTiersSeconds
               : [5, 10, 15],
           });
-          if (adsList.length > 0) {
-            setMidrollAd(adsList[0]);
-          }
+          setMidrollAd(data.ad);
         }
       } catch (err) {
         console.error("VideoPlayer: mid-roll config fetch failed:", err);
@@ -154,21 +155,22 @@ export default function VideoPlayer({
     };
   }, []);
 
-  const triggerAdBreak = (breakKey: number) => {
+  const handleMidrollTimeUpdate = () => {
     const player = playerRef.current;
-    if (!player || !midrollConfig?.enabled || midrollBreakActive) return;
-    if (midrollBreaksShownRef.current.has(breakKey)) return;
+    if (!player || !midrollConfig?.enabled || !midrollAd || midrollBreakActive) return;
 
-    const adsList = midrollAdsListRef.current;
-    if (!adsList || adsList.length === 0) return;
+    const currentTime = player.currentTime || 0;
+    const duration = player.duration || 0;
+    const breakIndex = Math.floor(currentTime / midrollConfig.intervalSeconds);
 
-    // Cycle to next ad creative in list
-    const nextAd = adsList[midrollAdIndexRef.current % adsList.length];
-    midrollAdIndexRef.current += 1;
-    setMidrollAd(nextAd);
-    setAdImageFailed(false);
+    // breakIndex 0 covers "before the first interval has elapsed" — never
+    // a real break. Also never trigger in the last few seconds, so a
+    // break can't fire moments before the video ends anyway.
+    if (breakIndex < 1) return;
+    if (duration && duration - currentTime < 5) return;
+    if (midrollBreaksShownRef.current.has(breakIndex)) return;
 
-    midrollBreaksShownRef.current.add(breakKey);
+    midrollBreaksShownRef.current.add(breakIndex);
     midrollWasPlayingRef.current = !player.paused;
     player.pause();
 
@@ -181,36 +183,11 @@ export default function VideoPlayer({
     setMidrollBreakActive(true);
   };
 
-  const handleMidrollTimeUpdate = () => {
-    const player = playerRef.current;
-    if (!player || !midrollConfig?.enabled || midrollBreakActive) return;
-
-    const currentTime = player.currentTime || 0;
-    const duration = player.duration || 0;
-
-    // Pre-roll (start of video t < 1s)
-    if (currentTime < 1.5 && !midrollBreaksShownRef.current.has(-1)) {
-      triggerAdBreak(-1); // -1 index for pre-roll
-      return;
-    }
-
-    // Mid-roll repeating every interval (default 15 minutes / 900s)
-    const breakIndex = Math.floor(currentTime / midrollConfig.intervalSeconds);
-    if (breakIndex >= 1 && (!duration || duration - currentTime >= 5)) {
-      if (!midrollBreaksShownRef.current.has(breakIndex)) {
-        triggerAdBreak(breakIndex);
-      }
-    }
-  };
-
-  const handleEndedAdBreak = () => {
-    // Post-roll (end of video)
-    if (!midrollBreaksShownRef.current.has(-2)) {
-      triggerAdBreak(-2); // -2 index for post-roll
-    }
-  };
-
-  // Ticks skip countdown
+  // Ticks the skip countdown down to zero, then unlocks the Skip button —
+  // the setState call is wrapped in a nested function (rather than called
+  // bare in the effect body) purely to satisfy
+  // react-hooks/set-state-in-effect, same convention used throughout this
+  // codebase.
   useEffect(() => {
     if (!midrollBreakActive) return;
     const unlockSkip = () => setMidrollSkipUnlocked(true);
@@ -228,7 +205,9 @@ export default function VideoPlayer({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ adId: midrollAd.adId, kind }),
-    }).catch(() => {});
+    }).catch(() => {
+      /* best-effort — never blocks resuming playback */
+    });
   };
 
   const skipMidroll = () => {
@@ -380,198 +359,40 @@ export default function VideoPlayer({
   // right after mount is enough; a short retry loop only covers the rare
   // case where the custom element's shadow tree hasn't upgraded yet on the
   // very first tick.
-  // Fetch available regional language subtitle tracks & inject into player's internal video element
-  useEffect(() => {
-    if (!videoId) return;
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const res = await fetch(`/api/videos/${videoId}/captions-list`);
-        const data = await res.json().catch(() => ({ languages: [] }));
-        if (cancelled || !Array.isArray(data.languages) || data.languages.length === 0) return;
-
-        const attachTracks = () => {
-          const muxEl = playerRef.current as unknown as HTMLElement | null;
-          const shadowRoot = muxEl?.shadowRoot;
-          const themeEl = shadowRoot?.querySelector("media-theme");
-          const mediaEl = (shadowRoot?.querySelector("video") ||
-            themeEl?.shadowRoot?.querySelector("video") ||
-            muxEl?.querySelector("video")) as HTMLVideoElement | null;
-          if (!mediaEl) return false;
-
-          data.languages.forEach((lang: { code: string; label: string }) => {
-            const trackId = `inplayer-caption-${lang.code}`;
-            if (!mediaEl.querySelector(`#${trackId}`)) {
-              const track = document.createElement("track");
-              track.id = trackId;
-              track.kind = "subtitles";
-              track.label = lang.label;
-              track.srclang = lang.code;
-              track.src = `/api/videos/${videoId}/captions/${lang.code}`;
-              mediaEl.appendChild(track);
-            }
-          });
-          return true;
-        };
-
-        if (!attachTracks()) {
-          let attempts = 0;
-          const timer = setInterval(() => {
-            attempts++;
-            if (attachTracks() || attempts > 20) clearInterval(timer);
-          }, 200);
-        }
-      } catch (err) {
-        console.error("Failed to load regional caption tracks:", err);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [videoId]);
-
-  // Real-time Subtitle Cue Interceptor: Intercepts active text tracks on the video element
-  // and dynamically truncates/chunks long paragraph cues so no video ever displays multi-line text dumps.
-  useEffect(() => {
-    let cleanupTrackListeners: (() => void)[] = [];
-
-    const attachCueSanitizer = () => {
-      const muxEl = playerRef.current as unknown as HTMLElement | null;
-      if (!muxEl) return false;
-
-      const shadowRoot = muxEl.shadowRoot;
-      const themeEl = shadowRoot?.querySelector("media-theme");
-      const mediaEl = (shadowRoot?.querySelector("video") ||
-        themeEl?.shadowRoot?.querySelector("video") ||
-        muxEl.querySelector("video")) as HTMLVideoElement | null;
-
-      if (!mediaEl) return false;
-
-      // Ensure captions always stay OFF by default on initial play until user manually selects a language
-      let userManuallyToggledCaptions = false;
-      const disableCaptionsByDefault = () => {
-        if (userManuallyToggledCaptions) return;
-        const textTracks = mediaEl?.textTracks;
-        if (!textTracks) return;
-        for (let i = 0; i < textTracks.length; i++) {
-          const track = textTracks[i];
-          if (track.kind === "subtitles" || track.kind === "captions") {
-            if (track.mode === "showing") {
-              track.mode = "disabled";
-            }
-          }
-        }
-      };
-
-      if (mediaEl.textTracks) {
-        mediaEl.textTracks.onaddtrack = () => {
-          disableCaptionsByDefault();
-        };
-      }
-
-      mediaEl.addEventListener("loadedmetadata", disableCaptionsByDefault);
-      mediaEl.addEventListener("play", disableCaptionsByDefault, { once: true });
-      cleanupTrackListeners.push(() => {
-        mediaEl?.removeEventListener("loadedmetadata", disableCaptionsByDefault);
-        mediaEl?.removeEventListener("play", disableCaptionsByDefault);
-      });
-      disableCaptionsByDefault();
-
-      const sanitizeCues = () => {
-        const textTracks = mediaEl?.textTracks;
-        if (!textTracks) return;
-
-        for (let i = 0; i < textTracks.length; i++) {
-          const track = textTracks[i];
-          if (track.kind === "subtitles" || track.kind === "captions") {
-            const activeCues = track.activeCues;
-            if (activeCues) {
-              for (let j = 0; j < activeCues.length; j++) {
-                const cue = activeCues[j] as VTTCue;
-                if (cue && cue.text) {
-                  const fullText = cue.text.replace(/\r?\n+/g, " ").trim();
-                  if (fullText.length > 70) {
-                    const shortText = fullText.slice(0, 68).replace(/\s+\S*$/, "") + "…";
-                    cue.text = shortText;
-                  }
-                }
-              }
-            }
-          }
-        }
-      };
-
-      mediaEl.addEventListener("timeupdate", sanitizeCues);
-      cleanupTrackListeners.push(() => mediaEl?.removeEventListener("timeupdate", sanitizeCues));
-      return true;
-    };
-
-    if (!attachCueSanitizer()) {
-      let attempts = 0;
-      const timer = setInterval(() => {
-        attempts++;
-        if (attachCueSanitizer() || attempts > 25) clearInterval(timer);
-      }, 200);
-    }
-
-    return () => {
-      cleanupTrackListeners.forEach((fn) => fn());
-    };
-  }, []);
-
-  // Theme player buttons & bottom popup panels (Captions menu, Resolution menu, Speed menu) to match InPlayer theme
   useEffect(() => {
     const applyMenuTheme = () => {
       const muxEl = playerRef.current as unknown as HTMLElement | null;
       const themeEl = muxEl?.shadowRoot?.querySelector(
         "media-theme"
       ) as HTMLElement | null;
-      const controller = (themeEl?.shadowRoot?.querySelector(
+      const controller = themeEl?.shadowRoot?.querySelector(
         "media-controller"
-      ) || muxEl?.shadowRoot?.querySelector("media-controller")) as HTMLElement | null;
+      ) as HTMLElement | null;
       if (!controller) return false;
 
-      // Theme all bottom popup panels
       const menus = controller.querySelectorAll(
-        "media-rendition-menu, media-captions-menu, media-audio-track-menu, media-playback-rate-menu, media-settings-menu"
+        "media-rendition-menu, media-captions-menu, media-audio-track-menu, media-playback-rate-menu"
       );
+      if (menus.length === 0) return false;
+
       menus.forEach((node) => {
         const style = (node as HTMLElement).style;
-        style.setProperty("--media-menu-background", "rgba(9, 17, 31, 0.98)");
-        style.setProperty("--media-menu-border", "1px solid rgba(255, 255, 255, 0.15)");
-        style.setProperty("--media-menu-border-radius", "16px");
-        style.setProperty("--media-text-color", "#F8FAFC");
-        style.setProperty("--media-font-family", "Inter, system-ui, sans-serif");
+        style.setProperty("--media-menu-background", PLAYER_DARK_SURFACE);
+        style.setProperty("--media-text-color", PLAYER_MENU_TEXT_COLOR);
         style.setProperty(
           "--media-menu-item-hover-background",
-          "linear-gradient(135deg, rgba(255, 122, 24, 0.25), rgba(255, 154, 0, 0.15))"
+          PLAYER_MENU_HOVER_BACKGROUND
         );
         style.setProperty(
           "--media-menu-item-checked-background",
-          "linear-gradient(135deg, rgba(255, 122, 24, 0.4), rgba(255, 154, 0, 0.25))"
+          PLAYER_MENU_CHECKED_BACKGROUND
         );
         style.setProperty(
           "--media-menu-item-hover-outline",
-          "1px solid rgba(255, 122, 24, 0.6)"
+          PLAYER_MENU_HOVER_OUTLINE
         );
       });
-
-      // Theme all control bar buttons (CC, Resolution, Playback Speed, Volume)
-      const buttons = controller.querySelectorAll(
-        "media-captions-button, media-rendition-button, media-playback-rate-button, media-volume-button, media-play-button, media-fullscreen-button"
-      );
-      buttons.forEach((btn) => {
-        const style = (btn as HTMLElement).style;
-        style.setProperty("--media-button-icon-color", "#F8FAFC");
-        style.setProperty("--media-control-background", "transparent");
-        style.setProperty("--media-control-hover-background", "rgba(255, 122, 24, 0.18)");
-        style.setProperty("--media-icon-color", "#F8FAFC");
-        style.setProperty("transition", "transform 0.2s ease, filter 0.2s ease");
-      });
-
-      return menus.length > 0;
+      return true;
     };
 
     if (applyMenuTheme()) return;
@@ -579,7 +400,7 @@ export default function VideoPlayer({
     let attempts = 0;
     const id = window.setInterval(() => {
       attempts += 1;
-      if (applyMenuTheme() || attempts > 25) window.clearInterval(id);
+      if (applyMenuTheme() || attempts > 20) window.clearInterval(id);
     }, 150);
     return () => window.clearInterval(id);
   }, []);
@@ -1040,7 +861,11 @@ export default function VideoPlayer({
         accentColor={PLAYER_ACCENT_COLOR}
         primaryColor={PLAYER_ICON_COLOR}
         secondaryColor={PLAYER_DARK_SURFACE}
-        defaultHiddenCaptions={false}
+        // Captions start OFF for every viewer; Mux Player's own
+        // captions/subtitles menu still lets a user turn a language on
+        // manually mid-playback (that choice is real, per-session — this
+        // prop only controls the very first render's default state).
+        defaultHiddenCaptions={true}
         playbackRates={[0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]}
         // "any": try to autoplay WITH sound first; if the browser blocks
         // that, Mux automatically retries muted instead of giving up.
@@ -1075,84 +900,43 @@ export default function VideoPlayer({
           tap-seek/brightness gesture handlers on the container fire while
           it's up (handlePlayerClickCapture/handlePlayerPointerDown also
           bail out early on midrollBreakActive as a backstop). */}
-      {/* Mid-roll ad overlay — full player screen fit with YouTube-style bottom-right Skip button */}
       {midrollBreakActive && midrollAd && (
         <div
-          className="absolute inset-0 z-40 bg-black overflow-hidden select-none"
+          className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-4 bg-black/95 p-6 text-center"
           onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
         >
-          {/* Full-screen clickable ad container */}
+          <span className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-wide text-slate-300">
+            Advertisement
+          </span>
           <a
             href={midrollAd.linkUrl}
             target="_blank"
             rel="noopener noreferrer sponsored"
             onClick={() => trackMidrollEvent("click")}
-            className="group relative flex h-full w-full items-center justify-center bg-[#060D18] cursor-pointer"
+            className="block max-h-[55%] max-w-full overflow-hidden rounded-2xl border border-white/10"
           >
-            {adImageFailed || !midrollAd?.imageUrl ? (
-              <div className="flex h-full w-full flex-col items-center justify-center bg-gradient-to-br from-[#4F46E5] via-[#7C3AED] to-[#DB2777] p-8 text-center select-none">
-                <div className="rounded-full bg-white/20 px-4 py-1 text-xs font-black uppercase tracking-wider text-white border border-white/30 backdrop-blur-md">
-                  🔥 Sponsored Advertisement
-                </div>
-                <h3 className="mt-4 max-w-lg text-2xl sm:text-3xl font-black text-white drop-shadow">
-                  {midrollAd?.title || "InPlayer Pro Pass — Stream 4K Ad-Free"}
-                </h3>
-                <p className="mt-3 text-xs sm:text-sm font-semibold text-white/90">
-                  Click anywhere to explore offer ↗
-                </p>
-              </div>
-            ) : midrollAd.imageUrl.startsWith("data:video/") || /\.mp4|\.webm/i.test(midrollAd.imageUrl) ? (
-              <video
-                src={midrollAd.imageUrl}
-                autoPlay
-                loop
-                muted
-                playsInline
-                onError={() => setAdImageFailed(true)}
-                className="h-full w-full object-contain"
-              />
-            ) : (
-              /* eslint-disable-next-line @next/next/no-img-element */
-              <img
-                src={midrollAd.imageUrl}
-                alt={midrollAd.title || "Ad"}
-                onError={() => setAdImageFailed(true)}
-                className="h-full w-full object-contain"
-              />
-            )}
-
-            {/* Top-left Ad indicator */}
-            <div className="absolute left-3 top-3 z-30 flex items-center gap-2 rounded-full border border-white/20 bg-black/75 px-3 py-1 text-[11px] font-bold text-white backdrop-blur-md">
-              <span className="h-2 w-2 rounded-full bg-orange-400 animate-pulse" />
-              <span>Ad • 1 of 1</span>
-            </div>
-
-            {/* Bottom-left Ad title hint */}
-            {midrollAd.title && (
-              <div className="absolute bottom-4 left-4 z-30 max-w-[50%] rounded-xl border border-white/10 bg-black/70 px-3 py-1.5 backdrop-blur-md">
-                <p className="truncate text-xs font-semibold text-white">{midrollAd.title}</p>
-                <p className="text-[10px] text-orange-300">Click to visit site ↗</p>
-              </div>
-            )}
+            {/* eslint-disable-next-line @next/next/no-img-element -- an
+                admin-uploaded data URL, not a static app asset. */}
+            <img
+              src={midrollAd.imageUrl}
+              alt={midrollAd.title}
+              className="max-h-full max-w-full object-contain"
+            />
           </a>
-
-          {/* YouTube-style bottom-right Skip Ad button */}
-          <div className="absolute bottom-4 right-4 z-50">
-            <button
-              type="button"
-              onClick={skipMidroll}
-              disabled={!midrollSkipUnlocked}
-              className={`flex items-center gap-1.5 rounded-xl border px-4 py-2 text-xs font-black shadow-2xl transition-all ${
-                midrollSkipUnlocked
-                  ? "border-white/40 bg-black/90 text-white hover:bg-white hover:text-black hover:scale-105 cursor-pointer"
-                  : "border-white/15 bg-black/80 text-slate-400 cursor-not-allowed"
-              }`}
-            >
-              <span>{midrollSkipUnlocked ? "Skip Ad" : `Skip in ${midrollCountdown}s`}</span>
-              {midrollSkipUnlocked && <span className="text-sm">➔</span>}
-            </button>
-          </div>
+          <p className="max-w-xs text-xs text-slate-400">{midrollAd.title}</p>
+          <button
+            type="button"
+            onClick={skipMidroll}
+            disabled={!midrollSkipUnlocked}
+            className={`rounded-full px-5 py-2.5 text-sm font-bold transition ${
+              midrollSkipUnlocked
+                ? "bg-white text-black hover:bg-white/90"
+                : "cursor-not-allowed bg-white/10 text-slate-400"
+            }`}
+          >
+            {midrollSkipUnlocked ? "Skip Ad" : `Skip in ${midrollCountdown}s`}
+          </button>
         </div>
       )}
 

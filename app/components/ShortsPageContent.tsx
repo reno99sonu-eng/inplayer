@@ -444,19 +444,14 @@ export default function ShortsPageContent({
     });
   };
 
-  const togglePlayPause = () => {
-    const player = playerRef.current;
-    if (player) {
-      if (player.paused) {
-        player.play?.().catch(() => {});
-      } else {
-        player.pause?.();
-      }
-    }
-  };
-
+  // A tap on the video: always toggles mute immediately (synchronously,
+  // see toggleMuted above). If a second tap follows quickly, ALSO treat
+  // it as a double-tap (like), same as Instagram/TikTok — mute getting
+  // toggled twice during a double-tap is harmless, it just ends back
+  // where it started. Works identically for mouse clicks and touch taps
+  // since it's driven by the ordinary "click" event, not dblclick.
   const handleVideoTap = (short: Short, index: number) => {
-    togglePlayPause();
+    toggleMuted();
 
     if (tapTimerRef.current) {
       clearTimeout(tapTimerRef.current);
@@ -670,7 +665,7 @@ export default function ShortsPageContent({
         </button>
 
         <h1 className="text-sm font-black text-white lg:text-base">
-          Raftaar
+          Shorts
         </h1>
 
         <button
@@ -866,6 +861,9 @@ export default function ShortsPageContent({
                         loop
                         muted={muted}
                         thumbnailTime={0}
+                        // Captions start OFF; Mux Player's own captions
+                        // menu still lets a viewer turn a language on.
+                        defaultHiddenCaptions={true}
                         style={{ height: "100%", width: "100%" }}
                       />
                     </div>
@@ -1107,6 +1105,15 @@ export default function ShortsPageContent({
                       Save
                     </span>
                   </button>
+
+                  {short.videoId && (
+                    <Link
+                      href={`/watch/${short.videoId}`}
+                      className="mt-1 text-[9px] font-semibold text-slate-300 underline underline-offset-2"
+                    >
+                      Full page
+                    </Link>
+                  )}
                 </div>
               </div>
             </div>

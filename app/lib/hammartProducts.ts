@@ -24,9 +24,13 @@ export interface HammartProduct {
   vendorId: string;
   title: string;
   description: string;
+  details?: string;
+  hsCode?: string;
+  countryOfOrigin?: string;
   category: string;
   priceInr: number;
   imageUrl: string | null;
+  imageUrls?: string[];
   status: ProductStatus;
   flagged: boolean;
   flaggedCategory: string | null;
@@ -40,9 +44,13 @@ export interface CreateProductInput {
   vendorId: string;
   title: string;
   description: string;
+  details?: string;
+  hsCode?: string;
+  countryOfOrigin?: string;
   category: string;
   priceInr: number;
   imageUrl: string | null;
+  imageUrls?: string[];
   flagged: boolean;
   flaggedCategory: string | null;
   flaggedReason: string | null;
@@ -58,9 +66,13 @@ export async function createProduct(
     vendorId: input.vendorId,
     title: input.title,
     description: input.description,
+    details: input.details || "",
+    hsCode: input.hsCode || "",
+    countryOfOrigin: input.countryOfOrigin || "India",
     category: input.category,
     priceInr: input.priceInr,
     imageUrl: input.imageUrl,
+    imageUrls: input.imageUrls && input.imageUrls.length > 0 ? input.imageUrls : (input.imageUrl ? [input.imageUrl] : []),
     // A listing the banned-item check actually flagged never goes live —
     // it's created in a hidden state for the vendor to see (and for an
     // admin to review), same "flag, don't silently drop" convention as

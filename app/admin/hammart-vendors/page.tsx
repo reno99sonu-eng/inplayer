@@ -43,6 +43,9 @@ interface VendorKyc {
   reviewedBy: string | null;
   rejectionReason: string | null;
   suspended: boolean;
+  totalProducts?: number;
+  totalSold?: number;
+  totalRevenueInr?: number;
   documents: Record<string, string>;
 }
 
@@ -239,7 +242,23 @@ export default function AdminHammartVendorsPage() {
                       <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-black uppercase text-red-300">Suspended</span>
                     )}
                   </p>
-                  <p className="mt-1 text-xs text-slate-400 light:text-slate-600">
+                  <div className="mt-2 flex flex-wrap items-center gap-3 rounded-xl border border-white/5 bg-black/20 px-3 py-1.5 text-xs text-slate-300">
+                    <div>
+                      <span className="text-[10px] uppercase tracking-wider text-slate-500 block">Listings</span>
+                      <span className="font-bold text-white">{v.totalProducts || 0} products</span>
+                    </div>
+                    <div className="h-4 w-px bg-white/10" />
+                    <div>
+                      <span className="text-[10px] uppercase tracking-wider text-slate-500 block">Items Sold</span>
+                      <span className="font-bold text-emerald-400">{v.totalSold || 0} sold</span>
+                    </div>
+                    <div className="h-4 w-px bg-white/10" />
+                    <div>
+                      <span className="text-[10px] uppercase tracking-wider text-slate-500 block">Total Revenue</span>
+                      <span className="font-bold text-orange-400">₹{(v.totalRevenueInr || 0).toLocaleString("en-IN")}</span>
+                    </div>
+                  </div>
+                  <p className="mt-2 text-xs text-slate-400 light:text-slate-600">
                     {v.businessType === "business" ? v.businessName || "(business)" : v.legalName || "(individual)"} · {v.businessType}
                   </p>
                   <p className="text-xs text-slate-400 light:text-slate-600">PAN: {v.panNumber || "—"}</p>

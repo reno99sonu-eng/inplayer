@@ -60,9 +60,40 @@ export async function GET(request: NextRequest) {
 
   const usernames = await resolveUsernames(items.map((i) => i.userId as string));
 
+  // Scan products and orders once to aggregate vendor stats
+  const vendorProductsMap = new Map<string, number>();
+  try {
+    const prodRes = await docClient.send(new ScanCommand({ TableName: "Hammart-Products" }));
+    (prodRes.Items || []).forEach((p) => {
+      const vKey = (p.vendorUserId as string) || (p.vendorId as string);
+      if (vKey) {
+        vendorProductsMap.set(vKey, (vendorProductsMap.get(vKey) || 0) + 1);
+      }
+    });
+  } catch (err) {
+    console.error("admin/hammart-vendors: failed to scan products for stats:", err);
+  }
+
+  const vendorSalesMap = new Map<string, { count: number; revenue: number }>();
+  try {
+    const ordersRes = await docClient.send(new ScanCommand({ TableName: "Hammart-Orders" }));
+    (ordersRes.Items || []).forEach((o) => {
+      const vKey = (o.vendorUserId as string) || (o.vendorId as string);
+      if (vKey) {
+        const current = vendorSalesMap.get(vKey) || { count: 0, revenue: 0 };
+        current.count += 1;
+        current.revenue += Number(o.priceInr) || 0;
+        vendorSalesMap.set(vKey, current);
+      }
+    });
+  } catch (err) {
+    console.error("admin/hammart-vendors: failed to scan orders for stats:", err);
+  }
+
   const withDocs = await Promise.all(
     items.map(async (item) => {
       const userId = item.userId as string;
+      const vendorId = (item.vendorId as string) || "";
       const businessType = (item.businessType as "individual" | "business") || "individual";
       let documents: Record<string, string> = {};
       if (status === "pending_review") {
@@ -81,6 +112,9 @@ export async function GET(request: NextRequest) {
           console.error(`admin/hammart-vendors: documents query failed for ${userId}:`, err);
         }
       }
+
+      const prodCount = (vendorProductsMap.get(userId) || 0) + (vendorId ? vendorProductsMap.get(vendorId) || 0 : 0);
+      const salesData = vendorSalesMap.get(userId) || (vendorId ? vendorSalesMap.get(vendorId) : undefined) || { count: 0, revenue: 0 };
 
       return {
         userId,
@@ -107,6 +141,9 @@ export async function GET(request: NextRequest) {
         reviewedBy: item.reviewedBy || null,
         rejectionReason: item.rejectionReason || null,
         suspended: Boolean(item.suspended),
+        totalProducts: prodCount,
+        totalSold: salesData.count,
+        totalRevenueInr: salesData.revenue,
         documents,
       };
     })

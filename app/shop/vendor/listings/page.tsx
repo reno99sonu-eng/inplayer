@@ -10,28 +10,46 @@ import type { HammartProduct } from "@/app/lib/hammartProducts";
 
 const CATEGORIES = ["Merchandise", "Digital Products", "Handicrafts", "Fashion", "Electronics", "Home & Living", "Other"];
 
+const COUNTRIES = ["India", "United States", "Germany", "Japan", "China", "United Kingdom", "United Arab Emirates", "France", "Vietnam", "Taiwan", "Other"];
+
 function AddListingForm({ onCreated }: { onCreated: () => void }) {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [details, setDetails] = useState("");
+  const [hsCode, setHsCode] = useState("");
+  const [countryOfOrigin, setCountryOfOrigin] = useState("India");
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [priceInr, setPriceInr] = useState("");
-  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [processingImage, setProcessingImage] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [flaggedNotice, setFlaggedNotice] = useState<string | null>(null);
 
-  const handleImage = async (file: File) => {
+  const handleMultipleImages = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
     setProcessingImage(true);
     try {
-      const dataUrl = await compressImageToThumbnail(file, 1, 640, 0.82);
-      setImageUrl(dataUrl);
+      const remainingSlots = 5 - imageUrls.length;
+      const filesToProcess = Array.from(files).slice(0, remainingSlots);
+      const newUrls: string[] = [];
+
+      for (const file of filesToProcess) {
+        const dataUrl = await compressImageToThumbnail(file, 1, 640, 0.82);
+        newUrls.push(dataUrl);
+      }
+
+      setImageUrls((prev) => [...prev, ...newUrls]);
     } catch (err) {
       console.error("Product image processing failed:", err);
-      setError("Couldn't process that photo. Please try a different one.");
+      setError("Couldn't process one or more photos. Please try again.");
     } finally {
       setProcessingImage(false);
     }
+  };
+
+  const removeImage = (index: number) => {
+    setImageUrls((prev) => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -53,7 +71,17 @@ function AddListingForm({ onCreated }: { onCreated: () => void }) {
     try {
       const res = await authedFetch("/api/hammart/products", {
         method: "POST",
-        body: JSON.stringify({ title: title.trim(), description: description.trim(), category, priceInr: price, imageUrl }),
+        body: JSON.stringify({
+          title: title.trim(),
+          description: description.trim(),
+          details: details.trim(),
+          hsCode: hsCode.trim(),
+          countryOfOrigin,
+          category,
+          priceInr: price,
+          imageUrl: imageUrls.length > 0 ? imageUrls[0] : null,
+          imageUrls,
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -67,8 +95,11 @@ function AddListingForm({ onCreated }: { onCreated: () => void }) {
       }
       setTitle("");
       setDescription("");
+      setDetails("");
+      setHsCode("");
+      setCountryOfOrigin("India");
       setPriceInr("");
-      setImageUrl(null);
+      setImageUrls([]);
       onCreated();
     } catch (err) {
       console.error("Failed to create listing:", err);
@@ -79,64 +110,132 @@ function AddListingForm({ onCreated }: { onCreated: () => void }) {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-3 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.02] p-4">
-      <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-dashed border-white/15 light:border-black/15 px-3 py-3 hover:border-orange-400/40">
-        <input
-          type="file"
-          accept="image/*"
-          className="hidden"
-          onChange={(e) => {
-            const file = e.target.files?.[0];
-            if (file) handleImage(file);
-            e.target.value = "";
-          }}
-        />
-        {imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={imageUrl} alt="Product" className="h-16 w-16 flex-shrink-0 rounded-lg object-cover" />
-        ) : (
-          <div className="flex h-16 w-16 flex-shrink-0 items-center justify-center rounded-lg bg-white/5 light:bg-black/5 text-slate-500">
-            {processingImage ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />}
-          </div>
-        )}
-        <span className="text-xs font-semibold text-slate-300 light:text-slate-700">
-          {imageUrl ? "Tap to replace photo" : "Tap to add a product photo"}
-        </span>
-      </label>
+    <form onSubmit={handleSubmit} className="space-y-3.5 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.02] p-4 text-left">
+      <div>
+        <label className="block text-xs font-semibold text-slate-300 mb-1">
+          Product Photos (Upload up to 5 photos)
+        </label>
+        
+        <div className="flex flex-wrap gap-2.5 items-center">
+          {imageUrls.map((url, idx) => (
+            <div key={idx} className="relative group h-20 w-20 flex-shrink-0 rounded-xl overflow-hidden border border-white/15 bg-black/40">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={url} alt={`Photo ${idx + 1}`} className="h-full w-full object-cover" />
+              {idx === 0 && (
+                <span className="absolute top-1 left-1 rounded-md bg-orange-500/90 px-1 py-0.5 text-[9px] font-bold text-white">
+                  Cover
+                </span>
+              )}
+              <button
+                type="button"
+                onClick={() => removeImage(idx)}
+                className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/70 text-white transition opacity-80 hover:opacity-100 hover:bg-red-500"
+              >
+                <Trash2 size={11} />
+              </button>
+            </div>
+          ))}
+
+          {imageUrls.length < 5 && (
+            <label className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-white/20 light:border-black/20 bg-white/5 transition hover:border-orange-400/50 hover:bg-orange-500/5">
+              <input
+                type="file"
+                accept="image/*"
+                multiple
+                className="hidden"
+                onChange={(e) => {
+                  handleMultipleImages(e.target.files);
+                  e.target.value = "";
+                }}
+              />
+              {processingImage ? (
+                <Loader2 size={18} className="animate-spin text-orange-400" />
+              ) : (
+                <>
+                  <Plus size={20} className="text-orange-400" />
+                  <span className="mt-1 text-[10px] text-slate-400">Add Photo</span>
+                </>
+              )}
+            </label>
+          )}
+        </div>
+      </div>
 
       <input
         value={title}
         onChange={(e) => setTitle(e.target.value)}
-        placeholder="Listing title"
+        placeholder="Listing title (e.g. Handmade Ceramic Coffee Mug)"
         className="w-full rounded-xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-white px-3 py-2.5 text-sm text-white light:text-slate-900 outline-none focus:border-orange-400/50"
       />
+
       <textarea
         value={description}
         onChange={(e) => setDescription(e.target.value)}
-        placeholder="Description"
+        placeholder="Short Description (Summary of item)"
+        rows={2}
+        className="w-full rounded-xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-white px-3 py-2.5 text-sm text-white light:text-slate-900 outline-none focus:border-orange-400/50"
+      />
+
+      <textarea
+        value={details}
+        onChange={(e) => setDetails(e.target.value)}
+        placeholder="Product Details & Technical Specs (Dimensions, Material, Care Instructions, Warranty, Box Contents)"
         rows={3}
         className="w-full rounded-xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-white px-3 py-2.5 text-sm text-white light:text-slate-900 outline-none focus:border-orange-400/50"
       />
+
       <div className="grid grid-cols-2 gap-2">
-        <select
-          value={category}
-          onChange={(e) => setCategory(e.target.value)}
-          className="rounded-xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-white px-3 py-2.5 text-sm text-white light:text-slate-900 outline-none focus:border-orange-400/50"
-        >
-          {CATEGORIES.map((c) => (
-            <option key={c} value={c}>{c}</option>
-          ))}
-        </select>
-        <div className="relative">
-          <IndianRupee size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+        <div>
+          <label className="block text-[11px] font-semibold text-slate-400 mb-1">HS Code (Trade Classification)</label>
           <input
-            type="number"
-            inputMode="numeric"
-            value={priceInr}
-            onChange={(e) => setPriceInr(e.target.value)}
-            placeholder="Price"
-            className="w-full rounded-xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-white py-2.5 pl-8 pr-3 text-sm text-white light:text-slate-900 outline-none focus:border-orange-400/50"
+            value={hsCode}
+            onChange={(e) => setHsCode(e.target.value)}
+            placeholder="e.g. 6912.00 (Optional)"
+            className="w-full rounded-xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-white px-3 py-2 text-xs text-white light:text-slate-900 outline-none focus:border-orange-400/50"
           />
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-semibold text-slate-400 mb-1">Country of Origin</label>
+          <select
+            value={countryOfOrigin}
+            onChange={(e) => setCountryOfOrigin(e.target.value)}
+            className="w-full rounded-xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-white px-3 py-2 text-xs text-white light:text-slate-900 outline-none focus:border-orange-400/50"
+          >
+            {COUNTRIES.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="block text-[11px] font-semibold text-slate-400 mb-1">Category</label>
+          <select
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="w-full rounded-xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-white px-3 py-2.5 text-sm text-white light:text-slate-900 outline-none focus:border-orange-400/50"
+          >
+            {CATEGORIES.map((c) => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-semibold text-slate-400 mb-1">Price (₹ INR)</label>
+          <div className="relative">
+            <IndianRupee size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+            <input
+              type="number"
+              inputMode="numeric"
+              value={priceInr}
+              onChange={(e) => setPriceInr(e.target.value)}
+              placeholder="Price"
+              className="w-full rounded-xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-white py-2.5 pl-8 pr-3 text-sm text-white light:text-slate-900 outline-none focus:border-orange-400/50"
+            />
+          </div>
         </div>
       </div>
 

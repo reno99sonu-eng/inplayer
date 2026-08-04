@@ -10,10 +10,15 @@ import { THUMBNAIL_DATA_URL_MAX_LENGTH } from "@/app/lib/imageCompress";
 const MAX_IMAGE_LENGTH = THUMBNAIL_DATA_URL_MAX_LENGTH * 1.2;
 
 // GET /api/hammart/products — public storefront browse (only real, live,
-// unflagged listings from verified, non-suspended vendors).
+// unflagged listings from verified, non-suspended vendors). Supports filtering by vendorId.
 export async function GET(request: NextRequest) {
   const category = request.nextUrl.searchParams.get("category") || undefined;
-  const { products, tableMissing } = await listActiveProducts({ category });
+  const vendorId = request.nextUrl.searchParams.get("vendorId") || undefined;
+
+  let { products, tableMissing } = await listActiveProducts({ category });
+  if (vendorId) {
+    products = products.filter((p) => p.vendorId === vendorId || p.vendorUserId === vendorId);
+  }
   return NextResponse.json({ products, tableMissing });
 }
 
@@ -41,23 +46,24 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Complete business verification (KYC) before publishing listings." }, { status: 403 });
   }
 
-  // Hammart Listing Model: Unlimited listings for all verified vendors at ₹0.50 per product listing fee
-
   const body = await request.json().catch(() => ({}));
   const title = typeof body.title === "string" ? body.title.trim().slice(0, 150) : "";
   const description = typeof body.description === "string" ? body.description.trim().slice(0, 3000) : "";
+  const details = typeof body.details === "string" ? body.details.trim().slice(0, 3000) : "";
+  const hsCode = typeof body.hsCode === "string" ? body.hsCode.trim().slice(0, 30) : "";
+  const countryOfOrigin = typeof body.countryOfOrigin === "string" ? body.countryOfOrigin.trim().slice(0, 60) : "India";
   const category = typeof body.category === "string" ? body.category.trim().slice(0, 60) : "";
   const priceInr = Number(body.priceInr);
-  const imageUrl = typeof body.imageUrl === "string" ? body.imageUrl : null;
+
+  const rawImageUrls = Array.isArray(body.imageUrls) ? body.imageUrls : [];
+  const imageUrls: string[] = rawImageUrls.filter((url: unknown): url is string => typeof url === "string" && url.startsWith("data:image/"));
+  const imageUrl = imageUrls.length > 0 ? imageUrls[0] : (typeof body.imageUrl === "string" ? body.imageUrl : null);
 
   if (!title || !description || !category) {
     return NextResponse.json({ error: "Please fill in title, description, and category." }, { status: 400 });
   }
   if (!Number.isFinite(priceInr) || priceInr < 1 || priceInr > 10_000_000) {
     return NextResponse.json({ error: "Please enter a valid price." }, { status: 400 });
-  }
-  if (imageUrl && (!imageUrl.startsWith("data:image/") || imageUrl.length > MAX_IMAGE_LENGTH)) {
-    return NextResponse.json({ error: "Please upload a valid product photo." }, { status: 400 });
   }
 
   const moderation = await checkBannedProduct({ title, description, category });
@@ -67,9 +73,13 @@ export async function POST(request: NextRequest) {
     vendorId: vendor.vendorId,
     title,
     description,
+    details,
+    hsCode,
+    countryOfOrigin,
     category,
     priceInr,
     imageUrl,
+    imageUrls: imageUrls.length > 0 ? imageUrls : (imageUrl ? [imageUrl] : []),
     flagged: moderation.checked && moderation.banned,
     flaggedCategory: moderation.category,
     flaggedReason: moderation.reason,

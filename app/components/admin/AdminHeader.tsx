@@ -172,7 +172,7 @@ export default function AdminHeader({ email }: { email: string | null }) {
             onClick={() => switchMode("hammart")}
             className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${
               mode === "hammart"
-                ? "bg-gradient-to-r from-orange-500 to-amber-400 text-white shadow-lg shadow-orange-500/20"
+                ? "bg-gradient-to-r from-indigo-600 via-indigo-500 to-violet-500 text-white shadow-lg shadow-indigo-500/25"
                 : "text-slate-400 light:text-slate-600 hover:text-slate-200"
             }`}
           >

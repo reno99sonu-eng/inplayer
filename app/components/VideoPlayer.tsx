@@ -449,6 +449,25 @@ export default function VideoPlayer({
 
       if (!mediaEl) return false;
 
+      // Disable captions by default on initial video load
+      let initialTracksDisabled = false;
+      const disableCaptionsByDefault = () => {
+        if (initialTracksDisabled) return;
+        const textTracks = mediaEl?.textTracks;
+        if (!textTracks) return;
+        for (let i = 0; i < textTracks.length; i++) {
+          const track = textTracks[i];
+          if (track.kind === "subtitles" || track.kind === "captions") {
+            track.mode = "disabled";
+          }
+        }
+        initialTracksDisabled = true;
+      };
+
+      mediaEl.addEventListener("loadedmetadata", disableCaptionsByDefault);
+      cleanupTrackListeners.push(() => mediaEl?.removeEventListener("loadedmetadata", disableCaptionsByDefault));
+      disableCaptionsByDefault();
+
       const sanitizeCues = () => {
         const textTracks = mediaEl?.textTracks;
         if (!textTracks) return;

@@ -187,7 +187,9 @@ export default function AdminHammartVendorsPage() {
             type="button"
             onClick={() => setTab(t.key)}
             className={`rounded-full px-4 py-1.5 text-xs font-bold transition ${
-              tab === t.key ? "bg-indigo-500 text-white" : "bg-white/5 text-slate-400 hover:bg-white/10 light:bg-black/5"
+              tab === t.key
+                ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
+                : "bg-white/5 text-slate-400 light:text-slate-700 light:bg-slate-200/80 hover:bg-white/10 hover:text-white light:hover:text-slate-900"
             }`}
           >
             {t.label}
@@ -195,25 +197,25 @@ export default function AdminHammartVendorsPage() {
         ))}
       </div>
 
-      <div className="mt-3 flex items-center gap-2 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] px-4 py-3">
-        <Search size={16} className="text-slate-500" />
+      <div className="mt-3 flex items-center gap-2 rounded-2xl border border-white/10 light:border-slate-300 bg-white/[0.03] light:bg-white px-4 py-3 light:shadow-sm">
+        <Search size={16} className="text-slate-400 light:text-slate-600" />
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search by vendor ID, business name, legal name, PAN, or user ID…"
-          className="w-full bg-transparent text-sm text-white light:text-slate-900 outline-none placeholder:text-slate-500"
+          className="w-full bg-transparent text-sm text-white light:text-slate-900 outline-none placeholder:text-slate-500 light:placeholder:text-slate-600 font-medium"
         />
       </div>
 
       {tableMissing && (
-        <div className="mt-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs leading-5 text-amber-300 light:text-amber-700">
+        <div className="mt-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs leading-5 text-amber-300 light:text-amber-800 font-semibold">
           Hammart-Vendors hasn&apos;t been created in AWS yet, so nothing can be listed until it exists.
         </div>
       )}
 
       {error && (
-        <div className="mt-4 flex items-start gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300 light:text-red-700">
+        <div className="mt-4 flex items-start gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300 light:text-red-800 font-semibold">
           <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
           <span>{error}</span>
         </div>
@@ -221,44 +223,44 @@ export default function AdminHammartVendorsPage() {
 
       {loading ? (
         <div className="flex min-h-[30vh] items-center justify-center">
-          <Loader2 size={24} className="animate-spin text-indigo-400" />
+          <Loader2 size={24} className="animate-spin text-indigo-500" />
         </div>
       ) : filteredItems.length === 0 ? (
         <div className="mt-8 flex flex-col items-center gap-2 py-8 text-center">
-          <ShieldCheck size={28} className="text-emerald-400" />
-          <p className="text-sm text-slate-500">
+          <ShieldCheck size={28} className="text-emerald-500" />
+          <p className="text-sm font-semibold text-slate-400 light:text-slate-700">
             {query ? `Nothing matches "${query}".` : tab === "pending_review" ? "Nothing waiting on review." : "Nothing here yet."}
           </p>
         </div>
       ) : (
         <div className="mt-4 space-y-3">
           {filteredItems.map((v) => (
-            <div key={v.userId} className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4">
+            <div key={v.userId} className="rounded-2xl border border-white/10 light:border-slate-300 bg-white/[0.03] light:bg-white p-4 light:shadow-sm">
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div>
                   <p className="flex items-center gap-1.5 text-sm font-bold text-white light:text-slate-900">
-                    <Store size={13} className="text-orange-400" /> {v.vendorId || "(no vendor id)"}
+                    <Store size={13} className="text-indigo-500 light:text-indigo-600" /> {v.vendorId || "(no vendor id)"}
                     {v.suspended && (
-                      <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-black uppercase text-red-300">Suspended</span>
+                      <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-black uppercase text-red-300 light:text-red-700">Suspended</span>
                     )}
                   </p>
-                  <div className="mt-2 flex flex-wrap items-center gap-3 rounded-xl border border-white/5 bg-black/20 px-3 py-1.5 text-xs text-slate-300">
+                  <div className="mt-2 flex flex-wrap items-center gap-3 rounded-xl border border-white/5 light:border-slate-200 bg-black/20 light:bg-slate-100 px-3 py-1.5 text-xs text-slate-300 light:text-slate-800">
                     <div>
-                      <span className="text-[10px] uppercase tracking-wider text-slate-500 block">Listings</span>
-                      <span className="font-bold text-white">{v.totalProducts || 0} products</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 light:text-slate-600 block">Listings</span>
+                      <span className="font-bold text-white light:text-slate-900">{v.totalProducts || 0} products</span>
                     </div>
-                    <div className="h-4 w-px bg-white/10" />
+                    <div className="h-4 w-px bg-white/10 light:bg-slate-300" />
                     <div>
-                      <span className="text-[10px] uppercase tracking-wider text-slate-500 block">Items Sold</span>
-                      <span className="font-bold text-emerald-400">{v.totalSold || 0} sold</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 light:text-slate-600 block">Items Sold</span>
+                      <span className="font-bold text-emerald-400 light:text-emerald-700">{v.totalSold || 0} sold</span>
                     </div>
-                    <div className="h-4 w-px bg-white/10" />
+                    <div className="h-4 w-px bg-white/10 light:bg-slate-300" />
                     <div>
-                      <span className="text-[10px] uppercase tracking-wider text-slate-500 block">Total Revenue</span>
-                      <span className="font-bold text-orange-400">₹{(v.totalRevenueInr || 0).toLocaleString("en-IN")}</span>
+                      <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 light:text-slate-600 block">Total Revenue</span>
+                      <span className="font-bold text-indigo-400 light:text-indigo-700">₹{(v.totalRevenueInr || 0).toLocaleString("en-IN")}</span>
                     </div>
                   </div>
-                  <p className="mt-2 text-xs text-slate-400 light:text-slate-600">
+                  <p className="mt-2 text-xs font-medium text-slate-400 light:text-slate-700">
                     {v.businessType === "business" ? v.businessName || "(business)" : v.legalName || "(individual)"} · {v.businessType}
                   </p>
                   <p className="text-xs text-slate-400 light:text-slate-600">PAN: {v.panNumber || "—"}</p>

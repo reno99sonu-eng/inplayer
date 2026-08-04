@@ -112,7 +112,9 @@ export default function AdminHammartProductsPage() {
             type="button"
             onClick={() => setTab(t.key)}
             className={`rounded-full px-4 py-1.5 text-xs font-bold transition ${
-              tab === t.key ? "bg-indigo-500 text-white" : "bg-white/5 text-slate-400 hover:bg-white/10 light:bg-black/5"
+              tab === t.key
+                ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
+                : "bg-white/5 text-slate-400 light:text-slate-700 light:bg-slate-200/80 hover:bg-white/10 hover:text-white light:hover:text-slate-900"
             }`}
           >
             {t.label}
@@ -120,24 +122,24 @@ export default function AdminHammartProductsPage() {
         ))}
       </div>
 
-      <div className="mt-3 flex items-center gap-2 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] px-4 py-3">
-        <Search size={16} className="text-slate-500" />
+      <div className="mt-3 flex items-center gap-2 rounded-2xl border border-white/10 light:border-slate-300 bg-white/[0.03] light:bg-white px-4 py-3 light:shadow-sm">
+        <Search size={16} className="text-slate-400 light:text-slate-600" />
         <input
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search by title, vendor ID, or category…"
-          className="w-full bg-transparent text-sm text-white light:text-slate-900 outline-none placeholder:text-slate-500"
+          className="w-full bg-transparent text-sm text-white light:text-slate-900 outline-none placeholder:text-slate-500 light:placeholder:text-slate-600 font-medium"
         />
       </div>
 
       {tableMissing && (
-        <div className="mt-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs leading-5 text-amber-300 light:text-amber-700">
+        <div className="mt-3 rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs leading-5 text-amber-300 light:text-amber-800 font-semibold">
           Hammart-Products hasn&apos;t been created in AWS yet, so nothing can be listed until it exists.
         </div>
       )}
       {error && (
-        <div className="mt-4 flex items-start gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300 light:text-red-700">
+        <div className="mt-4 flex items-start gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300 light:text-red-800 font-semibold">
           <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
           <span>{error}</span>
         </div>

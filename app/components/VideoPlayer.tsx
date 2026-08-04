@@ -449,23 +449,34 @@ export default function VideoPlayer({
 
       if (!mediaEl) return false;
 
-      // Disable captions by default on initial video load
-      let initialTracksDisabled = false;
+      // Ensure captions always stay OFF by default on initial play until user manually selects a language
+      let userManuallyToggledCaptions = false;
       const disableCaptionsByDefault = () => {
-        if (initialTracksDisabled) return;
+        if (userManuallyToggledCaptions) return;
         const textTracks = mediaEl?.textTracks;
         if (!textTracks) return;
         for (let i = 0; i < textTracks.length; i++) {
           const track = textTracks[i];
           if (track.kind === "subtitles" || track.kind === "captions") {
-            track.mode = "disabled";
+            if (track.mode === "showing") {
+              track.mode = "disabled";
+            }
           }
         }
-        initialTracksDisabled = true;
       };
 
+      if (mediaEl.textTracks) {
+        mediaEl.textTracks.onaddtrack = () => {
+          disableCaptionsByDefault();
+        };
+      }
+
       mediaEl.addEventListener("loadedmetadata", disableCaptionsByDefault);
-      cleanupTrackListeners.push(() => mediaEl?.removeEventListener("loadedmetadata", disableCaptionsByDefault));
+      mediaEl.addEventListener("play", disableCaptionsByDefault, { once: true });
+      cleanupTrackListeners.push(() => {
+        mediaEl?.removeEventListener("loadedmetadata", disableCaptionsByDefault);
+        mediaEl?.removeEventListener("play", disableCaptionsByDefault);
+      });
       disableCaptionsByDefault();
 
       const sanitizeCues = () => {

@@ -2,54 +2,92 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import nextDynamic from "next/dynamic";
-import { MoreVertical } from "lucide-react";
+import { MoreVertical, ExternalLink } from "lucide-react";
 
-// The Mux player (with its whole HLS streaming engine) is one of the
-// heaviest pieces of JavaScript in the app. It's only needed here for
-// hover/scroll previews — so it's loaded on demand the first time a
-// preview actually starts, instead of being bundled into the homepage's
-// initial JavaScript. This alone cuts hundreds of KB from what every
-// visitor downloads before the homepage becomes interactive.
 const MuxPlayer = nextDynamic(() => import("@mux/mux-player-react"), {
   ssr: false,
 });
 import { recommendations, type Recommendation } from "../data/recommendations";
 import { shorts, type Short } from "../data/shorts";
 import ShortsShelf from "./ShortsShelf";
-import AdBanner from "./AdBanner";
 import { useSettings } from "./settings/SettingsProvider";
 
-// Hover-preview delay — don't start streaming a preview for every card the
-// mouse passes over while scrolling, only once the user actually pauses on
-// one (matches YouTube's own hover-preview behavior).
 const HOVER_PREVIEW_DELAY = 400;
 
 interface RecommendationFeedProps {
   realVideos?: Recommendation[];
   realShorts?: Short[];
-  // "horizontal" (default) renders the normal 16:9 video grid; "vertical"
-  // renders a Shorts-only grid. Driven by the Horizontal/Vertical chips in
-  // the category bar (see NavigationCategories.tsx / page.tsx).
   view?: "horizontal" | "vertical";
 }
 
-// A single vertical (9:16) Shorts card for the Vertical home view. Mirrors
-// the ShortsShelf card visual but lays out in a multi-row responsive grid
-// instead of a single scrolling row.
+// Native Video-Styled Ad Card (blends seamlessly into 4-column feed grid looking just like a video card)
+function NativeAdVideoCard({ seed }: { seed: number }) {
+  const adTitles = [
+    "Upgrade to Ultra HD Streaming with InPlayer Premium",
+    "Discover Handcrafted Products on HamMart Storefront",
+    "Learn Fullstack AI Development in 30 Days",
+    "Smart Home Security Systems - 40% Off Today",
+    "Fastest UPI Payments & Instant Cashback Deals",
+  ];
+  const adBrands = [
+    "InPlayer Pro",
+    "HamMart Express",
+    "TechAcademy",
+    "SmartLiving",
+    "PayFlex India",
+  ];
+
+  const title = adTitles[seed % adTitles.length];
+  const brand = adBrands[seed % adBrands.length];
+  const poster = `https://images.unsplash.com/photo-1526738549149-8e07eca6c147?w=600&auto=format&fit=crop&q=80`;
+
+  return (
+    <article className="group relative flex flex-col cursor-pointer">
+      <div className="relative aspect-video w-full overflow-hidden rounded-2xl bg-[#111827] border border-orange-500/20 shadow-md">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={poster}
+          alt={title}
+          className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
+        />
+        <div className="absolute top-2 left-2 rounded-md bg-amber-500 px-2 py-0.5 text-[10px] font-black uppercase tracking-wider text-slate-950 shadow-md">
+          Ad
+        </div>
+        <div className="absolute bottom-2 right-2 rounded-md bg-black/80 backdrop-blur-md px-1.5 py-0.5 text-[10px] font-bold text-orange-300 flex items-center gap-1">
+          Sponsored <ExternalLink size={10} />
+        </div>
+      </div>
+
+      <div className="mt-2.5 flex items-start gap-3">
+        <div className="h-9 w-9 flex-shrink-0 rounded-full border border-orange-400/40 bg-orange-500/20 flex items-center justify-center text-xs font-black text-orange-400">
+          {brand[0]}
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3 className="line-clamp-2 text-xs font-bold leading-tight text-white light:text-slate-900 group-hover:text-orange-400">
+            {title}
+          </h3>
+          <p className="mt-1 text-[11px] font-semibold text-orange-400 light:text-orange-600 flex items-center gap-1">
+            {brand} • Sponsored
+          </p>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+// Vertical Short Card for Vertical grid view
 function ShortCard({ short }: { short: Short }) {
   const cardContent = (
-    <div className="relative aspect-[9/16] overflow-hidden rounded-2xl bg-[#111827] light:bg-black/5">
-      <Image
+    <div className="relative aspect-[9/16] w-full overflow-hidden rounded-2xl bg-[#111827] border border-white/10 shadow-md">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
         src={short.poster}
         alt={short.title || "InPlay short"}
-        fill
-        sizes="(max-width:640px)45vw,(max-width:1024px)30vw,18vw"
-        className="object-cover transition-transform duration-500 group-hover:scale-105"
+        className="h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
       />
 
-      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/25 to-transparent" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent" />
 
       {short.videoId && (
         <span className="absolute top-2 left-2 rounded-md bg-orange-500/90 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-white">
@@ -82,9 +120,7 @@ function ShortCard({ short }: { short: Short }) {
   return <article className="group">{cardContent}</article>;
 }
 
-// A single homepage video card. Owns its own hover-preview state so each
-// card starts/stops its preview independently of every other card on the
-// page.
+// Single Homepage Video Card
 export function HomeVideoCard({ video }: { video: Recommendation }) {
   const [previewing, setPreviewing] = useState(false);
   const [canHover, setCanHover] = useState(false);
@@ -92,9 +128,6 @@ export function HomeVideoCard({ video }: { video: Recommendation }) {
   const cardRef = useRef<HTMLDivElement | null>(null);
   const { playback } = useSettings();
 
-  // Only real devices with an actual mouse get the hover preview — on
-  // touch devices "hover" is either unsupported or fires unreliably on
-  // first tap, which would make thumbnails flicker/misbehave.
   useEffect(() => {
     setCanHover(
       typeof window !== "undefined" &&
@@ -102,14 +135,6 @@ export function HomeVideoCard({ video }: { video: Recommendation }) {
     );
   }, []);
 
-  // Touch devices have no hover state at all, so the preview never had a
-  // way to trigger on mobile. The mobile equivalent: autoplay the muted
-  // preview once the card is significantly scrolled into view, same as
-  // Instagram/Facebook video feeds do. Only wired up when the device
-  // genuinely can't hover, so this and the mouse-hover behavior above
-  // never both fire for the same card. Skipped entirely when Data Saver
-  // is on (Settings → Playback) — that's the real, working effect of the
-  // toggle: no autoplaying preview clips burning mobile data.
   useEffect(() => {
     if (canHover || !video.muxPlaybackId || !cardRef.current || playback.dataSaver) return;
 
@@ -138,216 +163,71 @@ export function HomeVideoCard({ video }: { video: Recommendation }) {
 
   const thumbnail = (
     <div
-        ref={cardRef}
-        className="
-          relative
-          aspect-video
-          overflow-hidden
-          rounded-2xl
-          bg-[#111827]
-        "
-        onMouseEnter={startPreview}
-        onMouseLeave={stopPreview}
-      >
-        <Image
+      ref={cardRef}
+      className="relative aspect-video overflow-hidden rounded-2xl bg-[#111827]"
+      onMouseEnter={startPreview}
+      onMouseLeave={stopPreview}
+    >
+      {previewing && video.muxPlaybackId ? (
+        <MuxPlayer
+          playbackId={video.muxPlaybackId}
+          streamType="on-demand"
+          muted
+          autoPlay
+          loop
+          playsInline
+          aria-label={`Preview of ${video.title}`}
+          className="h-full w-full object-cover"
+        />
+      ) : (
+        /* eslint-disable-next-line @next/next/no-img-element */
+        <img
           src={video.thumbnail}
           alt={video.title}
-          fill
-          sizes="(max-width:768px)100vw,(max-width:1280px)50vw,25vw"
-          className={`
-            object-cover
-            transition-opacity
-            duration-300
-            group-hover:scale-[1.05]
-            ${previewing ? "opacity-0" : "opacity-100"}
-          `}
+          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
         />
+      )}
 
-        {/* Silent, no-controls preview clip — just like YouTube's
-            hover-preview, this never plays sound and never captures
-            clicks (pointer-events-none) so the card's own click-through
-            to the watch page always works normally. */}
-        {previewing && video.muxPlaybackId && (
-          <div className="preview-player pointer-events-none absolute inset-0">
-            <MuxPlayer
-              playbackId={video.muxPlaybackId}
-              streamType="on-demand"
-              autoPlay="muted"
-              muted
-              loop
-              thumbnailTime={0}
-              style={{ width: "100%", height: "100%" }}
-            />
-          </div>
-        )}
-
-        <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
-
-        <span
-          className="
-            absolute
-            bottom-3
-            right-3
-            rounded-md
-            bg-black/85
-            px-2
-            py-1
-            text-xs
-            font-semibold
-            text-white
-            backdrop-blur-sm
-          "
-        >
+      {video.duration && (
+        <span className="absolute bottom-2 right-2 rounded-md bg-black/80 px-1.5 py-0.5 text-[10px] font-bold text-white backdrop-blur-md">
           {video.duration}
         </span>
-
-        {video.videoId && (
-          <span
-            className="
-              absolute
-              top-3
-              left-3
-              rounded-md
-              bg-orange-500/90
-              px-2
-              py-0.5
-              text-[10px]
-              font-bold
-              uppercase
-              tracking-wide
-              text-white
-            "
-          >
-            New
-          </span>
-        )}
+      )}
     </div>
   );
 
-  const avatar = (
-    <div className="relative h-11 w-11 flex-shrink-0 overflow-hidden rounded-full border border-white/10 light:border-black/10">
-          {/* A plain <img>, not next/image — real uploaders' avatars are
-              base64 data URLs (see app/lib/imageCompress.ts), which
-              next/image doesn't optimize/serve cleanly. lazy + async so
-              below-the-fold avatars never compete with the visible cards
-              for decode/paint time. */}
+  return (
+    <article className="group relative flex flex-col">
+      {video.videoId ? (
+        <Link href={`/watch?v=${video.videoId}`}>{thumbnail}</Link>
+      ) : (
+        thumbnail
+      )}
+
+      <div className="mt-2.5 flex items-start gap-3">
+        {video.avatar ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
           <img
             src={video.avatar}
             alt={video.creator}
-            loading="lazy"
-            decoding="async"
-            className="h-full w-full object-cover"
+            className="h-9 w-9 flex-shrink-0 rounded-full object-cover"
           />
-    </div>
-  );
+        ) : (
+          <div className="h-9 w-9 flex-shrink-0 rounded-full bg-slate-700" />
+        )}
 
-  const information = (
-    <div className="mt-4 flex items-start gap-3">
-      {video.uploaderUsername ? (
-        <Link
-          href={`/u/${encodeURIComponent(video.uploaderUsername)}`}
-          aria-label={`Open ${video.creator}'s channel`}
-          className="flex-shrink-0 transition-transform hover:scale-105 focus-visible:rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-400"
-        >
-          {avatar}
-        </Link>
-      ) : (
-        avatar
-      )}
-
-      <div className="min-w-0 flex-1">
-
-          <h3
-            className="
-              line-clamp-2
-              text-[16px]
-              font-semibold
-              leading-6
-              text-white
-              light:text-slate-900
-            "
-          >
-            {video.videoId ? (
-              <Link
-                href={`/watch/${video.videoId}`}
-                className="transition hover:text-orange-200"
-              >
-                {video.title}
-              </Link>
-            ) : (
-              video.title
-            )}
+        <div className="flex-1 min-w-0">
+          <h3 className="line-clamp-2 text-xs font-bold leading-snug text-white light:text-slate-900 group-hover:text-orange-400">
+            {video.title}
           </h3>
-
-          <div className="mt-2 flex items-center gap-1 text-sm text-slate-400 light:text-slate-600">
-            <span className="truncate">
-              {video.creator}
-            </span>
-
-            {video.verified && (
-              <span className="ml-1 text-xs font-bold text-slate-300 light:text-slate-600">
-                ✓
-              </span>
-            )}
-          </div>
-
-          <p className="mt-1 text-sm text-slate-500">
+          <p className="mt-1 text-[11px] font-semibold text-slate-400 light:text-slate-600">
+            {video.creator}
+          </p>
+          <p className="text-[11px] text-slate-400 light:text-slate-600">
             {video.views} • {video.uploaded}
           </p>
-
+        </div>
       </div>
-
-      <button
-          className="
-            flex
-            h-9
-            w-9
-            flex-shrink-0
-            items-center
-            justify-center
-            rounded-full
-            text-slate-400
-            light:text-slate-600
-            transition-colors
-            hover:bg-white/5
-            light:hover:bg-black/5
-            hover:text-white
-            light:hover:text-slate-900
-          "
-        >
-          <MoreVertical size={18} />
-      </button>
-    </div>
-  );
-
-  // Real uploaded videos link to their actual watch page. Example
-  // (dummy) cards stay exactly as before — not clickable, since
-  // they don't point to anything real.
-  if (video.videoId) {
-    return (
-      <article className="group transition-all duration-300">
-        <Link
-          href={`/watch/${video.videoId}`}
-          aria-label={`Watch ${video.title}`}
-          className="block"
-        >
-          {thumbnail}
-        </Link>
-        {information}
-      </article>
-    );
-  }
-
-  return (
-    <article
-      className="
-        group
-        transition-all
-        duration-300
-      "
-    >
-      {thumbnail}
-      {information}
     </article>
   );
 }
@@ -357,26 +237,12 @@ export default function RecommendationFeed({
   realShorts = [],
   view = "horizontal",
 }: RecommendationFeedProps) {
-  // Real uploaded content always appears first, unshuffled — the example
-  // data behind it gets shuffled the same way as before. Render in
-  // original order first (matches server output), then shuffle
-  // client-side only after mount, to avoid a hydration mismatch.
-  const [items, setItems] = useState<Recommendation[]>([
-    ...realVideos,
-    ...recommendations,
-  ]);
-  const [shuffledShorts, setShuffledShorts] = useState<Short[]>([
-    ...realShorts,
-    ...shorts,
-  ]);
+  const [items, setItems] = useState<Recommendation[]>([]);
+  const [shuffledShorts, setShuffledShorts] = useState<Short[]>([]);
 
   useEffect(() => {
-    const shuffledRecs = [...recommendations];
-    for (let i = shuffledRecs.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffledRecs[i], shuffledRecs[j]] = [shuffledRecs[j], shuffledRecs[i]];
-    }
-    setItems([...realVideos, ...shuffledRecs]);
+    const combined = realVideos.length > 0 ? realVideos : recommendations;
+    setItems(combined);
 
     const shuffledShortsArr = [...shorts];
     for (let i = shuffledShortsArr.length - 1; i > 0; i--) {
@@ -389,20 +255,16 @@ export default function RecommendationFeed({
     setShuffledShorts([...realShorts, ...shuffledShortsArr]);
   }, [realVideos, realShorts]);
 
-  // Keep the discovery feed in repeating blocks: 6 standard videos, followed by
-  // a slim horizontal ad banner, and alternating Shorts shelves.
+  // Feed Grid Structure: 4 videos (Row 1) + 4 videos (Row 2) = 8 videos per block,
+  // followed by a Raftaar Shorts shelf!
+  const videosPerBlock = 8;
   const videoBatches = Array.from(
-    { length: Math.ceil(items.length / 6) },
-    (_, index) => items.slice(index * 6, index * 6 + 6)
+    { length: Math.max(1, Math.ceil(items.length / videosPerBlock)) },
+    (_, index) => items.slice(index * videosPerBlock, index * videosPerBlock + videosPerBlock)
   );
+
   const shortsPerShelf = 8;
 
-  const renderCard = (video: Recommendation) => (
-    <HomeVideoCard key={video.id} video={video} />
-  );
-
-  // Vertical view: a Shorts-only responsive grid (fills every device width,
-  // 2 columns on the smallest phones up to 6 on wide desktops/TVs).
   if (view === "vertical") {
     return (
       <section className="mx-auto max-w-[1800px] px-4 py-6 lg:py-10 lg:px-8">
@@ -428,29 +290,35 @@ export default function RecommendationFeed({
     );
   }
 
-  // Horizontal view: repeat 6 video cards followed by a repeating inline ad banner
-  // and alternating Shorts shelf.
   return (
     <>
-      {videoBatches.map((videos, index) => {
+      {videoBatches.map((videos, blockIndex) => {
         const shelfShorts = shuffledShorts.slice(
-          index * shortsPerShelf,
-          (index + 1) * shortsPerShelf
+          blockIndex * shortsPerShelf,
+          (blockIndex + 1) * shortsPerShelf
         );
 
         return (
-          <div key={`feed-block-${index}`}>
-            <section className="mx-auto max-w-[1800px] px-4 py-2 sm:py-3 lg:py-4 lg:px-8">
-              <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-6">
-                {videos.map(renderCard)}
+          <div key={`feed-block-${blockIndex}`}>
+            {/* 4 Videos Row 1 + 4 Videos Row 2 (Grid: 4 columns on large screens) */}
+            <section className="mx-auto max-w-[1800px] px-4 py-3 lg:px-8">
+              <div className="grid grid-cols-1 gap-x-5 gap-y-6 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4">
+                {videos.map((video, idx) => {
+                  const globalIdx = blockIndex * videosPerBlock + idx;
+                  // Insert a video-styled Ad Card at position 13 or 16
+                  const isAdSlot = globalIdx === 13 || globalIdx === 16;
+
+                  return (
+                    <div key={video.id || idx}>
+                      {isAdSlot ? <NativeAdVideoCard seed={globalIdx} /> : <HomeVideoCard video={video} />}
+                    </div>
+                  );
+                })}
               </div>
             </section>
 
-            {/* Repeating sleek ad banner after every 6 videos */}
-            <AdBanner placement="homepage" seed={index} />
-
-            {/* Alternating Shorts shelf (Raftaar) */}
-            {shelfShorts.length > 0 && index % 2 === 0 && <ShortsShelf items={shelfShorts} />}
+            {/* Raftaar Shorts shelf after 2 video rows (8 videos) */}
+            {shelfShorts.length > 0 && <ShortsShelf items={shelfShorts} />}
           </div>
         );
       })}

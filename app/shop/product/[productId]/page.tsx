@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import QRCode from "qrcode";
 import Link from "next/link";
-import { Loader2, ShoppingBag, IndianRupee, Store, ExternalLink, CheckCircle2, AlertTriangle, Star, Globe, Shield, MapPin, Send, ArrowLeft } from "lucide-react";
+import { Loader2, ShoppingBag, IndianRupee, Store, ExternalLink, CheckCircle2, AlertTriangle, Star, Globe, Shield, MapPin, Send, ArrowLeft, X } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { authedFetch } from "@/app/lib/apiFetch";
 import { buildUpiLink } from "@/app/lib/upi";
@@ -71,6 +71,7 @@ export default function ProductPage() {
 
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [buyerNameInput, setBuyerNameInput] = useState(user?.name || "");
+  const [buyerEmail, setBuyerEmail] = useState(user?.email || "");
   const [buyerPhone, setBuyerPhone] = useState("");
   const [deliveryAddress, setDeliveryAddress] = useState("");
   const [city, setCity] = useState("");
@@ -83,6 +84,7 @@ export default function ProductPage() {
       return;
     }
     setBuyerNameInput(user?.name || "");
+    setBuyerEmail(user?.email || "");
     setShowAddressModal(true);
   };
 
@@ -414,47 +416,78 @@ export default function ProductPage() {
         </div>
       )}
 
-      {/* Delivery Address & Phone Modal with Swiggy Instamart Location Map Picker Button */}
+      {/* Shipping Address Modal */}
       {showAddressModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-sm p-4 animate-fadeIn">
-          <div className="w-full max-w-md rounded-3xl border border-white/15 bg-[#0A1220] p-6 shadow-2xl text-white">
-            <h3 className="text-lg font-black text-white flex items-center gap-2">
-              <ShoppingBag className="text-orange-400" size={20} />
-              Shipping & Delivery Details
-            </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4 backdrop-blur-md">
+          <div className="w-full max-w-md rounded-3xl border border-white/15 light:border-slate-300 bg-slate-900 light:bg-white p-6 shadow-2xl text-white light:text-slate-900">
+            <div className="flex items-center justify-between border-b border-white/10 light:border-slate-200 pb-3">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowAddressModal(false)}
+                  className="rounded-full p-1 text-slate-400 hover:text-white light:hover:text-slate-900 transition mr-1"
+                  title="Back"
+                >
+                  <ArrowLeft size={18} />
+                </button>
+                <ShoppingBag className="text-orange-400" size={20} />
+                <h3 className="text-lg font-black text-white light:text-slate-900">
+                  Shipping & Delivery Details
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowAddressModal(false)}
+                className="rounded-full p-1.5 text-slate-400 light:text-slate-600 transition hover:bg-white/10 light:hover:bg-slate-100"
+              >
+                <X size={18} />
+              </button>
+            </div>
 
             <form onSubmit={handleConfirmOrder} className="mt-4 space-y-3">
               <div>
-                <label className="text-[11px] font-bold text-slate-300 uppercase">Full Name</label>
+                <label className="text-[11px] font-bold text-slate-300 light:text-slate-800 uppercase">Full Name</label>
                 <input
                   type="text"
                   required
                   value={buyerNameInput}
                   onChange={(e) => setBuyerNameInput(e.target.value)}
                   placeholder="Your Name"
-                  className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none focus:border-orange-400"
+                  className="mt-1 w-full rounded-xl border border-white/10 light:border-slate-300 bg-white/5 light:bg-white px-3 py-2 text-xs text-white light:text-slate-900 placeholder:text-slate-500 light:placeholder:text-slate-600 outline-none focus:border-orange-400 font-medium"
                 />
               </div>
 
               <div>
-                <label className="text-[11px] font-bold text-slate-300 uppercase">Phone / Mobile Number</label>
+                <label className="text-[11px] font-bold text-slate-300 light:text-slate-800 uppercase">Customer Email Address</label>
+                <input
+                  type="email"
+                  required
+                  value={buyerEmail}
+                  onChange={(e) => setBuyerEmail(e.target.value)}
+                  placeholder="name@example.com"
+                  className="mt-1 w-full rounded-xl border border-white/10 light:border-slate-300 bg-white/5 light:bg-white px-3 py-2 text-xs text-white light:text-slate-900 placeholder:text-slate-500 light:placeholder:text-slate-600 outline-none focus:border-orange-400 font-medium"
+                />
+              </div>
+
+              <div>
+                <label className="text-[11px] font-bold text-slate-300 light:text-slate-800 uppercase">Phone / Mobile Number</label>
                 <input
                   type="tel"
                   required
                   value={buyerPhone}
                   onChange={(e) => setBuyerPhone(e.target.value)}
                   placeholder="+91 98765 43210"
-                  className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none focus:border-orange-400"
+                  className="mt-1 w-full rounded-xl border border-white/10 light:border-slate-300 bg-white/5 light:bg-white px-3 py-2 text-xs text-white light:text-slate-900 placeholder:text-slate-500 light:placeholder:text-slate-600 outline-none focus:border-orange-400 font-medium"
                 />
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="text-[11px] font-bold text-slate-300 uppercase">Delivery Address</label>
+                  <label className="text-[11px] font-bold text-slate-300 light:text-slate-800 uppercase">Delivery Address</label>
                   <button
                     type="button"
                     onClick={() => setShowMapPicker(true)}
-                    className="flex items-center gap-1 text-[11px] font-bold text-orange-400 hover:underline"
+                    className="flex items-center gap-1 text-[11px] font-bold text-orange-400 light:text-orange-600 hover:underline"
                   >
                     <MapPin size={12} /> Auto-Detect Map
                   </button>
@@ -465,60 +498,60 @@ export default function ProductPage() {
                   value={deliveryAddress}
                   onChange={(e) => setDeliveryAddress(e.target.value)}
                   placeholder="House/Flat No., Street, Landmark"
-                  className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none focus:border-orange-400"
+                  className="w-full rounded-xl border border-white/10 light:border-slate-300 bg-white/5 light:bg-white px-3 py-2 text-xs text-white light:text-slate-900 placeholder:text-slate-500 light:placeholder:text-slate-600 outline-none focus:border-orange-400 font-medium"
                 />
               </div>
 
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <label className="text-[11px] font-bold text-slate-300 uppercase">City</label>
+                  <label className="text-[11px] font-bold text-slate-300 light:text-slate-800 uppercase">City</label>
                   <input
                     type="text"
                     required
                     value={city}
                     onChange={(e) => setCity(e.target.value)}
                     placeholder="City"
-                    className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none focus:border-orange-400"
+                    className="mt-1 w-full rounded-xl border border-white/10 light:border-slate-300 bg-white/5 light:bg-white px-3 py-2 text-xs text-white light:text-slate-900 placeholder:text-slate-500 light:placeholder:text-slate-600 outline-none focus:border-orange-400 font-medium"
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] font-bold text-slate-300 uppercase">State</label>
+                  <label className="text-[11px] font-bold text-slate-300 light:text-slate-800 uppercase">State</label>
                   <input
                     type="text"
                     required
                     value={stateName}
                     onChange={(e) => setStateName(e.target.value)}
                     placeholder="State"
-                    className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none focus:border-orange-400"
+                    className="mt-1 w-full rounded-xl border border-white/10 light:border-slate-300 bg-white/5 light:bg-white px-3 py-2 text-xs text-white light:text-slate-900 placeholder:text-slate-500 light:placeholder:text-slate-600 outline-none focus:border-orange-400 font-medium"
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] font-bold text-slate-300 uppercase">Pincode</label>
+                  <label className="text-[11px] font-bold text-slate-300 light:text-slate-800 uppercase">Pincode</label>
                   <input
                     type="text"
                     required
                     value={pincode}
                     onChange={(e) => setPincode(e.target.value)}
                     placeholder="110001"
-                    className="mt-1 w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none focus:border-orange-400"
+                    className="mt-1 w-full rounded-xl border border-white/10 light:border-slate-300 bg-white/5 light:bg-white px-3 py-2 text-xs text-white light:text-slate-900 placeholder:text-slate-500 light:placeholder:text-slate-600 outline-none focus:border-orange-400 font-medium"
                   />
                 </div>
               </div>
 
-              {error && <p className="text-xs text-red-400">{error}</p>}
+              {error && <p className="text-xs font-bold text-red-400">{error}</p>}
 
               <div className="mt-5 flex gap-2 pt-2">
                 <button
                   type="button"
                   onClick={() => setShowAddressModal(false)}
-                  className="flex-1 rounded-xl border border-white/10 bg-white/5 py-2.5 text-xs font-bold text-slate-300 hover:bg-white/10"
+                  className="flex-1 rounded-xl border border-white/10 light:border-slate-300 bg-white/5 light:bg-slate-100 py-2.5 text-xs font-bold text-slate-300 light:text-slate-800 hover:bg-white/10 light:hover:bg-slate-200"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={placing}
-                  className="flex-1 rounded-xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] py-2.5 text-xs font-bold text-slate-950 disabled:opacity-50"
+                  className="flex-1 rounded-xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] py-2.5 text-xs font-black text-slate-950 disabled:opacity-50 shadow-md shadow-orange-500/20"
                 >
                   {placing ? "Sending..." : "Confirm Order"}
                 </button>

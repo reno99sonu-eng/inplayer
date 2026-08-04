@@ -30,7 +30,14 @@ function safeBase64Encode(str: string): string {
   return Buffer.from(str, "utf-8").toString("base64");
 }
 
-export function generateAiNavbarThemeImage(occasionId: string, customPrompt?: string): string {
+// Real, hand-designed SVG art for each of the six known preset occasions —
+// deterministic on purpose, not an AI call, since a fixed known set of
+// occasions is better served by curated art that's guaranteed to look right
+// every time. Free-text "custom" occasions are handled separately by the
+// real OpenAI-backed /api/admin/ai-navbar-theme-generate route (see
+// app/admin/navbar-theme/page.tsx) — nothing here can be hardcoded for
+// input nobody has typed yet.
+export function generateAiNavbarThemeImage(occasionId: string): string {
   const width = 160;
   const height = 80;
 

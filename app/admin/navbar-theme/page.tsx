@@ -136,32 +136,61 @@ function NavbarThemeManagerContent() {
     loadActiveTheme();
   }, []);
 
-  // Generate theme graphic image when occasion is switched
+  // Switching to a preset occasion loads that occasion's real, hand-designed
+  // graphic immediately (instant, deterministic — always the correct
+  // Diwali/Holi/etc art). Switching to "custom" just opens the prompt field;
+  // generation for custom occasions happens explicitly via handleAiGenerate
+  // below, since there's nothing to generate until something is typed.
   const handleSelectOccasion = (occId: string) => {
     setSelectedOccasion(occId);
+    setError(null);
+    if (occId === "custom") return;
+
+    const preset = PRESET_OCCASIONS.find((o) => o.id === occId);
+    const title = preset?.name || "Occasion Celebration Theme";
+    const generatedUrl = generateAiNavbarThemeImage(occId);
+    setPreviewImageUrl(generatedUrl);
+    setGeneratedTitle(title);
+  };
+
+  // Presets are loaded instantly above (real curated art, not an AI call —
+  // see the comment on generateAiNavbarThemeImage). Custom occasions are the
+  // one case that genuinely needs AI, since nothing can be hardcoded for
+  // free-text nobody typed yet — this calls the real OpenAI-backed
+  // /api/admin/ai-navbar-theme-generate route (see that file for why it
+  // replaced the old code, which silently ignored whatever was typed here).
+  const handleAiGenerate = async () => {
+    if (selectedOccasion !== "custom") {
+      handleSelectOccasion(selectedOccasion);
+      return;
+    }
+
+    const trimmedPrompt = customPrompt.trim();
+    if (!trimmedPrompt) {
+      setError("Type a custom occasion first.");
+      return;
+    }
+
     setGenerating(true);
     setError(null);
     try {
-      const preset = PRESET_OCCASIONS.find((o) => o.id === occId);
-      const title = occId === "custom" && customPrompt.trim()
-        ? customPrompt.trim()
-        : preset?.name || "Occasion Celebration Theme";
-
-      const generatedUrl = generateAiNavbarThemeImage(occId, customPrompt);
-      setPreviewImageUrl(generatedUrl);
-      setGeneratedTitle(title);
-      setSuccessMsg(`AI generated new ${title} graphic pattern!`);
+      const res = await authedFetch("/api/admin/ai-navbar-theme-generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt: trimmedPrompt }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "AI generation failed.");
+      setPreviewImageUrl(data.imageUrl);
+      setGeneratedTitle(data.title || trimmedPrompt);
+      setSuccessMsg(`AI generated a new "${data.title || trimmedPrompt}" graphic!`);
       setTimeout(() => setSuccessMsg(null), 3000);
     } catch (err) {
       console.error("Failed to generate AI theme:", err);
-      setError("AI generation failed. Please try again.");
+      setError(err instanceof Error ? err.message : "AI generation failed. Please try again.");
     } finally {
       setGenerating(false);
     }
-  };
-
-  const handleAiGenerate = () => {
-    handleSelectOccasion(selectedOccasion);
   };
 
   const handlePublishTheme = async () => {

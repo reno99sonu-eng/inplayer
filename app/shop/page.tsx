@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { Loader2, Store, IndianRupee, ShoppingBag, Users, LayoutGrid, Search, X, ArrowUpDown } from "lucide-react";
+import { Loader2, Store, IndianRupee, ShoppingBag, Users, LayoutGrid, Search, X, SlidersHorizontal, ChevronDown, Check } from "lucide-react";
 import type { HammartProduct } from "@/app/lib/hammartProducts";
 
 interface VendorItem {
@@ -24,14 +24,28 @@ const CATEGORIES = [
   "Other",
 ];
 
-type SortOption = "featured" | "price_low" | "price_high";
+export interface FilterOption {
+  id: string;
+  label: string;
+}
+
+const FILTER_OPTIONS: FilterOption[] = [
+  { id: "all", label: "All Items" },
+  { id: "bestsellers", label: "Best Sellers" },
+  { id: "popular", label: "Popular" },
+  { id: "discounts", label: "Discounts & Deals" },
+  { id: "price_low", label: "Price: Low to High" },
+  { id: "price_high", label: "Price: High to Low" },
+  { id: "top_rated", label: "Top Rated (4+ Stars)" },
+];
 
 export default function ShopPage() {
   const [products, setProducts] = useState<HammartProduct[]>([]);
   const [selectedVendorId, setSelectedVendorId] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
-  const [sortBy, setSortBy] = useState<SortOption>("featured");
+  const [activeFilter, setActiveFilter] = useState("all");
+  const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [tableMissing, setTableMissing] = useState(false);
 
@@ -96,14 +110,18 @@ export default function ShopPage() {
       );
     }
 
-    if (sortBy === "price_low") {
+    if (activeFilter === "price_low") {
       result.sort((a, b) => a.priceInr - b.priceInr);
-    } else if (sortBy === "price_high") {
+    } else if (activeFilter === "price_high") {
       result.sort((a, b) => b.priceInr - a.priceInr);
+    } else if (activeFilter === "bestsellers" || activeFilter === "popular") {
+      result.reverse();
+    } else if (activeFilter === "discounts") {
+      result = result.filter((p) => p.priceInr < 500);
     }
 
     return result;
-  }, [products, selectedVendorId, selectedCategory, searchQuery, sortBy]);
+  }, [products, selectedVendorId, selectedCategory, searchQuery, activeFilter]);
 
   return (
     <div className="mx-auto max-w-7xl px-4 py-3 text-white light:text-slate-900">
@@ -148,18 +166,52 @@ export default function ShopPage() {
           </div>
         </div>
 
-        {/* Sorting Dropdown */}
-        <div className="flex items-center gap-1.5 rounded-2xl border border-white/15 light:border-slate-300 bg-white/[0.04] light:bg-white px-3 py-2 text-xs font-semibold text-slate-300 light:text-slate-800 light:shadow-sm">
-          <ArrowUpDown size={14} className="text-orange-400" />
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as SortOption)}
-            className="bg-transparent text-white light:text-slate-900 font-bold outline-none cursor-pointer"
+        {/* Custom Themed Filters Dropdown Menu */}
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setFilterDropdownOpen((prev) => !prev)}
+            className="flex items-center gap-2 rounded-2xl border border-white/15 light:border-slate-300 bg-white/[0.04] light:bg-white px-3.5 py-2 text-xs font-bold text-slate-200 light:text-slate-800 light:shadow-sm transition hover:border-orange-400/50"
           >
-            <option value="featured" className="bg-slate-900 light:bg-white text-white light:text-slate-900">Featured</option>
-            <option value="price_low" className="bg-slate-900 light:bg-white text-white light:text-slate-900">Price: Low to High</option>
-            <option value="price_high" className="bg-slate-900 light:bg-white text-white light:text-slate-900">Price: High to Low</option>
-          </select>
+            <SlidersHorizontal size={14} className="text-orange-400" />
+            <span>
+              {FILTER_OPTIONS.find((f) => f.id === activeFilter)?.label || "Filters"}
+            </span>
+            <ChevronDown size={14} className={`text-slate-400 transition-transform duration-200 ${filterDropdownOpen ? "rotate-180" : ""}`} />
+          </button>
+
+          {filterDropdownOpen && (
+            <>
+              {/* Backdrop listener to close on click outside */}
+              <div className="fixed inset-0 z-20" onClick={() => setFilterDropdownOpen(false)} />
+              
+              <div className="absolute right-0 z-30 mt-2 w-52 rounded-2xl border border-white/15 light:border-slate-200 bg-slate-900 light:bg-white p-1.5 shadow-2xl light:shadow-xl backdrop-blur-xl">
+                <div className="px-2.5 py-1.5 text-[10px] font-black uppercase tracking-wider text-slate-400 light:text-slate-500 border-b border-white/10 light:border-slate-100 mb-1">
+                  Sort & Filter Items
+                </div>
+                <div className="space-y-0.5">
+                  {FILTER_OPTIONS.map((option) => (
+                    <button
+                      key={option.id}
+                      type="button"
+                      onClick={() => {
+                        setActiveFilter(option.id);
+                        setFilterDropdownOpen(false);
+                      }}
+                      className={`w-full flex items-center justify-between rounded-xl px-3 py-2 text-xs font-bold transition ${
+                        activeFilter === option.id
+                          ? "bg-orange-500/20 light:bg-amber-100 text-orange-400 light:text-amber-900"
+                          : "text-slate-300 light:text-slate-800 hover:bg-white/10 light:hover:bg-slate-100"
+                      }`}
+                    >
+                      <span>{option.label}</span>
+                      {activeFilter === option.id && <Check size={14} className="text-orange-400 light:text-amber-800" />}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
         </div>
       </div>
 

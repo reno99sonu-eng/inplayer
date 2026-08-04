@@ -3,7 +3,8 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import QRCode from "qrcode";
-import { Loader2, ShoppingBag, IndianRupee, Store, ExternalLink, CheckCircle2, AlertTriangle, Star, Globe, Shield, MapPin, Send } from "lucide-react";
+import Link from "next/link";
+import { Loader2, ShoppingBag, IndianRupee, Store, ExternalLink, CheckCircle2, AlertTriangle, Star, Globe, Shield, MapPin, Send, ArrowLeft } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { authedFetch } from "@/app/lib/apiFetch";
 import { buildUpiLink } from "@/app/lib/upi";
@@ -178,7 +179,7 @@ export default function ProductPage() {
   if (loading) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
-        <Loader2 size={24} className="animate-spin text-slate-400" />
+        <Loader2 size={24} className="animate-spin text-orange-400" />
       </div>
     );
   }
@@ -186,8 +187,11 @@ export default function ProductPage() {
   if (notFound || !product) {
     return (
       <div className="mx-auto max-w-md px-6 py-16 text-center">
-        <ShoppingBag size={28} className="mx-auto text-slate-600" />
-        <p className="mt-3 text-sm text-slate-500">This listing isn&apos;t available.</p>
+        <ShoppingBag size={28} className="mx-auto text-slate-500 light:text-slate-600" />
+        <p className="mt-3 text-sm font-semibold text-slate-400 light:text-slate-700">This listing isn&apos;t available.</p>
+        <Link href="/shop" className="mt-4 inline-flex items-center gap-1.5 text-xs font-bold text-orange-400 underline">
+          <ArrowLeft size={14} /> Back to HamMart
+        </Link>
       </div>
     );
   }
@@ -199,16 +203,25 @@ export default function ProductPage() {
   const isOwnListing = user?.userId === product.vendorUserId;
 
   return (
-    <div className="mx-auto max-w-4xl px-6 py-8 text-white">
+    <div className="mx-auto max-w-4xl px-6 py-6 text-white light:text-slate-900">
+      {/* Prominent Back Button */}
+      <Link
+        href="/shop"
+        className="mb-6 inline-flex items-center gap-2 rounded-xl border border-white/10 light:border-slate-300 bg-white/5 light:bg-white px-3.5 py-2 text-xs font-bold text-slate-200 light:text-slate-800 light:shadow-sm transition hover:bg-white/10 hover:border-orange-400/40"
+      >
+        <ArrowLeft size={16} className="text-orange-400" />
+        Back to Store
+      </Link>
+
       <div className="grid gap-8 md:grid-cols-2">
         {/* Multi-Photo Carousel Gallery */}
         <div className="space-y-3">
-          <div className="aspect-square overflow-hidden rounded-3xl border border-white/10 bg-black/40 shadow-xl">
+          <div className="aspect-square overflow-hidden rounded-3xl border border-white/10 light:border-slate-300 bg-black/40 light:bg-slate-100 shadow-xl light:shadow-sm">
             {activePhoto ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={activePhoto} alt={product.title} className="h-full w-full object-cover transition-all duration-300" />
             ) : (
-              <div className="flex h-full w-full items-center justify-center text-slate-600">
+              <div className="flex h-full w-full items-center justify-center text-slate-500">
                 <ShoppingBag size={48} />
               </div>
             )}
@@ -221,7 +234,7 @@ export default function ProductPage() {
                   key={idx}
                   onClick={() => setActiveImageIndex(idx)}
                   className={`h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl border-2 transition ${
-                    activeImageIndex === idx ? "border-orange-400 scale-105" : "border-white/10 opacity-70 hover:opacity-100"
+                    activeImageIndex === idx ? "border-orange-400 scale-105" : "border-white/10 light:border-slate-300 opacity-70 hover:opacity-100"
                   }`}
                 >
                   {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -236,10 +249,10 @@ export default function ProductPage() {
         <div className="flex flex-col justify-between">
           <div>
             <div className="flex items-center justify-between">
-              <p className="flex items-center gap-1.5 text-xs font-bold text-orange-400">
+              <p className="flex items-center gap-1.5 text-xs font-bold text-orange-400 light:text-orange-600">
                 <Store size={13} /> {product.vendorId}
               </p>
-              <span className="rounded-full bg-white/5 px-2.5 py-1 text-[11px] font-semibold text-slate-400 border border-white/10">
+              <span className="rounded-full bg-white/5 light:bg-slate-100 px-2.5 py-1 text-[11px] font-bold text-slate-300 light:text-slate-800 border border-white/10 light:border-slate-300">
                 {product.category}
               </span>
             </div>
@@ -250,76 +263,76 @@ export default function ProductPage() {
             <div className="mt-2 flex items-center gap-2">
               <div className="flex items-center text-amber-400">
                 {[1, 2, 3, 4, 5].map((star) => (
-                  <Star key={star} size={15} className={star <= Math.round(avgRating) ? "fill-amber-400" : "text-slate-600"} />
+                  <Star key={star} size={15} className={star <= Math.round(avgRating) ? "fill-amber-400" : "text-slate-600 light:text-slate-400"} />
                 ))}
               </div>
-              <span className="text-xs font-bold text-slate-200">{avgRating.toFixed(1)}</span>
-              <span className="text-xs text-slate-500">({totalReviews} ratings)</span>
+              <span className="text-xs font-bold text-slate-200 light:text-slate-900">{avgRating.toFixed(1)}</span>
+              <span className="text-xs font-bold text-slate-400 light:text-slate-700">({totalReviews} ratings)</span>
             </div>
 
-            <p className="mt-3 flex items-center gap-1 text-3xl font-black text-orange-400">
+            <p className="mt-3 flex items-center gap-1 text-3xl font-black text-orange-400 light:text-orange-600">
               <IndianRupee size={24} /> {product.priceInr.toLocaleString("en-IN")}
             </p>
 
             {/* HS Code & Country of Origin Badges */}
             <div className="mt-4 flex flex-wrap gap-2 text-xs">
-              <div className="flex items-center gap-1 rounded-xl bg-white/5 px-3 py-1.5 border border-white/10 text-slate-300">
-                <Globe size={13} className="text-sky-400" />
-                <span className="text-slate-400">Origin:</span>
+              <div className="flex items-center gap-1 rounded-xl bg-white/5 light:bg-white px-3 py-1.5 border border-white/10 light:border-slate-300 text-slate-300 light:text-slate-900 light:shadow-sm">
+                <Globe size={13} className="text-sky-400 light:text-sky-600" />
+                <span className="text-slate-400 light:text-slate-700 font-semibold">Origin:</span>
                 <span className="font-bold">{product.countryOfOrigin || "India"}</span>
               </div>
 
               {product.hsCode && (
-                <div className="flex items-center gap-1 rounded-xl bg-white/5 px-3 py-1.5 border border-white/10 text-slate-300">
-                  <Shield size={13} className="text-emerald-400" />
-                  <span className="text-slate-400">HS Code:</span>
+                <div className="flex items-center gap-1 rounded-xl bg-white/5 light:bg-white px-3 py-1.5 border border-white/10 light:border-slate-300 text-slate-300 light:text-slate-900 light:shadow-sm">
+                  <Shield size={13} className="text-emerald-400 light:text-emerald-600" />
+                  <span className="text-slate-400 light:text-slate-700 font-semibold">HS Code:</span>
                   <span className="font-mono font-bold">{product.hsCode}</span>
                 </div>
               )}
             </div>
 
             <div className="mt-4">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">Overview</h4>
-              <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-slate-300">{product.description}</p>
+              <h4 className="text-xs font-black uppercase tracking-wider text-slate-400 light:text-slate-700">Overview</h4>
+              <p className="mt-1 whitespace-pre-wrap text-sm leading-relaxed text-slate-200 light:text-slate-800 font-medium">{product.description}</p>
             </div>
 
             {product.details && (
-              <div className="mt-4 rounded-2xl border border-white/10 bg-white/[0.02] p-3.5">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-orange-400">Product Details & Specs</h4>
-                <p className="mt-1.5 whitespace-pre-wrap text-xs leading-relaxed text-slate-300">{product.details}</p>
+              <div className="mt-4 rounded-2xl border border-white/10 light:border-slate-300 bg-white/[0.02] light:bg-white p-3.5 light:shadow-sm">
+                <h4 className="text-xs font-black uppercase tracking-wider text-orange-400 light:text-orange-600">Product Details & Specs</h4>
+                <p className="mt-1.5 whitespace-pre-wrap text-xs leading-relaxed text-slate-200 light:text-slate-800 font-medium">{product.details}</p>
               </div>
             )}
           </div>
 
-          <div className="mt-6 pt-4 border-t border-white/10">
+          <div className="mt-6 pt-4 border-t border-white/10 light:border-slate-300">
             {isOwnListing ? (
-              <p className="text-xs text-slate-500">This is your own listing.</p>
+              <p className="text-xs font-semibold text-slate-500 light:text-slate-700">This is your own listing.</p>
             ) : !order ? (
               <button
                 type="button"
                 onClick={handleBuy}
                 disabled={placing}
-                className="w-full flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] py-3.5 text-sm font-bold text-slate-950 shadow-lg shadow-orange-500/25 transition hover:brightness-110 active:scale-[0.99] disabled:opacity-60"
+                className="w-full flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] py-3.5 text-sm font-black text-slate-950 shadow-lg shadow-orange-500/25 transition hover:brightness-110 active:scale-[0.99] disabled:opacity-60"
               >
                 {placing ? <Loader2 size={18} className="animate-spin" /> : <ShoppingBag size={18} />}
-                {placing ? "Placing order..." : "Buy Now (Direct UPI)"}
+                {placing ? "Placing order..." : "Buy Now"}
               </button>
             ) : null}
-            {error && <p className="mt-2 text-xs text-red-400 text-center">{error}</p>}
+            {error && <p className="mt-2 text-xs font-bold text-red-400 text-center">{error}</p>}
           </div>
         </div>
       </div>
 
       {/* Swiggy Instamart Style Customer Reviews & Ratings Section */}
-      <div className="mt-12 rounded-3xl border border-white/10 bg-white/[0.02] p-6">
-        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+      <div className="mt-12 rounded-3xl border border-white/10 light:border-slate-300 bg-white/[0.02] light:bg-white p-6 light:shadow-sm">
+        <h3 className="text-lg font-black text-white light:text-slate-900 flex items-center gap-2">
           <Star className="text-amber-400 fill-amber-400" size={20} />
           Customer Feedback & Ratings
         </h3>
 
         {/* Submit Review Form */}
-        <form onSubmit={handleSubmitReview} className="mt-4 rounded-2xl border border-white/10 bg-black/20 p-4">
-          <span className="text-xs font-semibold text-slate-300 block mb-2">Write a review for this product</span>
+        <form onSubmit={handleSubmitReview} className="mt-4 rounded-2xl border border-white/10 light:border-slate-300 bg-black/20 light:bg-slate-50 p-4">
+          <span className="text-xs font-bold text-slate-200 light:text-slate-900 block mb-2">Write a review for this product</span>
           <div className="flex items-center gap-1.5 mb-3">
             {[1, 2, 3, 4, 5].map((star) => (
               <button
@@ -328,10 +341,10 @@ export default function ProductPage() {
                 onClick={() => setUserRating(star)}
                 className="transition transform hover:scale-110"
               >
-                <Star size={20} className={star <= userRating ? "fill-amber-400 text-amber-400" : "text-slate-600"} />
+                <Star size={20} className={star <= userRating ? "fill-amber-400 text-amber-400" : "text-slate-600 light:text-slate-400"} />
               </button>
             ))}
-            <span className="ml-2 text-xs font-bold text-amber-400">{userRating} / 5 Stars</span>
+            <span className="ml-2 text-xs font-bold text-amber-500 light:text-amber-700">{userRating} / 5 Stars</span>
           </div>
 
           <div className="flex gap-2">
@@ -340,7 +353,7 @@ export default function ProductPage() {
               value={userComment}
               onChange={(e) => setUserComment(e.target.value)}
               placeholder="Share your feedback about item quality, delivery, etc."
-              className="flex-1 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white outline-none focus:border-orange-400/50"
+              className="flex-1 rounded-xl border border-white/10 light:border-slate-300 bg-white/5 light:bg-white px-3.5 py-2 text-xs text-white light:text-slate-900 outline-none focus:border-orange-400 placeholder:text-slate-400 light:placeholder:text-slate-600 font-medium"
             />
             <button
               type="submit"
@@ -351,26 +364,26 @@ export default function ProductPage() {
               Post
             </button>
           </div>
-          {reviewError && <p className="mt-2 text-xs text-red-400">{reviewError}</p>}
+          {reviewError && <p className="mt-2 text-xs font-bold text-red-400">{reviewError}</p>}
         </form>
 
         {/* Reviews List */}
         <div className="mt-6 space-y-3">
           {reviews.length === 0 ? (
-            <p className="text-xs text-slate-500 italic">No reviews yet — be the first to rate this product after purchase!</p>
+            <p className="text-xs font-semibold text-slate-400 light:text-slate-700 italic">No reviews yet — be the first to rate this product after purchase!</p>
           ) : (
             reviews.map((r) => (
-              <div key={r.reviewId} className="rounded-xl border border-white/5 bg-white/[0.03] p-3 text-xs">
+              <div key={r.reviewId} className="rounded-xl border border-white/5 light:border-slate-200 bg-white/[0.03] light:bg-slate-50 p-3 text-xs">
                 <div className="flex items-center justify-between">
-                  <span className="font-bold text-slate-200">{r.userName}</span>
+                  <span className="font-bold text-slate-200 light:text-slate-900">{r.userName}</span>
                   <div className="flex items-center text-amber-400">
                     {[1, 2, 3, 4, 5].map((star) => (
-                      <Star key={star} size={12} className={star <= r.rating ? "fill-amber-400" : "text-slate-700"} />
+                      <Star key={star} size={12} className={star <= r.rating ? "fill-amber-400" : "text-slate-700 light:text-slate-400"} />
                     ))}
                   </div>
                 </div>
-                <p className="mt-1 text-slate-300 leading-relaxed">{r.comment}</p>
-                <span className="mt-1 block text-[10px] text-slate-500">{new Date(r.createdAt).toLocaleDateString()}</span>
+                <p className="mt-1 text-slate-300 light:text-slate-800 font-medium leading-relaxed">{r.comment}</p>
+                <span className="mt-1 block text-[10px] text-slate-500 light:text-slate-600 font-semibold">{new Date(r.createdAt).toLocaleDateString()}</span>
               </div>
             ))
           )}

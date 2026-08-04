@@ -1179,9 +1179,9 @@ function AdvertisingPage() {
             </h3>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-slate-300 light:text-slate-800 font-medium">
               <div className="rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 p-3 space-y-1">
-                <strong className="block text-white light:text-slate-900 font-bold">Homepage & Watch Banners</strong>
-                <code className="inline-block rounded bg-orange-500/20 light:bg-orange-100 px-1.5 py-0.5 font-bold text-orange-300 light:text-amber-900">16:5 aspect ratio</code>
-                <p className="text-[11px] text-slate-400 light:text-slate-600">Recommended: 1200 × 375 px or 1920 × 600 px image/video.</p>
+                <strong className="block text-white light:text-slate-900 font-bold">Homepage Feed Ad Card (Slots 13 & 16)</strong>
+                <code className="inline-block rounded bg-orange-500/20 light:bg-orange-100 px-1.5 py-0.5 font-bold text-orange-300 light:text-amber-900">16:9 Native Video Card ratio</code>
+                <p className="text-[11px] text-slate-400 light:text-slate-600">Blends natively into the homepage 4-column grid as a video thumbnail card (1920 × 1080 px or 1200 × 675 px image/video with Sponsored Ad tag).</p>
               </div>
               <div className="rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 p-3 space-y-1">
                 <strong className="block text-white light:text-slate-900 font-bold">Weekly Featured Banner</strong>

@@ -41,6 +41,7 @@ export async function POST(request: NextRequest) {
   const state = typeof body.state === "string" ? body.state.trim().slice(0, 60) : "";
   const pincode = typeof body.pincode === "string" ? body.pincode.trim().slice(0, 10) : "";
   const customName = typeof body.buyerName === "string" ? body.buyerName.trim().slice(0, 100) : "";
+  const customEmail = typeof body.buyerEmail === "string" ? body.buyerEmail.trim().slice(0, 120) : "";
 
   if (!productId) return NextResponse.json({ error: "productId is required." }, { status: 400 });
 
@@ -58,6 +59,7 @@ export async function POST(request: NextRequest) {
   }
 
   const buyerName = customName || user.name || "InPlayer Customer";
+  const buyerEmail = customEmail || user.email || "";
 
   const result = await createOrder({
     productId: product.productId,
@@ -66,7 +68,7 @@ export async function POST(request: NextRequest) {
     priceInr: product.priceInr,
     buyerUserId: user.userId,
     buyerName,
-    buyerEmail: user.email || "",
+    buyerEmail,
     buyerPhone,
     deliveryAddress,
     city,
@@ -83,17 +85,17 @@ export async function POST(request: NextRequest) {
 
   const orderIdDisplay = result.order.orderId.slice(0, 8).toUpperCase();
 
-  // Send Buyer Confirmation Email
-  if (user.email) {
+  // Send Buyer Confirmation Email to Customer's Primary Email Address
+  if (buyerEmail) {
     void sendEmail({
-      to: user.email,
+      to: buyerEmail,
       subject: `Hammart Order Confirmed [${orderIdDisplay}] — ${product.title}`,
       text: `Order ID: ${orderIdDisplay}\nYou placed an order for "${product.title}" (₹${product.priceInr}) from vendor @${vendor.vendorId}.\n\nPayment Note: Pay the vendor directly via UPI ID ${vendor.upiId}. InPlayer does not process this payment directly.\n\nYour shipping address was sent directly to the vendor for fulfillment.`,
       html: `<h2>Order Confirmed — ${orderIdDisplay}</h2><p>You placed an order for <strong>${product.title}</strong> (₹${product.priceInr}) from vendor <strong>@${vendor.vendorId}</strong>.</p><p><strong>Payment Note:</strong> Pay the vendor directly via UPI ID <strong>${vendor.upiId}</strong>. InPlayer does not process this transaction.</p><p>Your delivery address has been sent directly to the vendor for shipment.</p>`,
     }).catch((err) => console.error("Failed to email buyer order confirmation:", err));
   }
 
-  // Send Direct Email Notification to Vendor with Customer Name, Phone, Address, & Order ID
+  // Send Direct Email Notification to Vendor with Order ID, Customer Name, Email, Phone, & Full Address
   const vendorEmailMap = await resolveCognitoEmails([vendor.userId]);
   const vendorEmail = vendorEmailMap.get(vendor.userId);
   if (vendorEmail) {
@@ -101,7 +103,7 @@ export async function POST(request: NextRequest) {
     void sendEmail({
       to: vendorEmail,
       subject: `🚨 New Hammart Order [ID: ${orderIdDisplay}] — ${product.title}`,
-      text: `NEW ORDER RECEIVED!\n\nOrder ID: ${orderIdDisplay}\nProduct: ${product.title}\nPrice: ₹${product.priceInr}\n\nCUSTOMER DETAILS:\n- Name: ${buyerName}\n- Phone: ${buyerPhone || "Not provided"}\n- Email: ${user.email || "Not provided"}\n- Delivery Address: ${fullAddress || "Direct Contact"}\n\nNote: Buyer will pay you directly to your UPI ID (${vendor.upiId}). Fulfill and ship order to the customer's address above.`,
+      text: `NEW ORDER RECEIVED!\n\nOrder ID: ${orderIdDisplay}\nProduct: ${product.title}\nPrice: ₹${product.priceInr}\n\nCUSTOMER DETAILS:\n- Name: ${buyerName}\n- Email: ${buyerEmail || "Not provided"}\n- Phone: ${buyerPhone || "Not provided"}\n- Delivery Address: ${fullAddress || "Direct Contact"}\n\nNote: Buyer will pay you directly to your UPI ID (${vendor.upiId}). Fulfill and ship order to the customer's address above.`,
       html: `
         <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
           <h2 style="color: #f97316;">🎉 New Hammart Order Received!</h2>
@@ -113,8 +115,8 @@ export async function POST(request: NextRequest) {
           <h3>👤 Customer Delivery Information:</h3>
           <p>
             <strong>Customer Name:</strong> ${buyerName}<br/>
+            <strong>Email:</strong> ${buyerEmail || "Not provided"}<br/>
             <strong>Phone Number:</strong> ${buyerPhone || "Not provided"}<br/>
-            <strong>Email:</strong> ${user.email || "Not provided"}<br/>
             <strong>Shipping Address:</strong> ${fullAddress || "Contact buyer directly"}
           </p>
           <hr style="border: 0; border-top: 1px solid #eee;" />

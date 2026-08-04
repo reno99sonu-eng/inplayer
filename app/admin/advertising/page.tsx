@@ -22,8 +22,7 @@ import {
   Crop,
   RefreshCw,
 } from "lucide-react";
-import { compressImageToBanner, aiCropAndRedesignImage, extractVideoFramePoster } from "@/app/lib/imageCompress";
-import { generateAiAdData, analyzeImageAndGenerateTitle } from "@/app/lib/aiAdGenerator";
+import { compressImageToBanner, compressDataUrlToBanner, aiCropAndRedesignImage, extractVideoFramePoster } from "@/app/lib/imageCompress";
 
 type AdSlotSource = "house" | "adsense" | "off";
 type Placement = "homepage" | "watch" | "homepage_spotlight" | "weekly_featured";
@@ -374,25 +373,43 @@ function AdvertisingPage() {
     }
   };
 
+  // Calls the real OpenAI-backed /api/admin/ai-ad-generate route (see that
+  // file for why this replaced the old app/lib/aiAdGenerator.ts — that
+  // module never called any AI model, it picked a random title off a fixed
+  // list and drew a canned SVG gradient, which is why results looked
+  // identical/irrelevant no matter what file was uploaded).
+  const callAiAdGenerate = async (
+    body: Record<string, unknown>
+  ): Promise<{ title?: string; imageUrl?: string }> => {
+    const res = await authedFetch("/api/admin/ai-ad-generate", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || "AI generation failed.");
+    return data;
+  };
+
   const generateTitleWithAi = async (targetPlacement: string, isMidroll = false) => {
-    if (isMidroll) {
-      setMidrollGeneratingTitleAi(true);
-      try {
-        const res = await analyzeImageAndGenerateTitle(midrollPreview || "", targetPlacement);
-        setMidrollTitle(res.title);
-        if (!midrollLink) setMidrollLink(res.linkUrl);
-      } finally {
-        setMidrollGeneratingTitleAi(false);
-      }
-    } else {
-      setGeneratingTitleAi(true);
-      try {
-        const res = await analyzeImageAndGenerateTitle(uploadPreview || "", targetPlacement);
-        setUploadTitle(res.title);
-        if (!uploadLink) setUploadLink(res.linkUrl);
-      } finally {
-        setGeneratingTitleAi(false);
-      }
+    const preview = isMidroll ? midrollPreview : uploadPreview;
+    if (!preview || preview.startsWith("data:video/")) {
+      (isMidroll ? setMidrollUploadError : setUploadError)(
+        "Upload an image first — AI reads the actual image to write an accurate title."
+      );
+      return;
+    }
+    (isMidroll ? setMidrollGeneratingTitleAi : setGeneratingTitleAi)(true);
+    (isMidroll ? setMidrollUploadError : setUploadError)(null);
+    try {
+      const { title } = await callAiAdGenerate({ mode: "title", imageDataUrl: preview, placement: targetPlacement });
+      (isMidroll ? setMidrollTitle : setUploadTitle)(title || "");
+    } catch (err) {
+      (isMidroll ? setMidrollUploadError : setUploadError)(
+        err instanceof Error ? err.message : "AI title generation failed."
+      );
+    } finally {
+      (isMidroll ? setMidrollGeneratingTitleAi : setGeneratingTitleAi)(false);
     }
   };
 
@@ -427,12 +444,22 @@ function AdvertisingPage() {
     if (uploadPreview) {
       await generateTitleWithAi(placement, false);
       await handleAiCropAndRedesign(placement);
-    } else {
-      const aiData = generateAiAdData(placement);
-      setUploadTitle(aiData.title);
-      setUploadLink(aiData.linkUrl);
-      setUploadPreview(aiData.imageUrl);
+      return;
+    }
+    setGeneratingTitleAi(true);
+    setUploadError(null);
+    try {
+      const ratio = placement === "weekly_featured" ? 3.2 : placement === "homepage_spotlight" ? 1.77 : 3.2;
+      const { title, imageUrl } = await callAiAdGenerate({ mode: "full", placement });
+      if (!imageUrl) throw new Error("AI didn't return a banner image.");
+      const banner = await compressDataUrlToBanner(imageUrl, 140_000, ratio);
+      setUploadTitle(title || "");
+      setUploadPreview(banner);
       setUploadFileType("image");
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "AI ad generation failed.");
+    } finally {
+      setGeneratingTitleAi(false);
     }
   };
 
@@ -440,12 +467,21 @@ function AdvertisingPage() {
     if (midrollPreview) {
       await generateTitleWithAi("midroll", true);
       await handleAiCropMidroll();
-    } else {
-      const aiData = generateAiAdData("midroll");
-      setMidrollTitle(aiData.title);
-      setMidrollLink(aiData.linkUrl);
-      setMidrollPreview(aiData.imageUrl);
+      return;
+    }
+    setMidrollGeneratingTitleAi(true);
+    setMidrollUploadError(null);
+    try {
+      const { title, imageUrl } = await callAiAdGenerate({ mode: "full", placement: "midroll" });
+      if (!imageUrl) throw new Error("AI didn't return a banner image.");
+      const banner = await compressDataUrlToBanner(imageUrl, 140_000, 1.77);
+      setMidrollTitle(title || "");
+      setMidrollPreview(banner);
       setMidrollFileType("image");
+    } catch (err) {
+      setMidrollUploadError(err instanceof Error ? err.message : "AI ad generation failed.");
+    } finally {
+      setMidrollGeneratingTitleAi(false);
     }
   };
 
@@ -892,7 +928,7 @@ function AdvertisingPage() {
                       className="flex items-center gap-1.5 rounded-xl bg-purple-600/30 border border-purple-500/40 px-3 py-1.5 text-xs font-bold text-purple-300 light:text-purple-900 hover:bg-purple-600/40 transition disabled:opacity-50 cursor-pointer"
                     >
                       {croppingAi ? <Loader2 size={13} className="animate-spin" /> : <Crop size={13} />}
-                      Crop & Redesign with AI
+                      Auto-Crop & Enhance
                     </button>
                   )}
                 </div>
@@ -1078,7 +1114,7 @@ function AdvertisingPage() {
                       className="flex items-center gap-1.5 rounded-xl bg-purple-600/30 border border-purple-500/40 px-3 py-1.5 text-xs font-bold text-purple-300 light:text-purple-900 hover:bg-purple-600/40 transition disabled:opacity-50 cursor-pointer"
                     >
                       {midrollCroppingAi ? <Loader2 size={13} className="animate-spin" /> : <Crop size={13} />}
-                      Crop & Redesign with AI
+                      Auto-Crop & Enhance
                     </button>
                   )}
                 </div>

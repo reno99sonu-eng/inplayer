@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowLeft } from "lucide-react";
+import LegalBackButton from "../components/LegalBackButton";
 
 // Real, InPlayer-specific Terms of Service — this is what the signup flow
 // and TermsAcceptanceModal (app/components/auth/TermsAcceptanceModal.tsx)
@@ -29,12 +29,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 export default function TermsPage() {
   return (
     <div className="mx-auto max-w-[760px] px-5 py-10 sm:py-14">
-      <Link
-        href="/"
-        className="inline-flex items-center gap-2 text-sm font-semibold text-slate-400 light:text-slate-600 hover:text-orange-400"
-      >
-        <ArrowLeft size={16} /> Back to InPlayer
-      </Link>
+      <LegalBackButton />
 
       <h1 className="mt-6 text-3xl font-black text-white light:text-slate-900">
         Terms of Service

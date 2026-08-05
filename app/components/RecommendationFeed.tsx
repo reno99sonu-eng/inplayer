@@ -445,21 +445,24 @@ export default function RecommendationFeed({
     feedEntries.push({ kind: "video", video });
   });
 
-  // Keep the discovery feed in repeating YouTube-style blocks — but how
-  // many videos make up one block before a Raftaar (Trending Creators) row
-  // now matches how many actually fit a "row" at the current viewport,
-  // instead of one fixed number for every screen size:
+  // Keep the discovery feed in repeating YouTube-style blocks for the video
+  // grid itself — how many videos make up one block matches how many
+  // actually fit a "row" at the current viewport, instead of one fixed
+  // number for every screen size:
   //   - Mobile/tablet (<1024px, the grid's 1-2 column range below): 4
-  //     videos then Raftaar, looping — a shorter block so mobile visitors
-  //     hit variety sooner instead of scrolling a long single column
-  //     before ever reaching Raftaar.
+  //     videos per block.
   //   - Desktop (>=1024px, matching the grid's own 4-column xl
-  //     breakpoint): two full rows of four videos (eight) then Raftaar,
-  //     looping — unchanged from before.
-  // A Shorts shelf still appears too, just every second block, so it
-  // doesn't crowd out that primary video/Raftaar rhythm. New uploads flow
-  // into the same sequence instead of being stranded after a one-off
-  // section.
+  //     breakpoint): two full rows of four videos (eight) per block.
+  // A Shorts shelf still appears every second block, so it doesn't crowd
+  // out the video grid. New uploads flow into the same sequence instead of
+  // being stranded after a one-off section.
+  //
+  // Raftaar (Trending Creators) is real, live-ranked data, not per-block
+  // filler — every block asks the same /api/trending endpoint and gets
+  // back the exact same ranked list, so repeating it after every block (as
+  // this used to do) just showed the identical set of names again and
+  // again as you scrolled, reading as a stuck/duplicated section rather
+  // than "fresh" content. It's rendered once, after the first block, below.
   //
   // Detected client-side only (post-mount, same reasoning as the
   // shuffle/ad-slot logic above) since server-rendered HTML can't know the
@@ -538,7 +541,7 @@ export default function RecommendationFeed({
               </div>
             </section>
 
-            <TrendingNow />
+            {index === 0 && <TrendingNow />}
 
             {showShortsShelf && <ShortsShelf items={shelfShorts} />}
           </div>

@@ -24,8 +24,11 @@ import { useSettings } from "./settings/SettingsProvider";
 
 // Hover-preview delay — don't start streaming a preview for every card the
 // mouse passes over while scrolling, only once the user actually pauses on
-// one (matches YouTube's own hover-preview behavior).
-const HOVER_PREVIEW_DELAY = 400;
+// one (matches YouTube's own hover-preview behavior). Shortened from the
+// original 400ms — the bigger part of the "slow to start" feeling was the
+// on-demand @mux/mux-player-react chunk load (see the prefetch effect in
+// the default export below), but a snappier delay helps too.
+const HOVER_PREVIEW_DELAY = 200;
 
 interface RecommendationFeedProps {
   realVideos?: Recommendation[];
@@ -379,6 +382,19 @@ export default function RecommendationFeed({
     ...realShorts,
     ...shorts,
   ]);
+
+  // Proactively fetch the Mux player chunk in the background as soon as the
+  // feed mounts, instead of waiting for a card's first hover/scroll-preview
+  // to trigger the on-demand import() (see the nextDynamic() call up top).
+  // That first-ever preview was the real "auto previews are a bit slower to
+  // work" delay Reno reported — the browser had to fetch + parse the whole
+  // player bundle before any preview could start. This warms the module
+  // cache ahead of time (dynamic import() is a no-op on subsequent calls
+  // once resolved) so by the time a real preview fires, the chunk is
+  // already loaded.
+  useEffect(() => {
+    import("@mux/mux-player-react");
+  }, []);
 
   useEffect(() => {
     (() => {

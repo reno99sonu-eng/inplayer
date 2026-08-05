@@ -620,7 +620,12 @@ export default function ShortsPageContent({
       {/* Pinned header — neutral/dark like YouTube's Shorts chrome. Capped
           to the same width as the video column on desktop (see the feed
           container below) so it doesn't span the full, much-wider desktop
-          viewport disconnected from the actual video. */}
+          viewport disconnected from the actual video. No title text — just
+          the two icon buttons. Top padding adds env(safe-area-inset-top) on
+          top of the base spacing so the icons clear a phone's notch/status
+          bar/Dynamic Island instead of sitting flush against (or partly
+          under) it — same real-device-safe-area pattern already used for
+          the bottom nav in MobileBottomNav.tsx. */}
       <div
         className="
           absolute
@@ -635,7 +640,8 @@ export default function ShortsPageContent({
           from-black/80
           to-transparent
           px-3
-          py-3
+          pb-3
+          [padding-top:calc(0.75rem+env(safe-area-inset-top))]
 
           lg:left-1/2
           lg:right-auto
@@ -643,15 +649,18 @@ export default function ShortsPageContent({
           lg:-translate-x-1/2
           lg:gap-3
           lg:px-4
-          lg:py-4
+          lg:pb-4
+          lg:[padding-top:calc(1rem+env(safe-area-inset-top))]
         "
       >
         <button
           onClick={() => router.back()}
+          aria-label="Back"
           className="
             flex
             h-8
             w-8
+            shrink-0
             items-center
             justify-center
             rounded-full
@@ -672,17 +681,15 @@ export default function ShortsPageContent({
           <ArrowLeft size={17} />
         </button>
 
-        <h1 className="text-sm font-black text-white lg:text-base">
-          Shorts
-        </h1>
-
         <button
           onClick={toggleMuted}
+          aria-label={muted ? "Unmute" : "Mute"}
           className="
             ml-auto
             flex
             h-8
             w-8
+            shrink-0
             items-center
             justify-center
             rounded-full

@@ -3,8 +3,10 @@ import FeaturedHero from "./components/featuredHero/FeaturedHero";
 import RecommendationFeed from "./components/RecommendationFeed";
 import AdBanner from "./components/AdBanner";
 import { getReadyVideos } from "./lib/videoStore";
+import { getFeaturedThisWeek } from "./lib/trendingStore";
 import type { Recommendation } from "./data/recommendations";
 import type { Short } from "./data/shorts";
+import type { FeaturedSlide } from "./data/featuredSlides";
 import { resolveUsernames } from "./lib/resolveUsernames";
 
 function formatDuration(seconds: number): string {
@@ -115,19 +117,48 @@ async function getRealContent(): Promise<RealContent> {
   }
 }
 
+// Server-side fetch of the same "top videos this week" data the old
+// /api/featured-weekly route serves — called directly here (not via fetch)
+// so the Weekly Featured hero already has real slides in the very first
+// server-rendered HTML instead of showing a black placeholder while a
+// client-side useEffect fetch resolves. RankedVideo (trendingStore's return
+// type) matches FeaturedSlide's shape field-for-field, aside from
+// uploaderUsername being optional (possibly `undefined`) there vs required
+// (`string | null`) on FeaturedSlide — normalized below. The old API-route
+// path never hit this mismatch only because JSON.stringify/parse silently
+// drops `undefined` keys in transit.
+async function getFeaturedSlides(): Promise<FeaturedSlide[]> {
+  try {
+    const videos = await getFeaturedThisWeek(6);
+    return videos.map((video) => ({
+      ...video,
+      uploaderUsername: video.uploaderUsername ?? null,
+    }));
+  } catch (err) {
+    console.error("Failed to fetch featured weekly videos for homepage:", err);
+    return [];
+  }
+}
+
 interface HomeProps {
   searchParams: Promise<{ view?: string }>;
 }
 
 export default async function Home({ searchParams }: HomeProps) {
-  const { realVideos, realShorts } = await getRealContent();
-
   // "horizontal" (default) shows normal 16:9 videos; "vertical" swaps the
   // whole feed to Shorts. Driven by the Horizontal/Vertical chips in the
   // category bar (see NavigationCategories.tsx).
   const { view } = await searchParams;
   const activeView = view === "vertical" ? "vertical" : "horizontal";
   const isVertical = activeView === "vertical";
+
+  // The hero only renders in horizontal view, so only fetch its data then —
+  // no point paying for the extra query on the Shorts feed. Both fetches
+  // run in parallel rather than sequentially.
+  const [{ realVideos, realShorts }, featuredSlides] = await Promise.all([
+    getRealContent(),
+    isVertical ? Promise.resolve<FeaturedSlide[]>([]) : getFeaturedSlides(),
+  ]);
 
   return (
     <main className="relative min-h-screen overflow-x-hidden bg-[#050816] light:bg-[#F4ECDA]">
@@ -176,7 +207,7 @@ export default async function Home({ searchParams }: HomeProps) {
               then videos again" rhythm lives in one place. */}
           {!isVertical && (
             <>
-              <FeaturedHero />
+              <FeaturedHero initialSlides={featuredSlides} />
 
               <div className="mx-auto h-px w-[92%] bg-gradient-to-r from-transparent via-white/10 to-transparent light:via-black/10" />
             </>

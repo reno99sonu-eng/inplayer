@@ -105,10 +105,25 @@ export default function AdminSettingsPage() {
     setSaved(false);
   };
 
-  const save = async () => {
-    if (!settings || saving) return;
+  // Accepts an explicit override so the three ON/OFF toggles below can
+  // save the value they just computed directly, instead of relying on the
+  // `settings` state variable — which, read synchronously right after
+  // setSettings(), would still be the value from BEFORE the click (React
+  // state updates aren't synchronous). Without this, a toggle looked
+  // flipped in the UI the instant you clicked it, but the actual PATCH
+  // could go out with the old value — which is exactly why "the
+  // announcement toggle doesn't work" and similar reports kept recurring:
+  // the toggle LOOKED on, but nothing had actually been saved yet, and
+  // this page (unlike Admin -> Advertising) required a separate "Save
+  // changes" click to persist anything, which was easy to forget. Every
+  // toggle now saves itself immediately and reliably; "Save changes" is
+  // only still needed for the maintenance message / announcement text /
+  // link fields, which shouldn't fire a save on every keystroke.
+  const save = async (override?: CoreSettings) => {
+    const target = override || settings;
+    if (!target || saving) return;
 
-    if (settings.maintenanceMode) {
+    if (target.maintenanceMode) {
       const ok = window.confirm(
         "Turning maintenance mode ON will hide the site from every visitor except you. Continue?"
       );
@@ -122,7 +137,7 @@ export default function AdminSettingsPage() {
       const res = await authedFetch("/api/admin/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
+        body: JSON.stringify(target),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `Couldn't save settings (HTTP ${res.status}).`);
@@ -133,6 +148,16 @@ export default function AdminSettingsPage() {
     } finally {
       setSaving(false);
     }
+  };
+
+  // Toggle an ON/OFF field and save it immediately — see the comment on
+  // save() above for why this can't just call update() + save().
+  const toggleAndSave = <K extends keyof CoreSettings>(key: K, value: CoreSettings[K]) => {
+    if (!settings) return;
+    const next = { ...settings, [key]: value };
+    setSettings(next);
+    setSaved(false);
+    save(next);
   };
 
   if (loading) {
@@ -157,8 +182,10 @@ export default function AdminSettingsPage() {
       <div>
         <h2 className="text-xl font-black text-white light:text-slate-900">Platform Settings</h2>
         <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
-          Real, live site-wide controls — every toggle here takes effect immediately for every
-          visitor, no redeploy needed.
+          Real, live site-wide controls. Every ON/OFF toggle below saves itself the instant you
+          click it — no separate save step to forget. The message/headline/link text fields still
+          use the &ldquo;Save changes&rdquo; button below, so a save isn&apos;t fired on every
+          keystroke.
         </p>
       </div>
 
@@ -178,7 +205,7 @@ export default function AdminSettingsPage() {
                 </p>
               </div>
             </div>
-            <Toggle checked={settings.maintenanceMode} onChange={(v) => update("maintenanceMode", v)} />
+            <Toggle checked={settings.maintenanceMode} onChange={(v) => toggleAndSave("maintenanceMode", v)} />
           </div>
           {settings.maintenanceMode && (
             <div className="mt-4 pl-12">
@@ -211,7 +238,7 @@ export default function AdminSettingsPage() {
                 </p>
               </div>
             </div>
-            <Toggle checked={settings.signupsEnabled} onChange={(v) => update("signupsEnabled", v)} />
+            <Toggle checked={settings.signupsEnabled} onChange={(v) => toggleAndSave("signupsEnabled", v)} />
           </div>
         </div>
 
@@ -233,7 +260,7 @@ export default function AdminSettingsPage() {
             </div>
             <Toggle
               checked={settings.announcementEnabled}
-              onChange={(v) => update("announcementEnabled", v)}
+              onChange={(v) => toggleAndSave("announcementEnabled", v)}
             />
           </div>
           {settings.announcementEnabled && (
@@ -286,7 +313,7 @@ export default function AdminSettingsPage() {
         <div className="flex items-center justify-between">
           <button
             type="button"
-            onClick={save}
+            onClick={() => save()}
             disabled={saving}
             className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#6366F1] via-[#8B5CF6] to-[#A855F7] px-5 py-2.5 text-sm font-bold text-white shadow-[0_10px_25px_rgba(139,92,246,.25)] transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
           >

@@ -47,10 +47,14 @@ export default function SplashScreen() {
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
     // Tight and punchy on purpose — a cinematic ident earns its keep by
-    // being short and bold, not by lingering. The 0.85s zoom/flash/shine
+    // being short and bold, not by lingering. The 1.05s zoom/flash/shine
     // sequence (see globals.css) plays out, holds fully revealed for a
-    // shorter beat than before, then cuts out fast — no slow ambient fade.
-    const holdMs = reducedMotion ? 350 : 1300;
+    // beat, then cuts out fast — no slow ambient fade. holdMs is scaled up
+    // from the previous 1300ms by the same ~1.235x as the CSS animation
+    // durations in globals.css, per Reno's "a little slower, not too slow"
+    // feedback — so the hold still starts right after the tagline
+    // animation actually finishes instead of cutting it off early.
+    const holdMs = reducedMotion ? 350 : 1600;
     const fadeOutMs = reducedMotion ? 180 : 380;
 
     // Lock scroll while the curtain is up so the already-rendered page

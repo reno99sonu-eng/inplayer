@@ -20,8 +20,8 @@ export default function HelpPage() {
   const [openIndex, setOpenIndex] = useState<number | null>(null);
 
   return (
-    <div className="min-h-screen bg-[#06101D] text-white">
-      <div className="flex items-center gap-4 border-b border-white/10 px-5 py-5">
+    <div className="min-h-screen bg-[#06101D] light:bg-[#FAF5E9] text-white light:text-slate-900">
+      <div className="flex items-center gap-4 border-b border-white/10 light:border-black/10 px-5 py-5">
         <button
           onClick={() => router.back()}
           className="
@@ -33,10 +33,13 @@ export default function HelpPage() {
             rounded-full
             border
             border-white/10
+            light:border-black/10
             bg-white/5
+            light:bg-black/5
             transition-all
             duration-200
             hover:bg-white/15
+            light:hover:bg-black/10
           "
         >
           <ArrowLeft size={20} />
@@ -46,7 +49,7 @@ export default function HelpPage() {
       </div>
 
       <div className="mx-auto max-w-2xl px-5 py-8">
-        <h2 className="mb-4 text-xs font-bold uppercase tracking-[0.25em] text-orange-300/80">
+        <h2 className="mb-4 text-xs font-bold uppercase tracking-[0.25em] text-orange-300/80 light:text-orange-600/90">
           Frequently Asked Questions
         </h2>
 
@@ -57,23 +60,23 @@ export default function HelpPage() {
             return (
               <div
                 key={item.q}
-                className="overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03]"
+                className="overflow-hidden rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.03]"
               >
                 <button
                   onClick={() => setOpenIndex(isOpen ? null : index)}
                   className="flex w-full items-center justify-between px-5 py-4 text-left"
                 >
-                  <span className="font-semibold text-white">{item.q}</span>
+                  <span className="font-semibold text-white light:text-slate-900">{item.q}</span>
                   <ChevronDown
                     size={18}
-                    className={`shrink-0 text-orange-300 transition-transform duration-200 ${
+                    className={`shrink-0 text-orange-300 light:text-orange-600 transition-transform duration-200 ${
                       isOpen ? "rotate-180" : ""
                     }`}
                   />
                 </button>
 
                 {isOpen && (
-                  <p className="border-t border-white/10 px-5 py-4 text-sm leading-6 text-slate-400">
+                  <p className="border-t border-white/10 light:border-black/10 px-5 py-4 text-sm leading-6 text-slate-400 light:text-slate-600">
                     {item.a}
                   </p>
                 )}
@@ -82,8 +85,8 @@ export default function HelpPage() {
           })}
         </div>
 
-        <div className="mt-8 rounded-2xl border border-orange-400/20 bg-orange-500/5 p-5">
-          <p className="mb-3 text-sm text-slate-300">
+        <div className="mt-8 rounded-2xl border border-orange-400/20 light:border-orange-500/25 bg-orange-500/5 light:bg-orange-500/10 p-5">
+          <p className="mb-3 text-sm text-slate-300 light:text-slate-700">
             Still need help? Reach out to our support team directly.
           </p>
           <a

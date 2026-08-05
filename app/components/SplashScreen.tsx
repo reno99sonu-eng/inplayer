@@ -2,16 +2,26 @@
 
 import { useEffect, useState } from "react";
 
-// Reworked per Reno's feedback: the previous version (glowing particles,
-// spinning ring, multi-color drift) read as "decorative," not premium. This
-// is a Netflix/Disney+-style cinematic ident instead — one bold, controlled
-// moment (dim → rapid zoom → bright flash → settle) rather than ongoing
-// ambient motion. Always renders on a near-black stage regardless of the
-// site's own light/dark theme, the same way streaming-app splash idents
-// always cut to black first — a bright cream backdrop would wash out the
-// zoom/flash entirely and undercut the exact "punchy" effect being asked
-// for here, so this is a deliberate, one-off exception to the app's normal
-// theme-follows-site rule.
+// Reworked per Reno's feedback, twice now:
+// 1) The original version (glowing particles, spinning ring, multi-color
+//    drift) read as "decorative," not premium — replaced with a
+//    Netflix/Disney+-style cinematic ident: one bold, controlled moment
+//    instead of ongoing ambient motion.
+// 2) That cinematic version still had a soft blurred circle glowing behind
+//    the logo — Reno flagged the circle specifically and asked for a more
+//    "crazy style premium" logo transition, a bit faster. This version:
+//    removes the circle entirely (no glow blob anywhere), gives the logo a
+//    punchier 3D-tilt zoom with more overshoot (see splashCinematicZoom in
+//    globals.css), and adds a diagonal light-shine sweep across the logo
+//    right after the flash — a common premium-logo-reveal touch — instead
+//    of a static glow. Everything is faster too: the whole reveal is ~15%
+//    quicker and the on-screen hold is shorter.
+// Always renders on a near-black stage regardless of the site's own
+// light/dark theme, the same way streaming-app splash idents always cut to
+// black first — a bright cream backdrop would wash out the zoom/flash
+// entirely and undercut the "punchy" effect being asked for here, so this
+// is a deliberate, one-off exception to the app's normal theme-follows-site
+// rule.
 //
 // The real site is already mounted behind this overlay the whole time
 // (SiteChrome renders {children} in parallel, not after this unmounts) —
@@ -37,11 +47,11 @@ export default function SplashScreen() {
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
     // Tight and punchy on purpose — a cinematic ident earns its keep by
-    // being short and bold, not by lingering. The 1.05s zoom/flash
-    // animation (see globals.css) plays out, holds fully revealed for a
-    // beat, then cuts out fast — no slow ambient fade like before.
-    const holdMs = reducedMotion ? 400 : 1750;
-    const fadeOutMs = reducedMotion ? 200 : 450;
+    // being short and bold, not by lingering. The 0.85s zoom/flash/shine
+    // sequence (see globals.css) plays out, holds fully revealed for a
+    // shorter beat than before, then cuts out fast — no slow ambient fade.
+    const holdMs = reducedMotion ? 350 : 1300;
+    const fadeOutMs = reducedMotion ? 180 : 380;
 
     // Lock scroll while the curtain is up so the already-rendered page
     // underneath can't be scrolled/interacted with mid-animation. Restored
@@ -83,27 +93,38 @@ export default function SplashScreen() {
         leaving ? "pointer-events-none opacity-0" : "opacity-100"
       }`}
     >
-      {/* One steady ignition glow behind the mark — ramps in once with the
-          zoom, then holds still. No breathing/pulsing loop: constant
-          ambient motion is exactly the "decorative" feeling this replaces. */}
-      <div className="animate-splash-glow-ignite pointer-events-none absolute h-[320px] w-[320px] rounded-full bg-orange-500/35 blur-[100px] sm:h-[480px] sm:w-[480px]" />
-
       {/* The flash burst — a brief, bright wash timed to hit exactly when
           the logo's zoom peaks, like a camera flash / lens flare at the
           moment of impact. This is the single "punchy" beat the whole
-          ident is built around. */}
-      <div className="animate-splash-flash-burst pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.9)_0%,rgba(255,166,0,0.55)_35%,rgba(255,166,0,0)_70%)]" />
+          ident is built around. No circular glow blob anymore — Reno
+          flagged that as the thing to remove; this radial wash fills the
+          whole screen rectangle rather than reading as a distinct circle. */}
+      <div className="animate-splash-flash-burst pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.92)_0%,rgba(255,166,0,0.6)_35%,rgba(255,166,0,0)_70%)]" />
 
-      <div className="relative flex flex-col items-center px-6 text-center">
-        {/* Always the dark/white-wordmark asset — the stage is always
-            near-black now regardless of site theme, so there's no light
-            variant to swap to here anymore. */}
-        <img
-          src="/logos/inplayer-mark-dark.png"
-          alt="INPLAYER"
-          draggable={false}
-          className="animate-splash-cinematic-zoom h-16 w-auto object-contain drop-shadow-[0_4px_32px_rgba(249,115,22,0.55)] sm:h-20 md:h-24"
-        />
+      <div
+        className="relative flex flex-col items-center px-6 text-center"
+        style={{ perspective: "900px" }}
+      >
+        {/* The logo mark + its light-shine sweep, both clipped to exactly
+            the logo's own footprint (not a separate floating shape) — the
+            "premium reveal" touch that replaces the old glow circle. */}
+        <div className="relative overflow-hidden rounded-xl">
+          {/* Always the dark/white-wordmark asset — the stage is always
+              near-black now regardless of site theme, so there's no light
+              variant to swap to here anymore. */}
+          <img
+            src="/logos/inplayer-mark-dark.png"
+            alt="INPLAYER"
+            draggable={false}
+            className="animate-splash-cinematic-zoom h-16 w-auto object-contain drop-shadow-[0_4px_32px_rgba(249,115,22,0.55)] sm:h-20 md:h-24"
+          />
+
+          {/* Diagonal light-shine sweeping once across the logo right after
+              the flash — a common premium logo-reveal touch (think app-icon
+              or brand-ident shines), and a "crazy"/dynamic beat that isn't
+              just another static glow. */}
+          <div className="animate-splash-logo-shine pointer-events-none absolute inset-y-0 left-0 w-1/2 -skew-x-[20deg] bg-gradient-to-r from-transparent via-white/80 to-transparent" />
+        </div>
 
         <p className="animate-splash-tagline-in mt-5 text-[11px] font-bold uppercase tracking-[0.3em] text-orange-300 sm:text-sm">
           {TAGLINE}

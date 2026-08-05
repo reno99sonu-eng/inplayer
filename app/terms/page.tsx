@@ -183,8 +183,6 @@ export default function TermsPage() {
           &quot;Content you post&quot; above — can be raised with our Grievance Officer:
         </p>
         <p>
-          Grievance Officer: Reno
-          <br />
           Email:{" "}
           <a href="mailto:support@inplayer.in" className="text-orange-400 hover:underline">
             support@inplayer.in

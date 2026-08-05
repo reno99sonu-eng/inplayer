@@ -11,6 +11,10 @@ export interface PlatformSettings {
   signupsEnabled: boolean;
   announcementEnabled: boolean;
   announcementText: string;
+  // Destination for the announcement overlay's CTA button — optional. When
+  // empty, the overlay still shows (headline + close button), it just
+  // doesn't render a button pointing nowhere real.
+  announcementLinkUrl: string;
   moderationEnabledComments: boolean;
   moderationEnabledMessages: boolean;
   moderationEnabledUploads: boolean;
@@ -32,6 +36,7 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
   signupsEnabled: true,
   announcementEnabled: false,
   announcementText: "",
+  announcementLinkUrl: "",
   moderationEnabledComments: true,
   moderationEnabledMessages: true,
   moderationEnabledUploads: true,
@@ -54,6 +59,7 @@ export type PublicPlatformSettings = Pick<
   | "signupsEnabled"
   | "announcementEnabled"
   | "announcementText"
+  | "announcementLinkUrl"
   | "adsenseEnabled"
   | "adsensePublisherId"
   | "homepageBannerSource"
@@ -106,6 +112,7 @@ export function toPublicSettings(settings: PlatformSettings): PublicPlatformSett
     signupsEnabled: settings.signupsEnabled,
     announcementEnabled: settings.announcementEnabled,
     announcementText: settings.announcementText,
+    announcementLinkUrl: settings.announcementLinkUrl || "",
     adsenseEnabled: settings.adsenseEnabled,
     adsensePublisherId: settings.adsensePublisherId,
     homepageBannerSource: settings.homepageBannerSource,

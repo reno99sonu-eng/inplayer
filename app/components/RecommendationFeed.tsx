@@ -18,6 +18,8 @@ const MuxPlayer = nextDynamic(() => import("@mux/mux-player-react"), {
 import { recommendations, type Recommendation } from "../data/recommendations";
 import { shorts, type Short } from "../data/shorts";
 import ShortsShelf from "./ShortsShelf";
+import TrendingNow from "./TrendingNow";
+import AdThumbnailCard from "./AdThumbnailCard";
 import { useSettings } from "./settings/SettingsProvider";
 
 // Hover-preview delay — don't start streaming a preview for every card the
@@ -399,18 +401,54 @@ export default function RecommendationFeed({
     })();
   }, [realVideos, realShorts]);
 
-  // Keep the discovery feed in repeating YouTube-style blocks: exactly four
-  // standard videos, then the next unused shelf of Shorts. New uploads flow
-  // into the same sequence instead of being stranded after a one-off section.
-  const videoBatches = Array.from(
-    { length: Math.ceil(items.length / 4) },
-    (_, index) => items.slice(index * 4, index * 4 + 4)
+  // One ad slot, inserted at a random point among every 8/16/20 videos —
+  // picked client-side only (after mount) so the server-rendered and
+  // first-paint client markup still match; the ad simply isn't there yet
+  // for that very first render, same reasoning as the shuffle above. Never
+  // displaces a real video — everything after the ad just shifts down one
+  // grid slot, same as a normal ad insertion anywhere else.
+  const [adSlotIndex, setAdSlotIndex] = useState<number | null>(null);
+
+  useEffect(() => {
+    (() => {
+      const candidates = [8, 16, 20].filter((n) => n <= items.length);
+      setAdSlotIndex(
+        candidates.length > 0
+          ? candidates[Math.floor(Math.random() * candidates.length)]
+          : null
+      );
+    })();
+  }, [items.length]);
+
+  type FeedEntry = { kind: "video"; video: Recommendation } | { kind: "ad" };
+  const feedEntries: FeedEntry[] = [];
+  items.forEach((video, index) => {
+    if (adSlotIndex !== null && index === adSlotIndex) {
+      feedEntries.push({ kind: "ad" });
+    }
+    feedEntries.push({ kind: "video", video });
+  });
+
+  // Keep the discovery feed in repeating YouTube-style blocks: two full
+  // rows of four videos (eight per block, matching the grid's own
+  // 4-column breakpoint at xl) followed by a Raftaar (Trending Creators)
+  // row, then the next block of eight, and so on. A Shorts shelf still
+  // appears too, just every second block, so it doesn't crowd out that
+  // primary video/Raftaar rhythm. New uploads flow into the same sequence
+  // instead of being stranded after a one-off section.
+  const BLOCK_SIZE = 8;
+  const feedBatches = Array.from(
+    { length: Math.ceil(feedEntries.length / BLOCK_SIZE) },
+    (_, index) => feedEntries.slice(index * BLOCK_SIZE, index * BLOCK_SIZE + BLOCK_SIZE)
   );
   const shortsPerShelf = 8;
 
-  const renderCard = (video: Recommendation) => (
-    <HomeVideoCard key={video.id} video={video} />
-  );
+  const renderEntry = (entry: FeedEntry) =>
+    entry.kind === "ad" ? (
+      <AdThumbnailCard key="ad-slot" />
+    ) : (
+      <HomeVideoCard key={entry.video.id} video={entry.video} />
+    );
 
   // Vertical view: a Shorts-only responsive grid (fills every device width,
   // 2 columns on the smallest phones up to 6 on wide desktops/TVs).
@@ -439,24 +477,29 @@ export default function RecommendationFeed({
     );
   }
 
-  // Horizontal view: repeat four normal video cards followed by a Shorts
-  // shelf for as long as there is content to display.
+  // Horizontal view: repeat an 8-video (two-row) grid followed by a
+  // Raftaar row, then a Shorts shelf every second block, for as long as
+  // there is content to display.
   return (
     <>
-      {videoBatches.map((videos, index) => {
+      {feedBatches.map((entries, index) => {
         const shelfShorts = shuffledShorts.slice(
           index * shortsPerShelf,
           (index + 1) * shortsPerShelf
         );
+        const showShortsShelf = index % 2 === 1 && shelfShorts.length > 0;
 
         return (
           <div key={`feed-block-${index}`}>
             <section className="mx-auto max-w-[1800px] px-4 py-5 lg:py-8 lg:px-8">
               <div className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                {videos.map(renderCard)}
+                {entries.map(renderEntry)}
               </div>
             </section>
-            {shelfShorts.length > 0 && <ShortsShelf items={shelfShorts} />}
+
+            <TrendingNow />
+
+            {showShortsShelf && <ShortsShelf items={shelfShorts} />}
           </div>
         );
       })}

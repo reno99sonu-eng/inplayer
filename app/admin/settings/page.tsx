@@ -22,6 +22,7 @@ interface CoreSettings {
   signupsEnabled: boolean;
   announcementEnabled: boolean;
   announcementText: string;
+  announcementLinkUrl: string;
 }
 
 // A plain two-button On/Off switch — deliberately not a sliding pill toggle.
@@ -88,6 +89,7 @@ export default function AdminSettingsPage() {
           signupsEnabled: data.settings.signupsEnabled !== false,
           announcementEnabled: Boolean(data.settings.announcementEnabled),
           announcementText: data.settings.announcementText || "",
+          announcementLinkUrl: data.settings.announcementLinkUrl || "",
         });
         setUpdatedMeta({ updatedAt: data.settings.updatedAt, updatedBy: data.settings.updatedBy });
       } catch (err) {
@@ -223,8 +225,9 @@ export default function AdminSettingsPage() {
               <div>
                 <h3 className="font-bold text-white light:text-slate-900">Site-wide announcement</h3>
                 <p className="mt-0.5 text-xs text-slate-400 light:text-slate-600">
-                  A dismissible banner across the top of every page — e.g. &ldquo;Paid memberships are
-                  live&rdquo; or a scheduled-downtime notice.
+                  A dismissible, full-screen premium takeover shown once per visitor — e.g.
+                  &ldquo;Paid memberships are live&rdquo; or a scheduled-downtime notice, with an
+                  optional button linking anywhere you want.
                 </p>
               </div>
             </div>
@@ -234,20 +237,35 @@ export default function AdminSettingsPage() {
             />
           </div>
           {settings.announcementEnabled && (
-            <div className="mt-4 pl-12">
-              <label className="mb-1.5 flex items-center justify-between text-xs font-semibold text-slate-400 light:text-slate-600">
-                <span>Banner text</span>
-                <span className={settings.announcementText.length > 200 ? "text-red-400" : ""}>
-                  {settings.announcementText.length}/200
-                </span>
-              </label>
-              <input
-                type="text"
-                value={settings.announcementText}
-                onChange={(e) => update("announcementText", e.target.value.slice(0, 200))}
-                placeholder="e.g. Paid memberships are now live on InPlayer!"
-                className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-indigo-400/50"
-              />
+            <div className="mt-4 pl-12 space-y-3">
+              <div>
+                <label className="mb-1.5 flex items-center justify-between text-xs font-semibold text-slate-400 light:text-slate-600">
+                  <span>Headline text</span>
+                  <span className={settings.announcementText.length > 200 ? "text-red-400" : ""}>
+                    {settings.announcementText.length}/200
+                  </span>
+                </label>
+                <input
+                  type="text"
+                  value={settings.announcementText}
+                  onChange={(e) => update("announcementText", e.target.value.slice(0, 200))}
+                  placeholder="e.g. Paid memberships are now live on InPlayer!"
+                  className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-indigo-400/50"
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-xs font-semibold text-slate-400 light:text-slate-600">
+                  Button link (optional — leave blank to show just the headline and a close
+                  button, no button)
+                </label>
+                <input
+                  type="url"
+                  value={settings.announcementLinkUrl}
+                  onChange={(e) => update("announcementLinkUrl", e.target.value.slice(0, 500))}
+                  placeholder="https://inplayer.in/shop"
+                  className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-indigo-400/50"
+                />
+              </div>
             </div>
           )}
         </div>

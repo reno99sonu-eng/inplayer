@@ -45,6 +45,33 @@ function MapController({ lat, lng, zoom, flyToSignal, onMapReady, onMoveEnd, onZ
     if (readyReported.current) return;
     readyReported.current = true;
     onMapReady(map);
+
+    // Real fix for "dragging doesn't work" on this map: it mounts inside a
+    // modal (LocationMapPicker) via next/dynamic, and Leaflet computes its
+    // internal drag/pan pixel math from the container's size at the exact
+    // moment it's constructed. If that size was ever wrong even for one
+    // frame — which happens easily inside a modal, and ESPECIALLY once the
+    // on-screen keyboard opens/closes as the user taps the address inputs
+    // right below the map on mobile — Leaflet's cached size goes stale and
+    // dragging stops tracking the cursor correctly, even though the tiles
+    // still visibly render fine. invalidateSize() recalculates that
+    // internal size/offset; calling it once right after mount (deferred a
+    // tick so layout has settled) and again on every resize/orientation
+    // change/keyboard toggle keeps dragging accurate the whole time this
+    // map is open.
+    const recalc = () => map.invalidateSize();
+    const initialTimer = window.setTimeout(recalc, 120);
+
+    window.addEventListener("resize", recalc);
+    window.addEventListener("orientationchange", recalc);
+    window.visualViewport?.addEventListener("resize", recalc);
+
+    return () => {
+      window.clearTimeout(initialTimer);
+      window.removeEventListener("resize", recalc);
+      window.removeEventListener("orientationchange", recalc);
+      window.visualViewport?.removeEventListener("resize", recalc);
+    };
   }, [map, onMapReady]);
 
   useEffect(() => {

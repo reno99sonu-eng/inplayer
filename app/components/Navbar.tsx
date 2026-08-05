@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState, Suspense } from "react";
-import Image from "next/image";
 import { fetchAuthSession } from "aws-amplify/auth";
 import NavbarLogo from "./NavbarLogo";
 import NavbarLinks from "./NavbarLinks";
@@ -283,7 +282,7 @@ export default function Navbar() {
       <img
         src={navbarTheme.imageUrl}
         alt="Occasion Graphic"
-        className="relative z-10 mx-auto h-12 lg:h-13 xl:h-14 w-auto object-contain drop-shadow-[0_2px_14px_rgba(255,165,0,0.5)]"
+        className="relative z-10 mx-auto h-12 lg:h-13 xl:h-14 w-auto object-contain opacity-80 drop-shadow-[0_2px_14px_rgba(255,165,0,0.5)]"
       />
     </div>
   )}
@@ -381,7 +380,7 @@ export default function Navbar() {
         <img
           src={navbarTheme.imageUrl}
           alt="Occasion Graphic"
-          className="relative z-10 mx-auto h-8 sm:h-9 md:h-10 w-auto object-contain drop-shadow-[0_2px_12px_rgba(255,165,0,0.45)]"
+          className="relative z-10 mx-auto h-8 sm:h-9 md:h-10 w-auto object-contain opacity-80 drop-shadow-[0_2px_12px_rgba(255,165,0,0.45)]"
         />
       </div>
     )}
@@ -774,12 +773,20 @@ lg:right-auto
   "
 >
         <div className="relative h-7 w-7 flex-shrink-0 overflow-hidden rounded-full">
-          <Image
-            src={channel.avatarUrl || "/recommendations/avatars/default.jpg"}
+          {/* Plain <img>, not next/image — real subscribed-channel avatars
+              are base64 data URLs (see app/lib/imageCompress.ts) that
+              next/image can't optimize/serve, and "/recommendations/avatars/
+              default.jpg" below never existed as a real file, so both
+              together were exactly why every avatar in this list showed as
+              a broken image icon. Same pattern as HomeVideoCard's avatar
+              and NavbarProfile's own picture, which use a real existing
+              fallback (/avatars/avatar.png) the same way. */}
+          <img
+            src={channel.avatarUrl || "/avatars/avatar.png"}
             alt={channel.name}
-            fill
-            sizes="28px"
-            className="object-cover"
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover"
           />
         </div>
 

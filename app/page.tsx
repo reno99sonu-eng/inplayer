@@ -1,4 +1,3 @@
-import TrendingNow from "./components/TrendingNow";
 import FloatingAIButton from "./components/FloatingAIButton";
 import FeaturedHero from "./components/featuredHero/FeaturedHero";
 import RecommendationFeed from "./components/RecommendationFeed";
@@ -167,20 +166,19 @@ export default async function Home({ searchParams }: HomeProps) {
 
       <div className="relative z-10">
         <div className="space-y-1 lg:space-y-2">
-          {/* The cinematic hero + trending row are horizontal-video showcases,
-              so they only make sense in the Horizontal view. Vertical view is
-              a pure Shorts feed. */}
+          {/* The cinematic hero is a horizontal-video showcase, so it only
+              makes sense in the Horizontal view. Vertical view is a pure
+              Shorts feed. The Raftaar (Trending Creators) row and the
+              homepage ad no longer live here as one-off sections — Raftaar
+              now repeats after every block of videos, and the ad is a
+              random in-grid slot styled like a thumbnail, both owned by
+              RecommendationFeed itself so the whole "videos, then Raftaar,
+              then videos again" rhythm lives in one place. */}
           {!isVertical && (
             <>
               <FeaturedHero />
 
               <div className="mx-auto h-px w-[92%] bg-gradient-to-r from-transparent via-white/10 to-transparent light:via-black/10" />
-
-              <TrendingNow />
-
-              <div className="mx-auto h-px w-[92%] bg-gradient-to-r from-transparent via-white/10 to-transparent light:via-black/10" />
-
-              <AdBanner placement="homepage" />
             </>
           )}
 

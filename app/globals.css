@@ -999,56 +999,65 @@ animation: aiGlassSweep 5.5s linear infinite;
 }
 
 /* ---------- Intro splash screen (app/components/SplashScreen.tsx) ---------- */
-/* Reworked into a Netflix/Disney+-style cinematic ident: one controlled,
-   punchy beat (dim → rapid zoom → bright flash → settle) instead of
-   ongoing ambient motion (the old particle/spin/multi-glow version read as
-   "decorative" rather than premium). The fade-OUT is a plain Tailwind
-   opacity transition driven by React state (see SplashScreen.tsx);
-   everything below is the fade-IN sequence, which autoplays the moment
-   each element mounts so it needs no JS timing of its own. */
+/* Netflix/Disney+-style cinematic ident: one controlled, punchy beat (dim →
+   rapid 3D-tilt zoom → bright flash → light-shine sweep → settle) instead
+   of ongoing ambient motion. Second pass per Reno's follow-up feedback:
+   removed the blurred circular glow that used to sit behind the logo
+   entirely (no circle anywhere now), replaced it with a diagonal shine
+   that sweeps across the logo itself for a more "premium reveal" feel, and
+   tightened every timing to feel noticeably faster. The fade-OUT is a
+   plain Tailwind opacity transition driven by React state (see
+   SplashScreen.tsx); everything below is the fade-IN sequence, which
+   autoplays the moment each element mounts so it needs no JS timing of
+   its own. */
 
-/* The logo's zoom: starts tiny, dim and blurred like it's powering on,
-   rockets past its final size (the overshoot to 1.22 is the "impact"
-   moment the flash burst below is timed against), then settles with a
-   small bounce-back — same cubic-bezier overshoot curve used elsewhere in
-   this file for a consistent feel, just tuned punchier and faster. */
+/* The logo's zoom: starts tiny, dim, blurred and tilted away in 3D like
+   it's swinging into frame, rockets past its final size with a stronger
+   overshoot than before (1.3 vs the old 1.22) for more punch, settles with
+   a small bounce-back. The added rotate/rotateY (needs `perspective` on
+   the parent — see SplashScreen.tsx) is what makes this read as "more
+   dynamic/premium" instead of a plain scale-up. Runs in 0.85s, down from
+   1.05s — noticeably faster per Reno's request. */
 @keyframes splashCinematicZoom {
   0% {
     opacity: 0;
-    transform: scale(0.15);
-    filter: blur(10px);
+    transform: scale(0.12) rotate(-8deg) rotateY(32deg);
+    filter: blur(12px);
   }
-  35% {
+  30% {
     opacity: 1;
-    filter: blur(2px);
+    filter: blur(1.5px);
+    transform: scale(0.88) rotate(3deg) rotateY(10deg);
   }
-  60% {
-    transform: scale(1.22);
+  55% {
+    transform: scale(1.3) rotate(-2deg) rotateY(-5deg);
     filter: blur(0);
   }
-  80% {
-    transform: scale(0.96);
+  78% {
+    transform: scale(0.94) rotate(1deg) rotateY(2deg);
   }
   100% {
     opacity: 1;
-    transform: scale(1);
+    transform: scale(1) rotate(0deg) rotateY(0deg);
     filter: blur(0);
   }
 }
 .animate-splash-cinematic-zoom {
-  animation: splashCinematicZoom 1.05s cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: splashCinematicZoom 0.85s cubic-bezier(0.16, 1, 0.3, 1) both;
+  transform-style: preserve-3d;
 }
 
 /* A brief, bright radial wash timed to hit right as the zoom above peaks
-   (both animations run 1.05s, and this one crests at ~62% — matching the
-   zoom's 60% overshoot point) — the "flash" beat that makes the reveal
-   feel like an impact instead of a fade. Fires once, never loops. */
+   (both animations now run 0.85s, and this one crests at ~57% — matching
+   the zoom's 55% overshoot point) — the "flash" beat that makes the
+   reveal feel like an impact instead of a fade. Fires once, never loops.
+   This fills the whole screen rectangle (inset-0), not a circle. */
 @keyframes splashFlashBurst {
   0%,
-  55% {
+  50% {
     opacity: 0;
   }
-  62% {
+  57% {
     opacity: 1;
   }
   100% {
@@ -1056,29 +1065,36 @@ animation: aiGlassSweep 5.5s linear infinite;
   }
 }
 .animate-splash-flash-burst {
-  animation: splashFlashBurst 1.05s ease-out both;
+  animation: splashFlashBurst 0.85s ease-out both;
 }
 
-/* One steady glow that ignites in sync with the zoom and then holds
-   still — deliberately NOT an infinite pulse/breathe loop, since ongoing
-   ambient motion is exactly what made the previous version feel busy
-   rather than premium. */
-@keyframes splashGlowIgnite {
+/* The logo shine: a diagonal white streak that sweeps once across the
+   logo's own footprint right as the flash fades, like light catching a
+   polished surface — the "crazy/premium" touch that replaces the old
+   glow circle, without introducing another circular shape. Fires once,
+   never loops, so it never turns into ambient decoration. */
+@keyframes splashLogoShine {
   0% {
+    transform: translateX(-140%);
     opacity: 0;
-    transform: scale(0.6);
   }
-  60% {
-    opacity: 0.85;
-    transform: scale(1.1);
+  8% {
+    opacity: 1;
+  }
+  42% {
+    opacity: 1;
+  }
+  58% {
+    transform: translateX(220%);
+    opacity: 0;
   }
   100% {
-    opacity: 0.55;
-    transform: scale(1);
+    transform: translateX(220%);
+    opacity: 0;
   }
 }
-.animate-splash-glow-ignite {
-  animation: splashGlowIgnite 1.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+.animate-splash-logo-shine {
+  animation: splashLogoShine 0.65s cubic-bezier(0.4, 0, 0.2, 1) 0.42s both;
 }
 
 @keyframes splashTaglineIn {
@@ -1094,30 +1110,116 @@ animation: aiGlassSweep 5.5s linear infinite;
   }
 }
 .animate-splash-tagline-in {
-  animation: splashTaglineIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.85s both;
+  animation: splashTaglineIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.66s both;
 }
 
 /* Users who've asked their OS/browser to reduce motion still get the logo
-   and tagline, just as a plain instant fade — no zoom punch, no flash. */
+   and tagline, just as a plain instant fade — no zoom punch, no flash, no
+   shine sweep. */
 @media (prefers-reduced-motion: reduce) {
   .animate-splash-cinematic-zoom,
   .animate-splash-flash-burst,
-  .animate-splash-glow-ignite,
+  .animate-splash-logo-shine,
   .animate-splash-tagline-in {
     animation: none;
   }
   .animate-splash-cinematic-zoom {
     opacity: 1;
+    transform: none;
+    filter: none;
   }
   .animate-splash-flash-burst {
     opacity: 0;
   }
-  .animate-splash-glow-ignite {
-    opacity: 0.4;
+  .animate-splash-logo-shine {
+    opacity: 0;
   }
   .animate-splash-tagline-in {
     opacity: 1;
     letter-spacing: 0.3em;
+  }
+}
+
+/* ---------- Site-wide announcement takeover (app/components/AnnouncementBanner.tsx) ---------- */
+@keyframes announcementFadeIn {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+.animate-announcement-fade-in {
+  animation: announcementFadeIn 0.35s ease-out both;
+}
+
+@keyframes announcementPopIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.9) translateY(10px);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1.02) translateY(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+.animate-announcement-pop-in {
+  animation: announcementPopIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) 0.05s both;
+}
+
+/* A believable "neon sign" flicker on the CTA button — irregular timing
+   (not a smooth sine pulse) is what makes it read as a flicker instead of
+   a breathing glow. Loops the whole time the overlay stays open, since
+   this is the one element on the page meant to keep pulling the eye
+   toward the admin's link. */
+@keyframes announcementFlicker {
+  0%,
+  100% {
+    filter: brightness(1);
+    box-shadow: 0 15px 35px rgba(249, 115, 22, 0.45), 0 0 0 rgba(255, 200, 60, 0);
+  }
+  4% {
+    filter: brightness(1.35);
+    box-shadow: 0 15px 35px rgba(249, 115, 22, 0.45), 0 0 22px rgba(255, 200, 60, 0.85);
+  }
+  8% {
+    filter: brightness(0.92);
+  }
+  12% {
+    filter: brightness(1.2);
+    box-shadow: 0 15px 35px rgba(249, 115, 22, 0.45), 0 0 16px rgba(255, 200, 60, 0.6);
+  }
+  16%,
+  45% {
+    filter: brightness(1);
+    box-shadow: 0 15px 35px rgba(249, 115, 22, 0.45), 0 0 0 rgba(255, 200, 60, 0);
+  }
+  50% {
+    filter: brightness(1.3);
+    box-shadow: 0 15px 35px rgba(249, 115, 22, 0.45), 0 0 20px rgba(255, 200, 60, 0.8);
+  }
+  54% {
+    filter: brightness(0.95);
+  }
+  58%,
+  100% {
+    filter: brightness(1);
+    box-shadow: 0 15px 35px rgba(249, 115, 22, 0.45), 0 0 0 rgba(255, 200, 60, 0);
+  }
+}
+.animate-announcement-flicker {
+  animation: announcementFlicker 3.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-announcement-fade-in,
+  .animate-announcement-pop-in,
+  .animate-announcement-flicker {
+    animation: none;
   }
 }
 

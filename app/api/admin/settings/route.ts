@@ -44,6 +44,9 @@ export async function PATCH(request: NextRequest) {
   if (typeof body.announcementText === "string") {
     partial.announcementText = body.announcementText.trim().slice(0, 200);
   }
+  if (typeof body.announcementLinkUrl === "string") {
+    partial.announcementLinkUrl = body.announcementLinkUrl.trim().slice(0, 500);
+  }
   if (typeof body.moderationEnabledComments === "boolean") {
     partial.moderationEnabledComments = body.moderationEnabledComments;
   }

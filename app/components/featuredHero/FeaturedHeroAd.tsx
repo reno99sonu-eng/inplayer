@@ -36,6 +36,22 @@ interface FeaturedHeroAdCreative {
 // blurred, zoomed copy of the same image fills the letterbox space behind
 // it so there's never an empty black bar, while the sharp foreground copy
 // always shows the whole, uncropped creative.
+//
+// The <a> wrapper is `absolute inset-0`, NOT `relative` + `h-full w-full`
+// like an earlier version had it. Reason: on mobile/sm/md this section is
+// sized by `min-h-[...]` only (no explicit `height` — see className
+// below), and a percentage height like `h-full` on an ordinary in-flow
+// child can't resolve against a parent whose height comes only from
+// min-height (the browser treats it as indeterminate/"auto"). With the
+// <a>'s own height stuck at "auto" and its only children being absolutely
+// positioned (which don't count toward auto-height), the two images
+// inside lost a reliable box to fill — producing exactly the
+// inconsistent "poster doesn't fit right" rendering Reno kept seeing on
+// mobile even after the object-contain fix above. Anchoring the <a>
+// itself with `absolute inset-0` against the section (which DOES have a
+// real, fully-resolved box once min-height is applied) removes that
+// ambiguity entirely — same technique FeaturedHeroVideo.tsx already uses
+// successfully for this exact "min-height-only on mobile" section.
 export default function FeaturedHeroAd({
   creative,
 }: {
@@ -82,7 +98,7 @@ export default function FeaturedHeroAd({
         target="_blank"
         rel="noopener noreferrer sponsored"
         onClick={handleClick}
-        className="group relative block h-full w-full"
+        className="group absolute inset-0 block h-full w-full"
       >
         {/* Blurred, scaled-up backdrop copy — fills the box completely so
             object-contain below never leaves a bare black gap on

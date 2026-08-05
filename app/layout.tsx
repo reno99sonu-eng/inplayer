@@ -47,14 +47,23 @@ export default async function RootLayout({
     duration-300
   `}
 >
-{/*
+{/* Applies the correct light/dark class to <html> BEFORE first paint —
+    must stay in sync with ThemeProvider.tsx's own resolveTheme() (same
+    "inplayer-theme" localStorage key, same 6:00-17:59 local-time daytime
+    window). Without this running, <html> carries no theme class until
+    ThemeProvider's client-side effect fires after hydration, so every
+    page — including the splash screen — briefly renders in the unprefixed
+    default (dark) styling and then visibly snaps to light on a
+    daytime/light-preference visit. This script was accidentally left
+    wrapped in a JSX comment (dead code that never rendered at all), which
+    was the actual cause of the dark-then-light flash Reno reported on the
+    splash logo — this is a real bug fix, not a re-decoration. */}
 <script
   dangerouslySetInnerHTML={{
     __html:
       '(function(){try{var t=localStorage.getItem("inplayer-theme");var r=(t==="light"||t==="dark")?t:((new Date().getHours()>=6&&new Date().getHours()<18)?"light":"dark");document.documentElement.classList.add(r);}catch(e){document.documentElement.classList.add("dark");}})();',
   }}
 />
-*/}
 <AuthProvider>
   <SettingsProvider>
     <ThemeProvider>

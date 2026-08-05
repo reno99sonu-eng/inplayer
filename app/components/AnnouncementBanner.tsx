@@ -4,15 +4,35 @@ import { useEffect, useState } from "react";
 import { X, Megaphone, ArrowUpRight } from "lucide-react";
 import { usePlatformSettings } from "@/app/hooks/usePlatformSettings";
 
-const DISMISS_KEY_PREFIX = "inplayer-announcement-dismissed:";
-
 // Real site-wide takeover, toggled from Admin Panel -> Platform Settings —
 // e.g. "Paid memberships are live" or a scheduled-downtime notice, shown
 // once as a full-screen premium overlay rather than a thin top strip.
-// Keyed by the announcement's own text + link so a dismissal only ever
-// hides THAT specific message: change either field in Settings and every
-// visitor sees the new one again, even if they dismissed an older one.
 //
+// Per Reno's feedback, dismissing this now only hides it for the current
+// page view — it does NOT persist across reloads or new visits. This used
+// to write a permanent "dismissed" flag to localStorage (keyed by the
+// announcement's own text+link), so the very first person to click the X
+// on a given browser would never see that announcement again on that
+// device, ever — Reno reported that as "only works once." Now there's
+// nothing saved anywhere: every fresh page load or visit shows the
+// announcement again for as long as it's switched on in Platform
+// Settings. The outer component below renders the actual overlay keyed by
+// the announcement's own text+link, so dismissing it only closes THAT
+// specific message for the current view (clicking around the site
+// client-side won't bring it back), but a live admin edit that changes
+// the text/link — or a fresh reload/visit — always starts undismissed.
+export default function AnnouncementBanner() {
+  const { settings } = usePlatformSettings();
+
+  const text = settings?.announcementText || "";
+  const linkUrl = settings?.announcementLinkUrl?.trim() || "";
+  const active = Boolean(settings?.announcementEnabled) && text.trim().length > 0;
+
+  if (!active) return null;
+
+  return <AnnouncementOverlay key={`${text}|${linkUrl}`} text={text} linkUrl={linkUrl} />;
+}
+
 // "Transparent" per Reno's request means the ENTIRE screen becomes a
 // translucent color-gradient wash — not a boxed card floating over a dim
 // backdrop (that read as "a small popup," per his follow-up feedback).
@@ -22,33 +42,14 @@ const DISMISS_KEY_PREFIX = "inplayer-announcement-dismissed:";
 // icon/headline/button sitting directly on that wash. Themed with
 // light:/dark: variants so it blends with the site's own gradient
 // language in both modes instead of one flat color.
-export default function AnnouncementBanner() {
-  const { settings } = usePlatformSettings();
+function AnnouncementOverlay({ text, linkUrl }: { text: string; linkUrl: string }) {
   const [dismissed, setDismissed] = useState(false);
-
-  const text = settings?.announcementText || "";
-  const linkUrl = settings?.announcementLinkUrl?.trim() || "";
-  const active = Boolean(settings?.announcementEnabled) && text.trim().length > 0;
-  const dismissKey = DISMISS_KEY_PREFIX + text + "|" + linkUrl;
-
-  useEffect(() => {
-    (() => {
-      if (!active) return;
-      try {
-        setDismissed(localStorage.getItem(dismissKey) === "1");
-      } catch {
-        setDismissed(false);
-      }
-    })();
-  }, [active, dismissKey]);
-
-  const visible = active && !dismissed;
 
   // Lock page scroll while the takeover is up, same pattern as
   // SplashScreen/LocationMapPicker — restored on dismiss or unmount so a
   // fast route change never leaves scrolling permanently disabled.
   useEffect(() => {
-    if (!visible) return;
+    if (dismissed) return;
     const previousBodyOverflow = document.body.style.overflow;
     const previousHtmlOverflow = document.documentElement.style.overflow;
     document.body.style.overflow = "hidden";
@@ -57,18 +58,11 @@ export default function AnnouncementBanner() {
       document.body.style.overflow = previousBodyOverflow;
       document.documentElement.style.overflow = previousHtmlOverflow;
     };
-  }, [visible]);
+  }, [dismissed]);
 
-  if (!visible) return null;
+  if (dismissed) return null;
 
-  const dismiss = () => {
-    try {
-      localStorage.setItem(dismissKey, "1");
-    } catch {
-      /* ignore — dismissal just won't persist across reloads */
-    }
-    setDismissed(true);
-  };
+  const dismiss = () => setDismissed(true);
 
   return (
     <div

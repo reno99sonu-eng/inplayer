@@ -1,9 +1,12 @@
 import FloatingAIButton from "./components/FloatingAIButton";
 import FeaturedHero from "./components/featuredHero/FeaturedHero";
+import FeaturedHeroAd from "./components/featuredHero/FeaturedHeroAd";
 import RecommendationFeed from "./components/RecommendationFeed";
 import AdBanner from "./components/AdBanner";
 import { getReadyVideos } from "./lib/videoStore";
 import { getFeaturedThisWeek } from "./lib/trendingStore";
+import { getPlatformSettings } from "./lib/platformSettings";
+import { getActiveAdCreative } from "./lib/adCreatives";
 import type { Recommendation } from "./data/recommendations";
 import type { Short } from "./data/shorts";
 import type { FeaturedSlide } from "./data/featuredSlides";
@@ -140,6 +143,52 @@ async function getFeaturedSlides(): Promise<FeaturedSlide[]> {
   }
 }
 
+interface HeroAdCreative {
+  adId: string;
+  imageUrl: string;
+  linkUrl: string;
+  title: string;
+}
+
+type HeroContent =
+  | { kind: "ad"; creative: HeroAdCreative }
+  | { kind: "videos"; slides: FeaturedSlide[] };
+
+// Decides what actually fills the homepage hero slot. Admin Panel ->
+// Advertising -> Weekly Featured Banner is a single ON/OFF switch
+// (weeklyFeaturedEnabled): OFF (default) keeps showing InPlayer's real
+// "top videos this week" carousel (FeaturedHero.tsx); ON swaps it for the
+// admin's own uploaded poster (FeaturedHeroAd.tsx) — the actual wiring
+// that placement was missing (previously nothing on the live site read
+// weeklyFeaturedEnabled or fetched a weekly_featured creative at all, so
+// anything uploaded there never appeared to a real visitor). If ON but
+// nothing's been uploaded/activated yet, this falls back to the real
+// videos rather than leaving the hero blank — an empty gap at the very
+// top of the homepage would be a worse first impression than showing real
+// content while the admin finishes setting the poster up.
+async function getHeroContent(): Promise<HeroContent> {
+  try {
+    const settings = await getPlatformSettings();
+    if (settings.weeklyFeaturedEnabled) {
+      const creative = await getActiveAdCreative("weekly_featured");
+      if (creative) {
+        return {
+          kind: "ad",
+          creative: {
+            adId: creative.adId,
+            imageUrl: creative.imageUrl,
+            linkUrl: creative.linkUrl,
+            title: creative.title,
+          },
+        };
+      }
+    }
+  } catch (err) {
+    console.error("Failed to resolve weekly featured hero content:", err);
+  }
+  return { kind: "videos", slides: await getFeaturedSlides() };
+}
+
 interface HomeProps {
   searchParams: Promise<{ view?: string }>;
 }
@@ -155,9 +204,11 @@ export default async function Home({ searchParams }: HomeProps) {
   // The hero only renders in horizontal view, so only fetch its data then —
   // no point paying for the extra query on the Shorts feed. Both fetches
   // run in parallel rather than sequentially.
-  const [{ realVideos, realShorts }, featuredSlides] = await Promise.all([
+  const [{ realVideos, realShorts }, heroContent] = await Promise.all([
     getRealContent(),
-    isVertical ? Promise.resolve<FeaturedSlide[]>([]) : getFeaturedSlides(),
+    isVertical
+      ? Promise.resolve<HeroContent>({ kind: "videos", slides: [] })
+      : getHeroContent(),
   ]);
 
   return (
@@ -207,7 +258,11 @@ export default async function Home({ searchParams }: HomeProps) {
               then videos again" rhythm lives in one place. */}
           {!isVertical && (
             <>
-              <FeaturedHero initialSlides={featuredSlides} />
+              {heroContent.kind === "ad" ? (
+                <FeaturedHeroAd creative={heroContent.creative} />
+              ) : (
+                <FeaturedHero initialSlides={heroContent.slides} />
+              )}
 
               <div className="mx-auto h-px w-[92%] bg-gradient-to-r from-transparent via-white/10 to-transparent light:via-black/10" />
             </>

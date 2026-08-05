@@ -11,7 +11,7 @@ import { AD_CREATIVES_TABLE, AdPlacement, getAllAdCreatives } from "@/app/lib/ad
 // picks one real active creative for that placement at random so
 // multiple uploads for the same slot rotate naturally instead of only
 // the newest one ever showing.
-const VALID_PLACEMENTS: AdPlacement[] = ["homepage", "watch", "homepage_spotlight"];
+const VALID_PLACEMENTS: AdPlacement[] = ["homepage", "watch", "homepage_spotlight", "weekly_featured"];
 
 export async function GET(request: NextRequest) {
   const placement = request.nextUrl.searchParams.get("placement") as AdPlacement | null;
@@ -20,11 +20,21 @@ export async function GET(request: NextRequest) {
   }
 
   const settings = await getPlatformSettings();
+  // "weekly_featured" isn't a house/adsense/off three-way slot like the
+  // others — Admin Panel -> Advertising -> Weekly Featured Banner is a
+  // single ON/OFF switch (weeklyFeaturedEnabled) that swaps the homepage
+  // hero between real Weekly Featured videos (OFF, default — see
+  // app/page.tsx / FeaturedHero.tsx) and an admin-uploaded poster (ON).
+  // There's no AdSense option for this slot, so ON always means "house".
   const source =
     placement === "homepage"
       ? settings.homepageBannerSource
       : placement === "watch"
       ? settings.watchPageBannerSource
+      : placement === "weekly_featured"
+      ? settings.weeklyFeaturedEnabled
+        ? "house"
+        : "off"
       : settings.homepageSpotlightSource;
 
   if (source === "off") {

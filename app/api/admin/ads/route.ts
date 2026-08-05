@@ -12,7 +12,7 @@ import {
   AdPlacement,
 } from "@/app/lib/adCreatives";
 
-const VALID_PLACEMENTS: AdPlacement[] = ["homepage", "watch", "homepage_spotlight"];
+const VALID_PLACEMENTS: AdPlacement[] = ["homepage", "watch", "homepage_spotlight", "weekly_featured"];
 
 export async function GET(request: NextRequest) {
   try {

@@ -1236,8 +1236,8 @@ function AdvertisingPage() {
               </div>
               <div className="rounded-xl border border-amber-500/30 light:border-amber-600/40 bg-amber-500/10 light:bg-amber-100/60 p-3 space-y-1">
                 <strong className="block text-white light:text-slate-900 font-bold">Weekly Featured Banner</strong>
-                <code className="inline-block rounded bg-red-500/20 light:bg-red-100 px-1.5 py-0.5 font-bold text-red-300 light:text-red-800">⚠ Not shown on the website yet</code>
-                <p className="text-[11px] text-slate-400 light:text-slate-600">This slot exists in the admin panel but there&apos;s no matching placement on the site yet — anything uploaded here won&apos;t be visible to visitors until that&apos;s built. Ask to have it wired up, or skip this tab for now.</p>
+                <code className="inline-block rounded bg-orange-500/20 light:bg-orange-100 px-1.5 py-0.5 font-bold text-orange-300 light:text-amber-900">10:1 on tablet/desktop · 16:9 on mobile</code>
+                <p className="text-[11px] text-slate-400 light:text-slate-600">Live at the very top of the homepage — this is the ON/OFF switch above, not a house/adsense/off picker. OFF (default) shows real Weekly Featured videos; ON swaps that whole slot for your uploaded poster below, at the exact same 1800 × 180 px / 10:1 size as the other banners. If ON with nothing active uploaded yet, the real videos show instead so the homepage never shows a blank gap.</p>
               </div>
               <div className="rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 p-3 space-y-1">
                 <strong className="block text-white light:text-slate-900 font-bold">Video Player Mid-Roll Ads</strong>

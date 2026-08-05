@@ -127,15 +127,49 @@ export interface TrendingCreator {
   windowViews: number;
 }
 
+// Powers the public homepage "Trending Creators" strip ONLY (see
+// app/api/trending/route.ts) — tries today's UTC calendar day first, same
+// as getTrendingToday, but progressively widens to a 3-day then 7-day
+// trailing window if that comes back empty, instead of returning nothing.
+// A single quiet UTC day (early in the day, a brief traffic dip, or an
+// extended stretch with maintenance mode on — see MaintenanceGate.tsx,
+// which blocks every non-admin visitor from watching anything, so no daily
+// views get recorded at all) used to make the whole strip vanish outright
+// with zero fallback, which read as "this feature is broken" even though
+// no code was wrong — there just wasn't a single real view yet today.
+// Deliberately NOT used by Admin Panel -> Analytics' own "today" stat
+// (getTrendingToday, called directly there) — that number needs to mean
+// literally today, not a rolling window.
+async function rankedVideosForTrendingCreators(limit: number): Promise<RankedVideo[]> {
+  const today = await getTrendingToday(limit);
+  if (today.length > 0) return today;
+
+  const last3Days = Array.from({ length: 3 }, (_, i) => {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - i);
+    return dateKey(d);
+  });
+  const recentFew = await rankByWindow(last3Days, limit);
+  if (recentFew.length > 0) return recentFew;
+
+  const last7Days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date();
+    d.setUTCDate(d.getUTCDate() - i);
+    return dateKey(d);
+  });
+  return rankByWindow(last7Days, limit);
+}
+
 // The Trending algorithm deliberately stays video-based: each video's views
-// are still calculated from today's daily-view bucket. This presentation
+// are still calculated from real daily-view buckets (today, widening only
+// if needed — see rankedVideosForTrendingCreators above). This presentation
 // groups those ranked videos by uploader, so one creator with several popular
 // videos is ranked by their combined real momentum rather than by a made-up
 // profile metric. Profiles are hydrated in one BatchGet, avoiding N+1 reads.
-export async function getTrendingCreatorsToday(
+export async function getTrendingCreators(
   limit = 20
 ): Promise<TrendingCreator[]> {
-  const rankedVideos = await getTrendingToday(60);
+  const rankedVideos = await rankedVideosForTrendingCreators(60);
   const creators = new Map<
     string,
     { name: string; avatarUrl: string | null; windowViews: number }

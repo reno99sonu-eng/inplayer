@@ -6,7 +6,6 @@ import {
   VENDORS_TABLE,
   VENDOR_KYC_DOCUMENTS_TABLE,
   vendorKycDocTypesFor,
-  type VendorKycStatus,
   type VendorKycDocType,
 } from "@/app/lib/hammartVendors";
 import { resolveUsernames } from "@/app/lib/resolveUsernames";
@@ -30,32 +29,58 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
+  const TABS = ["pending_review", "verified", "rejected", "not_started", "all"] as const;
+  type Tab = (typeof TABS)[number];
   const tabParam = request.nextUrl.searchParams.get("tab");
-  const status: VendorKycStatus =
-    tabParam === "verified" || tabParam === "rejected" ? tabParam : "pending_review";
+  const tab: Tab = (TABS as readonly string[]).includes(tabParam || "")
+    ? (tabParam as Tab)
+    : "pending_review";
 
-  const items: Record<string, unknown>[] = [];
+  // One unfiltered scan instead of a per-tab FilterExpression — needed so
+  // `counts` below can report accurate totals for EVERY kyc status in a
+  // single request, not just whichever tab happens to be open. Without
+  // this, a vendor who registered a storefront but never submitted KYC
+  // (kycStatus === "not_started") had NO tab at all that would ever show
+  // them — the old filter only recognized "pending_review" / "verified" /
+  // "rejected" — so that vendor was completely invisible here regardless
+  // of which tab you checked. A verified vendor (the only kycStatus a
+  // vendor can have while their listings are actually live — see
+  // app/api/hammart/products/route.ts's kycStatus check) was always
+  // findable under "Verified", but with no visible counts anywhere it was
+  // easy to only ever look at the default "Pending" tab and conclude the
+  // vendor didn't exist here at all.
+  const allItems: Record<string, unknown>[] = [];
   try {
     let exclusiveStartKey: Record<string, unknown> | undefined;
     do {
       const result = await docClient.send(
-        new ScanCommand({
-          TableName: VENDORS_TABLE,
-          FilterExpression: "kycStatus = :status",
-          ExpressionAttributeValues: { ":status": status },
-          ExclusiveStartKey: exclusiveStartKey,
-        })
+        new ScanCommand({ TableName: VENDORS_TABLE, ExclusiveStartKey: exclusiveStartKey })
       );
-      items.push(...((result.Items || []) as Record<string, unknown>[]));
+      allItems.push(...((result.Items || []) as Record<string, unknown>[]));
       exclusiveStartKey = result.LastEvaluatedKey;
     } while (exclusiveStartKey);
   } catch (err) {
     console.error("admin/hammart-vendors: scan failed (table may not exist yet):", err);
-    return NextResponse.json({ items: [], tableMissing: true });
+    return NextResponse.json({ items: [], tableMissing: true, counts: {} });
   }
 
+  const kycStatusOf = (item: Record<string, unknown>): string =>
+    (item.kycStatus as string) || "not_started";
+
+  const counts = { pending_review: 0, verified: 0, rejected: 0, not_started: 0 };
+  for (const item of allItems) {
+    const s = kycStatusOf(item);
+    if (s in counts) counts[s as keyof typeof counts] += 1;
+  }
+
+  const items = tab === "all" ? allItems : allItems.filter((item) => kycStatusOf(item) === tab);
+
+  // Fall back to createdAt for the sort key — a "not_started" vendor has
+  // never submitted KYC, so submittedAt is always empty for them.
   items.sort(
-    (a, b) => new Date((b.submittedAt as string) || 0).getTime() - new Date((a.submittedAt as string) || 0).getTime()
+    (a, b) =>
+      new Date((b.submittedAt as string) || (b.createdAt as string) || 0).getTime() -
+      new Date((a.submittedAt as string) || (a.createdAt as string) || 0).getTime()
   );
 
   const usernames = await resolveUsernames(items.map((i) => i.userId as string));
@@ -96,7 +121,7 @@ export async function GET(request: NextRequest) {
       const vendorId = (item.vendorId as string) || "";
       const businessType = (item.businessType as "individual" | "business") || "individual";
       let documents: Record<string, string> = {};
-      if (status === "pending_review") {
+      if (kycStatusOf(item) === "pending_review") {
         try {
           const docsResult = await docClient.send(
             new QueryCommand({
@@ -120,6 +145,7 @@ export async function GET(request: NextRequest) {
         userId,
         username: usernames.get(userId) || null,
         vendorId: item.vendorId || null,
+        kycStatus: kycStatusOf(item),
         businessType,
         businessName: item.businessName || null,
         legalName: item.legalName || null,
@@ -137,6 +163,7 @@ export async function GET(request: NextRequest) {
         state: item.state || null,
         pincode: item.pincode || null,
         submittedAt: item.submittedAt || null,
+        createdAt: item.createdAt || null,
         reviewedAt: item.reviewedAt || null,
         reviewedBy: item.reviewedBy || null,
         rejectionReason: item.rejectionReason || null,
@@ -149,7 +176,7 @@ export async function GET(request: NextRequest) {
     })
   );
 
-  return NextResponse.json({ items: withDocs });
+  return NextResponse.json({ items: withDocs, counts });
 }
 
 export async function POST(request: NextRequest) {

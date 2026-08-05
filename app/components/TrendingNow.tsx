@@ -233,7 +233,7 @@ export default function TrendingNow() {
       <div className="mb-1.5 flex items-end justify-between lg:mb-2">
         <div>
           <span className="rounded-full border border-red-500/20 bg-red-500/10 px-2 lg:px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.2em] text-red-300 light:text-red-600 backdrop-blur-sm">
-            Trending today
+            Trending now
           </span>
 
           <h2 className="mt-0.5 text-base lg:text-lg font-black tracking-tight text-white light:text-slate-900">

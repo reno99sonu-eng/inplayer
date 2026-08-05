@@ -16,12 +16,17 @@ import {
   RotateCcw,
 } from "lucide-react";
 
-type Tab = "pending_review" | "verified" | "rejected";
+type Tab = "pending_review" | "verified" | "rejected" | "not_started" | "all";
 
 interface VendorKyc {
   userId: string;
   username: string | null;
   vendorId: string | null;
+  // Present on every row now (see app/api/admin/hammart-vendors/route.ts) so
+  // the "All" tab can tell rows apart, and so a card can be judged on its
+  // own real status instead of assuming every card on screen shares
+  // whatever tab is currently selected.
+  kycStatus: "not_started" | "pending_review" | "verified" | "rejected";
   businessType: "individual" | "business";
   businessName: string | null;
   legalName: string | null;
@@ -39,6 +44,7 @@ interface VendorKyc {
   state: string | null;
   pincode: string | null;
   submittedAt: string | null;
+  createdAt?: string | null;
   reviewedAt: string | null;
   reviewedBy: string | null;
   rejectionReason: string | null;
@@ -94,6 +100,21 @@ export default function AdminHammartVendorsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [tableMissing, setTableMissing] = useState(false);
+  // Real counts across EVERY kyc status, refreshed on every load regardless
+  // of which tab is open — shown as badges on the tab buttons below so a
+  // vendor sitting in a tab you're not currently viewing is never
+  // invisible. This is what actually fixes "the vendor has no visible
+  // record here" reports: most of the time the vendor is exactly where
+  // they should be (Verified, since that's required before any listing can
+  // go live — see app/api/hammart/products/route.ts), just not on the
+  // Pending tab this page used to open on by default with no indication
+  // there was anyone to see elsewhere.
+  const [counts, setCounts] = useState<Record<string, number>>({
+    pending_review: 0,
+    verified: 0,
+    rejected: 0,
+    not_started: 0,
+  });
   const [busyId, setBusyId] = useState<string | null>(null);
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
@@ -122,6 +143,9 @@ export default function AdminHammartVendorsPage() {
       const data = await res.json();
       setItems(data.items || []);
       setTableMissing(Boolean(data.tableMissing));
+      if (data.counts) {
+        setCounts((prev) => ({ ...prev, ...data.counts }));
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -174,25 +198,36 @@ export default function AdminHammartVendorsPage() {
         </p>
       </div>
 
-      <div className="mt-4 flex items-center gap-2">
+      <div className="mt-4 flex flex-wrap items-center gap-2">
         {(
           [
             { key: "pending_review", label: "Pending" },
             { key: "verified", label: "Verified" },
             { key: "rejected", label: "Rejected" },
+            { key: "not_started", label: "Not started" },
+            { key: "all", label: "All vendors" },
           ] as { key: Tab; label: string }[]
         ).map((t) => (
           <button
             key={t.key}
             type="button"
             onClick={() => setTab(t.key)}
-            className={`rounded-full px-4 py-1.5 text-xs font-bold transition ${
+            className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${
               tab === t.key
                 ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
                 : "bg-white/5 text-slate-400 light:text-slate-700 light:bg-slate-200/80 hover:bg-white/10 hover:text-white light:hover:text-slate-900"
             }`}
           >
             {t.label}
+            {t.key !== "all" && (
+              <span
+                className={`rounded-full px-1.5 py-0.5 text-[10px] font-black ${
+                  tab === t.key ? "bg-white/20 text-white" : "bg-white/10 light:bg-black/10 text-slate-400 light:text-slate-700"
+                }`}
+              >
+                {counts[t.key] ?? 0}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -229,7 +264,13 @@ export default function AdminHammartVendorsPage() {
         <div className="mt-8 flex flex-col items-center gap-2 py-8 text-center">
           <ShieldCheck size={28} className="text-emerald-500" />
           <p className="text-sm font-semibold text-slate-400 light:text-slate-700">
-            {query ? `Nothing matches "${query}".` : tab === "pending_review" ? "Nothing waiting on review." : "Nothing here yet."}
+            {query
+              ? `Nothing matches "${query}".`
+              : tab === "pending_review"
+              ? "Nothing waiting on review."
+              : tab === "all"
+              ? "No vendor accounts yet."
+              : "Nothing here yet."}
           </p>
         </div>
       ) : (
@@ -240,6 +281,21 @@ export default function AdminHammartVendorsPage() {
                 <div>
                   <p className="flex items-center gap-1.5 text-sm font-bold text-white light:text-slate-900">
                     <Store size={13} className="text-indigo-500 light:text-indigo-600" /> {v.vendorId || "(no vendor id)"}
+                    {tab === "all" && (
+                      <span
+                        className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase ${
+                          v.kycStatus === "verified"
+                            ? "bg-emerald-500/15 text-emerald-300 light:text-emerald-700"
+                            : v.kycStatus === "rejected"
+                            ? "bg-red-500/15 text-red-300 light:text-red-700"
+                            : v.kycStatus === "pending_review"
+                            ? "bg-amber-500/15 text-amber-300 light:text-amber-700"
+                            : "bg-white/10 text-slate-400 light:text-slate-600"
+                        }`}
+                      >
+                        {v.kycStatus.replace("_", " ")}
+                      </span>
+                    )}
                     {v.suspended && (
                       <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-black uppercase text-red-300 light:text-red-700">Suspended</span>
                     )}
@@ -287,26 +343,30 @@ export default function AdminHammartVendorsPage() {
                     </Link>
                   )}
                 </div>
-                {v.submittedAt && (
+                {v.submittedAt ? (
                   <span className="text-[11px] text-slate-500">Submitted {new Date(v.submittedAt).toLocaleDateString("en-IN")}</span>
-                )}
+                ) : v.createdAt ? (
+                  <span className="text-[11px] text-slate-500">Joined {new Date(v.createdAt).toLocaleDateString("en-IN")}</span>
+                ) : null}
               </div>
 
               {v.rejectionReason && (
                 <p className="mt-2 rounded-lg bg-red-500/10 px-2.5 py-1.5 text-[11px] text-red-300">Rejected: &quot;{v.rejectionReason}&quot;</p>
               )}
 
-              {tab === "pending_review" ? (
+              {v.kycStatus === "pending_review" ? (
                 <div className="mt-3 flex flex-wrap gap-3">
                   {Object.entries(v.businessType === "business" ? DOC_LABELS_BUSINESS : DOC_LABELS_INDIVIDUAL).map(([key, label]) => (
                     <DocThumb key={key} label={label} src={v.documents[key]} />
                   ))}
                 </div>
-              ) : tab === "verified" ? (
+              ) : v.kycStatus === "verified" || v.kycStatus === "rejected" ? (
                 <p className="mt-3 text-[11px] italic text-slate-600">Documents and address were purged automatically after this review.</p>
-              ) : null}
+              ) : (
+                <p className="mt-3 text-[11px] italic text-slate-600">Hasn&apos;t submitted business verification (KYC) yet.</p>
+              )}
 
-              {tab === "pending_review" && (
+              {v.kycStatus === "pending_review" && (
                 <div className="mt-3">
                   {rejectingId === v.userId ? (
                     <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
@@ -363,7 +423,7 @@ export default function AdminHammartVendorsPage() {
                 </div>
               )}
 
-              {tab === "verified" && (
+              {v.kycStatus === "verified" && (
                 <div className="mt-3">
                   {v.suspended ? (
                     <button

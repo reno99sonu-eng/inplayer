@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import type { TrendingCreator } from "@/app/data/trending";
-import { getTrendingCreatorsToday } from "@/app/lib/trendingStore";
+import { getTrendingCreators } from "@/app/lib/trendingStore";
 
 export async function GET() {
-  const creators = await getTrendingCreatorsToday(20);
+  const creators = await getTrendingCreators(20);
 
   return NextResponse.json({
     count: creators.length,

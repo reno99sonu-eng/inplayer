@@ -286,7 +286,19 @@ function AdvertisingPage() {
     setSaved(false);
   };
 
-  const saveSettings = async () => {
+  // Every ON/OFF toggle on this page calls updateSettings() then
+  // immediately saveSettings() in the same click handler. setSettings()
+  // is async — React hasn't re-rendered yet by the time saveSettings()
+  // runs, so reading the `settings` closure at that point still returns
+  // the value from BEFORE the click. Without an explicit override, the
+  // very first click after any change would silently PATCH the OLD
+  // value to the server (the toggle still LOOKS flipped locally, but the
+  // saved state doesn't actually change until some later save catches
+  // up) — exactly the kind of "looks like it worked, didn't actually
+  // save" bug the "no dummy things" standard rules out. Every auto-save
+  // call site below now computes the next settings object itself and
+  // passes it here explicitly instead of relying on this closure.
+  const saveSettings = async (override?: AdSettings) => {
     if (saving) return;
     setSaving(true);
     setError(null);
@@ -295,7 +307,7 @@ function AdvertisingPage() {
       const res = await authedFetch("/api/admin/settings", {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(settings),
+        body: JSON.stringify(override || settings),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `Couldn't save settings (HTTP ${res.status}).`);
@@ -800,8 +812,10 @@ function AdvertisingPage() {
                 <button
                   type="button"
                   onClick={() => {
-                    updateSettings("weeklyFeaturedEnabled", !settings.weeklyFeaturedEnabled);
-                    saveSettings();
+                    const next = { ...settings, weeklyFeaturedEnabled: !settings.weeklyFeaturedEnabled };
+                    setSettings(next);
+                    setSaved(false);
+                    saveSettings(next);
                   }}
                   className={`rounded-full px-3.5 py-1 text-xs font-bold transition ${
                     settings.weeklyFeaturedEnabled
@@ -818,9 +832,15 @@ function AdvertisingPage() {
                       key={src}
                       type="button"
                       onClick={() => {
-                        if (activePanel === "homepage") updateSettings("homepageBannerSource", src);
-                        if (activePanel === "watch") updateSettings("watchPageBannerSource", src);
-                        saveSettings();
+                        const next =
+                          activePanel === "homepage"
+                            ? { ...settings, homepageBannerSource: src }
+                            : activePanel === "watch"
+                            ? { ...settings, watchPageBannerSource: src }
+                            : settings;
+                        setSettings(next);
+                        setSaved(false);
+                        saveSettings(next);
                       }}
                       className={`rounded-full px-3 py-1 text-xs font-bold transition capitalize ${
                         (activePanel === "homepage" && settings.homepageBannerSource === src) ||
@@ -1020,8 +1040,10 @@ function AdvertisingPage() {
               <button
                 type="button"
                 onClick={() => {
-                  updateSettings("midrollEnabled", !settings.midrollEnabled);
-                  saveSettings();
+                  const next = { ...settings, midrollEnabled: !settings.midrollEnabled };
+                  setSettings(next);
+                  setSaved(false);
+                  saveSettings(next);
                 }}
                 className={`rounded-full px-3.5 py-1 text-xs font-bold transition ${
                   settings.midrollEnabled
@@ -1202,7 +1224,7 @@ function AdvertisingPage() {
               />
               <button
                 type="button"
-                onClick={saveSettings}
+                onClick={() => saveSettings()}
                 disabled={saving}
                 className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-50 cursor-pointer"
               >

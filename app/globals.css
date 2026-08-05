@@ -999,103 +999,86 @@ animation: aiGlassSweep 5.5s linear infinite;
 }
 
 /* ---------- Intro splash screen (app/components/SplashScreen.tsx) ---------- */
-/* Shown once per fresh page load, before the site's own already-rendered
-   content is revealed. The fade-OUT is a plain Tailwind opacity transition
-   driven by React state (see SplashScreen.tsx); everything below is the
-   fade-IN burst, which autoplays the moment each element mounts so it needs
-   no JS timing of its own. */
+/* Reworked into a Netflix/Disney+-style cinematic ident: one controlled,
+   punchy beat (dim → rapid zoom → bright flash → settle) instead of
+   ongoing ambient motion (the old particle/spin/multi-glow version read as
+   "decorative" rather than premium). The fade-OUT is a plain Tailwind
+   opacity transition driven by React state (see SplashScreen.tsx);
+   everything below is the fade-IN sequence, which autoplays the moment
+   each element mounts so it needs no JS timing of its own. */
 
-@keyframes splashLogoIn {
+/* The logo's zoom: starts tiny, dim and blurred like it's powering on,
+   rockets past its final size (the overshoot to 1.22 is the "impact"
+   moment the flash burst below is timed against), then settles with a
+   small bounce-back — same cubic-bezier overshoot curve used elsewhere in
+   this file for a consistent feel, just tuned punchier and faster. */
+@keyframes splashCinematicZoom {
   0% {
     opacity: 0;
-    transform: scale(0.35) rotate(-14deg);
-    filter: blur(6px);
+    transform: scale(0.15);
+    filter: blur(10px);
   }
-  55% {
+  35% {
     opacity: 1;
-    transform: scale(1.08) rotate(3deg);
+    filter: blur(2px);
+  }
+  60% {
+    transform: scale(1.22);
     filter: blur(0);
   }
-  75% {
-    transform: scale(0.97) rotate(-1deg);
+  80% {
+    transform: scale(0.96);
   }
   100% {
     opacity: 1;
-    transform: scale(1) rotate(0deg);
-    filter: blur(0);
-  }
-}
-.animate-splash-logo-in {
-  animation: splashLogoIn 1.4s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-@keyframes splashGlowPulse {
-  0%,
-  100% {
-    opacity: 0.45;
     transform: scale(1);
-  }
-  50% {
-    opacity: 0.85;
-    transform: scale(1.18);
+    filter: blur(0);
   }
 }
-.animate-splash-glow-pulse {
-  animation: splashGlowPulse 2.6s ease-in-out infinite;
+.animate-splash-cinematic-zoom {
+  animation: splashCinematicZoom 1.05s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-/* Second glow layer behind the splash logo (see SplashScreen.tsx) — same
-   pulsing shape as the primary orange glow but on its own opacity/scale
-   curve and offset position, so the warm and cool color layers don't pulse
-   in lockstep. That's what makes the backdrop read as alive and multi-hued
-   rather than a single orange blob breathing in and out. */
-@keyframes splashGlowPulseAlt {
+/* A brief, bright radial wash timed to hit right as the zoom above peaks
+   (both animations run 1.05s, and this one crests at ~62% — matching the
+   zoom's 60% overshoot point) — the "flash" beat that makes the reveal
+   feel like an impact instead of a fade. Fires once, never loops. */
+@keyframes splashFlashBurst {
   0%,
-  100% {
-    opacity: 0.3;
-    transform: scale(0.92);
+  55% {
+    opacity: 0;
   }
-  50% {
-    opacity: 0.7;
-    transform: scale(1.12);
-  }
-}
-.animate-splash-glow-pulse-alt {
-  animation: splashGlowPulseAlt 3.1s ease-in-out infinite;
-}
-
-/* Slowly cycles the spinning accent ring's hue through the brand's
-   warm-to-pink range instead of sitting at one flat orange the whole time. */
-@keyframes splashHueCycle {
-  0% {
-    filter: hue-rotate(0deg);
-  }
-  50% {
-    filter: hue-rotate(45deg);
+  62% {
+    opacity: 1;
   }
   100% {
-    filter: hue-rotate(0deg);
+    opacity: 0;
   }
 }
-.animate-splash-hue-cycle {
-  animation: splashHueCycle 3.2s ease-in-out infinite;
+.animate-splash-flash-burst {
+  animation: splashFlashBurst 1.05s ease-out both;
 }
 
-@keyframes splashRingSpin {
+/* One steady glow that ignites in sync with the zoom and then holds
+   still — deliberately NOT an infinite pulse/breathe loop, since ongoing
+   ambient motion is exactly what made the previous version feel busy
+   rather than premium. */
+@keyframes splashGlowIgnite {
   0% {
     opacity: 0;
-    transform: rotate(0deg) scale(0.8);
+    transform: scale(0.6);
   }
-  20% {
-    opacity: 0.9;
+  60% {
+    opacity: 0.85;
+    transform: scale(1.1);
   }
   100% {
     opacity: 0.55;
-    transform: rotate(360deg) scale(1);
+    transform: scale(1);
   }
 }
-.animate-splash-ring-spin {
-  animation: splashRingSpin 3.2s cubic-bezier(0.16, 1, 0.3, 1) infinite;
+.animate-splash-glow-ignite {
+  animation: splashGlowIgnite 1.3s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
 @keyframes splashTaglineIn {
@@ -1107,49 +1090,34 @@ animation: aiGlassSweep 5.5s linear infinite;
   100% {
     opacity: 1;
     transform: translateY(0);
-    letter-spacing: 0.12em;
+    letter-spacing: 0.3em;
   }
 }
 .animate-splash-tagline-in {
-  animation: splashTaglineIn 0.9s cubic-bezier(0.16, 1, 0.3, 1) 0.75s both;
-}
-
-@keyframes splashParticleDrift {
-  0% {
-    opacity: 0;
-    transform: translate(0, 0) scale(0.6);
-  }
-  30% {
-    opacity: 1;
-  }
-  100% {
-    opacity: 0;
-    transform: translate(var(--splash-particle-x, 40px), var(--splash-particle-y, -60px)) scale(1);
-  }
-}
-.animate-splash-particle {
-  animation: splashParticleDrift 2.4s ease-out infinite;
+  animation: splashTaglineIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.85s both;
 }
 
 /* Users who've asked their OS/browser to reduce motion still get the logo
-   and tagline, just as a plain fade — no spin, no scale punch, no drifting
-   particles. */
+   and tagline, just as a plain instant fade — no zoom punch, no flash. */
 @media (prefers-reduced-motion: reduce) {
-  .animate-splash-logo-in,
-  .animate-splash-glow-pulse,
-  .animate-splash-glow-pulse-alt,
-  .animate-splash-hue-cycle,
-  .animate-splash-ring-spin,
-  .animate-splash-tagline-in,
-  .animate-splash-particle {
+  .animate-splash-cinematic-zoom,
+  .animate-splash-flash-burst,
+  .animate-splash-glow-ignite,
+  .animate-splash-tagline-in {
     animation: none;
   }
-  .animate-splash-logo-in {
+  .animate-splash-cinematic-zoom {
     opacity: 1;
+  }
+  .animate-splash-flash-burst {
+    opacity: 0;
+  }
+  .animate-splash-glow-ignite {
+    opacity: 0.4;
   }
   .animate-splash-tagline-in {
     opacity: 1;
-    letter-spacing: 0.12em;
+    letter-spacing: 0.3em;
   }
 }
 

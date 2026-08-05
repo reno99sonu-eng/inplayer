@@ -2,37 +2,27 @@
 
 import { useEffect, useState } from "react";
 
-// The "opening the app" moment Reno asked for: the InPlayer mark + tagline
-// fade/pop in over an animated glow, hold for a beat, then fade out to
-// reveal the real site underneath. The real site is already mounted behind
-// this overlay the whole time (SiteChrome renders {children} in parallel,
-// not after this unmounts) — this is purely a visual curtain, so it never
-// delays hydration, data fetching, or first paint of the actual page.
+// Reworked per Reno's feedback: the previous version (glowing particles,
+// spinning ring, multi-color drift) read as "decorative," not premium. This
+// is a Netflix/Disney+-style cinematic ident instead — one bold, controlled
+// moment (dim → rapid zoom → bright flash → settle) rather than ongoing
+// ambient motion. Always renders on a near-black stage regardless of the
+// site's own light/dark theme, the same way streaming-app splash idents
+// always cut to black first — a bright cream backdrop would wash out the
+// zoom/flash entirely and undercut the exact "punchy" effect being asked
+// for here, so this is a deliberate, one-off exception to the app's normal
+// theme-follows-site rule.
+//
+// The real site is already mounted behind this overlay the whole time
+// (SiteChrome renders {children} in parallel, not after this unmounts) —
+// this is purely a visual curtain, so it never delays hydration, data
+// fetching, or first paint of the actual page.
 //
 // Shows once per FRESH page load. SiteChrome (and this component inside
 // it) is mounted once at the root of the app and stays mounted across
-// client-side navigations between pages, so this naturally does not
-// re-trigger every time someone clicks around the site — only on an actual
-// full load/refresh, which matches "when someone opens inplayer website."
-//
-// Every particle position below is a fixed, hand-picked value (not
-// Math.random()) on purpose: this is a client component, and randomizing
-// on every render would make the server-rendered markup and the first
-// client render disagree, which React flags as a hydration mismatch.
-// Each particle now also carries a color so the burst reads as multi-hued
-// (orange/pink/violet) instead of a single flat orange tone — alternating
-// down the list keeps the mix visually even in both corners of the screen.
-const PARTICLES = [
-  { top: "22%", left: "28%", x: "-46px", y: "-58px", delay: "0s", size: 6, color: "bg-orange-300 light:bg-orange-500" },
-  { top: "30%", left: "72%", x: "54px", y: "-40px", delay: "0.3s", size: 5, color: "bg-pink-300 light:bg-pink-500" },
-  { top: "68%", left: "24%", x: "-38px", y: "50px", delay: "0.6s", size: 5, color: "bg-violet-300 light:bg-violet-500" },
-  { top: "72%", left: "76%", x: "42px", y: "56px", delay: "0.15s", size: 4, color: "bg-amber-300 light:bg-amber-500" },
-  { top: "50%", left: "12%", x: "-60px", y: "6px", delay: "0.45s", size: 4, color: "bg-rose-300 light:bg-rose-500" },
-  { top: "48%", left: "88%", x: "60px", y: "-4px", delay: "0.75s", size: 4, color: "bg-orange-300 light:bg-orange-500" },
-  { top: "38%", left: "50%", x: "0px", y: "-70px", delay: "0.9s", size: 3, color: "bg-fuchsia-300 light:bg-fuchsia-500" },
-  { top: "60%", left: "50%", x: "0px", y: "70px", delay: "1.05s", size: 3, color: "bg-amber-200 light:bg-amber-400" },
-];
-
+// client-side navigations, so this naturally does not re-trigger every
+// time someone clicks around the site — only on an actual full
+// load/refresh.
 const TAGLINE = "The Future of Entertainment";
 
 export default function SplashScreen() {
@@ -46,17 +36,12 @@ export default function SplashScreen() {
       typeof window !== "undefined" &&
       window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
-    // Reduced-motion visitors get a quick, plain fade instead of the full
-    // multi-second animated sequence — same content, far less time on
-    // screen, no spinning/drifting elements (those are also disabled via
-    // the prefers-reduced-motion CSS block in globals.css).
-    //
-    // Slowed down and given a longer, gentler fade-out per Reno's feedback
-    // that the previous timing (1.65s hold + 0.7s fade) felt rushed — the
-    // intro now holds noticeably longer and eases out over a full second
-    // instead of snapping away.
-    const holdMs = reducedMotion ? 500 : 2500;
-    const fadeOutMs = reducedMotion ? 250 : 1000;
+    // Tight and punchy on purpose — a cinematic ident earns its keep by
+    // being short and bold, not by lingering. The 1.05s zoom/flash
+    // animation (see globals.css) plays out, holds fully revealed for a
+    // beat, then cuts out fast — no slow ambient fade like before.
+    const holdMs = reducedMotion ? 400 : 1750;
+    const fadeOutMs = reducedMotion ? 200 : 450;
 
     // Lock scroll while the curtain is up so the already-rendered page
     // underneath can't be scrolled/interacted with mid-animation. Restored
@@ -94,56 +79,33 @@ export default function SplashScreen() {
   return (
     <div
       aria-hidden="true"
-      className={`fixed inset-0 z-[999999] flex items-center justify-center overflow-hidden bg-[#05070D] light:bg-[#F1E7D0] transition-opacity duration-1000 ease-out ${
+      className={`fixed inset-0 z-[999999] flex items-center justify-center overflow-hidden bg-[#020203] transition-opacity duration-[450ms] ease-out ${
         leaving ? "pointer-events-none opacity-0" : "opacity-100"
       }`}
     >
-      {/* Ambient glow behind the mark — two overlapping, differently-hued
-          blurs (warm orange + a cooler violet/pink layer) pulsing slightly
-          out of phase, so the backdrop reads as genuinely colorful instead
-          of a single flat orange wash. */}
-      <div className="animate-splash-glow-pulse pointer-events-none absolute h-[340px] w-[340px] rounded-full bg-orange-500/30 blur-[90px] light:bg-orange-400/25 sm:h-[460px] sm:w-[460px]" />
-      <div className="animate-splash-glow-pulse-alt pointer-events-none absolute h-[300px] w-[300px] translate-x-16 -translate-y-6 rounded-full bg-fuchsia-500/20 blur-[100px] light:bg-fuchsia-400/15 sm:h-[400px] sm:w-[400px]" />
-      <div className="animate-splash-glow-pulse-alt pointer-events-none absolute h-[280px] w-[280px] -translate-x-16 translate-y-10 rounded-full bg-violet-500/20 blur-[100px] light:bg-violet-400/15 sm:h-[380px] sm:w-[380px]" style={{ animationDelay: "0.6s" }} />
+      {/* One steady ignition glow behind the mark — ramps in once with the
+          zoom, then holds still. No breathing/pulsing loop: constant
+          ambient motion is exactly the "decorative" feeling this replaces. */}
+      <div className="animate-splash-glow-ignite pointer-events-none absolute h-[320px] w-[320px] rounded-full bg-orange-500/35 blur-[100px] sm:h-[480px] sm:w-[480px]" />
 
-      {/* Spinning accent ring, now slowly cycling hue so it doesn't stay a
-          single flat orange for the whole intro */}
-      <div className="animate-splash-ring-spin animate-splash-hue-cycle pointer-events-none absolute h-[220px] w-[220px] rounded-full border-2 border-dashed border-orange-400/40 sm:h-[300px] sm:w-[300px]" />
-
-      {/* Drifting multi-color particles */}
-      {PARTICLES.map((particle, index) => (
-        <span
-          key={index}
-          className={`animate-splash-particle pointer-events-none absolute rounded-full ${particle.color}`}
-          style={
-            {
-              top: particle.top,
-              left: particle.left,
-              width: particle.size,
-              height: particle.size,
-              animationDelay: particle.delay,
-              "--splash-particle-x": particle.x,
-              "--splash-particle-y": particle.y,
-            } as React.CSSProperties
-          }
-        />
-      ))}
+      {/* The flash burst — a brief, bright wash timed to hit exactly when
+          the logo's zoom peaks, like a camera flash / lens flare at the
+          moment of impact. This is the single "punchy" beat the whole
+          ident is built around. */}
+      <div className="animate-splash-flash-burst pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(255,255,255,0.9)_0%,rgba(255,166,0,0.55)_35%,rgba(255,166,0,0)_70%)]" />
 
       <div className="relative flex flex-col items-center px-6 text-center">
+        {/* Always the dark/white-wordmark asset — the stage is always
+            near-black now regardless of site theme, so there's no light
+            variant to swap to here anymore. */}
         <img
           src="/logos/inplayer-mark-dark.png"
           alt="INPLAYER"
           draggable={false}
-          className="animate-splash-logo-in light:hidden h-16 w-auto object-contain drop-shadow-[0_4px_28px_rgba(249,115,22,0.45)] sm:h-20 md:h-24"
-        />
-        <img
-          src="/logos/inplayer-mark-light.png"
-          alt="INPLAYER"
-          draggable={false}
-          className="animate-splash-logo-in hidden light:block h-16 w-auto object-contain drop-shadow-[0_4px_20px_rgba(194,65,12,0.25)] sm:h-20 md:h-24"
+          className="animate-splash-cinematic-zoom h-16 w-auto object-contain drop-shadow-[0_4px_32px_rgba(249,115,22,0.55)] sm:h-20 md:h-24"
         />
 
-        <p className="animate-splash-tagline-in mt-5 text-[11px] font-bold uppercase text-orange-300 light:text-orange-700 sm:text-sm">
+        <p className="animate-splash-tagline-in mt-5 text-[11px] font-bold uppercase tracking-[0.3em] text-orange-300 sm:text-sm">
           {TAGLINE}
         </p>
       </div>

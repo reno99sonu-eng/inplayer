@@ -22,7 +22,18 @@ import SplashScreen from "./SplashScreen";
 // must always be able to reach /admin to turn maintenance mode back off,
 // and app/admin/layout.tsx already does its own real sign-in/authorization
 // gating for everyone else who isn't the admin.
-export default function SiteChrome({ children }: { children: ReactNode }) {
+export default function SiteChrome({
+  children,
+  initialMaintenanceMode,
+  initialMaintenanceMessage,
+}: {
+  children: ReactNode;
+  // Server-fetched in app/layout.tsx and threaded down here so
+  // MaintenanceGate can render the correct state on the very first paint —
+  // see the comment on MaintenanceGate's own props for why.
+  initialMaintenanceMode: boolean;
+  initialMaintenanceMessage: string;
+}) {
   const pathname = usePathname();
   const isAdmin = pathname?.startsWith("/admin");
 
@@ -36,7 +47,10 @@ export default function SiteChrome({ children }: { children: ReactNode }) {
           loads normally underneath it, so the splash never delays the
           actual page. */}
       <SplashScreen />
-      <MaintenanceGate>
+      <MaintenanceGate
+        initialMaintenanceMode={initialMaintenanceMode}
+        initialMaintenanceMessage={initialMaintenanceMessage}
+      >
         <Navbar />
         <AnnouncementBanner />
         <div className="pb-20 lg:pb-0">{children}</div>

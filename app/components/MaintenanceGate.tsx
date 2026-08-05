@@ -20,13 +20,39 @@ import { usePlatformSettings } from "@/app/hooks/usePlatformSettings";
 // directly wouldn't be stopped by this component. That's an acceptable
 // tradeoff for InPlayer's current Cognito-in-the-browser auth model (see
 // AdminLayout.tsx's own comment on the same tradeoff), not an oversight.
-export default function MaintenanceGate({ children }: { children: ReactNode }) {
+export default function MaintenanceGate({
+  children,
+  initialMaintenanceMode,
+  initialMaintenanceMessage,
+}: {
+  children: ReactNode;
+  // Server-fetched in app/layout.tsx (via getPlatformSettings(), the same
+  // source usePlatformSettings() below reads client-side) — used as the
+  // known-correct answer for the window between first paint and this
+  // component's own client fetch resolving. Without this, every fresh page
+  // load rendered the real site (navbar, homepage, bottom nav) for however
+  // long that client fetch took, THEN swapped to the maintenance splash —
+  // a flash that's barely visible on a fast desktop connection but stretches
+  // out (and reads as "maintenance mode isn't working right") on a slower
+  // mobile connection. This makes the very first render already correct on
+  // every device, regardless of network speed.
+  initialMaintenanceMode: boolean;
+  initialMaintenanceMessage: string;
+}) {
   const { signedIn, authLoading, user } = useAuthModal();
   const { settings, loading: settingsLoading } = usePlatformSettings();
   const [checkingAdmin, setCheckingAdmin] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
 
-  const maintenanceOn = Boolean(settings?.maintenanceMode);
+  // Once the client's own fetch resolves, its (always-fresh) value takes
+  // over; until then, fall back to the server-known value instead of an
+  // "unknown, so just show the real site" default.
+  const maintenanceOn = settingsLoading
+    ? initialMaintenanceMode
+    : Boolean(settings?.maintenanceMode);
+  const maintenanceMessage = settingsLoading
+    ? initialMaintenanceMessage
+    : settings?.maintenanceMessage || initialMaintenanceMessage;
 
   useEffect(() => {
     if (!maintenanceOn || authLoading) return;
@@ -71,14 +97,25 @@ export default function MaintenanceGate({ children }: { children: ReactNode }) {
     };
   }, [maintenanceOn, authLoading, signedIn, user?.userId]);
 
-  // Nothing to block on, or still figuring out whether this visitor is the
-  // admin — render normally rather than flash a splash and then swap it
-  // away a moment later.
-  if (settingsLoading || !maintenanceOn || authLoading || checkingAdmin) {
+  // Maintenance fully off — render normally, no gate at all.
+  if (!maintenanceOn) {
     return <>{children}</>;
   }
 
-  if (signedIn && isAdmin) {
+  // Maintenance is ON. Only show the real site once we've positively
+  // confirmed this visitor is the signed-in admin — NOT while that check
+  // is still in flight (authLoading / checkingAdmin). Showing the real
+  // site any earlier, "just in case they turn out to be the admin," is
+  // exactly the flash-of-real-content bug this was rewritten to fix: that
+  // in-flight window used to default to showing children, so every
+  // ordinary visitor saw the real navbar/homepage/bottom nav for however
+  // long auth took to resolve before the block ever appeared — barely
+  // noticeable on a fast desktop connection, but stretched out (and read
+  // as "maintenance mode isn't working") on a slower mobile one. A real
+  // admin now sees one brief extra beat of the maintenance screen before
+  // it swaps to the real site the instant they're confirmed — a much
+  // smaller cost than leaking the real site to everyone else meanwhile.
+  if (signedIn && isAdmin && !authLoading && !checkingAdmin) {
     return (
       <>
         <div className="flex items-center justify-center gap-2 bg-amber-500/15 px-4 py-2 text-center text-xs font-semibold text-amber-300">
@@ -99,7 +136,7 @@ export default function MaintenanceGate({ children }: { children: ReactNode }) {
         Be right back
       </h1>
       <p className="mt-2 max-w-sm text-sm text-slate-400 light:text-slate-600">
-        {settings?.maintenanceMessage ||
+        {maintenanceMessage ||
           "InPlayer is down for scheduled maintenance. We'll be back shortly."}
       </p>
     </div>

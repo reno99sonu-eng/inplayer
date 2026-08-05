@@ -445,17 +445,42 @@ export default function RecommendationFeed({
     feedEntries.push({ kind: "video", video });
   });
 
-  // Keep the discovery feed in repeating YouTube-style blocks: two full
-  // rows of four videos (eight per block, matching the grid's own
-  // 4-column breakpoint at xl) followed by a Raftaar (Trending Creators)
-  // row, then the next block of eight, and so on. A Shorts shelf still
-  // appears too, just every second block, so it doesn't crowd out that
-  // primary video/Raftaar rhythm. New uploads flow into the same sequence
-  // instead of being stranded after a one-off section.
-  const BLOCK_SIZE = 8;
+  // Keep the discovery feed in repeating YouTube-style blocks — but how
+  // many videos make up one block before a Raftaar (Trending Creators) row
+  // now matches how many actually fit a "row" at the current viewport,
+  // instead of one fixed number for every screen size:
+  //   - Mobile/tablet (<1024px, the grid's 1-2 column range below): 4
+  //     videos then Raftaar, looping — a shorter block so mobile visitors
+  //     hit variety sooner instead of scrolling a long single column
+  //     before ever reaching Raftaar.
+  //   - Desktop (>=1024px, matching the grid's own 4-column xl
+  //     breakpoint): two full rows of four videos (eight) then Raftaar,
+  //     looping — unchanged from before.
+  // A Shorts shelf still appears too, just every second block, so it
+  // doesn't crowd out that primary video/Raftaar rhythm. New uploads flow
+  // into the same sequence instead of being stranded after a one-off
+  // section.
+  //
+  // Detected client-side only (post-mount, same reasoning as the
+  // shuffle/ad-slot logic above) since server-rendered HTML can't know the
+  // visitor's real viewport — defaults to the desktop grouping so the very
+  // first paint matches the server-rendered markup, then re-groups once
+  // mount detects a narrower screen. A live "change" listener keeps it
+  // correct if the window is resized without a reload, instead of only
+  // being checked once on mount.
+  const [blockSize, setBlockSize] = useState(8);
+
+  useEffect(() => {
+    const mql = window.matchMedia("(min-width: 1024px)");
+    const applyBlockSize = () => setBlockSize(mql.matches ? 8 : 4);
+    applyBlockSize();
+    mql.addEventListener("change", applyBlockSize);
+    return () => mql.removeEventListener("change", applyBlockSize);
+  }, []);
+
   const feedBatches = Array.from(
-    { length: Math.ceil(feedEntries.length / BLOCK_SIZE) },
-    (_, index) => feedEntries.slice(index * BLOCK_SIZE, index * BLOCK_SIZE + BLOCK_SIZE)
+    { length: Math.ceil(feedEntries.length / blockSize) },
+    (_, index) => feedEntries.slice(index * blockSize, index * blockSize + blockSize)
   );
   const shortsPerShelf = 8;
 

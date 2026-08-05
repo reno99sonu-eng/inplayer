@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { X, Megaphone, ArrowUpRight } from "lucide-react";
 import { usePlatformSettings } from "@/app/hooks/usePlatformSettings";
+import { useScrollLock } from "@/app/hooks/useScrollLock";
 
 // Real site-wide takeover, toggled from Admin Panel -> Platform Settings —
 // e.g. "Paid memberships are live" or a scheduled-downtime notice, shown
@@ -45,20 +46,14 @@ export default function AnnouncementBanner() {
 function AnnouncementOverlay({ text, linkUrl }: { text: string; linkUrl: string }) {
   const [dismissed, setDismissed] = useState(false);
 
-  // Lock page scroll while the takeover is up, same pattern as
-  // SplashScreen/LocationMapPicker — restored on dismiss or unmount so a
-  // fast route change never leaves scrolling permanently disabled.
-  useEffect(() => {
-    if (dismissed) return;
-    const previousBodyOverflow = document.body.style.overflow;
-    const previousHtmlOverflow = document.documentElement.style.overflow;
-    document.body.style.overflow = "hidden";
-    document.documentElement.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = previousBodyOverflow;
-      document.documentElement.style.overflow = previousHtmlOverflow;
-    };
-  }, [dismissed]);
+  // Lock page scroll while the takeover is up. Shared reference-counted
+  // lock (see useScrollLock) instead of this component saving/restoring
+  // document.body.style.overflow on its own — this and SplashScreen's own
+  // curtain can both be up at the same time on a fresh load, and two
+  // independent save/restore locks on the same global value is exactly
+  // what caused the homepage to get stuck unscrollable after dismissing
+  // the announcement.
+  useScrollLock(!dismissed);
 
   if (dismissed) return null;
 

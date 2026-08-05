@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useScrollLock } from "../hooks/useScrollLock";
 
 // Reworked per Reno's feedback, twice now:
 // 1) The original version (glowing particles, spinning ring, multi-color
@@ -44,6 +45,17 @@ export default function SplashScreen() {
   const [visible, setVisible] = useState(true);
   const [leaving, setLeaving] = useState(false);
 
+  // Lock scroll while the curtain is up so the already-rendered page
+  // underneath can't be scrolled/interacted with mid-animation. Shared
+  // reference-counted lock (see useScrollLock) — plain save/restore of
+  // document.body.style.overflow used to break when this and
+  // AnnouncementBanner's own takeover were both up at once (whichever
+  // released first would "restore" scroll back to the other one's
+  // "hidden" instead of the true original value, leaving the page stuck
+  // unscrollable). This releases automatically the instant `visible`
+  // flips false below, or on unmount either way.
+  useScrollLock(visible);
+
   useEffect(() => {
     if (!visible) return;
 
@@ -62,31 +74,14 @@ export default function SplashScreen() {
     const holdMs = reducedMotion ? 350 : 1600;
     const fadeOutMs = reducedMotion ? 180 : 380;
 
-    // Lock scroll while the curtain is up so the already-rendered page
-    // underneath can't be scrolled/interacted with mid-animation. Restored
-    // in every exit path (fade-out timer, and the cleanup function) so a
-    // fast route change or unmount never leaves scrolling permanently
-    // disabled.
-    const previousBodyOverflow = document.body.style.overflow;
-    const previousHtmlOverflow = document.documentElement.style.overflow;
-    document.body.style.overflow = "hidden";
-    document.documentElement.style.overflow = "hidden";
-
-    const restoreScroll = () => {
-      document.body.style.overflow = previousBodyOverflow;
-      document.documentElement.style.overflow = previousHtmlOverflow;
-    };
-
     const leaveTimer = window.setTimeout(() => setLeaving(true), holdMs);
     const removeTimer = window.setTimeout(() => {
-      restoreScroll();
       setVisible(false);
     }, holdMs + fadeOutMs);
 
     return () => {
       window.clearTimeout(leaveTimer);
       window.clearTimeout(removeTimer);
-      restoreScroll();
     };
     // Intentionally runs once on mount only — visible/leaving are only
     // ever set BY this effect, never read as a re-run trigger.

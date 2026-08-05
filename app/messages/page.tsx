@@ -53,6 +53,17 @@ export default function MessagesPage() {
 
   useEffect(() => {
     (() => {
+      // Wait for auth to actually resolve before deciding anything —
+      // signedIn is false both while auth is still loading AND once it's
+      // confirmed nobody's signed in, and treating those the same used to
+      // set loading=false prematurely (while auth was still checking).
+      // That stale `loading=false` then let the page render past its own
+      // `authLoading || loading` guard the instant authLoading flipped
+      // true→false, showing a flash of "No conversations yet" using the
+      // still-empty state, before the real fetch below had a chance to
+      // finish and fill it in.
+      if (authLoading) return;
+
       if (!signedIn) {
         setLoading(false);
         return;
@@ -77,7 +88,7 @@ export default function MessagesPage() {
 
       load();
     })();
-  }, [signedIn]);
+  }, [signedIn, authLoading]);
 
   useEffect(() => {
     const q = composeQuery.trim();

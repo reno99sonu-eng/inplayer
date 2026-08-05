@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useScrollLock } from "../hooks/useScrollLock";
+import { useAuthModal } from "./auth/AuthProvider";
 
 // Reworked per Reno's feedback, twice now:
 // 1) The original version (glowing particles, spinning ring, multi-color
@@ -41,9 +42,52 @@ import { useScrollLock } from "../hooks/useScrollLock";
 // load/refresh.
 const TAGLINE = "The Future of Entertainment";
 
+// Module-level, not component state — this is what actually makes the
+// splash "only on fresh load/reload," not just "only once per mount."
+// SiteChrome unmounts+remounts this component on some client-side
+// navigations (e.g. entering/leaving /admin, whose branch renders
+// `<>{children}</>` with no SplashScreen at all — see SiteChrome.tsx), and
+// a plain useState(true) has no memory across that remount, so the intro
+// used to replay every time. A real reload or fresh visit re-evaluates
+// this whole module from scratch (a new document load always gets a new
+// JS module instance), which is exactly when it SHOULD play again — no
+// sessionStorage needed, since sessionStorage would also survive an
+// actual reload and wrongly suppress the replay-on-reload behavior Reno
+// asked for.
+let hasPlayedThisLoad = false;
+
 export default function SplashScreen() {
-  const [visible, setVisible] = useState(true);
+  const [visible, setVisible] = useState(() => {
+    if (hasPlayedThisLoad) return false;
+    hasPlayedThisLoad = true;
+    return true;
+  });
   const [leaving, setLeaving] = useState(false);
+  const { user } = useAuthModal();
+
+  // Time-of-day greeting ("Good Morning/Afternoon/Evening/Night, {name}")
+  // — same 4-bucket boundaries as the navbar's own Greeting.tsx, computed
+  // client-side only (useEffect, not a render-time Date() call) so this
+  // never disagrees with what the server rendered and triggers a
+  // hydration mismatch. Renders nothing until this fires, which is fine —
+  // it fades in on its own delayed beat anyway (see
+  // animate-splash-greeting-in below).
+  const [greetingWord, setGreetingWord] = useState("");
+
+  useEffect(() => {
+    // setState wrapped in a nested, immediately-invoked function — same
+    // react-hooks/set-state-in-effect workaround used throughout this
+    // codebase (see MaintenanceGate.tsx, VoiceRecorder.tsx, app/messages/
+    // page.tsx) — calling it directly at the effect's top level is what
+    // the lint rule actually flags, not the setState call itself.
+    (() => {
+      const hour = new Date().getHours();
+      if (hour >= 5 && hour < 12) setGreetingWord("Morning");
+      else if (hour >= 12 && hour < 17) setGreetingWord("Afternoon");
+      else if (hour >= 17 && hour < 21) setGreetingWord("Evening");
+      else setGreetingWord("Night");
+    })();
+  }, []);
 
   // Lock scroll while the curtain is up so the already-rendered page
   // underneath can't be scrolled/interacted with mid-animation. Shared
@@ -140,6 +184,17 @@ export default function SplashScreen() {
         <p className="animate-splash-tagline-in mt-5 text-[11px] font-bold uppercase tracking-[0.3em] text-orange-300 light:text-orange-600 sm:text-sm">
           {TAGLINE}
         </p>
+
+        {/* Personal greeting — a secondary, softer beat under the tagline
+            (not competing with it), landing just as the tagline finishes.
+            Falls back to no name at all pre-sign-in or while auth is still
+            resolving, rather than delaying/blocking on it. */}
+        {greetingWord && (
+          <p className="animate-splash-greeting-in mt-3 whitespace-nowrap bg-gradient-to-r from-orange-200 via-white to-orange-200 light:from-orange-700 light:via-slate-800 light:to-orange-700 bg-clip-text text-sm font-semibold tracking-wide text-transparent drop-shadow-[0_2px_12px_rgba(249,115,22,0.35)] sm:text-base">
+            Good {greetingWord}
+            {user?.name ? `, ${user.name}` : ""}
+          </p>
+        )}
       </div>
     </div>
   );

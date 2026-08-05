@@ -1156,6 +1156,25 @@ animation: aiGlassSweep 5.5s linear infinite;
   animation: splashTaglineIn 0.62s cubic-bezier(0.16, 1, 0.3, 1) 0.82s both;
 }
 
+/* The personal greeting: a soft fade+rise, starting just as the tagline
+   above is finishing (0.82s + 0.62s = 1.44s) so the two read as one
+   connected reveal rather than two separate waits, and landing well
+   inside the 1.6s hold (see SplashScreen.tsx's holdMs) so there's a real
+   beat to read it before the whole curtain fades out. */
+@keyframes splashGreetingIn {
+  0% {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.animate-splash-greeting-in {
+  animation: splashGreetingIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.95s both;
+}
+
 /* Users who've asked their OS/browser to reduce motion still get the logo
    and tagline, just as a plain instant fade — no zoom punch, no flash, no
    shine sweep. */
@@ -1163,7 +1182,8 @@ animation: aiGlassSweep 5.5s linear infinite;
   .animate-splash-cinematic-zoom,
   .animate-splash-flash-burst,
   .animate-splash-logo-shine,
-  .animate-splash-tagline-in {
+  .animate-splash-tagline-in,
+  .animate-splash-greeting-in {
     animation: none;
   }
   .animate-splash-cinematic-zoom {
@@ -1180,6 +1200,10 @@ animation: aiGlassSweep 5.5s linear infinite;
   .animate-splash-tagline-in {
     opacity: 1;
     letter-spacing: 0.3em;
+  }
+  .animate-splash-greeting-in {
+    opacity: 1;
+    transform: none;
   }
 }
 

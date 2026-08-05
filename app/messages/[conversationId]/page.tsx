@@ -18,6 +18,8 @@ import {
   Loader2,
   Mic,
   Palette,
+  Paperclip,
+  Smile,
 } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { formatTimeAgo } from "@/app/lib/formatters";
@@ -27,7 +29,9 @@ import MessageActionsMenu from "@/app/components/MessageActionsMenu";
 import VoiceRecorder from "@/app/components/chat/VoiceRecorder";
 import VoiceMessageBubble from "@/app/components/chat/VoiceMessageBubble";
 import UserProfileDrawer from "@/app/components/chat/UserProfileDrawer";
+import EmojiPicker from "@/app/components/chat/EmojiPicker";
 import { CHAT_THEMES } from "@/app/components/chat/ChatThemes";
+import { compressImageToDocument } from "@/app/lib/imageCompress";
 
 interface ConversationDetail {
   conversationId: string;
@@ -53,6 +57,7 @@ interface MessageItem {
   deletedForEveryone?: boolean;
   audioUrl?: string;
   audioDurationSec?: number;
+  imageUrl?: string;
 }
 
 const DISAPPEARING_OPTIONS = [
@@ -84,8 +89,15 @@ export default function ConversationThreadPage() {
   const [actionBusy, setActionBusy] = useState(false);
   const [voiceMode, setVoiceMode] = useState(false);
   const [profileDrawerOpen, setProfileDrawerOpen] = useState(false);
+  const [emojiPickerOpen, setEmojiPickerOpen] = useState(false);
+  const [pendingImage, setPendingImage] = useState<string | null>(null);
+  const [imageProcessing, setImageProcessing] = useState(false);
+  const [imageSending, setImageSending] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastTypingPingRef = useRef(0);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   async function authHeaders() {
     const session = await fetchAuthSession();
@@ -309,6 +321,80 @@ export default function ConversationThreadPage() {
       });
     } catch (err) {
       console.error("Failed to save chat wallpaper:", err);
+    }
+  };
+
+  const handlePickImage = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = "";
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setImageError("Please choose an image file.");
+      return;
+    }
+
+    setImageError(null);
+    setImageProcessing(true);
+    try {
+      // Same compressor already used for KYC document photos — progressively
+      // tries smaller widths/qualities until it lands under the target byte
+      // budget, entirely in-browser via canvas. Same 300KB budget as voice
+      // notes (see MAX_IMAGE_DATA_URL_LENGTH in app/api/messages/route.ts).
+      const dataUrl = await compressImageToDocument(file, 300_000);
+      setPendingImage(dataUrl);
+    } catch (err) {
+      console.error("Failed to process image:", err);
+      setImageError("Couldn't process that photo. Please try another.");
+    } finally {
+      setImageProcessing(false);
+    }
+  };
+
+  const handleSendImage = async () => {
+    if (!pendingImage || !targetUserId || !user || imageSending) return;
+
+    const imageToSend = pendingImage;
+    const caption = text.trim();
+    setImageSending(true);
+    setSendError(null);
+    const optimisticId = `optimistic-${Date.now()}`;
+    setMessages((prev) => [
+      ...prev,
+      {
+        conversationId: params.conversationId,
+        messageId: optimisticId,
+        senderId: user.userId,
+        text: caption,
+        imageUrl: imageToSend,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+    setPendingImage(null);
+    setText("");
+
+    try {
+      const headers = await authHeaders();
+      const res = await fetch("/api/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({ otherUserId: targetUserId, text: caption, imageUrl: imageToSend }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMessages((prev) => prev.filter((m) => m.messageId !== optimisticId));
+        setSendError(data.error || "Couldn't send that photo.");
+        return;
+      }
+
+      await Promise.all([refetchConversation(), fetchMessages()]);
+    } catch (err) {
+      console.error("Failed to send photo:", err);
+      setMessages((prev) => prev.filter((m) => m.messageId !== optimisticId));
+      setSendError("Something went wrong. Please try again.");
+    } finally {
+      setImageSending(false);
     }
   };
 
@@ -555,6 +641,22 @@ const showAvatar =
     >
       {!m.deletedForEveryone && m.audioUrl ? (
         <VoiceMessageBubble audioUrl={m.audioUrl} mine={mine} />
+      ) : !m.deletedForEveryone && m.imageUrl ? (
+        <div>
+          <button
+            type="button"
+            onClick={() => setLightboxUrl(m.imageUrl ?? null)}
+            className="block overflow-hidden rounded-xl"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element -- chat photo attachments are compressed base64 data URLs (see app/lib/imageCompress.ts), same as avatars/voice notes — next/image can't optimize a data URL without the `unoptimized` prop. */}
+            <img
+              src={m.imageUrl}
+              alt="Photo attachment"
+              className="max-h-64 w-full max-w-[220px] object-cover"
+            />
+          </button>
+          {m.text && <p className="mt-1.5 whitespace-pre-wrap break-words">{m.text}</p>}
+        </div>
       ) : (
         <p className="whitespace-pre-wrap break-words">{m.text}</p>
       )}
@@ -639,12 +741,86 @@ const showAvatar =
               ? "You've blocked this user — unblock them to send a message."
               : "You can't message this user."}
           </p>
+        ) : pendingImage ? (
+          <div className="mx-auto flex w-full max-w-3xl items-center gap-2.5">
+            <div className="relative flex-shrink-0">
+              {/* eslint-disable-next-line @next/next/no-img-element -- local preview of a not-yet-sent compressed data URL. */}
+              <img
+                src={pendingImage}
+                alt="Attachment preview"
+                className="h-12 w-12 rounded-xl border border-white/10 object-cover"
+              />
+              <button
+                onClick={() => setPendingImage(null)}
+                title="Remove photo"
+                className="absolute -right-1.5 -top-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-white"
+              >
+                <X size={12} />
+              </button>
+            </div>
+            <input
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  handleSendImage();
+                }
+              }}
+              placeholder="Add a caption..."
+              className="min-w-0 flex-1 rounded-full border border-white/10 light:border-slate-300 bg-white/[0.03] light:bg-white px-4 py-2.5 text-sm text-white light:text-slate-900 placeholder:text-slate-500 caret-orange-500 shadow-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-300/30"
+            />
+            <button
+              onClick={handleSendImage}
+              disabled={imageSending}
+              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white transition hover:-translate-y-0.5 disabled:opacity-50"
+            >
+              {imageSending ? <Loader2 size={17} className="animate-spin" /> : <Send size={17} />}
+            </button>
+          </div>
         ) : voiceMode ? (
           <div className="mx-auto flex w-full max-w-3xl items-center gap-2.5">
             <VoiceRecorder onSend={handleSendVoice} onCancel={() => setVoiceMode(false)} />
           </div>
         ) : (
-          <div className="mx-auto flex w-full max-w-3xl items-center gap-2.5">
+          <div className="mx-auto flex w-full max-w-3xl items-center gap-2">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handlePickImage}
+            />
+
+            <div className="relative flex-shrink-0">
+              <button
+                onClick={() => setEmojiPickerOpen((v) => !v)}
+                title="Emoji"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 text-slate-300 light:text-slate-600 transition hover:bg-white/15 light:hover:bg-black/10"
+              >
+                <Smile size={19} />
+              </button>
+              {emojiPickerOpen && (
+                <div className="absolute bottom-full left-0 z-20 mb-2">
+                  <EmojiPicker
+                    onSelect={(emoji) => {
+                      setText((prev) => prev + emoji);
+                      pingTyping();
+                    }}
+                  />
+                </div>
+              )}
+            </div>
+
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={imageProcessing}
+              title="Attach a photo"
+              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 text-slate-300 light:text-slate-600 transition hover:bg-white/15 light:hover:bg-black/10 disabled:opacity-50"
+            >
+              {imageProcessing ? <Loader2 size={19} className="animate-spin" /> : <Paperclip size={19} />}
+            </button>
+
             <input
               value={text}
               onChange={(e) => {
@@ -657,6 +833,7 @@ const showAvatar =
                   handleSend();
                 }
               }}
+              onFocus={() => setEmojiPickerOpen(false)}
               placeholder="Message..."
               className="min-w-0 flex-1 rounded-full border border-white/10 light:border-slate-300 bg-white/[0.03] light:bg-white px-4 py-2.5 text-sm text-white light:text-slate-900 placeholder:text-slate-500 caret-orange-500 shadow-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-300/30"
             />
@@ -679,8 +856,30 @@ const showAvatar =
             )}
           </div>
         )}
+        {imageError && <p className="mt-2 text-center text-xs text-red-400">{imageError}</p>}
         {sendError && <p className="mt-2 text-center text-xs text-red-400">{sendError}</p>}
       </div>
+
+      {lightboxUrl && (
+        <div
+          className="fixed inset-0 z-[999] flex items-center justify-center bg-black/90 p-4"
+          onClick={() => setLightboxUrl(null)}
+        >
+          <button
+            onClick={() => setLightboxUrl(null)}
+            className="absolute right-4 top-4 flex h-10 w-10 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20"
+          >
+            <X size={20} />
+          </button>
+          {/* eslint-disable-next-line @next/next/no-img-element -- full-size lightbox preview of a chat photo attachment (base64 data URL). */}
+          <img
+            src={lightboxUrl}
+            alt="Full-size attachment"
+            onClick={(e) => e.stopPropagation()}
+            className="max-h-full max-w-full rounded-lg object-contain"
+          />
+        </div>
+      )}
 
       <UserProfileDrawer
         open={profileDrawerOpen}

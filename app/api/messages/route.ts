@@ -17,6 +17,11 @@ const MAX_MESSAGE_LENGTH = 4000;
 // leaves headroom for the rest of the item, same reasoning as
 // app/api/profile/avatar/route.ts's own cap.
 const MAX_AUDIO_DATA_URL_LENGTH = 300_000;
+// Same reasoning, for a photo attachment — the client already compresses
+// to this budget via compressImageToDocument() before it ever reaches
+// here (see app/messages/[conversationId]/page.tsx), this is just the
+// server-side backstop.
+const MAX_IMAGE_DATA_URL_LENGTH = 300_000;
 
 // One row per (user, conversation) — the same "denormalized per-user
 // index" convention this codebase already uses for Watchlist/History/
@@ -80,7 +85,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Please sign in." }, { status: 401 });
   }
 
-  const { otherUserId, text, audioUrl, audioDurationSec } = await request.json();
+  const { otherUserId, text, audioUrl, audioDurationSec, imageUrl } = await request.json();
 
   if (!otherUserId || typeof otherUserId !== "string") {
     return NextResponse.json({ error: "Missing recipient." }, { status: 400 });
@@ -105,7 +110,21 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "That voice note is too long to send." }, { status: 400 });
   }
 
-  if (!trimmedText && !hasValidAudio) {
+  // Photo attachment — same "either non-empty text or a valid data URL"
+  // shape as voice notes, except a photo can ALSO carry a text caption
+  // (trimmedText), so this doesn't participate in the empty-message OR
+  // below the same way audio does.
+  const hasValidImage =
+    typeof imageUrl === "string" &&
+    imageUrl.startsWith("data:image/") &&
+    imageUrl.length > 0 &&
+    imageUrl.length <= MAX_IMAGE_DATA_URL_LENGTH;
+
+  if (typeof imageUrl === "string" && imageUrl.length > 0 && !hasValidImage) {
+    return NextResponse.json({ error: "That photo is too large to send." }, { status: 400 });
+  }
+
+  if (!trimmedText && !hasValidAudio && !hasValidImage) {
     return NextResponse.json({ error: "Message can't be empty." }, { status: 400 });
   }
   if (trimmedText.length > MAX_MESSAGE_LENGTH) {
@@ -187,6 +206,9 @@ export async function POST(request: NextRequest) {
             audioUrl,
             audioDurationSec: validDurationSec,
           }),
+          ...(hasValidImage && {
+            imageUrl,
+          }),
           ...(expiresAtMs !== undefined && {
             expiresAt: new Date(expiresAtMs).toISOString(),
             // Numeric mirror in Unix-epoch *seconds* — DynamoDB's native
@@ -227,7 +249,8 @@ export async function POST(request: NextRequest) {
     // Conversation-list preview text — a voice note has no `text` to show,
     // so both participants' row previews fall back to a label instead of
     // going blank.
-    const previewText = trimmedText || (hasValidAudio ? "🎤 Voice message" : "");
+    const previewText =
+      trimmedText || (hasValidAudio ? "🎤 Voice message" : hasValidImage ? "📷 Photo" : "");
 
     await Promise.all([
       // My own row — I'm reading this conversation right now (I just sent

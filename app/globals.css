@@ -914,6 +914,41 @@ animation: aiGlassSweep 5.5s linear infinite;
     display: none;
   }
 }
+
+/* Remove the page's own browser scrollbar entirely on mobile — requested
+   because it was visually overlapping the Watch Now/Watchlist/Details
+   buttons near the bottom of the homepage's Featured hero banner. Two
+   things happen here, both mobile-only:
+   1. `overflow-x: hidden` on html/body is the actual fix for the
+      overlap's root cause — some element on the page runs a hair wider
+      than the viewport on narrow screens, which makes mobile browsers
+      draw a horizontal scrollbar pinned along the very bottom edge of the
+      screen, right where the hero's buttons sit. `main` in app/page.tsx
+      already sets `overflow-x-hidden` on itself, but that only clips
+      overflow inside `main` — it can't stop the browser from measuring a
+      wider `html`/`body` and drawing that bottom scrollbar regardless.
+      Setting it here, on html/body themselves, removes the actual
+      horizontal scroll capability (and its scrollbar) site-wide on
+      mobile, not just visually.
+   2. Hiding the (rare, mostly-Android-WebView) visible vertical scrollbar
+      overlay the same way `.scrollbar-hide-mobile` already does above,
+      so nothing scrollbar-shaped can render on top of UI on mobile at
+      all. The page/section still scrolls normally by touch/swipe either
+      way — this only removes the visible scrollbar chrome and the
+      horizontal overflow that was causing it, not scrolling itself. */
+@media (max-width: 767px) {
+  html,
+  body {
+    overflow-x: hidden;
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  html::-webkit-scrollbar,
+  body::-webkit-scrollbar {
+    display: none;
+  }
+}
 /* ---------- Settings (Premium Redesign) ----------
    A restrained fade+rise used only when switching between Settings
    tabs/sections — keyed remount in SettingsContent.tsx replays this each

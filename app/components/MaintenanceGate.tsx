@@ -128,7 +128,15 @@ export default function MaintenanceGate({
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-[#06101D] px-6 text-center light:bg-[#F5EEDC]">
+    // min-h-dvh, not min-h-screen (100vh) — 100vh is measured against the
+    // largest possible mobile viewport (address bar hidden), so on the
+    // very first paint, before the browser settles, the page can render
+    // taller than what's actually visible, leaving this centered content
+    // looking shifted or clipped depending on the phone/browser chrome —
+    // the same class of mobile-only sizing bug already called out and
+    // fixed with dvh for the fake-fullscreen video player in this file's
+    // globals.css. dvh tracks the real, current visible height instead.
+    <div className="flex min-h-dvh flex-col items-center justify-center bg-[#06101D] px-6 text-center light:bg-[#F5EEDC]">
       <div className="flex h-16 w-16 items-center justify-center rounded-full border border-orange-400/30 bg-orange-500/10">
         <Wrench size={28} className="text-orange-300" />
       </div>

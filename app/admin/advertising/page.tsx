@@ -14,7 +14,6 @@ import {
   Home,
   Tv,
   Star,
-  Film,
   Globe,
   Ruler,
   BarChart3,
@@ -25,14 +24,13 @@ import {
 import { compressImageToBanner, compressDataUrlToBanner, aiCropAndRedesignImage, extractVideoFramePoster } from "@/app/lib/imageCompress";
 
 type AdSlotSource = "house" | "adsense" | "off";
-type Placement = "homepage" | "watch" | "homepage_spotlight" | "weekly_featured";
+type Placement = "homepage" | "watch" | "weekly_featured";
 
 type SidePanel =
   | "overview"
   | "homepage"
   | "watch"
   | "weekly_featured"
-  | "homepage_spotlight"
   | "midroll"
   | "adsense"
   | "specs";
@@ -40,16 +38,24 @@ type SidePanel =
 const PLACEMENT_LABELS: Record<Placement, string> = {
   homepage: "Homepage Banner",
   watch: "Watch Page Banner",
-  homepage_spotlight: "Homepage Spotlight",
   weekly_featured: "Weekly Featured Banner",
 };
+
+// homepage & watch both render as video-thumbnail-styled cards
+// (AdThumbnailCard.tsx, straight 16:9) — weekly_featured is the one
+// remaining placement that renders as a wide hero banner, so it keeps the
+// old 10:1 crop ratio. Used by the upload/AI-crop tools below so a
+// creative is cropped to the ratio it will actually be displayed at,
+// instead of one hardcoded ratio for every placement.
+function getBannerAspectRatio(placement: Placement | SidePanel): number {
+  return placement === "homepage" || placement === "watch" ? 16 / 9 : 10;
+}
 
 interface AdSettings {
   adsenseEnabled: boolean;
   adsensePublisherId: string;
   homepageBannerSource: AdSlotSource;
   watchPageBannerSource: AdSlotSource;
-  homepageSpotlightSource: AdSlotSource;
   weeklyFeaturedEnabled: boolean;
   midrollEnabled: boolean;
   midrollIntervalSeconds: number;
@@ -84,7 +90,6 @@ const DEFAULT_SETTINGS: AdSettings = {
   adsensePublisherId: "",
   homepageBannerSource: "house",
   watchPageBannerSource: "house",
-  homepageSpotlightSource: "off",
   weeklyFeaturedEnabled: true, // ON by default
   midrollEnabled: true,
   midrollIntervalSeconds: 900,
@@ -195,7 +200,6 @@ function AdvertisingPage() {
           adsensePublisherId: String(s.adsensePublisherId || ""),
           homepageBannerSource: (s.homepageBannerSource as AdSlotSource) || "house",
           watchPageBannerSource: (s.watchPageBannerSource as AdSlotSource) || "house",
-          homepageSpotlightSource: (s.homepageSpotlightSource as AdSlotSource) || "off",
           weeklyFeaturedEnabled: s.weeklyFeaturedEnabled !== false,
           midrollEnabled: Boolean(s.midrollEnabled),
           midrollIntervalSeconds: Number(s.midrollIntervalSeconds) || 900,
@@ -337,7 +341,7 @@ function AdvertisingPage() {
         }
       } else {
         setUploadFileType("image");
-        const compressed = await compressImageToBanner(file);
+        const compressed = await compressImageToBanner(file, 140_000, getBannerAspectRatio(activePanel));
         setUploadPreview(compressed);
       }
     } catch (err) {
@@ -419,12 +423,12 @@ function AdvertisingPage() {
     if (!uploadPreview || uploadFileType === "video") return;
     setCroppingAi(true);
     try {
-      // Matches AdBanner.tsx's real rendered box exactly (10:1 on tablet/
-      // desktop for every placement — see app/components/AdBanner.tsx) so
-      // an AI-cropped poster actually displays edge-to-edge with zero
-      // cropping once it's live, instead of being cropped to a ratio the
-      // banner never actually renders at.
-      const ratio = 10;
+      // Matches the real rendered box for this placement exactly — 16:9
+      // for homepage/watch (AdThumbnailCard.tsx's thumbnail-card style) or
+      // 10:1 for weekly_featured's wide hero banner — so an AI-cropped
+      // poster actually displays edge-to-edge with zero cropping once it's
+      // live, instead of being cropped to a ratio the slot never renders at.
+      const ratio = getBannerAspectRatio(activePanel);
       const redesigned = await aiCropAndRedesignImage(uploadPreview, ratio, 1200);
       setUploadPreview(redesigned);
     } catch (err) {
@@ -456,12 +460,9 @@ function AdvertisingPage() {
     setGeneratingTitleAi(true);
     setUploadError(null);
     try {
-      // Matches AdBanner.tsx's real rendered box exactly (10:1 on tablet/
-      // desktop for every placement — see app/components/AdBanner.tsx) so
-      // an AI-cropped poster actually displays edge-to-edge with zero
-      // cropping once it's live, instead of being cropped to a ratio the
-      // banner never actually renders at.
-      const ratio = 10;
+      // Matches the real rendered box for this placement exactly — see
+      // handleAiCropAndRedesign's comment above for why.
+      const ratio = getBannerAspectRatio(placement);
       const { title, imageUrl } = await callAiAdGenerate({ mode: "full", placement });
       if (!imageUrl) throw new Error("AI didn't return a banner image.");
       const banner = await compressDataUrlToBanner(imageUrl, 140_000, ratio);
@@ -637,7 +638,6 @@ function AdvertisingPage() {
     { id: "homepage", label: "Homepage Banner", icon: Home, badge: String(safeCreatives.filter((c) => c.placement === "homepage").length) },
     { id: "watch", label: "Watch Page Banner", icon: Tv, badge: String(safeCreatives.filter((c) => c.placement === "watch").length) },
     { id: "weekly_featured", label: "Weekly Featured Banner", icon: Star, badge: String(safeCreatives.filter((c) => c.placement === "weekly_featured").length) },
-    { id: "homepage_spotlight", label: "Homepage Spotlight", icon: Film, badge: String(safeCreatives.filter((c) => c.placement === "homepage_spotlight").length) },
     { id: "midroll", label: "Video Mid-Roll Ads", icon: Video, badge: String(safeMidrollAds.length) },
     { id: "adsense", label: "Google AdSense", icon: Globe },
     { id: "specs", label: "Poster Specs & Ratios", icon: Ruler },
@@ -770,10 +770,6 @@ function AdvertisingPage() {
                   <span className="font-bold text-white light:text-slate-900 uppercase">{settings.watchPageBannerSource}</span>
                 </div>
                 <div className="flex justify-between p-2 rounded-xl bg-white/5 light:bg-black/5">
-                  <span className="text-slate-400 light:text-slate-700">Homepage Spotlight:</span>
-                  <span className="font-bold text-white light:text-slate-900 uppercase">{settings.homepageSpotlightSource}</span>
-                </div>
-                <div className="flex justify-between p-2 rounded-xl bg-white/5 light:bg-black/5">
                   <span className="text-slate-400 light:text-slate-700">Weekly Featured Carousel:</span>
                   <span className="font-bold text-emerald-400 light:text-emerald-700">
                     {settings.weeklyFeaturedEnabled ? "ON (Custom Ad Poster)" : "OFF (User Videos - Default)"}
@@ -784,11 +780,10 @@ function AdvertisingPage() {
           </div>
         )}
 
-        {/* 2-5. PLACEMENT SUB-PANELS (Homepage, Watch, Weekly Featured, Spotlight) */}
+        {/* 2-4. PLACEMENT SUB-PANELS (Homepage, Watch, Weekly Featured) */}
         {(activePanel === "homepage" ||
           activePanel === "watch" ||
-          activePanel === "weekly_featured" ||
-          activePanel === "homepage_spotlight") && (
+          activePanel === "weekly_featured") && (
           <div className="space-y-4">
             <div className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4 flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -825,13 +820,11 @@ function AdvertisingPage() {
                       onClick={() => {
                         if (activePanel === "homepage") updateSettings("homepageBannerSource", src);
                         if (activePanel === "watch") updateSettings("watchPageBannerSource", src);
-                        if (activePanel === "homepage_spotlight") updateSettings("homepageSpotlightSource", src);
                         saveSettings();
                       }}
                       className={`rounded-full px-3 py-1 text-xs font-bold transition capitalize ${
                         (activePanel === "homepage" && settings.homepageBannerSource === src) ||
-                        (activePanel === "watch" && settings.watchPageBannerSource === src) ||
-                        (activePanel === "homepage_spotlight" && settings.homepageSpotlightSource === src)
+                        (activePanel === "watch" && settings.watchPageBannerSource === src)
                           ? "bg-indigo-600 text-white"
                           : "bg-white/5 text-slate-400 light:bg-black/5 light:text-slate-700"
                       }`}
@@ -1231,8 +1224,8 @@ function AdvertisingPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-slate-300 light:text-slate-800 font-medium">
               <div className="rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 p-3 space-y-1">
                 <strong className="block text-white light:text-slate-900 font-bold">Homepage Banner</strong>
-                <code className="inline-block rounded bg-orange-500/20 light:bg-orange-100 px-1.5 py-0.5 font-bold text-orange-300 light:text-amber-900">10:1 on tablet/desktop · 16:9 on mobile</code>
-                <p className="text-[11px] text-slate-400 light:text-slate-600">Full-width strip near the top of the homepage. Recommended: 1800 × 180 px (any 10:1-ratio image scales cleanly). On phones it switches to a 16:9 box instead — e.g. 1200 × 675 px — so a single upload can&apos;t be crop-proof on every device; the AI crop tool below targets the 10:1 desktop size.</p>
+                <code className="inline-block rounded bg-orange-500/20 light:bg-orange-100 px-1.5 py-0.5 font-bold text-orange-300 light:text-amber-900">16:9 (video-thumbnail style)</code>
+                <p className="text-[11px] text-slate-400 light:text-slate-600">Renders as a video-thumbnail-styled card, randomly mixed into the homepage video grid — the same shape and size as a real video thumbnail, on every device. Recommended: 1280 × 720 px (or any 16:9 image). The upload/AI-crop tools on this tab already target this exact ratio.</p>
               </div>
               <div className="rounded-xl border border-amber-500/30 light:border-amber-600/40 bg-amber-500/10 light:bg-amber-100/60 p-3 space-y-1">
                 <strong className="block text-white light:text-slate-900 font-bold">Weekly Featured Banner</strong>
@@ -1244,15 +1237,10 @@ function AdvertisingPage() {
                 <code className="inline-block rounded bg-orange-500/20 light:bg-orange-100 px-1.5 py-0.5 font-bold text-orange-300 light:text-amber-900">16:9 aspect ratio</code>
                 <p className="text-[11px] text-slate-400 light:text-slate-600">Shown inside the video player, which fits the whole image/video without cropping (letterboxed if it isn&apos;t 16:9). Recommended: 1920 × 1080 px image or .mp4 clip (up to 30s).</p>
               </div>
-              <div className="rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 p-3 space-y-1">
-                <strong className="block text-white light:text-slate-900 font-bold">Homepage Spotlight</strong>
-                <code className="inline-block rounded bg-orange-500/20 light:bg-orange-100 px-1.5 py-0.5 font-bold text-orange-300 light:text-amber-900">10:1 on tablet/desktop · 16:9 on mobile</code>
-                <p className="text-[11px] text-slate-400 light:text-slate-600">Same banner strip as the Homepage placement, shown lower on the page. Recommended: 1800 × 180 px (10:1 ratio); 1200 × 675 px (16:9) on mobile.</p>
-              </div>
               <div className="rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 p-3 space-y-1 sm:col-span-2">
                 <strong className="block text-white light:text-slate-900 font-bold">Watch Page Banner</strong>
-                <code className="inline-block rounded bg-orange-500/20 light:bg-orange-100 px-1.5 py-0.5 font-bold text-orange-300 light:text-amber-900">10:1 on most screens · 4:1 on wide desktop (≥1280px) · 16:9 on mobile</code>
-                <p className="text-[11px] text-slate-400 light:text-slate-600">Sits below the video. Recommended: 1800 × 180 px (10:1). On wide desktop screens the video moves into a two-column layout and this banner narrows into a sidebar, switching to a shorter 4:1 box (e.g. 800 × 200 px) so it never looks squashed to a sliver; on phones it&apos;s 16:9 (e.g. 1200 × 675 px). No single upload covers all three — the AI crop tool targets the 10:1 default size, which is correct for the majority of visitors.</p>
+                <code className="inline-block rounded bg-orange-500/20 light:bg-orange-100 px-1.5 py-0.5 font-bold text-orange-300 light:text-amber-900">16:9 (video-thumbnail style)</code>
+                <p className="text-[11px] text-slate-400 light:text-slate-600">Renders as a video-thumbnail-styled card in the &quot;Up Next&quot; rail next to the video you&apos;re watching (desktop) or below it (mobile) — hidden only when theater mode is on. Recommended: 1280 × 720 px (or any 16:9 image), same as Homepage Banner. The upload/AI-crop tools on this tab already target this exact ratio.</p>
               </div>
             </div>
           </div>

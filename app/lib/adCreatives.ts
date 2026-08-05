@@ -46,7 +46,7 @@ export const getAllAdCreatives = unstable_cache(scanAllAdCreatives, [AD_CREATIVE
 // this large would be unusual but shouldn't silently corrupt the item.
 export const AD_IMAGE_DATA_URL_MAX_LENGTH = 150_000;
 
-export type AdPlacement = "homepage" | "watch" | "homepage_spotlight" | "weekly_featured";
+export type AdPlacement = "homepage" | "watch" | "weekly_featured";
 
 export interface AdCreative {
   adId: string;

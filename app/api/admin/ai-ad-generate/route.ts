@@ -16,13 +16,12 @@ const OPENAI_CHAT_ENDPOINT = "https://api.openai.com/v1/chat/completions";
 const OPENAI_IMAGE_ENDPOINT = "https://api.openai.com/v1/images/generations";
 const PER_CALL_TIMEOUT_MS = 60_000;
 
-type Placement = "homepage" | "watch" | "homepage_spotlight" | "weekly_featured" | "midroll";
+type Placement = "homepage" | "watch" | "weekly_featured" | "midroll";
 
 const PLACEMENT_CONTEXT: Record<Placement, string> = {
-  homepage: "a wide homepage banner ad shown to every visitor on InPlayer's homepage (roughly 16:5, letterbox shape)",
-  watch: "a wide banner ad shown on InPlayer's video watch page, just below the video player (roughly 16:5, letterbox shape)",
+  homepage: "a homepage ad card shown among video thumbnails on InPlayer's homepage (roughly 16:9 landscape)",
+  watch: "a watch-page ad card shown in the 'Up Next' rail next to the video, styled like a video thumbnail (roughly 16:9 landscape)",
   weekly_featured: "InPlayer's Weekly Featured hero banner — a large, prominent wide banner (roughly 16:5, letterbox shape)",
-  homepage_spotlight: "a homepage spotlight ad card shown among video thumbnails (roughly 16:9 landscape)",
   midroll: "a full-screen ad shown as a mid-roll break inside video playback (roughly 16:9 landscape)",
 };
 
@@ -224,9 +223,9 @@ export async function POST(request: NextRequest) {
 
     // mode === "full": no image was uploaded — write a real headline, then
     // generate a real banner image with that exact headline baked in (the
-    // site never overlays the "title" field visibly — see AdBanner.tsx,
-    // which only uses it as alt text — so the visible ad copy has to live
-    // inside the image itself).
+    // site never overlays the "title" field visibly — see
+    // AdThumbnailCard.tsx / FeaturedHeroAd.tsx, which only use it as alt
+    // text — so the visible ad copy has to live inside the image itself).
     const headline = await generateHeadlineText(apiKey, placement);
     const imageUrl = await generateBannerImage(apiKey, placement, headline);
     return NextResponse.json({ title: headline, imageUrl });

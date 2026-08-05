@@ -66,9 +66,6 @@ export async function PATCH(request: NextRequest) {
   if (AD_SLOT_SOURCES.includes(body.watchPageBannerSource)) {
     partial.watchPageBannerSource = body.watchPageBannerSource;
   }
-  if (AD_SLOT_SOURCES.includes(body.homepageSpotlightSource)) {
-    partial.homepageSpotlightSource = body.homepageSpotlightSource;
-  }
   if (typeof body.weeklyFeaturedEnabled === "boolean") {
     partial.weeklyFeaturedEnabled = body.weeklyFeaturedEnabled;
   }

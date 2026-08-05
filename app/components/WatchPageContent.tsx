@@ -12,7 +12,7 @@ import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { formatTimeAgo, formatViews } from "@/app/lib/formatters";
 import WatchActions from "@/app/components/watch/WatchActions";
 import WatchMeta from "@/app/components/watch/WatchMeta";
-import AdBanner from "@/app/components/AdBanner";
+import AdThumbnailCard from "@/app/components/AdThumbnailCard";
 
 interface VideoData {
   videoId: string;
@@ -175,7 +175,7 @@ export default function WatchPageContent({ video, relatedVideos: initialRelatedV
         </div>
 
         {!theaterMode && <aside className="xl:sticky xl:top-5 xl:self-start space-y-4">
-          <AdBanner placement="watch" />
+          <AdThumbnailCard placement="watch" />
           <div className="rounded-3xl border border-white/[0.08] bg-white/[0.035] p-3 backdrop-blur-xl light:border-black/[0.08] light:bg-black/[0.025]">
             <div className="mb-3 flex items-center gap-2 px-1 pt-1"><span className="h-5 w-1 rounded-full bg-gradient-to-b from-orange-400 to-amber-300" /><div><p className="text-[11px] font-black uppercase tracking-[0.2em] text-orange-300 light:text-orange-700">Keep watching</p><h2 className="text-base font-black text-white light:text-slate-900">Up Next</h2></div></div>
             <div className="space-y-2">

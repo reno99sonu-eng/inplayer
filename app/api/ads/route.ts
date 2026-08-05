@@ -11,7 +11,7 @@ import { AD_CREATIVES_TABLE, AdPlacement, getAllAdCreatives } from "@/app/lib/ad
 // picks one real active creative for that placement at random so
 // multiple uploads for the same slot rotate naturally instead of only
 // the newest one ever showing.
-const VALID_PLACEMENTS: AdPlacement[] = ["homepage", "watch", "homepage_spotlight", "weekly_featured"];
+const VALID_PLACEMENTS: AdPlacement[] = ["homepage", "watch", "weekly_featured"];
 
 export async function GET(request: NextRequest) {
   const placement = request.nextUrl.searchParams.get("placement") as AdPlacement | null;
@@ -31,11 +31,9 @@ export async function GET(request: NextRequest) {
       ? settings.homepageBannerSource
       : placement === "watch"
       ? settings.watchPageBannerSource
-      : placement === "weekly_featured"
-      ? settings.weeklyFeaturedEnabled
-        ? "house"
-        : "off"
-      : settings.homepageSpotlightSource;
+      : settings.weeklyFeaturedEnabled
+      ? "house"
+      : "off";
 
   if (source === "off") {
     return NextResponse.json({ source: "off" });
@@ -94,9 +92,10 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Real click-tracking — fired by AdBanner right before it navigates the
-// visitor to the creative's real linkUrl. Fire-and-forget on the client
-// side (see AdBanner.tsx), so a slow/failed write never delays the click.
+// Real click-tracking — fired by the placement's ad component (see
+// AdThumbnailCard.tsx and FeaturedHeroAd.tsx) right before it navigates
+// the visitor to the creative's real linkUrl. Fire-and-forget on the
+// client side, so a slow/failed write never delays the click.
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const adId = body?.adId;

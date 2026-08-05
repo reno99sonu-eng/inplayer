@@ -7,7 +7,8 @@ import { MIDROLL_ADS_TABLE, MIDROLL_SKIP_TIERS_SECONDS, getAllMidrollAds } from 
 // Public, unauthenticated — app/components/VideoPlayer.tsx calls this
 // once per mount to learn whether mid-roll breaks are on at all and, if
 // so, which creative to show when a break triggers. Same
-// "resolve-once-then-reuse" shape as AdBanner/api/ads, not fetched again
+// "resolve-once-then-reuse" shape as the homepage/watch ad slots' own
+// /api/ads fetch, not fetched again
 // per break — a single video playback shows the same picked creative at
 // every break it triggers, which also keeps the impression counter
 // meaning "this creative was queued up for a viewer," same convention as

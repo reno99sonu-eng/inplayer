@@ -14,18 +14,23 @@ type AdResponse =
   | { source: "house"; creative: HouseCreative; creatives?: HouseCreative[] }
   | { source: "adsense"; adsensePublisherId: string };
 
-// A single ad slot that sits INSIDE the homepage video grid — same
-// admin-configured "Homepage Banner" creative pool as the old wide
-// AdBanner strip (GET /api/ads?placement=homepage), but shaped and styled
-// exactly like a real video thumbnail card so it blends into the grid
-// instead of interrupting it as a separate wide banner. RecommendationFeed
-// decides WHERE in the grid this renders (a random slot among every
-// 8/16/20 videos); this component only owns fetching + rendering the one
-// creative. AdSense isn't supported here (AdSense units need their own
-// fixed-size ad slot, not a video-thumbnail-shaped box) — an AdSense
-// placement configured for "homepage" simply means no in-grid ad shows,
-// same as "off".
-export default function AdThumbnailCard() {
+// A single ad slot styled and shaped exactly like a real video thumbnail
+// card, instead of a separate wide banner strip. Originally built for the
+// Homepage Banner slot (a random slot in RecommendationFeed's grid, among
+// every 8/16/20 videos — this component only owns fetching + rendering the
+// one creative, RecommendationFeed decides WHERE it renders). Reused as-is
+// for the Watch Page Banner slot (placement="watch", rendered in
+// WatchPageContent.tsx's "Up Next" rail) so both placements look like real
+// content instead of one being this thumbnail card and the other a
+// separate wide AdBanner strip. AdSense isn't supported for either
+// placement here (AdSense units need their own fixed-size ad slot, not a
+// video-thumbnail-shaped box) — an AdSense source configured for either
+// slot simply means no ad shows, same as "off".
+export default function AdThumbnailCard({
+  placement = "homepage",
+}: {
+  placement?: "homepage" | "watch";
+}) {
   const [data, setData] = useState<AdResponse | null>(null);
   const [imageBroken, setImageBroken] = useState(false);
 
@@ -33,7 +38,7 @@ export default function AdThumbnailCard() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/ads?placement=homepage");
+        const res = await fetch(`/api/ads?placement=${placement}`);
         if (!res.ok) return;
         const json = await res.json();
         if (!cancelled) setData(json);
@@ -44,7 +49,7 @@ export default function AdThumbnailCard() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [placement]);
 
   if (!data || data.source !== "house") return null;
 

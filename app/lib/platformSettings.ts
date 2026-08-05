@@ -22,7 +22,6 @@ export interface PlatformSettings {
   adsensePublisherId: string;
   homepageBannerSource: AdSlotSource;
   watchPageBannerSource: AdSlotSource;
-  homepageSpotlightSource: AdSlotSource;
   weeklyFeaturedEnabled: boolean;
   midrollEnabled: boolean;
   midrollIntervalSeconds: number;
@@ -44,7 +43,6 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
   adsensePublisherId: "",
   homepageBannerSource: "house",
   watchPageBannerSource: "house",
-  homepageSpotlightSource: "off",
   weeklyFeaturedEnabled: true, // ON by default
   midrollEnabled: true,
   midrollIntervalSeconds: 900,
@@ -64,7 +62,6 @@ export type PublicPlatformSettings = Pick<
   | "adsensePublisherId"
   | "homepageBannerSource"
   | "watchPageBannerSource"
-  | "homepageSpotlightSource"
   | "weeklyFeaturedEnabled"
   | "midrollEnabled"
   | "midrollIntervalSeconds"
@@ -117,7 +114,6 @@ export function toPublicSettings(settings: PlatformSettings): PublicPlatformSett
     adsensePublisherId: settings.adsensePublisherId,
     homepageBannerSource: settings.homepageBannerSource,
     watchPageBannerSource: settings.watchPageBannerSource,
-    homepageSpotlightSource: settings.homepageSpotlightSource,
     weeklyFeaturedEnabled: settings.weeklyFeaturedEnabled !== false,
     midrollEnabled: settings.midrollEnabled,
     midrollIntervalSeconds: settings.midrollIntervalSeconds,

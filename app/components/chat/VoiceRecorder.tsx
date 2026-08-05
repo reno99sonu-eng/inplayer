@@ -8,6 +8,11 @@ interface VoiceRecorderProps {
   onCancel: () => void;
 }
 
+// Hard cap on recording length — also keeps a note's base64 size well
+// under DynamoDB's 400KB item cap, combined with the bitrate cap on the
+// MediaRecorder itself below (see startRecording).
+const MAX_DURATION_SEC = 90;
+
 export default function VoiceRecorder({ onSend, onCancel }: VoiceRecorderProps) {
   const [recording, setRecording] = useState(false);
   const [duration, setDuration] = useState(0);
@@ -17,6 +22,10 @@ export default function VoiceRecorder({ onSend, onCancel }: VoiceRecorderProps) 
   const mediaRecorderRef = useRef<MediaRecorder | null>(null);
   const audioChunksRef = useRef<Blob[]>([]);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  // Always-current mirror of `duration` state, safe to read from inside
+  // callbacks (the timer interval, handleStopAndSend) whose closure was
+  // captured once at mount and would otherwise see a stale value.
+  const durationRef = useRef(0);
 
   // Declared before the effect below (not after, as this used to be) — the
   // React Compiler's linter flags a function referenced inside an effect
@@ -30,9 +39,41 @@ export default function VoiceRecorder({ onSend, onCancel }: VoiceRecorderProps) 
     }
   };
 
+  // Also declared before startRecording (which schedules a timer that can
+  // call this directly on auto-stop) for the same source-order reason as
+  // stopTimer above.
+  const handleStopAndSend = () => {
+    const mediaRecorder = mediaRecorderRef.current;
+    if (!mediaRecorder) return;
+
+    setProcessing(true);
+    stopTimer();
+
+    mediaRecorder.onstop = () => {
+      const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64Data = reader.result as string;
+        // Reads the ref, not the `duration` state — this can fire from
+        // inside the timer interval below (auto-stop at MAX_DURATION_SEC),
+        // whose closure was created once at mount and would otherwise
+        // always see duration as it was back then (0).
+        onSend(base64Data, durationRef.current);
+        // Stop stream tracks
+        mediaRecorder.stream.getTracks().forEach((track) => track.stop());
+      };
+      reader.readAsDataURL(audioBlob);
+    };
+
+    if (mediaRecorder.state !== "inactive") {
+      mediaRecorder.stop();
+    }
+  };
+
   const startRecording = async () => {
     setMicError(null);
     setDuration(0);
+    durationRef.current = 0;
     audioChunksRef.current = [];
 
     try {
@@ -42,7 +83,10 @@ export default function VoiceRecorder({ onSend, onCancel }: VoiceRecorderProps) 
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const mediaRecorder = new MediaRecorder(stream);
+      // Low, speech-tuned bitrate — keeps even a full MAX_DURATION_SEC note
+      // comfortably under DynamoDB's 400KB item cap once base64-encoded
+      // (base64 adds ~33% overhead on top of the raw encoded size).
+      const mediaRecorder = new MediaRecorder(stream, { audioBitsPerSecond: 16000 });
       mediaRecorderRef.current = mediaRecorder;
 
       mediaRecorder.ondataavailable = (event) => {
@@ -55,7 +99,11 @@ export default function VoiceRecorder({ onSend, onCancel }: VoiceRecorderProps) 
       setRecording(true);
 
       timerRef.current = setInterval(() => {
-        setDuration((prev) => prev + 1);
+        durationRef.current += 1;
+        setDuration(durationRef.current);
+        if (durationRef.current >= MAX_DURATION_SEC) {
+          handleStopAndSend();
+        }
       }, 1000);
     } catch (err) {
       console.error("Failed to access microphone:", err);
@@ -81,30 +129,6 @@ export default function VoiceRecorder({ onSend, onCancel }: VoiceRecorderProps) 
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const handleStopAndSend = () => {
-    const mediaRecorder = mediaRecorderRef.current;
-    if (!mediaRecorder) return;
-
-    setProcessing(true);
-    stopTimer();
-
-    mediaRecorder.onstop = () => {
-      const audioBlob = new Blob(audioChunksRef.current, { type: "audio/webm" });
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const base64Data = reader.result as string;
-        onSend(base64Data, duration);
-        // Stop stream tracks
-        mediaRecorder.stream.getTracks().forEach((track) => track.stop());
-      };
-      reader.readAsDataURL(audioBlob);
-    };
-
-    if (mediaRecorder.state !== "inactive") {
-      mediaRecorder.stop();
-    }
-  };
 
   const handleCancel = () => {
     stopTimer();

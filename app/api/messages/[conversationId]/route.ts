@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { GetCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
+import { CHAT_THEMES } from "@/app/components/chat/ChatThemes";
 
 const CONVERSATIONS_TABLE = "InPlayer-Conversations";
 const DISAPPEARING_OPTIONS = [3600, 86400, 604800]; // 1 hour / 1 day / 1 week
@@ -100,7 +101,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   }
 
   const { conversationId } = await params;
-  const { action, seconds } = await request.json();
+  const { action, seconds, theme } = await request.json();
 
   let row;
   try {
@@ -178,6 +179,22 @@ export async function PATCH(request: NextRequest, { params }: Params) {
             Key: { userId: user.userId, conversationId },
             UpdateExpression: "SET muted = :v",
             ExpressionAttributeValues: { ":v": action === "mute" },
+          })
+        );
+        break;
+      }
+
+      case "set_theme": {
+        // Personal preference, like mute — written to MY OWN row only, not
+        // the other participant's, so each side can pick their own chat
+        // wallpaper independently.
+        const themeId = typeof theme === "string" && theme in CHAT_THEMES ? theme : "default";
+        await docClient.send(
+          new UpdateCommand({
+            TableName: CONVERSATIONS_TABLE,
+            Key: { userId: user.userId, conversationId },
+            UpdateExpression: "SET chatTheme = :v",
+            ExpressionAttributeValues: { ":v": themeId },
           })
         );
         break;

@@ -13,6 +13,10 @@ import { applyModerationStrike } from "@/app/lib/moderationStrikes";
 const CONVERSATIONS_TABLE = "InPlayer-Conversations";
 const MESSAGES_TABLE = "InPlayer-Messages";
 const MAX_MESSAGE_LENGTH = 4000;
+// base64 voice note cap — DynamoDB items are capped at 400KB total; this
+// leaves headroom for the rest of the item, same reasoning as
+// app/api/profile/avatar/route.ts's own cap.
+const MAX_AUDIO_DATA_URL_LENGTH = 300_000;
 
 // One row per (user, conversation) — the same "denormalized per-user
 // index" convention this codebase already uses for Watchlist/History/
@@ -76,7 +80,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Please sign in." }, { status: 401 });
   }
 
-  const { otherUserId, text } = await request.json();
+  const { otherUserId, text, audioUrl, audioDurationSec } = await request.json();
 
   if (!otherUserId || typeof otherUserId !== "string") {
     return NextResponse.json({ error: "Missing recipient." }, { status: 400 });
@@ -86,7 +90,22 @@ export async function POST(request: NextRequest) {
   }
 
   const trimmedText = typeof text === "string" ? text.trim() : "";
-  if (!trimmedText) {
+
+  // Voice notes ride this same send endpoint — same denormalization/
+  // notification logic either way, so duplicating it into a second route
+  // is exactly the kind of thing that drifts (see the comment on POST
+  // above). A message is either non-empty text OR a valid audio data URL.
+  const hasValidAudio =
+    typeof audioUrl === "string" &&
+    audioUrl.startsWith("data:audio/") &&
+    audioUrl.length > 0 &&
+    audioUrl.length <= MAX_AUDIO_DATA_URL_LENGTH;
+
+  if (typeof audioUrl === "string" && audioUrl.length > 0 && !hasValidAudio) {
+    return NextResponse.json({ error: "That voice note is too long to send." }, { status: 400 });
+  }
+
+  if (!trimmedText && !hasValidAudio) {
     return NextResponse.json({ error: "Message can't be empty." }, { status: 400 });
   }
   if (trimmedText.length > MAX_MESSAGE_LENGTH) {
@@ -95,6 +114,10 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
+
+  const validDurationSec = hasValidAudio
+    ? Math.max(0, Math.min(600, Math.round(Number(audioDurationSec) || 0)))
+    : undefined;
 
   const conversationId = makeConversationId(user.userId, otherUserId);
 
@@ -145,9 +168,10 @@ export async function POST(request: NextRequest) {
     // Skipped entirely when Admin Panel -> Platform Settings has message
     // moderation turned off — no OpenAI call is made at all.
     const platformSettings = await getPlatformSettings();
-    const moderation = platformSettings.moderationEnabledMessages
-      ? await moderateText(trimmedText)
-      : UNCHECKED;
+    const moderation =
+      platformSettings.moderationEnabledMessages && trimmedText
+        ? await moderateText(trimmedText)
+        : UNCHECKED;
     const flagged = moderation.checked && moderation.flagged;
 
     await docClient.send(
@@ -159,6 +183,10 @@ export async function POST(request: NextRequest) {
           senderId: user.userId,
           text: trimmedText,
           createdAt: now,
+          ...(hasValidAudio && {
+            audioUrl,
+            audioDurationSec: validDurationSec,
+          }),
           ...(expiresAtMs !== undefined && {
             expiresAt: new Date(expiresAtMs).toISOString(),
             // Numeric mirror in Unix-epoch *seconds* — DynamoDB's native
@@ -196,6 +224,10 @@ export async function POST(request: NextRequest) {
     const otherUsername = (otherUserRecord.Item?.username as string) || null;
     const otherAvatarUrl = (otherUserRecord.Item?.avatarUrl as string) || null;
     const initiatedBy = isNewConversation ? user.userId : myRow.Item?.initiatedBy || user.userId;
+    // Conversation-list preview text — a voice note has no `text` to show,
+    // so both participants' row previews fall back to a label instead of
+    // going blank.
+    const previewText = trimmedText || (hasValidAudio ? "🎤 Voice message" : "");
 
     await Promise.all([
       // My own row — I'm reading this conversation right now (I just sent
@@ -218,7 +250,7 @@ export async function POST(request: NextRequest) {
             ":otherAvatarUrl": otherAvatarUrl,
             ":requestStatus": requestStatus,
             ":initiatedBy": initiatedBy,
-            ":text": trimmedText,
+            ":text": previewText,
             ":sender": user.userId,
             ":now": now,
             ":zero": 0,
@@ -246,7 +278,7 @@ export async function POST(request: NextRequest) {
             ":myAvatarUrl": myAvatarUrl,
             ":requestStatus": requestStatus,
             ":initiatedBy": initiatedBy,
-            ":text": trimmedText,
+            ":text": previewText,
             ":sender": user.userId,
             ":now": now,
             ":zero": 0,

@@ -2,7 +2,6 @@
 
 import { authedFetch } from "@/app/lib/apiFetch";
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import {
   Search,
@@ -432,11 +431,10 @@ export default function AdminUsersPage() {
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div className="flex min-w-0 items-center gap-3">
                 {u.avatarUrl ? (
-                  <Image
+                  // eslint-disable-next-line @next/next/no-img-element -- avatarUrl may be a compressed base64 data URL (see app/api/profile/avatar/route.ts), which next/image can't optimize without the `unoptimized` prop.
+                  <img
                     src={u.avatarUrl}
                     alt={u.username || "User"}
-                    width={44}
-                    height={44}
                     className="h-11 w-11 shrink-0 rounded-full object-cover"
                   />
                 ) : (

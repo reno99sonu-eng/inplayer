@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Image from "next/image";
 import { fetchAuthSession } from "aws-amplify/auth";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Rss, ChevronRight } from "lucide-react";
@@ -128,15 +127,11 @@ export default function SubscriptionsPage() {
                 "
               >
                 <div className="relative h-12 w-12 overflow-hidden rounded-full">
-                  <Image
-                    src={
-                      creator.avatarUrl ||
-                      "/recommendations/avatars/default.jpg"
-                    }
+                  {/* eslint-disable-next-line @next/next/no-img-element -- avatarUrl may be a compressed base64 data URL (see app/api/profile/avatar/route.ts), which next/image can't optimize without the `unoptimized` prop. */}
+                  <img
+                    src={creator.avatarUrl || "/recommendations/avatars/default.jpg"}
                     alt={creator.name}
-                    fill
-                    sizes="48px"
-                    className="object-cover"
+                    className="absolute inset-0 h-full w-full object-cover"
                   />
                 </div>
 

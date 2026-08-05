@@ -16,12 +16,18 @@ import {
   CheckCheck,
   X,
   Loader2,
+  Mic,
+  Palette,
 } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { formatTimeAgo } from "@/app/lib/formatters";
 import { otherParticipant } from "@/app/lib/conversationId";
 import ReportButton from "@/app/components/ReportButton";
 import MessageActionsMenu from "@/app/components/MessageActionsMenu";
+import VoiceRecorder from "@/app/components/chat/VoiceRecorder";
+import VoiceMessageBubble from "@/app/components/chat/VoiceMessageBubble";
+import UserProfileDrawer from "@/app/components/chat/UserProfileDrawer";
+import { CHAT_THEMES } from "@/app/components/chat/ChatThemes";
 
 interface ConversationDetail {
   conversationId: string;
@@ -35,6 +41,7 @@ interface ConversationDetail {
   muted?: boolean;
   disappearingEnabled?: boolean;
   disappearingSeconds?: number | null;
+  chatTheme?: string;
 }
 
 interface MessageItem {
@@ -44,6 +51,8 @@ interface MessageItem {
   text: string;
   createdAt: string;
   deletedForEveryone?: boolean;
+  audioUrl?: string;
+  audioDurationSec?: number;
 }
 
 const DISAPPEARING_OPTIONS = [
@@ -73,6 +82,8 @@ export default function ConversationThreadPage() {
   const [sendError, setSendError] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [actionBusy, setActionBusy] = useState(false);
+  const [voiceMode, setVoiceMode] = useState(false);
+  const [profileDrawerOpen, setProfileDrawerOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const lastTypingPingRef = useRef(0);
 
@@ -239,6 +250,68 @@ export default function ConversationThreadPage() {
     }
   };
 
+  const handleSendVoice = async (audioDataUrl: string, durationSec: number) => {
+    if (!targetUserId || !user) return;
+
+    setVoiceMode(false);
+    setSendError(null);
+    const optimisticId = `optimistic-${Date.now()}`;
+    setMessages((prev) => [
+      ...prev,
+      {
+        conversationId: params.conversationId,
+        messageId: optimisticId,
+        senderId: user.userId,
+        text: "",
+        audioUrl: audioDataUrl,
+        audioDurationSec: durationSec,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
+
+    try {
+      const headers = await authHeaders();
+      const res = await fetch("/api/messages", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({
+          otherUserId: targetUserId,
+          audioUrl: audioDataUrl,
+          audioDurationSec: durationSec,
+        }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setMessages((prev) => prev.filter((m) => m.messageId !== optimisticId));
+        setSendError(data.error || "Couldn't send that voice note.");
+        return;
+      }
+
+      await Promise.all([refetchConversation(), fetchMessages()]);
+    } catch (err) {
+      console.error("Failed to send voice note:", err);
+      setMessages((prev) => prev.filter((m) => m.messageId !== optimisticId));
+      setSendError("Something went wrong. Please try again.");
+    }
+  };
+
+  const handleSetTheme = async (themeId: string) => {
+    // Optimistic — the wallpaper picker should feel instant, same as every
+    // other setting toggle in this menu.
+    setConversation((prev) => (prev ? { ...prev, chatTheme: themeId } : prev));
+    try {
+      const headers = await authHeaders();
+      await fetch(`/api/messages/${params.conversationId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({ action: "set_theme", theme: themeId }),
+      });
+    } catch (err) {
+      console.error("Failed to save chat wallpaper:", err);
+    }
+  };
+
   if (authLoading || !conversationLoaded) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#06101D] light:bg-[#FAF5E9]">
@@ -277,20 +350,40 @@ export default function ConversationThreadPage() {
   const isPendingIncoming =
     conversation?.requestStatus === "pending" && conversation?.initiatedBy !== user?.userId;
   const isBlocked = !!(conversation?.blocked || conversation?.blockedByOther);
+  const theme = CHAT_THEMES[conversation?.chatTheme || "default"] || CHAT_THEMES.default;
 
   return (
-    <div className="flex min-h-screen flex-col bg-[#06101D] light:bg-[#FAF5E9] text-white light:text-slate-900">
+    <div className={`relative flex min-h-screen flex-col ${theme.containerClass}`}>
+      {/* Wallpaper layer — fixed (not absolute) so it stays put behind the
+          chat instead of scrolling away with the message list, same as
+          WhatsApp's own chat wallpaper. */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 -z-10"
+        style={{
+          backgroundImage: theme.backgroundImageUrl ? `url(${theme.backgroundImageUrl})` : undefined,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+          opacity: 0.13,
+        }}
+      />
+      <div
+        aria-hidden="true"
+        className="pointer-events-none fixed inset-0 -z-10"
+        style={{ backgroundImage: theme.texturePattern }}
+      />
+
       <div className="flex items-center gap-3 border-b border-white/10 light:border-black/10 px-4 py-3">
         <button
-          onClick={() => router.push("/messages")}
+          onClick={() => router.back()}
           className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 transition hover:bg-white/15 light:hover:bg-black/10"
         >
           <ArrowLeft size={20} />
         </button>
 
-        <Link
-          href={`/u/${encodeURIComponent(displayUsername)}`}
-          className="flex min-w-0 flex-1 items-center gap-3"
+        <button
+          onClick={() => setProfileDrawerOpen(true)}
+          className="flex min-w-0 flex-1 items-center gap-3 text-left"
         >
           <div className="relative flex-shrink-0">
             {/* eslint-disable-next-line @next/next/no-img-element -- avatar may be a data URL. */}
@@ -311,7 +404,7 @@ export default function ConversationThreadPage() {
                 : ""}
             </span>
           </div>
-        </Link>
+        </button>
 
         <div className="relative flex-shrink-0">
           <button
@@ -331,6 +424,26 @@ export default function ConversationThreadPage() {
                 {conversation?.muted ? <Bell size={15} /> : <BellOff size={15} />}
                 {conversation?.muted ? "Unmute notifications" : "Mute notifications"}
               </button>
+
+              <div className="border-t border-white/10 light:border-black/10 px-4 py-3">
+                <p className="mb-1.5 flex items-center gap-2 text-sm font-semibold text-slate-200 light:text-slate-800">
+                  <Palette size={15} /> Chat wallpaper
+                </p>
+                <div className="flex flex-wrap gap-2">
+                  {Object.values(CHAT_THEMES).map((t) => (
+                    <button
+                      key={t.id}
+                      onClick={() => handleSetTheme(t.id)}
+                      title={t.name}
+                      className={`h-7 w-7 rounded-full border-2 ${t.previewBg} ${
+                        (conversation?.chatTheme || "default") === t.id
+                          ? "ring-2 ring-orange-400 ring-offset-2 ring-offset-[#0B1524]"
+                          : ""
+                      }`}
+                    />
+                  ))}
+                </div>
+              </div>
 
               <div className="border-t border-white/10 light:border-black/10 px-4 py-3">
                 <p className="mb-1.5 flex items-center gap-2 text-sm font-semibold text-slate-200 light:text-slate-800">
@@ -436,11 +549,15 @@ const showAvatar =
         m.deletedForEveryone
           ? "border border-dashed border-white/15 light:border-black/15 text-slate-500 light:text-slate-600 italic"
           : mine
-          ? "bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white"
-          : "border border-white/10 light:border-black/10 bg-white/[0.04] light:bg-slate-100 text-slate-100 light:text-slate-900"
+          ? theme.bubbleMine
+          : theme.bubbleOther
       }`}
     >
-      <p className="whitespace-pre-wrap break-words">{m.text}</p>
+      {!m.deletedForEveryone && m.audioUrl ? (
+        <VoiceMessageBubble audioUrl={m.audioUrl} mine={mine} />
+      ) : (
+        <p className="whitespace-pre-wrap break-words">{m.text}</p>
+      )}
 
       <p
         className={`mt-0.5 flex items-center gap-1 text-[10px] ${
@@ -522,6 +639,10 @@ const showAvatar =
               ? "You've blocked this user — unblock them to send a message."
               : "You can't message this user."}
           </p>
+        ) : voiceMode ? (
+          <div className="mx-auto flex w-full max-w-3xl items-center gap-2.5">
+            <VoiceRecorder onSend={handleSendVoice} onCancel={() => setVoiceMode(false)} />
+          </div>
         ) : (
           <div className="mx-auto flex w-full max-w-3xl items-center gap-2.5">
             <input
@@ -539,17 +660,46 @@ const showAvatar =
               placeholder="Message..."
               className="min-w-0 flex-1 rounded-full border border-white/10 light:border-slate-300 bg-white/[0.03] light:bg-white px-4 py-2.5 text-sm text-white light:text-slate-900 placeholder:text-slate-500 caret-orange-500 shadow-sm outline-none transition focus:border-orange-400 focus:ring-2 focus:ring-orange-300/30"
             />
-            <button
-              onClick={handleSend}
-              disabled={sending || !text.trim()}
-              className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white transition hover:-translate-y-0.5 disabled:opacity-50"
-            >
-              {sending ? <Loader2 size={17} className="animate-spin" /> : <Send size={17} />}
-            </button>
+            {text.trim() ? (
+              <button
+                onClick={handleSend}
+                disabled={sending}
+                className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white transition hover:-translate-y-0.5 disabled:opacity-50"
+              >
+                {sending ? <Loader2 size={17} className="animate-spin" /> : <Send size={17} />}
+              </button>
+            ) : (
+              <button
+                onClick={() => setVoiceMode(true)}
+                title="Record a voice message"
+                className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white transition hover:-translate-y-0.5"
+              >
+                <Mic size={17} />
+              </button>
+            )}
           </div>
         )}
         {sendError && <p className="mt-2 text-center text-xs text-red-400">{sendError}</p>}
       </div>
+
+      <UserProfileDrawer
+        open={profileDrawerOpen}
+        onClose={() => setProfileDrawerOpen(false)}
+        username={displayUsername}
+        avatarUrl={displayAvatar}
+        online={otherIsOnline}
+        lastActiveAt={otherLastActiveAt}
+        conversationId={params.conversationId}
+        muted={conversation?.muted}
+        blocked={conversation?.blocked}
+        disappearingEnabled={conversation?.disappearingEnabled}
+        disappearingLabel={
+          DISAPPEARING_OPTIONS.find((o) => o.seconds === conversation?.disappearingSeconds)?.label
+        }
+        onToggleMute={() => handleAction(conversation?.muted ? "unmute" : "mute")}
+        onToggleBlock={() => handleAction(conversation?.blocked ? "unblock" : "block")}
+        onToggleDisappearing={() => handleAction("toggle_disappearing")}
+      />
     </div>
   );
 }

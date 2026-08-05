@@ -62,6 +62,29 @@ Hub.listen("auth", ({ payload }) => {
   }
 });
 
+// Security: auto sign-out after 8 hours with no interaction anywhere on
+// the site (see the idle-tracking effect below, after handleSignOut).
+// The activity timestamp lives in localStorage rather than component
+// state so every open tab reads/writes the SAME clock — using InPlayer in
+// any one tab keeps every other tab's session alive, and closing the
+// browser entirely for 8+ hours signs you out the moment you come back
+// (checked immediately on mount, not just on the interval), not only
+// while a tab is left open and idle.
+const IDLE_LIMIT_MS = 8 * 60 * 60 * 1000; // 8 hours
+const IDLE_ACTIVITY_KEY = "inplayer-last-activity";
+const IDLE_CHECK_INTERVAL_MS = 60_000;
+const IDLE_ACTIVITY_EVENTS = ["mousedown", "mousemove", "keydown", "scroll", "touchstart", "wheel"] as const;
+
+function recordActivity() {
+  try {
+    localStorage.setItem(IDLE_ACTIVITY_KEY, String(Date.now()));
+  } catch (err) {
+    // Storage disabled (private browsing, quota, etc.) — idle auto-logout
+    // just won't fire for this tab; never let it break normal use.
+    console.error("Failed to record activity for idle auto-logout:", err);
+  }
+}
+
 type AuthModal =
   | null
   | "signin"
@@ -356,6 +379,64 @@ export default function AuthProvider({
     await amplifySignOut();
     setUser(null);
   }
+
+  // Declared after handleSignOut (not before) — this codebase's own
+  // convention (see app/components/chat/VoiceRecorder.tsx) is that a
+  // function referenced inside an effect-scheduled callback must appear
+  // earlier in source order than that effect, so this effect is placed
+  // here rather than up with the other effects above.
+  useEffect(() => {
+    if (!user?.userId) return;
+
+    let cancelled = false;
+
+    function getLastActivityMs(): number {
+      try {
+        const stored = localStorage.getItem(IDLE_ACTIVITY_KEY);
+        if (stored) return parseInt(stored, 10);
+      } catch (err) {
+        console.error("Failed to read stored activity for idle auto-logout:", err);
+      }
+      // No stored value yet (first sign-in on this browser, or storage was
+      // cleared) — start the clock now rather than treating "missing" as
+      // "infinitely idle," which would sign a brand-new session straight
+      // back out.
+      recordActivity();
+      return Date.now();
+    }
+
+    async function checkIdle() {
+      const lastActivityMs = getLastActivityMs();
+      if (!cancelled && Date.now() - lastActivityMs >= IDLE_LIMIT_MS) {
+        await handleSignOut();
+      }
+    }
+
+    // Throttled so a scroll/keystroke burst writes to localStorage at
+    // most once every 30s, not on every event.
+    let lastRecordedMs = 0;
+    function handleActivityEvent() {
+      const nowMs = Date.now();
+      if (nowMs - lastRecordedMs < 30_000) return;
+      lastRecordedMs = nowMs;
+      recordActivity();
+    }
+
+    IDLE_ACTIVITY_EVENTS.forEach((eventName) =>
+      window.addEventListener(eventName, handleActivityEvent, { passive: true })
+    );
+
+    checkIdle();
+    const interval = setInterval(checkIdle, IDLE_CHECK_INTERVAL_MS);
+
+    return () => {
+      cancelled = true;
+      clearInterval(interval);
+      IDLE_ACTIVITY_EVENTS.forEach((eventName) =>
+        window.removeEventListener(eventName, handleActivityEvent)
+      );
+    };
+  }, [user?.userId]);
 
   async function handleAcceptTerms() {
     const session = await fetchAuthSession();

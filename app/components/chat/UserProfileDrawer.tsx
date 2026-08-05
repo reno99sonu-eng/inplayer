@@ -79,7 +79,7 @@ export default function UserProfileDrawer({
     async function loadPublicData() {
       setLoadingProfile(true);
       try {
-        const res = await fetch(`/api/u/${encodeURIComponent(username)}`);
+        const res = await fetch(`/api/users/${encodeURIComponent(username)}`);
         if (res.ok) {
           const data = await res.json();
           if (isSubscribed) {

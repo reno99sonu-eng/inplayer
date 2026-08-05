@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { fetchAuthSession } from "aws-amplify/auth";
 import {
   ArrowLeft,
@@ -296,12 +295,11 @@ export default function MessagesPage() {
                   onClick={() => openConversationWith(row.otherUserId, row.otherUsername || "")}
                   className="flex min-w-0 flex-1 items-center gap-4 text-left"
                 >
-                  <Image
+                  {/* eslint-disable-next-line @next/next/no-img-element -- otherAvatarUrl may be a compressed base64 data URL (see app/api/profile/avatar/route.ts), which next/image can't optimize without the `unoptimized` prop. Crashed this whole list when any conversation's other participant had a custom avatar. */}
+                  <img
                     src={row.otherAvatarUrl || "/avatars/avatar.png"}
                     alt={row.otherUsername || "User"}
-                    width={54}
-                    height={54}
-                    className="flex-shrink-0 rounded-full object-cover"
+                    className="h-[54px] w-[54px] flex-shrink-0 rounded-full object-cover"
                   />
 
                   <div className="min-w-0 flex-1">

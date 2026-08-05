@@ -13,6 +13,12 @@ import { MIDROLL_ADS_TABLE, MIDROLL_SKIP_TIERS_SECONDS, getAllMidrollAds } from 
 // every break it triggers, which also keeps the impression counter
 // meaning "this creative was queued up for a viewer," same convention as
 // the homepage/watch banner's impression count.
+//
+// See app/api/platform-settings/route.ts's comment on force-dynamic — same
+// no-request-signal shape, same problem: whether mid-rolls are on/off must
+// be read fresh on every request, not served from a frozen snapshot.
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   const settings = await getPlatformSettings();
 

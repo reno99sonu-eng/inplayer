@@ -3,6 +3,11 @@ import { docClient } from "@/app/lib/dynamodb";
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { PLATFORM_SETTINGS_TABLE } from "@/app/lib/platformSettings";
 
+// See app/api/platform-settings/route.ts's comment on force-dynamic — same
+// no-request-signal shape, same problem: an admin switching an occasion
+// theme on/off must take effect immediately, not on whatever's cached.
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const result = await docClient.send(

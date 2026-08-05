@@ -51,7 +51,16 @@ export type AdPlacement = "homepage" | "watch" | "weekly_featured";
 export interface AdCreative {
   adId: string;
   placement: AdPlacement;
+  // imageUrl is the mobile & tablet/iPad poster — required, and also the
+  // fallback shown on desktop/TV for any creative that only ever had one
+  // image uploaded (every creative before this field existed). imageUrlDesktop
+  // is optional: when a creative has one, desktop/smart-TV screens show it
+  // instead. Two images exist because this placement's box genuinely
+  // isn't one shape — short and wide on a phone, dramatically wider on a
+  // desktop/TV screen (see FeaturedHeroAd.tsx) — so a single upload can
+  // never look right on both without cropping or heavy letterboxing.
   imageUrl: string;
+  imageUrlDesktop?: string;
   linkUrl: string;
   title: string;
   active: boolean;
@@ -93,6 +102,7 @@ export async function getActiveAdCreative(placement: AdPlacement): Promise<AdCre
       adId: pick.adId as string,
       placement: pick.placement as AdPlacement,
       imageUrl: pick.imageUrl as string,
+      imageUrlDesktop: (pick.imageUrlDesktop as string) || undefined,
       linkUrl: pick.linkUrl as string,
       title: pick.title as string,
       active: pick.active as boolean,

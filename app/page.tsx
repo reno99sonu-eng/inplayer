@@ -145,6 +145,7 @@ async function getFeaturedSlides(): Promise<FeaturedSlide[]> {
 interface HeroAdCreative {
   adId: string;
   imageUrl: string;
+  imageUrlDesktop?: string;
   linkUrl: string;
   title: string;
 }
@@ -176,6 +177,7 @@ async function getHeroContent(): Promise<HeroContent> {
           creative: {
             adId: creative.adId,
             imageUrl: creative.imageUrl,
+            imageUrlDesktop: creative.imageUrlDesktop,
             linkUrl: creative.linkUrl,
             title: creative.title,
           },

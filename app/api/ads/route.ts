@@ -82,6 +82,7 @@ export async function GET(request: NextRequest) {
       creative: {
         adId: pick.adId,
         imageUrl: pick.imageUrl,
+        imageUrlDesktop: pick.imageUrlDesktop || undefined,
         linkUrl: pick.linkUrl,
         title: pick.title,
       },

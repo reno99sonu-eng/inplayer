@@ -5,6 +5,7 @@ import { useState } from "react";
 interface FeaturedHeroAdCreative {
   adId: string;
   imageUrl: string;
+  imageUrlDesktop?: string;
   linkUrl: string;
   title: string;
 }
@@ -24,48 +25,34 @@ interface FeaturedHeroAdCreative {
 // there's no blank/loading flash on first paint here either. Only needs
 // "use client" for the click-tracking handler below.
 //
-// The foreground image uses object-contain, NOT object-cover. This box's
-// own aspect ratio isn't fixed — it ranges from a short, nearly-square
-// shape on mobile (min-h-[220px] at whatever width the phone is) up to a
-// wide 38vh-tall strip on large desktops — so there's no single ratio an
-// admin could upload at that would always fill it edge-to-edge without
-// cropping. Ad creatives also bake their headline/CTA copy directly into
-// the image pixels (see the poster specs tab and the AI-generate tool),
-// so cropping isn't a cosmetic trade-off here — it silently cuts off part
-// of the actual ad copy depending on the visitor's exact viewport. A
-// blurred, zoomed copy of the same image fills the letterbox space behind
-// it so there's never an empty black bar, while the sharp foreground copy
-// always shows the whole, uncropped creative.
+// TWO images, not one. This box's own aspect ratio isn't fixed — it's a
+// short, wide shape on mobile (min-h-[220px] at whatever width the phone
+// is) but a MUCH wider strip on desktop/TV (lg+ switches to viewport-
+// height sizing, so a 1920-wide 16:9 monitor renders roughly a 4.7:1 box,
+// and ultra-wide/4K screens go even wider) — no single upload can ever
+// fill both shapes edge-to-edge without heavy letterboxing on one end.
+// Admin Panel -> Advertising -> Weekly Featured Banner now has two
+// separate upload slots for exactly this reason: imageUrl (mobile &
+// tablet/iPad) and imageUrlDesktop (desktop & smart TV, optional). Below
+// lg (1024px, the same breakpoint where the box's own sizing model
+// switches from min-height to viewport-height) the mobile image shows;
+// at lg and above, the desktop image shows if one was uploaded, falling
+// back to the mobile image otherwise so older creatives that only ever
+// had one image keep working exactly as before.
 //
-// The <a> wrapper is `absolute inset-0`, NOT `relative` + `h-full w-full`
-// like an earlier version had it. Reason: on mobile/sm/md this section is
-// sized by `min-h-[...]` only (no explicit `height` — see className
-// below), and a percentage height like `h-full` on an ordinary in-flow
-// child can't resolve against a parent whose height comes only from
-// min-height (the browser treats it as indeterminate/"auto"). With the
-// <a>'s own height stuck at "auto" and its only children being absolutely
-// positioned (which don't count toward auto-height), the two images
-// inside lost a reliable box to fill — producing exactly the
-// inconsistent "poster doesn't fit right" rendering Reno kept seeing on
-// mobile even after the object-contain fix above. Anchoring the <a>
-// itself with `absolute inset-0` against the section (which DOES have a
-// real, fully-resolved box once min-height is applied) removes that
-// ambiguity entirely — same technique FeaturedHeroVideo.tsx already uses
-// successfully for this exact "min-height-only on mobile" section.
+// Each variant uses object-contain for its sharp foreground copy (never
+// crops — ad creatives bake their headline/CTA copy directly into the
+// image pixels, so cropping would silently cut off real ad copy) with a
+// blurred, scaled-up backdrop copy of the SAME image filling the
+// letterbox space behind it, so there's never an empty black bar even
+// when an image's own proportions don't perfectly match its slot.
 export default function FeaturedHeroAd({
   creative,
 }: {
   creative: FeaturedHeroAdCreative;
 }) {
-  // AdThumbnailCard.tsx already guards its ad image the same way — this
-  // one never had that guard, which is exactly how a corrupted or
-  // failed-to-decode admin upload turned into a solid black hero box with
-  // no visible poster at all: the <img> tags just silently rendered
-  // nothing, leaving the section's own bg-black showing through, with no
-  // indication anything was wrong. Once a real load failure is detected,
-  // hide the ad outright instead of leaving a broken black block — an
-  // empty gap reads as "no promo right now," not "the site is broken."
-  const [broken, setBroken] = useState(false);
+  const mobileUrl = creative.imageUrl;
+  const desktopUrl = creative.imageUrlDesktop || creative.imageUrl;
 
   const handleClick = () => {
     // Fire-and-forget, same as AdBanner.tsx's other placements — never
@@ -77,7 +64,7 @@ export default function FeaturedHeroAd({
     }).catch(() => {});
   };
 
-  if (broken || !creative.imageUrl) return null;
+  if (!mobileUrl && !desktopUrl) return null;
 
   return (
     <section
@@ -93,6 +80,12 @@ export default function FeaturedHeroAd({
         2xl:h-[38vh]
       "
     >
+      {/* absolute inset-0 (not relative + h-full/w-full) so this anchors
+          directly to the section's real, fully-resolved box on every
+          breakpoint instead of an in-flow percentage height that can't
+          resolve against a min-height-only parent (mobile/sm/md have no
+          explicit `height`, only `min-h-[...]`) — see FeaturedHeroVideo.tsx
+          for the same technique. */}
       <a
         href={creative.linkUrl}
         target="_blank"
@@ -100,25 +93,12 @@ export default function FeaturedHeroAd({
         onClick={handleClick}
         className="group absolute inset-0 block h-full w-full"
       >
-        {/* Blurred, scaled-up backdrop copy — fills the box completely so
-            object-contain below never leaves a bare black gap on
-            off-ratio uploads. Not shown to screen readers (decorative
-            duplicate of the real image, which already has alt text). */}
-        {/* eslint-disable-next-line @next/next/no-img-element -- admin-uploaded creative is a compressed data: URL, next/image can't optimize it (same reasoning as AdThumbnailCard.tsx) */}
-        <img
-          src={creative.imageUrl}
-          alt=""
-          aria-hidden="true"
-          className="absolute inset-0 h-full w-full scale-110 object-cover opacity-50 blur-2xl"
-        />
-
-        {/* eslint-disable-next-line @next/next/no-img-element -- admin-uploaded creative is a compressed data: URL, next/image can't optimize it (same reasoning as AdThumbnailCard.tsx) */}
-        <img
-          src={creative.imageUrl}
-          alt={creative.title || "Featured"}
-          onError={() => setBroken(true)}
-          className="relative h-full w-full object-contain transition duration-500 group-hover:scale-[1.01]"
-        />
+        {mobileUrl && (
+          <FeaturedHeroAdImage src={mobileUrl} title={creative.title} className="absolute inset-0 lg:hidden" />
+        )}
+        {desktopUrl && (
+          <FeaturedHeroAdImage src={desktopUrl} title={creative.title} className="absolute inset-0 hidden lg:block" />
+        )}
 
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />
 
@@ -133,5 +113,49 @@ export default function FeaturedHeroAd({
         )}
       </a>
     </section>
+  );
+}
+
+// One image variant (mobile OR desktop) — its own broken-image guard so a
+// corrupted/failed-to-decode upload on ONE variant only ever blanks that
+// variant, never the other one a visitor on a different device is
+// actually seeing. Matches AdThumbnailCard.tsx's established guard
+// pattern: once a real load failure is detected, render nothing instead
+// of leaving a broken black block.
+function FeaturedHeroAdImage({
+  src,
+  title,
+  className,
+}: {
+  src: string;
+  title: string;
+  className: string;
+}) {
+  const [broken, setBroken] = useState(false);
+
+  if (broken) return null;
+
+  return (
+    <div className={className}>
+      {/* Blurred, scaled-up backdrop copy — fills the box completely so
+          object-contain below never leaves a bare black gap on off-ratio
+          uploads. Not shown to screen readers (decorative duplicate of the
+          real image, which already has alt text). */}
+      {/* eslint-disable-next-line @next/next/no-img-element -- admin-uploaded creative is a compressed data: URL, next/image can't optimize it (same reasoning as AdThumbnailCard.tsx) */}
+      <img
+        src={src}
+        alt=""
+        aria-hidden="true"
+        className="absolute inset-0 h-full w-full scale-110 object-cover opacity-50 blur-2xl"
+      />
+
+      {/* eslint-disable-next-line @next/next/no-img-element -- admin-uploaded creative is a compressed data: URL, next/image can't optimize it (same reasoning as AdThumbnailCard.tsx) */}
+      <img
+        src={src}
+        alt={title || "Featured"}
+        onError={() => setBroken(true)}
+        className="relative h-full w-full object-contain transition duration-500 group-hover:scale-[1.01]"
+      />
+    </div>
   );
 }

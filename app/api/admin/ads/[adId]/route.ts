@@ -4,7 +4,15 @@ import { revalidateTag } from "next/cache";
 import { docClient } from "@/app/lib/dynamodb";
 import { requireAdmin } from "@/app/lib/isAdmin";
 import { logAdminAction } from "@/app/lib/auditLog";
-import { AD_CREATIVES_TABLE, AD_CREATIVES_TAG } from "@/app/lib/adCreatives";
+import { AD_CREATIVES_TABLE, AD_CREATIVES_TAG, AD_IMAGE_DATA_URL_MAX_LENGTH } from "@/app/lib/adCreatives";
+
+function isValidCreativeImage(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    value.startsWith("data:image/") &&
+    value.length <= AD_IMAGE_DATA_URL_MAX_LENGTH
+  );
+}
 
 export async function PATCH(
   request: NextRequest,
@@ -37,6 +45,17 @@ export async function PATCH(
   if (typeof body.title === "string" && body.title.trim()) {
     sets.push("title = :title");
     values[":title"] = body.title.trim().slice(0, 120);
+  }
+  // Lets an admin swap out just the mobile/tablet image, or just add/
+  // replace the desktop/TV one, without deleting and recreating the whole
+  // creative (which would reset its impressions/clicks history).
+  if (isValidCreativeImage(body.imageUrl)) {
+    sets.push("imageUrl = :imageUrl");
+    values[":imageUrl"] = body.imageUrl;
+  }
+  if (isValidCreativeImage(body.imageUrlDesktop)) {
+    sets.push("imageUrlDesktop = :imageUrlDesktop");
+    values[":imageUrlDesktop"] = body.imageUrlDesktop;
   }
 
   if (sets.length === 0) {

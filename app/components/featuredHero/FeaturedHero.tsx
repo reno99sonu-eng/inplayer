@@ -115,55 +115,14 @@ export default function FeaturedHero({ initialSlides }: FeaturedHeroProps) {
       {/* Background Image — crossfading carousel */}
       <FeaturedHeroVideo slides={slides} activeIndex={activeIndex} />
 
-      {/* Slide progress indicators */}
-      {slides.length > 1 && (
-        <div
-          className="
-            absolute
-            bottom-4
-            left-1/2
-            z-30
-            flex
-            -translate-x-1/2
-            gap-2
-
-            lg:bottom-6
-          "
-        >
-          {slides.map((slide, index) => (
-            <button
-              key={slide.videoId}
-              onClick={() => setActiveIndex(index)}
-              aria-label={`Go to slide ${index + 1}`}
-              className="
-                relative
-                h-1.5
-                w-6
-                overflow-hidden
-                rounded-full
-                bg-white/20
-                transition-colors
-                duration-300
-                hover:bg-white/30
-              "
-            >
-              {index === activeIndex && !isPaused && (
-                <div
-                  key={`${slide.videoId}-fill`}
-                  className="absolute inset-y-0 left-0 rounded-full bg-orange-400"
-                  style={{
-                    animation: `heroProgressFill ${SLIDE_DURATION}ms linear forwards`,
-                  }}
-                />
-              )}
-
-              {index === activeIndex && isPaused && (
-                <div className="absolute inset-y-0 left-0 w-full rounded-full bg-orange-400/50" />
-              )}
-            </button>
-          ))}
-        </div>
-      )}
+      {/* Per Reno's feedback, the row of small pill-shaped slide-progress
+          indicators that used to sit here (one per slide, the active one
+          filling left-to-right in orange as it auto-advances) has been
+          removed — he read the orange animated fill as a stray "scroll
+          bar" on the banner. The carousel itself is untouched: slides
+          still auto-advance every SLIDE_DURATION via the effect above,
+          this was purely the visual indicator row, not the cycling
+          logic. */}
     </section>
   );
 }

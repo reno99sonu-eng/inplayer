@@ -56,7 +56,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
   }
 
-  const { placement, imageUrl, linkUrl, title } = body;
+  const { placement, imageUrl, imageUrlDesktop, linkUrl, title } = body;
 
   if (!VALID_PLACEMENTS.includes(placement)) {
     return NextResponse.json({ error: "Invalid placement." }, { status: 400 });
@@ -68,6 +68,22 @@ export async function POST(request: NextRequest) {
   ) {
     return NextResponse.json(
       { error: "That creative image is too large or invalid. Please try a different image." },
+      { status: 400 }
+    );
+  }
+  // Desktop/smart-TV image is optional — a creative can be published with
+  // just the mobile/tablet upload (imageUrl), same as before this field
+  // existed. When provided, it's validated the same way as imageUrl.
+  if (
+    imageUrlDesktop !== undefined &&
+    imageUrlDesktop !== null &&
+    imageUrlDesktop !== "" &&
+    (typeof imageUrlDesktop !== "string" ||
+      !imageUrlDesktop.startsWith("data:image/") ||
+      imageUrlDesktop.length > AD_IMAGE_DATA_URL_MAX_LENGTH)
+  ) {
+    return NextResponse.json(
+      { error: "That desktop/TV creative image is too large or invalid. Please try a different image." },
       { status: 400 }
     );
   }
@@ -86,6 +102,7 @@ export async function POST(request: NextRequest) {
     adId,
     placement,
     imageUrl,
+    ...(typeof imageUrlDesktop === "string" && imageUrlDesktop ? { imageUrlDesktop } : {}),
     linkUrl: linkUrl.trim().slice(0, 500),
     title: title.trim().slice(0, 120),
     active: true,

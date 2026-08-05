@@ -42,14 +42,26 @@ const PLACEMENT_LABELS: Record<Placement, string> = {
 };
 
 // homepage & watch both render as video-thumbnail-styled cards
-// (AdThumbnailCard.tsx, straight 16:9) — weekly_featured is the one
-// remaining placement that renders as a wide hero banner, so it keeps the
-// old 10:1 crop ratio. Used by the upload/AI-crop tools below so a
-// creative is cropped to the ratio it will actually be displayed at,
-// instead of one hardcoded ratio for every placement.
+// (AdThumbnailCard.tsx, straight 16:9, the same shape on every device).
+// weekly_featured used to share this function too (a flat 10:1), but that
+// never actually matched how its box renders — see WF_MOBILE_ASPECT_RATIO
+// / WF_DESKTOP_ASPECT_RATIO below, which replaced it with two real,
+// device-matched ratios. Kept here only for homepage/watch now.
 function getBannerAspectRatio(placement: Placement | SidePanel): number {
   return placement === "homepage" || placement === "watch" ? 16 / 9 : 10;
 }
+
+// Weekly Featured is the one placement whose box genuinely isn't the same
+// shape on every device: a short, wide strip on mobile/tablet (min-height
+// only, ~220-280px tall — see FeaturedHeroAd.tsx) vs. a MUCH wider strip
+// on desktop/smart TV (34-38vh of actual screen height, which works out to
+// roughly a 4.5:1 box on a typical 1920x1080 screen and wider still on
+// ultrawide/4K). One image can never fill both shapes edge-to-edge
+// without heavy letterboxing on one end, which is why this placement gets
+// its own two-slot upload below (Admin Panel -> Advertising -> Weekly
+// Featured Banner) instead of the single upload homepage/watch use.
+const WF_MOBILE_ASPECT_RATIO = 2.3; // ~1600x700, matches the box's mobile & tablet/iPad shape
+const WF_DESKTOP_ASPECT_RATIO = 4.5; // matches the box's shape on a typical 16:9 desktop/smart-TV screen
 
 interface AdSettings {
   adsenseEnabled: boolean;
@@ -65,6 +77,7 @@ interface AdCreative {
   adId: string;
   placement: Placement;
   imageUrl: string;
+  imageUrlDesktop?: string;
   linkUrl: string;
   title: string;
   active: boolean;
@@ -170,6 +183,26 @@ function AdvertisingPage() {
   const [generatingTitleAi, setGeneratingTitleAi] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Weekly Featured Banner Upload Form State — two independent upload
+  // slots (mobile & tablet/iPad, desktop & smart TV) instead of the single
+  // slot homepage/watch use above, per WF_MOBILE_ASPECT_RATIO's comment.
+  // Deliberately kept as its own separate set of state instead of adding a
+  // "variant" flavor to the state above, so homepage/watch's existing
+  // upload flow is completely untouched by this.
+  const [wfUploadTitle, setWfUploadTitle] = useState("");
+  const [wfUploadLink, setWfUploadLink] = useState("");
+  const [wfPreviewMobile, setWfPreviewMobile] = useState<string | null>(null);
+  const [wfFileTypeMobile, setWfFileTypeMobile] = useState<"image" | "video" | null>(null);
+  const [wfCroppingAiMobile, setWfCroppingAiMobile] = useState(false);
+  const wfFileInputMobileRef = useRef<HTMLInputElement>(null);
+  const [wfPreviewDesktop, setWfPreviewDesktop] = useState<string | null>(null);
+  const [wfFileTypeDesktop, setWfFileTypeDesktop] = useState<"image" | "video" | null>(null);
+  const [wfCroppingAiDesktop, setWfCroppingAiDesktop] = useState(false);
+  const wfFileInputDesktopRef = useRef<HTMLInputElement>(null);
+  const [wfUploading, setWfUploading] = useState(false);
+  const [wfUploadError, setWfUploadError] = useState<string | null>(null);
+  const [wfGeneratingTitleAi, setWfGeneratingTitleAi] = useState(false);
+
   // Midroll Upload Form State
   const [midrollTitle, setMidrollTitle] = useState("");
   const [midrollLink, setMidrollLink] = useState("");
@@ -225,6 +258,7 @@ function AdvertisingPage() {
             adId: String(item.adId || ""),
             placement: (item.placement as Placement) || "homepage",
             imageUrl: String(item.imageUrl || ""),
+            imageUrlDesktop: item.imageUrlDesktop ? String(item.imageUrlDesktop) : undefined,
             linkUrl: String(item.linkUrl || ""),
             title: String(item.title || ""),
             active: Boolean(item.active),
@@ -543,6 +577,166 @@ function AdvertisingPage() {
     }
   };
 
+  // --- Weekly Featured Banner: mobile/tablet + desktop/TV dual upload ---
+
+  const handleWfFileChange = async (variant: "mobile" | "desktop", e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setWfUploadError(null);
+    const ratio = variant === "mobile" ? WF_MOBILE_ASPECT_RATIO : WF_DESKTOP_ASPECT_RATIO;
+    const setPreview = variant === "mobile" ? setWfPreviewMobile : setWfPreviewDesktop;
+    const setFileType = variant === "mobile" ? setWfFileTypeMobile : setWfFileTypeDesktop;
+    try {
+      if (file.type.startsWith("video/")) {
+        if (file.size <= 250_000) {
+          setFileType("video");
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            if (typeof event.target?.result === "string") {
+              setPreview(event.target.result);
+            }
+          };
+          reader.readAsDataURL(file);
+        } else {
+          setFileType("image");
+          const poster = await extractVideoFramePoster(file);
+          setPreview(poster);
+        }
+      } else {
+        setFileType("image");
+        const compressed = await compressImageToBanner(file, 140_000, ratio);
+        setPreview(compressed);
+      }
+    } catch (err) {
+      setWfUploadError(err instanceof Error ? err.message : "Couldn't process that file.");
+    }
+  };
+
+  const clearWfFile = (variant: "mobile" | "desktop") => {
+    if (variant === "mobile") {
+      setWfPreviewMobile(null);
+      setWfFileTypeMobile(null);
+      if (wfFileInputMobileRef.current) wfFileInputMobileRef.current.value = "";
+    } else {
+      setWfPreviewDesktop(null);
+      setWfFileTypeDesktop(null);
+      if (wfFileInputDesktopRef.current) wfFileInputDesktopRef.current.value = "";
+    }
+  };
+
+  const handleWfAiCrop = async (variant: "mobile" | "desktop") => {
+    const preview = variant === "mobile" ? wfPreviewMobile : wfPreviewDesktop;
+    const fileType = variant === "mobile" ? wfFileTypeMobile : wfFileTypeDesktop;
+    if (!preview || fileType === "video") return;
+    const setCropping = variant === "mobile" ? setWfCroppingAiMobile : setWfCroppingAiDesktop;
+    const setPreview = variant === "mobile" ? setWfPreviewMobile : setWfPreviewDesktop;
+    const ratio = variant === "mobile" ? WF_MOBILE_ASPECT_RATIO : WF_DESKTOP_ASPECT_RATIO;
+    setCropping(true);
+    try {
+      const redesigned = await aiCropAndRedesignImage(preview, ratio, 1200);
+      setPreview(redesigned);
+    } catch (err) {
+      setWfUploadError(err instanceof Error ? err.message : "AI Crop failed.");
+    } finally {
+      setCropping(false);
+    }
+  };
+
+  const generateWfTitleWithAi = async () => {
+    const preview = wfPreviewMobile || wfPreviewDesktop;
+    if (!preview || preview.startsWith("data:video/")) {
+      setWfUploadError("Upload an image first — AI reads the actual image to write an accurate title.");
+      return;
+    }
+    setWfGeneratingTitleAi(true);
+    setWfUploadError(null);
+    try {
+      const { title } = await callAiAdGenerate({
+        mode: "title",
+        imageDataUrl: preview,
+        placement: "weekly_featured",
+      });
+      setWfUploadTitle(title || "");
+    } catch (err) {
+      setWfUploadError(err instanceof Error ? err.message : "AI title generation failed.");
+    } finally {
+      setWfGeneratingTitleAi(false);
+    }
+  };
+
+  // Magic AI button: if either slot already has an upload, just fills in
+  // the title and auto-crops whichever slot(s) have an image (each to its
+  // own ratio). If neither slot has anything yet, generates one AI image
+  // and compresses that SAME image to both ratios at once, so one click
+  // fills the title and both slots together instead of running AI
+  // generation twice.
+  const generateWfMagicAi = async () => {
+    if (wfPreviewMobile || wfPreviewDesktop) {
+      await generateWfTitleWithAi();
+      if (wfPreviewMobile && wfFileTypeMobile !== "video") await handleWfAiCrop("mobile");
+      if (wfPreviewDesktop && wfFileTypeDesktop !== "video") await handleWfAiCrop("desktop");
+      return;
+    }
+    setWfGeneratingTitleAi(true);
+    setWfUploadError(null);
+    try {
+      const { title, imageUrl } = await callAiAdGenerate({ mode: "full", placement: "weekly_featured" });
+      if (!imageUrl) throw new Error("AI didn't return a banner image.");
+      const [mobileBanner, desktopBanner] = await Promise.all([
+        compressDataUrlToBanner(imageUrl, 140_000, WF_MOBILE_ASPECT_RATIO),
+        compressDataUrlToBanner(imageUrl, 140_000, WF_DESKTOP_ASPECT_RATIO),
+      ]);
+      setWfUploadTitle(title || "");
+      setWfPreviewMobile(mobileBanner);
+      setWfFileTypeMobile("image");
+      setWfPreviewDesktop(desktopBanner);
+      setWfFileTypeDesktop("image");
+    } catch (err) {
+      setWfUploadError(err instanceof Error ? err.message : "AI ad generation failed.");
+    } finally {
+      setWfGeneratingTitleAi(false);
+    }
+  };
+
+  // Mobile/tablet image is required (matches the server's required
+  // imageUrl field) — desktop/TV is optional, same as the API. A creative
+  // published with only the mobile slot filled in falls back to that same
+  // image on desktop too, same behavior as before this feature existed.
+  const wfCanUpload =
+    Boolean(wfPreviewMobile) && wfUploadTitle.trim().length > 0 && /^https?:\/\//.test(wfUploadLink.trim());
+
+  const submitWfCreative = async () => {
+    if (!wfCanUpload || wfUploading) return;
+    setWfUploading(true);
+    setWfUploadError(null);
+    try {
+      const res = await authedFetch("/api/admin/ads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          placement: "weekly_featured",
+          imageUrl: wfPreviewMobile,
+          ...(wfPreviewDesktop ? { imageUrlDesktop: wfPreviewDesktop } : {}),
+          linkUrl: wfUploadLink.trim(),
+          title: wfUploadTitle.trim(),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Couldn't create that ad creative.");
+      if (data?.ad) {
+        setCreatives((prev) => [data.ad, ...prev]);
+      }
+      clearWfFile("mobile");
+      clearWfFile("desktop");
+      setWfUploadTitle("");
+      setWfUploadLink("");
+    } catch (err) {
+      setWfUploadError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setWfUploading(false);
+    }
+  };
+
   const canUploadMidroll =
     Boolean(midrollPreview) && midrollTitle.trim().length > 0 && /^https?:\/\//.test(midrollLink.trim());
 
@@ -856,124 +1050,265 @@ function AdvertisingPage() {
               )}
             </div>
 
-            {/* Upload & AI Tools Form */}
-            <div className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4 space-y-3">
-              <div className="flex items-center justify-between border-b border-white/10 light:border-black/10 pb-2">
-                <span className="text-xs font-bold text-white light:text-slate-900">
-                  Upload Ad (Image or Video)
-                </span>
-                <button
-                  type="button"
-                  onClick={() => generateMagicAiAd(activePanel as Placement)}
-                  className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-500 to-pink-500 px-3.5 py-1 text-[11px] font-bold text-white shadow-sm transition hover:opacity-90 cursor-pointer"
-                >
-                  <Sparkles size={13} /> Magic AI Auto-Generate
-                </button>
-              </div>
-
-              {/* Title & Prominent High-Contrast AI Title Button */}
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="text-[11px] font-semibold text-slate-400 light:text-slate-600">Ad Title</label>
-                  <button
-                    type="button"
-                    onClick={() => generateTitleWithAi(activePanel, false)}
-                    disabled={generatingTitleAi}
-                    className="flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white font-bold text-[11px] px-3 py-1 shadow-md hover:opacity-90 transition cursor-pointer light:from-indigo-600 light:to-purple-700 disabled:opacity-50"
-                  >
-                    {generatingTitleAi ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />}
-                    Generate Title with AI
-                  </button>
-                </div>
-                <input
-                  type="text"
-                  value={uploadTitle}
-                  onChange={(e) => setUploadTitle(e.target.value)}
-                  placeholder={`Title for ${PLACEMENT_LABELS[activePanel as Placement] || "Ad Placement"}`}
-                  className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-1.5 text-xs text-white light:text-slate-900 outline-none focus:border-indigo-400"
-                />
-              </div>
-
-              {/* Destination Link */}
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-400 light:text-slate-600 mb-1">Destination Link URL</label>
-                <input
-                  type="text"
-                  value={uploadLink}
-                  onChange={(e) => setUploadLink(e.target.value)}
-                  placeholder="https://..."
-                  className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-1.5 text-xs text-white light:text-slate-900 outline-none focus:border-indigo-400"
-                />
-              </div>
-
-              {/* File Selector */}
-              <div>
-                <label className="block text-[11px] font-semibold text-slate-400 light:text-slate-600 mb-1">Select Media (Image or Video)</label>
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*,video/*"
-                  onChange={handleFileChange}
-                  className="block w-full text-[11px] text-slate-400 light:text-slate-700 file:mr-2.5 file:rounded-xl file:border file:border-indigo-500/30 file:bg-indigo-600 file:px-3 file:py-1.5 file:text-[11px] file:font-bold file:text-white hover:file:bg-indigo-500 cursor-pointer shadow-sm"
-                />
-              </div>
-
-              {/* File Preview + X Remove Button + AI Crop & Redesign Button */}
-              {uploadPreview && (
-                <div className="space-y-2">
-                  <div className="relative rounded-xl border border-white/10 light:border-black/10 overflow-hidden bg-black/40 max-h-48 flex items-center justify-center p-1">
-                    {uploadFileType === "video" || uploadPreview.startsWith("data:video/") ? (
-                      <video src={uploadPreview} controls className="max-h-44 w-auto rounded-lg" />
-                    ) : (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img src={uploadPreview} alt="Preview" className="max-h-44 w-auto object-contain rounded-lg" />
-                    )}
-
-                    {/* X Clear Button */}
-                    <button
-                      type="button"
-                      onClick={() => clearFileSelection(false)}
-                      className="absolute top-2 right-2 rounded-full bg-red-600 text-white p-1 shadow-md hover:bg-red-500 transition cursor-pointer"
-                      title="Remove / Clear selected file"
-                    >
-                      <X size={14} />
-                    </button>
-
-                    <span className="absolute bottom-2 left-2 rounded-full bg-black/70 px-2.5 py-0.5 text-[10px] font-bold text-white uppercase">
-                      {uploadFileType || "Preview"}
+            {/* Upload & AI Tools Form — weekly_featured gets two separate
+                upload slots (mobile & tablet/iPad, desktop & smart TV);
+                homepage/watch keep the single upload unchanged, since
+                AdThumbnailCard.tsx renders those as the same fixed 16:9
+                shape on every device. */}
+            {activePanel === "weekly_featured" ? (
+              <div className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4 space-y-4">
+                <div className="flex items-center justify-between border-b border-white/10 light:border-black/10 pb-2 gap-3">
+                  <div>
+                    <span className="text-xs font-bold text-white light:text-slate-900 block">
+                      Upload Ad — Two Posters
+                    </span>
+                    <span className="text-[10px] text-slate-400 light:text-slate-600">
+                      One for mobile &amp; tablet/iPad, one for desktop &amp; smart TV. Same title, link, and the ON/OFF switch above cover both — publishing creates one ad with both posters attached.
                     </span>
                   </div>
+                  <button
+                    type="button"
+                    onClick={generateWfMagicAi}
+                    disabled={wfGeneratingTitleAi}
+                    className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-500 to-pink-500 px-3.5 py-1 text-[11px] font-bold text-white shadow-sm transition hover:opacity-90 cursor-pointer disabled:opacity-50 flex-shrink-0"
+                  >
+                    {wfGeneratingTitleAi ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />} Magic AI Auto-Generate
+                  </button>
+                </div>
 
-                  {/* AI Crop & Redesign Image Button */}
-                  {uploadFileType !== "video" && !uploadPreview.startsWith("data:video/") && (
+                {/* Title & Prominent High-Contrast AI Title Button — one title covers both posters */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-[11px] font-semibold text-slate-400 light:text-slate-600">Ad Title</label>
                     <button
                       type="button"
-                      onClick={() => handleAiCropAndRedesign()}
-                      disabled={croppingAi}
-                      className="flex items-center gap-1.5 rounded-xl bg-purple-600/30 border border-purple-500/40 px-3 py-1.5 text-xs font-bold text-purple-300 light:text-purple-900 hover:bg-purple-600/40 transition disabled:opacity-50 cursor-pointer"
+                      onClick={generateWfTitleWithAi}
+                      disabled={wfGeneratingTitleAi}
+                      className="flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white font-bold text-[11px] px-3 py-1 shadow-md hover:opacity-90 transition cursor-pointer light:from-indigo-600 light:to-purple-700 disabled:opacity-50"
                     >
-                      {croppingAi ? <Loader2 size={13} className="animate-spin" /> : <Crop size={13} />}
-                      Auto-Crop & Enhance
+                      {wfGeneratingTitleAi ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />}
+                      Generate Title with AI
                     </button>
-                  )}
+                  </div>
+                  <input
+                    type="text"
+                    value={wfUploadTitle}
+                    onChange={(e) => setWfUploadTitle(e.target.value)}
+                    placeholder="Title for Weekly Featured Banner"
+                    className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-1.5 text-xs text-white light:text-slate-900 outline-none focus:border-indigo-400"
+                  />
                 </div>
-              )}
 
-              {uploadError && (
-                <div className="flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 p-2 text-xs text-red-300 light:text-red-700">
-                  <AlertTriangle size={14} /> <span>{uploadError}</span>
+                {/* Destination Link — one link covers both posters */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 light:text-slate-600 mb-1">Destination Link URL</label>
+                  <input
+                    type="text"
+                    value={wfUploadLink}
+                    onChange={(e) => setWfUploadLink(e.target.value)}
+                    placeholder="https://..."
+                    className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-1.5 text-xs text-white light:text-slate-900 outline-none focus:border-indigo-400"
+                  />
                 </div>
-              )}
 
-              <button
-                type="button"
-                onClick={() => submitCreative(activePanel as Placement)}
-                disabled={!canUploadBanner || uploading}
-                className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-50 cursor-pointer"
-              >
-                {uploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />} Publish Creative
-              </button>
-            </div>
+                {/* Two independent upload slots, side by side */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {(["mobile", "desktop"] as const).map((variant) => {
+                    const preview = variant === "mobile" ? wfPreviewMobile : wfPreviewDesktop;
+                    const fileType = variant === "mobile" ? wfFileTypeMobile : wfFileTypeDesktop;
+                    const cropping = variant === "mobile" ? wfCroppingAiMobile : wfCroppingAiDesktop;
+                    const inputRef = variant === "mobile" ? wfFileInputMobileRef : wfFileInputDesktopRef;
+                    return (
+                      <div
+                        key={variant}
+                        className="rounded-xl border border-white/10 light:border-black/10 bg-white/[0.02] light:bg-black/[0.01] p-3 space-y-2"
+                      >
+                        <span className="text-[11px] font-bold text-white light:text-slate-900 block">
+                          {variant === "mobile" ? "Mobile & Tablet/iPad Poster" : "Desktop & Smart TV Poster"}
+                          {variant === "desktop" && (
+                            <span className="ml-1.5 font-normal text-slate-500">(optional — falls back to the mobile poster if left empty)</span>
+                          )}
+                        </span>
+                        <input
+                          ref={inputRef}
+                          type="file"
+                          accept="image/*,video/*"
+                          onChange={(e) => handleWfFileChange(variant, e)}
+                          className="block w-full text-[11px] text-slate-400 light:text-slate-700 file:mr-2 file:rounded-lg file:border file:border-indigo-500/30 file:bg-indigo-600 file:px-2.5 file:py-1 file:text-[10px] file:font-bold file:text-white hover:file:bg-indigo-500 cursor-pointer"
+                        />
+
+                        {preview && (
+                          <div className="space-y-1.5">
+                            <div className="relative rounded-lg border border-white/10 light:border-black/10 overflow-hidden bg-black/40 h-24 flex items-center justify-center p-1">
+                              {fileType === "video" || preview.startsWith("data:video/") ? (
+                                <video src={preview} controls className="max-h-full w-auto rounded-md" />
+                              ) : (
+                                /* eslint-disable-next-line @next/next/no-img-element */
+                                <img src={preview} alt={`${variant} preview`} className="max-h-full w-auto object-contain rounded-md" />
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => clearWfFile(variant)}
+                                className="absolute top-1.5 right-1.5 rounded-full bg-red-600 text-white p-1 shadow-md hover:bg-red-500 transition cursor-pointer"
+                                title="Remove / Clear selected file"
+                              >
+                                <X size={12} />
+                              </button>
+                            </div>
+
+                            {fileType !== "video" && !preview.startsWith("data:video/") && (
+                              <button
+                                type="button"
+                                onClick={() => handleWfAiCrop(variant)}
+                                disabled={cropping}
+                                className="flex items-center gap-1.5 rounded-lg bg-purple-600/30 border border-purple-500/40 px-2.5 py-1 text-[11px] font-bold text-purple-300 light:text-purple-900 hover:bg-purple-600/40 transition disabled:opacity-50 cursor-pointer"
+                              >
+                                {cropping ? <Loader2 size={12} className="animate-spin" /> : <Crop size={12} />}
+                                Auto-Crop & Enhance
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {wfUploadError && (
+                  <div className="flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 p-2 text-xs text-red-300 light:text-red-700">
+                    <AlertTriangle size={14} /> <span>{wfUploadError}</span>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={submitWfCreative}
+                  disabled={!wfCanUpload || wfUploading}
+                  className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-50 cursor-pointer"
+                >
+                  {wfUploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />} Publish Creative
+                </button>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4 space-y-3">
+                <div className="flex items-center justify-between border-b border-white/10 light:border-black/10 pb-2">
+                  <span className="text-xs font-bold text-white light:text-slate-900">
+                    Upload Ad (Image or Video)
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => generateMagicAiAd(activePanel as Placement)}
+                    className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-amber-500 to-pink-500 px-3.5 py-1 text-[11px] font-bold text-white shadow-sm transition hover:opacity-90 cursor-pointer"
+                  >
+                    <Sparkles size={13} /> Magic AI Auto-Generate
+                  </button>
+                </div>
+
+                {/* Title & Prominent High-Contrast AI Title Button */}
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-[11px] font-semibold text-slate-400 light:text-slate-600">Ad Title</label>
+                    <button
+                      type="button"
+                      onClick={() => generateTitleWithAi(activePanel, false)}
+                      disabled={generatingTitleAi}
+                      className="flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white font-bold text-[11px] px-3 py-1 shadow-md hover:opacity-90 transition cursor-pointer light:from-indigo-600 light:to-purple-700 disabled:opacity-50"
+                    >
+                      {generatingTitleAi ? <Loader2 size={12} className="animate-spin" /> : <Wand2 size={12} />}
+                      Generate Title with AI
+                    </button>
+                  </div>
+                  <input
+                    type="text"
+                    value={uploadTitle}
+                    onChange={(e) => setUploadTitle(e.target.value)}
+                    placeholder={`Title for ${PLACEMENT_LABELS[activePanel as Placement] || "Ad Placement"}`}
+                    className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-1.5 text-xs text-white light:text-slate-900 outline-none focus:border-indigo-400"
+                  />
+                </div>
+
+                {/* Destination Link */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 light:text-slate-600 mb-1">Destination Link URL</label>
+                  <input
+                    type="text"
+                    value={uploadLink}
+                    onChange={(e) => setUploadLink(e.target.value)}
+                    placeholder="https://..."
+                    className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-1.5 text-xs text-white light:text-slate-900 outline-none focus:border-indigo-400"
+                  />
+                </div>
+
+                {/* File Selector */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-slate-400 light:text-slate-600 mb-1">Select Media (Image or Video)</label>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept="image/*,video/*"
+                    onChange={handleFileChange}
+                    className="block w-full text-[11px] text-slate-400 light:text-slate-700 file:mr-2.5 file:rounded-xl file:border file:border-indigo-500/30 file:bg-indigo-600 file:px-3 file:py-1.5 file:text-[11px] file:font-bold file:text-white hover:file:bg-indigo-500 cursor-pointer shadow-sm"
+                  />
+                </div>
+
+                {/* File Preview + X Remove Button + AI Crop & Redesign Button */}
+                {uploadPreview && (
+                  <div className="space-y-2">
+                    <div className="relative rounded-xl border border-white/10 light:border-black/10 overflow-hidden bg-black/40 max-h-48 flex items-center justify-center p-1">
+                      {uploadFileType === "video" || uploadPreview.startsWith("data:video/") ? (
+                        <video src={uploadPreview} controls className="max-h-44 w-auto rounded-lg" />
+                      ) : (
+                        /* eslint-disable-next-line @next/next/no-img-element */
+                        <img src={uploadPreview} alt="Preview" className="max-h-44 w-auto object-contain rounded-lg" />
+                      )}
+
+                      {/* X Clear Button */}
+                      <button
+                        type="button"
+                        onClick={() => clearFileSelection(false)}
+                        className="absolute top-2 right-2 rounded-full bg-red-600 text-white p-1 shadow-md hover:bg-red-500 transition cursor-pointer"
+                        title="Remove / Clear selected file"
+                      >
+                        <X size={14} />
+                      </button>
+
+                      <span className="absolute bottom-2 left-2 rounded-full bg-black/70 px-2.5 py-0.5 text-[10px] font-bold text-white uppercase">
+                        {uploadFileType || "Preview"}
+                      </span>
+                    </div>
+
+                    {/* AI Crop & Redesign Image Button */}
+                    {uploadFileType !== "video" && !uploadPreview.startsWith("data:video/") && (
+                      <button
+                        type="button"
+                        onClick={() => handleAiCropAndRedesign()}
+                        disabled={croppingAi}
+                        className="flex items-center gap-1.5 rounded-xl bg-purple-600/30 border border-purple-500/40 px-3 py-1.5 text-xs font-bold text-purple-300 light:text-purple-900 hover:bg-purple-600/40 transition disabled:opacity-50 cursor-pointer"
+                      >
+                        {croppingAi ? <Loader2 size={13} className="animate-spin" /> : <Crop size={13} />}
+                        Auto-Crop & Enhance
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {uploadError && (
+                  <div className="flex items-center gap-2 rounded-xl border border-red-500/20 bg-red-500/10 p-2 text-xs text-red-300 light:text-red-700">
+                    <AlertTriangle size={14} /> <span>{uploadError}</span>
+                  </div>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => submitCreative(activePanel as Placement)}
+                  disabled={!canUploadBanner || uploading}
+                  className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-50 cursor-pointer"
+                >
+                  {uploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />} Publish Creative
+                </button>
+              </div>
+            )}
 
             {/* List of Existing Creatives */}
             <div className="space-y-2">
@@ -989,6 +1324,7 @@ function AdvertisingPage() {
                     .map((ad) => {
                       const imgUrl = String(ad?.imageUrl || "");
                       const isVideo = imgUrl.startsWith("data:video/") || imgUrl.endsWith(".mp4");
+                      const hasDesktopPoster = Boolean(ad?.imageUrlDesktop && ad.imageUrlDesktop !== ad.imageUrl);
                       return (
                         <div key={ad.adId} className="rounded-xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-3 space-y-2">
                           <div className="relative h-28 overflow-hidden rounded-lg border border-white/10 light:border-black/10 bg-black/40 flex items-center justify-center">
@@ -997,6 +1333,17 @@ function AdvertisingPage() {
                             ) : (
                               /* eslint-disable-next-line @next/next/no-img-element */
                               <img src={imgUrl} alt={ad.title || "Ad"} className="h-full w-full object-cover" />
+                            )}
+                            {activePanel === "weekly_featured" && (
+                              <span
+                                className={`absolute bottom-1.5 left-1.5 rounded-md px-1.5 py-0.5 text-[9px] font-bold uppercase ${
+                                  hasDesktopPoster
+                                    ? "bg-emerald-500/80 text-white"
+                                    : "bg-black/70 text-slate-300"
+                                }`}
+                              >
+                                {hasDesktopPoster ? "+ Desktop poster set" : "Desktop uses mobile poster"}
+                              </span>
                             )}
                           </div>
                           <div className="flex items-center justify-between text-xs">
@@ -1251,8 +1598,8 @@ function AdvertisingPage() {
               </div>
               <div className="rounded-xl border border-amber-500/30 light:border-amber-600/40 bg-amber-500/10 light:bg-amber-100/60 p-3 space-y-1">
                 <strong className="block text-white light:text-slate-900 font-bold">Weekly Featured Banner</strong>
-                <code className="inline-block rounded bg-orange-500/20 light:bg-orange-100 px-1.5 py-0.5 font-bold text-orange-300 light:text-amber-900">10:1 on tablet/desktop · 16:9 on mobile</code>
-                <p className="text-[11px] text-slate-400 light:text-slate-600">Live at the very top of the homepage — this is the ON/OFF switch above, not a house/adsense/off picker. OFF (default) shows real Weekly Featured videos; ON swaps that whole slot for your uploaded poster below, at the exact same 1800 × 180 px / 10:1 size as the other banners. If ON with nothing active uploaded yet, the real videos show instead so the homepage never shows a blank gap.</p>
+                <code className="inline-block rounded bg-orange-500/20 light:bg-orange-100 px-1.5 py-0.5 font-bold text-orange-300 light:text-amber-900">~2.3:1 mobile/tablet · ~4.5:1 desktop/TV</code>
+                <p className="text-[11px] text-slate-400 light:text-slate-600">Live at the very top of the homepage — this is the ON/OFF switch above, not a house/adsense/off picker. OFF (default) shows real Weekly Featured videos; ON swaps that whole slot for your uploaded poster(s) below. This is the one placement whose box genuinely isn&apos;t the same shape everywhere, so the upload form has two slots: Mobile &amp; Tablet/iPad (recommended ~1600 × 700 px) and Desktop &amp; Smart TV (recommended ~1800 × 400 px, optional — falls back to the mobile poster if left empty). If ON with nothing active uploaded yet, the real videos show instead so the homepage never shows a blank gap.</p>
               </div>
               <div className="rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 p-3 space-y-1">
                 <strong className="block text-white light:text-slate-900 font-bold">Video Player Mid-Roll Ads</strong>

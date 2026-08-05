@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 interface FeaturedHeroAdCreative {
   adId: string;
   imageUrl: string;
@@ -39,6 +41,16 @@ export default function FeaturedHeroAd({
 }: {
   creative: FeaturedHeroAdCreative;
 }) {
+  // AdThumbnailCard.tsx already guards its ad image the same way — this
+  // one never had that guard, which is exactly how a corrupted or
+  // failed-to-decode admin upload turned into a solid black hero box with
+  // no visible poster at all: the <img> tags just silently rendered
+  // nothing, leaving the section's own bg-black showing through, with no
+  // indication anything was wrong. Once a real load failure is detected,
+  // hide the ad outright instead of leaving a broken black block — an
+  // empty gap reads as "no promo right now," not "the site is broken."
+  const [broken, setBroken] = useState(false);
+
   const handleClick = () => {
     // Fire-and-forget, same as AdBanner.tsx's other placements — never
     // delays or blocks the actual navigation.
@@ -48,6 +60,8 @@ export default function FeaturedHeroAd({
       body: JSON.stringify({ adId: creative.adId }),
     }).catch(() => {});
   };
+
+  if (broken || !creative.imageUrl) return null;
 
   return (
     <section
@@ -86,6 +100,7 @@ export default function FeaturedHeroAd({
         <img
           src={creative.imageUrl}
           alt={creative.title || "Featured"}
+          onError={() => setBroken(true)}
           className="relative h-full w-full object-contain transition duration-500 group-hover:scale-[1.01]"
         />
 

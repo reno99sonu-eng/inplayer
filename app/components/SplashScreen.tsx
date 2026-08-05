@@ -16,12 +16,17 @@ import { useEffect, useState } from "react";
 //    right after the flash — a common premium-logo-reveal touch — instead
 //    of a static glow. Everything is faster too: the whole reveal is ~15%
 //    quicker and the on-screen hold is shorter.
-// Always renders on a near-black stage regardless of the site's own
-// light/dark theme, the same way streaming-app splash idents always cut to
-// black first — a bright cream backdrop would wash out the zoom/flash
-// entirely and undercut the "punchy" effect being asked for here, so this
-// is a deliberate, one-off exception to the app's normal theme-follows-site
-// rule.
+// Per Reno's follow-up feedback, this now follows the site's own light/dark
+// theme instead of always cutting to black — same `light:` variant pattern
+// used everywhere else in the app (NavbarLogo.tsx, page.tsx, MaintenanceGate,
+// AnnouncementBanner), and the exact same two logo assets NavbarLogo.tsx
+// already swaps between: inplayer-mark-dark.png (white wordmark) for the
+// dark stage, inplayer-mark-light.png (recolored for a light backdrop) for
+// the light one. The theme class is applied to <html> by a blocking script
+// in app/layout.tsx before first paint (see ThemeProvider.tsx's matching
+// comment), so these `light:` classes already resolve correctly on this
+// component's very first render — no client-only theme detection needed,
+// and no flash of the wrong stage color.
 //
 // The real site is already mounted behind this overlay the whole time
 // (SiteChrome renders {children} in parallel, not after this unmounts) —
@@ -93,7 +98,7 @@ export default function SplashScreen() {
   return (
     <div
       aria-hidden="true"
-      className={`fixed inset-0 z-[999999] flex items-center justify-center overflow-hidden bg-[#020203] transition-opacity duration-[450ms] ease-out ${
+      className={`fixed inset-0 z-[999999] flex items-center justify-center overflow-hidden bg-[#020203] light:bg-[#F4ECDA] transition-opacity duration-[450ms] ease-out ${
         leaving ? "pointer-events-none opacity-0" : "opacity-100"
       }`}
     >
@@ -113,14 +118,21 @@ export default function SplashScreen() {
             the logo's own footprint (not a separate floating shape) — the
             "premium reveal" touch that replaces the old glow circle. */}
         <div className="relative overflow-hidden rounded-xl">
-          {/* Always the dark/white-wordmark asset — the stage is always
-              near-black now regardless of site theme, so there's no light
-              variant to swap to here anymore. */}
+          {/* White wordmark for the dark stage — hidden in light mode. */}
           <img
             src="/logos/inplayer-mark-dark.png"
             alt="INPLAYER"
             draggable={false}
-            className="animate-splash-cinematic-zoom h-16 w-auto object-contain drop-shadow-[0_4px_32px_rgba(249,115,22,0.55)] sm:h-20 md:h-24"
+            className="light:hidden animate-splash-cinematic-zoom h-16 w-auto object-contain drop-shadow-[0_4px_32px_rgba(249,115,22,0.55)] sm:h-20 md:h-24"
+          />
+          {/* Recolored wordmark for the light stage — same asset
+              NavbarLogo.tsx uses so the splash's brand mark always matches
+              the navbar the visitor lands on right after it. */}
+          <img
+            src="/logos/inplayer-mark-light.png"
+            alt="INPLAYER"
+            draggable={false}
+            className="hidden light:block animate-splash-cinematic-zoom h-16 w-auto object-contain drop-shadow-[0_4px_24px_rgba(249,115,22,0.35)] sm:h-20 md:h-24"
           />
 
           {/* Diagonal light-shine sweeping once across the logo right after
@@ -130,7 +142,7 @@ export default function SplashScreen() {
           <div className="animate-splash-logo-shine pointer-events-none absolute inset-y-0 left-0 w-1/2 -skew-x-[20deg] bg-gradient-to-r from-transparent via-white/80 to-transparent" />
         </div>
 
-        <p className="animate-splash-tagline-in mt-5 text-[11px] font-bold uppercase tracking-[0.3em] text-orange-300 sm:text-sm">
+        <p className="animate-splash-tagline-in mt-5 text-[11px] font-bold uppercase tracking-[0.3em] text-orange-300 light:text-orange-600 sm:text-sm">
           {TAGLINE}
         </p>
       </div>

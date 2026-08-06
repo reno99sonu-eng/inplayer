@@ -22,6 +22,7 @@ import {
   Store,
   Bug,
   ShoppingBag,
+  AlertTriangle,
 } from "lucide-react";
 import { useAdminMode } from "@/app/components/admin/AdminModeContext";
 
@@ -34,6 +35,7 @@ const inplayerItems = [
   { id: "users", label: "Users", icon: Users, href: "/admin/users" },
   { id: "creators", label: "Creators", icon: Star, href: "/admin/creators" },
   { id: "bug-reports", label: "Bug Reports", icon: Bug, href: "/admin/bug-reports" },
+  { id: "error-logs", label: "Error Logs", icon: AlertTriangle, href: "/admin/error-logs" },
   { id: "videos", label: "Videos", icon: Video, href: "/admin/videos" },
   { id: "shorts", label: "Shorts", icon: Film, href: "/admin/videos?type=short" },
   { id: "reports", label: "Reports & Moderation", icon: Flag, href: "/admin/moderation" },

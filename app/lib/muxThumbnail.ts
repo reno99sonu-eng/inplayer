@@ -1,18 +1,34 @@
-const MUX_THUMBNAIL_QUERY =
+const LANDSCAPE_THUMBNAIL_QUERY =
   "width=640&height=360&fit_mode=smartcrop&time=1";
+// Shorts are portrait (9:16) source video, not landscape. This used to
+// request the SAME 640x360 (16:9) crop for Shorts as for regular videos —
+// Mux's smartcrop then had to squeeze a tall vertical frame into a wide
+// landscape box, and the app's own Shorts cards (aspect-[9/16], see
+// ShortsShelf.tsx) then object-cover'd that already oddly-cropped landscape
+// image back into a tall portrait card, scaling it up a lot to cover the
+// height. The combination is what read as "stretched"/distorted thumbnails
+// on the homepage Shorts row. Requesting a properly portrait-shaped crop
+// from Mux directly (640x1138 ≈ 9:16) fixes it at the source instead of
+// trying to patch it with CSS.
+const PORTRAIT_THUMBNAIL_QUERY =
+  "width=640&height=1138&fit_mode=smartcrop&time=1";
 
 /**
  * Builds the public Mux thumbnail URL from the playback ID, never the asset
  * or upload ID. Public assets do not need a signed image token.
  */
-export function getMuxThumbnailUrl(playbackId: string): string | null {
+export function getMuxThumbnailUrl(
+  playbackId: string,
+  isPortrait = false
+): string | null {
   const id = playbackId.trim();
 
   if (!id) {
     return null;
   }
 
-  return `https://image.mux.com/${encodeURIComponent(id)}/thumbnail.webp?${MUX_THUMBNAIL_QUERY}`;
+  const query = isPortrait ? PORTRAIT_THUMBNAIL_QUERY : LANDSCAPE_THUMBNAIL_QUERY;
+  return `https://image.mux.com/${encodeURIComponent(id)}/thumbnail.webp?${query}`;
 }
 
 /**

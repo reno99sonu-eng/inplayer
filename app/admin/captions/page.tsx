@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { fetchAuthSession } from "aws-amplify/auth";
-import { Loader2, Wand2, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Loader2, Wand2, CheckCircle2, AlertTriangle, ImageIcon } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 
 // One-time maintenance screen (admin only — the API behind it checks the
@@ -27,6 +27,60 @@ export default function AdminCaptionsPage() {
   const [status, setStatus] = useState("");
   const [totals, setTotals] = useState<RunTotals | null>(null);
   const [failed, setFailed] = useState<string | null>(null);
+
+  // Second, independent maintenance job on this same page — fixes the
+  // landscape-shaped auto thumbnails already saved on Shorts uploaded
+  // before the portrait-thumbnail fix (see app/lib/muxThumbnail.ts and
+  // app/api/admin/backfill-short-thumbnails). Completes in one call (no
+  // Groq/Mux API work per item, just a DynamoDB update), so this doesn't
+  // need the caption repair's loop-until-done polling.
+  const [thumbsRunning, setThumbsRunning] = useState(false);
+  const [thumbsResult, setThumbsResult] = useState<{
+    processed: number;
+    skippedCustomThumbnail: number;
+    errors: string[];
+  } | null>(null);
+  const [thumbsFailed, setThumbsFailed] = useState<string | null>(null);
+
+  const runThumbnailFix = async () => {
+    setThumbsRunning(true);
+    setThumbsFailed(null);
+    setThumbsResult(null);
+
+    try {
+      const session = await fetchAuthSession();
+      const idToken = session.tokens?.idToken?.toString();
+      if (!idToken) {
+        setThumbsFailed("Your session expired — please sign in again.");
+        return;
+      }
+
+      const res = await fetch("/api/admin/backfill-short-thumbnails", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+
+      if (res.status === 401) {
+        setThumbsFailed("This account isn't authorized to run this repair.");
+        return;
+      }
+      if (!res.ok) {
+        setThumbsFailed(`The repair call failed (HTTP ${res.status}).`);
+        return;
+      }
+
+      const data = await res.json();
+      setThumbsResult({
+        processed: data?.processed || 0,
+        skippedCustomThumbnail: data?.skippedCustomThumbnail || 0,
+        errors: Array.isArray(data?.errors) ? data.errors : [],
+      });
+    } catch (err) {
+      setThumbsFailed(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setThumbsRunning(false);
+    }
+  };
 
   const run = async () => {
     setRunning(true);
@@ -193,6 +247,77 @@ export default function AdminCaptionsPage() {
           <span>{failed}</span>
         </div>
       )}
+
+      <div className="mt-10 border-t border-white/10 light:border-black/10 pt-8">
+        <h1 className="text-2xl sm:text-3xl font-black text-white light:text-slate-900">
+          Fix Shorts thumbnails
+        </h1>
+        <p className="mt-2 text-sm leading-relaxed text-slate-400 light:text-slate-600">
+          Shorts uploaded before this fix have a stretched-looking, wrong-shaped
+          (landscape) auto thumbnail saved on them — this is what caused the
+          distorted-looking pictures on the homepage Raftaar Shorts row. This
+          regenerates a correctly-shaped, sharp portrait thumbnail for every
+          existing Short that doesn&apos;t have its own custom thumbnail. New
+          Shorts you upload from now on already get the correct shape
+          automatically. Safe to run more than once.
+        </p>
+
+        <button
+          onClick={runThumbnailFix}
+          disabled={thumbsRunning}
+          className="mt-7 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFB020] py-3.5 font-bold text-slate-950 shadow-[0_15px_35px_rgba(255,154,0,.3)] transition-all hover:-translate-y-0.5 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {thumbsRunning ? (
+            <>
+              <Loader2 size={18} className="animate-spin" />
+              Fixing thumbnails…
+            </>
+          ) : (
+            <>
+              <ImageIcon size={18} />
+              Fix all Shorts thumbnails
+            </>
+          )}
+        </button>
+
+        {thumbsResult && (
+          <div className="mt-4 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-white light:text-slate-900">
+              {!thumbsRunning && !thumbsFailed && (
+                <CheckCircle2 size={16} className="text-emerald-400" />
+              )}
+              <span>{thumbsResult.processed} Shorts thumbnails fixed</span>
+            </div>
+            {thumbsResult.skippedCustomThumbnail > 0 && (
+              <p className="mt-2 text-xs text-slate-400 light:text-slate-600">
+                {thumbsResult.skippedCustomThumbnail} Short(s) already had their
+                own custom thumbnail — left untouched.
+              </p>
+            )}
+            {thumbsResult.errors.length > 0 && (
+              <details className="mt-3">
+                <summary className="cursor-pointer text-xs font-semibold text-amber-400">
+                  {thumbsResult.errors.length} item(s) reported an issue
+                </summary>
+                <ul className="mt-2 space-y-1 text-xs text-slate-400 light:text-slate-600">
+                  {thumbsResult.errors.slice(0, 40).map((e, i) => (
+                    <li key={i} className="break-words">
+                      {e}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
+        )}
+
+        {thumbsFailed && (
+          <div className="mt-4 flex items-start gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300 light:text-red-700">
+            <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
+            <span>{thumbsFailed}</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

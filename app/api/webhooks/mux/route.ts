@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { revalidateTag } from "next/cache";
 import { after } from "next/server";
-import { ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import mux from "@/app/lib/mux";
 import { docClient } from "@/app/lib/dynamodb";
 import { getMuxThumbnailUrl } from "@/app/lib/muxThumbnail";
@@ -135,7 +135,21 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const thumbnailUrl = getMuxThumbnailUrl(playbackId);
+    // Portrait Shorts need a portrait-shaped auto thumbnail, not the
+    // landscape crop regular videos get — see the comment on
+    // getMuxThumbnailUrl in app/lib/muxThumbnail.ts for why. contentType
+    // isn't part of the Mux webhook payload at all (Mux has no idea what a
+    // "Short" is), so it's read back from the placeholder row this same
+    // upload already wrote at creation time (app/api/upload/create).
+    const existing = await docClient.send(
+      new GetCommand({
+        TableName: "InPlayer-Videos",
+        Key: { videoId: uploadId },
+        ProjectionExpression: "contentType",
+      })
+    );
+    const isShort = existing.Item?.contentType === "short";
+    const thumbnailUrl = getMuxThumbnailUrl(playbackId, isShort);
 
     const updateResult = await docClient.send(
       new UpdateCommand({

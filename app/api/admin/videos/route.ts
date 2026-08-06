@@ -33,7 +33,9 @@ const NAMES = { "#st": "status", "#v": "views" };
 function toRow(item: Record<string, unknown>): AdminVideoRow {
   const thumbnailUrl =
     (item.thumbnailUrl as string) ||
-    (typeof item.muxPlaybackId === "string" ? getMuxThumbnailUrl(item.muxPlaybackId) : null);
+    (typeof item.muxPlaybackId === "string"
+      ? getMuxThumbnailUrl(item.muxPlaybackId, item.contentType === "short")
+      : null);
 
   return {
     videoId: item.videoId as string,

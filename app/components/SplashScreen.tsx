@@ -58,6 +58,33 @@ let hasPlayedThisLoad = false;
 
 export default function SplashScreen() {
   const [visible, setVisible] = useState(() => {
+    // This module-level flag must never be read or written during
+    // server-side rendering. Next.js/Vercel keep a server process (or
+    // serverless function instance) warm and reuse it for MANY different
+    // visitors' requests, but a plain JS module is only ever evaluated
+    // ONCE per process — so without this guard, the FIRST request a given
+    // server instance ever handled would flip this flag to `true`, and
+    // every other visitor routed to that same warm instance afterwards
+    // would get server-rendered HTML with NO splash (this returning
+    // `false`), while their browser (a genuinely fresh page load, its own
+    // separate JS instance) always computes `true` on its own first
+    // render. That server/client disagreement is a hydration mismatch,
+    // and it was happening on essentially every real visit — confirmed by
+    // reproducing it locally, where it fires from the very first request
+    // after any earlier request had already primed the flag on the
+    // server. React recovers from a hydration mismatch by discarding and
+    // rebuilding the whole mismatched subtree on the client, and that
+    // forced rebuild is what was surfacing as the "stuck on the splash
+    // logo," "the greeting text is missing," and the real React crashes
+    // (#300/#310) Reno reported — this is the actual root cause, not a
+    // stale-deploy/stale-tab issue. On the server this always evaluates to
+    // `true` (matching what a fresh browser will always compute on its
+    // own first render, so the very first paint never mismatches); the
+    // module flag still does its original job of preventing a replay on a
+    // client-side-only remount (e.g. entering/leaving /admin) within the
+    // same already-hydrated tab, since it's only ever read/written in the
+    // browser from that point on.
+    if (typeof window === "undefined") return true;
     if (hasPlayedThisLoad) return false;
     hasPlayedThisLoad = true;
     return true;

@@ -21,6 +21,12 @@ import ShortsShelf from "./ShortsShelf";
 import TrendingNow from "./TrendingNow";
 import AdThumbnailCard from "./AdThumbnailCard";
 import { useSettings } from "./settings/SettingsProvider";
+import {
+  getActivePreviewId,
+  requestActivePreview,
+  releaseActivePreview,
+  subscribeToActivePreview,
+} from "./videoPreviewGate";
 
 // Hover-preview delay — don't start streaming a preview for every card the
 // mouse passes over while scrolling, only once the user actually pauses on
@@ -90,11 +96,37 @@ function ShortCard({ short }: { short: Short }) {
 // card starts/stops its preview independently of every other card on the
 // page.
 export function HomeVideoCard({ video }: { video: Recommendation }) {
-  const [previewing, setPreviewing] = useState(false);
+  // A stable per-card identity used only to claim/release the single
+  // shared preview slot below — never rendered or compared by value, just
+  // needs to stay the same object across this card's re-renders. A lazy
+  // useState initializer (not useRef) is what actually guarantees that:
+  // reading ref.current during render is itself against the rules of React
+  // (refs are for effects/handlers, not render), which is exactly why this
+  // is state instead.
+  const [cardId] = useState<symbol>(() => Symbol(video.id));
   const [canHover, setCanHover] = useState(false);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const cardRef = useRef<HTMLDivElement | null>(null);
   const { playback } = useSettings();
+
+  // Only one card's preview may stream at a time, app-wide — see
+  // videoPreviewGate.ts for why this has to be a shared gate rather than
+  // each card owning its own independent "am I previewing" state. This
+  // subscribes to that shared slot and re-renders only when THIS card's
+  // own active/inactive status actually changes.
+  const [activePreviewId, setActivePreviewId] = useState<symbol | null>(
+    () => getActivePreviewId()
+  );
+  useEffect(() => subscribeToActivePreview(setActivePreviewId), []);
+  const previewing = activePreviewId === cardId;
+
+  // Release this card's claim on the shared slot if it unmounts while
+  // active (e.g. the shuffled feed re-renders a different set of cards),
+  // so the slot doesn't stay permanently stuck "held" by a card that no
+  // longer exists.
+  useEffect(() => {
+    return () => releaseActivePreview(cardId);
+  }, [cardId]);
 
   // Only real devices with an actual mouse get the hover preview — on
   // touch devices "hover" is either unsupported or fires unreliably on
@@ -116,21 +148,36 @@ export function HomeVideoCard({ video }: { video: Recommendation }) {
   // never both fire for the same card. Skipped entirely when Data Saver
   // is on (Settings → Playback) — that's the real, working effect of the
   // toggle: no autoplaying preview clips burning mobile data.
+  //
+  // Crucially, this no longer sets local "previewing" state directly —
+  // several cards can cross the 60%-visible threshold in the same instant
+  // (e.g. right when the homepage first finishes loading), and without the
+  // shared gate below, every one of them used to start streaming its own
+  // preview clip at once. Now this only ever REQUESTS the shared slot;
+  // whichever card's request lands last wins, and every other card that
+  // was previously showing a preview is told to stop via the subscription
+  // above — so at most one preview is ever actually streaming.
   useEffect(() => {
     if (canHover || !video.muxPlaybackId || !cardRef.current || playback.dataSaver) return;
 
     const el = cardRef.current;
     const observer = new IntersectionObserver(
-      ([entry]) => setPreviewing(entry.isIntersecting),
+      ([entry]) => {
+        if (entry.isIntersecting) requestActivePreview(cardId);
+        else releaseActivePreview(cardId);
+      },
       { threshold: 0.6 }
     );
     observer.observe(el);
-    return () => observer.disconnect();
-  }, [canHover, video.muxPlaybackId, playback.dataSaver]);
+    return () => {
+      observer.disconnect();
+      releaseActivePreview(cardId);
+    };
+  }, [canHover, video.muxPlaybackId, playback.dataSaver, cardId]);
 
   const startPreview = () => {
     if (!canHover || !video.muxPlaybackId || playback.dataSaver) return;
-    hoverTimer.current = setTimeout(() => setPreviewing(true), HOVER_PREVIEW_DELAY);
+    hoverTimer.current = setTimeout(() => requestActivePreview(cardId), HOVER_PREVIEW_DELAY);
   };
 
   const stopPreview = () => {
@@ -139,7 +186,7 @@ export function HomeVideoCard({ video }: { video: Recommendation }) {
       clearTimeout(hoverTimer.current);
       hoverTimer.current = null;
     }
-    setPreviewing(false);
+    releaseActivePreview(cardId);
   };
 
   const thumbnail = (

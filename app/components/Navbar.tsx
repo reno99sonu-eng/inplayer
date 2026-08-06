@@ -286,7 +286,7 @@ export default function Navbar() {
 </div>
 
 {/* Desktop Search */}
-<div className="hidden lg:flex flex-1 justify-center px-8 min-w-0">
+<div className="hidden lg:flex flex-1 justify-center pl-4 pr-12 min-w-0">
   <NavbarSearch />
 </div>
 

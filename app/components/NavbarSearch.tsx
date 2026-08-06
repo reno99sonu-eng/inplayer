@@ -123,7 +123,7 @@ export default function NavbarSearch() {
   return (
     <form
       onSubmit={handleSubmit}
-      className="group relative flex-1 min-w-0 max-w-[500px]"
+      className="group relative flex-1 min-w-0 max-w-[640px]"
     >
       <div
         className="
@@ -148,7 +148,7 @@ export default function NavbarSearch() {
         onChange={(e) => setQuery(e.target.value)}
         placeholder={placeholder}
         className="
-          relative h-12 lg:h-14 w-full min-w-0 rounded-full
+          relative h-11 lg:h-12 w-full min-w-0 rounded-full
           border border-white/10 light:border-black/10
           bg-white/[0.08] light:bg-black/[0.045]
           backdrop-blur-[30px]

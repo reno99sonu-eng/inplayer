@@ -1,6 +1,7 @@
 import { PutCommand, GetCommand, UpdateCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { randomUUID } from "crypto";
 import { docClient } from "@/app/lib/dynamodb";
+import { clampOrderQuantity } from "@/app/lib/hammartOrderMath";
 
 // Hammart orders. IMPORTANT — read before assuming this table means "a
 // payment happened": money for a Hammart order moves buyer -> vendor
@@ -18,12 +19,37 @@ export const ORDERS_TABLE = "Hammart-Orders"; // PK: orderId
 
 export type OrderStatus = "placed" | "vendor_confirmed" | "vendor_cancelled";
 
+export type OrderFeedbackType = "feedback" | "complaint";
+export type OrderFeedbackStatus = "open" | "resolved";
+
+// A lightweight, one-per-order "tell the vendor something" channel — not
+// a full support-ticket thread. A buyer submits one note (general
+// feedback or a complaint); the vendor can reply once, which marks it
+// resolved. Stored directly on the order row (see submitOrderFeedback /
+// respondToOrderFeedback below) — no separate table needed since it's
+// always 1:1 with an order.
+export interface OrderFeedback {
+  type: OrderFeedbackType;
+  message: string;
+  createdAt: string;
+  status: OrderFeedbackStatus;
+  vendorResponse?: string | null;
+  vendorRespondedAt?: string | null;
+}
+
 export interface HammartOrder {
   orderId: string;
   productId: string;
   productTitle: string;
   productImageUrl: string | null;
   priceInr: number;
+  // Per-unit quantity — priceInr always stays the UNIT price (unchanged
+  // meaning from before this field existed); see orderTotalInr in
+  // app/lib/hammartOrderMath.ts for the real amount owed. Optional so
+  // older rows saved before cart/quantity support existed (DynamoDB is
+  // schemaless) are still valid — they're simply treated as quantity 1,
+  // which is what they actually were.
+  quantity?: number;
   buyerUserId: string;
   buyerName: string;
   buyerEmail: string;
@@ -36,6 +62,7 @@ export interface HammartOrder {
   vendorId: string;
   vendorUpiId: string;
   status: OrderStatus;
+  feedback?: OrderFeedback | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -44,7 +71,14 @@ export async function createOrder(
   input: Omit<HammartOrder, "orderId" | "status" | "createdAt" | "updatedAt">
 ): Promise<{ success: boolean; order?: HammartOrder; tableMissing?: boolean }> {
   const now = new Date().toISOString();
-  const order: HammartOrder = { ...input, orderId: randomUUID(), status: "placed", createdAt: now, updatedAt: now };
+  const order: HammartOrder = {
+    ...input,
+    quantity: clampOrderQuantity(input.quantity ?? 1),
+    orderId: randomUUID(),
+    status: "placed",
+    createdAt: now,
+    updatedAt: now,
+  };
   try {
     await docClient.send(new PutCommand({ TableName: ORDERS_TABLE, Item: order }));
     return { success: true, order };
@@ -116,8 +150,54 @@ export async function setOrderStatus(orderId: string, status: OrderStatus): Prom
   );
 }
 
+// Buyer leaves feedback or files a complaint on their own order — see
+// OrderFeedback's comment above. A resubmit overwrites the previous note
+// (this is a single-note channel, not a thread).
+export async function submitOrderFeedback(
+  orderId: string,
+  feedback: { type: OrderFeedbackType; message: string }
+): Promise<void> {
+  await docClient.send(
+    new UpdateCommand({
+      TableName: ORDERS_TABLE,
+      Key: { orderId },
+      UpdateExpression: "SET feedback = :feedback, updatedAt = :now",
+      ExpressionAttributeValues: {
+        ":feedback": {
+          type: feedback.type,
+          message: feedback.message,
+          createdAt: new Date().toISOString(),
+          status: "open",
+        },
+        ":now": new Date().toISOString(),
+      },
+    })
+  );
+}
+
+// Vendor replies to feedback/a complaint on one of their own orders,
+// which also marks it resolved. Only ever called after submitOrderFeedback
+// has already put a `feedback` map on the row (enforced by the caller —
+// see app/api/hammart/orders/[orderId]/feedback/route.ts's PATCH handler)
+// since SET on a nested path requires the parent map to already exist.
+export async function respondToOrderFeedback(orderId: string, vendorResponse: string): Promise<void> {
+  const now = new Date().toISOString();
+  await docClient.send(
+    new UpdateCommand({
+      TableName: ORDERS_TABLE,
+      Key: { orderId },
+      UpdateExpression:
+        "SET feedback.vendorResponse = :resp, feedback.vendorRespondedAt = :now, feedback.#status = :resolved, updatedAt = :now",
+      ExpressionAttributeNames: { "#status": "status" },
+      ExpressionAttributeValues: { ":resp": vendorResponse, ":now": now, ":resolved": "resolved" },
+    })
+  );
+}
+
 // Re-exported for any server-side caller that already imports from this
-// file — the real implementation lives in app/lib/upi.ts (a plain,
-// import-free module) so client components can use it too without
-// pulling AWS SDK code into the browser bundle.
+// file — the real implementations live in app/lib/upi.ts and
+// app/lib/hammartOrderMath.ts (plain, import-free modules) so client
+// components can use them too without pulling AWS SDK code into the
+// browser bundle.
 export { buildUpiLink } from "@/app/lib/upi";
+export { clampOrderQuantity, MAX_ORDER_QUANTITY, orderTotalInr } from "@/app/lib/hammartOrderMath";

@@ -1,14 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import QRCode from "qrcode";
 import Link from "next/link";
-import { Loader2, ShoppingBag, IndianRupee, Store, ExternalLink, CheckCircle2, AlertTriangle, Star, Globe, Shield, MapPin, Send, ArrowLeft, X } from "lucide-react";
+import { Loader2, ShoppingBag, IndianRupee, Store, ExternalLink, CheckCircle2, AlertTriangle, Star, Globe, Shield, MapPin, Send, ArrowLeft, X, RefreshCw, Minus, Plus, Heart, ShoppingCart } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { authedFetch } from "@/app/lib/apiFetch";
 import { buildUpiLink } from "@/app/lib/upi";
+import { orderTotalInr } from "@/app/lib/hammartOrderMath";
 import LocationMapPicker, { type LocationAddress } from "@/app/components/hammart/LocationMapPicker";
+import ShopNavLinks from "@/app/components/hammart/ShopNavLinks";
 import type { HammartProduct } from "@/app/lib/hammartProducts";
 import type { HammartOrder } from "@/app/lib/hammartOrders";
 import type { HammartReview } from "@/app/lib/hammartReviews";
@@ -17,6 +19,7 @@ export default function ProductPage() {
   const params = useParams();
   const productId = params?.productId as string;
   const { user, signedIn, openSignIn } = useAuthModal();
+  const searchParams = useSearchParams();
 
   const [product, setProduct] = useState<HammartProduct | null>(null);
   const [activeImageIndex, setActiveImageIndex] = useState(0);
@@ -37,6 +40,15 @@ export default function ProductPage() {
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [reorderPrefilled, setReorderPrefilled] = useState(false);
+  const reorderHandledRef = useRef(false);
+
+  const [buyQuantity, setBuyQuantity] = useState(1);
+  const [wishlisted, setWishlisted] = useState(false);
+  const [wishlistBusy, setWishlistBusy] = useState(false);
+  const [addingToCart, setAddingToCart] = useState(false);
+  const [addedToCart, setAddedToCart] = useState(false);
+  const [cartError, setCartError] = useState<string | null>(null);
 
   const [showMapPicker, setShowMapPicker] = useState(false);
 
@@ -74,6 +86,24 @@ export default function ProductPage() {
     })();
   }, [productId]);
 
+  // Wishlist heart's initial state — a cheap single-item check (see
+  // /api/hammart/wishlist's GET, same dual-mode shape as /api/watchlist)
+  // rather than fetching the buyer's entire wishlist just to check one id.
+  useEffect(() => {
+    (() => {
+      if (!signedIn || !productId) return;
+      (async () => {
+        try {
+          const res = await authedFetch(`/api/hammart/wishlist?productId=${encodeURIComponent(productId)}`);
+          const data = await res.json().catch(() => ({}));
+          setWishlisted(Boolean(data.wishlisted));
+        } catch (err) {
+          console.error("Failed to check wishlist status:", err);
+        }
+      })();
+    })();
+  }, [signedIn, productId]);
+
   const [showAddressModal, setShowAddressModal] = useState(false);
   const [buyerNameInput, setBuyerNameInput] = useState(user?.name || "");
   const [buyerEmail, setBuyerEmail] = useState(user?.email || "");
@@ -83,6 +113,49 @@ export default function ProductPage() {
   const [stateName, setStateName] = useState("");
   const [pincode, setPincode] = useState("");
 
+  // "Reorder" from My Orders (/shop/orders) links here with ?reorder=1.
+  // Runs at most once per page visit (reorderHandledRef) so it never
+  // fights with someone mid-edit in the address modal. Pulls the buyer's
+  // own most recent real order for this exact product — /api/hammart/
+  // orders only ever returns the caller's own orders, never anyone
+  // else's — and prefills the same modal the normal "Buy Now" button
+  // opens, so price/availability are always re-checked live through the
+  // exact same order-creation flow rather than assumed from the old
+  // order.
+  useEffect(() => {
+    (() => {
+      if (reorderHandledRef.current) return;
+      if (!product || !signedIn) return;
+      if (searchParams.get("reorder") !== "1") return;
+      if (user?.userId === product.vendorUserId) return;
+      reorderHandledRef.current = true;
+
+      (async () => {
+        setBuyerNameInput(user?.name || "");
+        setBuyerEmail(user?.email || "");
+        try {
+          const res = await authedFetch("/api/hammart/orders");
+          const data = await res.json().catch(() => ({}));
+          const past = ((data.orders || []) as HammartOrder[]).find((o) => o.productId === productId);
+          if (past) {
+            setBuyerNameInput(past.buyerName || user?.name || "");
+            setBuyerEmail(past.buyerEmail || user?.email || "");
+            setBuyerPhone(past.buyerPhone ?? "");
+            setDeliveryAddress(past.deliveryAddress ?? "");
+            setCity(past.city ?? "");
+            setStateName(past.state ?? "");
+            setPincode(past.pincode ?? "");
+            setReorderPrefilled(true);
+          }
+        } catch (err) {
+          console.error("Failed to prefill reorder details:", err);
+        } finally {
+          setShowAddressModal(true);
+        }
+      })();
+    })();
+  }, [product, signedIn, searchParams, user, productId]);
+
   const handleBuy = async () => {
     if (!signedIn) {
       openSignIn();
@@ -91,6 +164,57 @@ export default function ProductPage() {
     setBuyerNameInput(user?.name || "");
     setBuyerEmail(user?.email || "");
     setShowAddressModal(true);
+  };
+
+  const handleAddToCart = async () => {
+    if (!signedIn) {
+      openSignIn();
+      return;
+    }
+    setCartError(null);
+    setAddingToCart(true);
+    try {
+      const res = await authedFetch("/api/hammart/cart", {
+        method: "POST",
+        body: JSON.stringify({ productId, quantity: buyQuantity }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setCartError(data.error || "Couldn't add that to your cart.");
+        return;
+      }
+      setAddedToCart(true);
+      setTimeout(() => setAddedToCart(false), 1800);
+    } catch (err) {
+      console.error("Failed to add to cart:", err);
+      setCartError("Something went wrong. Please try again.");
+    } finally {
+      setAddingToCart(false);
+    }
+  };
+
+  const toggleWishlist = async () => {
+    if (!signedIn) {
+      openSignIn();
+      return;
+    }
+    setWishlistBusy(true);
+    try {
+      if (wishlisted) {
+        await authedFetch(`/api/hammart/wishlist/${productId}`, { method: "DELETE" });
+        setWishlisted(false);
+      } else {
+        const res = await authedFetch("/api/hammart/wishlist", {
+          method: "POST",
+          body: JSON.stringify({ productId }),
+        });
+        if (res.ok) setWishlisted(true);
+      }
+    } catch (err) {
+      console.error("Failed to update wishlist:", err);
+    } finally {
+      setWishlistBusy(false);
+    }
   };
 
   const handleAddressFromMap = (addr: LocationAddress) => {
@@ -149,6 +273,7 @@ export default function ProductPage() {
         method: "POST",
         body: JSON.stringify({
           productId,
+          quantity: buyQuantity,
           buyerName: buyerNameInput,
           buyerPhone,
           deliveryAddress,
@@ -167,7 +292,7 @@ export default function ProductPage() {
       const link = buildUpiLink({
         vpa: data.order.vendorUpiId,
         payeeName: data.order.vendorId,
-        amountInr: data.order.priceInr,
+        amountInr: orderTotalInr(data.order),
         note: data.order.productTitle,
       });
       try {
@@ -206,19 +331,22 @@ export default function ProductPage() {
   const photos = product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls : (product.imageUrl ? [product.imageUrl] : []);
   const activePhoto = photos[activeImageIndex] || product.imageUrl;
 
-  const upiLink = order ? buildUpiLink({ vpa: order.vendorUpiId, payeeName: order.vendorId, amountInr: order.priceInr, note: order.productTitle }) : null;
+  const upiLink = order ? buildUpiLink({ vpa: order.vendorUpiId, payeeName: order.vendorId, amountInr: orderTotalInr(order), note: order.productTitle }) : null;
   const isOwnListing = user?.userId === product.vendorUserId;
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-6 text-white light:text-slate-900">
-      {/* Prominent Back Button */}
-      <Link
-        href="/shop"
-        className="mb-6 inline-flex items-center gap-2 rounded-xl border border-white/10 light:border-slate-300 bg-white/5 light:bg-white px-3.5 py-2 text-xs font-bold text-slate-200 light:text-slate-800 light:shadow-sm transition hover:bg-white/10 hover:border-orange-400/40"
-      >
-        <ArrowLeft size={16} className="text-orange-400" />
-        Back to Store
-      </Link>
+      {/* Prominent Back Button + Orders/Wishlist/Cart quick nav */}
+      <div className="mb-6 flex items-center justify-between gap-3">
+        <Link
+          href="/shop"
+          className="inline-flex items-center gap-2 rounded-xl border border-white/10 light:border-slate-300 bg-white/5 light:bg-white px-3.5 py-2 text-xs font-bold text-slate-200 light:text-slate-800 light:shadow-sm transition hover:bg-white/10 hover:border-orange-400/40"
+        >
+          <ArrowLeft size={16} className="text-orange-400" />
+          Back to Store
+        </Link>
+        <ShopNavLinks />
+      </div>
 
       <div className="grid gap-8 md:grid-cols-2">
         {/* Multi-Photo Carousel Gallery */}
@@ -323,17 +451,64 @@ export default function ProductPage() {
             {isOwnListing ? (
               <p className="text-xs font-semibold text-slate-500 light:text-slate-700">This is your own listing.</p>
             ) : !order ? (
-              <button
-                type="button"
-                onClick={handleBuy}
-                disabled={placing}
-                className="w-full flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] py-3.5 text-sm font-black text-slate-950 shadow-lg shadow-orange-500/25 transition hover:brightness-110 active:scale-[0.99] disabled:opacity-60"
-              >
-                {placing ? <Loader2 size={18} className="animate-spin" /> : <ShoppingBag size={18} />}
-                {placing ? "Placing order..." : "Buy Now"}
-              </button>
+              <>
+                <div className="flex items-center gap-3">
+                  <div className="flex items-center rounded-xl border border-white/10 light:border-slate-300 bg-white/5 light:bg-white light:shadow-sm">
+                    <button
+                      type="button"
+                      onClick={() => setBuyQuantity((q) => Math.max(1, q - 1))}
+                      className="flex h-10 w-10 items-center justify-center text-slate-300 light:text-slate-700 hover:text-orange-400 light:hover:text-orange-600"
+                    >
+                      <Minus size={14} />
+                    </button>
+                    <span className="w-8 text-center text-sm font-bold text-white light:text-slate-900">{buyQuantity}</span>
+                    <button
+                      type="button"
+                      onClick={() => setBuyQuantity((q) => Math.min(20, q + 1))}
+                      className="flex h-10 w-10 items-center justify-center text-slate-300 light:text-slate-700 hover:text-orange-400 light:hover:text-orange-600"
+                    >
+                      <Plus size={14} />
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={toggleWishlist}
+                    disabled={wishlistBusy}
+                    title={wishlisted ? "Remove from wishlist" : "Save to wishlist"}
+                    className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl border transition disabled:opacity-60 ${
+                      wishlisted
+                        ? "border-red-400/40 bg-red-500/10 text-red-400"
+                        : "border-white/10 light:border-slate-300 bg-white/5 light:bg-white light:shadow-sm text-slate-300 light:text-slate-700"
+                    }`}
+                  >
+                    <Heart size={16} className={wishlisted ? "fill-red-400" : ""} />
+                  </button>
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-2.5">
+                  <button
+                    type="button"
+                    onClick={handleAddToCart}
+                    disabled={addingToCart}
+                    className="flex items-center justify-center gap-2 rounded-2xl border border-orange-400/40 bg-orange-500/10 py-3.5 text-sm font-black text-orange-300 transition hover:bg-orange-500/20 disabled:opacity-60"
+                  >
+                    {addingToCart ? <Loader2 size={18} className="animate-spin" /> : <ShoppingCart size={18} />}
+                    {addedToCart ? "Added ✓" : addingToCart ? "Adding..." : "Add to Cart"}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleBuy}
+                    disabled={placing}
+                    className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] py-3.5 text-sm font-black text-slate-950 shadow-lg shadow-orange-500/25 transition hover:brightness-110 active:scale-[0.99] disabled:opacity-60"
+                  >
+                    {placing ? <Loader2 size={18} className="animate-spin" /> : <ShoppingBag size={18} />}
+                    {placing ? "Placing order..." : "Buy Now"}
+                  </button>
+                </div>
+              </>
             ) : null}
             {error && <p className="mt-2 text-xs font-bold text-red-400 text-center">{error}</p>}
+            {cartError && <p className="mt-2 text-xs font-bold text-red-400 text-center">{cartError}</p>}
           </div>
         </div>
       </div>
@@ -409,6 +584,12 @@ export default function ProductPage() {
         <div className="mt-8 rounded-2xl border border-orange-400/20 bg-orange-500/[0.05] p-5 text-center">
           <CheckCircle2 size={22} className="mx-auto text-emerald-400" />
           <p className="mt-2 text-sm font-bold text-white light:text-slate-900">Order placed — pay {order.vendorId} directly</p>
+          {(order.quantity ?? 1) > 1 && (
+            <p className="mt-1 text-xs text-slate-400">
+              Qty: {order.quantity} × ₹{order.priceInr.toLocaleString("en-IN")}
+            </p>
+          )}
+          <p className="mt-1 text-lg font-black text-orange-400">₹{orderTotalInr(order).toLocaleString("en-IN")}</p>
           {qrDataUrl && (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={qrDataUrl} alt="UPI QR code" className="mx-auto mt-4 h-48 w-48 rounded-xl bg-white p-2" />
@@ -458,6 +639,11 @@ export default function ProductPage() {
             </div>
 
             <form onSubmit={handleConfirmOrder} className="mt-4 space-y-3">
+              {reorderPrefilled && (
+                <p className="flex items-center gap-1.5 rounded-lg bg-orange-500/10 px-2.5 py-2 text-[11px] font-semibold text-orange-300">
+                  <RefreshCw size={12} className="flex-shrink-0" /> Prefilled from your last order — feel free to edit.
+                </p>
+              )}
               <div>
                 <label className="text-[11px] font-bold text-slate-300 light:text-slate-800 uppercase">Full Name</label>
                 <input

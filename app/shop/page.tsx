@@ -2,7 +2,10 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { Loader2, Store, IndianRupee, ShoppingBag, Users, LayoutGrid, Search, X, SlidersHorizontal, ChevronDown, Check } from "lucide-react";
+import { Loader2, Store, IndianRupee, ShoppingBag, ShoppingCart, Users, LayoutGrid, Search, X, SlidersHorizontal, ChevronDown, Check } from "lucide-react";
+import { useAuthModal } from "@/app/components/auth/AuthProvider";
+import { authedFetch } from "@/app/lib/apiFetch";
+import ShopNavLinks from "@/app/components/hammart/ShopNavLinks";
 import type { HammartProduct } from "@/app/lib/hammartProducts";
 
 interface VendorItem {
@@ -44,6 +47,7 @@ const FILTER_OPTIONS: FilterOption[] = [
 ];
 
 export default function ShopPage() {
+  const { signedIn, openSignIn } = useAuthModal();
   const [products, setProducts] = useState<HammartProduct[]>([]);
   const [selectedVendorId, setSelectedVendorId] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState("All");
@@ -52,6 +56,42 @@ export default function ShopPage() {
   const [filterDropdownOpen, setFilterDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [tableMissing, setTableMissing] = useState(false);
+  const [addingProductId, setAddingProductId] = useState<string | null>(null);
+  const [addedProductIds, setAddedProductIds] = useState<Set<string>>(new Set());
+
+  // Quick "Add to Cart" straight from the browse grid — no need to open
+  // the product page first. Wishlist toggling lives on the product detail
+  // page itself (see app/shop/product/[productId]/page.tsx), since that's
+  // where a real per-item saved-state check already happens.
+  const handleQuickAddToCart = async (e: React.MouseEvent, product: HammartProduct) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (!signedIn) {
+      openSignIn();
+      return;
+    }
+    setAddingProductId(product.productId);
+    try {
+      const res = await authedFetch("/api/hammart/cart", {
+        method: "POST",
+        body: JSON.stringify({ productId: product.productId, quantity: 1 }),
+      });
+      if (res.ok) {
+        setAddedProductIds((prev) => new Set(prev).add(product.productId));
+        setTimeout(() => {
+          setAddedProductIds((prev) => {
+            const next = new Set(prev);
+            next.delete(product.productId);
+            return next;
+          });
+        }, 1800);
+      }
+    } catch (err) {
+      console.error("Failed to add to cart:", err);
+    } finally {
+      setAddingProductId(null);
+    }
+  };
 
   useEffect(() => {
     (async () => {
@@ -137,12 +177,15 @@ export default function ShopPage() {
           </div>
         </div>
 
-        <Link
-          href="/shop/vendor"
-          className="rounded-xl border border-orange-400/40 bg-orange-500/10 light:bg-amber-100 light:border-amber-300 px-3.5 py-1.5 text-xs font-bold text-orange-300 light:text-amber-900 transition hover:bg-orange-500/20 active:scale-95"
-        >
-          Become a Seller / Open Storefront →
-        </Link>
+        <div className="flex items-center gap-2.5">
+          <ShopNavLinks />
+          <Link
+            href="/shop/vendor"
+            className="rounded-xl border border-orange-400/40 bg-orange-500/10 light:bg-amber-100 light:border-amber-300 px-3.5 py-1.5 text-xs font-bold text-orange-300 light:text-amber-900 transition hover:bg-orange-500/20 active:scale-95"
+          >
+            Become a Seller / Open Storefront →
+          </Link>
+        </div>
       </div>
 
       {/* Top Navbar Style Search Bar & Filters Bar */}
@@ -346,6 +389,25 @@ export default function ShopPage() {
                           <ShoppingBag size={22} />
                         </div>
                       )}
+
+                      {/* Quick Add to Cart — preventDefault/stopPropagation
+                          so it doesn't trigger the card's own Link
+                          navigation to the product page. */}
+                      <button
+                        type="button"
+                        onClick={(e) => handleQuickAddToCart(e, p)}
+                        disabled={addingProductId === p.productId}
+                        title="Add to cart"
+                        className="absolute bottom-1.5 right-1.5 flex h-8 w-8 items-center justify-center rounded-full bg-orange-500 text-white shadow-lg transition hover:bg-orange-600 disabled:opacity-70"
+                      >
+                        {addingProductId === p.productId ? (
+                          <Loader2 size={14} className="animate-spin" />
+                        ) : addedProductIds.has(p.productId) ? (
+                          <Check size={14} />
+                        ) : (
+                          <ShoppingCart size={14} />
+                        )}
+                      </button>
                     </div>
 
                     <div className="p-2.5">

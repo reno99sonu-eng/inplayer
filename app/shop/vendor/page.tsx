@@ -7,7 +7,9 @@ import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { authedFetch } from "@/app/lib/apiFetch";
 import VendorKycForm from "@/app/components/hammart/VendorKycForm";
 import VendorSubscribeButton from "@/app/components/hammart/VendorSubscribeButton";
+import VendorSalesStats from "@/app/components/hammart/VendorSalesStats";
 import { FREE_LISTINGS_LIMIT, type BusinessType, type VendorProfile } from "@/app/lib/hammartVendors";
+import type { HammartOrder } from "@/app/lib/hammartOrders";
 
 // Real "become a vendor" path for someone who ALREADY has an InPlayer
 // account (the sign-up-form toggle in SignUpModal.tsx only covers brand
@@ -122,14 +124,27 @@ export default function VendorDashboardPage() {
   const [vendor, setVendor] = useState<VendorProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [tableMissing, setTableMissing] = useState(false);
+  const [vendorOrders, setVendorOrders] = useState<HammartOrder[]>([]);
 
   const load = async () => {
     setLoading(true);
     try {
       const res = await authedFetch("/api/hammart/vendor/me");
       const data = await res.json().catch(() => ({}));
-      setVendor(data.vendor || null);
+      const loadedVendor = (data.vendor || null) as VendorProfile | null;
+      setVendor(loadedVendor);
       setTableMissing(Boolean(data.tableMissing));
+
+      // Sales data only means anything once a vendor can actually receive
+      // orders — same verified-and-not-suspended gate the "Orders
+      // Received" link itself sits behind below.
+      if (loadedVendor && loadedVendor.kycStatus === "verified" && !loadedVendor.suspended) {
+        const ordersRes = await authedFetch("/api/hammart/orders?role=vendor");
+        const ordersData = await ordersRes.json().catch(() => ({}));
+        setVendorOrders(ordersData.orders || []);
+      } else {
+        setVendorOrders([]);
+      }
     } catch (err) {
       console.error("Failed to load vendor profile:", err);
     } finally {
@@ -241,6 +256,19 @@ export default function VendorDashboardPage() {
               Orders Received
             </Link>
           </div>
+        </div>
+      )}
+
+      {vendor && vendor.kycStatus === "verified" && !vendor.suspended && vendorOrders.length > 0 && (
+        <div className="mt-4 text-left">
+          <h2 className="mb-2 text-xs font-black uppercase tracking-wide text-slate-400 light:text-slate-600">Sales Overview</h2>
+          <VendorSalesStats orders={vendorOrders} compact />
+          <Link
+            href="/shop/vendor/orders"
+            className="mt-2.5 block text-center text-xs font-semibold text-orange-300 hover:text-orange-200"
+          >
+            View full sales breakdown &amp; orders →
+          </Link>
         </div>
       )}
     </div>

@@ -3,6 +3,8 @@ import { verifyAuth } from "@/app/lib/verifyAuth";
 import { getProduct } from "@/app/lib/hammartProducts";
 import { getVendorProfile } from "@/app/lib/hammartVendors";
 import { createOrder, listBuyerOrders, listVendorOrders } from "@/app/lib/hammartOrders";
+import { clampOrderQuantity, orderTotalInr } from "@/app/lib/hammartOrderMath";
+import { removeCartItem } from "@/app/lib/hammartCart";
 import { sendEmail } from "@/app/lib/ses";
 import { resolveCognitoEmails } from "@/app/lib/cognitoClient";
 
@@ -35,6 +37,7 @@ export async function POST(request: NextRequest) {
 
   const body = await request.json().catch(() => ({}));
   const productId = typeof body.productId === "string" ? body.productId : "";
+  const quantity = clampOrderQuantity(body.quantity ?? 1);
   const buyerPhone = typeof body.buyerPhone === "string" ? body.buyerPhone.trim().slice(0, 20) : "";
   const deliveryAddress = typeof body.deliveryAddress === "string" ? body.deliveryAddress.trim().slice(0, 300) : "";
   const city = typeof body.city === "string" ? body.city.trim().slice(0, 60) : "";
@@ -66,6 +69,7 @@ export async function POST(request: NextRequest) {
     productTitle: product.title,
     productImageUrl: product.imageUrl,
     priceInr: product.priceInr,
+    quantity,
     buyerUserId: user.userId,
     buyerName,
     buyerEmail,
@@ -83,15 +87,25 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Couldn't place your order right now.", tableMissing: result.tableMissing }, { status: 503 });
   }
 
+  // This product just became a real order — if it was sitting in the
+  // buyer's cart (from a cart checkout, or just added there earlier and
+  // bought directly instead), it shouldn't linger there with a stale
+  // quantity. Harmless no-op if it wasn't in the cart at all.
+  await removeCartItem(user.userId, product.productId).catch((err) =>
+    console.error("Failed to clear ordered item from cart:", err)
+  );
+
   const orderIdDisplay = result.order.orderId.slice(0, 8).toUpperCase();
+  const lineTotal = orderTotalInr(result.order);
+  const qtyNote = quantity > 1 ? ` × ${quantity} = ₹${lineTotal.toLocaleString("en-IN")}` : "";
 
   // Send Buyer Confirmation Email to Customer's Primary Email Address
   if (buyerEmail) {
     void sendEmail({
       to: buyerEmail,
       subject: `Hammart Order Confirmed [${orderIdDisplay}] — ${product.title}`,
-      text: `Order ID: ${orderIdDisplay}\nYou placed an order for "${product.title}" (₹${product.priceInr}) from vendor @${vendor.vendorId}.\n\nPayment Note: Pay the vendor directly via UPI ID ${vendor.upiId}. InPlayer does not process this payment directly.\n\nYour shipping address was sent directly to the vendor for fulfillment.`,
-      html: `<h2>Order Confirmed — ${orderIdDisplay}</h2><p>You placed an order for <strong>${product.title}</strong> (₹${product.priceInr}) from vendor <strong>@${vendor.vendorId}</strong>.</p><p><strong>Payment Note:</strong> Pay the vendor directly via UPI ID <strong>${vendor.upiId}</strong>. InPlayer does not process this transaction.</p><p>Your delivery address has been sent directly to the vendor for shipment.</p>`,
+      text: `Order ID: ${orderIdDisplay}\nYou placed an order for "${product.title}" (₹${product.priceInr}${qtyNote}) from vendor @${vendor.vendorId}.\n\nPayment Note: Pay the vendor directly via UPI ID ${vendor.upiId} — total amount ₹${lineTotal}. InPlayer does not process this payment directly.\n\nYour shipping address was sent directly to the vendor for fulfillment.`,
+      html: `<h2>Order Confirmed — ${orderIdDisplay}</h2><p>You placed an order for <strong>${product.title}</strong> (₹${product.priceInr}${qtyNote}) from vendor <strong>@${vendor.vendorId}</strong>.</p><p><strong>Payment Note:</strong> Pay the vendor directly via UPI ID <strong>${vendor.upiId}</strong> — total amount <strong>₹${lineTotal.toLocaleString("en-IN")}</strong>. InPlayer does not process this transaction.</p><p>Your delivery address has been sent directly to the vendor for shipment.</p>`,
     }).catch((err) => console.error("Failed to email buyer order confirmation:", err));
   }
 
@@ -103,14 +117,14 @@ export async function POST(request: NextRequest) {
     void sendEmail({
       to: vendorEmail,
       subject: `🚨 New Hammart Order [ID: ${orderIdDisplay}] — ${product.title}`,
-      text: `NEW ORDER RECEIVED!\n\nOrder ID: ${orderIdDisplay}\nProduct: ${product.title}\nPrice: ₹${product.priceInr}\n\nCUSTOMER DETAILS:\n- Name: ${buyerName}\n- Email: ${buyerEmail || "Not provided"}\n- Phone: ${buyerPhone || "Not provided"}\n- Delivery Address: ${fullAddress || "Direct Contact"}\n\nNote: Buyer will pay you directly to your UPI ID (${vendor.upiId}). Fulfill and ship order to the customer's address above.`,
+      text: `NEW ORDER RECEIVED!\n\nOrder ID: ${orderIdDisplay}\nProduct: ${product.title}\nPrice: ₹${product.priceInr}${qtyNote}\nTotal to collect: ₹${lineTotal}\n\nCUSTOMER DETAILS:\n- Name: ${buyerName}\n- Email: ${buyerEmail || "Not provided"}\n- Phone: ${buyerPhone || "Not provided"}\n- Delivery Address: ${fullAddress || "Direct Contact"}\n\nNote: Buyer will pay you directly to your UPI ID (${vendor.upiId}). Fulfill and ship order to the customer's address above.`,
       html: `
         <div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
           <h2 style="color: #f97316;">🎉 New Hammart Order Received!</h2>
           <p><strong>Order ID:</strong> ${orderIdDisplay}</p>
           <hr style="border: 0; border-top: 1px solid #eee;" />
           <h3>🛒 Item Details:</h3>
-          <p><strong>Product:</strong> ${product.title}<br/><strong>Price:</strong> ₹${product.priceInr}</p>
+          <p><strong>Product:</strong> ${product.title}<br/><strong>Price:</strong> ₹${product.priceInr}${qtyNote}<br/><strong>Total to collect:</strong> ₹${lineTotal.toLocaleString("en-IN")}</p>
           <hr style="border: 0; border-top: 1px solid #eee;" />
           <h3>👤 Customer Delivery Information:</h3>
           <p>
@@ -121,7 +135,7 @@ export async function POST(request: NextRequest) {
           </p>
           <hr style="border: 0; border-top: 1px solid #eee;" />
           <p style="background: #fff7ed; padding: 12px; border-radius: 8px; border: 1px solid #ffedd5; color: #c2410c;">
-            <strong>💳 Payment Note:</strong> Customer pays you directly via your UPI ID (<strong>${vendor.upiId}</strong>). InPlayer does not process this transaction.
+            <strong>💳 Payment Note:</strong> Customer pays you directly via your UPI ID (<strong>${vendor.upiId}</strong>) — total <strong>₹${lineTotal.toLocaleString("en-IN")}</strong>. InPlayer does not process this transaction.
           </p>
         </div>
       `,

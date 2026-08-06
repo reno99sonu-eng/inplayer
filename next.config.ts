@@ -14,6 +14,16 @@ const nextConfig: NextConfig = {
     // same images over and over.
     minimumCacheTTL: 2678400,
   },
+  // Tree-shake heavy barrel-export libraries so only the specific
+  // icons/components actually used end up in the client bundle, instead of
+  // the entire library. Without this, lucide-react alone can add 200KB+
+  // and @aws-amplify/ui-react even more.
+  experimental: {
+    optimizePackageImports: [
+      "lucide-react",
+      "@aws-amplify/ui-react",
+    ],
+  },
 };
 
 export default nextConfig;

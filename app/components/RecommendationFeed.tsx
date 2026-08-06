@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, memo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import nextDynamic from "next/dynamic";
@@ -96,7 +96,7 @@ function ShortCard({ short }: { short: Short }) {
 // A single homepage video card. Owns its own hover-preview state so each
 // card starts/stops its preview independently of every other card on the
 // page.
-export function HomeVideoCard({ video }: { video: Recommendation }) {
+export const HomeVideoCard = memo(function HomeVideoCard({ video }: { video: Recommendation }) {
   // A stable per-card identity used only to claim/release the single
   // shared preview slot below — never rendered or compared by value, just
   // needs to stay the same object across this card's re-renders. A lazy
@@ -426,7 +426,7 @@ export function HomeVideoCard({ video }: { video: Recommendation }) {
       {information}
     </article>
   );
-}
+});
 
 export default function RecommendationFeed({
   realVideos = [],
@@ -500,13 +500,16 @@ export default function RecommendationFeed({
   }, [items.length]);
 
   type FeedEntry = { kind: "video"; video: Recommendation } | { kind: "ad" };
-  const feedEntries: FeedEntry[] = [];
-  items.forEach((video, index) => {
-    if (adSlotIndex !== null && index === adSlotIndex) {
-      feedEntries.push({ kind: "ad" });
-    }
-    feedEntries.push({ kind: "video", video });
-  });
+  const feedEntries = useMemo<FeedEntry[]>(() => {
+    const entries: FeedEntry[] = [];
+    items.forEach((video, index) => {
+      if (adSlotIndex !== null && index === adSlotIndex) {
+        entries.push({ kind: "ad" });
+      }
+      entries.push({ kind: "video", video });
+    });
+    return entries;
+  }, [items, adSlotIndex]);
 
   // Keep the discovery feed in repeating YouTube-style blocks for the video
   // grid itself — a fixed 4 videos per block, on every screen size. This
@@ -531,9 +534,12 @@ export default function RecommendationFeed({
   // than "fresh" content. It's rendered once, after the first block, below.
   const blockSize = 4;
 
-  const feedBatches = Array.from(
-    { length: Math.ceil(feedEntries.length / blockSize) },
-    (_, index) => feedEntries.slice(index * blockSize, index * blockSize + blockSize)
+  const feedBatches = useMemo(
+    () => Array.from(
+      { length: Math.ceil(feedEntries.length / blockSize) },
+      (_, index) => feedEntries.slice(index * blockSize, index * blockSize + blockSize)
+    ),
+    [feedEntries, blockSize]
   );
   const shortsPerShelf = 8;
 

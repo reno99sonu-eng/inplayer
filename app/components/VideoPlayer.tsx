@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import MuxPlayer from "@mux/mux-player-react";
+import dynamic from "next/dynamic";
+const MuxPlayer = dynamic(() => import("@mux/mux-player-react"), { ssr: false });
 import type { MuxCSSProperties, MuxPlayerRefAttributes } from "@mux/mux-player-react";
 import { useSettings } from "@/app/components/settings/SettingsProvider";
 
@@ -426,12 +427,21 @@ export default function VideoPlayer({
 
     if (applyMenuTheme()) return;
 
-    let attempts = 0;
-    const id = window.setInterval(() => {
-      attempts += 1;
-      if (applyMenuTheme() || attempts > 20) window.clearInterval(id);
-    }, 150);
-    return () => window.clearInterval(id);
+    // Instead of polling every 150ms up to 20 times, observe the shadow
+    // DOM for changes and apply theme once menus appear.
+    const muxEl = playerRef.current as unknown as HTMLElement | null;
+    const target = muxEl?.shadowRoot;
+    if (!target) return;
+
+    const mo = new MutationObserver(() => {
+      if (applyMenuTheme()) mo.disconnect();
+    });
+    mo.observe(target, { childList: true, subtree: true });
+
+    // Safety: disconnect after 5s regardless (same spirit as the old
+    // 20-attempt cap, but doesn't burn CPU cycles polling).
+    const timeout = window.setTimeout(() => mo.disconnect(), 5000);
+    return () => { mo.disconnect(); window.clearTimeout(timeout); };
   }, []);
 
   // While CSS-fullscreen: freeze page scroll behind the player, and let

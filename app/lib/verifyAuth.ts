@@ -4,6 +4,28 @@ import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { sessionStillActive } from "@/app/lib/sessions";
 
+// ── In-memory TTL cache for the DynamoDB suspension/name check ──────
+// verifyAuth runs on EVERY authenticated API request (50+ routes), and
+// each call was hitting DynamoDB to check isSuspended + resolve the
+// user's display name. For a user clicking around the site, that's
+// 10-20+ DB round-trips in a few seconds — all returning the same data.
+//
+// This cache stores the result for 30 seconds. First request in any 30s
+// window does the real DB lookup (exactly as before); subsequent requests
+// get the cached answer instantly. Suspended users are still blocked
+// (the cached result includes isSuspended: true). An admin suspending
+// someone takes effect within 30s max — the same order of magnitude as
+// Cognito's own token expiry window, and far faster than any user would
+// notice.
+const AUTH_CACHE_TTL_MS = 30_000;
+interface AuthCacheEntry {
+  isSuspended: boolean;
+  suspendedUntil?: string;
+  name?: string;
+  cachedAt: number;
+}
+const authCache = new Map<string, AuthCacheEntry>();
+
 // These match the values in amplify-config.ts — same User Pool, same
 // App Client, just verified here on the server instead of trusted
 // blindly from the browser.
@@ -81,50 +103,84 @@ export async function verifyAuth(request: NextRequest): Promise<VerifiedUser> {
   // row blocks it. This is deliberate: a bug or blip in this one check must
   // never be able to take down sign-in-gated actions for every user on the
   // site, only the one row an admin actually suspended.
+  //
+  // Performance: the result is cached in-memory for 30s (see authCache
+  // above) so rapid-fire requests from the same user don't each make their
+  // own DynamoDB round-trip. The cached entry includes isSuspended, so
+  // suspended users are still blocked instantly from cache.
   try {
-    const result = await docClient.send(
-      new GetCommand({
-        TableName: "InPlayer-Users",
-        Key: { userId },
-        ProjectionExpression: "isSuspended, suspendedUntil, #n",
-        ExpressionAttributeNames: { "#n": "name" },
-      })
-    );
-    if (result.Item?.isSuspended === true) {
+    const now = Date.now();
+    const cached = authCache.get(userId);
+    let isSuspended = false;
+    let suspendedUntil: string | undefined;
+    let storedName: string | undefined;
+
+    if (cached && now - cached.cachedAt < AUTH_CACHE_TTL_MS) {
+      // Cache hit — use the stored result without touching DynamoDB.
+      isSuspended = cached.isSuspended;
+      suspendedUntil = cached.suspendedUntil;
+      storedName = cached.name;
+    } else {
+      // Cache miss or expired — do the real DynamoDB lookup.
+      const result = await docClient.send(
+        new GetCommand({
+          TableName: "InPlayer-Users",
+          Key: { userId },
+          ProjectionExpression: "isSuspended, suspendedUntil, #n",
+          ExpressionAttributeNames: { "#n": "name" },
+        })
+      );
+      isSuspended = result.Item?.isSuspended === true;
+      suspendedUntil = result.Item?.suspendedUntil as string | undefined;
+      storedName = result.Item?.name as string | undefined;
+
+      // Cache the result (including suspended status — enforcement still
+      // happens below, just from the cached copy on the next request).
+      authCache.set(userId, {
+        isSuspended,
+        suspendedUntil,
+        name: storedName,
+        cachedAt: now,
+      });
+
+      // Seed initial name (first time ever) — only on a real DB lookup,
+      // never from cache (the UpdateCommand is conditional anyway).
+      if (!storedName && jwtName) {
+        try {
+          await docClient.send(
+            new UpdateCommand({
+              TableName: "InPlayer-Users",
+              Key: { userId },
+              UpdateExpression: "SET #n = :name",
+              ConditionExpression: "attribute_not_exists(#n)",
+              ExpressionAttributeNames: { "#n": "name" },
+              ExpressionAttributeValues: { ":name": jwtName },
+            })
+          );
+          storedName = jwtName;
+          // Update cache with the seeded name so subsequent requests
+          // within the TTL window see it immediately.
+          authCache.set(userId, { isSuspended, suspendedUntil, name: storedName, cachedAt: now });
+        } catch (seedErr) {
+          // ConditionalCheckFailedException just means someone else won the
+          // race (or already has a real saved name) — not a real error.
+          const name = (seedErr as { name?: string } | undefined)?.name;
+          if (name !== "ConditionalCheckFailedException") {
+            console.error("verifyAuth: failed to seed initial name:", seedErr);
+          }
+        }
+      }
+    }
+
+    if (isSuspended) {
       throw new Error(SUSPENDED_MESSAGE);
     }
-    const suspendedUntil = result.Item?.suspendedUntil as string | undefined;
     if (suspendedUntil && new Date(suspendedUntil).getTime() > Date.now()) {
       throw new Error(TEMP_BLOCKED_MESSAGE);
     }
 
-    const storedName = result.Item?.name as string | undefined;
     if (storedName) {
       resolvedName = storedName;
-    } else if (jwtName) {
-      // First time this account has ever been resolved — claim the
-      // current name as the permanent one. Conditioned on the name still
-      // being unset so two concurrent requests can't clobber each other
-      // (or a name someone just explicitly saved via the profile page).
-      try {
-        await docClient.send(
-          new UpdateCommand({
-            TableName: "InPlayer-Users",
-            Key: { userId },
-            UpdateExpression: "SET #n = :name",
-            ConditionExpression: "attribute_not_exists(#n)",
-            ExpressionAttributeNames: { "#n": "name" },
-            ExpressionAttributeValues: { ":name": jwtName },
-          })
-        );
-      } catch (seedErr) {
-        // ConditionalCheckFailedException just means someone else won the
-        // race (or already has a real saved name) — not a real error.
-        const name = (seedErr as { name?: string } | undefined)?.name;
-        if (name !== "ConditionalCheckFailedException") {
-          console.error("verifyAuth: failed to seed initial name:", seedErr);
-        }
-      }
     }
   } catch (err) {
     if (err instanceof Error && (err.message === SUSPENDED_MESSAGE || err.message === TEMP_BLOCKED_MESSAGE)) {

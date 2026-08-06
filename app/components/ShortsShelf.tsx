@@ -47,6 +47,8 @@ export default function ShortsShelf({ items, renderFooter }: ShortsShelfProps) {
               <img
                 src={short.poster}
                 alt={short.title || "Raftaar Short"}
+                loading="lazy"
+                decoding="async"
                 className="h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
               />
 

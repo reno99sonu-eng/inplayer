@@ -24,11 +24,6 @@ export default function NavigationCategories() {
   const searchParams = useSearchParams();
   const pathname = usePathname();
 
-  // Hide category bar on chat screens and admin panel for clean full-height layout
-  if (pathname.startsWith("/messages") || pathname.startsWith("/admin")) {
-    return null;
-  }
-
   const activeCategory = searchParams.get("category");
 
   // On the home page the orientation is driven by ?view=; anywhere else
@@ -60,6 +55,10 @@ export default function NavigationCategories() {
       el.removeEventListener("scroll", checkScrollState);
       window.removeEventListener("resize", checkScrollState);
     };
+    // This effect is a no-op on routes where the bar is hidden below (the
+    // ref never attaches to a DOM node there), which is fine — it just
+    // means there's nothing to measure until this mounts somewhere the bar
+    // actually renders.
   }, [checkScrollState]);
 
   const handleScroll = (direction: "left" | "right") => {
@@ -97,6 +96,28 @@ export default function NavigationCategories() {
     "bg-white text-black light:bg-slate-900 light:text-white";
   const idleChip =
     "bg-white/10 text-white hover:bg-white/20 light:bg-black/[0.06] light:text-slate-800 light:hover:bg-black/10";
+
+  // Hide category bar on chat screens and admin panel for clean full-height
+  // layout. This check must come AFTER every hook above (useState,
+  // useRef, useCallback, useEffect) — putting a conditional `return` in
+  // between two hook calls means this component calls a different NUMBER
+  // of hooks depending on which route it's rendering on. Since this
+  // component stays mounted as the SAME instance across client-side
+  // navigation (it lives in the persistent page chrome, not inside a
+  // route's own page content), React compares this render's hook count
+  // against the previous render's every time — navigating away from
+  // /messages or /admin used to make that count jump from 2 hooks to 7,
+  // and navigating back made it drop from 7 to 2. That mismatch is
+  // exactly React's "Rendered fewer/more hooks than expected" crash
+  // (errors #300 and #310), and it's what was making the Messages page
+  // and the page you landed on after using its back button crash and get
+  // stuck. Moving this after all the hooks fixes the crash while keeping
+  // the exact same visible behavior — the bar still renders nothing on
+  // these routes, it just does so after its hooks have already run
+  // unconditionally like every other render.
+  if (pathname.startsWith("/messages") || pathname.startsWith("/admin")) {
+    return null;
+  }
 
   return (
     <div
@@ -208,4 +229,3 @@ export default function NavigationCategories() {
     </div>
   );
 }
-

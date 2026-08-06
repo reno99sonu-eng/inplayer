@@ -220,6 +220,7 @@ export default function NavigationCategories() {
               key={category}
               href={href}
               className={`${chipBase} ${isActive ? activeChip : idleChip}`}
+              prefetch={false}
             >
               {category}
             </Link>

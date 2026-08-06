@@ -83,7 +83,7 @@ export default function ShortsShelf({ items, renderFooter }: ShortsShelfProps) {
           if (short.videoId) {
             return (
               <div key={short.id} className="group">
-                <Link href={`/shorts?v=${short.videoId}`}>{cardContent}</Link>
+                <Link href={`/shorts?v=${short.videoId}`} prefetch={false}>{cardContent}</Link>
                 {footer}
               </div>
             );

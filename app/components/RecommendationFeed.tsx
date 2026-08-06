@@ -77,7 +77,7 @@ function ShortCard({ short }: { short: Short }) {
 
   if (short.videoId) {
     return (
-      <Link href={`/shorts?v=${short.videoId}`} className="group">
+      <Link href={`/shorts?v=${short.videoId}`} className="group" prefetch={false}>
         {cardContent}
       </Link>
     );
@@ -261,6 +261,7 @@ export function HomeVideoCard({ video }: { video: Recommendation }) {
           href={`/u/${encodeURIComponent(video.uploaderUsername)}`}
           aria-label={`Open ${video.creator}'s channel`}
           className="flex-shrink-0 transition-transform hover:scale-105 focus-visible:rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-orange-400"
+          prefetch={false}
         >
           {avatar}
         </Link>
@@ -284,6 +285,7 @@ export function HomeVideoCard({ video }: { video: Recommendation }) {
               <Link
                 href={`/watch/${video.videoId}`}
                 className="transition hover:text-orange-200"
+                prefetch={false}
               >
                 {video.title}
               </Link>
@@ -343,6 +345,7 @@ export function HomeVideoCard({ video }: { video: Recommendation }) {
           href={`/watch/${video.videoId}`}
           aria-label={`Watch ${video.title}`}
           className="block"
+          prefetch={false}
         >
           {thumbnail}
         </Link>

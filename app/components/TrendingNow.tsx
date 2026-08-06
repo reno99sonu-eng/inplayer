@@ -361,6 +361,7 @@ export default function TrendingNow() {
                       tabIndex={groupIndex === 1 ? -1 : undefined}
                       aria-label={`Open ${item.name}'s channel`}
                       className="group flex w-20 flex-shrink-0 flex-col items-center gap-1 text-center sm:w-22 lg:w-24"
+                      prefetch={false}
                     >
                       {/* Compact clean circular avatar with hover zoom */}
                       <div className="relative h-14 w-14 flex-shrink-0 transition duration-200 group-hover:scale-105 group-active:scale-95 sm:h-16 sm:w-16 lg:h-16 lg:w-16">

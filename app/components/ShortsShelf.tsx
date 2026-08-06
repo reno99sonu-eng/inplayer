@@ -19,15 +19,15 @@ export default function ShortsShelf({ items, renderFooter }: ShortsShelfProps) {
         </h2>
       </div>
 
-      {/* Fixed at 4 columns from sm upward (not 3/4/6/8 escalating by
-          breakpoint like before) — with shortsPerShelf capped at 8 items
-          per shelf (see RecommendationFeed.tsx), that reliably lays out as
-          exactly two rows of four, on every screen size from tablet up.
-          Once a shelf's 8 slots are full, the next 8 shorts start their own
-          shelf (same two-rows-of-four layout) after the next block of
-          regular videos, and so on. Below sm (phones), it stays a single
-          horizontally-scrollable row — four fixed columns would be too
-          cramped on a narrow phone screen. */}
+      {/* ONE single horizontally-scrollable row, on every screen size — a
+          YouTube-style Shorts shelf, not a wrapping grid. (A previous
+          version of this tried a 4-column wrapping grid here, which is NOT
+          what was actually wanted and broke the row into an inconsistent
+          multi-row stack — reverted.) shortsPerShelf still caps each shelf
+          at 8 items (see RecommendationFeed.tsx): once one shelf's 8 slots
+          are full, the next 8 shorts start their own new shelf row after
+          the next block of regular videos, and so on — that scheduling is
+          unchanged, only the layout within a single shelf is. */}
       <div
         className="
           flex
@@ -36,10 +36,6 @@ export default function ShortsShelf({ items, renderFooter }: ShortsShelfProps) {
           pb-2
           [scrollbar-width:none]
           [&::-webkit-scrollbar]:hidden
-
-          sm:grid
-          sm:grid-cols-4
-          sm:overflow-visible
         "
       >
         {items.map((short) => {

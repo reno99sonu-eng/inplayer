@@ -509,16 +509,19 @@ export default function RecommendationFeed({
   });
 
   // Keep the discovery feed in repeating YouTube-style blocks for the video
-  // grid itself — how many videos make up one block matches how many
-  // actually fit a "row" at the current viewport, instead of one fixed
-  // number for every screen size:
-  //   - Mobile/tablet (<1024px, the grid's 1-2 column range below): 4
-  //     videos per block.
-  //   - Desktop (>=1024px, matching the grid's own 4-column xl
-  //     breakpoint): two full rows of four videos (eight) per block.
-  // A Shorts shelf still appears every second block, so it doesn't crowd
-  // out the video grid. New uploads flow into the same sequence instead of
-  // being stranded after a one-off section.
+  // grid itself — a fixed 4 videos per block, on every screen size. This
+  // used to double to 8 on desktop/TV (>=1024px) to line up with the
+  // grid's own 4-column row at that width — but since a Shorts shelf only
+  // appears every SECOND block, that doubled block size also doubled how
+  // much content had to load before a shelf got another chance to appear
+  // (every 16 videos on desktop vs every 8 on mobile). With a real library
+  // instead of an endless dummy feed, that meant desktop visitors could
+  // scroll through everything without ever reaching a second Shorts row,
+  // even though the exact same content showed multiple rows on mobile. A
+  // fixed block size makes new Shorts rows appear at the same cadence
+  // everywhere, which is what was actually wanted — the video grid simply
+  // wrapping a 4-item block across 2-3 columns instead of 4 at the wider
+  // breakpoints is a minor cosmetic tradeoff against that.
   //
   // Raftaar (Trending Creators) is real, live-ranked data, not per-block
   // filler — every block asks the same /api/trending endpoint and gets
@@ -526,23 +529,7 @@ export default function RecommendationFeed({
   // this used to do) just showed the identical set of names again and
   // again as you scrolled, reading as a stuck/duplicated section rather
   // than "fresh" content. It's rendered once, after the first block, below.
-  //
-  // Detected client-side only (post-mount, same reasoning as the
-  // shuffle/ad-slot logic above) since server-rendered HTML can't know the
-  // visitor's real viewport — defaults to the desktop grouping so the very
-  // first paint matches the server-rendered markup, then re-groups once
-  // mount detects a narrower screen. A live "change" listener keeps it
-  // correct if the window is resized without a reload, instead of only
-  // being checked once on mount.
-  const [blockSize, setBlockSize] = useState(8);
-
-  useEffect(() => {
-    const mql = window.matchMedia("(min-width: 1024px)");
-    const applyBlockSize = () => setBlockSize(mql.matches ? 8 : 4);
-    applyBlockSize();
-    mql.addEventListener("change", applyBlockSize);
-    return () => mql.removeEventListener("change", applyBlockSize);
-  }, []);
+  const blockSize = 4;
 
   const feedBatches = Array.from(
     { length: Math.ceil(feedEntries.length / blockSize) },

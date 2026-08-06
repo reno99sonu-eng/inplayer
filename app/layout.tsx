@@ -65,6 +65,33 @@ export default async function RootLayout({
       '(function(){try{var t=localStorage.getItem("inplayer-theme");var r=(t==="light"||t==="dark")?t:((new Date().getHours()>=6&&new Date().getHours()<18)?"light":"dark");document.documentElement.classList.add(r);}catch(e){document.documentElement.classList.add("dark");}})();',
   }}
 />
+{/* Belt-and-suspenders failsafe for the splash curtain (see
+    SplashScreen.tsx, id="app-splash-curtain"). SplashScreen normally
+    dismisses itself via a React useEffect timer ~2s after mount — that's
+    the primary, animated path and is left completely alone. But that path
+    depends on React actually getting a turn to run that effect, and
+    real-world reports (splash stuck open indefinitely, confirmed with a
+    clean console/network — no crash, no hung request, plain
+    window.setTimeout proven to fire fine in the same browser) show a
+    small number of visits where, for reasons that resisted every
+    remote-diagnosis avenue available (no reproducible crash, no failing
+    request, no redirect loop, no stuck data fetch), that effect-driven
+    dismissal never visibly happens. This script is plain, framework-free
+    JS baked directly into the initial HTML — it runs the moment the
+    browser parses it, completely independent of React/hydration/effects
+    ever running at all, so it can't be affected by whatever is blocking
+    the primary path. It only ever does anything if the curtain is STILL
+    in the DOM ~3.2s after the document starts loading (normal case: React
+    has already removed it by ~2s, so this finds nothing and is a no-op);
+    if it's still there, this force-hides it and restores page scrolling,
+    trading the graceful fade for "the site is usable" as the outcome that
+    actually matters. */}
+<script
+  dangerouslySetInnerHTML={{
+    __html:
+      '(function(){setTimeout(function(){try{var el=document.getElementById("app-splash-curtain");if(el){el.style.transition="none";el.style.opacity="0";el.style.pointerEvents="none";el.style.display="none";}document.body.style.overflow="";document.documentElement.style.overflow="";}catch(e){}},3200);})();',
+  }}
+/>
 <ChunkErrorRecovery />
 <AuthProvider>
   <SettingsProvider>

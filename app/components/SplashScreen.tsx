@@ -163,6 +163,7 @@ export default function SplashScreen() {
 
   return (
     <div
+      id="app-splash-curtain"
       aria-hidden="true"
       className={`fixed inset-0 z-[999999] flex items-center justify-center overflow-hidden bg-[#020203] light:bg-[#F4ECDA] transition-opacity duration-[450ms] ease-out ${
         leaving ? "pointer-events-none opacity-0" : "opacity-100"

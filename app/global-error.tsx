@@ -25,6 +25,29 @@ export default function GlobalError({
 }) {
   useEffect(() => {
     console.error("Root layout error:", error);
+
+    // Best-effort report to our own server logs (see
+    // app/api/client-error-log/route.ts) — this is the ONLY way a crash
+    // that only ever happened in one visitor's browser becomes something
+    // that shows up where it can actually be diagnosed, since nobody
+    // non-technical opens devtools to relay a stack trace by hand.
+    try {
+      fetch("/api/client-error-log", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          kind: "global-error",
+          message: error.message,
+          stack: error.stack,
+          digest: error.digest,
+          pathname: window.location.pathname,
+        }),
+        keepalive: true,
+      }).catch(() => {});
+    } catch {
+      /* ignore */
+    }
+
     try {
       const lastReload = Number(sessionStorage.getItem(CHUNK_RELOAD_STORAGE_KEY) || 0);
       if (Date.now() - lastReload >= CHUNK_RELOAD_COOLDOWN_MS) {

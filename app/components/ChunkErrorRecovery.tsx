@@ -28,7 +28,7 @@ function looksLikeStaleChunkError(message: unknown): boolean {
   return typeof message === "string" && CHUNK_ERROR_PATTERN.test(message);
 }
 
-export function recoverFromStaleChunkOnce() {
+export function recoverFromStaleChunkOnce(message?: string) {
   try {
     const lastReload = Number(sessionStorage.getItem(CHUNK_RELOAD_STORAGE_KEY) || 0);
     if (Date.now() - lastReload < CHUNK_RELOAD_COOLDOWN_MS) return;
@@ -37,18 +37,38 @@ export function recoverFromStaleChunkOnce() {
     // No storage access (private mode) — still safer to reload once than
     // leave the page stuck, just without loop protection.
   }
+
+  // Best-effort report to our own server logs (see
+  // app/api/client-error-log/route.ts) so a real pattern here — the same
+  // chunk error firing over and over for one route — is actually visible
+  // instead of only ever silently auto-fixing itself.
+  try {
+    fetch("/api/client-error-log", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        kind: "chunk-error",
+        message: message || "stale chunk/module load failure",
+        pathname: window.location.pathname,
+      }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch {
+    /* ignore */
+  }
+
   window.location.reload();
 }
 
 export default function ChunkErrorRecovery() {
   useEffect(() => {
     function handleError(event: ErrorEvent) {
-      if (looksLikeStaleChunkError(event.message)) recoverFromStaleChunkOnce();
+      if (looksLikeStaleChunkError(event.message)) recoverFromStaleChunkOnce(event.message);
     }
     function handleRejection(event: PromiseRejectionEvent) {
       const reason = event.reason;
       const message = reason instanceof Error ? reason.message : String(reason);
-      if (looksLikeStaleChunkError(message)) recoverFromStaleChunkOnce();
+      if (looksLikeStaleChunkError(message)) recoverFromStaleChunkOnce(message);
     }
 
     window.addEventListener("error", handleError);

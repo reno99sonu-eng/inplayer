@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import sharp from "sharp";
 import { requireAdmin } from "@/app/lib/isAdmin";
 
 // Real OpenAI-backed generator for the Navbar Theme Manager's "Custom
@@ -62,7 +63,9 @@ export async function POST(request: NextRequest) {
     `navigation bar's logo as a festive accent — think a compact emblem, icon cluster, or light sparkle/confetti ` +
     `pattern, NOT a full scene or poster. Vibrant, glowing, celebratory style on a fully transparent background. ` +
     `No text, no words, no letters, no watermark, no navigation bar or UI elements drawn in — just the standalone ` +
-    `decorative graphic itself.`;
+    `decorative graphic itself. Do not spell out "${occasionPrompt}" or any part of it, or any other word, as ` +
+    `text or lettering anywhere in the image, even stylized — this must be a purely graphical icon/pattern with ` +
+    `zero readable characters.`;
 
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), PER_CALL_TIMEOUT_MS);
@@ -95,7 +98,34 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "OpenAI couldn't generate a theme graphic this time. Please try again." }, { status: 502 });
     }
 
-    return NextResponse.json({ imageUrl: `data:image/png;base64,${b64}`, title: occasionPrompt });
+    // OpenAI returns this at 1024x1024, which as a raw base64 PNG typically
+    // runs well over DynamoDB's 400KB per-item limit — saving it as-is via
+    // POST /api/admin/navbar-theme's PutCommand fails with "Failed to save
+    // theme in DynamoDB" every time (confirmed: this is exactly what broke
+    // for the "HamMart is live" custom theme). The live navbar only ever
+    // renders this graphic at h-12/h-13/h-14 (48-56px tall, see
+    // app/components/Navbar.tsx), so shrink it down to a size that still
+    // looks sharp there — 240px on the long edge, well beyond retina for a
+    // 56px-tall render — and re-encode as WebP (keeps transparency, much
+    // smaller than PNG at this size) before it's ever handed back to the
+    // client to publish.
+    let optimizedImageUrl: string;
+    try {
+      const pngBuffer = Buffer.from(b64, "base64");
+      const webpBuffer = await sharp(pngBuffer)
+        .resize({ width: 240, height: 240, fit: "inside", withoutEnlargement: true })
+        .webp({ quality: 85 })
+        .toBuffer();
+      optimizedImageUrl = `data:image/webp;base64,${webpBuffer.toString("base64")}`;
+    } catch (resizeErr) {
+      console.error("ai-navbar-theme-generate: failed to shrink generated image:", resizeErr);
+      return NextResponse.json(
+        { error: "Generated the graphic but couldn't process it for saving. Please try again." },
+        { status: 502 }
+      );
+    }
+
+    return NextResponse.json({ imageUrl: optimizedImageUrl, title: occasionPrompt });
   } catch (err) {
     console.error("ai-navbar-theme-generate route error:", err);
     return NextResponse.json({ error: "Couldn't generate that theme graphic right now. Please try again shortly." }, { status: 502 });

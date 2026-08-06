@@ -54,6 +54,19 @@ export async function POST(request: NextRequest) {
   if (!imageUrl || typeof imageUrl !== "string") {
     return NextResponse.json({ error: "imageUrl is required." }, { status: 400 });
   }
+  // DynamoDB rejects any item over 400KB total. This whole item is just this
+  // one image plus a few short strings, so the image itself is effectively
+  // the budget. Catch an oversized image here with a clear message instead
+  // of letting PutCommand fail below with the opaque "Failed to save theme
+  // in DynamoDB" — this is a backstop; the AI generator route already
+  // shrinks what it hands back, so this should only ever trip if something
+  // else supplies a raw, unprocessed image.
+  if (imageUrl.length > 350_000) {
+    return NextResponse.json(
+      { error: "That theme graphic is too large to save. Try generating it again." },
+      { status: 400 }
+    );
+  }
 
   const themeItem = {
     settingsId: "navbar_theme",

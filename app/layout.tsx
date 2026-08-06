@@ -6,6 +6,7 @@ import { ThemeProvider } from "./components/ThemeProvider";
 import { SettingsProvider } from "./components/settings/SettingsProvider";
 import AuthProvider from "./components/auth/AuthProvider";
 import SiteChrome from "./components/SiteChrome";
+import ChunkErrorRecovery from "./components/ChunkErrorRecovery";
 import { getPlatformSettings } from "./lib/platformSettings";
 
 const jakarta = Plus_Jakarta_Sans({
@@ -64,6 +65,7 @@ export default async function RootLayout({
       '(function(){try{var t=localStorage.getItem("inplayer-theme");var r=(t==="light"||t==="dark")?t:((new Date().getHours()>=6&&new Date().getHours()<18)?"light":"dark");document.documentElement.classList.add(r);}catch(e){document.documentElement.classList.add("dark");}})();',
   }}
 />
+<ChunkErrorRecovery />
 <AuthProvider>
   <SettingsProvider>
     <ThemeProvider>

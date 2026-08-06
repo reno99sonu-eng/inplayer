@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import nextDynamic from "next/dynamic";
 import { MoreVertical } from "lucide-react";
+import VideoOptionsMenu from "./watch/VideoOptionsMenu";
 
 // The Mux player (with its whole HLS streaming engine) is one of the
 // heaviest pieces of JavaScript in the app. It's only needed here for
@@ -359,7 +360,18 @@ export function HomeVideoCard({ video }: { video: Recommendation }) {
 
       </div>
 
-      <button
+      {/* This used to be a plain <button><MoreVertical/></button> with no
+          onClick at all — it looked real but did nothing when tapped.
+          Swapped for the same "More options" menu already wired up (real
+          Watch Later / Save to playlist / Report backends) on the watch
+          page, instead of inventing a second, redundant menu here. Only
+          for real uploaded videos — the example/dummy cards below (no
+          videoId) keep the old inert icon, since there's nothing real for
+          them to open. */}
+      {video.videoId ? (
+        <VideoOptionsMenu videoId={video.videoId} />
+      ) : (
+        <button
           className="
             flex
             h-9
@@ -378,7 +390,8 @@ export function HomeVideoCard({ video }: { video: Recommendation }) {
           "
         >
           <MoreVertical size={18} />
-      </button>
+        </button>
+      )}
     </div>
   );
 
@@ -574,14 +587,41 @@ export default function RecommendationFeed({
   // Horizontal view: repeat an 8-video (two-row) grid followed by a
   // Raftaar row, then a Shorts shelf every second block, for as long as
   // there is content to display.
+  //
+  // shelfCursor (below) is a SEPARATE counter from the block's own index —
+  // this used to slice shuffledShorts with the block index itself
+  // (index * shortsPerShelf), which only ever rendered a shelf on ODD
+  // block indexes (1, 3, 5…) but sliced shuffledShorts starting from
+  // EVERY index including the even ones. That silently threw away the
+  // slice at index 0 — shuffledShorts[0..8) — every single time, forever,
+  // no matter how far you scrolled. Since real, newly-uploaded shorts are
+  // placed at the very front of shuffledShorts (realShorts first, dummy
+  // filler after), they landed almost entirely inside that permanently-
+  // skipped slice: new shorts uploaded a visitor would never see them in
+  // the homepage feed, only on the dedicated Shorts page (which reads the
+  // same shuffledShorts list unsliced). shelfCursor now only advances when
+  // a shelf actually renders, so the slices handed out are 0..8, 8..16,
+  // 16..24… with nothing skipped — new shorts show up in the very first
+  // shelf that appears.
+  let shelfCursor = 0;
+
   return (
     <>
       {feedBatches.map((entries, index) => {
-        const shelfShorts = shuffledShorts.slice(
-          index * shortsPerShelf,
-          (index + 1) * shortsPerShelf
-        );
-        const showShortsShelf = index % 2 === 1 && shelfShorts.length > 0;
+        const wantsShelf = index % 2 === 1;
+        let shelfShorts: Short[] = [];
+        let showShortsShelf = false;
+
+        if (wantsShelf) {
+          shelfShorts = shuffledShorts.slice(
+            shelfCursor * shortsPerShelf,
+            (shelfCursor + 1) * shortsPerShelf
+          );
+          if (shelfShorts.length > 0) {
+            showShortsShelf = true;
+            shelfCursor += 1;
+          }
+        }
 
         return (
           <div key={`feed-block-${index}`}>

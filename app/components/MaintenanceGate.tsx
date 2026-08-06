@@ -1,25 +1,21 @@
 "use client";
 
-import { ReactNode, useEffect, useState } from "react";
-import { fetchAuthSession } from "aws-amplify/auth";
+import { ReactNode } from "react";
 import { Wrench } from "lucide-react";
-import { useAuthModal } from "./auth/AuthProvider";
 import { usePlatformSettings } from "@/app/hooks/usePlatformSettings";
 
 // Real maintenance mode — flip it on from Admin Panel -> Platform Settings
-// and every signed-out visitor and non-admin signed-in user sees the
-// splash below instead of the app, using the exact same public settings
-// row every other platform toggle reads (app/lib/platformSettings.ts).
-// The admin account itself always gets through (checked via the same
-// /api/admin/me endpoint AdminLayout uses), so turning maintenance mode
-// back off is never something you can accidentally lock yourself out of.
-//
-// Honest limitation: this is a client-side UI gate, not a server-side
-// security boundary — it blocks the normal site for regular visitors (the
-// actual point of maintenance mode), but someone calling an API route
-// directly wouldn't be stopped by this component. That's an acceptable
-// tradeoff for InPlayer's current Cognito-in-the-browser auth model (see
-// AdminLayout.tsx's own comment on the same tradeoff), not an oversight.
+// and EVERY visitor sees the splash below instead of the app. No bypass for
+// the signed-in admin anymore: this used to detect the admin and show them
+// the real site (navbar, homepage, everything) with a small amber banner on
+// top instead of the splash — Reno flagged that as exactly the wrong
+// behavior ("instead of the InPlayer website visible along with the
+// contents"), since it meant maintenance mode never actually looked like
+// maintenance mode to him, on any device. There's no risk of that leaving
+// him locked out of turning it back off: SiteChrome.tsx already routes
+// every /admin/* page around this component entirely (its own separate
+// sign-in-gated layout, see SiteChrome's own comment), so /admin stays
+// reachable no matter what this shows on the public site.
 export default function MaintenanceGate({
   children,
   initialMaintenanceMode,
@@ -39,10 +35,7 @@ export default function MaintenanceGate({
   initialMaintenanceMode: boolean;
   initialMaintenanceMessage: string;
 }) {
-  const { signedIn, authLoading, user } = useAuthModal();
   const { settings, loading: settingsLoading } = usePlatformSettings();
-  const [checkingAdmin, setCheckingAdmin] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
 
   // Once the client's own fetch resolves, its (always-fresh) value takes
   // over; until then, fall back to the server-known value instead of an
@@ -54,77 +47,9 @@ export default function MaintenanceGate({
     ? initialMaintenanceMessage
     : settings?.maintenanceMessage || initialMaintenanceMessage;
 
-  useEffect(() => {
-    if (!maintenanceOn || authLoading) return;
-
-    let cancelled = false;
-
-    // The not-signed-in case is handled inside this same async function
-    // (rather than as an early return directly in the effect body) so its
-    // setState calls are consistent with the rest of this effect — see
-    // AdminLayout.tsx's identical comment for why: react-hooks/set-state-in-effect
-    // flags setState called synchronously straight in an effect body, but
-    // not inside a nested function like this one.
-    (async () => {
-      if (!signedIn) {
-        if (!cancelled) setIsAdmin(false);
-        return;
-      }
-
-      setCheckingAdmin(true);
-      try {
-        const session = await fetchAuthSession();
-        const idToken = session.tokens?.idToken?.toString();
-        if (!idToken) {
-          if (!cancelled) setIsAdmin(false);
-          return;
-        }
-        const res = await fetch("/api/admin/me", {
-          headers: { Authorization: `Bearer ${idToken}` },
-        });
-        const data = await res.json();
-        if (!cancelled) setIsAdmin(Boolean(data.isAdmin));
-      } catch (err) {
-        console.error("Maintenance gate admin check failed:", err);
-        if (!cancelled) setIsAdmin(false);
-      } finally {
-        if (!cancelled) setCheckingAdmin(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [maintenanceOn, authLoading, signedIn, user?.userId]);
-
   // Maintenance fully off — render normally, no gate at all.
   if (!maintenanceOn) {
     return <>{children}</>;
-  }
-
-  // Maintenance is ON. Only show the real site once we've positively
-  // confirmed this visitor is the signed-in admin — NOT while that check
-  // is still in flight (authLoading / checkingAdmin). Showing the real
-  // site any earlier, "just in case they turn out to be the admin," is
-  // exactly the flash-of-real-content bug this was rewritten to fix: that
-  // in-flight window used to default to showing children, so every
-  // ordinary visitor saw the real navbar/homepage/bottom nav for however
-  // long auth took to resolve before the block ever appeared — barely
-  // noticeable on a fast desktop connection, but stretched out (and read
-  // as "maintenance mode isn't working") on a slower mobile one. A real
-  // admin now sees one brief extra beat of the maintenance screen before
-  // it swaps to the real site the instant they're confirmed — a much
-  // smaller cost than leaking the real site to everyone else meanwhile.
-  if (signedIn && isAdmin && !authLoading && !checkingAdmin) {
-    return (
-      <>
-        <div className="flex items-center justify-center gap-2 bg-amber-500/15 px-4 py-2 text-center text-xs font-semibold text-amber-300">
-          <Wrench size={13} /> Maintenance mode is ON for everyone else — only you can see the
-          site right now.
-        </div>
-        {children}
-      </>
-    );
   }
 
   return (

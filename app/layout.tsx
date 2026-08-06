@@ -66,30 +66,38 @@ export default async function RootLayout({
   }}
 />
 {/* Belt-and-suspenders failsafe for the splash curtain (see
-    SplashScreen.tsx, id="app-splash-curtain"). SplashScreen normally
-    dismisses itself via a React useEffect timer ~2s after mount — that's
-    the primary, animated path and is left completely alone. But that path
-    depends on React actually getting a turn to run that effect, and
-    real-world reports (splash stuck open indefinitely, confirmed with a
-    clean console/network — no crash, no hung request, plain
-    window.setTimeout proven to fire fine in the same browser) show a
-    small number of visits where, for reasons that resisted every
-    remote-diagnosis avenue available (no reproducible crash, no failing
-    request, no redirect loop, no stuck data fetch), that effect-driven
-    dismissal never visibly happens. This script is plain, framework-free
-    JS baked directly into the initial HTML — it runs the moment the
-    browser parses it, completely independent of React/hydration/effects
-    ever running at all, so it can't be affected by whatever is blocking
-    the primary path. It only ever does anything if the curtain is STILL
-    in the DOM ~3.2s after the document starts loading (normal case: React
-    has already removed it by ~2s, so this finds nothing and is a no-op);
-    if it's still there, this force-hides it and restores page scrolling,
-    trading the graceful fade for "the site is usable" as the outcome that
-    actually matters. */}
+    SplashScreen.tsx, id="app-splash-curtain" and id="app-splash-greeting").
+    SplashScreen normally dismisses itself — and fills in its "Good
+    Morning/Afternoon/Evening/Night" greeting — via React useEffects that
+    run ~2s after mount. That's the primary, animated path and is left
+    completely alone. But that path depends on React actually getting a
+    turn to run those effects, and real-world reports (splash stuck open
+    indefinitely, confirmed with a clean console/network — no crash, no
+    hung request, plain window.setTimeout proven to fire fine in the same
+    browser) show a small number of visits where, for reasons that resisted
+    every remote-diagnosis avenue available (no reproducible crash, no
+    failing request, no redirect loop, no stuck data fetch), those
+    effect-driven updates never visibly happen. This script is plain,
+    framework-free JS baked directly into the initial HTML — it runs
+    independent of React/hydration/effects ever running at all, so it
+    can't be affected by whatever is blocking the primary path:
+
+    1. As soon as the document has finished parsing, if the greeting
+       paragraph is still empty (React's own effect hasn't filled it in
+       yet), this writes the plain time-of-day greeting into it — no
+       signed-in user's name (that part genuinely does need React/auth
+       state), but the "Good Morning" etc. text people actually see. If
+       React's effect DOES run afterward, its own render simply overwrites
+       this with the fuller version — no conflict either way.
+    2. ~3.2s after the document starts loading, if the curtain is still in
+       the DOM (normal case: React has already removed it by ~2s, so this
+       finds nothing and is a no-op), this force-hides it and restores
+       page scrolling — trading the graceful fade for "the site is usable"
+       as the outcome that actually matters. */}
 <script
   dangerouslySetInnerHTML={{
     __html:
-      '(function(){setTimeout(function(){try{var el=document.getElementById("app-splash-curtain");if(el){el.style.transition="none";el.style.opacity="0";el.style.pointerEvents="none";el.style.display="none";}document.body.style.overflow="";document.documentElement.style.overflow="";}catch(e){}},3200);})();',
+      '(function(){function g(){try{var e=document.getElementById("app-splash-greeting");if(e&&!e.textContent){var h=new Date().getHours();var w=(h>=5&&h<12)?"Morning":(h>=12&&h<17)?"Afternoon":(h>=17&&h<21)?"Evening":"Night";e.textContent="Good "+w;}}catch(err){}}if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",g);}else{g();}setTimeout(function(){try{var el=document.getElementById("app-splash-curtain");if(el){el.style.transition="none";el.style.opacity="0";el.style.pointerEvents="none";el.style.display="none";}document.body.style.overflow="";document.documentElement.style.overflow="";}catch(e){}},3200);})();',
   }}
 />
 <ChunkErrorRecovery />

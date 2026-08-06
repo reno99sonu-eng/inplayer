@@ -216,13 +216,28 @@ export default function SplashScreen() {
         {/* Personal greeting — a secondary, softer beat under the tagline
             (not competing with it), landing just as the tagline finishes.
             Falls back to no name at all pre-sign-in or while auth is still
-            resolving, rather than delaying/blocking on it. */}
-        {greetingWord && (
-          <p className="animate-splash-greeting-in mt-3 whitespace-nowrap bg-gradient-to-r from-orange-200 via-white to-orange-200 light:from-orange-700 light:via-slate-800 light:to-orange-700 bg-clip-text text-sm font-semibold tracking-wide text-transparent drop-shadow-[0_2px_12px_rgba(249,115,22,0.35)] sm:text-base">
-            Good {greetingWord}
-            {user?.name ? `, ${user.name}` : ""}
-          </p>
-        )}
+            resolving, rather than delaying/blocking on it.
+
+            This paragraph is now ALWAYS rendered (previously it only
+            rendered once greetingWord was set, via `{greetingWord && ...}`)
+            specifically so it always has a stable id="app-splash-greeting"
+            node present in the DOM for layout.tsx's plain-JS failsafe
+            script to find and fill in on the rare visits where this
+            component's own useEffect doesn't get a turn to run (see the
+            long comment on that script in layout.tsx). When this
+            component's effect runs normally, React fills in the real text
+            (with the signed-in user's name, when available) exactly as
+            before — this only changes what's in the DOM in the in-between
+            moment before that happens, from "no element at all" to "an
+            empty one with something to grab onto." */}
+        <p
+          id="app-splash-greeting"
+          className="animate-splash-greeting-in mt-3 whitespace-nowrap bg-gradient-to-r from-orange-200 via-white to-orange-200 light:from-orange-700 light:via-slate-800 light:to-orange-700 bg-clip-text text-sm font-semibold tracking-wide text-transparent drop-shadow-[0_2px_12px_rgba(249,115,22,0.35)] sm:text-base"
+        >
+          {greetingWord
+            ? `Good ${greetingWord}${user?.name ? `, ${user.name}` : ""}`
+            : ""}
+        </p>
       </div>
     </div>
   );

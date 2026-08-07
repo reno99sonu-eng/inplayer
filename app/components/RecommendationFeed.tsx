@@ -20,6 +20,7 @@ import { recommendations, type Recommendation } from "../data/recommendations";
 import { shorts, type Short } from "../data/shorts";
 import ShortsShelf from "./ShortsShelf";
 import TrendingNow from "./TrendingNow";
+import PlayablesShelf from "./PlayablesShelf";
 import AdThumbnailCard from "./AdThumbnailCard";
 import { useSettings } from "./settings/SettingsProvider";
 import {
@@ -625,6 +626,7 @@ export default function RecommendationFeed({
             </section>
 
             {index === 0 && <TrendingNow />}
+            {index === 1 && <PlayablesShelf />}
 
             {showShortsShelf && <ShortsShelf items={shelfShorts} />}
           </div>

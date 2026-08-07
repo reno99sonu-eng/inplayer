@@ -37,7 +37,7 @@ export default function PlayablesShelf() {
       <div className="mb-3 flex items-center gap-2">
         <Gamepad2 className="text-orange-500" size={26} />
         <h2 className="text-xl font-black text-white sm:text-2xl light:text-slate-900">
-          Playables
+          InJoy
         </h2>
       </div>
 

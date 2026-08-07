@@ -146,10 +146,10 @@ export default function SignInModal({
 
       if (result.isSignedIn) {
         setSuccess(true);
-        onSuccess?.();
-
-        // Refresh global AuthProvider state so user & signedIn update immediately
+        // AuthProvider's onSuccess already calls refreshUser({ isFreshSignIn: true }),
+        // but we'll await it here explicitly to ensure we have the latest state.
         await refreshUser({ isFreshSignIn: true });
+        onSuccess?.();
 
         try {
           const session = await fetchAuthSession();
@@ -161,7 +161,11 @@ export default function SignInModal({
             const adminData = await adminRes.json();
             if (adminData.isAdmin) {
               onClose();
-              window.location.href = "/admin";
+              if (window.location.pathname.startsWith("/admin")) {
+                window.location.reload();
+              } else {
+                window.location.href = "/admin";
+              }
               return;
             }
           }

@@ -72,3 +72,10 @@ export function getRequestDevice(request: NextRequest): string | null {
 
   return `${browser} on ${os}`;
 }
+
+// ISO 3166-1 alpha-2 country code derived from Vercel's edge network
+// (the same real-IP geolocation that populates city/region above). Returns
+// null when running outside Vercel (local dev).
+export function getRequestCountry(request: NextRequest): string | null {
+  return request.headers.get("x-vercel-ip-country") || null;
+}

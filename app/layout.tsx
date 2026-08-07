@@ -8,6 +8,7 @@ import AuthProvider from "./components/auth/AuthProvider";
 import SiteChrome from "./components/SiteChrome";
 import ChunkErrorRecovery from "./components/ChunkErrorRecovery";
 import { getPlatformSettings } from "./lib/platformSettings";
+import { headers } from "next/headers";
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -36,6 +37,13 @@ export default async function RootLayout({
   // already fails open to defaults (maintenance off) on any read error, so
   // this can't accidentally lock real visitors out over a transient issue.
   const { maintenanceMode, maintenanceMessage } = await getPlatformSettings();
+
+  // Vercel's edge network sets x-vercel-ip-country on every request based
+  // on the real connecting IP. When it's absent (local dev, non-Vercel
+  // host), default to allowed so development isn't blocked.
+  const hdrs = await headers();
+  const ipCountry = hdrs.get("x-vercel-ip-country") || "IN";
+  const geoAllowed = ipCountry === "IN";
 
   return (
     <html lang="en">
@@ -107,6 +115,7 @@ export default async function RootLayout({
       <SiteChrome
         initialMaintenanceMode={maintenanceMode}
         initialMaintenanceMessage={maintenanceMessage}
+        initialGeoAllowed={geoAllowed}
       >
         {children}
       </SiteChrome>

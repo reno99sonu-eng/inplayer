@@ -6,6 +6,7 @@ import Navbar from "./Navbar";
 import AnnouncementBanner from "./AnnouncementBanner";
 import MobileBottomNav from "./MobileBottomNav";
 import MaintenanceGate from "./MaintenanceGate";
+import GeoGate from "./GeoGate";
 import SplashScreen from "./SplashScreen";
 
 // Splits the public site's chrome (top navbar/search/categories, the
@@ -26,6 +27,7 @@ export default function SiteChrome({
   children,
   initialMaintenanceMode,
   initialMaintenanceMessage,
+  initialGeoAllowed,
 }: {
   children: ReactNode;
   // Server-fetched in app/layout.tsx and threaded down here so
@@ -33,6 +35,10 @@ export default function SiteChrome({
   // see the comment on MaintenanceGate's own props for why.
   initialMaintenanceMode: boolean;
   initialMaintenanceMessage: string;
+  // Server-known geo status from Vercel's x-vercel-ip-country header,
+  // threaded the same way as initialMaintenanceMode so GeoGate has the
+  // correct first-paint answer (Indian users never see a block flash).
+  initialGeoAllowed: boolean;
 }) {
   const pathname = usePathname();
   const isAdmin = pathname?.startsWith("/admin");
@@ -51,10 +57,12 @@ export default function SiteChrome({
         initialMaintenanceMode={initialMaintenanceMode}
         initialMaintenanceMessage={initialMaintenanceMessage}
       >
-        <Navbar />
-        <AnnouncementBanner />
-        <div className="pb-20 lg:pb-0">{children}</div>
-        <MobileBottomNav />
+        <GeoGate initialGeoAllowed={initialGeoAllowed}>
+          <Navbar />
+          <AnnouncementBanner />
+          <div className="pb-20 lg:pb-0">{children}</div>
+          <MobileBottomNav />
+        </GeoGate>
       </MaintenanceGate>
     </>
   );

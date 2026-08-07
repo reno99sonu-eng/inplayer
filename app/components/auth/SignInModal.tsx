@@ -146,33 +146,7 @@ export default function SignInModal({
 
       if (result.isSignedIn) {
         setSuccess(true);
-        // AuthProvider's onSuccess already calls refreshUser({ isFreshSignIn: true }),
-        // but we'll await it here explicitly to ensure we have the latest state.
-        await refreshUser({ isFreshSignIn: true });
         onSuccess?.();
-
-        try {
-          const session = await fetchAuthSession();
-          const idToken = session.tokens?.idToken?.toString();
-          if (idToken) {
-            const adminRes = await fetch("/api/admin/me", {
-              headers: { Authorization: `Bearer ${idToken}` },
-            });
-            const adminData = await adminRes.json();
-            if (adminData.isAdmin) {
-              onClose();
-              if (window.location.pathname.startsWith("/admin")) {
-                window.location.reload();
-              } else {
-                window.location.href = "/admin";
-              }
-              return;
-            }
-          }
-        } catch (err) {
-          console.error("Admin redirect check error:", err);
-        }
-
         setTimeout(() => {
           onClose();
         }, 700);

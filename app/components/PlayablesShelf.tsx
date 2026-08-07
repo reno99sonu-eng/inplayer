@@ -1,13 +1,16 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { Gamepad2 } from "lucide-react";
+import { useEffect, useState, useRef } from "react";
+import { Gamepad2, ChevronLeft, ChevronRight } from "lucide-react";
 import { playables, type Playable } from "../data/playables";
 
 export default function PlayablesShelf() {
   const [sortedPlayables, setSortedPlayables] = useState<Playable[]>(playables);
   const [recentIds, setRecentIds] = useState<Set<string>>(new Set());
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [showLeftArrow, setShowLeftArrow] = useState(false);
+  const [showRightArrow, setShowRightArrow] = useState(true);
 
   useEffect(() => {
     try {
@@ -30,10 +33,30 @@ export default function PlayablesShelf() {
     }
   }, []);
 
+  const checkScroll = () => {
+    if (!scrollContainerRef.current) return;
+    const { scrollLeft, scrollWidth, clientWidth } = scrollContainerRef.current;
+    setShowLeftArrow(scrollLeft > 0);
+    setShowRightArrow(Math.ceil(scrollLeft + clientWidth) < scrollWidth);
+  };
+
+  useEffect(() => {
+    checkScroll();
+    window.addEventListener("resize", checkScroll);
+    return () => window.removeEventListener("resize", checkScroll);
+  }, [sortedPlayables]);
+
+  const scroll = (direction: "left" | "right") => {
+    if (scrollContainerRef.current) {
+      const scrollAmount = direction === "left" ? -400 : 400;
+      scrollContainerRef.current.scrollBy({ left: scrollAmount, behavior: "smooth" });
+    }
+  };
+
   if (playables.length === 0) return null;
 
   return (
-    <section className="mx-auto max-w-[1800px] px-3 py-3 lg:px-8">
+    <section className="mx-auto max-w-[1800px] px-3 py-3 lg:px-8 relative group">
       <div className="mb-3 flex items-center gap-2">
         <Gamepad2 className="text-orange-500" size={26} />
         <h2 className="text-xl font-black text-white sm:text-2xl light:text-slate-900">
@@ -41,62 +64,85 @@ export default function PlayablesShelf() {
         </h2>
       </div>
 
-      <div
-        className="
-          flex
-          gap-4
-          overflow-x-auto
-          pb-4
-          [scrollbar-width:none]
-          [&::-webkit-scrollbar]:hidden
-        "
-      >
-        {sortedPlayables.map((game) => {
-          const isRecent = recentIds.has(game.id);
+      <div className="relative">
+        {showLeftArrow && (
+          <button
+            onClick={() => scroll("left")}
+            className="hidden md:flex absolute -left-5 top-1/2 -translate-y-1/2 z-10 h-10 w-10 items-center justify-center rounded-full bg-white/10 backdrop-blur-md text-white shadow-lg border border-white/20 hover:bg-white/20 transition-all"
+          >
+            <ChevronLeft size={24} />
+          </button>
+        )}
 
-          return (
-            <Link 
-              key={game.id} 
-              href={`/play/${game.id}`}
-              prefetch={false}
-              className="group flex flex-col w-[140px] sm:w-[160px] flex-shrink-0"
-            >
-              <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-black/40 border border-white/10 shadow-lg">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={game.thumbnail}
-                  alt={game.title}
-                  loading="lazy"
-                  decoding="async"
-                  className="h-full w-full object-cover object-center transition-transform duration-500 group-hover:scale-105"
-                />
+        <div
+          ref={scrollContainerRef}
+          onScroll={checkScroll}
+          className="
+            flex
+            gap-4
+            overflow-x-auto
+            pb-4
+            [scrollbar-width:none]
+            [&::-webkit-scrollbar]:hidden
+            scroll-smooth
+          "
+        >
+          {sortedPlayables.map((game) => {
+            const isRecent = recentIds.has(game.id);
 
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent opacity-60" />
+            return (
+              <Link 
+                key={game.id} 
+                href={`/play/${game.id}`}
+                prefetch={false}
+                className="group/item flex flex-col w-[140px] sm:w-[160px] flex-shrink-0"
+              >
+                <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-black/40 border border-white/10 shadow-lg">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={game.thumbnail}
+                    alt={game.title}
+                    loading="lazy"
+                    decoding="async"
+                    className="h-full w-full object-cover object-center transition-transform duration-500 group-hover/item:scale-105"
+                  />
 
-                <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-all duration-300 group-hover:bg-black/40 group-hover:opacity-100">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 backdrop-blur-md text-white shadow-lg transition-transform group-hover:scale-110">
-                    <Gamepad2 size={24} className="text-white drop-shadow-md" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent opacity-60" />
+
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/0 opacity-0 transition-all duration-300 group-hover/item:bg-black/40 group-hover/item:opacity-100">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-white/20 backdrop-blur-md text-white shadow-lg transition-transform group-hover/item:scale-110">
+                      <Gamepad2 size={24} className="text-white drop-shadow-md" />
+                    </div>
                   </div>
+
+                  {isRecent && (
+                    <span className="absolute top-2 left-2 rounded-md bg-blue-500/90 px-1.5 py-0.5 text-[9px] font-black tracking-wide text-white shadow-sm">
+                      Recently Played
+                    </span>
+                  )}
                 </div>
 
-                {isRecent && (
-                  <span className="absolute top-2 left-2 rounded-md bg-blue-500/90 px-1.5 py-0.5 text-[9px] font-black tracking-wide text-white shadow-sm">
-                    Recently Played
-                  </span>
-                )}
-              </div>
+                <div className="mt-2 px-1">
+                  <h3 className="line-clamp-1 text-sm font-bold text-white light:text-slate-900">
+                    {game.title}
+                  </h3>
+                  <p className="mt-0.5 text-[11px] font-semibold text-slate-400 light:text-slate-600 truncate">
+                    {game.developer}
+                  </p>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
 
-              <div className="mt-2 px-1">
-                <h3 className="line-clamp-1 text-sm font-bold text-white light:text-slate-900">
-                  {game.title}
-                </h3>
-                <p className="mt-0.5 text-[11px] font-semibold text-slate-400 light:text-slate-600 truncate">
-                  {game.developer}
-                </p>
-              </div>
-            </Link>
-          );
-        })}
+        {showRightArrow && (
+          <button
+            onClick={() => scroll("right")}
+            className="hidden md:flex absolute -right-5 top-1/2 -translate-y-1/2 z-10 h-10 w-10 items-center justify-center rounded-full bg-white/10 backdrop-blur-md text-white shadow-lg border border-white/20 hover:bg-white/20 transition-all"
+          >
+            <ChevronRight size={24} />
+          </button>
+        )}
       </div>
     </section>
   );

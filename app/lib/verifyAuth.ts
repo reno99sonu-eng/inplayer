@@ -3,6 +3,7 @@ import { NextRequest } from "next/server";
 import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { sessionStillActive } from "@/app/lib/sessions";
+import { resolveCognitoEmails } from "@/app/lib/cognitoClient";
 
 // ── In-memory TTL cache for the DynamoDB suspension/name check ──────
 // verifyAuth runs on EVERY authenticated API request (50+ routes), and
@@ -197,9 +198,22 @@ export async function verifyAuth(request: NextRequest): Promise<VerifiedUser> {
     }
   }
 
+  let email = typeof payload.email === "string" ? payload.email : undefined;
+  if (!email && typeof payload["cognito:username"] === "string" && payload["cognito:username"].includes("@")) {
+    email = payload["cognito:username"];
+  }
+  if (!email) {
+    try {
+      const emailMap = await resolveCognitoEmails([userId]);
+      email = emailMap.get(userId);
+    } catch {
+      // Lookup failed — fail open with undefined
+    }
+  }
+
   return {
     userId,
-    email: typeof payload.email === "string" ? payload.email : undefined,
+    email,
     name: resolvedName,
   };
 }

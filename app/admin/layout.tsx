@@ -89,7 +89,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [signedIn, authLoading]);
+  }, [signedIn, authLoading, user?.email, user?.userId]);
 
   if (authLoading || checking) {
     return (

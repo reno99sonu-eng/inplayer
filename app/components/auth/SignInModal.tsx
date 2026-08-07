@@ -161,7 +161,7 @@ export default function SignInModal({
             const adminData = await adminRes.json();
             if (adminData.isAdmin) {
               onClose();
-              router.push("/admin");
+              window.location.href = "/admin";
               return;
             }
           }

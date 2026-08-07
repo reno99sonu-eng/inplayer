@@ -26,6 +26,7 @@ import { NextRequest, NextResponse } from "next/server";
 const BYPASS_PREFIXES = [
   "/geo-blocked",
   "/admin",
+  "/api/admin",
   "/_next",
   "/api/geo",
 ] as const;

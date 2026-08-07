@@ -135,7 +135,7 @@ interface AuthContextType {
   user: AuthUser | null;
   authLoading: boolean;
   signedIn: boolean;
-  refreshUser: () => Promise<void>;
+  refreshUser: (options?: { isFreshSignIn?: boolean }) => Promise<void>;
   signOut: () => Promise<void>;
 }
 

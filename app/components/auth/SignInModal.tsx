@@ -39,7 +39,7 @@ export default function SignInModal({
   onSuccess,
 }: SignInModalProps) {
   const router = useRouter();
-  const { openSignUp, openForgotPassword } = useAuthModal();
+  const { openSignUp, openForgotPassword, refreshUser } = useAuthModal();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -147,6 +147,9 @@ export default function SignInModal({
       if (result.isSignedIn) {
         setSuccess(true);
         onSuccess?.();
+
+        // Refresh global AuthProvider state so user & signedIn update immediately
+        await refreshUser({ isFreshSignIn: true });
 
         try {
           const session = await fetchAuthSession();

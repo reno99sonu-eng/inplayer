@@ -42,12 +42,12 @@ export default function GamePlayerPage() {
   return (
     <div className="flex flex-col h-[calc(100vh-64px)] bg-[#050816] light:bg-[#F4ECDA]">
       <div className="flex items-center gap-4 p-4 lg:px-8 border-b border-white/5 light:border-black/5">
-        <Link 
-          href="/" 
-          className="p-2 rounded-full hover:bg-white/10 light:hover:bg-black/10 transition text-white light:text-slate-900"
+        <button 
+          onClick={() => window.history.back()}
+          className="p-2 rounded-full hover:bg-white/10 light:hover:bg-black/10 transition text-white light:text-slate-900 cursor-pointer"
         >
           <ArrowLeft size={24} />
-        </Link>
+        </button>
         <div>
           <h1 className="text-xl font-bold text-white light:text-slate-900">{game.title}</h1>
           <p className="text-sm text-slate-400 light:text-slate-600">by {game.developer}</p>

@@ -2,13 +2,18 @@
 
 import { playables } from "../data/playables";
 import Link from "next/link";
-import { Gamepad2, Play } from "lucide-react";
-
+import { Gamepad2, Play, ArrowLeft } from "lucide-react";
 export default function InJoyPage() {
   return (
     <div className="min-h-[calc(100vh-64px)] bg-[#050816] light:bg-[#F4ECDA] p-4 lg:p-8">
       <div className="max-w-[1800px] mx-auto">
         <div className="mb-8 flex items-center gap-3">
+          <button 
+            onClick={() => window.history.back()}
+            className="p-2 rounded-full hover:bg-white/10 light:hover:bg-black/10 transition text-white light:text-slate-900 mr-2"
+          >
+            <ArrowLeft size={24} />
+          </button>
           <Gamepad2 className="text-orange-500" size={32} />
           <h1 className="text-3xl font-black text-white sm:text-4xl light:text-slate-900">
             InJoy

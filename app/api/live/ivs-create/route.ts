@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     
     // Create an IVS channel
     const command = new CreateChannelCommand({
-      name: `live-stream-${user.id}-${Date.now()}`,
+      name: `live-stream-${user.userId}-${Date.now()}`,
       latencyMode: "LOW",
       type: "STANDARD",
       insecureIngest: false,

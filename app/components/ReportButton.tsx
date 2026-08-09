@@ -9,7 +9,8 @@ import { useAuthModal } from "@/app/components/auth/AuthProvider";
 
 type ReportTarget =
   | { targetType: "comment"; videoId: string; commentId: string }
-  | { targetType: "message"; conversationId: string; messageId: string };
+  | { targetType: "message"; conversationId: string; messageId: string }
+  | { targetType: "video"; videoId: string };
 
 // The YouTube-style "Report" affordance for comments and direct messages —
 // app/components/watch/VideoOptionsMenu.tsx has its own larger built-in
@@ -95,7 +96,7 @@ export default function ReportButton({
             >
               <div className="mb-1 flex items-center justify-between px-1 pb-2">
                 <p className="text-xs font-bold uppercase tracking-wide text-slate-400 light:text-slate-600">
-                  Report this {target.targetType === "comment" ? "comment" : "message"}
+                  Report this {target.targetType === "comment" ? "comment" : target.targetType === "message" ? "message" : "video"}
                 </p>
                 <button
                   onClick={close}

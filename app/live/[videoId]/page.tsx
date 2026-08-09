@@ -143,7 +143,7 @@ export default async function LiveViewerPage({ params }: LiveViewerPageProps) {
               <div className="flex flex-wrap items-center gap-2">
                 <LikeButton videoId={videoId} />
                 <ShareButton videoId={videoId} title={video.title} />
-                <ReportButton videoId={videoId} title={video.title} />
+                <ReportButton target={{ targetType: "video", videoId }} className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] text-slate-300 light:text-slate-600 transition-all duration-300 hover:text-red-400" />
               </div>
             </div>
 

@@ -1,6 +1,6 @@
 import { Amplify } from "aws-amplify";
 import { cognitoUserPoolsTokenProvider } from "aws-amplify/auth/cognito";
-import { sessionStorage as amplifySessionStorage } from "aws-amplify/utils";
+import { defaultStorage, sessionStorage as amplifySessionStorage } from "aws-amplify/utils";
 
 // "Continue with Google" needs a Cognito Hosted UI domain with Google added
 // as a federated identity provider (configured in the AWS Cognito console).
@@ -54,14 +54,14 @@ Amplify.configure({
   },
 });
 
-// Honor "Remember me": when the viewer signed in with it UNCHECKED, their
-// tokens live in sessionStorage (cleared when the browser closes) instead
-// of localStorage. This must be applied at boot — before any auth call —
-// so reloads within the same browser session still find the tokens.
+// Honor "Remember me": sessions default to persistent localStorage (survives tab closes & app switches).
+// Only when explicitly unchecked does storage switch to sessionStorage.
 if (typeof window !== "undefined") {
   try {
     if (window.localStorage.getItem("inplayer-remember-me") === "0") {
       cognitoUserPoolsTokenProvider.setKeyValueStorage(amplifySessionStorage);
+    } else {
+      cognitoUserPoolsTokenProvider.setKeyValueStorage(defaultStorage);
     }
   } catch {
     // Storage unavailable (private mode etc.) — default behavior is fine.

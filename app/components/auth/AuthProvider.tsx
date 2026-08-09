@@ -62,15 +62,9 @@ Hub.listen("auth", ({ payload }) => {
   }
 });
 
-// Security: auto sign-out after 8 hours with no interaction anywhere on
-// the site (see the idle-tracking effect below, after handleSignOut).
-// The activity timestamp lives in localStorage rather than component
-// state so every open tab reads/writes the SAME clock — using InPlayer in
-// any one tab keeps every other tab's session alive, and closing the
-// browser entirely for 8+ hours signs you out the moment you come back
-// (checked immediately on mount, not just on the interval), not only
-// while a tab is left open and idle.
-const IDLE_LIMIT_MS = 8 * 60 * 60 * 1000; // 8 hours
+// Persistent sessions: Sessions remain active across tab closes and app switches.
+// Idle timeout set to 30 days (standard for video streaming applications).
+const IDLE_LIMIT_MS = 30 * 24 * 60 * 60 * 1000; // 30 days
 const IDLE_ACTIVITY_KEY = "inplayer-last-activity";
 const IDLE_CHECK_INTERVAL_MS = 60_000;
 const IDLE_ACTIVITY_EVENTS = ["mousedown", "mousemove", "keydown", "scroll", "touchstart", "wheel"] as const;
@@ -298,11 +292,7 @@ export default function AuthProvider({
     let cancelled = false;
     async function ping() {
       try {
-        const res = await authedFetch("/api/presence", { method: "POST" });
-        if (res.status === 401 && !cancelled) {
-          await amplifySignOut().catch(() => {});
-          if (!cancelled) setUser(null);
-        }
+        await authedFetch("/api/presence", { method: "POST" });
       } catch (err) {
         console.error("Presence heartbeat failed:", err);
       }

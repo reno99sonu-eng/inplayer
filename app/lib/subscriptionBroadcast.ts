@@ -115,6 +115,98 @@ export async function broadcastNewVideoToSubscribers(params: VideoBroadcastParam
 }
 
 /**
+ * Broadcasts YouTube-style email notifications to all subscribers of a channel when they go live.
+ */
+export async function broadcastLiveStreamToSubscribers(params: Omit<VideoBroadcastParams, "contentType">): Promise<number> {
+  const { videoId, title, description, thumbnailUrl, uploaderId, uploaderName, uploaderAvatarUrl } = params;
+
+  try {
+    // 1. Query all subscribers of the creator from InPlayer-Subscriptions GSI (creatorId-index)
+    const subsResult = await docClient.send(
+      new QueryCommand({
+        TableName: "InPlayer-Subscriptions",
+        IndexName: "creatorId-index",
+        KeyConditionExpression: "creatorId = :creatorId",
+        ExpressionAttributeValues: {
+          ":creatorId": uploaderId,
+        },
+      })
+    ).catch(() => null);
+
+    const subscribers = subsResult?.Items || [];
+    if (subscribers.length === 0) return 0;
+
+    // Filter subscribers with notifications enabled (defaults to true)
+    const activeSubscribers = subscribers.filter((sub) => sub.notifyEnabled !== false);
+    const subscriberUserIds = activeSubscribers.map((sub) => sub.subscriberId);
+    if (subscriberUserIds.length === 0) return 0;
+
+    // 2. Resolve subscriber emails from Cognito
+    const emailMap = await resolveCognitoEmails(subscriberUserIds);
+    if (emailMap.size === 0) return 0;
+
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://inplayer.app";
+    const watchUrl = `${baseUrl}/live/${videoId}`;
+    const subject = `🔴 ${uploaderName} is now live: "${title}"`;
+
+    let sentCount = 0;
+
+    // 3. Dispatch personalized broadcast emails
+    for (const [userId, recipientEmail] of emailMap.entries()) {
+      if (!recipientEmail) continue;
+
+      const html = `
+        <div style="font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; max-width: 600px; margin: 0 auto; background-color: #0b0f19; color: #ffffff; border-radius: 16px; overflow: hidden; border: 1px solid #1e293b;">
+          <!-- Header / Channel Info -->
+          <div style="padding: 20px 24px; background-color: #111827; border-bottom: 1px solid #1f2937; display: flex; align-items: center;">
+            ${
+              uploaderAvatarUrl
+                ? `<img src="${uploaderAvatarUrl}" alt="${uploaderName}" style="width: 44px; height: 44px; border-radius: 50%; object-fit: cover; margin-right: 12px;" />`
+                : `<div style="width: 44px; height: 44px; border-radius: 50%; background: #4f46e5; color: #fff; font-weight: bold; line-height: 44px; text-align: center; margin-right: 12px;">${uploaderName.slice(0, 1).toUpperCase()}</div>`
+            }
+            <div>
+              <div style="font-size: 15px; font-weight: 700; color: #f8fafc;">${uploaderName}</div>
+              <div style="font-size: 12px; color: #94a3b8;">Started a live stream</div>
+            </div>
+          </div>
+
+          <!-- Video Thumbnail Card -->
+          <div style="padding: 24px;">
+            <h2 style="margin-top: 16px; font-size: 18px; font-weight: 800; color: #ffffff; line-height: 1.4;">
+              <a href="${watchUrl}" target="_blank" style="color: #ffffff; text-decoration: none;">${title}</a>
+            </h2>
+
+            ${description ? `<p style="font-size: 13px; color: #cbd5e1; line-height: 1.6; margin-top: 8px;">${description.slice(0, 200)}${description.length > 200 ? "..." : ""}</p>` : ""}
+
+            <div style="margin-top: 24px; text-align: center;">
+              <a href="${watchUrl}" target="_blank" style="display: inline-block; background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: #ffffff; font-weight: 700; font-size: 14px; padding: 12px 28px; border-radius: 100px; text-decoration: none; box-shadow: 0 4px 14px rgba(239, 68, 68, 0.4);">
+                🔴 Join Live Stream
+              </a>
+            </div>
+          </div>
+
+          <!-- Footer -->
+          <div style="padding: 16px 24px; background-color: #090d16; border-top: 1px solid #1e293b; text-align: center; font-size: 11px; color: #64748b;">
+            You received this notification because you subscribed to <strong>${uploaderName}</strong> on InPlayer.<br/>
+            To change your notification preferences, manage your subscriptions in your InPlayer account settings.
+          </div>
+        </div>
+      `;
+
+      const text = `${uploaderName} is live: "${title}"\n\nJoin here: ${watchUrl}\n\nYou received this because you are subscribed to ${uploaderName} on InPlayer.`;
+
+      const success = await sendEmail({ to: recipientEmail, subject, html, text });
+      if (success) sentCount++;
+    }
+
+    return sentCount;
+  } catch (err) {
+    console.error("broadcastLiveStreamToSubscribers failed:", err);
+    return 0;
+  }
+}
+
+/**
  * Sends welcome subscription email when a user subscribes to a channel.
  */
 export async function sendSubscriptionWelcomeEmail(subscriberUserId: string, creatorName: string): Promise<void> {

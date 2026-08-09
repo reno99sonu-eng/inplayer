@@ -15,7 +15,8 @@ export type NotificationType =
   | "subscribe"
   | "message"
   | "message_request"
-  | "admin_announcement";
+  | "admin_announcement"
+  | "live_stream";
 
 interface CreateNotificationInput {
   userId: string; // recipient

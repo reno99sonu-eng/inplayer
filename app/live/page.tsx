@@ -1,76 +1,14 @@
 "use client";
 
-import { useState } from "react";
-import MuxPlayer from "@mux/mux-player-react";
+import { useState, useRef, useEffect } from "react";
 import { fetchAuthSession } from "aws-amplify/auth";
-import { Radio, Copy, Check, Eye, EyeOff, Loader2, Info } from "lucide-react";
+import { Radio, Loader2, StopCircle } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 
 interface LiveCreds {
   streamKey: string;
-  playbackId: string | null;
-  rtmpUrl: string;
-  isTest?: boolean;
-}
-
-function CopyField({
-  label,
-  value,
-  secret = false,
-}: {
-  label: string;
-  value: string;
-  secret?: boolean;
-}) {
-  const [copied, setCopied] = useState(false);
-  const [revealed, setRevealed] = useState(!secret);
-
-  const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(value);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    } catch {
-      /* clipboard blocked — user can still select the text */
-    }
-  };
-
-  const shown = revealed ? value : "•".repeat(Math.min(value.length, 32));
-
-  return (
-    <div>
-      <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-slate-400 light:text-slate-600">
-        {label}
-      </label>
-      <div className="flex items-center gap-2 rounded-2xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-black/[0.03] px-4 py-3">
-        <code className="min-w-0 flex-1 truncate text-sm text-white light:text-slate-900">
-          {shown}
-        </code>
-        {secret && (
-          <button
-            type="button"
-            onClick={() => setRevealed((v) => !v)}
-            aria-label={revealed ? "Hide" : "Reveal"}
-            className="flex-shrink-0 text-slate-400 transition hover:text-white light:hover:text-slate-900"
-          >
-            {revealed ? <EyeOff size={16} /> : <Eye size={16} />}
-          </button>
-        )}
-        <button
-          type="button"
-          onClick={copy}
-          aria-label="Copy"
-          className="flex-shrink-0 text-slate-400 transition hover:text-orange-400"
-        >
-          {copied ? (
-            <Check size={16} className="text-emerald-400" />
-          ) : (
-            <Copy size={16} />
-          )}
-        </button>
-      </div>
-    </div>
-  );
+  ingestEndpoint: string;
+  playbackUrl: string;
 }
 
 export default function LivePage() {
@@ -78,6 +16,37 @@ export default function LivePage() {
   const [creds, setCreds] = useState<LiveCreds | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  const [isBroadcasting, setIsBroadcasting] = useState(false);
+  const previewRef = useRef<HTMLCanvasElement>(null);
+  
+  // Store the client and stream instance so we can stop it later
+  const broadcastClientRef = useRef<any>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+
+  // Clean up on unmount
+  useEffect(() => {
+    return () => {
+      stopBroadcast();
+    };
+  }, []);
+
+  const stopBroadcast = () => {
+    if (broadcastClientRef.current) {
+      try {
+        broadcastClientRef.current.stopBroadcast();
+      } catch (e) {
+        console.error(e);
+      }
+      broadcastClientRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    setIsBroadcasting(false);
+    setCreds(null);
+  };
 
   const startLive = async () => {
     setLoading(true);
@@ -87,7 +56,8 @@ export default function LivePage() {
       const session = await fetchAuthSession();
       const idToken = session.tokens?.idToken?.toString();
 
-      const res = await fetch("/api/live/create", {
+      // 1. Get AWS IVS Channel Details
+      const res = await fetch("/api/live/ivs-create", {
         method: "POST",
         headers: { Authorization: `Bearer ${idToken}` },
       });
@@ -96,13 +66,53 @@ export default function LivePage() {
 
       if (!res.ok) {
         setError(data.error || "Couldn't start a live stream.");
+        setLoading(false);
         return;
       }
 
       setCreds(data);
+
+      // 2. Initialize Web Broadcast SDK dynamically to avoid SSR issues
+      const IVSBroadcastClientModule = (await import("amazon-ivs-web-broadcast")).default;
+      
+      const client = IVSBroadcastClientModule.create({
+        streamConfig: IVSBroadcastClientModule.STANDARD_LANDSCAPE,
+        ingestEndpoint: data.ingestEndpoint,
+      });
+
+      broadcastClientRef.current = client;
+
+      // 3. Request camera and microphone permissions
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { width: { ideal: 1280 }, height: { ideal: 720 } },
+        audio: true,
+      });
+      streamRef.current = stream;
+
+      // 4. Attach preview
+      if (previewRef.current) {
+        client.attachPreview(previewRef.current);
+      }
+
+      // 5. Add devices to the client
+      const videoTrack = stream.getVideoTracks()[0];
+      const audioTrack = stream.getAudioTracks()[0];
+
+      if (videoTrack) {
+        await client.addVideoInputDevice(videoTrack, "camera1", { index: 0 });
+      }
+      if (audioTrack) {
+        await client.addAudioInputDevice(audioTrack, "mic1");
+      }
+
+      // 6. Start Broadcast!
+      await client.startBroadcast(data.streamKey);
+      
+      setIsBroadcasting(true);
     } catch (err) {
       console.error("Failed to start live stream:", err);
-      setError("Something went wrong. Please try again.");
+      setError("Something went wrong. Please check your camera permissions and try again.");
+      stopBroadcast();
     } finally {
       setLoading(false);
     }
@@ -138,96 +148,90 @@ export default function LivePage() {
   return (
     <div className="mx-auto max-w-[820px] px-4 py-8 sm:py-12">
       <div className="flex items-center gap-3">
-        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-amber-400 text-white">
-          <Radio size={22} />
+        <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-amber-400 text-white shadow-lg shadow-orange-500/20">
+          <Radio size={22} className={isBroadcasting ? "animate-pulse" : ""} />
         </span>
         <div>
           <h1 className="text-2xl sm:text-3xl font-black text-white light:text-slate-900">
-            Go Live
+            {isBroadcasting ? "You are LIVE!" : "Live Studio"}
           </h1>
           <p className="text-sm text-slate-400 light:text-slate-600">
-            Stream to InPlayer from OBS, Streamlabs, or any RTMP encoder.
+            {isBroadcasting 
+              ? "Your camera and microphone are being broadcasted directly from the browser."
+              : "1-Click broadcast directly from your browser. No OBS required!"}
           </p>
         </div>
       </div>
 
-      {!creds ? (
-        <div className="mt-8 rounded-[28px] border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.03] p-8 text-center">
-          <p className="mx-auto max-w-md text-sm leading-6 text-slate-300 light:text-slate-700">
-            Start a live stream to get your private stream key and RTMP URL.
-            Paste them into your streaming software, start broadcasting, and
-            your live video appears below and to your viewers.
-          </p>
-          <button
-            onClick={startLive}
-            disabled={loading}
-            className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-8 py-3.5 font-bold text-white shadow-[0_15px_35px_rgba(255,153,0,.3)] transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            {loading ? (
-              <>
-                <Loader2 size={18} className="animate-spin" />
-                Starting…
-              </>
-            ) : (
-              <>
-                <Radio size={18} />
-                Start Live Stream
-              </>
-            )}
-          </button>
-
-          {error && (
-            <p className="mt-4 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-300 light:text-red-700">
-              {error}
-            </p>
-          )}
-        </div>
-      ) : (
-        <div className="mt-8 space-y-6">
-          {creds.isTest && (
-            <div className="flex items-start gap-2 rounded-2xl border border-amber-400/30 bg-amber-500/10 p-3 text-xs leading-5 text-amber-200 light:text-amber-800">
-              <Info size={15} className="mt-0.5 flex-shrink-0" />
-              <span>
-                Your Mux account is on the free plan, so this is a{" "}
-                <strong>test stream</strong> — watermarked and limited to
-                about 5 minutes. Add a payment method to your Mux account to
-                unlock full live streaming.
-              </span>
+      <div className="mt-8 rounded-[28px] overflow-hidden border border-white/10 light:border-black/10 bg-black relative shadow-2xl">
+        {/* Live Preview Canvas */}
+        <div className="aspect-video w-full bg-[#0a0a0a] flex items-center justify-center relative">
+          {!isBroadcasting && !loading && (
+            <div className="absolute text-slate-500 flex flex-col items-center gap-2">
+              <Radio size={32} className="opacity-50" />
+              <span className="text-sm font-medium">Ready to broadcast</span>
             </div>
           )}
+          {loading && (
+            <div className="absolute text-orange-400 flex flex-col items-center gap-3 z-10 bg-black/50 p-6 rounded-3xl backdrop-blur-md">
+              <Loader2 size={32} className="animate-spin" />
+              <span className="text-sm font-bold tracking-wide uppercase">Connecting...</span>
+            </div>
+          )}
+          <canvas 
+            ref={previewRef} 
+            className={`w-full h-full object-cover transition-opacity duration-500 ${isBroadcasting ? 'opacity-100' : 'opacity-0'}`} 
+          />
+          
+          {isBroadcasting && (
+            <div className="absolute top-4 right-4 bg-red-500 text-white text-xs font-bold px-3 py-1.5 rounded-full uppercase tracking-wider flex items-center gap-2 shadow-lg shadow-red-500/30 animate-pulse">
+              <div className="w-2 h-2 rounded-full bg-white"></div>
+              LIVE
+            </div>
+          )}
+        </div>
 
-          {/* Live preview */}
-          <div className="overflow-hidden rounded-3xl border border-white/10 light:border-black/10 bg-black">
-            {creds.playbackId ? (
-              <MuxPlayer
-                streamType="live"
-                playbackId={creds.playbackId}
-                accentColor="#EA580C"
-                style={{ width: "100%", aspectRatio: "16 / 9" }}
-              />
-            ) : (
-              <div className="flex aspect-video items-center justify-center text-sm text-slate-400">
-                Preview unavailable
+        {/* Controls */}
+        <div className="p-6 bg-white/[0.03] light:bg-black/[0.03] border-t border-white/10 light:border-black/10 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="text-sm text-slate-400 light:text-slate-600">
+            {isBroadcasting && creds ? (
+              <div>
+                <p><strong>Playback URL:</strong></p>
+                <code className="text-xs break-all bg-black/30 p-2 rounded block mt-1 border border-white/10">
+                  {creds.playbackUrl}
+                </code>
               </div>
+            ) : (
+              "Click the button to request camera permissions and go live instantly."
             )}
           </div>
-
-          {/* Credentials */}
-          <div className="space-y-4 rounded-3xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.03] p-5 sm:p-6">
-            <CopyField label="Server / RTMP URL" value={creds.rtmpUrl} />
-            <CopyField label="Stream Key" value={creds.streamKey} secret />
-
-            <div className="flex items-start gap-2 rounded-2xl border border-orange-400/20 bg-orange-500/10 p-3 text-xs leading-5 text-orange-200 light:text-orange-800">
-              <Info size={15} className="mt-0.5 flex-shrink-0" />
-              <span>
-                In OBS: Settings → Stream → Service &ldquo;Custom&rdquo;, paste
-                the Server and Stream Key above, then Start Streaming. It can
-                take a few seconds for the live preview to appear here.
-              </span>
-            </div>
-          </div>
+          
+          {!isBroadcasting ? (
+            <button
+              onClick={startLive}
+              disabled={loading}
+              className="w-full sm:w-auto flex-shrink-0 inline-flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-8 py-3.5 font-bold text-white shadow-[0_15px_35px_rgba(255,153,0,.3)] transition-all hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Radio size={18} />
+              Start Broadcast
+            </button>
+          ) : (
+            <button
+              onClick={stopBroadcast}
+              className="w-full sm:w-auto flex-shrink-0 inline-flex items-center justify-center gap-2 rounded-2xl bg-red-500 hover:bg-red-600 px-8 py-3.5 font-bold text-white shadow-[0_15px_35px_rgba(239,68,68,.3)] transition-all hover:-translate-y-0.5"
+            >
+              <StopCircle size={18} />
+              Stop Broadcast
+            </button>
+          )}
         </div>
-      )}
+        
+        {error && (
+          <div className="p-4 bg-red-500/10 border-t border-red-500/20 text-red-400 text-sm font-medium text-center">
+            {error}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

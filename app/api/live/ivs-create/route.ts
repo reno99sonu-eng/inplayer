@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { IVSClient, CreateChannelCommand } from "@aws-sdk/client-ivs";
+import { IvsClient, CreateChannelCommand } from "@aws-sdk/client-ivs";
 import { verifyAuth } from "@/app/lib/verifyAuth";
 
-const ivsClient = new IVSClient({
+const ivsClient = new IvsClient({
   region: process.env.AWS_REGION || "us-east-1",
   credentials: {
     accessKeyId: process.env.AWS_ACCESS_KEY_ID || "",

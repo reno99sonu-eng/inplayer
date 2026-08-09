@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import { fetchAuthSession } from "aws-amplify/auth/server";
-import { runWithAmplifyServerContext } from "@/app/lib/amplifyServerUtils";
 import { UpdateCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
+import { verifyAuth } from "@/app/lib/verifyAuth";
 
 export async function POST(req: NextRequest) {
   try {
@@ -12,12 +11,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Missing videoId" }, { status: 400 });
     }
 
-    const session = await runWithAmplifyServerContext({
-      nextServerContext: { request: req, response: new NextResponse() },
-      operation: (contextSpec) => fetchAuthSession(contextSpec),
-    });
-
-    const userSub = session.tokens?.idToken?.payload?.sub;
+    const user = await verifyAuth(req);
+    const userSub = user.userId;
     if (!userSub) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }

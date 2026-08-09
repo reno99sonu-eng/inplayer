@@ -60,10 +60,24 @@ export async function GET(request: NextRequest) {
     console.error("comments GET: member badge lookup failed:", err);
   }
 
+  const distinctIds = Array.from(new Set(comments.map((c) => c.userId)));
+  const verifiedIds = new Set<string>();
+  await Promise.all(
+    distinctIds.map(async (uid) => {
+      try {
+        const u = await docClient.send(new GetCommand({ TableName: "InPlayer-Users", Key: { userId: uid }, ProjectionExpression: "isVerified" }));
+        if (u.Item?.isVerified) {
+          verifiedIds.add(uid);
+        }
+      } catch (e) {}
+    })
+  );
+
   const commentsWithUsernames = comments.map((c) => ({
     ...c,
     userUsername: usernames.get(c.userId),
     isMember: memberIds.has(c.userId),
+    isVerified: verifiedIds.has(c.userId),
   }));
 
   return NextResponse.json({ comments: commentsWithUsernames });

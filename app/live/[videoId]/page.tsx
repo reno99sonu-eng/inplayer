@@ -7,12 +7,12 @@ import IVSPlayer from "@/app/components/IVSPlayer";
 import Link from "next/link";
 import Image from "next/image";
 import CommentSection from "@/app/components/CommentSection";
-import FollowButton from "@/app/components/FollowButton";
+import SubscribeButton from "@/app/components/SubscribeButton";
 import ReportButton from "@/app/components/ReportButton";
 import ShareButton from "@/app/components/ShareButton";
-import LikeDislikeButtons from "@/app/components/LikeDislikeButtons";
+import LikeButton from "@/app/components/LikeButton";
 import { Eye, Clock } from "lucide-react";
-import { formatTimeAgo } from "@/app/lib/formatTimeAgo";
+import { formatTimeAgo } from "@/app/lib/formatters";
 
 export const dynamic = "force-dynamic";
 
@@ -135,18 +135,14 @@ export default async function LiveViewerPage({ params }: LiveViewerPageProps) {
                   </span>
                 </div>
                 <div className="ml-2">
-                  <FollowButton targetUserId={video.uploaderId} />
+                  <SubscribeButton creatorId={video.uploaderId} />
                 </div>
               </div>
 
               {/* Actions */}
               <div className="flex flex-wrap items-center gap-2">
-                <LikeDislikeButtons
-                  videoId={videoId}
-                  initialLikes={video.likes || 0}
-                  initialDislikes={video.dislikes || 0}
-                />
-                <ShareButton videoId={videoId} />
+                <LikeButton videoId={videoId} />
+                <ShareButton videoId={videoId} title={video.title} />
                 <ReportButton videoId={videoId} title={video.title} />
               </div>
             </div>

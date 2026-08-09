@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { fetchAuthSession } from "aws-amplify/auth";
-import { Trash2, Crown } from "lucide-react";
+import { Trash2, Crown, BadgeCheck, Smile, Image as ImageIcon, FileImage } from "lucide-react";
 import { useAuthModal } from "./auth/AuthProvider";
 import { formatTimeAgo } from "@/app/lib/formatters";
 import ReportButton from "@/app/components/ReportButton";
@@ -21,6 +21,7 @@ interface Comment {
   // membership with this video's creator right now? See app/api/comments
   // (GET) and app/lib/memberships.ts.
   isMember?: boolean;
+  isVerified?: boolean;
 }
 
 interface CommentSectionProps {
@@ -141,37 +142,63 @@ export default function CommentSection({ videoId }: CommentSectionProps) {
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder={signedIn ? "Add a comment..." : "Sign in to comment"}
+            placeholder={signedIn ? "Write a comment..." : "Sign in to comment"}
             rows={1}
             onFocus={() => {
               if (!signedIn) openSignIn();
             }}
-            className="w-full resize-none rounded-xl border border-white/10 light:border-black/10 bg-transparent px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-orange-400/50"
+            className="w-full resize-none rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-4 py-3 text-sm text-white light:text-slate-900 outline-none focus:border-orange-400/50"
           />
 
           {error && <p className="mt-1 text-xs text-red-400">{error}</p>}
           {notice && <p className="mt-1 text-xs text-amber-400">{notice}</p>}
 
-          {text.trim() && (
-            <div className="mt-2 flex justify-end gap-2">
-              <button
-                onClick={() => {
-                  setText("");
-                  setError(null);
-                }}
-                className="rounded-full px-4 py-1.5 text-xs font-semibold text-slate-400 hover:bg-white/5 light:hover:bg-black/5"
+          <div className="mt-2 flex items-center justify-between">
+            <div className="flex items-center gap-1 text-slate-400 light:text-slate-500">
+              <button 
+                className="rounded-full p-2 hover:bg-white/10 light:hover:bg-black/10 transition"
+                title="Insert an emoji"
+                disabled={!signedIn}
               >
-                Cancel
+                <Smile size={18} />
               </button>
-              <button
-                onClick={handlePost}
-                disabled={posting}
-                className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-4 py-1.5 text-xs font-bold text-white disabled:opacity-60"
+              <button 
+                className="rounded-full p-2 hover:bg-white/10 light:hover:bg-black/10 transition"
+                title="Attach a photo or video"
+                disabled={!signedIn}
               >
-                {posting ? "Posting..." : "Comment"}
+                <ImageIcon size={18} />
+              </button>
+              <button 
+                className="rounded-full p-2 hover:bg-white/10 light:hover:bg-black/10 transition"
+                title="Post a GIF"
+                disabled={!signedIn}
+              >
+                <FileImage size={18} />
               </button>
             </div>
-          )}
+            
+            {text.trim() && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    setText("");
+                    setError(null);
+                  }}
+                  className="rounded-full px-4 py-1.5 text-xs font-semibold text-slate-400 hover:bg-white/5 light:hover:bg-black/5"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handlePost}
+                  disabled={posting}
+                  className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-4 py-1.5 text-xs font-bold text-white disabled:opacity-60 transition hover:shadow-lg hover:shadow-orange-500/20"
+                >
+                  {posting ? "Posting..." : "Comment"}
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -230,6 +257,11 @@ export default function CommentSection({ videoId }: CommentSectionProps) {
                     <p className="text-sm font-semibold text-white light:text-slate-900">
                       {comment.userName}
                     </p>
+                  )}
+                  {comment.isVerified && (
+                    <span title="Verified User" className="text-blue-500">
+                      <BadgeCheck size={14} className="fill-blue-500 text-white light:text-slate-100" />
+                    </span>
                   )}
                   {comment.isMember && (
                     <span

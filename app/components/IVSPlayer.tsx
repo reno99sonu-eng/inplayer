@@ -29,7 +29,7 @@ export default function IVSPlayer({ streamUrl, children }: IVSPlayerProps) {
           return;
         }
 
-        player = IVSPlayer.create();
+        player = IVSPlayer.create({} as any);
         player.attachHTMLVideoElement(videoRef.current);
         player.load(streamUrl);
         player.play();

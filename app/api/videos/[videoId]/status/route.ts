@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GetCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
+import mux from "@/app/lib/mux";
+import { getMuxThumbnailUrl } from "@/app/lib/muxThumbnail";
 
 interface Params {
   params: Promise<{ videoId: string }>;
@@ -9,7 +11,7 @@ interface Params {
 export async function GET(request: NextRequest, { params }: Params) {
   const { videoId } = await params;
 
-  const result = await docClient.send(
+  let result = await docClient.send(
     new GetCommand({
       TableName: "InPlayer-Videos",
       Key: { videoId },
@@ -18,6 +20,67 @@ export async function GET(request: NextRequest, { params }: Params) {
 
   if (!result.Item) {
     return NextResponse.json({ status: "not_found" });
+  }
+
+  // Self-heal: If webhooks are missed (e.g. local dev without ngrok) or delayed, check Mux directly
+  if (result.Item.status === "processing") {
+    try {
+      const upload = await mux.video.uploads.retrieve(videoId);
+      if (upload.asset_id) {
+        const asset = await mux.video.assets.retrieve(upload.asset_id);
+        if (asset.status === "ready") {
+          const playbackId = asset.playback_ids?.find((id) => id.policy === "public")?.id;
+          const signedPlaybackId = asset.playback_ids?.find((id) => id.policy === "signed")?.id;
+
+          if (playbackId) {
+            const isShort = result.Item.contentType === "short";
+            const thumbnailUrl = getMuxThumbnailUrl(playbackId, isShort);
+
+            const updateResult = await docClient.send(
+              new UpdateCommand({
+                TableName: "InPlayer-Videos",
+                Key: { videoId },
+                UpdateExpression:
+                  "SET #status = :status, muxAssetId = :assetId, muxPlaybackId = :playbackId, #duration = :duration, thumbnailUrl = if_not_exists(customThumbnailUrl, :thumbnailUrl)" +
+                  (signedPlaybackId ? ", muxSignedPlaybackId = :signedPlaybackId" : ""),
+                ExpressionAttributeNames: {
+                  "#status": "status",
+                  "#duration": "duration",
+                },
+                ExpressionAttributeValues: {
+                  ":status": "ready",
+                  ":assetId": asset.id,
+                  ":playbackId": playbackId,
+                  ":duration": asset.duration || 0,
+                  ":thumbnailUrl": thumbnailUrl,
+                  ...(signedPlaybackId && { ":signedPlaybackId": signedPlaybackId }),
+                },
+                ReturnValues: "ALL_NEW",
+              })
+            );
+            if (updateResult.Attributes) {
+              result = { Item: updateResult.Attributes as any };
+            }
+          }
+        } else if (asset.status === "errored") {
+          const updateResult = await docClient.send(
+            new UpdateCommand({
+              TableName: "InPlayer-Videos",
+              Key: { videoId },
+              UpdateExpression: "SET #status = :status",
+              ExpressionAttributeNames: { "#status": "status" },
+              ExpressionAttributeValues: { ":status": "error" },
+              ReturnValues: "ALL_NEW",
+            })
+          );
+          if (updateResult.Attributes) {
+            result = { Item: updateResult.Attributes as any };
+          }
+        }
+      }
+    } catch (err) {
+      console.error("Self-heal check failed for video", videoId, err);
+    }
   }
 
   return NextResponse.json({

@@ -8,11 +8,11 @@ class AppColors {
   // ==========================
 
   static const Color backgroundDark = Color(0xFF05070D);
-  static const Color surfaceDark = Color(0xFF091224);
-  static const Color cardDark = Color(0xFF111827);
+  static const Color surfaceDark = Color(0xFF0A0D18);
+  static const Color cardDark = Color(0xFF070A12);
 
   static const Color textPrimaryDark = Color(0xFFF8FAFC);
-  static const Color textSecondaryDark = Color(0xFFCBD5E1);
+  static const Color textSecondaryDark = Color(0xFF9CA3AF);
 
   // ==========================
   // LIGHT THEME

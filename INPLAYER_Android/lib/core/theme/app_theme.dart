@@ -11,7 +11,7 @@ class AppTheme {
 
       brightness: Brightness.dark,
 
-      fontFamily: 'PlusJakartaSans',
+      // fontFamily: 'PlusJakartaSans', // Uncomment when fonts are added
 
       scaffoldBackgroundColor: AppColors.backgroundDark,
 

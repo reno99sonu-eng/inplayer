@@ -294,7 +294,7 @@ export default function VideoMetadataFields({
                               : "border-white/10 hover:border-orange-400/50"
                           }`}
                         >
-                          <img src={frameUrl} alt={`Frame ${idx + 1}`} className="h-full w-full object-cover" />
+                          <img src={frameUrl} alt={`Frame ${idx + 1}`} className="h-full w-full object-contain" />
                         </button>
                       );
                     })}
@@ -309,7 +309,7 @@ export default function VideoMetadataFields({
                   className="group relative flex aspect-video h-14 cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-dashed border-white/20 bg-black/20 hover:border-orange-400/50"
                 >
                   {thumbnail.previewUrl && (!muxFrames || !muxFrames.includes(thumbnail.previewUrl)) ? (
-                    <img src={thumbnail.previewUrl} alt="Custom" className="h-full w-full object-cover" />
+                    <img src={thumbnail.previewUrl} alt="Custom" className="h-full w-full object-contain" />
                   ) : (
                     <div className="flex items-center gap-1.5 text-slate-400 px-3 text-center">
                       <UploadCloud size={16} className="text-orange-400" />

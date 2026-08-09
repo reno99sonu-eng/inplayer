@@ -60,11 +60,35 @@ dependencies:
   # Device Information
   device_info_plus: ^12.4.0
 
+  # Video Player
+  video_player: ^2.9.1
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
 
   flutter_lints: ^6.0.0
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
+
+  assets:
+    - assets/images/
+
+  # Uncomment and add font files to enable custom fonts
+  # fonts:
+  #   - family: PlusJakartaSans
+  #     fonts:
+  #       - asset: assets/fonts/PlusJakartaSans-Regular.ttf
+  #       - asset: assets/fonts/PlusJakartaSans-Medium.ttf
+  #         weight: 500
+  #       - asset: assets/fonts/PlusJakartaSans-SemiBold.ttf
+  #         weight: 600
+  #       - asset: assets/fonts/PlusJakartaSans-Bold.ttf
+  #         weight: 700
+
+flutter_launcher_icons:
+  android: "ic_launcher"
+  image_path: "assets/images/app_icon.png"
+  min_sdk_android: 21

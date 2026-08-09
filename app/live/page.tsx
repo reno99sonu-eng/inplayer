@@ -40,6 +40,7 @@ export default function LivePage() {
   const [description, setDescription] = useState("");
   const [visibility, setVisibility] = useState<Visibility>("public");
   const [commentsEnabled, setCommentsEnabled] = useState(true);
+  const [tagInput, setTagInput] = useState("");
 
   // AI Assistant state
   const [aiGenerating, setAiGenerating] = useState(false);
@@ -322,6 +323,8 @@ export default function LivePage() {
             onOpenAITitleAssist={() => setAiTitleAssistOpen(true)}
             aiError={aiType === "title" ? aiError : null}
             aiSuggestions={aiType === "title" ? aiSuggestions : []}
+            tagInput={tagInput}
+            onTagInputChange={setTagInput}
           />
         </div>
       )}

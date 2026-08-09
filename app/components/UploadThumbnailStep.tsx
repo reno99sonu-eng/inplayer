@@ -117,7 +117,7 @@ export default function UploadThumbnailStep({
                 }`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element -- external Mux image host, next/image isn't worth configuring for a transient picker. */}
-                <img src={url} alt="Thumbnail option" className="aspect-video w-full object-cover" />
+                <img src={url} alt="Thumbnail option" className="aspect-video w-full object-contain bg-black/20" />
               </button>
             ))}
           </div>

@@ -23,9 +23,21 @@ export function extractLocalVideoThumbnails(
       const canvas = document.createElement("canvas");
       const ctx = canvas.getContext("2d");
 
-      // Standard 16:9 aspect ratio thumbnail canvas
-      canvas.width = 640;
-      canvas.height = 360;
+      // Preserve native aspect ratio but cap max dimension to 640px to keep data URI size small
+      const maxDim = 640;
+      let w = video.videoWidth || 640;
+      let h = video.videoHeight || 360;
+      if (w > maxDim || h > maxDim) {
+        if (w > h) {
+          h = Math.round((h * maxDim) / w);
+          w = maxDim;
+        } else {
+          w = Math.round((w * maxDim) / h);
+          h = maxDim;
+        }
+      }
+      canvas.width = w;
+      canvas.height = h;
 
       const timestamps: number[] = [];
       for (let i = 1; i <= count; i++) {

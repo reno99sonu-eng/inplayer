@@ -99,10 +99,10 @@ export default function LivePage() {
       const audioTrack = stream.getAudioTracks()[0];
 
       if (videoTrack) {
-        await client.addVideoInputDevice(videoTrack, "camera1", { index: 0 });
+        await client.addVideoInputDevice(new MediaStream([videoTrack]), "camera1", { index: 0 });
       }
       if (audioTrack) {
-        await client.addAudioInputDevice(audioTrack, "mic1");
+        await client.addAudioInputDevice(new MediaStream([audioTrack]), "mic1");
       }
 
       // 6. Start Broadcast!

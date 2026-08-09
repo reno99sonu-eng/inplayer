@@ -322,7 +322,6 @@ export default function LivePage() {
             onOpenAITitleAssist={() => setAiTitleAssistOpen(true)}
             aiError={aiType === "title" ? aiError : null}
             aiSuggestions={aiType === "title" ? aiSuggestions : []}
-            hideThumbnail={true}
           />
         </div>
       )}

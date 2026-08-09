@@ -13,6 +13,7 @@ import { headers } from "next/headers";
 const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
   variable: "--font-jakarta",
+  display: "swap",
 });
 
 export const metadata: Metadata = {

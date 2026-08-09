@@ -2,9 +2,11 @@
 
 import { ReactNode } from "react";
 import { usePathname } from "next/navigation";
+import dynamic from "next/dynamic";
 import Navbar from "./Navbar";
-import AnnouncementBanner from "./AnnouncementBanner";
-import MobileBottomNav from "./MobileBottomNav";
+// Non-critical for first paint — lazy-loaded
+const AnnouncementBanner = dynamic(() => import("./AnnouncementBanner"), { ssr: false });
+const MobileBottomNav = dynamic(() => import("./MobileBottomNav"), { ssr: false });
 import MaintenanceGate from "./MaintenanceGate";
 import GeoGate from "./GeoGate";
 import SplashScreen from "./SplashScreen";

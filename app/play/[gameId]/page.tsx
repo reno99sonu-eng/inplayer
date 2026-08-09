@@ -60,6 +60,7 @@ export default function GamePlayerPage() {
           className="absolute inset-0 w-full h-full border-none"
           allow="fullscreen; autoplay; encrypted-media"
           sandbox="allow-scripts allow-same-origin allow-popups allow-forms allow-presentation"
+          loading="lazy"
         />
       </div>
     </div>

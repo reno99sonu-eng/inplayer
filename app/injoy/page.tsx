@@ -2,6 +2,7 @@
 
 import { playables } from "../data/playables";
 import Link from "next/link";
+import Image from "next/image";
 import { Gamepad2, Play, ArrowLeft } from "lucide-react";
 export default function InJoyPage() {
   return (
@@ -27,12 +28,12 @@ export default function InJoyPage() {
               href={`/play/${game.id}`}
               className="group relative flex aspect-square cursor-pointer flex-col overflow-hidden rounded-2xl bg-white/5 light:bg-black/5"
             >
-              <img
+              <Image
                 src={game.thumbnail}
                 alt={game.title}
-                loading="lazy"
-                decoding="async"
-                className="absolute inset-0 h-full w-full object-cover transition-transform duration-500 group-hover:scale-110"
+                fill
+                sizes="(max-width:640px) 50vw, (max-width:1024px) 33vw, 16vw"
+                className="object-cover transition-transform duration-500 group-hover:scale-110"
               />
               <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 transition-opacity duration-300 group-hover:opacity-80" />
               

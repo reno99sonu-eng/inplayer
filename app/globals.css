@@ -44,6 +44,14 @@ html.dark body {
   color: #F8FAFC;
 }
 
+/* ---------- Performance: content-visibility ---------- */
+/* Tells the browser to skip rendering work for sections that aren't visible
+   yet. Dramatically speeds up initial paint on long pages like the homepage. */
+.cv-auto {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 500px;
+}
+
 /* ---------- Existing Animations ---------- */
 
 @keyframes shimmer {

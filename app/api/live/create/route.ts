@@ -37,47 +37,40 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       streamKey: liveStream.stream_key,
       playbackId: liveStream.playback_ids?.[0]?.id || null,
-      // Mux's standard global RTMP ingest endpoint.
       rtmpUrl: "rtmp://global-live.mux.com:5222/app",
       isTest: false,
     });
   } catch (err) {
     const muxMsg = muxErrorMessages(err);
+    console.warn("Primary live stream creation failed, attempting test stream fallback:", err);
 
-    // Free-plan account → fall back to a test stream so the feature still
-    // works end-to-end (with Mux's test limits) instead of hard-failing.
-    if (muxMsg && /free plan/i.test(muxMsg)) {
-      try {
-        const testStream = await mux.video.liveStreams.create({
-          ...baseSettings,
-          test: true,
-        });
+    // Fall back to a test stream so the feature still works end-to-end
+    // (with Mux's test limits) on free-plan accounts or API variations
+    try {
+      const testStream = await mux.video.liveStreams.create({
+        ...baseSettings,
+        test: true,
+      });
 
-        return NextResponse.json({
-          streamKey: testStream.stream_key,
-          playbackId: testStream.playback_ids?.[0]?.id || null,
-          rtmpUrl: "rtmp://global-live.mux.com:5222/app",
-          isTest: true,
-        });
-      } catch (testErr) {
-        const testMsg = muxErrorMessages(testErr);
-        console.error("Test live stream also failed:", testErr);
-        return NextResponse.json(
-          {
-            error:
-              testMsg ||
-              muxMsg ||
-              "Couldn't start a live stream. Please try again.",
-          },
-          { status: 502 }
-        );
-      }
+      return NextResponse.json({
+        streamKey: testStream.stream_key,
+        playbackId: testStream.playback_ids?.[0]?.id || null,
+        rtmpUrl: "rtmp://global-live.mux.com:5222/app",
+        isTest: true,
+      });
+    } catch (testErr) {
+      const testMsg = muxErrorMessages(testErr);
+      console.error("Test live stream also failed:", testErr);
+      return NextResponse.json(
+        {
+          error:
+            testMsg ||
+            muxMsg ||
+            (err instanceof Error ? err.message : null) ||
+            "Couldn't start a live stream. Please check your Mux API keys in .env.local.",
+        },
+        { status: 502 }
+      );
     }
-
-    console.error("Failed to create live stream:", err);
-    return NextResponse.json(
-      { error: muxMsg || "Couldn't start a live stream. Please try again." },
-      { status: 502 }
-    );
   }
 }

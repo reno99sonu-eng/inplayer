@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useState, useRef } from "react";
 import { Gamepad2, ChevronLeft, ChevronRight } from "lucide-react";
 import { playables, type Playable } from "../data/playables";
@@ -42,7 +43,7 @@ export default function PlayablesShelf() {
 
   useEffect(() => {
     checkScroll();
-    window.addEventListener("resize", checkScroll);
+    window.addEventListener("resize", checkScroll, { passive: true });
     return () => window.removeEventListener("resize", checkScroll);
   }, [sortedPlayables]);
 
@@ -98,13 +99,12 @@ export default function PlayablesShelf() {
                 className="group/item flex flex-col w-[140px] sm:w-[160px] flex-shrink-0"
               >
                 <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-black/40 border border-white/10 shadow-lg">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
+                  <Image
                     src={game.thumbnail}
                     alt={game.title}
-                    loading="lazy"
-                    decoding="async"
-                    className="h-full w-full object-cover object-center transition-transform duration-500 group-hover/item:scale-105"
+                    fill
+                    sizes="(max-width:640px) 140px, 160px"
+                    className="object-cover object-center transition-transform duration-500 group-hover/item:scale-105"
                   />
 
                   <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent opacity-60" />

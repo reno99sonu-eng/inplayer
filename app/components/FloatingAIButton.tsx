@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import AIStudioModal from "./AIStudioModal";
+import dynamic from "next/dynamic";
 
+// 13KB modal — only loaded when the user actually clicks the button
+const AIStudioModal = dynamic(() => import("./AIStudioModal"), { ssr: false });
 export default function FloatingAIButton() {
   const [hidden, setHidden] = useState(false);
   const [open, setOpen] = useState(false);
@@ -18,7 +20,7 @@ export default function FloatingAIButton() {
       setHidden(rect.top < window.innerHeight);
     };
 
-    window.addEventListener("scroll", onScroll);
+    window.addEventListener("scroll", onScroll, { passive: true });
     onScroll();
 
     return () => window.removeEventListener("scroll", onScroll);

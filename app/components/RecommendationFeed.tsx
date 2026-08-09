@@ -18,9 +18,11 @@ const MuxPlayer = nextDynamic(() => import("@mux/mux-player-react"), {
 });
 import { recommendations, type Recommendation } from "../data/recommendations";
 import { shorts, type Short } from "../data/shorts";
-import ShortsShelf from "./ShortsShelf";
-import TrendingNow from "./TrendingNow";
-import PlayablesShelf from "./PlayablesShelf";
+// Below-fold shelves: lazy-loaded so their JS isn't in the initial bundle.
+// They only render after the user scrolls past the hero and first video rows.
+const ShortsShelf = nextDynamic(() => import("./ShortsShelf"), { ssr: false });
+const TrendingNow = nextDynamic(() => import("./TrendingNow"), { ssr: false });
+const PlayablesShelf = nextDynamic(() => import("./PlayablesShelf"), { ssr: false });
 import AdThumbnailCard from "./AdThumbnailCard";
 import { useSettings } from "./settings/SettingsProvider";
 import {

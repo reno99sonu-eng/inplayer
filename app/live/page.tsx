@@ -190,6 +190,10 @@ export default function LivePage() {
         setCreds(activeCreds);
       }
 
+      if (!activeCreds?.streamKey) {
+        throw new Error("Couldn't obtain live stream key.");
+      }
+
       // Automatically establish WHIP WebRTC connection directly to streaming server
       const pc = await startWhipStream(mediaStreamRef.current, activeCreds.streamKey);
       peerConnectionRef.current = pc;

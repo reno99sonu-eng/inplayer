@@ -59,7 +59,7 @@ export async function GET(request: NextRequest, { params }: Params) {
               })
             );
             if (updateResult.Attributes) {
-              result = { Item: updateResult.Attributes as any };
+              result.Item = updateResult.Attributes as any;
             }
           }
         } else if (asset.status === "errored") {
@@ -74,7 +74,7 @@ export async function GET(request: NextRequest, { params }: Params) {
             })
           );
           if (updateResult.Attributes) {
-            result = { Item: updateResult.Attributes as any };
+            result.Item = updateResult.Attributes as any;
           }
         }
       }

@@ -11,7 +11,7 @@ interface Params {
 export async function GET(request: NextRequest, { params }: Params) {
   const { videoId } = await params;
 
-  let result = await docClient.send(
+  const result = await docClient.send(
     new GetCommand({
       TableName: "InPlayer-Videos",
       Key: { videoId },
@@ -22,8 +22,10 @@ export async function GET(request: NextRequest, { params }: Params) {
     return NextResponse.json({ status: "not_found" });
   }
 
+  let item = result.Item;
+
   // Self-heal: If webhooks are missed (e.g. local dev without ngrok) or delayed, check Mux directly
-  if (result.Item.status === "processing") {
+  if (item.status === "processing") {
     try {
       const upload = await mux.video.uploads.retrieve(videoId);
       if (upload.asset_id) {
@@ -33,7 +35,7 @@ export async function GET(request: NextRequest, { params }: Params) {
           const signedPlaybackId = asset.playback_ids?.find((id) => id.policy === "signed")?.id;
 
           if (playbackId) {
-            const isShort = result.Item.contentType === "short";
+            const isShort = item.contentType === "short";
             const thumbnailUrl = getMuxThumbnailUrl(playbackId, isShort);
 
             const updateResult = await docClient.send(
@@ -59,7 +61,7 @@ export async function GET(request: NextRequest, { params }: Params) {
               })
             );
             if (updateResult.Attributes) {
-              result.Item = updateResult.Attributes as any;
+              item = updateResult.Attributes;
             }
           }
         } else if (asset.status === "errored") {
@@ -74,7 +76,7 @@ export async function GET(request: NextRequest, { params }: Params) {
             })
           );
           if (updateResult.Attributes) {
-            result.Item = updateResult.Attributes as any;
+            item = updateResult.Attributes;
           }
         }
       }
@@ -84,19 +86,19 @@ export async function GET(request: NextRequest, { params }: Params) {
   }
 
   return NextResponse.json({
-    status: result.Item.status,
-    downloadStatus: result.Item.downloadStatus || "unavailable",
-    downloadFileName: result.Item.downloadFileName,
+    status: item.status,
+    downloadStatus: item.downloadStatus || "unavailable",
+    downloadFileName: item.downloadFileName,
     // Map of ready qualities: { "1080p": "1080p.mp4", ... }. Powers the
     // Download button's quality picker.
-    downloadRenditions: result.Item.downloadRenditions || {},
+    downloadRenditions: item.downloadRenditions || {},
     // Only meaningful once status is "ready" (set together by the
     // video.asset.ready webhook handler). Lets the upload flow's
     // post-processing thumbnail step build real candidate frame URLs the
     // moment they first become possible, instead of showing a picker that
     // can never have anything in it.
-    muxPlaybackId: result.Item.muxPlaybackId || null,
-    duration: result.Item.duration || 0,
-    thumbnailUrl: result.Item.thumbnailUrl || null,
+    muxPlaybackId: item.muxPlaybackId || null,
+    duration: item.duration || 0,
+    thumbnailUrl: item.thumbnailUrl || null,
   });
 }

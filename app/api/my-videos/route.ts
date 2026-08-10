@@ -18,7 +18,7 @@ export async function GET(request: NextRequest) {
   }
 
   const userId = user.userId;
-  const usernameLower = (user.username || "").toLowerCase();
+  const usernameLower = ((user as Record<string, any>).username || "").toLowerCase();
   const nameLower = (user.name || "").toLowerCase();
 
   const items: Record<string, any>[] = [];

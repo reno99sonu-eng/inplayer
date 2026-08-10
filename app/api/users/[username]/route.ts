@@ -6,6 +6,8 @@ import { areUsersConnected } from "@/app/lib/connections";
 import { normalizeUsername } from "@/app/lib/username";
 import { ensureUsername } from "@/app/lib/ensureUsername";
 
+import { selfHealVideoBatch } from "@/app/lib/selfHealVideo";
+
 export const dynamic = "force-dynamic";
 
 interface Params {
@@ -147,7 +149,8 @@ export async function GET(request: NextRequest, { params }: Params) {
           exclusiveStartKey = page.LastEvaluatedKey;
         } while (exclusiveStartKey);
 
-        return items;
+        const healedItems = await selfHealVideoBatch(items);
+        return healedItems;
       })(),
     ]);
 

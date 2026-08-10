@@ -200,6 +200,10 @@ export async function GET(request: NextRequest, { params }: Params) {
       subscriberCount: subscriberCountResult.Count || 0,
       totalViews,
       videos,
+    }, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+      },
     });
   } catch (err) {
     console.error("Failed to load public profile:", err);

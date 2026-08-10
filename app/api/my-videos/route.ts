@@ -40,5 +40,9 @@ export async function GET(request: NextRequest) {
       new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
   );
 
-  return NextResponse.json({ videos });
+  return NextResponse.json({ videos }, {
+    headers: {
+      "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+    },
+  });
 }

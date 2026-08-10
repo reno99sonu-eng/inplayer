@@ -30,7 +30,11 @@ export async function GET(request: Request) {
       };
     });
 
-    return NextResponse.json({ videos });
+    return NextResponse.json({ videos }, {
+      headers: {
+        "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+      },
+    });
   } catch (err) {
     console.error("Failed to fetch videos for API:", err);
     return NextResponse.json({ videos: [] }, { status: 500 });

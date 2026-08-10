@@ -55,6 +55,8 @@ function sanitizeSoundtrack(input: unknown): {
   };
 }
 
+export const maxDuration = 60;
+
 export async function POST(request: NextRequest) {
   let user;
 

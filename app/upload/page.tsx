@@ -351,7 +351,7 @@ export default function UploadPage() {
       setStage("processing");
     } catch (err) {
       console.error("Upload error:", err);
-      setError("Something went wrong uploading your video. Please try again.");
+      setError(`Something went wrong uploading your video: ${err instanceof Error ? err.message : 'Unknown error'}`);
       setStage("error");
     }
   };

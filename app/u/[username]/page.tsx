@@ -105,8 +105,8 @@ export default function PublicProfilePage() {
   const allVideos = useMemo(() => profile?.videos ?? [], [profile]);
   const normalizedQuery = searchQuery.trim().toLocaleLowerCase();
   const matchingVideos = useMemo(() => allVideos.filter((video) => !normalizedQuery || video.title.toLocaleLowerCase().includes(normalizedQuery)), [allVideos, normalizedQuery]);
-  const regularVideos = useMemo(() => sortVideos(matchingVideos.filter((video) => video.contentType !== "short"), sort), [matchingVideos, sort]);
-  const shortVideos = useMemo(() => sortVideos(matchingVideos.filter((video) => video.contentType === "short"), sort), [matchingVideos, sort]);
+  const regularVideos = useMemo(() => sortVideos(matchingVideos.filter((video) => !(video.contentType === "short" || video.category?.toLowerCase().includes("raftaar") || video.category?.toLowerCase().includes("short"))), sort), [matchingVideos, sort]);
+  const shortVideos = useMemo(() => sortVideos(matchingVideos.filter((video) => (video.contentType === "short" || video.category?.toLowerCase().includes("raftaar") || video.category?.toLowerCase().includes("short"))), sort), [matchingVideos, sort]);
 
   if (loading) return <div className="flex min-h-[60vh] items-center justify-center"><Loader2 size={28} className="animate-spin text-orange-400" /></div>;
   if (notFound || !profile) return <div className="mx-auto max-w-[720px] px-4 py-8 sm:py-12"><BackButton /><div className="flex flex-col items-center justify-center py-16 text-center"><p className="font-semibold text-white light:text-slate-900">No channel at @{params.username}</p><p className="mt-1 text-sm text-slate-400 light:text-slate-600">Double-check the username and try again.</p></div></div>;

@@ -10,6 +10,7 @@ export interface ChannelVideo {
   views: number;
   uploadedAt: string;
   contentType: string;
+  category?: string;
   muxPlaybackId?: string;
 }
 

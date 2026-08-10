@@ -442,8 +442,9 @@ export default function MyVideosPage() {
     );
   }
 
-  const videoItems = videos.filter((v) => v.contentType !== "short");
-  const shortItems = videos.filter((v) => v.contentType === "short");
+  const isVideoShort = (v: any) => v.contentType === "short" || v.category?.toLowerCase().includes("raftaar") || v.category?.toLowerCase().includes("short");
+  const videoItems = videos.filter((v) => !isVideoShort(v));
+  const shortItems = videos.filter((v) => isVideoShort(v));
 
   const totalViews = analytics ? analytics.videos.views + analytics.shorts.views : 0;
   const subscriberCount = analytics?.subscriberCount ?? 0;

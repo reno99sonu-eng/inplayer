@@ -174,6 +174,7 @@ export async function GET(request: NextRequest, { params }: Params) {
         views: v.views || 0,
         uploadedAt: v.uploadedAt,
         contentType: v.contentType || "video",
+        category: v.category,
         muxPlaybackId: v.muxPlaybackId,
       }));
 

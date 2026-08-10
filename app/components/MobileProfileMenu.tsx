@@ -49,7 +49,7 @@ export default function MobileProfileMenu({
         onClick={() => (signedIn ? setOpen((current) => !current) : openSignIn())}
         aria-expanded={open}
         aria-label={signedIn ? "Open account menu" : "Sign in"}
-        className={`flex flex-col items-center gap-1 px-3 py-1 transition-all duration-200 ${
+        className={`flex flex-col items-center gap-1 px-3 pt-1 pb-[calc(0.5rem+env(safe-area-inset-bottom))] transition-all duration-200 ${
           isActive
             ? "text-orange-400 font-black scale-105"
             : "text-slate-300 light:text-slate-600 hover:text-orange-300 light:hover:text-orange-600"

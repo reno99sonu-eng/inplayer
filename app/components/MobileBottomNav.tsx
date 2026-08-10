@@ -42,8 +42,7 @@ export default function MobileBottomNav() {
         light:bg-[#F5EEDC]/95
         backdrop-blur-2xl
         px-2
-        py-2
-        pb-[calc(0.5rem+env(safe-area-inset-bottom))]
+        pt-2
         shadow-[0_-4px_25px_rgba(0,0,0,0.4)]
       "
     >
@@ -56,7 +55,8 @@ export default function MobileBottomNav() {
           items-center
           gap-0.5
           px-3
-          py-1
+          pt-1
+          pb-[calc(0.5rem+env(safe-area-inset-bottom))]
           transition-all
           duration-200
           ${
@@ -81,7 +81,8 @@ export default function MobileBottomNav() {
           items-center
           gap-0.5
           px-3
-          py-1
+          pt-1
+          pb-[calc(0.5rem+env(safe-area-inset-bottom))]
           transition-all
           duration-200
           ${
@@ -98,7 +99,7 @@ export default function MobileBottomNav() {
       </Link>
 
       {/* + Create Button */}
-      <div className="flex flex-col items-center justify-center px-1">
+      <div className="flex flex-col items-center justify-center px-1 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-0.5">
         <MobileCreateButton />
       </div>
 
@@ -111,7 +112,8 @@ export default function MobileBottomNav() {
           items-center
           gap-0.5
           px-3
-          py-1
+          pt-1
+          pb-[calc(0.5rem+env(safe-area-inset-bottom))]
           transition-all
           duration-200
           ${

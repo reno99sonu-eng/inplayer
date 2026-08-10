@@ -151,8 +151,8 @@ export async function GET(request: NextRequest, { params }: Params) {
 
     const publicVideos = videosResult.filter(
       (video) =>
-        video.status === "ready" &&
-        (!video.visibility || video.visibility === "public")
+        (isOwner || video.status === "ready") &&
+        (isOwner || !video.visibility || video.visibility === "public")
     );
     const totalViews = publicVideos.reduce(
       (sum, video) => sum + (Number(video.views) || 0),

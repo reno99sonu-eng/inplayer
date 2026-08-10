@@ -284,7 +284,7 @@ export default function ShopPage() {
       ) : (
         <div className="flex flex-col md:flex-row gap-5">
           {/* Left Taller Slim Vendor Sidebar Navbar */}
-          <div className="w-full md:w-60 flex-shrink-0">
+          <div className="hidden md:block w-60 flex-shrink-0">
             <div className="sticky top-20 h-[calc(100vh-140px)] min-h-[480px] flex flex-col rounded-3xl border border-white/10 light:border-slate-300 bg-white/[0.02] light:bg-white p-3.5 light:shadow-sm">
               <div className="flex items-center justify-between border-b border-white/10 light:border-slate-200 pb-2.5 mb-2.5">
                 <span className="text-xs font-black uppercase tracking-wider text-slate-300 light:text-slate-800 flex items-center gap-1.5">

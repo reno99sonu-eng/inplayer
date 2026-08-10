@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import FloatingAIButton from "./components/FloatingAIButton";
 import FeaturedHero from "./components/featuredHero/FeaturedHero";
 import FeaturedHeroAd from "./components/featuredHero/FeaturedHeroAd";
@@ -202,16 +203,6 @@ export default async function Home({ searchParams }: HomeProps) {
   const activeView = view === "vertical" ? "vertical" : "horizontal";
   const isVertical = activeView === "vertical";
 
-  // The hero only renders in horizontal view, so only fetch its data then —
-  // no point paying for the extra query on the Shorts feed. Both fetches
-  // run in parallel rather than sequentially.
-  const [{ realVideos, realShorts }, heroContent] = await Promise.all([
-    getRealContent(),
-    isVertical
-      ? Promise.resolve<HeroContent>({ kind: "videos", slides: [] })
-      : getHeroContent(),
-  ]);
-
   return (
     <main className="relative min-h-screen overflow-x-hidden bg-[#050816] light:bg-[#F4ECDA]">
       {/* Premium Background */}
@@ -248,6 +239,28 @@ export default async function Home({ searchParams }: HomeProps) {
       </div>
 
       <div className="relative z-10">
+        <Suspense fallback={<div className="h-screen w-full flex items-center justify-center"><div className="animate-spin h-8 w-8 rounded-full border-b-2 border-orange-500"></div></div>}>
+          <HomeContent activeView={activeView} isVertical={isVertical} />
+        </Suspense>
+      </div>
+
+      <FloatingAIButton />
+    </main>
+  );
+}
+
+async function HomeContent({ activeView, isVertical }: { activeView: "horizontal" | "vertical", isVertical: boolean }) {
+  // The hero only renders in horizontal view, so only fetch its data then —
+  // no point paying for the extra query on the Shorts feed. Both fetches
+  // run in parallel rather than sequentially.
+  const [{ realVideos, realShorts }, heroContent] = await Promise.all([
+    getRealContent(),
+    isVertical
+      ? Promise.resolve<HeroContent>({ kind: "videos", slides: [] })
+      : getHeroContent(),
+  ]);
+
+  return (
         <div className="space-y-1 lg:space-y-2">
           {/* The cinematic hero is a horizontal-video showcase, so it only
               makes sense in the Horizontal view. Vertical view is a pure
@@ -275,9 +288,5 @@ export default async function Home({ searchParams }: HomeProps) {
             view={activeView}
           />
         </div>
-      </div>
-
-      <FloatingAIButton />
-    </main>
   );
 }

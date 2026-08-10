@@ -52,7 +52,7 @@ interface RecommendationFeedProps {
 // A single vertical (9:16) Shorts card for the Vertical home view. Mirrors
 // the ShortsShelf card visual but lays out in a multi-row responsive grid
 // instead of a single scrolling row.
-function ShortCard({ short }: { short: Short }) {
+const ShortCard = memo(function ShortCard({ short }: { short: Short }) {
   const cardContent = (
     <div className="relative aspect-[9/16] overflow-hidden rounded-2xl bg-[#111827] light:bg-black/5">
       <Image
@@ -94,7 +94,7 @@ function ShortCard({ short }: { short: Short }) {
   }
 
   return <article className="group">{cardContent}</article>;
-}
+});
 
 // A single homepage video card. Owns its own hover-preview state so each
 // card starts/stops its preview independently of every other card on the

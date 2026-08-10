@@ -6,6 +6,8 @@ import { areUsersConnected } from "@/app/lib/connections";
 import { normalizeUsername } from "@/app/lib/username";
 import { ensureUsername } from "@/app/lib/ensureUsername";
 
+export const dynamic = "force-dynamic";
+
 interface Params {
   params: Promise<{ username: string }>;
 }

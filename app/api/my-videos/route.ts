@@ -17,10 +17,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Please sign in." }, { status: 401 });
   }
 
-  const userId = user.userId;
-  const usernameLower = ((user as Record<string, any>).username || "").toLowerCase();
-  const nameLower = (user.name || "").toLowerCase();
-
   const items: Record<string, any>[] = [];
   let exclusiveStartKey: Record<string, unknown> | undefined;
 
@@ -28,30 +24,12 @@ export async function GET(request: NextRequest) {
     const page = await docClient.send(
       new ScanCommand({
         TableName: "InPlayer-Videos",
+        FilterExpression: "uploaderId = :uid",
+        ExpressionAttributeValues: { ":uid": user.userId },
         ExclusiveStartKey: exclusiveStartKey,
       })
     );
-
-    for (const item of page.Items || []) {
-      const itemUploaderId = String(item.uploaderId || "");
-      const itemUploaderName = String(item.uploaderName || "").toLowerCase();
-      const itemUploaderUsername = String(item.uploaderUsername || "").toLowerCase();
-
-      const matchesId = itemUploaderId === userId;
-      const matchesUsername =
-        Boolean(usernameLower) &&
-        (itemUploaderId.toLowerCase() === usernameLower ||
-          itemUploaderName === usernameLower ||
-          itemUploaderUsername === usernameLower);
-      const matchesName =
-        Boolean(nameLower) &&
-        (itemUploaderName === nameLower || itemUploaderUsername === nameLower);
-
-      if (matchesId || matchesUsername || matchesName) {
-        items.push(item);
-      }
-    }
-
+    items.push(...(page.Items || []));
     exclusiveStartKey = page.LastEvaluatedKey;
   } while (exclusiveStartKey);
 
@@ -62,9 +40,5 @@ export async function GET(request: NextRequest) {
       new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime()
   );
 
-  return NextResponse.json({ videos }, {
-    headers: {
-      "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-    },
-  });
+  return NextResponse.json({ videos });
 }

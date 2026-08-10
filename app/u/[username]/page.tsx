@@ -105,7 +105,7 @@ export default function PublicProfilePage() {
   const allVideos = useMemo(() => profile?.videos ?? [], [profile]);
   const normalizedQuery = searchQuery.trim().toLocaleLowerCase();
   const matchingVideos = useMemo(() => allVideos.filter((video) => !normalizedQuery || video.title.toLocaleLowerCase().includes(normalizedQuery)), [allVideos, normalizedQuery]);
-  const regularVideos = useMemo(() => sortVideos(matchingVideos.filter((video) => video.contentType !== "short"), sort), [matchingVideos, sort]);
+  const regularVideos = useMemo(() => sortVideos(matchingVideos, sort), [matchingVideos, sort]);
   const shortVideos = useMemo(() => sortVideos(matchingVideos.filter((video) => video.contentType === "short"), sort), [matchingVideos, sort]);
 
   if (loading) return <div className="flex min-h-[60vh] items-center justify-center"><Loader2 size={28} className="animate-spin text-orange-400" /></div>;

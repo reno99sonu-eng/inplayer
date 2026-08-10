@@ -88,6 +88,7 @@ export default function MyVideosPage() {
   const [loading, setLoading] = useState(true);
 
   const [activeTab, setActiveTab] = useState<ActivePanel>("dashboard");
+  const [libraryFilter, setLibraryFilter] = useState<"all" | "video" | "short">("all");
 
   // Channel Description / Bio State
   const [channelBio, setChannelBio] = useState("");
@@ -450,7 +451,7 @@ export default function MyVideosPage() {
 
   const sidebarNavItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { id: "videos", label: "Videos Library", icon: Film, count: videoItems.length },
+    { id: "videos", label: "Videos Library", icon: Film, count: videos.length },
     { id: "shorts", label: "Raftaar Library", icon: PlaySquare, count: shortItems.length },
     { id: "edit", label: "Edit Content", icon: Pencil, disabled: false },
     { id: "profile", label: "Profile & Settings", icon: User },
@@ -648,45 +649,89 @@ export default function MyVideosPage() {
           )}
 
           {/* PANEL 2: VIDEOS LIBRARY */}
-          {activeTab === "videos" && (
-            <div className="space-y-5">
-              <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[#071120] px-4 py-3 light:border-black/10 light:bg-white">
-                <div>
-                  <h2 className="text-base font-black text-white light:text-slate-900 sm:text-lg">
-                    Videos Library
-                  </h2>
-                  <p className="text-xs text-slate-400 light:text-slate-600">
-                    {videoItems.length} {videoItems.length === 1 ? "video" : "videos"} uploaded
-                  </p>
-                </div>
-                <Link
-                  href="/upload?type=video"
-                  className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-3.5 py-2 text-xs font-bold text-white shadow transition hover:-translate-y-0.5"
-                >
-                  <Plus size={14} />
-                  Upload Video
-                </Link>
-              </div>
+          {activeTab === "videos" && (() => {
+            const displayedItems =
+              libraryFilter === "video"
+                ? videoItems
+                : libraryFilter === "short"
+                ? shortItems
+                : videos;
 
-              {videoItems.length === 0 ? (
-                <div className="flex flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/[0.02] py-14 text-center light:border-black/10 light:bg-black/[0.02]">
-                  <Film size={36} className="mb-2 text-slate-500" />
-                  <p className="font-bold text-white light:text-slate-900 text-sm">
-                    No videos uploaded yet
-                  </p>
-                  <p className="mt-1 text-xs text-slate-400 light:text-slate-600">
-                    Upload horizontal long-form videos to build your audience.
-                  </p>
-                  <Link
-                    href="/upload?type=video"
-                    className="mt-4 rounded-xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-5 py-2 text-xs font-bold text-white"
-                  >
-                    Upload Video
-                  </Link>
+            return (
+              <div className="space-y-5">
+                <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-[#071120] p-4 light:border-black/10 light:bg-white sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h2 className="text-base font-black text-white light:text-slate-900 sm:text-lg">
+                      Videos Library
+                    </h2>
+                    <p className="text-xs text-slate-400 light:text-slate-600">
+                      {displayedItems.length} {displayedItems.length === 1 ? "item" : "items"} displayed ({videos.length} total uploads)
+                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center rounded-xl bg-black/20 p-1 light:bg-black/5">
+                      <button
+                        onClick={() => setLibraryFilter("all")}
+                        className={`rounded-lg px-3 py-1 text-xs font-bold transition ${
+                          libraryFilter === "all"
+                            ? "bg-gradient-to-r from-[#FF7A18] to-[#FF9A00] text-white shadow"
+                            : "text-slate-400 hover:text-white light:text-slate-600"
+                        }`}
+                      >
+                        All ({videos.length})
+                      </button>
+                      <button
+                        onClick={() => setLibraryFilter("video")}
+                        className={`rounded-lg px-3 py-1 text-xs font-bold transition ${
+                          libraryFilter === "video"
+                            ? "bg-gradient-to-r from-[#FF7A18] to-[#FF9A00] text-white shadow"
+                            : "text-slate-400 hover:text-white light:text-slate-600"
+                        }`}
+                      >
+                        Videos ({videoItems.length})
+                      </button>
+                      <button
+                        onClick={() => setLibraryFilter("short")}
+                        className={`rounded-lg px-3 py-1 text-xs font-bold transition ${
+                          libraryFilter === "short"
+                            ? "bg-gradient-to-r from-[#FF7A18] to-[#FF9A00] text-white shadow"
+                            : "text-slate-400 hover:text-white light:text-slate-600"
+                        }`}
+                      >
+                        Shorts ({shortItems.length})
+                      </button>
+                    </div>
+
+                    <Link
+                      href="/upload?type=video"
+                      className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-3.5 py-2 text-xs font-bold text-white shadow transition hover:-translate-y-0.5"
+                    >
+                      <Plus size={14} />
+                      Upload
+                    </Link>
+                  </div>
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                  {videoItems.map((video) => (
+
+                {displayedItems.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/[0.02] py-14 text-center light:border-black/10 light:bg-black/[0.02]">
+                    <Film size={36} className="mb-2 text-slate-500" />
+                    <p className="font-bold text-white light:text-slate-900 text-sm">
+                      No content found in this filter
+                    </p>
+                    <p className="mt-1 text-xs text-slate-400 light:text-slate-600">
+                      Upload videos or shorts to build your channel.
+                    </p>
+                    <Link
+                      href="/upload"
+                      className="mt-4 rounded-xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-5 py-2 text-xs font-bold text-white"
+                    >
+                      Upload Content
+                    </Link>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                    {displayedItems.map((video) => (
                     <div
                       key={video.videoId}
                       className="group flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#071120] p-3 transition-all hover:border-orange-500/40 light:border-black/10 light:bg-white"
@@ -782,7 +827,8 @@ export default function MyVideosPage() {
                 </div>
               )}
             </div>
-          )}
+          );
+        })()}
 
           {/* PANEL 3: SHORTS LIBRARY */}
           {activeTab === "shorts" && (

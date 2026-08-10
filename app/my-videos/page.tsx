@@ -175,9 +175,9 @@ export default function MyVideosPage() {
           const headers = { Authorization: `Bearer ${idToken}` };
 
           const [videosRes, analyticsRes, payoutRes] = await Promise.all([
-            fetch("/api/my-videos", { headers }),
-            fetch("/api/my-videos/analytics", { headers }),
-            fetch("/api/creator/payout-status", { headers }),
+            fetch("/api/my-videos", { headers, cache: "no-store" }),
+            fetch("/api/my-videos/analytics", { headers, cache: "no-store" }),
+            fetch("/api/creator/payout-status", { headers, cache: "no-store" }),
           ]);
 
           const videosData = await videosRes.json();

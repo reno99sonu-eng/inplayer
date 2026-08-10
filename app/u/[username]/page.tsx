@@ -83,7 +83,10 @@ export default function PublicProfilePage() {
           const idToken = session.tokens?.idToken?.toString();
           if (idToken) headers = { Authorization: `Bearer ${idToken}` };
         }
-        const response = await fetch(`/api/users/${encodeURIComponent(params.username)}`, { headers });
+        const response = await fetch(`/api/users/${encodeURIComponent(params.username)}`, {
+          headers,
+          cache: "no-store",
+        });
         if (cancelled) return;
         if (!response.ok) { setNotFound(true); return; }
         setProfile(await response.json());

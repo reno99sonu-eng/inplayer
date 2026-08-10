@@ -9,6 +9,8 @@ import { ensureUsername } from "@/app/lib/ensureUsername";
 import { selfHealVideoBatch } from "@/app/lib/selfHealVideo";
 
 export const dynamic = "force-dynamic";
+export const revalidate = 0;
+export const fetchCache = "force-no-store";
 
 interface Params {
   params: Promise<{ username: string }>;

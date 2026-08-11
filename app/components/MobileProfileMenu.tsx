@@ -46,7 +46,18 @@ export default function MobileProfileMenu({
     <div ref={rootRef} className="relative flex flex-col items-center">
       <button
         type="button"
-        onClick={() => (signedIn ? setOpen((current) => !current) : openSignIn())}
+        onClick={() => {
+          if (!signedIn) {
+            openSignIn();
+            return;
+          }
+          setOpen((current) => !current);
+          // This menu's items use onClick + router.push rather than
+          // <Link>, so Next never auto-prefetches them — warm all five
+          // destinations the instant the menu opens instead of leaving
+          // each one to cold-fetch on tap.
+          for (const item of items) router.prefetch(item.href);
+        }}
         aria-expanded={open}
         aria-label={signedIn ? "Open account menu" : "Sign in"}
         className={`flex flex-col items-center gap-1 px-3 pt-1 pb-[calc(0.5rem+env(safe-area-inset-bottom))] transition-all duration-200 ${

@@ -96,6 +96,11 @@ interface MidrollAdCreative {
   impressions: number;
   clicks: number;
   skips: number;
+  // Video ad creatives only — "processing" while Mux transcodes, "ready"
+  // once webhooks/mux/route.ts's PROCESSING_COMPLETE handler fires. Static
+  // image creatives never get this field at all (see the isProcessing
+  // check in the preview render below).
+  status?: string;
 }
 
 const DEFAULT_SETTINGS: AdSettings = {
@@ -292,6 +297,7 @@ function AdvertisingPage() {
             impressions: Number(item.impressions || 0),
             clicks: Number(item.clicks || 0),
             skips: Number(item.skips || 0),
+            status: typeof item.status === "string" ? item.status : undefined,
           }));
         setMidrollAds(sanitized);
       }
@@ -1536,6 +1542,13 @@ function AdvertisingPage() {
 
               <div>
                 <label className="block text-[11px] font-semibold text-slate-400 light:text-slate-600 mb-1">Select Media (Image or Video)</label>
+                {/* This used to only exist on the separate "Poster Specs &
+                    Ratios" tab, easy to miss when actually uploading here.
+                    Matches the player's fixed 16:9 ad-break frame
+                    (VideoPlayer.tsx). */}
+                <p className="mb-1.5 text-[11px] text-slate-500">
+                  Recommended for video ads: MP4 or WebM, 16:9 (1920×1080), 30 seconds or less, under 550MB. A video outside these won&apos;t fail to upload, but may be cropped, stretched, or feel too long during the ad break.
+                </p>
                 <input
                   ref={midrollFileInputRef}
                   type="file"
@@ -1600,11 +1613,47 @@ function AdvertisingPage() {
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {safeMidrollAds.map((ad) => {
                 const imgUrl = String(ad?.imageUrl || "");
-                const isVideo = imgUrl.startsWith("data:video/") || imgUrl.endsWith(".mp4");
+                const isMuxVideo = imgUrl.startsWith("mux:");
+                const isVideo =
+                  isMuxVideo ||
+                  imgUrl.startsWith("data:video/") ||
+                  imgUrl.endsWith(".mp4");
+                const isProcessing = ad?.status && ad.status !== "ready";
                 return (
                   <div key={ad.adId} className="rounded-xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-3 space-y-2">
                     <div className="relative h-28 overflow-hidden rounded-lg border border-white/10 light:border-black/10 bg-black/40 flex items-center justify-center">
-                      {isVideo ? (
+                      {isProcessing ? (
+                        // Uploaded but Mux hasn't finished transcoding it
+                        // yet — imageUrl is still empty at this point, so
+                        // showing a broken <img>/<video> here (as this list
+                        // used to for every "mux:"-prefixed ad, ready or
+                        // not — see the isMuxVideo fix just above) reads as
+                        // "this is broken" when it's really just still
+                        // processing. Large 550MB uploads can take a few
+                        // minutes.
+                        <span className="text-[11px] font-semibold text-slate-400">Processing on Mux…</span>
+                      ) : isMuxVideo ? (
+                        // A plain <video src=".m3u8"> only plays in Safari
+                        // (HLS needs a JS player almost everywhere else —
+                        // the real in-stream ad break uses MuxPlayer for
+                        // exactly this reason, see VideoPlayer.tsx). This
+                        // list is just a "is this the right upload" check,
+                        // so a real Mux-hosted thumbnail plus a badge is
+                        // simpler and guaranteed to render in any browser,
+                        // rather than risking a second broken-looking
+                        // preview here.
+                        <div className="relative h-full w-full">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img
+                            src={`https://image.mux.com/${imgUrl.slice("mux:".length)}/thumbnail.jpg`}
+                            alt={ad.title || "Midroll video ad"}
+                            className="h-full w-full object-cover"
+                          />
+                          <span className="absolute bottom-1.5 right-1.5 rounded-full bg-black/70 px-2 py-0.5 text-[10px] font-bold text-white">
+                            ▶ Video
+                          </span>
+                        </div>
+                      ) : isVideo ? (
                         <video src={imgUrl} controls className="h-full w-auto" />
                       ) : (
                         /* eslint-disable-next-line @next/next/no-img-element */

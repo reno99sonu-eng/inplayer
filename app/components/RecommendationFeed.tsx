@@ -165,15 +165,30 @@ export const HomeVideoCard = memo(function HomeVideoCard({ video }: { video: Rec
     if (canHover || !video.muxPlaybackId || !cardRef.current || playback.dataSaver) return;
 
     const el = cardRef.current;
+    // Debounced the same way the hover path above already is
+    // (HOVER_PREVIEW_DELAY) — without this, a fast scroll flings a card
+    // through the 60%-visible threshold and back out again in a single
+    // frame, and each crossing was immediately mounting/unmounting a real
+    // Mux player, thrashing playback instead of only ever activating the
+    // card a viewer actually paused on.
+    let debounceTimer: ReturnType<typeof setTimeout> | null = null;
     const observer = new IntersectionObserver(
       ([entry]) => {
-        if (entry.isIntersecting) requestActivePreview(cardId);
-        else releaseActivePreview(cardId);
+        if (debounceTimer) {
+          clearTimeout(debounceTimer);
+          debounceTimer = null;
+        }
+        if (entry.isIntersecting) {
+          debounceTimer = setTimeout(() => requestActivePreview(cardId), HOVER_PREVIEW_DELAY);
+        } else {
+          releaseActivePreview(cardId);
+        }
       },
       { threshold: 0.6 }
     );
     observer.observe(el);
     return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
       observer.disconnect();
       releaseActivePreview(cardId);
     };
@@ -240,6 +255,11 @@ export const HomeVideoCard = memo(function HomeVideoCard({ video }: { video: Rec
               // (VideoPlayer.tsx), Shorts feed, and live stream player all
               // do respect the real setting.
               defaultHiddenCaptions={true}
+              // This only mounts once a viewer is already hovering/holding
+              // on the card, so it should start buffering the real video
+              // immediately instead of waiting on Mux Player's default
+              // "metadata"-only preload.
+              preload="auto"
               style={{ width: "100%", height: "100%" }}
             />
           </div>

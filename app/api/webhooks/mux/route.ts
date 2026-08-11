@@ -6,6 +6,7 @@ import mux from "@/app/lib/mux";
 import { docClient } from "@/app/lib/dynamodb";
 import { getMuxThumbnailUrl } from "@/app/lib/muxThumbnail";
 import { READY_VIDEOS_TAG } from "@/app/lib/videoStore";
+import { MIDROLL_ADS_TAG } from "@/app/lib/videoAds";
 import {
   CAPTION_TARGETS,
   resolveSourceLang,
@@ -173,6 +174,11 @@ export async function POST(request: NextRequest) {
             },
           })
         );
+        // Without this, a freshly-ready ad still couldn't be served for up
+        // to 30s (getAllMidrollAds's cache TTL, app/lib/videoAds.ts) —
+        // same immediate-invalidation pattern already used for
+        // READY_VIDEOS_TAG just above in this same file.
+        revalidateTag(MIDROLL_ADS_TAG, "max");
         // Mid-roll ads don't use captions or email broadcasts
         return NextResponse.json({ received: true });
       } else {

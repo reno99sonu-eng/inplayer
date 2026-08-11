@@ -142,7 +142,13 @@ export async function GET(request: NextRequest, { params }: Params) {
           const page = await docClient.send(
             new ScanCommand({
               TableName: "InPlayer-Videos",
-              FilterExpression: "uploaderId = :uid",
+              // Fall back to userId when uploaderId doesn't match — some
+              // rows predate the uploaderId rename and only have userId set
+              // (same defensive OR pattern already used in
+              // app/api/admin/creators/route.ts's v.uploaderId || v.userId
+              // fallback), so those videos weren't showing up on the
+              // owning user's own public channel page.
+              FilterExpression: "uploaderId = :uid OR userId = :uid",
               ExpressionAttributeValues: { ":uid": targetUserId },
               ExclusiveStartKey: exclusiveStartKey,
             })

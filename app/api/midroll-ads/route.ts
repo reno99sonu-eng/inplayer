@@ -32,7 +32,20 @@ export async function GET() {
   // on a busy video that was one uncached Scan per viewer per view.
   try {
     const allAds = await getAllMidrollAds();
-    const items = allAds.filter((item) => item.active === true);
+    // Video ad creatives go through Mux processing and carry a `status`
+    // ("processing" -> "ready", set by app/api/webhooks/mux/route.ts) —
+    // without this check, a just-uploaded video ad that's still
+    // transcoding (or one whose Mux transcode failed outright) could get
+    // picked and served, silently rendering nothing (VideoPlayer.tsx has
+    // no fallback for an empty/unready imageUrl). Static image ad
+    // creatives never get a `status` field at all, so their absence of
+    // one is treated as "ready" — this only excludes items that HAVE a
+    // status and it isn't "ready" yet.
+    const items = allAds.filter(
+      (item) =>
+        item.active === true &&
+        (item.status === undefined || item.status === "ready")
+    );
 
     if (items.length === 0) {
       return NextResponse.json({ enabled: false });

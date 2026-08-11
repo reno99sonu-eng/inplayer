@@ -881,6 +881,12 @@ export default function ShortsPageContent({
                         // captions menu still lets a viewer turn a
                         // language on manually either way.
                         defaultHiddenCaptions={!playback.captions}
+                        // Full download instead of Mux Player's default
+                        // "metadata" preload — this is the active Raftaar
+                        // slide, so it should already be buffering by the
+                        // time a viewer swipes to it rather than starting a
+                        // cold fetch on arrival.
+                        preload="auto"
                         style={{ height: "100%", width: "100%" }}
                       />
                     </div>
@@ -994,13 +1000,18 @@ export default function ShortsPageContent({
                         </span>
                       </>
                     )}
+                  </div>
+
+                  <div className="mt-1 flex items-center gap-2">
+                    <p className="text-[11px] text-slate-300">
+                      {short.views}
+                    </p>
 
                     {!isOwnChannel && short.uploaderId && (
                       <button
                         onClick={() => handleToggleSubscribe(short)}
                         className={`
                           pointer-events-auto
-                          ml-1
                           rounded-full
                           px-3
                           py-1
@@ -1019,10 +1030,6 @@ export default function ShortsPageContent({
                       </button>
                     )}
                   </div>
-
-                  <p className="mt-1 text-[11px] text-slate-300">
-                    {short.views}
-                  </p>
                 </div>
 
                 {/* Icon rail — neutral chrome, red heart when liked */}

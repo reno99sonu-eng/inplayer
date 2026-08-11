@@ -92,7 +92,17 @@ export default function MobileCreateButton() {
       <button
         ref={buttonRef}
         type="button"
-        onClick={() => setOpen((prev) => !prev)}
+        onClick={() => {
+          setOpen((prev) => !prev);
+          // Prefetch both real destinations the instant the menu opens
+          // (this "+" button uses onClick handlers + router.push rather
+          // than <Link>, so Next never auto-prefetches them otherwise) —
+          // by the time someone actually taps "Upload Video" or "Go Live"
+          // a beat later, the route's JS/data is already warm instead of
+          // starting a cold fetch on that tap.
+          router.prefetch("/upload");
+          router.prefetch("/live");
+        }}
         aria-label="Create"
         className="
           flex

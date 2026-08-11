@@ -306,7 +306,7 @@ export const HomeVideoCard = memo(function HomeVideoCard({ video }: { video: Rec
   );
 
   const information = (
-    <div className="mt-4 flex items-start gap-3">
+    <div className="mt-3 flex items-start gap-3">
       {video.uploaderUsername ? (
         <Link
           href={`/u/${encodeURIComponent(video.uploaderUsername)}`}
@@ -345,21 +345,22 @@ export const HomeVideoCard = memo(function HomeVideoCard({ video }: { video: Rec
             )}
           </h3>
 
-          <div className="mt-2 flex items-center gap-1 text-sm text-slate-400 light:text-slate-600">
-            <span className="truncate">
+          <div className="mt-1.5 flex min-w-0 items-center gap-1 text-xs text-slate-400 light:text-slate-600">
+            <span className="min-w-0 truncate">
               {video.creator}
             </span>
 
             {video.verified && (
-              <span className="ml-1 text-xs font-bold text-slate-300 light:text-slate-600">
+              <span className="flex-shrink-0 text-[10px] font-bold text-slate-300 light:text-slate-600">
                 ✓
               </span>
             )}
-          </div>
 
-          <p className="mt-1 text-sm text-slate-500">
-            {video.views} • {video.uploaded}
-          </p>
+            <span className="flex-shrink-0 text-slate-500">•</span>
+            <span className="flex-shrink-0 text-slate-500">{video.views}</span>
+            <span className="flex-shrink-0 text-slate-500">•</span>
+            <span className="flex-shrink-0 truncate text-slate-500">{video.uploaded}</span>
+          </div>
 
       </div>
 
@@ -553,8 +554,8 @@ export default function RecommendationFeed({
   // 2 columns on the smallest phones up to 6 on wide desktops/TVs).
   if (view === "vertical") {
     return (
-      <section className="mx-auto max-w-[1800px] px-4 py-2 lg:py-3 lg:px-8">
-        <div className="mb-1.5 flex items-center gap-2 lg:mb-2 lg:gap-2.5">
+      <section className="mx-auto max-w-[1800px] px-4 py-1.5 lg:py-2 lg:px-8">
+        <div className="mb-1 flex items-center gap-2 lg:mb-1.5 lg:gap-2.5">
           <span className="text-lg lg:text-xl">🔥</span>
           <h2 className="text-base lg:text-lg font-black text-white light:text-slate-900">
             Vertical
@@ -617,8 +618,8 @@ export default function RecommendationFeed({
 
         return (
           <div key={`feed-block-${index}`}>
-            <section className="mx-auto max-w-[1800px] px-4 py-1.5 lg:py-2 lg:px-8">
-              <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <section className="mx-auto max-w-[1800px] px-4 py-1 lg:py-1.5 lg:px-8">
+              <div className="grid grid-cols-1 gap-x-4 gap-y-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {entries.map(renderEntry)}
               </div>
             </section>

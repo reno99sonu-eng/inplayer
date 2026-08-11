@@ -4,5 +4,6 @@
       "path": "/api/creator/payout-run",
       "schedule": "0 6 1-5 * *"
     }
-  ]
+  ],
+  "regions": ["bom1"]
 }

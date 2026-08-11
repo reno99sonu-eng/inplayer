@@ -406,8 +406,8 @@ function AdvertisingPage() {
         if (file.type !== "video/mp4" && file.type !== "video/webm") {
           throw new Error("Mid-roll videos must be MP4 or WebM.");
         }
-        if (file.size > 250_000_000) {
-          throw new Error("Mid-roll videos must be 250 MB or smaller.");
+        if (file.size > 550_000_000) {
+          throw new Error("Mid-roll videos must be 550 MB or smaller.");
         }
         setMidrollFileType("video");
         setMidrollFile(file);

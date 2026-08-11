@@ -450,16 +450,29 @@ function AdvertisingPage() {
           const video = document.createElement("video");
           video.crossOrigin = "anonymous";
           video.src = preview;
-          video.currentTime = 1;
-          video.onseeked = () => {
-            const canvas = document.createElement("canvas");
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            const ctx = canvas.getContext("2d");
-            ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
-            resolve(canvas.toDataURL("image/jpeg", 0.7));
+          video.muted = true;
+          video.playsInline = true;
+
+          video.onloadeddata = () => {
+            // Seek to 1s once data is loaded
+            video.currentTime = 1;
           };
+
+          video.onseeked = () => {
+            try {
+              const canvas = document.createElement("canvas");
+              canvas.width = video.videoWidth || 640;
+              canvas.height = video.videoHeight || 360;
+              canvas.getContext("2d")?.drawImage(video, 0, 0, canvas.width, canvas.height);
+              resolve(canvas.toDataURL("image/jpeg", 0.7));
+            } catch (e) {
+              reject(e);
+            }
+          };
+
           video.onerror = () => reject(new Error("Failed to load video frame"));
+          
+          video.load();
         });
       } catch (err) {
         setMidrollUploadError("Could not extract a frame from the video to send to the AI.");
@@ -762,7 +775,17 @@ function AdvertisingPage() {
     Boolean(midrollPreview) && midrollTitle.trim().length > 0 && /^https?:\/\//.test(midrollLink.trim());
 
   const submitMidrollAd = async () => {
-    if (!canUploadMidroll || midrollUploading) return;
+    if (midrollUploading) return;
+    if (!Boolean(midrollPreview)) {
+      return alert("Please select an ad media file first.");
+    }
+    if (midrollTitle.trim().length === 0) {
+      return alert("Please enter a title for the ad.");
+    }
+    if (!/^https?:\/\//.test(midrollLink.trim())) {
+      return alert("Please enter a valid link URL starting with http:// or https://");
+    }
+
     setMidrollUploading(true);
     setMidrollUploadError(null);
     try {
@@ -1566,7 +1589,7 @@ function AdvertisingPage() {
               <button
                 type="button"
                 onClick={submitMidrollAd}
-                disabled={!canUploadMidroll || midrollUploading}
+                disabled={midrollUploading}
                 className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-50 cursor-pointer"
               >
                 {midrollUploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />} Save Mid-Roll Ad

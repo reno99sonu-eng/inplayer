@@ -1,4 +1,9 @@
+import { BatchGetCommand } from "@aws-sdk/lib-dynamodb";
 import { ensureUsername } from "@/app/lib/ensureUsername";
+import { docClient } from "@/app/lib/dynamodb";
+import { isReservedUsername, isValidUsernameFormat, normalizeUsername } from "@/app/lib/username";
+
+const USERS_TABLE = "InPlayer-Users";
 
 // Shared userId -> username resolver, used by every read path that needs
 // to turn an uploaderId/userId into a real profile link (/u/[username]):
@@ -25,8 +30,47 @@ export async function resolveUsernames(
   const map = new Map<string, string>();
   if (distinctIds.length === 0) return map;
 
+  // Keep ensureUsername only as a legacy repair fallback for rows that
+  // genuinely do not have a usable username yet. Healthy profile reads no
+  // longer perform any write or one-request-per-creator lookup.
+  const unresolved = new Set(distinctIds);
+  for (let index = 0; index < distinctIds.length; index += 100) {
+    const keys = distinctIds.slice(index, index + 100).map((userId) => ({ userId }));
+    try {
+      let pendingKeys = keys;
+      do {
+        const result = await docClient.send(
+          new BatchGetCommand({
+            RequestItems: {
+              [USERS_TABLE]: {
+                Keys: pendingKeys,
+                ProjectionExpression: "userId, username",
+              },
+            },
+          })
+        );
+        for (const item of result.Responses?.[USERS_TABLE] || []) {
+          const userId = item.userId;
+          const username = item.username;
+          if (
+            typeof userId === "string" &&
+            typeof username === "string" &&
+            isValidUsernameFormat(username) &&
+            !isReservedUsername(normalizeUsername(username))
+          ) {
+            map.set(userId, username.trim());
+            unresolved.delete(userId);
+          }
+        }
+        pendingKeys = (result.UnprocessedKeys?.[USERS_TABLE]?.Keys || []) as { userId: string }[];
+      } while (pendingKeys.length > 0);
+    } catch (err) {
+      console.error("Failed to batch-resolve uploader usernames:", err);
+    }
+  }
+
   await Promise.all(
-    distinctIds.map(async (userId) => {
+    [...unresolved].map(async (userId) => {
       try {
         // Always pass through ensureUsername, rather than only when the
         // profile field is absent. Older rows may have a username but no

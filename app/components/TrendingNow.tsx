@@ -79,7 +79,7 @@ export default function TrendingNow() {
   const loopGroups = [firstHalf, secondHalf];
 
   return (
-    <section className="mx-auto max-w-[1800px] px-3 py-1.5 lg:px-6 lg:py-2 overflow-hidden">
+    <section className="mx-auto max-w-[1800px] px-3 py-1 lg:px-6 lg:py-1.5 overflow-hidden">
       <style dangerouslySetInnerHTML={{ __html: `
         @keyframes trendingMarquee {
           0% { transform: translateX(0); }

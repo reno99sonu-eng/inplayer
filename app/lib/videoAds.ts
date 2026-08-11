@@ -38,6 +38,9 @@ export const getAllMidrollAds = unstable_cache(scanAllMidrollAds, [MIDROLL_ADS_T
 
 // Same budget as AD_IMAGE_DATA_URL_MAX_LENGTH in adCreatives.ts.
 export const MIDROLL_IMAGE_DATA_URL_MAX_LENGTH = 150_000;
+// DynamoDB's 400KB item limit leaves room for the rest of the creative row
+// when an uploaded video is base64 encoded as a data URL.
+export const MIDROLL_VIDEO_DATA_URL_MAX_LENGTH = 350_000;
 
 export interface MidrollAdCreative {
   adId: string;

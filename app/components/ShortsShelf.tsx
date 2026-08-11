@@ -11,7 +11,7 @@ interface ShortsShelfProps {
 
 export default function ShortsShelf({ items, renderFooter }: ShortsShelfProps) {
   return (
-    <section className="mx-auto max-w-[1800px] px-3 py-3 lg:px-8">
+    <section className="mx-auto max-w-[1800px] px-3 py-2 lg:px-8">
       <div className="mb-3 flex items-center gap-2">
         <span className="text-xl sm:text-2xl">🔥</span>
         <h2 className="text-xl font-black text-white sm:text-2xl light:text-slate-900">

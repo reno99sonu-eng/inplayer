@@ -1,7 +1,9 @@
 import { GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
+import { revalidateTag, unstable_cache } from "next/cache";
 import { docClient } from "@/app/lib/dynamodb";
 
 export const PLATFORM_SETTINGS_TABLE = "InPlayer-Platform-Settings";
+export const PLATFORM_SETTINGS_TAG = "platform-settings";
 
 export type AdSlotSource = "house" | "adsense" | "off";
 
@@ -67,7 +69,7 @@ export type PublicPlatformSettings = Pick<
   | "midrollIntervalSeconds"
 >;
 
-export async function getPlatformSettings(): Promise<PlatformSettings> {
+async function readPlatformSettings(): Promise<PlatformSettings> {
   try {
     const result = await docClient.send(
       new GetCommand({ TableName: PLATFORM_SETTINGS_TABLE, Key: { settingsId: "global" } })
@@ -80,11 +82,26 @@ export async function getPlatformSettings(): Promise<PlatformSettings> {
   }
 }
 
+// Global settings are read by the root layout and several hot API paths.
+// Cache the one-row lookup briefly, then invalidate it immediately whenever
+// an admin changes settings so control-plane updates remain visible at once.
+const getCachedPlatformSettings = unstable_cache(
+  readPlatformSettings,
+  [PLATFORM_SETTINGS_TAG],
+  { revalidate: 30, tags: [PLATFORM_SETTINGS_TAG] }
+);
+
+export async function getPlatformSettings(): Promise<PlatformSettings> {
+  return getCachedPlatformSettings();
+}
+
 export async function updatePlatformSettings(
   partial: Partial<PlatformSettings>,
   updatedBy: string
 ): Promise<PlatformSettings> {
-  const current = await getPlatformSettings();
+  // Read the source of truth here instead of the cached public value: two
+  // admins saving close together must not overwrite each other's settings.
+  const current = await readPlatformSettings();
   const updated: PlatformSettings = {
     ...current,
     ...partial,
@@ -98,6 +115,8 @@ export async function updatePlatformSettings(
       Item: { settingsId: "global", ...updated },
     })
   );
+
+  revalidateTag(PLATFORM_SETTINGS_TAG, "max");
 
   return updated;
 }

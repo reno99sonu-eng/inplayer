@@ -959,11 +959,24 @@ export default function VideoPlayer({
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- an
                 admin-uploaded data URL, not a static app asset. */}
-            <img
-              src={midrollAd.imageUrl}
-              alt={midrollAd.title}
-              className="max-h-full max-w-full object-contain"
-            />
+            {midrollAd.imageUrl.startsWith("data:video/") ? (
+              <video
+                src={midrollAd.imageUrl}
+                aria-label={midrollAd.title}
+                autoPlay
+                loop
+                muted
+                playsInline
+                preload="metadata"
+                className="max-h-full max-w-full object-contain"
+              />
+            ) : (
+              <img
+                src={midrollAd.imageUrl}
+                alt={midrollAd.title}
+                className="max-h-full max-w-full object-contain"
+              />
+            )}
           </a>
           <p className="max-w-xs text-xs text-slate-400">{midrollAd.title}</p>
           <button

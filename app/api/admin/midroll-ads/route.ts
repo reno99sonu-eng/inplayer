@@ -9,6 +9,7 @@ import {
   MIDROLL_ADS_TABLE,
   MIDROLL_ADS_TAG,
   MIDROLL_IMAGE_DATA_URL_MAX_LENGTH,
+  MIDROLL_VIDEO_DATA_URL_MAX_LENGTH,
 } from "@/app/lib/videoAds";
 
 export async function GET(request: NextRequest) {
@@ -55,13 +56,17 @@ export async function POST(request: NextRequest) {
 
   const { imageUrl, linkUrl, title } = body;
 
-  if (
-    typeof imageUrl !== "string" ||
-    !imageUrl.startsWith("data:image/") ||
-    imageUrl.length > MIDROLL_IMAGE_DATA_URL_MAX_LENGTH
-  ) {
+  const isImage = typeof imageUrl === "string" && imageUrl.startsWith("data:image/");
+  const isVideo =
+    typeof imageUrl === "string" &&
+    /^data:video\/(mp4|webm);base64,/i.test(imageUrl);
+  const isValidMedia =
+    (isImage && imageUrl.length <= MIDROLL_IMAGE_DATA_URL_MAX_LENGTH) ||
+    (isVideo && imageUrl.length <= MIDROLL_VIDEO_DATA_URL_MAX_LENGTH);
+
+  if (!isValidMedia) {
     return NextResponse.json(
-      { error: "That creative image is too large or invalid. Please try a different image." },
+      { error: "Upload an image up to 150 KB or an MP4/WebM video up to 250 KB." },
       { status: 400 }
     );
   }

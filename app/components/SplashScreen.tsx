@@ -142,8 +142,8 @@ export default function SplashScreen() {
     // durations in globals.css, per Reno's "a little slower, not too slow"
     // feedback — so the hold still starts right after the tagline
     // animation actually finishes instead of cutting it off early.
-    const holdMs = reducedMotion ? 350 : 1600;
-    const fadeOutMs = reducedMotion ? 180 : 380;
+    const holdMs = reducedMotion ? 180 : 600;
+    const fadeOutMs = reducedMotion ? 120 : 180;
 
     const leaveTimer = window.setTimeout(() => setLeaving(true), holdMs);
     const removeTimer = window.setTimeout(() => {

@@ -459,10 +459,6 @@ export default function RecommendationFeed({
   // once resolved) so by the time a real preview fires, the chunk is
   // already loaded.
   useEffect(() => {
-    import("@mux/mux-player-react");
-  }, []);
-
-  useEffect(() => {
     (() => {
       const shuffledRecs = [...recommendations];
       for (let i = shuffledRecs.length - 1; i > 0; i--) {
@@ -621,8 +617,8 @@ export default function RecommendationFeed({
 
         return (
           <div key={`feed-block-${index}`}>
-            <section className="mx-auto max-w-[1800px] px-4 py-5 lg:py-8 lg:px-8">
-              <div className="grid grid-cols-1 gap-x-6 gap-y-10 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <section className="mx-auto max-w-[1800px] px-4 py-2.5 lg:py-4 lg:px-8">
+              <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {entries.map(renderEntry)}
               </div>
             </section>

@@ -401,20 +401,20 @@ function AdvertisingPage() {
     setMidrollUploadError(null);
     try {
       if (file.type.startsWith("video/")) {
-        if (file.size <= 250_000) {
-          setMidrollFileType("video");
-          const reader = new FileReader();
-          reader.onload = (event) => {
-            if (typeof event.target?.result === "string") {
-              setMidrollPreview(event.target.result);
-            }
-          };
-          reader.readAsDataURL(file);
-        } else {
-          setMidrollFileType("image");
-          const poster = await extractVideoFramePoster(file);
-          setMidrollPreview(poster);
+        if (file.type !== "video/mp4" && file.type !== "video/webm") {
+          throw new Error("Mid-roll videos must be MP4 or WebM.");
         }
+        if (file.size > 250_000) {
+          throw new Error("Mid-roll videos must be 250 KB or smaller. Use an image for a larger creative.");
+        }
+        setMidrollFileType("video");
+        const reader = new FileReader();
+        reader.onload = (event) => {
+          if (typeof event.target?.result === "string") {
+            setMidrollPreview(event.target.result);
+          }
+        };
+        reader.readAsDataURL(file);
       } else {
         setMidrollFileType("image");
         const compressed = await compressImageToBanner(file);
@@ -1453,7 +1453,7 @@ function AdvertisingPage() {
                 <input
                   ref={midrollFileInputRef}
                   type="file"
-                  accept="image/*,video/*"
+                  accept="image/*,video/mp4,video/webm"
                   onChange={handleMidrollFileChange}
                   className="block w-full text-[11px] text-slate-400 light:text-slate-700 file:mr-2.5 file:rounded-xl file:border file:border-indigo-500/30 file:bg-indigo-600 file:px-3 file:py-1.5 file:text-[11px] file:font-bold file:text-white hover:file:bg-indigo-500 cursor-pointer shadow-sm"
                 />

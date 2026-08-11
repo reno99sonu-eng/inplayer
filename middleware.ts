@@ -22,6 +22,17 @@ import { NextRequest, NextResponse } from "next/server";
 // - /admin/* (admin must always be reachable, same as MaintenanceGate)
 // - /_next/* (Next.js internals, static chunks, HMR websocket)
 // - /api/geo/* (geo-verification API must be accessible to blocked users)
+// - /api/webhooks/* (Mux and Razorpay call these directly, server-to-server
+//   — there is no "visitor" to geo-check here. Mux's and Razorpay's own
+//   servers are not in India, so without this exemption their callbacks
+//   were getting silently rewritten to /geo-blocked instead of reaching
+//   the real handler: uploads got stuck in "processing" forever (the Mux
+//   webhook that flips status to "ready" never ran) and — far more
+//   seriously — the Razorpay webhook is the ONLY place a payment actually
+//   gets credited (see app/api/webhooks/razorpay/route.ts's own comment),
+//   so this same gap could silently fail to activate memberships/payouts
+//   too. Exactly the same class of bug /api/admin already hit once (see
+//   the "Fix admin panel sign-in" commit) — generalizing the fix here.
 // - Static files (favicon, images, etc.)
 const BYPASS_PREFIXES = [
   "/geo-blocked",
@@ -29,6 +40,7 @@ const BYPASS_PREFIXES = [
   "/api/admin",
   "/_next",
   "/api/geo",
+  "/api/webhooks",
 ] as const;
 
 const BYPASS_EXACT = new Set([

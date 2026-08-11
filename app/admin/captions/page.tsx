@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { fetchAuthSession } from "aws-amplify/auth";
-import { Loader2, Wand2, CheckCircle2, AlertTriangle, ImageIcon } from "lucide-react";
+import { Loader2, Wand2, CheckCircle2, AlertTriangle, ImageIcon, RefreshCw } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 
 // One-time maintenance screen (admin only — the API behind it checks the
@@ -41,6 +41,68 @@ export default function AdminCaptionsPage() {
     errors: string[];
   } | null>(null);
   const [thumbsFailed, setThumbsFailed] = useState<string | null>(null);
+
+  // Third, independent maintenance job — rescues uploads stuck at
+  // status:"processing" from before middleware.ts exempted /api/webhooks
+  // from the India-only geo-check. Mux and Razorpay's own servers aren't in
+  // India, so the Mux webhook that flips a video to "ready" was silently
+  // getting rewritten to /geo-blocked for some deliveries instead of
+  // reaching app/api/webhooks/mux — leaving those uploads invisible on the
+  // homepage, /videos, /shorts, and channel pages (all of which require
+  // status:"ready") even though the file itself finished processing on
+  // Mux's side. New uploads are unaffected now that the middleware gap is
+  // closed; this repairs whatever got stuck before that fix shipped.
+  const [healRunning, setHealRunning] = useState(false);
+  const [healResult, setHealResult] = useState<{
+    totalStuck: number;
+    healedToReady: number;
+    healedToError: number;
+    stillProcessing: number;
+    errors: string[];
+  } | null>(null);
+  const [healFailed, setHealFailed] = useState<string | null>(null);
+
+  const runSelfHeal = async () => {
+    setHealRunning(true);
+    setHealFailed(null);
+    setHealResult(null);
+
+    try {
+      const session = await fetchAuthSession();
+      const idToken = session.tokens?.idToken?.toString();
+      if (!idToken) {
+        setHealFailed("Your session expired — please sign in again.");
+        return;
+      }
+
+      const res = await fetch("/api/admin/self-heal-videos", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+
+      if (res.status === 401) {
+        setHealFailed("This account isn't authorized to run this repair.");
+        return;
+      }
+      if (!res.ok) {
+        setHealFailed(`The repair call failed (HTTP ${res.status}).`);
+        return;
+      }
+
+      const data = await res.json();
+      setHealResult({
+        totalStuck: data?.totalStuck || 0,
+        healedToReady: data?.healedToReady || 0,
+        healedToError: data?.healedToError || 0,
+        stillProcessing: data?.stillProcessing || 0,
+        errors: Array.isArray(data?.errors) ? data.errors : [],
+      });
+    } catch (err) {
+      setHealFailed(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setHealRunning(false);
+    }
+  };
 
   const runThumbnailFix = async () => {
     setThumbsRunning(true);
@@ -315,6 +377,89 @@ export default function AdminCaptionsPage() {
           <div className="mt-4 flex items-start gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300 light:text-red-700">
             <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
             <span>{thumbsFailed}</span>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-10 border-t border-white/10 light:border-black/10 pt-8">
+        <h1 className="text-2xl sm:text-3xl font-black text-white light:text-slate-900">
+          Fix stuck uploads
+        </h1>
+        <p className="mt-2 text-sm leading-relaxed text-slate-400 light:text-slate-600">
+          Some uploads got stuck showing &quot;processing&quot; forever and
+          never appeared on the homepage, Videos, Shorts, or channel pages —
+          a gap in the India-only access check was silently blocking
+          Mux&apos;s (and Razorpay&apos;s) callbacks to InPlayer, which is
+          now fixed for new uploads. This checks every video still stuck on
+          &quot;processing&quot; directly against Mux and marks it ready if
+          the file actually finished. Safe to run more than once.
+        </p>
+
+        <button
+          onClick={runSelfHeal}
+          disabled={healRunning}
+          className="mt-7 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#10B981] via-[#14B8A6] to-[#0EA5E9] py-3.5 font-bold text-white shadow-[0_15px_35px_rgba(16,185,129,.3)] transition-all hover:-translate-y-0.5 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {healRunning ? (
+            <>
+              <Loader2 size={18} className="animate-spin" />
+              Checking stuck uploads…
+            </>
+          ) : (
+            <>
+              <RefreshCw size={18} />
+              Fix stuck uploads
+            </>
+          )}
+        </button>
+
+        {healResult && (
+          <div className="mt-4 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-white light:text-slate-900">
+              {!healRunning && !healFailed && (
+                <CheckCircle2 size={16} className="text-emerald-400" />
+              )}
+              <span>
+                {healResult.totalStuck === 0
+                  ? "Nothing was stuck — every upload is already up to date."
+                  : `${healResult.healedToReady} of ${healResult.totalStuck} stuck upload(s) fixed and now live`}
+              </span>
+            </div>
+            {healResult.healedToError > 0 && (
+              <p className="mt-2 text-xs text-slate-400 light:text-slate-600">
+                {healResult.healedToError} upload(s) genuinely failed on
+                Mux&apos;s side (not the geo-check gap) and were marked as
+                errored — those will need to be re-uploaded.
+              </p>
+            )}
+            {healResult.stillProcessing > 0 && (
+              <p className="mt-2 text-xs text-slate-400 light:text-slate-600">
+                {healResult.stillProcessing} upload(s) are still genuinely
+                processing on Mux&apos;s side — check again in a few
+                minutes.
+              </p>
+            )}
+            {healResult.errors.length > 0 && (
+              <details className="mt-3">
+                <summary className="cursor-pointer text-xs font-semibold text-amber-400">
+                  {healResult.errors.length} item(s) reported an issue
+                </summary>
+                <ul className="mt-2 space-y-1 text-xs text-slate-400 light:text-slate-600">
+                  {healResult.errors.slice(0, 40).map((e, i) => (
+                    <li key={i} className="break-words">
+                      {e}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
+        )}
+
+        {healFailed && (
+          <div className="mt-4 flex items-start gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300 light:text-red-700">
+            <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
+            <span>{healFailed}</span>
           </div>
         )}
       </div>

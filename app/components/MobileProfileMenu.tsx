@@ -35,7 +35,7 @@ export default function MobileProfileMenu({
   // Downloads is intentionally not linked here — it's an app-only feature
   // (see app/downloads/page.tsx), not offered on the website.
   const items = [
-    { label: "Your Channel", icon: User, href: user?.handle ? `/u/${encodeURIComponent(user.handle)}` : "/my-videos" },
+    { label: "Your Channel", icon: User, href: "/my-videos" },
     { label: "My Profile", icon: User, href: "/profile" },
     { label: "Watchlist", icon: Heart, href: "/watchlist" },
     { label: "Messages", icon: MessageSquare, href: "/messages" },

@@ -553,10 +553,10 @@ export default function RecommendationFeed({
   // 2 columns on the smallest phones up to 6 on wide desktops/TVs).
   if (view === "vertical") {
     return (
-      <section className="mx-auto max-w-[1800px] px-4 py-6 lg:py-10 lg:px-8">
-        <div className="mb-4 flex items-center gap-2 lg:mb-6 lg:gap-3">
-          <span className="text-2xl lg:text-3xl">🔥</span>
-          <h2 className="text-2xl lg:text-3xl font-bold text-white light:text-slate-900">
+      <section className="mx-auto max-w-[1800px] px-4 py-2 lg:py-3 lg:px-8">
+        <div className="mb-1.5 flex items-center gap-2 lg:mb-2 lg:gap-2.5">
+          <span className="text-lg lg:text-xl">🔥</span>
+          <h2 className="text-base lg:text-lg font-black text-white light:text-slate-900">
             Vertical
           </h2>
         </div>
@@ -617,7 +617,7 @@ export default function RecommendationFeed({
 
         return (
           <div key={`feed-block-${index}`}>
-            <section className="mx-auto max-w-[1800px] px-4 py-2.5 lg:py-4 lg:px-8">
+            <section className="mx-auto max-w-[1800px] px-4 py-1.5 lg:py-2 lg:px-8">
               <div className="grid grid-cols-1 gap-x-6 gap-y-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                 {entries.map(renderEntry)}
               </div>

@@ -57,10 +57,10 @@ export default function PlayablesShelf() {
   if (playables.length === 0) return null;
 
   return (
-    <section className="mx-auto max-w-[1800px] px-3 py-2 lg:px-8 relative group">
-      <div className="mb-3 flex items-center gap-2">
-        <Gamepad2 className="text-orange-500" size={26} />
-        <h2 className="text-xl font-black text-white sm:text-2xl light:text-slate-900">
+    <section className="mx-auto max-w-[1800px] px-3 py-1.5 lg:px-8 lg:py-2 relative group">
+      <div className="mb-1.5 flex items-center gap-2">
+        <Gamepad2 className="text-orange-500" size={20} />
+        <h2 className="text-base font-black text-white lg:text-lg light:text-slate-900">
           InJoy
         </h2>
       </div>

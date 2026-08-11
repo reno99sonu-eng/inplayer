@@ -411,13 +411,7 @@ function AdvertisingPage() {
         }
         setMidrollFileType("video");
         setMidrollFile(file);
-        const reader = new FileReader();
-        reader.onload = (event) => {
-          if (typeof event.target?.result === "string") {
-            setMidrollPreview(event.target.result);
-          }
-        };
-        reader.readAsDataURL(file);
+        setMidrollPreview(URL.createObjectURL(file));
       } else {
         setMidrollFileType("image");
         const compressed = await compressImageToBanner(file);
@@ -448,16 +442,40 @@ function AdvertisingPage() {
 
   const generateTitleWithAi = async (targetPlacement: string, isMidroll = false) => {
     const preview = isMidroll ? midrollPreview : uploadPreview;
-    if (!preview || preview.startsWith("data:video/")) {
+    
+    let finalPreviewDataUrl = preview;
+    if (isMidroll && midrollFileType === "video" && preview?.startsWith("blob:")) {
+      try {
+        finalPreviewDataUrl = await new Promise<string>((resolve, reject) => {
+          const video = document.createElement("video");
+          video.crossOrigin = "anonymous";
+          video.src = preview;
+          video.currentTime = 1;
+          video.onseeked = () => {
+            const canvas = document.createElement("canvas");
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext("2d");
+            ctx?.drawImage(video, 0, 0, canvas.width, canvas.height);
+            resolve(canvas.toDataURL("image/jpeg", 0.7));
+          };
+          video.onerror = () => reject(new Error("Failed to load video frame"));
+        });
+      } catch (err) {
+        setMidrollUploadError("Could not extract a frame from the video to send to the AI.");
+        return;
+      }
+    } else if (!preview || preview.startsWith("data:video/")) {
       (isMidroll ? setMidrollUploadError : setUploadError)(
         "Upload an image first — AI reads the actual image to write an accurate title."
       );
       return;
     }
+    
     (isMidroll ? setMidrollGeneratingTitleAi : setGeneratingTitleAi)(true);
     (isMidroll ? setMidrollUploadError : setUploadError)(null);
     try {
-      const { title } = await callAiAdGenerate({ mode: "title", imageDataUrl: preview, placement: targetPlacement });
+      const { title } = await callAiAdGenerate({ mode: "title", imageDataUrl: finalPreviewDataUrl, placement: targetPlacement });
       (isMidroll ? setMidrollTitle : setUploadTitle)(title || "");
     } catch (err) {
       (isMidroll ? setMidrollUploadError : setUploadError)(

@@ -959,7 +959,17 @@ export default function VideoPlayer({
           >
             {/* eslint-disable-next-line @next/next/no-img-element -- an
                 admin-uploaded data URL, not a static app asset. */}
-            {midrollAd.imageUrl.startsWith("data:video/") ? (
+            {midrollAd.imageUrl.startsWith("mux:") ? (
+              <MuxPlayer
+                playbackId={midrollAd.imageUrl.replace("mux:", "")}
+                autoPlay="muted"
+                loop
+                muted
+                playsInline
+                className="max-h-full max-w-full object-contain"
+                style={{ "--controls": "none" } as MuxCSSProperties}
+              />
+            ) : midrollAd.imageUrl.startsWith("data:video/") ? (
               <video
                 src={midrollAd.imageUrl}
                 aria-label={midrollAd.title}

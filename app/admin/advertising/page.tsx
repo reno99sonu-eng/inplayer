@@ -212,6 +212,7 @@ function AdvertisingPage() {
   const [midrollUploadError, setMidrollUploadError] = useState<string | null>(null);
   const [midrollCroppingAi, setMidrollCroppingAi] = useState(false);
   const [midrollGeneratingTitleAi, setMidrollGeneratingTitleAi] = useState(false);
+  const [midrollFile, setMidrollFile] = useState<File | null>(null);
   const midrollFileInputRef = useRef<HTMLInputElement>(null);
 
   const loadSettings = async () => {
@@ -357,6 +358,7 @@ function AdvertisingPage() {
     if (isMidroll) {
       setMidrollPreview(null);
       setMidrollFileType(null);
+      setMidrollFile(null);
       if (midrollFileInputRef.current) midrollFileInputRef.current.value = "";
     } else {
       setUploadPreview(null);
@@ -404,10 +406,11 @@ function AdvertisingPage() {
         if (file.type !== "video/mp4" && file.type !== "video/webm") {
           throw new Error("Mid-roll videos must be MP4 or WebM.");
         }
-        if (file.size > 250_000) {
-          throw new Error("Mid-roll videos must be 250 KB or smaller. Use an image for a larger creative.");
+        if (file.size > 250_000_000) {
+          throw new Error("Mid-roll videos must be 250 MB or smaller.");
         }
         setMidrollFileType("video");
+        setMidrollFile(file);
         const reader = new FileReader();
         reader.onload = (event) => {
           if (typeof event.target?.result === "string") {
@@ -745,20 +748,62 @@ function AdvertisingPage() {
     setMidrollUploading(true);
     setMidrollUploadError(null);
     try {
-      const res = await authedFetch("/api/admin/midroll-ads", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          imageUrl: midrollPreview,
-          linkUrl: midrollLink.trim(),
-          title: midrollTitle.trim(),
-        }),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "Couldn't create that ad creative.");
-      if (data?.ad) {
-        setMidrollAds((prev) => [data.ad, ...prev]);
+      if (midrollFileType === "video" && midrollFile) {
+        // Upload video ad via Mux
+        const res = await authedFetch("/api/admin/midroll-ads/create-upload", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: midrollTitle.trim(),
+            linkUrl: midrollLink.trim(),
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Couldn't start video upload.");
+
+        const { uploadUrl, adId } = data;
+
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open("PUT", uploadUrl);
+          
+          xhr.upload.onprogress = (event) => {
+            // Optional: you could add a progress bar for midroll ads here
+          };
+          
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve();
+            } else {
+              reject(new Error(`Upload failed with status ${xhr.status}`));
+            }
+          };
+          xhr.onerror = () => reject(new Error("Network error during upload"));
+          xhr.send(midrollFile);
+        });
+
+        // The ad will appear once the webhook processes it. 
+        // We could manually insert a placeholder into the UI if desired, but 
+        // a page refresh or waiting for webhook will load it. 
+        alert("Video ad uploaded and is currently processing!");
+      } else {
+        // Handle standard image ad creation
+        const res = await authedFetch("/api/admin/midroll-ads", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            imageUrl: midrollPreview,
+            linkUrl: midrollLink.trim(),
+            title: midrollTitle.trim(),
+          }),
+        });
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(data.error || "Couldn't create that ad creative.");
+        if (data?.ad) {
+          setMidrollAds((prev) => [data.ad, ...prev]);
+        }
       }
+
       clearFileSelection(true);
       setMidrollTitle("");
       setMidrollLink("");

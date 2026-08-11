@@ -148,7 +148,40 @@ export async function POST(request: NextRequest) {
         ProjectionExpression: "contentType",
       })
     );
-    const isShort = existing.Item?.contentType === "short";
+
+    if (!existing.Item) {
+      // It might be a mid-roll video ad
+      const midrollAd = await docClient.send(
+        new GetCommand({
+          TableName: "InPlayer-Midroll-Ads",
+          Key: { adId: uploadId },
+        })
+      );
+      if (midrollAd.Item) {
+        await docClient.send(
+          new UpdateCommand({
+            TableName: "InPlayer-Midroll-Ads",
+            Key: { adId: uploadId },
+            UpdateExpression: "SET #status = :status, imageUrl = :imageUrl",
+            ExpressionAttributeNames: {
+              "#status": "status",
+            },
+            ExpressionAttributeValues: {
+              ":status": "ready",
+              // Store as a Mux prefix to differentiate from base64
+              ":imageUrl": `mux:${playbackId}`,
+            },
+          })
+        );
+        // Mid-roll ads don't use captions or email broadcasts
+        return NextResponse.json({ received: true });
+      } else {
+        console.error("No video or ad found for uploadId:", uploadId);
+        return NextResponse.json({ received: true });
+      }
+    }
+
+    const isShort = existing.Item.contentType === "short";
     const thumbnailUrl = getMuxThumbnailUrl(playbackId, isShort);
 
     const updateResult = await docClient.send(

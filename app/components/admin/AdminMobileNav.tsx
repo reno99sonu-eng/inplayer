@@ -15,6 +15,7 @@ const inplayerItems = [
   { id: "users", label: "Users", href: "/admin/users" },
   { id: "creators", label: "Creators", href: "/admin/creators" },
   { id: "bug-reports", label: "Bug Reports", href: "/admin/bug-reports" },
+  { id: "error-logs", label: "Error Logs", href: "/admin/error-logs" },
   { id: "videos", label: "Videos", href: "/admin/videos" },
   { id: "shorts", label: "Shorts", href: "/admin/videos?type=short" },
   { id: "reports", label: "Reports", href: "/admin/moderation" },

@@ -49,15 +49,33 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Please sign in." }, { status: 401 });
   }
 
-  // 1) This creator's videos, split by content type.
-  const videosResult = await docClient.send(
-    new ScanCommand({
-      TableName: "InPlayer-Videos",
-      FilterExpression: "uploaderId = :uploaderId",
-      ExpressionAttributeValues: { ":uploaderId": user.userId },
-    })
-  );
-  const allVideos = videosResult.Items || [];
+  // 1) This creator's videos, split by content type. Paginated — a
+  // one-shot Scan silently stops at ~1MB, which would quietly undercount
+  // views/shares/video-count once the table grows past that (see the same
+  // fix already applied in app/lib/videoStore.ts and
+  // app/api/admin/analytics/route.ts).
+  // Scanned items feed arithmetic below (views/shares totals), which
+  // Record<string, unknown> would break (same tradeoff already made
+  // throughout this file).
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const allVideos: Record<string, any>[] = [];
+  {
+    let exclusiveStartKey: Record<string, unknown> | undefined;
+    do {
+      const videosResult = await docClient.send(
+        new ScanCommand({
+          TableName: "InPlayer-Videos",
+          FilterExpression: "uploaderId = :uploaderId",
+          ExpressionAttributeValues: { ":uploaderId": user.userId },
+          ExclusiveStartKey: exclusiveStartKey,
+        })
+      );
+      allVideos.push(...(videosResult.Items || []));
+      exclusiveStartKey = videosResult.LastEvaluatedKey as
+        | Record<string, unknown>
+        | undefined;
+    } while (exclusiveStartKey);
+  }
   const videoItems = allVideos.filter((v) => v.contentType !== "short");
   const shortItems = allVideos.filter((v) => v.contentType === "short");
   const videoIds = new Set(allVideos.map((v) => v.videoId));
@@ -85,25 +103,35 @@ export async function GET(request: NextRequest) {
   // reverse videoId index on InPlayer-Likes would make this cheaper later.
   if (videoIds.size > 0) {
     try {
-      const likesResult = await docClient.send(
-        new ScanCommand({
-          TableName: "InPlayer-Likes",
-          FilterExpression: "reaction = :like",
-          ExpressionAttributeValues: { ":like": "like" },
-        })
-      );
-      for (const item of likesResult.Items || []) {
-        if (!videoIds.has(item.videoId)) continue;
-        const isShort = shortItems.some((s) => s.videoId === item.videoId);
-        if (isShort) stats.shorts.likes += 1;
-        else stats.videos.likes += 1;
-      }
+      let exclusiveStartKey: Record<string, unknown> | undefined;
+      do {
+        const likesResult = await docClient.send(
+          new ScanCommand({
+            TableName: "InPlayer-Likes",
+            FilterExpression: "reaction = :like",
+            ExpressionAttributeValues: { ":like": "like" },
+            ExclusiveStartKey: exclusiveStartKey,
+          })
+        );
+        for (const item of likesResult.Items || []) {
+          if (!videoIds.has(item.videoId)) continue;
+          const isShort = shortItems.some((s) => s.videoId === item.videoId);
+          if (isShort) stats.shorts.likes += 1;
+          else stats.videos.likes += 1;
+        }
+        exclusiveStartKey = likesResult.LastEvaluatedKey as
+          | Record<string, unknown>
+          | undefined;
+      } while (exclusiveStartKey);
     } catch (err) {
       console.error("Failed to aggregate likes for analytics:", err);
     }
   }
 
-  // 3) Comments — a cheap indexed Query per video, run in parallel.
+  // 3) Comments — a cheap indexed Query per video, run in parallel. Only
+  // counts comments a viewer could actually see: auto-flagged/hidden
+  // comments (see app/api/comments/route.ts's own `hidden` filter) are
+  // excluded here too, so this number matches what's really on the video.
   const commentCounts = await Promise.all(
     allVideos.map(async (v) => {
       try {
@@ -111,7 +139,12 @@ export async function GET(request: NextRequest) {
           new QueryCommand({
             TableName: "InPlayer-Comments",
             KeyConditionExpression: "videoId = :videoId",
-            ExpressionAttributeValues: { ":videoId": v.videoId },
+            FilterExpression:
+              "attribute_not_exists(hidden) OR hidden = :notHidden",
+            ExpressionAttributeValues: {
+              ":videoId": v.videoId,
+              ":notHidden": false,
+            },
             Select: "COUNT",
           })
         );

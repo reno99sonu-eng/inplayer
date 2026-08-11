@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useScrollLock } from "../hooks/useScrollLock";
 import { useAuthModal } from "./auth/AuthProvider";
 
@@ -90,7 +90,16 @@ export default function SplashScreen() {
     return true;
   });
   const [leaving, setLeaving] = useState(false);
-  const { user } = useAuthModal();
+  const { user, authLoading } = useAuthModal();
+
+  // Read inside the dismiss timer below (see the mount effect further
+  // down), not as a hook dependency — a ref always has the latest value
+  // without forcing that effect to re-run/restart the animation timers
+  // every time auth state changes mid-splash.
+  const authLoadingRef = useRef(authLoading);
+  useEffect(() => {
+    authLoadingRef.current = authLoading;
+  }, [authLoading]);
 
   // Time-of-day greeting ("Good Morning/Afternoon/Evening/Night, {name}")
   // — same 4-bucket boundaries as the navbar's own Greeting.tsx, computed
@@ -111,8 +120,10 @@ export default function SplashScreen() {
       const hour = new Date().getHours();
       if (hour >= 5 && hour < 12) setGreetingWord("Morning");
       else if (hour >= 12 && hour < 17) setGreetingWord("Afternoon");
-      else if (hour >= 17 && hour < 21) setGreetingWord("Evening");
-      else setGreetingWord("Night");
+      // 17:00-4:59 — only Morning/Afternoon/Evening exist now (Reno asked
+      // to drop "Good Night" entirely; same change as Greeting.tsx and
+      // layout.tsx's failsafe script, which must all three stay in sync).
+      else setGreetingWord("Evening");
     })();
   }, []);
 
@@ -144,18 +155,39 @@ export default function SplashScreen() {
     // animation actually finishes instead of cutting it off early.
     const holdMs = reducedMotion ? 180 : 600;
     const fadeOutMs = reducedMotion ? 120 : 180;
+    // If a signed-in user's name hasn't arrived by the time the base
+    // animation hold ends, this is why the personalized greeting
+    // "sometimes doesn't show up properly": AuthProvider's refreshUser()
+    // (Amplify/Cognito, plus an avatar fetch) can easily take longer than
+    // holdMs on a slow mobile connection or a cold serverless start, and
+    // the curtain used to close on a fixed timer regardless — dismissing
+    // before `user` was ever set, with no way to show the name afterward
+    // (the curtain doesn't come back). Give it a bit more time here
+    // instead. Already-signed-out visitors (authLoading resolves to false
+    // almost immediately, well before holdMs) see no change at all.
+    const authGraceMs = reducedMotion ? 200 : 700;
 
-    const leaveTimer = window.setTimeout(() => setLeaving(true), holdMs);
-    const removeTimer = window.setTimeout(() => {
-      setVisible(false);
-    }, holdMs + fadeOutMs);
+    let leaveTimer: number | undefined;
+    let removeTimer: number | undefined;
+
+    const holdTimer = window.setTimeout(() => {
+      const extraDelay = authLoadingRef.current ? authGraceMs : 0;
+      leaveTimer = window.setTimeout(() => setLeaving(true), extraDelay);
+      removeTimer = window.setTimeout(
+        () => setVisible(false),
+        extraDelay + fadeOutMs
+      );
+    }, holdMs);
 
     return () => {
+      window.clearTimeout(holdTimer);
       window.clearTimeout(leaveTimer);
       window.clearTimeout(removeTimer);
     };
     // Intentionally runs once on mount only — visible/leaving are only
-    // ever set BY this effect, never read as a re-run trigger.
+    // ever set BY this effect, never read as a re-run trigger. authLoading
+    // is read via the ref above specifically so it doesn't need to be a
+    // dependency here.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

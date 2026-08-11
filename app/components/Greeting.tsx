@@ -21,12 +21,13 @@ export default function Greeting({ name = "there" }: GreetingProps) {
       } else if (hour >= 12 && hour < 17) {
         setGreeting("Afternoon");
         setIcon("🌤️");
-      } else if (hour >= 17 && hour < 21) {
+      } else {
+        // 17:00-4:59 — only Morning/Afternoon/Evening exist now (Reno
+        // asked to drop "Good Night" entirely), so the old late-night
+        // bucket (21:00-4:59) folds into Evening instead of getting its
+        // own greeting.
         setGreeting("Evening");
         setIcon("🌇");
-      } else {
-        setGreeting("Night");
-        setIcon("🌙");
       }
     })();
 

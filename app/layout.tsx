@@ -106,7 +106,7 @@ export default async function RootLayout({
 <script
   dangerouslySetInnerHTML={{
     __html:
-      '(function(){function g(){try{var e=document.getElementById("app-splash-greeting");if(e&&!e.textContent){var h=new Date().getHours();var w=(h>=5&&h<12)?"Morning":(h>=12&&h<17)?"Afternoon":(h>=17&&h<21)?"Evening":"Night";e.textContent="Good "+w;}}catch(err){}}if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",g);}else{g();}setTimeout(function(){try{var el=document.getElementById("app-splash-curtain");if(el){el.style.transition="none";el.style.opacity="0";el.style.pointerEvents="none";el.style.display="none";}document.body.style.overflow="";document.documentElement.style.overflow="";}catch(e){}},1500);})();',
+      '(function(){function g(){try{var e=document.getElementById("app-splash-greeting");if(e&&!e.textContent){var h=new Date().getHours();var w=(h>=5&&h<12)?"Morning":(h>=12&&h<17)?"Afternoon":"Evening";e.textContent="Good "+w;}}catch(err){}}if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",g);}else{g();}setTimeout(function(){try{var el=document.getElementById("app-splash-curtain");if(el){el.style.transition="none";el.style.opacity="0";el.style.pointerEvents="none";el.style.display="none";}document.body.style.overflow="";document.documentElement.style.overflow="";}catch(e){}},1500);})();',
   }}
 />
 <ChunkErrorRecovery />

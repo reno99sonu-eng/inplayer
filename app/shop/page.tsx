@@ -275,6 +275,46 @@ export default function ShopPage() {
         ))}
       </div>
 
+      {/* Vendor Filter Pills — mobile-only equivalent of the "Sellers &
+          Vendors" sidebar further down (that sidebar is `hidden md:block`,
+          so phones lost the ability to filter by seller entirely). Same
+          horizontally-scrolling pill pattern as the Category pills above,
+          hidden on desktop (`md:hidden`) since the sidebar already covers
+          that screen size. */}
+      {vendorsList.length > 0 && (
+        <div className="flex gap-2 overflow-x-auto pb-3 mb-4 scrollbar-none md:hidden">
+          <button
+            onClick={() => setSelectedVendorId(null)}
+            className={`flex-shrink-0 whitespace-nowrap rounded-xl px-3.5 py-1.5 text-xs font-bold transition ${
+              selectedVendorId === null
+                ? "bg-orange-500 text-white shadow-md shadow-orange-500/25"
+                : "border border-white/10 light:border-slate-300 bg-white/[0.03] light:bg-white text-slate-300 light:text-slate-800 hover:bg-white/10 light:hover:bg-slate-100"
+            }`}
+          >
+            All Sellers
+          </button>
+          {vendorsList.map((vendor) => (
+            <button
+              key={vendor.vendorId}
+              onClick={() => setSelectedVendorId(vendor.vendorId)}
+              className={`flex flex-shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-3 py-1.5 text-xs font-bold transition ${
+                selectedVendorId === vendor.vendorId
+                  ? "bg-orange-500 text-white shadow-md shadow-orange-500/25"
+                  : "border border-white/10 light:border-slate-300 bg-white/[0.03] light:bg-white text-slate-300 light:text-slate-800 hover:bg-white/10 light:hover:bg-slate-100"
+              }`}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={vendor.avatarUrl}
+                alt=""
+                className="h-4 w-4 flex-shrink-0 rounded-full border border-white/20 light:border-slate-300 bg-white/10"
+              />
+              <span className="max-w-[90px] truncate">{vendor.name}</span>
+            </button>
+          ))}
+        </div>
+      )}
+
       {loading ? (
         <div className="mt-16 flex justify-center">
           <Loader2 size={24} className="animate-spin text-orange-400" />

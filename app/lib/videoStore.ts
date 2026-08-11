@@ -39,7 +39,22 @@ async function scanReadyVideos() {
       })
     );
 
-    items.push(...(result.Items || []));
+    // captionsVtt (see app/api/webhooks/mux/route.ts) stores the FULL raw
+    // subtitle text for every generated language directly on the video
+    // item — no listing surface reads it (captions are fetched separately,
+    // per-video, by app/api/videos/[videoId]/captions/[lang]/route.ts when
+    // someone actually turns them on). Left in, it was blowing this shared
+    // cached list past Next.js's 2MB per-entry cache-write limit (seen in
+    // production logs as "Failed to set Next.js data cache ... items over
+    // 2MB can not be cached", ~8.5MB), which silently defeated the whole
+    // point of this cache — every homepage/videos/shorts/trending load was
+    // paying for a full, uncached table Scan every single time instead of
+    // the intended 30-second-shared read. Stripped here, before anything
+    // is cached or returned, since nothing downstream needs it.
+    for (const item of result.Items || []) {
+      if ("captionsVtt" in item) delete item.captionsVtt;
+      items.push(item);
+    }
     exclusiveStartKey = result.LastEvaluatedKey as
       | Record<string, unknown>
       | undefined;

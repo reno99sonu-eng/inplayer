@@ -269,17 +269,31 @@ export async function POST(request: NextRequest) {
           // playback details. Shorts can't be members-only for now (the
           // Shorts feed has no per-item gating UI yet).
           ...(!isShort && { membersOnly: !!membersOnly }),
-          ...(isShort && shortSettings && typeof shortSettings === "object" && {
+          // Background soundtrack + "Look" filter — originally Shorts-only,
+          // now offered on Video uploads too (see ShortCreationTools /
+          // app/upload/page.tsx), so this no longer gates on isShort. Kept
+          // under the same `shortSettings` attribute name for both content
+          // types deliberately: renaming it would mean updating every
+          // already-published Short's existing data and every reader
+          // (ShortsPageContent, app/shorts/page.tsx) for a purely cosmetic
+          // naming win — not worth the risk of breaking something that
+          // already works.
+          ...(shortSettings && typeof shortSettings === "object" && {
             shortSettings: {
               // Full resolved track (id/title/artist/url/duration/source),
               // not just an id — see app/data/soundtracks.ts's
               // ResolvedSoundtrack comment for why: it lets already-published
-              // Shorts play back without ever re-looking-up an external
-              // (Jamendo) track later. Each field is type/length-sanitized
-              // before it ever reaches DynamoDB, since this is a raw client
-              // body a request could forge regardless of what the picker UI
-              // actually sends.
+              // Shorts/Videos play back without ever re-looking-up an
+              // external (Jamendo) track later. Each field is type/length-
+              // sanitized before it ever reaches DynamoDB, since this is a
+              // raw client body a request could forge regardless of what
+              // the picker UI actually sends.
               soundtrack: sanitizeSoundtrack(shortSettings.soundtrack),
+              // musicClipSeconds only means anything for Shorts (a fixed
+              // clip cut short of the source file's natural end — see
+              // ShortsPageContent.tsx). Videos loop the whole track
+              // instead (see VideoPlayer.tsx), so this is harmlessly
+              // ignored for them but still stored for schema consistency.
               musicClipSeconds: shortSettings.musicClipSeconds === 20 ? 20 : 30,
               filter: ["original", "warm", "vivid", "mono"].includes(shortSettings.filter) ? shortSettings.filter : "original",
             },

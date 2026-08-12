@@ -10,21 +10,27 @@ export interface ShortSettings {
   filter: "original" | "warm" | "vivid" | "mono";
 }
 
-// Soundtrack picker, clip length, and look filter for Shorts creation. Two
-// catalogs feed the same picker: InPlayer's own local instrumentals
-// (app/data/soundtracks.ts — 100% synthesized, no licensing needed at all)
-// and a live search against real Creative Commons music via Jamendo
-// (app/api/music/search) — the "works now, real commercial licensing
-// later" stopgap. Whichever is picked gets stored in full (id/title/
-// artist/url/duration/source), not just an id, so ShortsPageContent.tsx
-// never has to re-look-up an external track to play a published Short
-// back.
+// Soundtrack picker, clip length, and look filter — originally Shorts-only,
+// now offered for Video uploads too (see app/upload/page.tsx and
+// VideoPlayer.tsx). Two catalogs feed the same picker: InPlayer's own local
+// instrumentals (app/data/soundtracks.ts — 100% synthesized, no licensing
+// needed at all) and a live search against real Creative Commons music via
+// Jamendo (app/api/music/search) — the "works now, real commercial
+// licensing later" stopgap. Whichever is picked gets stored in full (id/
+// title/artist/url/duration/source), not just an id, so playback never has
+// to re-look-up an external track.
 export default function ShortCreationTools({
   value,
   onChange,
+  contentType,
 }: {
   value: ShortSettings;
   onChange: (value: ShortSettings) => void;
+  // Music-clip length only means anything for a Short (a fixed-length clip
+  // cut short of the track's natural end) — a Video instead loops the
+  // track for its whole runtime (see VideoPlayer.tsx), so that control is
+  // hidden when this is "video".
+  contentType: "video" | "short";
 }) {
   const [query, setQuery] = useState("");
   const [previewingId, setPreviewingId] = useState<string | null>(null);
@@ -145,7 +151,9 @@ export default function ShortCreationTools({
           Short creation tools
         </p>
         <p className="mt-1 text-xs leading-5 text-slate-400 light:text-slate-600">
-          Choose a soundtrack clip and a look for your Short.
+          {contentType === "short"
+            ? "Choose an optional soundtrack clip and a look for your Short."
+            : "Choose an optional background soundtrack and a look for your video — both are entirely optional and off by default."}
         </p>
       </div>
 
@@ -239,23 +247,31 @@ export default function ShortCreationTools({
         )}
       </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <span className="text-xs font-bold text-slate-300 light:text-slate-700">Music clip</span>
-        {([20, 30] as const).map((seconds) => (
-          <button
-            key={seconds}
-            type="button"
-            onClick={() => onChange({ ...value, musicClipSeconds: seconds })}
-            className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
-              value.musicClipSeconds === seconds
-                ? "bg-orange-500 text-white"
-                : "bg-white/5 text-slate-400 hover:bg-white/10 light:bg-black/5"
-            }`}
-          >
-            {seconds}s
-          </button>
-        ))}
-      </div>
+      {contentType === "short" ? (
+        <div className="mt-4 flex flex-wrap items-center gap-2">
+          <span className="text-xs font-bold text-slate-300 light:text-slate-700">Music clip</span>
+          {([20, 30] as const).map((seconds) => (
+            <button
+              key={seconds}
+              type="button"
+              onClick={() => onChange({ ...value, musicClipSeconds: seconds })}
+              className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
+                value.musicClipSeconds === seconds
+                  ? "bg-orange-500 text-white"
+                  : "bg-white/5 text-slate-400 hover:bg-white/10 light:bg-black/5"
+              }`}
+            >
+              {seconds}s
+            </button>
+          ))}
+        </div>
+      ) : (
+        value.soundtrack && (
+          <p className="mt-4 text-[11px] text-slate-400 light:text-slate-600">
+            The soundtrack loops quietly for the whole video, underneath your own audio.
+          </p>
+        )
+      )}
 
       <div className="mt-4">
         <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[.16em] text-slate-400 light:text-slate-600">
@@ -282,8 +298,9 @@ export default function ShortCreationTools({
 
       <div className="mt-4 flex items-center gap-2 rounded-2xl border border-white/10 bg-black/10 p-3 text-xs text-slate-400 light:border-black/10 light:bg-white/40 light:text-slate-600">
         <Wand2 size={15} className="shrink-0 text-orange-400" />
-        Soundtrack and look selections are saved with the Short and play back
-        automatically in the Shorts feed.
+        {contentType === "short"
+          ? "Soundtrack and look selections are saved with the Short and play back automatically in the Shorts feed."
+          : "Soundtrack and look selections are saved with the video and play back automatically wherever it's watched."}
       </div>
     </section>
   );

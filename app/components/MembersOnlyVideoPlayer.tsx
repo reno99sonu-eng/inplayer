@@ -6,12 +6,15 @@ import { Crown, Loader2 } from "lucide-react";
 import VideoPlayer from "@/app/components/VideoPlayer";
 import MembershipButton from "@/app/components/MembershipButton";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
+import type { VideoLookFilter } from "@/app/lib/videoFilters";
 
 interface MembersOnlyVideoPlayerProps {
   videoId: string;
   title: string;
   uploaderId: string;
   uploaderName: string;
+  soundtrack?: { url: string; durationSeconds: number } | null;
+  filterLook?: VideoLookFilter;
 }
 
 // Real gating, not a UI-only lock: this never receives a playable Mux
@@ -27,6 +30,8 @@ export default function MembersOnlyVideoPlayer({
   title,
   uploaderId,
   uploaderName,
+  soundtrack,
+  filterLook,
 }: MembersOnlyVideoPlayerProps) {
   const { signedIn, openSignIn } = useAuthModal();
   const [state, setState] = useState<
@@ -79,6 +84,8 @@ export default function MembersOnlyVideoPlayer({
         token={state.token}
         title={title}
         videoId={videoId}
+        soundtrack={soundtrack}
+        filterLook={filterLook}
       />
     );
   }

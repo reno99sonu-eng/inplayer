@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 const MuxPlayer = dynamic(() => import("@mux/mux-player-react"), { ssr: false });
 import type { MuxCSSProperties, MuxPlayerRefAttributes } from "@mux/mux-player-react";
 import { useSettings } from "@/app/components/settings/SettingsProvider";
+import { cssFilterFor, type VideoLookFilter } from "@/app/lib/videoFilters";
 
 // Safari-only fullscreen APIs (`webkit*`) predate the standard Fullscreen
 // API and were never added to lib.dom.d.ts — these two small extensions
@@ -45,7 +46,23 @@ interface VideoPlayerProps {
   // authorizes playback of that ID. Omitted entirely for every ordinary
   // public playback ID, which needs no token.
   token?: string;
+  // Optional background soundtrack + visual "Look", picked at upload time
+  // in ShortCreationTools (originally Shorts-only, now offered for Video
+  // uploads too — see app/api/upload/create/route.ts's shortSettings).
+  // Both absent/undefined for the (still-default) "no soundtrack, original
+  // look" case, which is exactly how every video published before this
+  // feature existed keeps behaving.
+  soundtrack?: { url: string; durationSeconds: number } | null;
+  filterLook?: VideoLookFilter;
 }
+
+// Background music under a long-form video's OWN real audio (narration,
+// dialogue, whatever the creator recorded) needs to sit well underneath it
+// rather than compete — unlike a Short, which is often silent-camera-roll
+// footage where the soundtrack IS the audio. Fixed, modest gain rather than
+// full volume; the creator can always skip picking a soundtrack at all for
+// content where any background music would be wrong (interviews, podcasts).
+const BACKGROUND_MUSIC_VOLUME = 0.22;
 
 // Multi-tap seek tuning (touch devices): taps on the left/right third of
 // the video within this window chain together — 2 taps = 10s, 3 = 20s,
@@ -119,9 +136,12 @@ export default function VideoPlayer({
   title,
   videoId,
   token,
+  soundtrack,
+  filterLook,
 }: VideoPlayerProps) {
   const playerRef = useRef<MuxPlayerRefAttributes>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const backgroundAudioRef = useRef<HTMLAudioElement | null>(null);
   // Real Settings → Playback → "Closed Captions" toggle — off by default
   // (matching "captions default off unless a viewer turns them on"), on
   // for any viewer who's actually turned the setting on.
@@ -289,6 +309,50 @@ export default function VideoPlayer({
     if (pulseTimerRef.current) clearTimeout(pulseTimerRef.current);
     setPulse({ icon, key: Date.now() });
     pulseTimerRef.current = setTimeout(() => setPulse(null), 700);
+  };
+
+  // Background soundtrack (see app/components/ShortsPageContent.tsx for the
+  // equivalent on Shorts). Unlike Shorts, a long-form video isn't cut to a
+  // fixed clip length here — it just loops the track for as long as the
+  // video plays, at a fixed low volume under the video's own real audio.
+  // Point the shared <audio> at the track whenever the video/soundtrack
+  // changes; actual play/pause is driven by the MuxPlayer onPlay/onPause
+  // handlers below so it always stays in lockstep with real playback state
+  // (manual toggle, autoplay, or a mid-roll ad pausing the video).
+  useEffect(() => {
+    const audio = backgroundAudioRef.current;
+    if (!audio) return;
+    if (!soundtrack) {
+      audio.pause();
+      audio.removeAttribute("src");
+      return;
+    }
+    audio.src = soundtrack.url;
+    audio.loop = true;
+    audio.volume = BACKGROUND_MUSIC_VOLUME;
+    audio.currentTime = 0;
+    // If the video is already playing by the time the soundtrack loads
+    // (e.g. autoplay beat this effect), start the music too rather than
+    // waiting for the next play/pause event.
+    if (playerRef.current && !playerRef.current.paused) {
+      audio.play().catch(() => {});
+    }
+  }, [soundtrack]);
+
+  const syncBackgroundAudioToPlayer = (playing: boolean) => {
+    const audio = backgroundAudioRef.current;
+    if (!audio || !soundtrack) return;
+    if (playing) audio.play().catch(() => {});
+    else audio.pause();
+  };
+
+  // Keeps the soundtrack's mute state glued to the video's — muting the
+  // video should genuinely silence everything, not just the dialogue.
+  const syncBackgroundAudioMute = () => {
+    const audio = backgroundAudioRef.current;
+    const player = playerRef.current;
+    if (!audio || !player) return;
+    audio.muted = player.muted;
   };
 
   // Brightness/volume vertical-drag state.
@@ -913,8 +977,15 @@ export default function VideoPlayer({
         autoPlay="any"
         // Real poster frame instead of a flat black rectangle.
         thumbnailTime={0}
-        onPlay={() => flashPulse("play")}
-        onPause={() => flashPulse("pause")}
+        onPlay={() => {
+          flashPulse("play");
+          syncBackgroundAudioToPlayer(true);
+        }}
+        onPause={() => {
+          flashPulse("pause");
+          syncBackgroundAudioToPlayer(false);
+        }}
+        onVolumeChange={syncBackgroundAudioMute}
         onTimeUpdate={handleMidrollTimeUpdate}
         style={
           {
@@ -922,16 +993,29 @@ export default function VideoPlayer({
             aspectRatio: "16 / 9",
             "--controls-backdrop-color": "rgba(0, 0, 0, 0.7)",
             // Netflix/YouTube-style left-half brightness swipe (see
-            // handlePlayerPointerMove) — only the video surface dims or
-            // brightens, never our own overlay buttons/indicators, since
-            // those are siblings of MuxPlayer, not descendants.
+            // handlePlayerPointerMove) combined with the creator's chosen
+            // "Look" filter (see app/lib/videoFilters) into one CSS filter
+            // string — only the video surface is affected, never our own
+            // overlay buttons/indicators, since those are siblings of
+            // MuxPlayer, not descendants.
             filter:
-              brightness !== 1 ? `brightness(${brightness})` : undefined,
+              [
+                brightness !== 1 ? `brightness(${brightness})` : null,
+                cssFilterFor(filterLook) || null,
+              ]
+                .filter(Boolean)
+                .join(" ") || undefined,
             // Hide Mux's control bar entirely while locked.
             ...(locked ? { "--controls": "none" } : {}),
           } as MuxCSSProperties
         }
       />
+
+      {/* Background soundtrack — see the effect above and
+          syncBackgroundAudioToPlayer/syncBackgroundAudioMute. Hidden,
+          controls-less; entirely silent (paused, no src) when the video has
+          no soundtrack attached. */}
+      <audio ref={backgroundAudioRef} className="hidden" />
 
       {/* Mid-roll ad break — a real interruption, not a stub: the
           underlying player is genuinely paused (see

@@ -315,7 +315,9 @@ export default function UploadPage() {
           commentsEnabled,
           tags,
           membersOnly: contentType === "video" ? membersOnly : undefined,
-          shortSettings: contentType === "short" ? shortSettings : undefined,
+          // Sent for both content types now — Videos can pick a background
+          // soundtrack/Look too (see ShortCreationTools below).
+          shortSettings,
           thumbnailDataUrl: thumbnailPreview,
         }),
       });
@@ -566,9 +568,11 @@ export default function UploadPage() {
               onTagInputChange={setTagInput}
             />
 
-            {contentType === "short" && (
-              <ShortCreationTools value={shortSettings} onChange={setShortSettings} />
-            )}
+            <ShortCreationTools
+              value={shortSettings}
+              onChange={setShortSettings}
+              contentType={contentType}
+            />
 
             {error && (
               <p className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-300 light:text-red-700">

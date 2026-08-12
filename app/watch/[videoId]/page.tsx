@@ -185,6 +185,12 @@ export default async function WatchPage({ params }: WatchPageProps) {
           tags: video.tags || [],
           commentsEnabled: video.commentsEnabled,
           ageRestricted: video.ageRestricted,
+          // Background soundtrack + "Look" filter, picked at upload time —
+          // stored under the shared shortSettings attribute regardless of
+          // contentType (see app/api/upload/create/route.ts). Undefined for
+          // every video published before this feature existed.
+          soundtrack: video.shortSettings?.soundtrack || null,
+          filterLook: video.shortSettings?.filter,
         }}
         relatedVideos={relatedVideos.map((v) => ({
           videoId: v.videoId as string,

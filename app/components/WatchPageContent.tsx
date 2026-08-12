@@ -13,6 +13,7 @@ import { formatTimeAgo, formatViews } from "@/app/lib/formatters";
 import WatchActions from "@/app/components/watch/WatchActions";
 import WatchMeta from "@/app/components/watch/WatchMeta";
 import AdThumbnailCard from "@/app/components/AdThumbnailCard";
+import type { VideoLookFilter } from "@/app/lib/videoFilters";
 
 interface VideoData {
   videoId: string;
@@ -39,6 +40,11 @@ interface VideoData {
   tags?: string[];
   commentsEnabled?: boolean;
   ageRestricted?: boolean;
+  // Optional background soundtrack + visual "Look" picked at upload time
+  // (see app/lib/videoFilters and app/components/ShortCreationTools) —
+  // both undefined for the default "none picked" case.
+  soundtrack?: { url: string; durationSeconds: number } | null;
+  filterLook?: VideoLookFilter;
 }
 
 interface RelatedVideo {
@@ -103,9 +109,17 @@ export default function WatchPageContent({ video, relatedVideos: initialRelatedV
                     title={video.title}
                     uploaderId={video.uploaderId}
                     uploaderName={video.uploaderName}
+                    soundtrack={video.soundtrack}
+                    filterLook={video.filterLook}
                   />
                 ) : (
-                  <VideoPlayer playbackId={video.muxPlaybackId || ""} title={video.title} videoId={video.videoId} />
+                  <VideoPlayer
+                    playbackId={video.muxPlaybackId || ""}
+                    title={video.title}
+                    videoId={video.videoId}
+                    soundtrack={video.soundtrack}
+                    filterLook={video.filterLook}
+                  />
                 )
               ) : (
                 <div className="flex aspect-video w-full flex-col items-center justify-center gap-4 bg-black px-6 text-center">

@@ -1,12 +1,11 @@
 import { Loader2 } from "lucide-react";
 
 // Automatic Next.js App Router loading UI. app/u/[username]/page.tsx is a
-// "use client" page that itself only starts fetching the profile after it
-// mounts — without this file, the tap from an avatar/creator-name link
-// (the single most common navigation target in the app) showed nothing at
-// all during the initial route change, reading as a hang. This shows
-// instantly while that RSC shell/client bundle loads, matching the same
-// pattern app/shorts/loading.tsx already uses.
+// server-rendered ("force-dynamic") page that resolves the channel's
+// profile from DynamoDB before it can render anything — this is the
+// Suspense fallback Next shows during that brief server-side data fetch,
+// same pattern app/watch/[videoId]/loading.tsx and app/shorts/loading.tsx
+// already use for their own server-rendered pages.
 export default function ChannelLoading() {
   return (
     <div className="flex min-h-[60vh] items-center justify-center">

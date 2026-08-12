@@ -4,8 +4,10 @@ import { useEffect, useMemo, useRef, useState, memo } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import nextDynamic from "next/dynamic";
-import { MoreVertical } from "lucide-react";
+import { MoreVertical, ThumbsUp, ThumbsDown } from "lucide-react";
 import VideoOptionsMenu from "./watch/VideoOptionsMenu";
+import { useAuthModal } from "./auth/AuthProvider";
+import { authedFetch } from "../lib/apiFetch";
 
 // The Mux player (with its whole HLS streaming engine) is one of the
 // heaviest pieces of JavaScript in the app. It's only needed here for
@@ -96,10 +98,99 @@ const ShortCard = memo(function ShortCard({ short }: { short: Short }) {
   return <article className="group">{cardContent}</article>;
 });
 
+// Compact Interested / Not Interested buttons shown under every real
+// homepage video card. Writes to the same app/api/video-feedback endpoint
+// VideoOptionsMenu.tsx's three-dot menu entries use, and reports every
+// successful change up to the parent RecommendationFeed via onChange —
+// that's what lets the parent filter "not_interested" videos out of the
+// feed (see the visibleItems/visibleShorts memos below), so this is a real
+// recommendation signal, not a button that only changes its own color.
+const VideoFeedbackButtons = memo(function VideoFeedbackButtons({
+  videoId,
+  feedback,
+  onChange,
+}: {
+  videoId: string;
+  feedback: "interested" | "not_interested" | null;
+  onChange: (videoId: string, feedback: "interested" | "not_interested" | null) => void;
+}) {
+  const { signedIn, openSignIn } = useAuthModal();
+  const [busy, setBusy] = useState(false);
+
+  const toggle = async (value: "interested" | "not_interested") => {
+    if (!signedIn) {
+      openSignIn();
+      return;
+    }
+    if (busy) return;
+    setBusy(true);
+    const previous = feedback;
+    const next = feedback === value ? null : value;
+    onChange(videoId, next);
+
+    try {
+      const res = await authedFetch("/api/video-feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ videoId, feedback: value }),
+      });
+      if (!res.ok) throw new Error("Request failed");
+      const data = await res.json();
+      onChange(videoId, data.feedback ?? null);
+    } catch (err) {
+      console.error("Failed to save video feedback:", err);
+      onChange(videoId, previous);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="mt-2 flex items-center gap-1.5">
+      <button
+        type="button"
+        onClick={() => toggle("interested")}
+        disabled={busy}
+        aria-pressed={feedback === "interested"}
+        className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-50 ${
+          feedback === "interested"
+            ? "border-emerald-400/40 bg-emerald-500/15 text-emerald-300"
+            : "border-white/10 light:border-black/10 text-slate-400 light:text-slate-600 hover:bg-white/5 light:hover:bg-black/5"
+        }`}
+      >
+        <ThumbsUp size={12} className={feedback === "interested" ? "fill-current" : ""} />
+        Interested
+      </button>
+      <button
+        type="button"
+        onClick={() => toggle("not_interested")}
+        disabled={busy}
+        aria-pressed={feedback === "not_interested"}
+        className={`flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition disabled:opacity-50 ${
+          feedback === "not_interested"
+            ? "border-red-400/40 bg-red-500/15 text-red-300"
+            : "border-white/10 light:border-black/10 text-slate-400 light:text-slate-600 hover:bg-white/5 light:hover:bg-black/5"
+        }`}
+      >
+        <ThumbsDown size={12} className={feedback === "not_interested" ? "fill-current" : ""} />
+        Not Interested
+      </button>
+    </div>
+  );
+});
+
 // A single homepage video card. Owns its own hover-preview state so each
 // card starts/stops its preview independently of every other card on the
 // page.
-export const HomeVideoCard = memo(function HomeVideoCard({ video }: { video: Recommendation }) {
+export const HomeVideoCard = memo(function HomeVideoCard({
+  video,
+  feedback = null,
+  onFeedbackChange,
+}: {
+  video: Recommendation;
+  feedback?: "interested" | "not_interested" | null;
+  onFeedbackChange?: (videoId: string, feedback: "interested" | "not_interested" | null) => void;
+}) {
   // A stable per-card identity used only to claim/release the single
   // shared preview slot below — never rendered or compared by value, just
   // needs to stay the same object across this card's re-renders. A lazy
@@ -346,10 +437,8 @@ export const HomeVideoCard = memo(function HomeVideoCard({ video }: { video: Rec
             className="
               line-clamp-2
               text-[13px]
-              sm:text-[16px]
               font-semibold
               leading-5
-              sm:leading-6
               text-white
               light:text-slate-900
             "
@@ -429,7 +518,9 @@ export const HomeVideoCard = memo(function HomeVideoCard({ video }: { video: Rec
 
   // Real uploaded videos link to their actual watch page. Example
   // (dummy) cards stay exactly as before — not clickable, since
-  // they don't point to anything real.
+  // they don't point to anything real. Interested/Not Interested only
+  // renders for real videos too — there's no real backend row for a dummy
+  // card's feedback to attach to.
   if (video.videoId) {
     return (
       <article className="group transition-all duration-300">
@@ -442,6 +533,9 @@ export const HomeVideoCard = memo(function HomeVideoCard({ video }: { video: Rec
           {thumbnail}
         </Link>
         {information}
+        {onFeedbackChange && (
+          <VideoFeedbackButtons videoId={video.videoId} feedback={feedback} onChange={onFeedbackChange} />
+        )}
       </article>
     );
   }
@@ -477,6 +571,56 @@ export default function RecommendationFeed({
     ...realShorts,
     ...shorts,
   ]);
+
+  // The signed-in viewer's real Interested/Not Interested feedback (see
+  // app/api/video-feedback/route.ts) — loaded once on mount. "Not
+  // Interested" videos are filtered out of BOTH the regular grid and the
+  // Raftaar/Shorts shelf below (visibleItems/visibleShorts), which is what
+  // makes the buttons under each card and VideoOptionsMenu.tsx's matching
+  // menu entries an actual working recommendation signal instead of a
+  // toggle with no real effect. Empty for a signed-out visitor — nothing
+  // to filter, same as every other personalization on this page.
+  const [feedbackMap, setFeedbackMap] = useState<Record<string, "interested" | "not_interested">>({});
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await authedFetch("/api/video-feedback");
+        if (!res.ok) return;
+        const data = await res.json().catch(() => ({}));
+        if (!cancelled) setFeedbackMap(data.feedback || {});
+      } catch (err) {
+        console.error("Failed to load video feedback:", err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleFeedbackChange = (videoId: string, value: "interested" | "not_interested" | null) => {
+    setFeedbackMap((prev) => {
+      if (value === null) {
+        const next = { ...prev };
+        delete next[videoId];
+        return next;
+      }
+      return { ...prev, [videoId]: value };
+    });
+  };
+
+  // Real videos/shorts a viewer has marked "not_interested" are dropped
+  // from both feeds entirely — dummy/example items (no videoId) never have
+  // feedback rows and always pass through untouched.
+  const visibleItems = useMemo(
+    () => items.filter((video) => !video.videoId || feedbackMap[video.videoId] !== "not_interested"),
+    [items, feedbackMap]
+  );
+  const visibleShorts = useMemo(
+    () => shuffledShorts.filter((short) => !short.videoId || feedbackMap[short.videoId] !== "not_interested"),
+    [shuffledShorts, feedbackMap]
+  );
 
   // Proactively fetch the Mux player chunk in the background as soon as the
   // feed mounts, instead of waiting for a card's first hover/scroll-preview
@@ -518,26 +662,26 @@ export default function RecommendationFeed({
 
   useEffect(() => {
     (() => {
-      const candidates = [8, 16, 20].filter((n) => n <= items.length);
+      const candidates = [8, 16, 20].filter((n) => n <= visibleItems.length);
       setAdSlotIndex(
         candidates.length > 0
           ? candidates[Math.floor(Math.random() * candidates.length)]
           : null
       );
     })();
-  }, [items.length]);
+  }, [visibleItems.length]);
 
   type FeedEntry = { kind: "video"; video: Recommendation } | { kind: "ad" };
   const feedEntries = useMemo<FeedEntry[]>(() => {
     const entries: FeedEntry[] = [];
-    items.forEach((video, index) => {
+    visibleItems.forEach((video, index) => {
       if (adSlotIndex !== null && index === adSlotIndex) {
         entries.push({ kind: "ad" });
       }
       entries.push({ kind: "video", video });
     });
     return entries;
-  }, [items, adSlotIndex]);
+  }, [visibleItems, adSlotIndex]);
 
   // Keep the discovery feed in repeating YouTube-style blocks for the video
   // grid itself — a fixed 4 videos per block, on every screen size. This
@@ -575,7 +719,12 @@ export default function RecommendationFeed({
     entry.kind === "ad" ? (
       <AdThumbnailCard key="ad-slot" />
     ) : (
-      <HomeVideoCard key={entry.video.id} video={entry.video} />
+      <HomeVideoCard
+        key={entry.video.id}
+        video={entry.video}
+        feedback={entry.video.videoId ? feedbackMap[entry.video.videoId] ?? null : null}
+        onFeedbackChange={handleFeedbackChange}
+      />
     );
 
   // Vertical view: a Shorts-only responsive grid (fills every device width,
@@ -590,13 +739,13 @@ export default function RecommendationFeed({
           </h2>
         </div>
 
-        {shuffledShorts.length === 0 ? (
+        {visibleShorts.length === 0 ? (
           <p className="text-sm text-slate-400 light:text-slate-600">
             No vertical videos yet.
           </p>
         ) : (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 lg:gap-4">
-            {shuffledShorts.map((short) => (
+            {visibleShorts.map((short) => (
               <ShortCard key={short.id} short={short} />
             ))}
           </div>
@@ -634,7 +783,7 @@ export default function RecommendationFeed({
         let showShortsShelf = false;
 
         if (wantsShelf) {
-          shelfShorts = shuffledShorts.slice(
+          shelfShorts = visibleShorts.slice(
             shelfCursor * shortsPerShelf,
             (shelfCursor + 1) * shortsPerShelf
           );

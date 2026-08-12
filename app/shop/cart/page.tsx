@@ -14,6 +14,7 @@ import {
   type CheckoutGroupResult,
 } from "@/app/lib/hammartCheckoutClient";
 import LocationMapPicker, { type LocationAddress } from "@/app/components/hammart/LocationMapPicker";
+import IndiaLocationFields from "@/app/components/hammart/IndiaLocationFields";
 import ShopNavLinks from "@/app/components/hammart/ShopNavLinks";
 import type { HammartProduct } from "@/app/lib/hammartProducts";
 
@@ -587,28 +588,12 @@ export default function CartPage() {
                   />
                 </div>
                 <div className="grid grid-cols-3 gap-2">
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-300 light:text-slate-800 uppercase">City</label>
-                    <input
-                      type="text"
-                      required
-                      value={city}
-                      onChange={(e) => setCity(e.target.value)}
-                      placeholder="City"
-                      className="mt-1 w-full rounded-xl border border-white/10 light:border-slate-300 bg-white/5 light:bg-white px-3 py-2 text-xs text-white light:text-slate-900 placeholder:text-slate-500 light:placeholder:text-slate-600 outline-none focus:border-orange-400 font-medium"
-                    />
-                  </div>
-                  <div>
-                    <label className="text-[11px] font-bold text-slate-300 light:text-slate-800 uppercase">State</label>
-                    <input
-                      type="text"
-                      required
-                      value={stateName}
-                      onChange={(e) => setStateName(e.target.value)}
-                      placeholder="State"
-                      className="mt-1 w-full rounded-xl border border-white/10 light:border-slate-300 bg-white/5 light:bg-white px-3 py-2 text-xs text-white light:text-slate-900 placeholder:text-slate-500 light:placeholder:text-slate-600 outline-none focus:border-orange-400 font-medium"
-                    />
-                  </div>
+                  <IndiaLocationFields
+                    state={stateName}
+                    city={city}
+                    onStateChange={setStateName}
+                    onCityChange={setCity}
+                  />
                   <div>
                     <label className="text-[11px] font-bold text-slate-300 light:text-slate-800 uppercase">Pincode</label>
                     <input

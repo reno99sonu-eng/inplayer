@@ -63,6 +63,25 @@ dependencies:
   # Video Player
   video_player: ^2.9.1
 
+  # Native share sheet — used by the Share action on the watch page.
+  share_plus: ^12.0.2
+
+  # Opens Help/Terms/Privacy Policy links (the real inplayer.in pages) from
+  # Settings in an external browser / custom tab.
+  url_launcher: ^6.3.1
+
+  # Typography — matches the website's own font. The website loads
+  # Plus_Jakarta_Sans via next/font/google (see app/layout.tsx); this
+  # package fetches/caches the same Google Font at runtime instead of the
+  # app falling back to Android's default system font.
+  google_fonts: ^6.2.1
+
+  # Picks a video from the device gallery for the Upload flow — the mobile
+  # equivalent of the website's drag-and-drop file picker
+  # (app/upload/page.tsx). Uses the system photo/video picker, so no
+  # storage permission handling is needed on our end.
+  image_picker: ^1.1.2
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
@@ -92,3 +111,15 @@ flutter_launcher_icons:
   android: "ic_launcher"
   image_path: "assets/images/app_icon.png"
   min_sdk_android: 21
+  # Adaptive icon (Android 8+, API 26+) — same logo, split into a solid
+  # background + a foreground layer padded into the safe zone, so it
+  # doesn't get clipped by circle/squircle/rounded-square launcher masks
+  # the way the old edge-to-edge single-layer icon did. The mipmap PNGs +
+  # XML this generates were also hand-regenerated once already this round
+  # (android/app/src/main/res/mipmap-*/ic_launcher*.png +
+  # mipmap-anydpi-v26/ic_launcher.xml) since there's no Flutter SDK in this
+  # environment to run this package's generator — re-running
+  # `flutter pub run flutter_launcher_icons:main` after any future icon
+  # change will regenerate the same files from this config.
+  adaptive_icon_background: "#05070D"
+  adaptive_icon_foreground: "assets/images/app_icon_foreground.png"

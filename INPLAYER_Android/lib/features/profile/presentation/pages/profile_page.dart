@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/image_utils.dart';
 import '../../../../providers/auth_provider.dart';
 
 class ProfilePage extends ConsumerWidget {
@@ -32,6 +33,10 @@ class ProfilePage extends ConsumerWidget {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.notifications_outlined),
+            onPressed: () => context.push('/notifications'),
+          ),
+          IconButton(
             icon: const Icon(Icons.settings),
             onPressed: () => context.push('/settings'),
           ),
@@ -48,10 +53,12 @@ class ProfilePage extends ConsumerWidget {
                   // Avatar
                   CircleAvatar(
                     radius: 50,
+                    backgroundColor: AppColors.surfaceDark,
                     backgroundImage: user.avatarUrl != null
-                        ? NetworkImage(user.avatarUrl!)
+                        ? smartImageProvider(user.avatarUrl!)
                         : null,
-                    child: user.avatarUrl == null
+                    child: user.avatarUrl == null ||
+                            smartImageProvider(user.avatarUrl!) == null
                         ? const Icon(Icons.person, size: 50)
                         : null,
                   ),
@@ -117,37 +124,27 @@ class ProfilePage extends ConsumerWidget {
             _buildMenuItem(
               icon: Icons.video_library,
               title: 'My Videos',
-              onTap: () {
-                // TODO: Navigate to my videos
-              },
+              onTap: () => context.push('/my-videos'),
             ),
             _buildMenuItem(
               icon: Icons.thumb_up,
               title: 'Liked Videos',
-              onTap: () {
-                // TODO: Navigate to liked videos
-              },
+              onTap: () => context.push('/liked-videos'),
             ),
             _buildMenuItem(
               icon: Icons.history,
               title: 'Watch History',
-              onTap: () {
-                // TODO: Navigate to watch history
-              },
+              onTap: () => context.push('/watch-history'),
             ),
             _buildMenuItem(
               icon: Icons.bookmark,
               title: 'Watchlist',
-              onTap: () {
-                // TODO: Navigate to watchlist
-              },
+              onTap: () => context.push('/watchlist'),
             ),
             _buildMenuItem(
               icon: Icons.playlist_play,
               title: 'Playlists',
-              onTap: () {
-                // TODO: Navigate to playlists
-              },
+              onTap: () => context.push('/playlists'),
             ),
             _buildMenuItem(
               icon: Icons.message,
@@ -158,7 +155,15 @@ class ProfilePage extends ConsumerWidget {
               icon: Icons.download,
               title: 'Downloads',
               onTap: () {
-                // TODO: Navigate to downloads
+                // There's no real download pipeline yet — videos are Mux
+                // HLS streams, not files — so this is an honest "not yet"
+                // rather than a fake button that looks like it works.
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text("Downloads aren't available yet."),
+                    backgroundColor: AppColors.surfaceDark,
+                  ),
+                );
               },
             ),
             const Divider(height: 1, color: AppColors.cardDark),

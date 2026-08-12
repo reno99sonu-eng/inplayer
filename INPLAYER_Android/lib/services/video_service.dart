@@ -17,13 +17,12 @@ class VideoService {
 
   /// Loads the real video feed from the InPlayer website backend.
   ///
-  /// NOTE:
-  /// The live website currently does not expose /api/videos as a
-  /// general video-list endpoint, so we use the existing featured
-  /// endpoint as the initial real video source.
+  /// This is the same `/api/videos` endpoint the website's homepage,
+  /// /videos, and channel pages all read from (see app/api/videos/route.ts)
+  /// — it returns every public, ready video, newest first.
   Future<List<Video>> getVideos() async {
     try {
-      final response = await _dio.get(ApiConstants.featuredWeekly);
+      final response = await _dio.get(ApiConstants.videos);
 
       if (response.statusCode != 200) {
         _logger.w(
@@ -35,14 +34,14 @@ class VideoService {
       final data = response.data;
 
       if (data is! Map) {
-        _logger.w('Unexpected /api/featured-weekly response format');
+        _logger.w('Unexpected /api/videos response format');
         return [];
       }
 
       final videosJson = data['videos'];
 
       if (videosJson is! List) {
-        _logger.w('No videos array found in featured response');
+        _logger.w('No videos array found in /api/videos response');
         return [];
       }
 
@@ -262,10 +261,17 @@ class VideoService {
   /// Loads real Shorts from the existing InPlayer backend.
   ///
   /// There are intentionally NO sample/dummy Shorts here.
+  ///
+  /// NOTE: the website has no standalone `/api/shorts` REST endpoint —
+  /// app/shorts/page.tsx renders Shorts server-side by filtering the same
+  /// video list down to `contentType === "short"`. We reuse `/api/videos`
+  /// here and apply that identical filter client-side so the app reads
+  /// from real data instead of a route that doesn't exist (which is why
+  /// Raftaar/Shorts always came back empty before).
   Future<List<Short>> getShorts() async {
     try {
       final response = await _dio.get(
-        ApiConstants.shorts,
+        ApiConstants.videos,
       );
 
       if (response.statusCode != 200) {
@@ -277,26 +283,20 @@ class VideoService {
 
       final data = response.data;
 
-      List<dynamic> shortsJson;
-
-      if (data is List) {
-        shortsJson = data;
-      } else if (data is Map && data['shorts'] is List) {
-        shortsJson = data['shorts'] as List;
-      } else {
+      if (data is! Map || data['videos'] is! List) {
         _logger.w(
-          'Unexpected /api/shorts response format',
+          'Unexpected /api/videos response format for shorts',
         );
         return [];
       }
 
-      return shortsJson
+      final videosJson = data['videos'] as List;
+
+      return videosJson
           .whereType<Map>()
-          .map(
-            (json) => Short.fromJson(
-              Map<String, dynamic>.from(json),
-            ),
-          )
+          .map((json) => Map<String, dynamic>.from(json))
+          .where((json) => json['contentType'] == 'short')
+          .map((json) => Short.fromJson(json))
           .toList();
     } catch (e, stackTrace) {
       _logger.e(
@@ -308,13 +308,17 @@ class VideoService {
     }
   }
 
+  /// NOTE: the website has no `/api/search` endpoint — its navbar search
+  /// box calls `/api/videos/suggest` for lightweight autocomplete
+  /// (videoId/title/thumbnail only, see app/api/videos/suggest/route.ts),
+  /// not full video cards. To keep returning full `Video` objects (so the
+  /// existing search results grid/VideoCard keeps working unchanged), this
+  /// reuses `/api/videos` and filters by title client-side instead of
+  /// calling a route that returns 404.
   Future<List<Video>> searchVideos(String query) async {
     try {
       final response = await _dio.get(
-        ApiConstants.search,
-        queryParameters: {
-          'q': query,
-        },
+        ApiConstants.videos,
       );
 
       if (response.statusCode != 200) {
@@ -323,23 +327,20 @@ class VideoService {
 
       final data = response.data;
 
-      List<dynamic> videosJson;
-
-      if (data is List) {
-        videosJson = data;
-      } else if (data is Map && data['videos'] is List) {
-        videosJson = data['videos'] as List;
-      } else {
+      if (data is! Map || data['videos'] is! List) {
         return [];
       }
 
-      return videosJson
+      final lowerQuery = query.toLowerCase();
+
+      return (data['videos'] as List)
           .whereType<Map>()
-          .map(
-            (json) => Video.fromJson(
-              Map<String, dynamic>.from(json),
-            ),
+          .map((json) => Map<String, dynamic>.from(json))
+          .where(
+            (json) => (json['title']?.toString().toLowerCase() ?? '')
+                .contains(lowerQuery),
           )
+          .map((json) => Video.fromJson(json))
           .toList();
     } catch (e, stackTrace) {
       _logger.e(
@@ -347,6 +348,55 @@ class VideoService {
         error: e,
         stackTrace: stackTrace,
       );
+      return [];
+    }
+  }
+
+  /// The signed-in user's own uploads (Creator Studio / "My Videos").
+  /// GET /api/my-videos (app/api/my-videos/route.ts) — every video where
+  /// uploaderId matches the caller, any status/visibility (unlike the
+  /// public feed, this includes the owner's own drafts/private videos).
+  Future<List<Video>> getMyVideos() async {
+    try {
+      final response = await _dio.get(ApiConstants.myVideos);
+
+      if (response.statusCode != 200 || response.data is! Map) {
+        return [];
+      }
+
+      final videosJson = (response.data as Map)['videos'];
+      if (videosJson is! List) return [];
+
+      return videosJson
+          .whereType<Map>()
+          .map((json) => Video.fromJson(Map<String, dynamic>.from(json)))
+          .toList();
+    } catch (e, stackTrace) {
+      _logger.e('Error fetching my videos', error: e, stackTrace: stackTrace);
+      return [];
+    }
+  }
+
+  /// Videos the signed-in user has liked (Profile -> Liked Videos).
+  /// GET /api/likes/my-likes (app/api/likes/my-likes/route.ts) returns
+  /// full video records (each with an extra `likedAt`), not just IDs.
+  Future<List<Video>> getLikedVideos() async {
+    try {
+      final response = await _dio.get(ApiConstants.myLikes);
+
+      if (response.statusCode != 200 || response.data is! Map) {
+        return [];
+      }
+
+      final videosJson = (response.data as Map)['videos'];
+      if (videosJson is! List) return [];
+
+      return videosJson
+          .whereType<Map>()
+          .map((json) => Video.fromJson(Map<String, dynamic>.from(json)))
+          .toList();
+    } catch (e, stackTrace) {
+      _logger.e('Error fetching liked videos', error: e, stackTrace: stackTrace);
       return [];
     }
   }

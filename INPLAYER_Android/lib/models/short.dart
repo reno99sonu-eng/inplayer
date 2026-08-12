@@ -41,24 +41,37 @@ class Short {
   }
 
   factory Short.fromJson(Map<String, dynamic> json) {
+    // On the raw video item (what `/api/videos` and DynamoDB actually
+    // store), the soundtrack picked in ShortCreationTools lives nested
+    // under `shortSettings.soundtrack`, not a top-level `soundtrack` key —
+    // see app/shorts/page.tsx's own mapping on the website side.
+    final shortSettings = json['shortSettings'];
+    final soundtrackJson = shortSettings is Map
+        ? shortSettings['soundtrack']
+        : json['soundtrack'];
+
     return Short(
       id: json['id']?.toString() ?? json['videoId']?.toString() ?? '',
       videoId: json['videoId']?.toString() ?? '',
       title: json['title'] ?? '',
-      creator: json['creator'] ?? json['uploaderName'] ?? 'Unknown',
+      creator: json['uploaderName'] ?? json['creator'] ?? 'Unknown',
       uploaderUsername: json['uploaderUsername'],
       uploaderId: json['uploaderId']?.toString(),
-      uploaderAvatarUrl: json['uploaderAvatarUrl'] != null 
-          ? _resolveUrl(json['uploaderAvatarUrl']) 
+      uploaderAvatarUrl: json['uploaderAvatarUrl'] != null
+          ? _resolveUrl(json['uploaderAvatarUrl'])
           : null,
       poster: _resolveUrl(json['poster'] ?? json['thumbnailUrl'] ?? ''),
       views: _formatViews(json['views'] ?? 0),
-      likes: _formatCount(json['likes'] ?? 0),
-      comments: _formatCount(json['comments'] ?? 0),
+      // `likeCount`/`commentCount` are the real raw field names on a video
+      // item; `likes`/`comments` are kept as a fallback in case a future
+      // endpoint pre-formats them the way the website's server-rendered
+      // Shorts page currently does.
+      likes: _formatCount(json['likes'] ?? json['likeCount'] ?? 0),
+      comments: _formatCount(json['comments'] ?? json['commentCount'] ?? 0),
       description: json['description'],
       muxPlaybackId: json['muxPlaybackId'],
-      soundtrack: json['soundtrack'] != null 
-          ? Soundtrack.fromJson(json['soundtrack']) 
+      soundtrack: soundtrackJson is Map
+          ? Soundtrack.fromJson(Map<String, dynamic>.from(soundtrackJson))
           : null,
     );
   }

@@ -187,6 +187,10 @@ function AdvertisingPage() {
   const [croppingAi, setCroppingAi] = useState(false);
   const [generatingTitleAi, setGeneratingTitleAi] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  // Set only while a multi-file batch (see handleFileChange) is publishing
+  // several creatives back-to-back — null the rest of the time, including
+  // during the normal single-file preview flow.
+  const [batchProgress, setBatchProgress] = useState<string | null>(null);
 
   // Weekly Featured Banner Upload Form State — two independent upload
   // slots (mobile & tablet/iPad, desktop & smart TV) instead of the single
@@ -219,6 +223,8 @@ function AdvertisingPage() {
   const [midrollGeneratingTitleAi, setMidrollGeneratingTitleAi] = useState(false);
   const [midrollFile, setMidrollFile] = useState<File | null>(null);
   const midrollFileInputRef = useRef<HTMLInputElement>(null);
+  // Same batch-progress convention as banner uploads' batchProgress above.
+  const [midrollBatchProgress, setMidrollBatchProgress] = useState<string | null>(null);
 
   const loadSettings = async () => {
     try {
@@ -373,58 +379,212 @@ function AdvertisingPage() {
     }
   };
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setUploadError(null);
-    try {
-      if (file.type.startsWith("video/")) {
-        if (file.size <= 250_000) {
-          setUploadFileType("video");
+  // Shared by the single-file preview flow AND the multi-file batch flow
+  // below, so both go through the exact same compression/size rules — no
+  // risk of the batch path silently behaving differently from the existing,
+  // already-working single-file path.
+  const processBannerFile = async (
+    file: File,
+    ratio: number
+  ): Promise<{ dataUrl: string; fileType: "image" | "video" }> => {
+    if (file.type.startsWith("video/")) {
+      if (file.size <= 250_000) {
+        const dataUrl = await new Promise<string>((resolve, reject) => {
           const reader = new FileReader();
           reader.onload = (event) => {
-            if (typeof event.target?.result === "string") {
-              setUploadPreview(event.target.result);
-            }
+            if (typeof event.target?.result === "string") resolve(event.target.result);
+            else reject(new Error(`"${file.name}": couldn't read that video file.`));
           };
+          reader.onerror = () => reject(new Error(`"${file.name}": couldn't read that video file.`));
           reader.readAsDataURL(file);
-        } else {
-          setUploadFileType("image");
-          const poster = await extractVideoFramePoster(file);
-          setUploadPreview(poster);
-        }
-      } else {
-        setUploadFileType("image");
-        const compressed = await compressImageToBanner(file, 140_000, getBannerAspectRatio(activePanel));
-        setUploadPreview(compressed);
+        });
+        return { dataUrl, fileType: "video" };
       }
-    } catch (err) {
-      setUploadError(err instanceof Error ? err.message : "Couldn't process that file.");
+      const poster = await extractVideoFramePoster(file);
+      return { dataUrl: poster, fileType: "image" };
+    }
+    const compressed = await compressImageToBanner(file, 140_000, ratio);
+    return { dataUrl: compressed, fileType: "image" };
+  };
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    setUploadError(null);
+
+    // One file selected — exactly the original flow: preview it, let the
+    // admin title/crop/review, then Publish Creative below does the
+    // actual POST. Nothing about this path changed.
+    if (files.length === 1) {
+      try {
+        const { dataUrl, fileType } = await processBannerFile(files[0], getBannerAspectRatio(activePanel));
+        setUploadFileType(fileType);
+        setUploadPreview(dataUrl);
+      } catch (err) {
+        setUploadError(err instanceof Error ? err.message : "Couldn't process that file.");
+      }
+      return;
+    }
+
+    // Multiple files selected at once — publish each straight away as its
+    // own creative under the Title/Link already typed above (numbered so
+    // the creative list doesn't show N identical, indistinguishable rows),
+    // instead of the single-file flow above which can only ever preview
+    // one file for manual review before publishing.
+    if (!uploadTitle.trim() || !/^https?:\/\//.test(uploadLink.trim())) {
+      setUploadError(
+        "Enter a Title and a valid Destination Link above first — every file in a multi-file batch publishes under these same details."
+      );
+      if (fileInputRef.current) fileInputRef.current.value = "";
+      return;
+    }
+
+    setUploading(true);
+    let failures = 0;
+    try {
+      for (let i = 0; i < files.length; i++) {
+        setBatchProgress(`Uploading ${i + 1} of ${files.length}...`);
+        try {
+          const { dataUrl } = await processBannerFile(files[i], getBannerAspectRatio(activePanel));
+          const res = await authedFetch("/api/admin/ads", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              placement: activePanel as Placement,
+              imageUrl: dataUrl,
+              linkUrl: uploadLink.trim(),
+              title: `${uploadTitle.trim()} (${i + 1})`,
+            }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (!res.ok) throw new Error(data.error || `Couldn't create creative ${i + 1}.`);
+          if (data?.ad) setCreatives((prev) => [data.ad, ...prev]);
+        } catch (err) {
+          failures++;
+          console.error(`Batch banner upload: file ${i + 1} (${files[i].name}) failed:`, err);
+        }
+      }
+      if (failures > 0) {
+        setUploadError(
+          `${files.length - failures} of ${files.length} uploaded. ${failures} failed — check file size/type and try those again individually.`
+        );
+      }
+    } finally {
+      setBatchProgress(null);
+      setUploading(false);
+      setUploadTitle("");
+      setUploadLink("");
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
 
-  const handleMidrollFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setMidrollUploadError(null);
-    try {
-      if (file.type.startsWith("video/")) {
-        if (file.type !== "video/mp4" && file.type !== "video/webm") {
-          throw new Error("Mid-roll videos must be MP4 or WebM.");
-        }
-        if (file.size > 550_000_000) {
-          throw new Error("Mid-roll videos must be 550 MB or smaller.");
-        }
-        setMidrollFileType("video");
-        setMidrollFile(file);
-        setMidrollPreview(URL.createObjectURL(file));
-      } else {
-        setMidrollFileType("image");
-        const compressed = await compressImageToBanner(file);
-        setMidrollPreview(compressed);
+  // Shared by the single-file preview flow AND the multi-file batch flow
+  // below — same reasoning as processBannerFile above.
+  const processMidrollFile = async (
+    file: File
+  ): Promise<{ dataUrl: string; fileType: "image" | "video"; rawFile?: File }> => {
+    if (file.type.startsWith("video/")) {
+      if (file.type !== "video/mp4" && file.type !== "video/webm") {
+        throw new Error(`"${file.name}": mid-roll videos must be MP4 or WebM.`);
       }
-    } catch (err) {
-      setMidrollUploadError(err instanceof Error ? err.message : "Couldn't process that file.");
+      if (file.size > 550_000_000) {
+        throw new Error(`"${file.name}": mid-roll videos must be 550 MB or smaller.`);
+      }
+      return { dataUrl: URL.createObjectURL(file), fileType: "video", rawFile: file };
+    }
+    const compressed = await compressImageToBanner(file);
+    return { dataUrl: compressed, fileType: "image" };
+  };
+
+  const handleMidrollFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    setMidrollUploadError(null);
+
+    // One file — original flow, untouched: preview it, let the admin
+    // title/crop/review, Publish Ad below (submitMidrollAd) does the
+    // actual create (including the real Mux upload for videos).
+    if (files.length === 1) {
+      try {
+        const { dataUrl, fileType, rawFile } = await processMidrollFile(files[0]);
+        setMidrollFileType(fileType);
+        setMidrollFile(rawFile || null);
+        setMidrollPreview(dataUrl);
+      } catch (err) {
+        setMidrollUploadError(err instanceof Error ? err.message : "Couldn't process that file.");
+      }
+      return;
+    }
+
+    // Multiple files at once — publish each as its own mid-roll creative
+    // under the Title/Link already typed above (numbered, same as the
+    // banner batch flow). Videos still go through the real per-file Mux
+    // upload pipeline (same steps as submitMidrollAd's video branch), just
+    // repeated once per selected file instead of requiring the admin to
+    // redo the whole form for each one.
+    if (!midrollTitle.trim() || !/^https?:\/\//.test(midrollLink.trim())) {
+      setMidrollUploadError(
+        "Enter a Title and a valid Destination Link above first — every file in a multi-file batch publishes under these same details."
+      );
+      if (midrollFileInputRef.current) midrollFileInputRef.current.value = "";
+      return;
+    }
+
+    setMidrollUploading(true);
+    let failures = 0;
+    try {
+      for (let i = 0; i < files.length; i++) {
+        setMidrollBatchProgress(`Uploading ${i + 1} of ${files.length}...`);
+        const batchTitle = `${midrollTitle.trim()} (${i + 1})`;
+        try {
+          const { dataUrl, fileType, rawFile } = await processMidrollFile(files[i]);
+          if (fileType === "video" && rawFile) {
+            const res = await authedFetch("/api/admin/midroll-ads/create-upload", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ title: batchTitle, linkUrl: midrollLink.trim() }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || "Couldn't start video upload.");
+            const { uploadUrl } = data;
+            await new Promise<void>((resolve, reject) => {
+              const xhr = new XMLHttpRequest();
+              xhr.open("PUT", uploadUrl);
+              xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) resolve();
+                else reject(new Error(`Upload failed with status ${xhr.status}`));
+              };
+              xhr.onerror = () => reject(new Error("Network error during upload"));
+              xhr.send(rawFile);
+            });
+          } else {
+            const res = await authedFetch("/api/admin/midroll-ads", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ imageUrl: dataUrl, linkUrl: midrollLink.trim(), title: batchTitle }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) throw new Error(data.error || "Couldn't create that ad creative.");
+            if (data?.ad) setMidrollAds((prev) => [data.ad, ...prev]);
+          }
+        } catch (err) {
+          failures++;
+          console.error(`Mid-roll batch upload: file ${i + 1} (${files[i].name}) failed:`, err);
+        }
+      }
+      if (failures > 0) {
+        setMidrollUploadError(
+          `${files.length - failures} of ${files.length} uploaded. ${failures} failed — check file type/size and try those again individually.`
+        );
+      } else {
+        alert(`${files.length} mid-roll ads uploaded. Video ads will appear once processing finishes.`);
+      }
+    } finally {
+      setMidrollBatchProgress(null);
+      setMidrollUploading(false);
+      setMidrollTitle("");
+      setMidrollLink("");
+      if (midrollFileInputRef.current) midrollFileInputRef.current.value = "";
     }
   };
 
@@ -931,13 +1091,43 @@ function AdvertisingPage() {
 
   const ctr = totalImpressions > 0 ? ((totalClicks / totalImpressions) * 100).toFixed(2) : "0.00";
 
-  const navItems: { id: SidePanel; label: string; icon: React.ElementType; badge?: string }[] = [
+  // Live-status per section — computed straight from state already in
+  // memory (settings + loaded creatives), so it updates the instant an
+  // admin flips a toggle or activates/pauses a creative, no extra fetch or
+  // polling needed. "Live" means a real visitor would actually see an ad
+  // from this section right now, not just that the section is switched on:
+  // a "house" source with zero active creatives, or an "adsense" source
+  // with AdSense itself off/unconfigured, both correctly show as not live.
+  const isHomepageLive =
+    settings.homepageBannerSource === "off"
+      ? false
+      : settings.homepageBannerSource === "adsense"
+      ? settings.adsenseEnabled && Boolean(settings.adsensePublisherId.trim())
+      : safeCreatives.some((c) => c.placement === "homepage" && c.active);
+
+  const isWatchLive =
+    settings.watchPageBannerSource === "off"
+      ? false
+      : settings.watchPageBannerSource === "adsense"
+      ? settings.adsenseEnabled && Boolean(settings.adsensePublisherId.trim())
+      : safeCreatives.some((c) => c.placement === "watch" && c.active);
+
+  const isWeeklyFeaturedLive =
+    settings.weeklyFeaturedEnabled && safeCreatives.some((c) => c.placement === "weekly_featured" && c.active);
+
+  const isMidrollLive =
+    settings.midrollEnabled &&
+    safeMidrollAds.some((m) => m.active && (m.status === undefined || m.status === "ready"));
+
+  const isAdsenseLive = settings.adsenseEnabled && Boolean(settings.adsensePublisherId.trim());
+
+  const navItems: { id: SidePanel; label: string; icon: React.ElementType; badge?: string; live?: boolean }[] = [
     { id: "overview", label: "Overview & Stats", icon: BarChart3 },
-    { id: "homepage", label: "Homepage Banner", icon: Home, badge: String(safeCreatives.filter((c) => c.placement === "homepage").length) },
-    { id: "watch", label: "Watch Page Banner", icon: Tv, badge: String(safeCreatives.filter((c) => c.placement === "watch").length) },
-    { id: "weekly_featured", label: "Weekly Featured Banner", icon: Star, badge: String(safeCreatives.filter((c) => c.placement === "weekly_featured").length) },
-    { id: "midroll", label: "Video Mid-Roll Ads", icon: Video, badge: String(safeMidrollAds.length) },
-    { id: "adsense", label: "Google AdSense", icon: Globe },
+    { id: "homepage", label: "Homepage Banner", icon: Home, badge: String(safeCreatives.filter((c) => c.placement === "homepage").length), live: isHomepageLive },
+    { id: "watch", label: "Watch Page Banner", icon: Tv, badge: String(safeCreatives.filter((c) => c.placement === "watch").length), live: isWatchLive },
+    { id: "weekly_featured", label: "Weekly Featured Banner", icon: Star, badge: String(safeCreatives.filter((c) => c.placement === "weekly_featured").length), live: isWeeklyFeaturedLive },
+    { id: "midroll", label: "Video Mid-Roll Ads", icon: Video, badge: String(safeMidrollAds.length), live: isMidrollLive },
+    { id: "adsense", label: "Google AdSense", icon: Globe, live: isAdsenseLive },
     { id: "specs", label: "Poster Specs & Ratios", icon: Ruler },
   ];
 
@@ -975,6 +1165,14 @@ function AdvertisingPage() {
               }`}
             >
               <div className="flex items-center gap-2.5">
+                {item.live !== undefined && (
+                  <span
+                    className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${
+                      item.live ? "bg-emerald-400 animate-pulse" : "bg-slate-500"
+                    }`}
+                    title={item.live ? "Live — currently serving to visitors" : "Not currently serving any ad"}
+                  />
+                )}
                 <Icon size={15} />
                 <span>{item.label}</span>
               </div>
@@ -1085,8 +1283,22 @@ function AdvertisingPage() {
           <div className="space-y-4">
             <div className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <span className="text-xs font-bold text-white light:text-slate-900 block">
+                <span className="flex items-center gap-2 text-xs font-bold text-white light:text-slate-900">
                   {PLACEMENT_LABELS[activePanel as Placement] || "Ad Placement"} Status
+                  {(() => {
+                    const isLive =
+                      activePanel === "homepage" ? isHomepageLive : activePanel === "watch" ? isWatchLive : isWeeklyFeaturedLive;
+                    return (
+                      <span
+                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-black uppercase ${
+                          isLive ? "bg-emerald-500/20 text-emerald-300" : "bg-white/10 text-slate-400 light:bg-black/10 light:text-slate-600"
+                        }`}
+                      >
+                        <span className={`h-1.5 w-1.5 rounded-full ${isLive ? "bg-emerald-400 animate-pulse" : "bg-slate-500"}`} />
+                        {isLive ? "Live" : "Not Live"}
+                      </span>
+                    );
+                  })()}
                 </span>
                 <span className="text-[11px] text-slate-400 light:text-slate-600">
                   {activePanel === "weekly_featured"
@@ -1335,13 +1547,24 @@ function AdvertisingPage() {
                 {/* File Selector */}
                 <div>
                   <label className="block text-[11px] font-semibold text-slate-400 light:text-slate-600 mb-1">Select Media (Image or Video)</label>
+                  <p className="mb-1.5 text-[11px] text-slate-500">
+                    Pick one file to preview, AI-crop, and review before publishing — or select several at once to
+                    publish them all immediately under the Title/Link above (each gets numbered, e.g. &quot;(1)&quot;, &quot;(2)&quot;).
+                  </p>
                   <input
                     ref={fileInputRef}
                     type="file"
                     accept="image/*,video/*"
+                    multiple
                     onChange={handleFileChange}
-                    className="block w-full text-[11px] text-slate-400 light:text-slate-700 file:mr-2.5 file:rounded-xl file:border file:border-indigo-500/30 file:bg-indigo-600 file:px-3 file:py-1.5 file:text-[11px] file:font-bold file:text-white hover:file:bg-indigo-500 cursor-pointer shadow-sm"
+                    disabled={uploading}
+                    className="block w-full text-[11px] text-slate-400 light:text-slate-700 file:mr-2.5 file:rounded-xl file:border file:border-indigo-500/30 file:bg-indigo-600 file:px-3 file:py-1.5 file:text-[11px] file:font-bold file:text-white hover:file:bg-indigo-500 cursor-pointer shadow-sm disabled:opacity-50"
                   />
+                  {batchProgress && (
+                    <div className="mt-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-indigo-300 light:text-indigo-700">
+                      <Loader2 size={12} className="animate-spin" /> {batchProgress}
+                    </div>
+                  )}
                 </div>
 
                 {/* File Preview + X Remove Button + AI Crop & Redesign Button */}
@@ -1471,7 +1694,17 @@ function AdvertisingPage() {
           <div className="space-y-4">
             <div className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4 flex flex-wrap items-center justify-between gap-3">
               <div>
-                <span className="text-xs font-bold text-white light:text-slate-900 block">Video Player Mid-Roll Engine</span>
+                <span className="flex items-center gap-2 text-xs font-bold text-white light:text-slate-900">
+                  Video Player Mid-Roll Engine
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-black uppercase ${
+                      isMidrollLive ? "bg-emerald-500/20 text-emerald-300" : "bg-white/10 text-slate-400 light:bg-black/10 light:text-slate-600"
+                    }`}
+                  >
+                    <span className={`h-1.5 w-1.5 rounded-full ${isMidrollLive ? "bg-emerald-400 animate-pulse" : "bg-slate-500"}`} />
+                    {isMidrollLive ? "Live" : "Not Live"}
+                  </span>
+                </span>
                 <span className="text-[11px] text-slate-400 light:text-slate-600">
                   Interrupts video playback at set intervals with skip timer escalation.
                 </span>
@@ -1492,6 +1725,32 @@ function AdvertisingPage() {
               >
                 {settings.midrollEnabled ? "ON" : "OFF"}
               </button>
+            </div>
+
+            <div className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <span className="text-[11px] font-semibold text-slate-300 light:text-slate-700 block">Break Interval</span>
+                <span className="text-[10px] text-slate-500">
+                  Seconds of playback between ad breaks (60–3600). Defaulted to 900s (15 min) — lower this if breaks
+                  aren&apos;t showing up on shorter videos.
+                </span>
+              </div>
+              <input
+                type="number"
+                min={60}
+                max={3600}
+                step={30}
+                value={settings.midrollIntervalSeconds}
+                onChange={(e) => setSettings({ ...settings, midrollIntervalSeconds: Number(e.target.value) || 0 })}
+                onBlur={() => {
+                  const clamped = Math.min(3600, Math.max(60, settings.midrollIntervalSeconds || DEFAULT_SETTINGS.midrollIntervalSeconds));
+                  const next = { ...settings, midrollIntervalSeconds: clamped };
+                  setSettings(next);
+                  setSaved(false);
+                  saveSettings(next);
+                }}
+                className="w-24 flex-shrink-0 rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-white px-3 py-2 text-sm font-bold text-white light:text-slate-900 text-center outline-none focus:border-orange-400"
+              />
             </div>
 
             {/* Form */}
@@ -1548,14 +1807,23 @@ function AdvertisingPage() {
                     (VideoPlayer.tsx). */}
                 <p className="mb-1.5 text-[11px] text-slate-500">
                   Recommended for video ads: MP4 or WebM, 16:9 (1920×1080), 30 seconds or less, under 550MB. A video outside these won&apos;t fail to upload, but may be cropped, stretched, or feel too long during the ad break.
+                  Pick one file to preview &amp; review before publishing, or select several at once to publish them all
+                  immediately under the Title/Link above (each gets numbered).
                 </p>
                 <input
                   ref={midrollFileInputRef}
                   type="file"
                   accept="image/*,video/mp4,video/webm"
+                  multiple
                   onChange={handleMidrollFileChange}
-                  className="block w-full text-[11px] text-slate-400 light:text-slate-700 file:mr-2.5 file:rounded-xl file:border file:border-indigo-500/30 file:bg-indigo-600 file:px-3 file:py-1.5 file:text-[11px] file:font-bold file:text-white hover:file:bg-indigo-500 cursor-pointer shadow-sm"
+                  disabled={midrollUploading}
+                  className="block w-full text-[11px] text-slate-400 light:text-slate-700 file:mr-2.5 file:rounded-xl file:border file:border-indigo-500/30 file:bg-indigo-600 file:px-3 file:py-1.5 file:text-[11px] file:font-bold file:text-white hover:file:bg-indigo-500 cursor-pointer shadow-sm disabled:opacity-50"
                 />
+                {midrollBatchProgress && (
+                  <div className="mt-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-indigo-300 light:text-indigo-700">
+                    <Loader2 size={12} className="animate-spin" /> {midrollBatchProgress}
+                  </div>
+                )}
               </div>
 
               {midrollPreview && (

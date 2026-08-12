@@ -4,6 +4,8 @@ import {
   TransactWriteCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
+import { sendEmail } from "@/app/lib/ses";
+import { resolveCognitoEmails } from "@/app/lib/cognitoClient";
 
 // Hammart is InPlayer's marketplace. This file is the vendor-account
 // foundation everything else (product listings, KYC, checkout, admin
@@ -276,6 +278,33 @@ export async function setVendorRazorpayAccount(
       ExpressionAttributeValues: values,
     })
   );
+}
+
+// Swiggy/Zomato-style "you're live" notice — call this exactly once, the
+// moment a vendor's Razorpay Route linked account first reaches "active"
+// (never on a duplicate/no-op status write). There are two call sites that
+// can genuinely flip a vendor to "active": the account.activated webhook
+// (app/api/webhooks/razorpay/route.ts, the common path) and the admin
+// panel's manual "Check status" sync (app/api/admin/hammart-vendors/
+// route.ts, the fallback for whenever that webhook event is missed) — both
+// import this instead of duplicating the email. Never throws: the same
+// status is already visible on the vendor's own dashboard
+// (app/shop/vendor/page.tsx) the next time they load it, so a failed email
+// here is a missed convenience, not a missed source of truth.
+export async function notifyVendorPayoutsActive(vendorUserId: string): Promise<void> {
+  try {
+    const emailMap = await resolveCognitoEmails([vendorUserId]);
+    const vendorEmail = emailMap.get(vendorUserId);
+    if (!vendorEmail) return;
+    await sendEmail({
+      to: vendorEmail,
+      subject: "🎉 Instant payouts are now active on your Hammart store",
+      text: `Good news — Razorpay has approved automatic payouts for your Hammart store.\n\nFrom now on, buyers can pay you by card, netbanking, or any UPI app (not just UPI QR), and your share of every order (after InPlayer's flat ₹0.50 fee) lands straight in your bank account the moment payment is captured — no manual step needed.\n\nYou can see this status anytime on your Vendor Dashboard.`,
+      html: `<h2>Instant payouts are now active 🎉</h2><p>Razorpay has approved automatic payouts for your Hammart store.</p><p>From now on, buyers can pay you by card, netbanking, or any UPI app (not just UPI QR), and your share of every order (after InPlayer's flat ₹0.50 fee) lands straight in your bank account the moment payment is captured — no manual step needed.</p><p>You can see this status anytime on your Vendor Dashboard.</p>`,
+    });
+  } catch (err) {
+    console.error(`notifyVendorPayoutsActive: email failed for ${vendorUserId}:`, err);
+  }
 }
 
 export async function acceptVendorTerms(userId: string): Promise<void> {

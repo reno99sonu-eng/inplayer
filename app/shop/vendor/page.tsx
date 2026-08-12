@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2, Store, ShieldCheck, Clock, XCircle, CheckCircle2 } from "lucide-react";
+import { Loader2, Store, ShieldCheck, Clock, XCircle, CheckCircle2, Wallet, AlertTriangle } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { authedFetch } from "@/app/lib/apiFetch";
 import VendorKycForm from "@/app/components/hammart/VendorKycForm";
@@ -116,6 +116,79 @@ function BecomeVendorForm({ onRegistered }: { onRegistered: () => void }) {
         {submitting ? "Creating..." : "Create Vendor Account"}
       </button>
     </form>
+  );
+}
+
+// Vendor-facing view of the same razorpayAccountStatus the admin panel
+// already shows (app/admin/hammart-vendors/page.tsx) — before this, a
+// vendor had no way to see this at all and had to ask Reno directly.
+// "Instant payouts" here means the same thing it means everywhere else in
+// this codebase (see app/lib/razorpay.ts's Route section, app/api/hammart/
+// checkout/route.ts's header comment): once active, a buyer can pay this
+// vendor's listings by card/netbanking/any UPI app, and Razorpay
+// automatically sends this vendor's share straight to the bank account
+// they submitted at KYC the moment each payment is captured — no manual
+// step for the vendor or for Reno. Until then, buyers keep paying this
+// vendor directly via their own UPI ID (never blocked, never a reason to
+// worry) — same message the admin panel already gives.
+function PayoutStatusCard({ vendor }: { vendor: VendorProfile }) {
+  const status = vendor.razorpayAccountStatus || "not_started";
+
+  if (status === "active") {
+    return (
+      <div className="mt-4 flex flex-col items-center gap-1.5 rounded-2xl border border-emerald-400/20 bg-emerald-500/[0.06] p-5 text-center">
+        <Wallet size={20} className="text-emerald-400" />
+        <p className="text-sm font-semibold text-white light:text-slate-900">Instant payouts are active</p>
+        <p className="max-w-sm text-[11px] leading-5 text-slate-400 light:text-slate-600">
+          Buyers can now pay you by card, netbanking, or any UPI app. Your share of every order (after InPlayer&apos;s
+          flat ₹0.50 fee) lands in your bank account automatically the moment payment is captured.
+        </p>
+      </div>
+    );
+  }
+
+  if (status === "pending") {
+    return (
+      <div className="mt-4 flex flex-col items-center gap-1.5 rounded-2xl border border-amber-400/20 bg-amber-500/[0.06] p-5 text-center">
+        <Clock size={20} className="text-amber-400" />
+        <p className="text-sm font-semibold text-white light:text-slate-900">Payout setup in review</p>
+        <p className="max-w-sm text-[11px] leading-5 text-slate-400 light:text-slate-600">
+          Razorpay is reviewing your bank details for automatic payouts — this can take a little while. In the
+          meantime, buyers pay you directly via your UPI ID ({vendor.upiId || "on file"}), same as before.
+        </p>
+      </div>
+    );
+  }
+
+  if (status === "failed") {
+    return (
+      <div className="mt-4 flex flex-col items-center gap-1.5 rounded-2xl border border-red-400/20 bg-red-500/[0.06] p-5 text-center">
+        <AlertTriangle size={20} className="text-red-400" />
+        <p className="text-sm font-semibold text-white light:text-slate-900">Payout setup needs another look</p>
+        {vendor.razorpayAccountError && (
+          <p className="max-w-sm text-[11px] leading-5 text-red-300">{vendor.razorpayAccountError}</p>
+        )}
+        <p className="max-w-sm text-[11px] leading-5 text-slate-400 light:text-slate-600">
+          Buyers can still pay you directly via your UPI ID in the meantime — contact InPlayer support to have this
+          retried.
+        </p>
+      </div>
+    );
+  }
+
+  // "not_started" — either a vendor approved before this feature existed,
+  // or the automatic attempt hasn't run yet. Kept low-key on purpose: this
+  // is never something the vendor needs to act on themselves, and selling
+  // via UPI is never blocked by it.
+  return (
+    <div className="mt-4 flex flex-col items-center gap-1.5 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.02] p-5 text-center">
+      <Wallet size={20} className="text-slate-400" />
+      <p className="text-sm font-semibold text-white light:text-slate-900">Automatic payouts not set up yet</p>
+      <p className="max-w-sm text-[11px] leading-5 text-slate-400 light:text-slate-600">
+        Buyers pay you directly via your UPI ID for now. InPlayer support can enable automatic card/netbanking
+        payouts to your bank account for you.
+      </p>
+    </div>
   );
 }
 
@@ -257,6 +330,10 @@ export default function VendorDashboardPage() {
             </Link>
           </div>
         </div>
+      )}
+
+      {vendor && vendor.kycStatus === "verified" && !vendor.suspended && (
+        <PayoutStatusCard vendor={vendor} />
       )}
 
       {vendor && vendor.kycStatus === "verified" && !vendor.suspended && vendorOrders.length > 0 && (

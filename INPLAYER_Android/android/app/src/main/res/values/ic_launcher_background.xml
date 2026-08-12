@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Adaptive icon background color — matches the app's own dark theme
+  (AppColors.backgroundDark in lib/core/theme/app_colors.dart) so the
+  launcher icon reads as part of the same brand instead of an arbitrary
+  fill color.
+-->
+<resources>
+    <color name="ic_launcher_background">#05070D</color>
+</resources>

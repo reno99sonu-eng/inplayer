@@ -13,6 +13,7 @@ import { createLinkedAccount, fetchLinkedAccount } from "@/app/lib/razorpay";
 import { resolveUsernames } from "@/app/lib/resolveUsernames";
 import { resolveCognitoEmails } from "@/app/lib/cognitoClient";
 import { logAdminAction } from "@/app/lib/auditLog";
+import { notifyVendorPayoutsActive } from "@/app/lib/hammartVendors";
 
 // Same "purge photos + strip address the moment a decision is recorded"
 // policy as app/api/admin/creators/route.ts — see that file's comments for
@@ -308,10 +309,20 @@ export async function POST(request: NextRequest) {
           return NextResponse.json({ error: "No Razorpay account has been created for this vendor yet — use Retry instead." }, { status: 400 });
         }
         const account = await fetchLinkedAccount(existingAccountId);
+        const newStatus = account.status === "activated" ? "active" : account.status === "suspended" ? "failed" : "pending";
+        const wasActive = vendorRow.razorpayAccountStatus === "active";
         await setVendorRazorpayAccount(userId, {
-          status: account.status === "activated" ? "active" : account.status === "suspended" ? "failed" : "pending",
+          status: newStatus,
           error: account.status === "activated" ? null : `Razorpay status: ${account.status}`,
         });
+        // A manual "Check status" sync is exactly the scenario where the
+        // account.activated webhook may have never arrived — this is often
+        // the FIRST time anyone (InPlayer or the vendor) learns the account
+        // just went active, so it gets the same notification email the
+        // webhook path sends.
+        if (newStatus === "active" && !wasActive) {
+          await notifyVendorPayoutsActive(userId);
+        }
       } else {
         await attemptRazorpayOnboarding(vendorRow);
       }

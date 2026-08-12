@@ -6,7 +6,7 @@ import RecommendationFeed from "./components/RecommendationFeed";
 import { getReadyVideos } from "./lib/videoStore";
 import { getFeaturedThisWeek } from "./lib/trendingStore";
 import { getPlatformSettings } from "./lib/platformSettings";
-import { getActiveAdCreative } from "./lib/adCreatives";
+import { getActiveAdCreatives } from "./lib/adCreatives";
 import type { Recommendation } from "./data/recommendations";
 import type { Short } from "./data/shorts";
 import type { FeaturedSlide } from "./data/featuredSlides";
@@ -154,14 +154,14 @@ interface HeroAdCreative {
 }
 
 type HeroContent =
-  | { kind: "ad"; creative: HeroAdCreative }
+  | { kind: "ad"; creatives: HeroAdCreative[] }
   | { kind: "videos"; slides: FeaturedSlide[] };
 
 // Decides what actually fills the homepage hero slot. Admin Panel ->
 // Advertising -> Weekly Featured Banner is a single ON/OFF switch
 // (weeklyFeaturedEnabled): OFF (default) keeps showing InPlayer's real
 // "top videos this week" carousel (FeaturedHero.tsx); ON swaps it for the
-// admin's own uploaded poster (FeaturedHeroAd.tsx) — the actual wiring
+// admin's own uploaded poster(s) (FeaturedHeroAd.tsx) — the actual wiring
 // that placement was missing (previously nothing on the live site read
 // weeklyFeaturedEnabled or fetched a weekly_featured creative at all, so
 // anything uploaded there never appeared to a real visitor). If ON but
@@ -169,21 +169,25 @@ type HeroContent =
 // videos rather than leaving the hero blank — an empty gap at the very
 // top of the homepage would be a worse first impression than showing real
 // content while the admin finishes setting the poster up.
+//
+// ALL active creatives are fetched now (not just one) so FeaturedHeroAd can
+// rotate/scroll through every uploaded banner instead of only ever showing
+// a single randomly-picked one per page load.
 async function getHeroContent(): Promise<HeroContent> {
   try {
     const settings = await getPlatformSettings();
     if (settings.weeklyFeaturedEnabled) {
-      const creative = await getActiveAdCreative("weekly_featured");
-      if (creative) {
+      const creatives = await getActiveAdCreatives("weekly_featured");
+      if (creatives.length > 0) {
         return {
           kind: "ad",
-          creative: {
+          creatives: creatives.map((creative) => ({
             adId: creative.adId,
             imageUrl: creative.imageUrl,
             imageUrlDesktop: creative.imageUrlDesktop,
             linkUrl: creative.linkUrl,
             title: creative.title,
-          },
+          })),
         };
       }
     }
@@ -275,7 +279,7 @@ async function HomeContent({ activeView, isVertical }: { activeView: "horizontal
           {!isVertical && (
             <>
               {heroContent.kind === "ad" ? (
-                <FeaturedHeroAd creative={heroContent.creative} />
+                <FeaturedHeroAd creatives={heroContent.creatives} />
               ) : (
                 <FeaturedHero initialSlides={heroContent.slides} />
               )}

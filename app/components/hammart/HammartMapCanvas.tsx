@@ -11,7 +11,7 @@
 // Google, etc.) — swapping the TileLayer `url` below is the only change
 // that would take.
 import { useEffect, useRef } from "react";
-import { MapContainer, TileLayer, useMap, useMapEvents } from "react-leaflet";
+import { MapContainer, TileLayer, useMap, useMapEvents, AttributionControl } from "react-leaflet";
 import type { Map as LeafletMap } from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -103,6 +103,7 @@ export default function HammartMapCanvas(props: HammartMapCanvasProps) {
       center={[props.lat, props.lng]}
       zoom={props.zoom}
       zoomControl={false}
+      attributionControl={false}
       dragging={true}
       touchZoom={true}
       scrollWheelZoom={true}
@@ -113,6 +114,7 @@ export default function HammartMapCanvas(props: HammartMapCanvasProps) {
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
+      <AttributionControl position="bottomright" prefix={false} />
       <MapController {...props} />
     </MapContainer>
   );

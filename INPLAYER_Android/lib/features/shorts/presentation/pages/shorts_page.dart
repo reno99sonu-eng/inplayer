@@ -13,6 +13,17 @@ class ShortsPage extends ConsumerStatefulWidget {
 }
 
 class _ShortsPageState extends ConsumerState<ShortsPage> {
+  // Tinder-style card deck, not a YouTube-style vertical feed — swiping
+  // moves LEFT/RIGHT between Shorts, and each card tilts/scales as it's
+  // dragged off screen instead of just sliding straight up/down.
+  final PageController _pageController = PageController();
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -97,11 +108,39 @@ class _ShortsPageState extends ConsumerState<ShortsPage> {
           }
 
           return PageView.builder(
-            scrollDirection: Axis.vertical,
+            controller: _pageController,
+            scrollDirection: Axis.horizontal,
             itemCount: shorts.length,
             itemBuilder: (context, index) {
               final short = shorts[index];
-              return ShortPlayerWidget(short: short);
+              return AnimatedBuilder(
+                animation: _pageController,
+                builder: (context, child) {
+                  // How far this card is from the currently-centered page,
+                  // clamped to [-1, 1] — 0 while fully centered, sliding
+                  // toward ±1 as the user drags it off to either side.
+                  double delta = 0;
+                  if (_pageController.position.haveDimensions) {
+                    delta = (_pageController.page ?? index.toDouble()) - index;
+                    delta = delta.clamp(-1.0, 1.0);
+                  }
+                  final scale = 1 - (delta.abs() * 0.08);
+                  final rotation = delta * -0.12; // radians — tilts like a flicked card
+                  final opacity = 1 - (delta.abs() * 0.25);
+
+                  return Transform.scale(
+                    scale: scale,
+                    child: Transform.rotate(
+                      angle: rotation,
+                      child: Opacity(
+                        opacity: opacity.clamp(0.0, 1.0),
+                        child: child,
+                      ),
+                    ),
+                  );
+                },
+                child: ShortPlayerWidget(short: short),
+              );
             },
           );
         },

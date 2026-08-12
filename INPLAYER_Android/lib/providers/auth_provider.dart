@@ -95,6 +95,14 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  /// For when the session has already ended by some other means (e.g.
+  /// AuthService.deleteUser() during account deletion) — just reflects
+  /// that locally instead of calling _authService.signOut() again, which
+  /// would fail against a session that's already gone.
+  void setUnauthenticated() {
+    state = const AuthState.unauthenticated();
+  }
+
   Future<void> resetPassword({required String email}) async {
     try {
       await _authService.resetPassword(email: email);
@@ -136,6 +144,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
       } catch (e) {
         _logger.e('Error refreshing user: $e');
       }
+    }
+  }
+
+  /// Applies a local edit to the signed-in user without a round trip to
+  /// Cognito. Needed because fields like display name/bio/privacy are the
+  /// app's own DynamoDB profile data (see app/api/profile/settings/route.ts),
+  /// not Cognito user attributes — [refreshUser] re-reads from Cognito, so
+  /// it would NOT pick up a just-saved name/bio/privacy change. Call this
+  /// right after a successful settings save instead.
+  void updateLocalUser(User Function(User current) update) {
+    final currentState = state;
+    if (currentState is AuthStateAuthenticated) {
+      state = AuthState.authenticated(update(currentState.user));
     }
   }
 }

@@ -133,6 +133,7 @@ export default function AdminHammartVendorsPage() {
         (v.businessName || "").toLowerCase().includes(q) ||
         (v.username || "").toLowerCase().includes(q) ||
         (v.panNumber || "").toLowerCase().includes(q) ||
+        (v.upiId || "").toLowerCase().includes(q) ||
         v.userId.toLowerCase().includes(q)
     );
   }, [items, query]);
@@ -256,7 +257,7 @@ export default function AdminHammartVendorsPage() {
           type="text"
           value={query}
           onChange={(e) => setQuery(e.target.value)}
-          placeholder="Search by vendor ID, business name, legal name, PAN, or user ID…"
+          placeholder="Search by vendor ID, business name, legal name, PAN, UPI ID, or user ID…"
           className="w-full bg-transparent text-sm text-white light:text-slate-900 outline-none placeholder:text-slate-500 light:placeholder:text-slate-600 font-medium"
         />
       </div>

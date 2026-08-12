@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 interface FeaturedHeroAdCreative {
   adId: string;
@@ -9,6 +9,11 @@ interface FeaturedHeroAdCreative {
   linkUrl: string;
   title: string;
 }
+
+// Matches FeaturedHero.tsx's own real-videos carousel timing exactly, so
+// switching between the two (weeklyFeaturedEnabled ON/OFF) never changes
+// the pacing a visitor gets used to.
+const SLIDE_DURATION = 4000;
 
 // Live counterpart to FeaturedHero.tsx's real-videos carousel — rendered
 // in the exact same slot instead of it when Admin Panel -> Advertising ->
@@ -46,11 +51,35 @@ interface FeaturedHeroAdCreative {
 // blurred, scaled-up backdrop copy of the SAME image filling the
 // letterbox space behind it, so there's never an empty black bar even
 // when an image's own proportions don't perfectly match its slot.
+//
+// Takes the FULL list of active weekly_featured creatives (app/page.tsx's
+// getHeroContent fetches all of them now, not just one) and auto-rotates
+// through them exactly like FeaturedHero.tsx's real-videos carousel does —
+// same SLIDE_DURATION, same pause-on-hover — so uploading several banners
+// makes them scroll through in rotation instead of only one ever showing.
+// With a single creative this behaves exactly as before: `(prev + 1) % 1`
+// is always 0, so the timer effect below is a no-op.
 export default function FeaturedHeroAd({
-  creative,
+  creatives,
 }: {
-  creative: FeaturedHeroAdCreative;
+  creatives: FeaturedHeroAdCreative[];
 }) {
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
+
+  useEffect(() => {
+    if (isPaused || creatives.length <= 1) return;
+
+    const timer = setTimeout(() => {
+      setActiveIndex((prev) => (prev + 1) % creatives.length);
+    }, SLIDE_DURATION);
+
+    return () => clearTimeout(timer);
+  }, [activeIndex, isPaused, creatives.length]);
+
+  if (creatives.length === 0) return null;
+
+  const creative = creatives[Math.min(activeIndex, creatives.length - 1)];
   const mobileUrl = creative.imageUrl;
   const desktopUrl = creative.imageUrlDesktop || creative.imageUrl;
 
@@ -69,6 +98,8 @@ export default function FeaturedHeroAd({
   return (
     <section
       aria-label="Featured"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
       className="
         relative w-full overflow-hidden bg-black
 
@@ -85,13 +116,17 @@ export default function FeaturedHeroAd({
           breakpoint instead of an in-flow percentage height that can't
           resolve against a min-height-only parent (mobile/sm/md have no
           explicit `height`, only `min-h-[...]`) — see FeaturedHeroVideo.tsx
-          for the same technique. */}
+          for the same technique. Keyed on adId so swapping creatives
+          re-mounts the <img>s and their crossfade transition replays each
+          time the rotation advances, instead of the browser just silently
+          swapping the src mid-frame. */}
       <a
+        key={creative.adId}
         href={creative.linkUrl}
         target="_blank"
         rel="noopener noreferrer sponsored"
         onClick={handleClick}
-        className="group absolute inset-0 block h-full w-full"
+        className="group absolute inset-0 block h-full w-full animate-fade-in"
       >
         {mobileUrl && (
           <FeaturedHeroAdImage src={mobileUrl} title={creative.title} className="absolute inset-0 lg:hidden" />

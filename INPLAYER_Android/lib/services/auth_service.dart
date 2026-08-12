@@ -213,6 +213,85 @@ class AuthService {
     }
   }
 
+  /// Change password while signed in (Settings -> Change Password) — not
+  /// the same as [resetPassword], which is the signed-out "forgot
+  /// password" flow.
+  Future<AccountActionResult> changePassword({
+    required String oldPassword,
+    required String newPassword,
+  }) async {
+    try {
+      await Amplify.Auth.updatePassword(
+        oldPassword: oldPassword,
+        newPassword: newPassword,
+      );
+      return AccountActionResult(success: true);
+    } on AuthException catch (e) {
+      _logger.e('Change password error: ${e.message}');
+      return AccountActionResult(success: false, error: e.message);
+    } catch (e) {
+      _logger.e('Unexpected change password error: $e');
+      return AccountActionResult(success: false, error: 'An unexpected error occurred');
+    }
+  }
+
+  /// Step 1 of changing the account email — requests the change and
+  /// returns whether Cognito needs a verification code before it takes
+  /// effect (it always does for email, per Cognito's default settings).
+  Future<AccountActionResult> requestEmailChange(String newEmail) async {
+    try {
+      final result = await Amplify.Auth.updateUserAttribute(
+        userAttributeKey: AuthUserAttributeKey.email,
+        value: newEmail,
+      );
+      final needsConfirmation = result.nextStep.updateAttributeStep ==
+          AuthUpdateAttributeStep.confirmAttributeWithCode;
+      return AccountActionResult(success: true, needsConfirmation: needsConfirmation);
+    } on AuthException catch (e) {
+      _logger.e('Request email change error: ${e.message}');
+      return AccountActionResult(success: false, error: e.message);
+    } catch (e) {
+      _logger.e('Unexpected request email change error: $e');
+      return AccountActionResult(success: false, error: 'An unexpected error occurred');
+    }
+  }
+
+  /// Step 2 — confirms the new email with the code Cognito sent to it.
+  Future<AccountActionResult> confirmEmailChange(String code) async {
+    try {
+      await Amplify.Auth.confirmUserAttribute(
+        userAttributeKey: AuthUserAttributeKey.email,
+        confirmationCode: code,
+      );
+      return AccountActionResult(success: true);
+    } on AuthException catch (e) {
+      _logger.e('Confirm email change error: ${e.message}');
+      return AccountActionResult(success: false, error: e.message);
+    } catch (e) {
+      _logger.e('Unexpected confirm email change error: $e');
+      return AccountActionResult(success: false, error: 'An unexpected error occurred');
+    }
+  }
+
+  /// Deletes the actual Cognito login. Must be called AFTER the backend's
+  /// own DELETE /api/account/delete has finished cleaning up server-side
+  /// data (see settings_service.dart) — once the Cognito account is gone,
+  /// this session can no longer authenticate that cleanup call. Ends the
+  /// session as a side effect, same as the website's own delete-account
+  /// flow (aws-amplify/auth's deleteUser()).
+  Future<AccountActionResult> deleteUser() async {
+    try {
+      await Amplify.Auth.deleteUser();
+      return AccountActionResult(success: true);
+    } on AuthException catch (e) {
+      _logger.e('Delete user error: ${e.message}');
+      return AccountActionResult(success: false, error: e.message);
+    } catch (e) {
+      _logger.e('Unexpected delete user error: $e');
+      return AccountActionResult(success: false, error: 'An unexpected error occurred');
+    }
+  }
+
   Future<void> resetPassword({
     required String email,
   }) async {
@@ -298,6 +377,18 @@ class ConfirmSignUpResult {
   ConfirmSignUpResult({
     required this.success,
     required this.isSignUpComplete,
+    this.error,
+  });
+}
+
+class AccountActionResult {
+  final bool success;
+  final bool needsConfirmation;
+  final String? error;
+
+  AccountActionResult({
+    required this.success,
+    this.needsConfirmation = false,
     this.error,
   });
 }

@@ -8,7 +8,13 @@ import {
   PAYOUTS_TABLE,
   CREATOR_SHARE,
 } from "@/app/lib/creatorPayouts";
-import { VENDORS_TABLE, VENDOR_SUBSCRIPTION_LEDGER_TABLE, setVendorRazorpayAccount } from "@/app/lib/hammartVendors";
+import {
+  VENDORS_TABLE,
+  VENDOR_SUBSCRIPTION_LEDGER_TABLE,
+  getVendorProfile,
+  setVendorRazorpayAccount,
+  notifyVendorPayoutsActive,
+} from "@/app/lib/hammartVendors";
 import { getOrder, markOrderPaid, markOrderPaymentFailed } from "@/app/lib/hammartOrders";
 import { orderTotalInr } from "@/app/lib/hammartOrderMath";
 import { sendEmail } from "@/app/lib/ses";
@@ -379,9 +385,20 @@ async function handleAccountStatusChanged(payload: RazorpayWebhookPayload["paylo
   const status =
     accountEntity.status === "activated" ? "active" : accountEntity.status === "suspended" ? "failed" : "pending";
 
+  // Read the vendor's status BEFORE overwriting it, purely so the "you're
+  // live" email below can tell a genuine pending/failed -> active
+  // transition apart from Razorpay re-sending the same activated event
+  // (or any other duplicate delivery) — never re-notify for the latter.
+  const { vendor: previous } = await getVendorProfile(userId).catch(() => ({ vendor: null }));
+  const justActivated = status === "active" && previous?.razorpayAccountStatus !== "active";
+
   await setVendorRazorpayAccount(userId, {
     accountId: accountEntity.id,
     status,
     error: status === "active" ? null : `Razorpay status: ${accountEntity.status}`,
   }).catch((err) => console.error(`razorpay webhook: account status update failed for ${userId}:`, err));
+
+  if (justActivated) {
+    await notifyVendorPayoutsActive(userId);
+  }
 }

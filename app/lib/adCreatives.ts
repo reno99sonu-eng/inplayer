@@ -115,3 +115,57 @@ export async function getActiveAdCreative(placement: AdPlacement): Promise<AdCre
     return null;
   }
 }
+
+// Every active creative for a placement, not just one — used where a slot
+// should rotate/scroll through ALL of them (e.g. the homepage Weekly
+// Featured hero banner, see FeaturedHeroAd.tsx) instead of picking a single
+// random one per page load. Order is randomized once per call (Fisher-Yates
+// style shuffle) so which creative shows first still varies across visits,
+// same spirit as the single-pick random before it, but nothing is dropped.
+export async function getActiveAdCreatives(placement: AdPlacement): Promise<AdCreative[]> {
+  try {
+    const allCreatives = await getAllAdCreatives();
+    const items = allCreatives.filter(
+      (item) => item.placement === placement && item.active === true
+    );
+    if (items.length === 0) return [];
+
+    const shuffled = [...items];
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+
+    // Best-effort impression counters for every creative actually being
+    // queued up to show in this rotation — same convention as the
+    // single-pick version, just fired for each one instead of one.
+    shuffled.forEach((pick) => {
+      docClient
+        .send(
+          new UpdateCommand({
+            TableName: AD_CREATIVES_TABLE,
+            Key: { adId: pick.adId },
+            UpdateExpression: "ADD impressions :one",
+            ExpressionAttributeValues: { ":one": 1 },
+          })
+        )
+        .catch((err) => console.error("adCreatives: impression counter failed:", err));
+    });
+
+    return shuffled.map((pick) => ({
+      adId: pick.adId as string,
+      placement: pick.placement as AdPlacement,
+      imageUrl: pick.imageUrl as string,
+      imageUrlDesktop: (pick.imageUrlDesktop as string) || undefined,
+      linkUrl: pick.linkUrl as string,
+      title: pick.title as string,
+      active: pick.active as boolean,
+      createdAt: pick.createdAt as string,
+      impressions: (pick.impressions as number) || 0,
+      clicks: (pick.clicks as number) || 0,
+    }));
+  } catch (err) {
+    console.error(`adCreatives: getActiveAdCreatives(${placement}) failed:`, err);
+    return [];
+  }
+}

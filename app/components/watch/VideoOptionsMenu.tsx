@@ -15,6 +15,8 @@ import {
   Plus,
   Bookmark,
   Flag,
+  ThumbsUp,
+  ThumbsDown,
 } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 
@@ -87,6 +89,11 @@ function MenuRow({
 //    manages your named playlists, quick Save is a one-tap bookmark into
 //    your own reserved "Saved" shelf, same backend either way.
 //  - Report writes a real row to app/api/reports.
+//  - Interested / Not Interested write a real row to app/api/video-feedback
+//    — RecommendationFeed.tsx reads that back to filter "not_interested"
+//    videos out of the homepage feed (regular cards AND the Raftaar/Shorts
+//    shelf), so this actually affects what a viewer sees platform-wide,
+//    not just a button that toggles locally.
 export default function VideoOptionsMenu({
   videoId,
   contentType,
@@ -110,6 +117,11 @@ export default function VideoOptionsMenu({
   const [newPlaylistName, setNewPlaylistName] = useState("");
   const [creatingPlaylist, setCreatingPlaylist] = useState(false);
   const [playlistBusyId, setPlaylistBusyId] = useState<string | null>(null);
+
+  // Interested / Not Interested — real, persisted feedback (see
+  // app/api/video-feedback/route.ts). null means nothing marked yet.
+  const [feedback, setFeedback] = useState<"interested" | "not_interested" | null>(null);
+  const [feedbackBusy, setFeedbackBusy] = useState(false);
 
   // Report
   const [reported, setReported] = useState(false);
@@ -135,10 +147,11 @@ export default function VideoOptionsMenu({
       try {
         const headers = await authHeaders();
 
-        const [watchlistRes, playlistsRes, reportRes] = await Promise.all([
+        const [watchlistRes, playlistsRes, reportRes, feedbackRes] = await Promise.all([
           fetch(`/api/watchlist?videoId=${videoId}`, { headers }),
           fetch("/api/playlists", { headers }),
           fetch(`/api/reports?videoId=${videoId}`, { headers }),
+          fetch("/api/video-feedback", { headers }),
         ]);
 
         if (cancelled) return;
@@ -154,6 +167,9 @@ export default function VideoOptionsMenu({
 
         const reportData = await reportRes.json();
         setReported(!!reportData.reported);
+
+        const feedbackData = await feedbackRes.json();
+        setFeedback((feedbackData.feedback || {})[videoId] || null);
       } catch (err) {
         console.error("Failed to load video options status:", err);
       }
@@ -219,6 +235,42 @@ export default function VideoOptionsMenu({
       console.error("Failed to toggle save:", err);
     } finally {
       setSavedBusy(false);
+    }
+  };
+
+  // ---------------- Interested / Not Interested ----------------
+  // Real, platform-wide recommendation feedback — writes to
+  // app/api/video-feedback/route.ts, which RecommendationFeed.tsx reads
+  // back to both highlight the matching inline button under this same
+  // video's homepage card AND filter "not_interested" videos out of the
+  // homepage feed (including the Raftaar/Shorts shelf) entirely. Clicking
+  // the already-active choice again clears it (see the route's own
+  // same-value-clears convention).
+  const toggleFeedback = async (value: "interested" | "not_interested") => {
+    if (!signedIn) {
+      openSignIn();
+      return;
+    }
+    setFeedbackBusy(true);
+    const previous = feedback;
+    const next = feedback === value ? null : value;
+    setFeedback(next);
+
+    try {
+      const headers = await authHeaders();
+      const res = await fetch("/api/video-feedback", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...headers },
+        body: JSON.stringify({ videoId, feedback: value }),
+      });
+      if (!res.ok) throw new Error("Request failed");
+      const data = await res.json();
+      setFeedback(data.feedback ?? null);
+    } catch (err) {
+      console.error("Failed to save video feedback:", err);
+      setFeedback(previous);
+    } finally {
+      setFeedbackBusy(false);
     }
   };
 
@@ -383,6 +435,28 @@ export default function VideoOptionsMenu({
                     label={saved ? "Saved" : "Save"}
                     onClick={toggleSaved}
                     disabled={savedBusy}
+                  />
+                  <MenuRow
+                    icon={
+                      <ThumbsUp
+                        size={18}
+                        className={feedback === "interested" ? "fill-current text-emerald-400" : ""}
+                      />
+                    }
+                    label={feedback === "interested" ? "Interested" : "Interested — more like this"}
+                    onClick={() => toggleFeedback("interested")}
+                    disabled={feedbackBusy}
+                  />
+                  <MenuRow
+                    icon={
+                      <ThumbsDown
+                        size={18}
+                        className={feedback === "not_interested" ? "fill-current text-red-400" : ""}
+                      />
+                    }
+                    label={feedback === "not_interested" ? "Not interested" : "Not interested — less like this"}
+                    onClick={() => toggleFeedback("not_interested")}
+                    disabled={feedbackBusy}
                   />
                   <MenuRow
                     icon={<Flag size={18} className={reported ? "text-red-400" : ""} />}

@@ -669,6 +669,18 @@ animation: aiGlassSweep 5.5s linear infinite;
   animation: fadeInUp .7s cubic-bezier(.16,1,.3,1) both;
 }
 
+/* Plain opacity crossfade — used by FeaturedHeroAd.tsx's banner-ad
+   rotation, unlike fadeInUp above this has no position shift since the
+   creative it's applied to is already absolutely positioned edge-to-edge. */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate-fade-in {
+  animation: fadeIn .6s ease both;
+}
+
 @keyframes ambientPulse {
   0%, 100% { opacity: 0.55; }
   50% { opacity: 0.85; }

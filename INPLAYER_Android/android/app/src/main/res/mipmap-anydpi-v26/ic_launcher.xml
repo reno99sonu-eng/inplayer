@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Adaptive icon definition (Android 8.0 / API 26+). Splits the launcher
+  icon into a solid background layer and a foreground content layer so
+  every launcher (circle, squircle, rounded-square masks, etc.) can crop
+  it consistently without cutting off the logo — the previous single flat
+  ic_launcher.png filled ~90% of its canvas edge-to-edge with no safe-zone
+  padding, so on adaptive-icon-aware launchers the OS's own auto-generated
+  mask was clipping the play-button triangle's corners.
+-->
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="@color/ic_launcher_background"/>
+    <foreground android:drawable="@mipmap/ic_launcher_foreground"/>
+</adaptive-icon>

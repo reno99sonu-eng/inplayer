@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/image_utils.dart';
 import '../../../../models/video.dart';
 
 class FeaturedHeroCarousel extends StatefulWidget {
@@ -68,11 +69,8 @@ class _FeaturedHeroCarouselState extends State<FeaturedHeroCarousel> {
           Positioned.fill(
             child: AnimatedSwitcher(
               duration: const Duration(milliseconds: 800),
-              child: Image.network(
+              child: _buildBackgroundImage(
                 widget.featuredVideos[_currentIndex].thumbnail,
-                key: ValueKey<String>(widget.featuredVideos[_currentIndex].thumbnail),
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) => Container(color: AppColors.surfaceDark),
               ),
             ),
           ),
@@ -124,6 +122,28 @@ class _FeaturedHeroCarouselState extends State<FeaturedHeroCarousel> {
     );
   }
 
+  // Some thumbnails come back as inline data:image/...;base64 URIs instead
+  // of https:// links — plain Image.network throws "No host specified in
+  // URI" on those (see lib/core/utils/image_utils.dart for why).
+  Widget _buildBackgroundImage(String thumbnail) {
+    final provider = smartImageProvider(thumbnail);
+
+    if (provider == null) {
+      return Container(
+        key: const ValueKey<String>('empty'),
+        color: AppColors.surfaceDark,
+      );
+    }
+
+    return Image(
+      key: ValueKey<String>(thumbnail),
+      image: provider,
+      fit: BoxFit.cover,
+      errorBuilder: (context, error, stackTrace) =>
+          Container(color: AppColors.surfaceDark),
+    );
+  }
+
   Widget _buildSlide(Video video) {
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 40, 20, 20),
@@ -138,12 +158,17 @@ class _FeaturedHeroCarouselState extends State<FeaturedHeroCarousel> {
                 borderRadius: BorderRadius.circular(16),
                 child: AspectRatio(
                   aspectRatio: 16 / 9,
-                  child: CachedNetworkImage(
-                    imageUrl: video.thumbnail,
-                    fit: BoxFit.cover,
-                    placeholder: (context, url) => Container(color: AppColors.surfaceDark),
-                    errorWidget: (context, url, error) => Container(color: AppColors.surfaceDark),
-                  ),
+                  // CachedNetworkImage only understands http(s) URLs, so a
+                  // data:image/...;base64 thumbnail has to be rendered via
+                  // Image.memory instead — see _buildBackgroundImage above.
+                  child: isDataImageUrl(video.thumbnail)
+                      ? _buildBackgroundImage(video.thumbnail)
+                      : CachedNetworkImage(
+                          imageUrl: video.thumbnail,
+                          fit: BoxFit.cover,
+                          placeholder: (context, url) => Container(color: AppColors.surfaceDark),
+                          errorWidget: (context, url, error) => Container(color: AppColors.surfaceDark),
+                        ),
                 ),
               ),
             ),

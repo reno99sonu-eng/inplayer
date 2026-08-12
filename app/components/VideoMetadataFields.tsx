@@ -355,30 +355,32 @@ export default function VideoMetadataFields({
               </select>
             </div>
 
-            {value.contentType === "video" ? (
-              <div>
-                <label className="mb-1 block text-xs font-bold text-slate-300 light:text-slate-700">
-                  Spoken Language
-                </label>
-                <select
-                  value={value.spokenLanguage}
-                  onChange={(e) => onChange("spokenLanguage", e.target.value as SpokenLanguage)}
-                  className="w-full rounded-xl border border-white/10 bg-[#060D18] px-2.5 py-2 text-xs text-white outline-none focus:border-orange-400/50 light:border-black/10 light:bg-white light:text-slate-900"
-                >
-                  {SPOKEN_LANGUAGES.map((l) => (
-                    <option key={l.value} value={l.value} className="bg-[#07111F] text-white light:bg-white light:text-slate-900">
-                      {l.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            ) : (
-              <div>
-                <label className="mb-1 block text-xs font-bold text-slate-300 light:text-slate-700">
-                  Content Format
-                </label>
+            {/* Spoken Language applies to both content types — the video
+                player's own language/audio-track menu isn't limited to
+                long-form, so Raftaar/Shorts uploads need this control too
+                instead of silently staying stuck on "auto" forever (the
+                field was always stored on shorts, see
+                app/api/upload/create/route.ts — it just never had a UI to
+                set it to anything else). */}
+            <div>
+              <label className="mb-1 block text-xs font-bold text-slate-300 light:text-slate-700">
+                Spoken Language
+              </label>
+              <select
+                value={value.spokenLanguage}
+                onChange={(e) => onChange("spokenLanguage", e.target.value as SpokenLanguage)}
+                className="w-full rounded-xl border border-white/10 bg-[#060D18] px-2.5 py-2 text-xs text-white outline-none focus:border-orange-400/50 light:border-black/10 light:bg-white light:text-slate-900"
+              >
+                {SPOKEN_LANGUAGES.map((l) => (
+                  <option key={l.value} value={l.value} className="bg-[#07111F] text-white light:bg-white light:text-slate-900">
+                    {l.label}
+                  </option>
+                ))}
+              </select>
+            </div>{value.contentType === "short" && (
+              <div className="col-span-2">
                 <div className="flex h-9 items-center rounded-xl border border-white/10 bg-[#060D18] px-3 text-xs font-semibold text-orange-400 light:border-black/10 light:bg-white">
-                  Shorts (9:16)
+                  Content Format: Shorts (9:16)
                 </div>
               </div>
             )}

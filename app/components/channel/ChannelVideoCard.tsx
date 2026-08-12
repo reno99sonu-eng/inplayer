@@ -8,6 +8,8 @@ export interface ChannelVideo {
   title: string;
   thumbnailUrl?: string;
   views: number;
+  likeCount?: number;
+  commentCount?: number;
   uploadedAt: string;
   contentType: string;
   category?: string;

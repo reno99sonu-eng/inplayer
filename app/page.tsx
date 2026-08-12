@@ -11,6 +11,7 @@ import type { Recommendation } from "./data/recommendations";
 import type { Short } from "./data/shorts";
 import type { FeaturedSlide } from "./data/featuredSlides";
 import { resolveUsernames } from "./lib/resolveUsernames";
+import { formatCompactNumber } from "./lib/formatters";
 
 function formatDuration(seconds: number): string {
   if (!seconds) return "0:00";
@@ -81,6 +82,7 @@ async function getRealContent(): Promise<RealContent> {
             (video.thumbnailUrl as string) ||
             "/recommendations/thumbnails/1.jpg",
           views: `${(video.views as number) || 0} views`,
+          likes: `${formatCompactNumber((video.likeCount as number) || 0)} likes`,
           uploaded: formatTimeAgo(video.uploadedAt as string),
           duration: formatDuration(video.duration as number),
           verified: false,
@@ -106,8 +108,8 @@ async function getRealContent(): Promise<RealContent> {
           uploaderAvatarUrl: video.uploaderAvatarUrl as string | undefined,
           poster: (video.thumbnailUrl as string) || "/shorts/1.jpg",
           views: `${(video.views as number) || 0} views`,
-          likes: "0",
-          comments: "0",
+          likes: `${formatCompactNumber((video.likeCount as number) || 0)} likes`,
+          comments: `${formatCompactNumber((video.commentCount as number) || 0)} comments`,
         };
       });
 

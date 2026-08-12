@@ -26,7 +26,7 @@ function MonetizationAnswer() {
     {
       icon: <TrendingUp size={15} />,
       title: "Grow your channel",
-      body: `Upload videos and Raftaar reels to build an audience. Monetization requires ${ELIGIBILITY_THRESHOLD.subscribers} In-Family members, 10,000 views for longform videos, or 1,000,000 (1 Million) views for Raftaar reels.`,
+      body: `Upload videos and Raftaar reels to build an audience. Monetization requires ${ELIGIBILITY_THRESHOLD.subscribers} In-Family members, ${ELIGIBILITY_THRESHOLD.videoViews.toLocaleString()} views for longform videos, or 1,000,000 (1 Million) views for Raftaar reels.`,
     },
     {
       icon: <ShieldCheck size={15} />,

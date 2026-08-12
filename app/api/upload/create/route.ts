@@ -210,6 +210,13 @@ export async function POST(request: NextRequest) {
           uploaderAvatarUrl,
           uploadedAt: new Date().toISOString(),
           views: 0,
+          // Denormalized counters kept in sync by app/api/likes and
+          // app/api/comments (ADD on every real like/comment/unlike/delete)
+          // so homepage/channel/Raftaar cards can show real engagement
+          // numbers straight off the already-fetched video record — no
+          // extra per-video Scan/Query needed just to render a card.
+          likeCount: 0,
+          commentCount: 0,
           ...(moderationHidden && {
             flagged: true,
             flaggedCategories: uploadModeration.categories,

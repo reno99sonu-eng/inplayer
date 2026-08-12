@@ -43,6 +43,7 @@ async function getShorts(startVideoId?: string): Promise<Short[]> {
             soundtrack?: Short["soundtrack"];
             soundtrackId?: string | null;
             musicClipSeconds?: 20 | 30;
+            filter?: Short["filter"];
           }
         | undefined;
 
@@ -60,13 +61,19 @@ async function getShorts(startVideoId?: string): Promise<Short[]> {
         uploaderAvatarUrl: video.uploaderAvatarUrl as string | undefined,
         poster: (video.thumbnailUrl as string) || "/shorts/1.jpg",
         views: `${(video.views as number) || 0} views`,
-        likes: "0",
-        comments: "0",
+        likes: `${(video.likeCount as number) || 0} likes`,
+        comments: `${(video.commentCount as number) || 0} comments`,
         soundtrack: shortSettings?.soundtrack ?? null,
         soundtrackId: shortSettings?.soundtrackId ?? null,
         musicClipSeconds: (shortSettings?.musicClipSeconds === 20
           ? 20
           : 30) as 20 | 30,
+        // The "Look" picked in ShortCreationTools at upload time — was
+        // stored server-side (see app/api/upload/create/route.ts) but never
+        // read back out anywhere, so it was captured then silently
+        // discarded. Applied as a real CSS filter on the <video> element in
+        // ShortsPageContent.tsx.
+        filter: (shortSettings?.filter as Short["filter"]) ?? "original",
       };
     });
 

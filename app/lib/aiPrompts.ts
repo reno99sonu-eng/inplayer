@@ -60,11 +60,17 @@ export function buildAIGeneratePrompt(
   if (type === "title") {
     return (
       `${context}\n\n` +
-      `Generate five distinct, high-CTR title options appropriate for the ${ctx.category} category` +
+      `Generate five title options appropriate for the ${ctx.category} category` +
       (ctx.contentType === "short"
         ? " and short-form format (short, punchy, under 60 characters)."
         : ".") +
-      ` Vary the style across the five (a question, a bold claim, a how-to framing, a curiosity hook, a plain descriptive title) so they read as genuinely different options rather than five rewordings of the same idea. Return ONLY the five titles, one per line, no numbering, no quotation marks.`
+      ` Each of the five must be written in a genuinely different TONE, not just a different structure — use exactly these five tones, one per title, in this order: ` +
+      `(1) high-CTR/clickbait — bold, urgent, makes a big promise; ` +
+      `(2) funny/playful — a light, witty, or self-aware title; ` +
+      `(3) dramatic/urgent — intense, high-stakes phrasing; ` +
+      `(4) minimal/understated — plain, quiet, confident, no hype at all; ` +
+      `(5) a genuine, curious question a real viewer would ask themselves. ` +
+      `They should read like five different creators wrote them, not one voice restyled five times. Return ONLY the five titles, one per line, no numbering, no quotation marks, no labels identifying the tone.`
     );
   }
 

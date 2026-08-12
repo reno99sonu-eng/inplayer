@@ -1,12 +1,20 @@
 "use client";
 
 import { Search, X, Mic } from "lucide-react";
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 interface MobileSearchOverlayProps {
   open: boolean;
   onClose: () => void;
+}
+
+interface VideoSuggestion {
+  videoId: string;
+  title: string;
+  thumbnailUrl: string | null;
+  contentType: string;
 }
 
 // Minimal shape of the Web Speech API's SpeechRecognition — not part of
@@ -57,6 +65,7 @@ export default function MobileSearchOverlay({
   const [query, setQuery] = useState("");
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const [suggestions, setSuggestions] = useState<VideoSuggestion[]>([]);
 
   useEffect(() => {
     if (!open) return;
@@ -66,11 +75,48 @@ export default function MobileSearchOverlay({
     return () => clearInterval(interval);
   }, [open]);
 
+  // Live suggestions as soon as 1-2 characters are typed, drawn from real
+  // uploaded video/raftaar titles (see app/api/videos/suggest).
+  useEffect(() => {
+    if (!open) return;
+    const trimmed = query.trim();
+    let cancelled = false;
+
+    // The "clear" path also goes through setTimeout (0ms) rather than
+    // calling setSuggestions synchronously in the effect body — keeps
+    // every state update here happening from an async callback.
+    const timer = setTimeout(async () => {
+      if (cancelled) return;
+      if (trimmed.length < 1) {
+        setSuggestions([]);
+        return;
+      }
+      try {
+        const res = await fetch(`/api/videos/suggest?q=${encodeURIComponent(trimmed)}`);
+        const data = await res.json();
+        if (!cancelled) setSuggestions(Array.isArray(data.suggestions) ? data.suggestions : []);
+      } catch (err) {
+        console.error("Search suggestions failed:", err);
+        if (!cancelled) setSuggestions([]);
+      }
+    }, trimmed.length < 1 ? 0 : 200);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [query, open]);
+
   const runSearch = (q: string) => {
     const term = q.trim();
     if (!term) return;
     onClose();
     router.push(`/videos?search=${encodeURIComponent(term)}`);
+  };
+
+  const goToSuggestion = (s: VideoSuggestion) => {
+    onClose();
+    router.push(s.contentType === "short" ? `/shorts?v=${s.videoId}` : `/watch/${s.videoId}`);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -183,6 +229,28 @@ export default function MobileSearchOverlay({
             </button>
           </div>
         </form>
+
+        {suggestions.length > 0 && (
+          <div className="mt-3 max-h-[50vh] overflow-y-auto rounded-2xl border border-white/10 bg-white/[0.03] p-1.5 light:border-black/10 light:bg-black/[0.02]">
+            {suggestions.map((s) => (
+              <button
+                key={s.videoId}
+                type="button"
+                onClick={() => goToSuggestion(s)}
+                className="flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition hover:bg-white/[0.06] light:hover:bg-black/[0.04]"
+              >
+                <div className="relative h-10 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-white/5 light:bg-black/5">
+                  {s.thumbnailUrl && (
+                    <Image src={s.thumbnailUrl} alt="" fill unoptimized sizes="64px" className="object-cover" />
+                  )}
+                </div>
+                <span className="min-w-0 flex-1 truncate text-sm font-medium text-white light:text-slate-900">
+                  {s.title}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </>
   );

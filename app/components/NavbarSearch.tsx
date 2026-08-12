@@ -1,8 +1,16 @@
 "use client";
 
 import { Search, Mic } from "lucide-react";
+import Image from "next/image";
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+
+interface VideoSuggestion {
+  videoId: string;
+  title: string;
+  thumbnailUrl: string | null;
+  contentType: string;
+}
 
 const desktopPlaceholders = [
   "Search movies...",
@@ -55,6 +63,65 @@ export default function NavbarSearch() {
   const [query, setQuery] = useState("");
   const [listening, setListening] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const [suggestions, setSuggestions] = useState<VideoSuggestion[]>([]);
+  const [suggestionsOpen, setSuggestionsOpen] = useState(false);
+  const formRef = useRef<HTMLFormElement>(null);
+
+  // Live suggestions as soon as 1-2 characters are typed, drawn from real
+  // uploaded video/raftaar titles (see app/api/videos/suggest) — debounced
+  // so it doesn't fire a request on every single keystroke.
+  useEffect(() => {
+    const trimmed = query.trim();
+    let cancelled = false;
+
+    // The "clear" path also goes through setTimeout (0ms) rather than
+    // calling setSuggestions synchronously in the effect body — same
+    // reasoning as the real debounced fetch below, and keeps every state
+    // update here happening from an async callback instead of directly
+    // during the effect's render-adjacent phase.
+    const timer = setTimeout(async () => {
+      if (cancelled) return;
+      if (trimmed.length < 1) {
+        setSuggestions([]);
+        return;
+      }
+      try {
+        const res = await fetch(`/api/videos/suggest?q=${encodeURIComponent(trimmed)}`);
+        const data = await res.json();
+        if (!cancelled) {
+          setSuggestions(Array.isArray(data.suggestions) ? data.suggestions : []);
+          setSuggestionsOpen(true);
+        }
+      } catch (err) {
+        console.error("Search suggestions failed:", err);
+        if (!cancelled) setSuggestions([]);
+      }
+    }, trimmed.length < 1 ? 0 : 200);
+
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [query]);
+
+  // Close the dropdown on an outside click, not just on blur — blur alone
+  // fires before a suggestion's own click/mousedown lands, which would
+  // close the list right before the click could register.
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (formRef.current && !formRef.current.contains(e.target as Node)) {
+        setSuggestionsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const goToSuggestion = (s: VideoSuggestion) => {
+    setSuggestionsOpen(false);
+    setQuery("");
+    router.push(s.contentType === "short" ? `/shorts?v=${s.videoId}` : `/watch/${s.videoId}`);
+  };
 
   useEffect(() => {
     const update = () => setIsMobile(window.innerWidth < 1024);
@@ -78,6 +145,7 @@ export default function NavbarSearch() {
   const runSearch = (q: string) => {
     const term = q.trim();
     if (!term) return;
+    setSuggestionsOpen(false);
     router.push(`/videos?search=${encodeURIComponent(term)}`);
   };
 
@@ -122,6 +190,7 @@ export default function NavbarSearch() {
 
   return (
     <form
+      ref={formRef}
       onSubmit={handleSubmit}
       className="group relative flex-1 min-w-0 max-w-[640px]"
     >
@@ -146,7 +215,9 @@ export default function NavbarSearch() {
         type="text"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
+        onFocus={() => { if (suggestions.length > 0) setSuggestionsOpen(true); }}
         placeholder={placeholder}
+        autoComplete="off"
         className="
           relative h-11 lg:h-12 w-full min-w-0 rounded-full
           border border-white/10 light:border-black/10
@@ -161,6 +232,28 @@ export default function NavbarSearch() {
           focus:bg-white/[0.14] light:focus:bg-black/[0.09] focus:border-orange-400
         "
       />
+
+      {suggestionsOpen && suggestions.length > 0 && (
+        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 max-h-[70vh] overflow-y-auto rounded-2xl border border-white/10 bg-[#0b1220] p-1.5 shadow-[0_25px_60px_rgba(0,0,0,.45)] light:border-black/10 light:bg-white">
+          {suggestions.map((s) => (
+            <button
+              key={s.videoId}
+              type="button"
+              onClick={() => goToSuggestion(s)}
+              className="flex w-full items-center gap-3 rounded-xl px-2.5 py-2 text-left transition hover:bg-white/[0.06] light:hover:bg-black/[0.04]"
+            >
+              <div className="relative h-10 w-16 flex-shrink-0 overflow-hidden rounded-lg bg-white/5 light:bg-black/5">
+                {s.thumbnailUrl && (
+                  <Image src={s.thumbnailUrl} alt="" fill unoptimized sizes="64px" className="object-cover" />
+                )}
+              </div>
+              <span className="min-w-0 flex-1 truncate text-sm font-medium text-white light:text-slate-900">
+                {s.title}
+              </span>
+            </button>
+          ))}
+        </div>
+      )}
 
       {/* Voice search */}
       <button

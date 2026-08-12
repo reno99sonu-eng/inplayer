@@ -4,6 +4,8 @@ import {
   PutCommand,
   DeleteCommand,
   GetCommand,
+  UpdateCommand,
+  BatchGetCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { randomUUID } from "crypto";
 import { docClient } from "@/app/lib/dynamodb";
@@ -38,40 +40,72 @@ export async function GET(request: NextRequest) {
     .filter((c) => c.hidden !== true)
     .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-  // Batched, distinct-userId lookup so each commenter's name can link to
-  // their real profile — see app/lib/resolveUsernames. A commenter with
-  // no username yet just renders without a link (handled client-side).
-  const usernames = await resolveUsernames(comments.map((c) => c.userId));
-
-  // Real "Member" badge — who among these commenters has an actual, active
-  // paid membership with THIS video's creator (see app/lib/memberships).
-  // Only fetched if the video still exists and has an uploader; fails to
-  // "nobody's a member" rather than breaking comment loading entirely.
-  let memberIds = new Set<string>();
-  try {
-    const videoResult = await docClient.send(
-      new GetCommand({ TableName: "InPlayer-Videos", Key: { videoId }, ProjectionExpression: "uploaderId" })
-    );
-    const uploaderId = videoResult.Item?.uploaderId as string | undefined;
-    if (uploaderId) {
-      memberIds = await resolveActiveMemberIds(uploaderId, comments.map((c) => c.userId));
-    }
-  } catch (err) {
-    console.error("comments GET: member badge lookup failed:", err);
-  }
-
+  // The three lookups below don't depend on each other's *results* — only
+  // resolveActiveMemberIds needs the video's uploaderId, which is why it's
+  // nested inside the video-lookup branch rather than run as a fourth
+  // top-level parallel task. Previously these ran as sequential awaits, and
+  // isVerified was a per-commenter GetCommand in a loop (a classic N+1 — 10
+  // commenters meant 10 extra round trips on every single comment-list
+  // load). Now: one parallel batch instead of one round trip per commenter,
+  // and independent lookups run concurrently instead of back-to-back.
   const distinctIds = Array.from(new Set(comments.map((c) => c.userId)));
-  const verifiedIds = new Set<string>();
-  await Promise.all(
-    distinctIds.map(async (uid) => {
+
+  const [usernames, memberIds, verifiedIds] = await Promise.all([
+    // Batched, distinct-userId lookup so each commenter's name can link to
+    // their real profile — see app/lib/resolveUsernames. A commenter with
+    // no username yet just renders without a link (handled client-side).
+    resolveUsernames(comments.map((c) => c.userId)),
+
+    // Real "Member" badge — who among these commenters has an actual,
+    // active paid membership with THIS video's creator (see
+    // app/lib/memberships). Only fetched if the video still exists and has
+    // an uploader; fails to "nobody's a member" rather than breaking
+    // comment loading entirely.
+    (async () => {
       try {
-        const u = await docClient.send(new GetCommand({ TableName: "InPlayer-Users", Key: { userId: uid }, ProjectionExpression: "isVerified" }));
-        if (u.Item?.isVerified) {
-          verifiedIds.add(uid);
+        const videoResult = await docClient.send(
+          new GetCommand({ TableName: "InPlayer-Videos", Key: { videoId }, ProjectionExpression: "uploaderId" })
+        );
+        const uploaderId = videoResult.Item?.uploaderId as string | undefined;
+        if (uploaderId) {
+          return await resolveActiveMemberIds(uploaderId, comments.map((c) => c.userId));
         }
-      } catch (e) {}
-    })
-  );
+      } catch (err) {
+        console.error("comments GET: member badge lookup failed:", err);
+      }
+      return new Set<string>();
+    })(),
+
+    // isVerified for every distinct commenter, in one BatchGetCommand
+    // (chunked at DynamoDB's 100-key limit) instead of one GetCommand per
+    // commenter — same batching idiom as app/lib/resolveUsernames.
+    (async () => {
+      const verified = new Set<string>();
+      if (distinctIds.length === 0) return verified;
+      for (let i = 0; i < distinctIds.length; i += 100) {
+        const keys = distinctIds.slice(i, i + 100).map((userId) => ({ userId }));
+        try {
+          let pendingKeys = keys;
+          do {
+            const result = await docClient.send(
+              new BatchGetCommand({
+                RequestItems: {
+                  "InPlayer-Users": { Keys: pendingKeys, ProjectionExpression: "userId, isVerified" },
+                },
+              })
+            );
+            for (const item of result.Responses?.["InPlayer-Users"] || []) {
+              if (item.isVerified && typeof item.userId === "string") verified.add(item.userId);
+            }
+            pendingKeys = (result.UnprocessedKeys?.["InPlayer-Users"]?.Keys || []) as { userId: string }[];
+          } while (pendingKeys.length > 0);
+        } catch (err) {
+          console.error("comments GET: batch isVerified lookup failed:", err);
+        }
+      }
+      return verified;
+    })(),
+  ]);
 
   const commentsWithUsernames = comments.map((c) => ({
     ...c,
@@ -145,6 +179,26 @@ export async function POST(request: NextRequest) {
       Item: comment,
     })
   );
+
+  // Keep InPlayer-Videos.commentCount in sync so homepage/channel/Raftaar
+  // cards can show a real count straight off the already-fetched video
+  // record — but only for comments the public can actually see (a
+  // moderation-hidden comment below shouldn't count towards a number
+  // viewers see displayed).
+  if (!comment.hidden) {
+    try {
+      await docClient.send(
+        new UpdateCommand({
+          TableName: "InPlayer-Videos",
+          Key: { videoId },
+          UpdateExpression: "SET commentCount = if_not_exists(commentCount, :zero) + :inc",
+          ExpressionAttributeValues: { ":inc": 1, ":zero": 0 },
+        })
+      );
+    } catch (err) {
+      console.error("Failed to update video commentCount:", err);
+    }
+  }
 
   // Flagged comments are hidden and go straight to the Admin Panel's
   // moderation queue instead of notifying the video owner — no point
@@ -246,6 +300,24 @@ export async function DELETE(request: NextRequest) {
       Key: { videoId, commentId },
     })
   );
+
+  // Mirror the same non-hidden-only rule POST uses above — a hidden
+  // comment was never counted in commentCount in the first place, so
+  // deleting it must not decrement the count either.
+  if (!existing.Item.hidden) {
+    try {
+      await docClient.send(
+        new UpdateCommand({
+          TableName: "InPlayer-Videos",
+          Key: { videoId },
+          UpdateExpression: "SET commentCount = if_not_exists(commentCount, :zero) - :dec",
+          ExpressionAttributeValues: { ":dec": 1, ":zero": 0 },
+        })
+      );
+    } catch (err) {
+      console.error("Failed to update video commentCount:", err);
+    }
+  }
 
   return NextResponse.json({ success: true });
 }

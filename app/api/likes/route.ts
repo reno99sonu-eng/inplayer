@@ -4,6 +4,7 @@ import {
   PutCommand,
   DeleteCommand,
   GetCommand,
+  UpdateCommand,
 } from "@aws-sdk/lib-dynamodb";
 import { randomUUID } from "crypto";
 import { docClient } from "@/app/lib/dynamodb";
@@ -65,6 +66,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Invalid request." }, { status: 400 });
   }
 
+  // Read the prior reaction first so the denormalized likeCount on
+  // InPlayer-Videos (see app/api/upload/create/route.ts) can be adjusted by
+  // exactly the right delta below — homepage/channel/Raftaar cards read
+  // that field directly instead of re-scanning InPlayer-Likes per card.
+  const priorResult = await docClient.send(
+    new GetCommand({
+      TableName: "InPlayer-Likes",
+      Key: { userId: user.userId, videoId },
+    })
+  );
+  const previousReaction = (priorResult.Item?.reaction as "like" | "dislike" | undefined) || null;
+
   if (action === "remove") {
     await docClient.send(
       new DeleteCommand({
@@ -114,6 +127,31 @@ export async function POST(request: NextRequest) {
         // A notification failing to write shouldn't break the like itself
         console.error("Failed to write like notification:", err);
       }
+    }
+  }
+
+  // Keep InPlayer-Videos.likeCount in sync with exactly what just happened
+  // — +1 only when this action newly makes it a "like" that wasn't one
+  // before, -1 only when it stops being a "like". Every other transition
+  // (e.g. dislike -> dislike, or a fresh dislike with no prior reaction)
+  // nets to a real delta of 0, so this never drifts from the true count.
+  const wasLike = previousReaction === "like";
+  const isLike = action === "like";
+  const likeCountDelta = (isLike ? 1 : 0) - (wasLike ? 1 : 0);
+  if (likeCountDelta !== 0) {
+    try {
+      await docClient.send(
+        new UpdateCommand({
+          TableName: "InPlayer-Videos",
+          Key: { videoId },
+          UpdateExpression: "SET likeCount = if_not_exists(likeCount, :zero) + :delta",
+          ExpressionAttributeValues: { ":delta": likeCountDelta, ":zero": 0 },
+        })
+      );
+    } catch (err) {
+      // A counter drifting slightly on a rare failure is far better than a
+      // 500 on the like action a viewer is actively waiting on.
+      console.error("Failed to update video likeCount:", err);
     }
   }
 

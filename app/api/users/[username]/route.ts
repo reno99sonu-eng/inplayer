@@ -178,6 +178,8 @@ export async function GET(request: NextRequest, { params }: Params) {
         title: v.title,
         thumbnailUrl: v.thumbnailUrl,
         views: v.views || 0,
+        likeCount: v.likeCount || 0,
+        commentCount: v.commentCount || 0,
         uploadedAt: v.uploadedAt,
         contentType: v.contentType || "video",
         category: v.category,

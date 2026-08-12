@@ -35,6 +35,10 @@ export interface Short {
   // instead of losing their soundtrack entirely.
   soundtrackId?: string | null;
   musicClipSeconds?: 20 | 30;
+  // The visual "Look" picked at upload time (ShortCreationTools) — applied
+  // as a real CSS filter on the <video> element at playback (see
+  // ShortsPageContent.tsx). Absent/undefined means "original" (no filter).
+  filter?: "original" | "warm" | "vivid" | "mono";
 }
 
 // No example/dummy shorts — the Shorts shelf is real-shorts-only. Real

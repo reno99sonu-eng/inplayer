@@ -345,9 +345,11 @@ export const HomeVideoCard = memo(function HomeVideoCard({ video }: { video: Rec
           <h3
             className="
               line-clamp-2
-              text-[16px]
+              text-[13px]
+              sm:text-[16px]
               font-semibold
-              leading-6
+              leading-5
+              sm:leading-6
               text-white
               light:text-slate-900
             "
@@ -378,6 +380,12 @@ export const HomeVideoCard = memo(function HomeVideoCard({ video }: { video: Rec
 
             <span className="flex-shrink-0 text-slate-500">•</span>
             <span className="flex-shrink-0 text-slate-500">{video.views}</span>
+            {video.likes && (
+              <>
+                <span className="flex-shrink-0 text-slate-500">•</span>
+                <span className="flex-shrink-0 text-slate-500">{video.likes}</span>
+              </>
+            )}
             <span className="flex-shrink-0 text-slate-500">•</span>
             <span className="flex-shrink-0 truncate text-slate-500">{video.uploaded}</span>
           </div>

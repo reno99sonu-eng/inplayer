@@ -25,3 +25,12 @@ export function formatDuration(seconds: number): string {
     if (count >= 1000) return `${(count / 1000).toFixed(1)}K views`;
     return `${count} views`;
   }
+
+  // Same compacting rule as formatViews (1.2K / 3.4M) but with no fixed
+  // suffix, so it works for likes/comments/any other count a card wants to
+  // label itself (e.g. `${formatCompactNumber(n)} likes`).
+  export function formatCompactNumber(count: number): string {
+    if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
+    if (count >= 1000) return `${(count / 1000).toFixed(1)}K`;
+    return `${count}`;
+  }

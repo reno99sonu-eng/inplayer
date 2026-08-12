@@ -5,6 +5,7 @@ export interface Recommendation {
   avatar: string;
   thumbnail: string;
   views: string;
+  likes?: string;
   uploaded: string;
   duration: string;
   verified?: boolean;

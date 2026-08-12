@@ -36,13 +36,13 @@ export const CREATOR_SHARE = 0.8;
 export const PLATFORM_SHARE = 0.2;
 
 // Eligibility is intentionally simple and stated in one place so it's easy
-// to tune later: 100 In-Family members (subscribers) AND 10,000 total views
+// to tune later: 500 In-Family members (subscribers) AND 50,000 total views
 // (videos + Shorts combined) unlocks the KYC / revenue flow.
 export const ELIGIBILITY_THRESHOLD = {
-  subscribers: 100,
-  videoViews: 10000,
+  subscribers: 500,
+  videoViews: 50000,
   shortViews: 1000000, // 1 Million views required for Reels/Raftaar monetization
-  views: 10000,
+  views: 50000,
 };
 
 export type KycStatus = "not_started" | "pending_review" | "verified" | "rejected";

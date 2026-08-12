@@ -76,7 +76,9 @@ export default function ShortsShelf({ items, renderFooter }: ShortsShelfProps) {
                 <p className="mt-1 text-[10px] font-bold text-orange-400 truncate drop-shadow-sm">
                   {short.creator}
                 </p>
-                <p className="text-[10px] font-semibold text-slate-300 drop-shadow-sm">{short.views}</p>
+                <p className="text-[10px] font-semibold text-slate-300 drop-shadow-sm">
+                  {[short.views, short.likes, short.comments].filter(Boolean).join(" • ")}
+                </p>
               </div>
             </div>
           );

@@ -161,6 +161,11 @@ export default function UploadPage() {
   const [progress, setProgress] = useState(0);
   const [uploadedVideoId, setUploadedVideoId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Guards against a fast double-click firing handlePublish twice before
+  // `stage` re-renders away from the Publish button (which would create two
+  // Mux uploads + two DynamoDB video records for one file — there's no
+  // idempotency key on /api/upload/create to catch that server-side).
+  const [publishing, setPublishing] = useState(false);
 
   const handleFile = async (selected: File | null) => {
     if (!selected) return;
@@ -270,13 +275,14 @@ export default function UploadPage() {
   };
 
   const handlePublish = async () => {
-    if (!file) return;
+    if (!file || publishing) return;
 
     if (!title.trim()) {
       setError("Please give your upload a title.");
       return;
     }
 
+    setPublishing(true);
     setError(null);
     setStage("uploading");
     setProgress(0);
@@ -349,13 +355,23 @@ export default function UploadPage() {
       });
 
       setStage("processing");
+      setPublishing(false);
     } catch (err) {
       console.error("Upload error:", err);
       setError(`Something went wrong uploading your video: ${err instanceof Error ? err.message : 'Unknown error'}`);
       setStage("error");
+      setPublishing(false);
     }
   };
 
+  // Fully resets every piece of upload-session state back to a blank
+  // picker — used both by the "X" cancel button and by the "Upload
+  // Another" button shown on the success screens below. Without this being
+  // reachable from the success screens, the only way to start a second
+  // upload was leaving /upload entirely and hoping a fresh navigation back
+  // remounted the page instead of restoring the stale "processing" state
+  // from before — which isn't guaranteed, and is exactly what made
+  // uploading a second time in the same session unreliable.
   const resetUpload = () => {
     setFile(null);
     setTitle("");
@@ -375,6 +391,9 @@ export default function UploadPage() {
     setStage("picking");
     setProgress(0);
     setError(null);
+    setUploadedVideoId(null);
+    setPublishing(false);
+    if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
   if (authLoading) {
@@ -559,9 +578,10 @@ export default function UploadPage() {
 
             <button
               onClick={handlePublish}
-              className="w-full rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] py-3.5 font-bold text-white shadow-[0_15px_35px_rgba(255,153,0,.3)] transition-all hover:-translate-y-0.5 active:scale-[0.98]"
+              disabled={publishing}
+              className="w-full rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] py-3.5 font-bold text-white shadow-[0_15px_35px_rgba(255,153,0,.3)] transition-all hover:-translate-y-0.5 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
             >
-              Publish {contentType === "short" ? "Short" : "Video"}
+              {publishing ? "Publishing..." : `Publish ${contentType === "short" ? "Short" : "Video"}`}
             </button>
           </div>
         )}
@@ -621,12 +641,20 @@ export default function UploadPage() {
                 contentType === "short" ? (
                   <div className="py-8 text-center">
                     <p className="text-lg font-bold text-white light:text-slate-900">Your Short is published! 🎉</p>
-                    <button
-                      onClick={() => router.push(`/shorts?v=${uploadedVideoId}`)}
-                      className="mt-4 rounded-2xl bg-gradient-to-r from-[#FF7A18] to-[#FFD54A] px-6 py-2.5 font-bold text-white shadow"
-                    >
-                      Watch Short
-                    </button>
+                    <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+                      <button
+                        onClick={() => router.push(`/shorts?v=${uploadedVideoId}`)}
+                        className="rounded-2xl bg-gradient-to-r from-[#FF7A18] to-[#FFD54A] px-6 py-2.5 font-bold text-white shadow"
+                      >
+                        Watch Short
+                      </button>
+                      <button
+                        onClick={resetUpload}
+                        className="rounded-2xl border border-white/10 px-6 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-orange-400/30 hover:bg-white/5 light:border-black/10 light:text-slate-700 light:hover:bg-black/5"
+                      >
+                        Upload Another
+                      </button>
+                    </div>
                   </div>
                 ) : (
                   <UploadThumbnailStep
@@ -639,7 +667,13 @@ export default function UploadPage() {
                 )
               }
             />
-            <div className="mt-2 flex justify-center">
+            <div className="mt-2 flex flex-wrap justify-center gap-3">
+              <button
+                onClick={resetUpload}
+                className="rounded-2xl bg-gradient-to-r from-[#FF7A18] to-[#FFD54A] px-6 py-2.5 text-sm font-bold text-white shadow transition hover:-translate-y-0.5"
+              >
+                Upload Another
+              </button>
               <button
                 onClick={() => router.push("/")}
                 className="rounded-2xl border border-white/10 px-6 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-orange-400/30 hover:bg-white/5 light:border-black/10 light:text-slate-700 light:hover:bg-black/5"

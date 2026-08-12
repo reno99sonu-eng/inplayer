@@ -29,6 +29,25 @@ interface ShortsPageContentProps {
   initialShorts: Short[];
 }
 
+// The "Look" picked in ShortCreationTools at upload time was stored on the
+// video record (app/api/upload/create/route.ts) and read back out (see
+// app/shorts/page.tsx) but never actually applied anywhere — this is what
+// turns that stored choice into a real, visible effect at playback. A CSS
+// filter on the player element itself (cheap, no server-side transcoding)
+// rather than a "burned in" re-encode of the source video.
+function cssFilterFor(filter: Short["filter"]): string | undefined {
+  switch (filter) {
+    case "warm":
+      return "sepia(0.35) saturate(1.4) hue-rotate(-8deg) brightness(1.03)";
+    case "vivid":
+      return "saturate(1.6) contrast(1.15) brightness(1.03)";
+    case "mono":
+      return "grayscale(1) contrast(1.05)";
+    default:
+      return undefined;
+  }
+}
+
 // Renders caption/description text with #hashtags highlighted, matching
 // the convention on every real shorts platform.
 function renderWithHashtags(text: string) {
@@ -887,7 +906,7 @@ export default function ShortsPageContent({
                         // time a viewer swipes to it rather than starting a
                         // cold fetch on arrival.
                         preload="auto"
-                        style={{ height: "100%", width: "100%" }}
+                        style={{ height: "100%", width: "100%", filter: cssFilterFor(short.filter) }}
                       />
                     </div>
                   ) : (

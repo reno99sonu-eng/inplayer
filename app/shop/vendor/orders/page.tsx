@@ -77,6 +77,30 @@ function VendorOrderCard({
       </div>
 
       {order.status === "placed" ? (
+        <>
+          <p className="mt-2 flex items-center gap-1 text-[10px] font-semibold text-amber-300">
+            <AlertTriangle size={10} /> Buyer pays you directly via UPI ({order.vendorUpiId || "your UPI ID"}) — verify it actually arrived before confirming.
+          </p>
+          <div className="mt-1.5 flex gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => onUpdateStatus(order.orderId, "vendor_confirmed")}
+              className="flex items-center gap-1 rounded-lg bg-emerald-500/15 px-2.5 py-1.5 text-xs font-bold text-emerald-300 hover:bg-emerald-500/25 disabled:opacity-50"
+            >
+              <Check size={12} /> Confirm received
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => onUpdateStatus(order.orderId, "vendor_cancelled")}
+              className="flex items-center gap-1 rounded-lg bg-red-500/15 px-2.5 py-1.5 text-xs font-bold text-red-300 hover:bg-red-500/25 disabled:opacity-50"
+            >
+              <X size={12} /> Cancel
+            </button>
+          </div>
+        </>
+      ) : order.status === "paid" ? (
         <div className="mt-2 flex gap-2">
           <button
             type="button"
@@ -84,7 +108,7 @@ function VendorOrderCard({
             onClick={() => onUpdateStatus(order.orderId, "vendor_confirmed")}
             className="flex items-center gap-1 rounded-lg bg-emerald-500/15 px-2.5 py-1.5 text-xs font-bold text-emerald-300 hover:bg-emerald-500/25 disabled:opacity-50"
           >
-            <Check size={12} /> Confirm received
+            <Check size={12} /> Confirm & ship
           </button>
           <button
             type="button"
@@ -95,6 +119,10 @@ function VendorOrderCard({
             <X size={12} /> Cancel
           </button>
         </div>
+      ) : order.status === "payment_pending" ? (
+        <p className="mt-2 text-[11px] font-semibold text-amber-300">Awaiting payment</p>
+      ) : order.status === "payment_failed" ? (
+        <p className="mt-2 text-[11px] font-semibold text-red-300">Payment failed</p>
       ) : (
         <p className={`mt-2 text-[11px] font-semibold ${order.status === "vendor_confirmed" ? "text-emerald-300" : "text-red-300"}`}>
           {order.status === "vendor_confirmed" ? "Confirmed" : "Cancelled"}
@@ -231,7 +259,8 @@ export default function VendorOrdersPage() {
     <div className="mx-auto max-w-xl px-6 py-8">
       <h1 className="text-xl font-black text-white light:text-slate-900">Orders Received</h1>
       <p className="mt-1 text-xs text-slate-500">
-        Confirm once you&apos;ve actually received payment via UPI — InPlayer can&apos;t verify this for you.
+        Orders paid through your Razorpay setup are verified automatically — just confirm once shipped. Orders
+        marked as paid via UPI need you to check your own UPI app before confirming.
       </p>
 
       {orders.length > 0 && (

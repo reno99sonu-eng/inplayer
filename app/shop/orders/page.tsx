@@ -11,6 +11,9 @@ import type { HammartOrder } from "@/app/lib/hammartOrders";
 
 const STATUS_LABEL: Record<string, { label: string; tone: string }> = {
   placed: { label: "Placed — awaiting vendor confirmation", tone: "text-amber-300" },
+  payment_pending: { label: "Awaiting payment", tone: "text-amber-300" },
+  paid: { label: "Paid — awaiting vendor confirmation", tone: "text-emerald-300" },
+  payment_failed: { label: "Payment failed", tone: "text-red-300" },
   vendor_confirmed: { label: "Confirmed by vendor", tone: "text-emerald-300" },
   vendor_cancelled: { label: "Cancelled by vendor", tone: "text-red-300" },
 };

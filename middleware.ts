@@ -33,6 +33,16 @@ import { NextRequest, NextResponse } from "next/server";
 //   so this same gap could silently fail to activate memberships/payouts
 //   too. Exactly the same class of bug /api/admin already hit once (see
 //   the "Fix admin panel sign-in" commit) — generalizing the fix here.
+// - /terms and /privacy — legal pages must be readable by non-India
+//   visitors/crawlers too: Razorpay's own automated "Page Compliance
+//   Check" (and Apple/Google app review, and any user checking your
+//   policies before they ever set foot in India) fetches these pages from
+//   servers that are NOT in India. Without this exemption they were
+//   silently rewritten to /geo-blocked, so the crawler saw the "Sorry,
+//   we're not available in your region" page instead of real legal text
+//   and could never verify the links — this is what was causing Razorpay's
+//   compliance check to keep failing even after the correct URLs were
+//   entered.
 // - Static files (favicon, images, etc.)
 const BYPASS_PREFIXES = [
   "/geo-blocked",
@@ -41,6 +51,8 @@ const BYPASS_PREFIXES = [
   "/_next",
   "/api/geo",
   "/api/webhooks",
+  "/terms",
+  "/privacy",
 ] as const;
 
 const BYPASS_EXACT = new Set([

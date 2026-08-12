@@ -4,17 +4,27 @@ import { ArrowLeft } from "lucide-react";
 // Real, Hammart-specific Vendor Terms of Service — written against the
 // actual Consumer Protection (E-Commerce) Rules 2020 (Rule 6's duties for
 // marketplace e-commerce entities regarding their sellers) and how
-// Hammart actually works today (direct buyer-to-vendor UPI payment, no
-// InPlayer escrow, real KYC review, the 10-free/₹249-per-month listing
-// model). Same honest caveat as app/terms/page.tsx: this is a working
-// draft matching the real product, not a substitute for review by a
-// lawyer familiar with Indian consumer-protection and IT law before this
-// is relied on for compliance at scale.
+// Hammart actually works today. Two payment paths, and setting up the
+// automatic one is never required to sell (an explicit product decision —
+// see app/api/hammart/checkout/route.ts's header comment): a vendor can
+// complete optional payout setup, in which case buyers pay online at
+// checkout and payouts happen automatically minus a flat ₹0.50 InPlayer
+// commission per order (Section 8); or a vendor can skip that and simply
+// receive buyer payments directly via their own UPI ID, same as before
+// this feature existed, with no InPlayer commission at all on that path.
+// Vendor-facing copy deliberately only ever describes the flat ₹0.50
+// commission where it actually applies — never the underlying payment
+// processor's account/API mechanics — per an explicit product decision to
+// keep vendor-facing language simple. Same honest caveat as
+// app/terms/page.tsx: this is a working draft matching the real product,
+// not a substitute for review by a lawyer familiar with Indian
+// consumer-protection and IT law before this is relied on for compliance
+// at scale.
 export const metadata = {
   title: "Vendor Terms — Hammart",
 };
 
-const LAST_UPDATED = "30 July 2026";
+const LAST_UPDATED = "11 August 2026";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -39,8 +49,9 @@ export default function HammartVendorTermsPage() {
         <p>
           Hammart is a marketplace feature of InPlayer where independent vendors — individuals or registered
           businesses — list and sell products directly to InPlayer users. InPlayer operates the listing platform,
-          vendor verification, and buyer-facing storefront, but is not a party to the sale itself: every purchase is a
-          direct transaction between you (the vendor) and the buyer.
+          vendor verification, and buyer-facing storefront, but every purchase remains a sale between you (the
+          vendor) and the buyer. Whether InPlayer takes any cut at all depends on which payment path you use — see
+          Section 4.
         </p>
       </Section>
 
@@ -48,8 +59,8 @@ export default function HammartVendorTermsPage() {
         <p>
           Before you can publish a listing, you must complete Hammart&apos;s business-KYC review: your legal name,
           PAN, and (for a registered business) GST or Udyam registration number, plus bank/UPI details, reviewed by a
-          real person on the InPlayer team. We may reject or request corrections to any submission. Approval doesn&apos;t
-          guarantee any particular sales outcome.
+          real person on the InPlayer team. We may reject or request corrections to any submission. Approval
+          doesn&apos;t guarantee any particular sales outcome.
         </p>
       </Section>
 
@@ -69,13 +80,29 @@ export default function HammartVendorTermsPage() {
         </p>
       </Section>
 
-      <Section title="4. Payment — direct, vendor-to-buyer, not through InPlayer">
+      <Section title="4. Payment — two ways to get paid, your choice">
         <p>
-          Hammart does not process payments and does not hold or escrow buyer funds. At checkout, a buyer is shown
-          your own UPI ID as a QR code and payment link, and pays you directly through their own UPI app. InPlayer
-          cannot see, confirm, or reverse this payment — that visibility exists only between you, the buyer, and your
-          bank/UPI provider. You are responsible for confirming payment actually arrived before marking an order
-          confirmed and shipping the product.
+          Setting up automatic online payouts is completely optional — you are never required to do it to sell on
+          Hammart. There are two ways an order gets paid for, and which one applies depends on whether you&apos;ve
+          set it up:
+        </p>
+        <ul className="list-disc space-y-1.5 pl-5">
+          <li>
+            <strong>Automatic payouts (optional):</strong> if you&apos;ve completed payout setup, a buyer pays
+            securely online at checkout, and your share of the order — the order total minus InPlayer&apos;s flat
+            ₹0.50 commission (see Section 8) — is paid out automatically to your bank account. You don&apos;t need to
+            manually confirm or chase this payment; the order only shows as awaiting your action once payment is
+            verified.
+          </li>
+          <li>
+            <strong>Direct UPI (default until you set up automatic payouts):</strong> a buyer pays your own UPI ID
+            directly, the same way Hammart has always worked. InPlayer never sees or processes this payment, so
+            you&apos;re responsible for checking your own UPI app and confirming an order only once you&apos;ve
+            actually verified the money arrived. No InPlayer commission applies on this path.
+          </li>
+        </ul>
+        <p>
+          Either way, you&apos;re responsible for shipping the product promptly once an order is confirmed as paid.
         </p>
       </Section>
 
@@ -84,8 +111,9 @@ export default function HammartVendorTermsPage() {
           You must clearly state your own return, refund, and cancellation policy to buyers (in your listing
           description) and honor it. Regardless of your stated policy, you cannot refuse to accept a return or issue
           a refund for a product that was defective, materially different from its listing, or not delivered — this
-          is a legal requirement under Rule 6, not optional. Since InPlayer never holds the payment, any refund is
-          one you send directly to the buyer.
+          is a legal requirement under Rule 6, not optional. Hammart does not currently offer an automated in-app
+          refund flow, so if a refund is owed you are responsible for arranging it directly with the buyer (for
+          example, by bank transfer or UPI) for the amount you actually received.
         </p>
       </Section>
 
@@ -116,9 +144,11 @@ export default function HammartVendorTermsPage() {
       <Section title="8. Fees & Listing Charges">
         <p>
           Verified vendors enjoy unlimited, free product listings on the Hammart marketplace — InPlayer does not
-          currently charge a per-listing fee. InPlayer also does not take a commission on individual sales — payments
-          for items are received directly by the vendor. If this changes in the future, we&apos;ll update this page
-          and give existing vendors advance notice before any fee applies.
+          currently charge a per-listing fee. For orders paid through automatic online payouts (Section 4), InPlayer
+          keeps a flat commission of ₹0.50 per order, deducted automatically before your payout — you always receive
+          the order total minus this ₹0.50. For orders paid via direct UPI, InPlayer takes no commission at all,
+          since that payment never passes through InPlayer. If this changes in the future, we&apos;ll update this
+          page and give existing vendors advance notice before any fee change applies.
         </p>
       </Section>
 

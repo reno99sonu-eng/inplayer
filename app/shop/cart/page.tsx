@@ -2,16 +2,20 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import QRCode from "qrcode";
-import { Loader2, ShoppingCart, IndianRupee, Minus, Plus, Trash2, Store, ArrowLeft, CheckCircle2, XCircle, X, MapPin } from "lucide-react";
+import { Loader2, ShoppingCart, IndianRupee, Minus, Plus, Trash2, Store, ArrowLeft, CheckCircle2, XCircle, Clock, X, MapPin } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { authedFetch } from "@/app/lib/apiFetch";
-import { buildUpiLink } from "@/app/lib/upi";
-import { orderTotalInr } from "@/app/lib/hammartOrderMath";
+import {
+  loadRazorpayCheckoutScript,
+  postHammartCheckout,
+  openHammartCheckoutForGroup,
+  pollHammartOrderStatuses,
+  generateUpiQrDataUrl,
+  type CheckoutGroupResult,
+} from "@/app/lib/hammartCheckoutClient";
 import LocationMapPicker, { type LocationAddress } from "@/app/components/hammart/LocationMapPicker";
 import ShopNavLinks from "@/app/components/hammart/ShopNavLinks";
 import type { HammartProduct } from "@/app/lib/hammartProducts";
-import type { HammartOrder } from "@/app/lib/hammartOrders";
 
 interface CartLineItem {
   productId: string;
@@ -21,13 +25,29 @@ interface CartLineItem {
   unavailable: boolean;
 }
 
-interface CheckoutResult {
+// One entry per vendor group in the checkout attempt — a multi-vendor
+// cart is one payment per seller (see app/api/hammart/checkout/route.ts),
+// not one per product line. Which kind of payment depends on that
+// vendor: "awaiting_upi" is the direct-UPI fallback (no gateway, no
+// polling — the vendor self-confirms once paid); everything else is the
+// Razorpay Route path.
+type GroupStatus = "opening" | "verifying" | "paid" | "payment_failed" | "dismissed" | "failed" | "unavailable" | "awaiting_upi";
+
+interface GroupCheckoutState {
+  vendorId: string;
+  amountInr: number;
+  status: GroupStatus;
+  error?: string;
+  paymentMethod?: "razorpay" | "upi";
+  upiLink?: string;
+  vendorUpiId?: string;
+  qrDataUrl?: string;
+}
+
+interface ItemFailureState {
   productId: string;
   productTitle: string;
-  success: boolean;
-  error?: string;
-  order?: HammartOrder;
-  qrDataUrl?: string;
+  error: string;
 }
 
 export default function CartPage() {
@@ -99,8 +119,8 @@ export default function CartPage() {
   const [showMapPicker, setShowMapPicker] = useState(false);
 
   const [checkingOut, setCheckingOut] = useState(false);
-  const [checkoutProgress, setCheckoutProgress] = useState<{ done: number; total: number } | null>(null);
-  const [checkoutResults, setCheckoutResults] = useState<CheckoutResult[] | null>(null);
+  const [groupResults, setGroupResults] = useState<GroupCheckoutState[] | null>(null);
+  const [itemFailures, setItemFailures] = useState<ItemFailureState[]>([]);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
   const openCheckout = () => {
@@ -131,12 +151,16 @@ export default function CartPage() {
 
   const grandTotal = availableItems.reduce((sum, it) => sum + it.product.priceInr * it.quantity, 0);
 
-  // Hammart payments move buyer -> vendor directly over UPI (see
-  // app/lib/hammartOrders.ts's top comment) — there's no single combined
-  // checkout, so a multi-vendor cart genuinely becomes N separate orders,
-  // each needing its own UPI payment. This loop places them one at a
-  // time and reports each outcome honestly rather than pretending it was
-  // one atomic transaction.
+  const updateGroupStatus = (vendorId: string, status: GroupStatus, error?: string) => {
+    setGroupResults((prev) => prev?.map((g) => (g.vendorId === vendorId ? { ...g, status, error } : g)) ?? prev);
+  };
+
+  // One payment per vendor group (see app/api/hammart/checkout/route.ts) —
+  // each group comes back as either "razorpay" (real gateway Checkout
+  // popup, opened one at a time since only one popup can meaningfully be
+  // open at once, final status from polling the webhook-verified "paid"
+  // state) or "upi" (no gateway at all — just render the vendor's QR/link
+  // and leave it to them to confirm once actually paid).
   const handleCheckout = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!deliveryAddress.trim() || !buyerPhone.trim()) {
@@ -150,56 +174,103 @@ export default function CartPage() {
 
     setCheckoutError(null);
     setCheckingOut(true);
-    setCheckoutProgress({ done: 0, total: availableItems.length });
 
-    const results: CheckoutResult[] = [];
-    for (const item of availableItems) {
-      const product = item.product;
-      try {
-        const res = await authedFetch("/api/hammart/orders", {
-          method: "POST",
-          body: JSON.stringify({
-            productId: item.productId,
-            quantity: item.quantity,
-            buyerName: buyerNameInput,
-            buyerEmail,
-            buyerPhone,
-            deliveryAddress,
-            city,
-            state: stateName,
-            pincode,
-          }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) {
-          results.push({ productId: item.productId, productTitle: product.title, success: false, error: data.error || "Couldn't place this order." });
-        } else {
-          const order = data.order as HammartOrder;
-          const link = buildUpiLink({ vpa: order.vendorUpiId, payeeName: order.vendorId, amountInr: orderTotalInr(order), note: order.productTitle });
-          let qrDataUrl: string | undefined;
-          try {
-            qrDataUrl = await QRCode.toDataURL(link, { width: 220, margin: 1 });
-          } catch (err) {
-            console.error("QR generation failed:", err);
-          }
-          results.push({ productId: item.productId, productTitle: product.title, success: true, order, qrDataUrl });
-        }
-      } catch (err) {
-        console.error(`Failed to order ${product.title}:`, err);
-        results.push({ productId: item.productId, productTitle: product.title, success: false, error: "Something went wrong. Please try again." });
-      }
-      setCheckoutProgress((prev) => (prev ? { done: prev.done + 1, total: prev.total } : prev));
+    let response;
+    try {
+      response = await postHammartCheckout({
+        authedFetch,
+        items: availableItems.map((it) => ({ productId: it.productId, quantity: it.quantity })),
+        buyerName: buyerNameInput,
+        buyerEmail,
+        buyerPhone,
+        deliveryAddress,
+        city,
+        state: stateName,
+        pincode,
+      });
+    } catch (err) {
+      setCheckoutError(err instanceof Error ? err.message : "Couldn't start checkout right now.");
+      setCheckingOut(false);
+      return;
     }
 
-    setCheckoutResults(results);
+    // Only load Razorpay's script if at least one vendor group actually
+    // needs it — a cart that's entirely UPI-fallback vendors shouldn't
+    // pull in the gateway script at all.
+    const razorpayGroups = response.groups.filter((g): g is CheckoutGroupResult & { success: true; paymentMethod: "razorpay" } => g.success && g.paymentMethod === "razorpay");
+    if (razorpayGroups.length > 0) {
+      try {
+        await loadRazorpayCheckoutScript();
+      } catch (err) {
+        // Don't abort the whole checkout over this — a hybrid cart may
+        // still have UPI-fallback groups that don't need this script at
+        // all. Razorpay groups will simply resolve "unavailable" below
+        // once openHammartCheckoutForGroup finds window.Razorpay missing,
+        // which already surfaces per-group in the results UI.
+        console.error("Failed to load Razorpay Checkout script:", err);
+      }
+    }
+
     setShowAddressModal(false);
+    setItemFailures(response.failedItems);
+    setGroupResults(
+      response.groups.map((g) => ({
+        vendorId: g.vendorId,
+        amountInr: g.amountInr || 0,
+        status: g.success ? (g.paymentMethod === "upi" ? "awaiting_upi" : "opening") : "failed",
+        error: g.error,
+        paymentMethod: g.paymentMethod,
+        upiLink: g.upiLink,
+        vendorUpiId: g.vendorUpiId,
+      }))
+    );
+
+    // The server already removed successfully-ordered items from the real
+    // cart — keep the visible list in sync without a full refetch.
+    const orderedVendorUserIds = new Set(response.groups.filter((g) => g.success).map((g) => g.vendorUserId));
+    setItems((prev) => prev.filter((it) => !(it.product && orderedVendorUserIds.has(it.product.vendorUserId))));
+
     setCheckingOut(false);
 
-    // The server already removed successfully-ordered items from the
-    // real cart (see POST /api/hammart/orders) — this just keeps the
-    // visible list in sync without a full refetch.
-    const succeededIds = new Set(results.filter((r) => r.success).map((r) => r.productId));
-    setItems((prev) => prev.filter((it) => !succeededIds.has(it.productId)));
+    // UPI groups just need their QR code rendered — no popup, no
+    // polling, nothing to wait on (all can happen concurrently).
+    const upiGroups = response.groups.filter((g): g is CheckoutGroupResult & { success: true; paymentMethod: "upi" } => g.success && g.paymentMethod === "upi");
+    await Promise.all(
+      upiGroups.map(async (group) => {
+        if (!group.upiLink) return;
+        const qrDataUrl = await generateUpiQrDataUrl(group.upiLink);
+        setGroupResults((prev) => prev?.map((g) => (g.vendorId === group.vendorId ? { ...g, qrDataUrl } : g)) ?? prev);
+      })
+    );
+
+    // Razorpay groups: sequential, not Promise.all — only one Checkout
+    // popup can be meaningfully open at a time.
+    for (const group of razorpayGroups) {
+      const outcome = await openHammartCheckoutForGroup(group, { buyerName: buyerNameInput, buyerEmail, buyerPhone });
+
+      if (outcome === "dismissed") {
+        updateGroupStatus(group.vendorId, "dismissed");
+        continue;
+      }
+      if (outcome === "unavailable") {
+        updateGroupStatus(group.vendorId, "unavailable");
+        continue;
+      }
+
+      updateGroupStatus(group.vendorId, "verifying");
+      const statuses = await pollHammartOrderStatuses({ authedFetch, orderIds: group.orderIds || [] });
+      const values = Object.values(statuses);
+      if (values.every((s) => s === "paid")) {
+        updateGroupStatus(group.vendorId, "paid");
+      } else if (values.some((s) => s === "payment_failed")) {
+        updateGroupStatus(group.vendorId, "payment_failed");
+      } else {
+        // Still pending after the poll budget — not a failure, just not
+        // confirmed yet. /shop/orders will reflect the real status the
+        // moment the webhook lands.
+        updateGroupStatus(group.vendorId, "verifying");
+      }
+    }
   };
 
   if (authLoading || (loading && user?.userId)) {
@@ -231,37 +302,73 @@ export default function CartPage() {
         <ShopNavLinks />
       </div>
 
-      {checkoutResults && (
+      {(groupResults || itemFailures.length > 0) && (
         <div className="mt-5 space-y-3">
           <p className="text-sm font-bold text-white light:text-slate-900">Checkout results</p>
-          {checkoutResults.map((r) => (
+          {groupResults?.map((g) => (
             <div
-              key={r.productId}
-              className={`rounded-2xl border p-4 ${r.success ? "border-emerald-400/20 bg-emerald-500/[0.05]" : "border-red-400/20 bg-red-500/[0.05]"}`}
+              key={g.vendorId}
+              className={`rounded-2xl border p-4 text-center ${
+                g.status === "paid"
+                  ? "border-emerald-400/20 bg-emerald-500/[0.05]"
+                  : g.status === "payment_failed" || g.status === "failed"
+                  ? "border-red-400/20 bg-red-500/[0.05]"
+                  : "border-amber-400/20 bg-amber-500/[0.05]"
+              }`}
             >
-              {r.success && r.order ? (
-                <div className="text-center">
+              {g.status === "paid" ? (
+                <>
                   <CheckCircle2 size={20} className="mx-auto text-emerald-400" />
-                  <p className="mt-1.5 text-sm font-bold text-white light:text-slate-900">
-                    {r.productTitle} — pay {r.order.vendorId} directly
-                  </p>
-                  <p className="mt-1 text-lg font-black text-orange-400">₹{orderTotalInr(r.order).toLocaleString("en-IN")}</p>
-                  {r.qrDataUrl && (
+                  <p className="mt-1.5 text-sm font-bold text-white light:text-slate-900">Paid — order from {g.vendorId} confirmed</p>
+                  <p className="mt-1 text-lg font-black text-orange-400">₹{g.amountInr.toLocaleString("en-IN")}</p>
+                </>
+              ) : g.status === "awaiting_upi" ? (
+                <>
+                  <p className="text-sm font-bold text-white light:text-slate-900">Pay {g.vendorId} directly</p>
+                  <p className="mt-1 text-lg font-black text-orange-400">₹{g.amountInr.toLocaleString("en-IN")}</p>
+                  {g.qrDataUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
-                    <img src={r.qrDataUrl} alt="UPI QR code" className="mx-auto mt-3 h-40 w-40 rounded-xl bg-white p-2" />
+                    <img src={g.qrDataUrl} alt="UPI QR code" className="mx-auto mt-3 h-40 w-40 rounded-xl bg-white p-2" />
+                  ) : (
+                    <Loader2 size={20} className="mx-auto mt-3 animate-spin text-amber-400" />
                   )}
                   <p className="mt-2 text-xs text-slate-400">
-                    UPI ID: <span className="font-mono">{r.order.vendorUpiId}</span>
+                    UPI ID: <span className="font-mono">{g.vendorUpiId}</span>
                   </p>
-                </div>
+                  <p className="mt-1 text-[11px] text-slate-500">
+                    This seller hasn&apos;t set up automatic payments yet — scan the QR or use the UPI ID above to pay them
+                    directly. They&apos;ll confirm your order once payment arrives.
+                  </p>
+                </>
+              ) : g.status === "opening" || g.status === "verifying" ? (
+                <>
+                  <Loader2 size={20} className="mx-auto animate-spin text-amber-400" />
+                  <p className="mt-1.5 text-sm font-bold text-white light:text-slate-900">
+                    {g.status === "opening" ? `Opening payment for ${g.vendorId}…` : `Confirming payment for ${g.vendorId}…`}
+                  </p>
+                </>
+              ) : g.status === "dismissed" ? (
+                <>
+                  <Clock size={20} className="mx-auto text-amber-400" />
+                  <p className="mt-1.5 text-sm font-bold text-white light:text-slate-900">Payment not completed — {g.vendorId}</p>
+                  <p className="mt-1 text-xs text-slate-400">Your order is saved as awaiting payment — retry anytime from My Orders.</p>
+                </>
               ) : (
-                <div className="flex items-center gap-2">
+                <div className="flex items-center gap-2 text-left">
                   <XCircle size={18} className="flex-shrink-0 text-red-400" />
                   <p className="text-xs font-semibold text-red-300">
-                    {r.productTitle}: {r.error}
+                    {g.vendorId}: {g.error || "Payment failed — please try again."}
                   </p>
                 </div>
               )}
+            </div>
+          ))}
+          {itemFailures.map((f) => (
+            <div key={f.productId} className="flex items-center gap-2 rounded-2xl border border-red-400/20 bg-red-500/[0.05] p-4">
+              <XCircle size={18} className="flex-shrink-0 text-red-400" />
+              <p className="text-xs font-semibold text-red-300">
+                {f.productTitle}: {f.error}
+              </p>
             </div>
           ))}
           <Link href="/shop/orders" className="mt-2 block text-center text-xs font-semibold text-orange-300 hover:text-orange-200">
@@ -373,7 +480,7 @@ export default function CartPage() {
               </div>
               {groups.size > 1 && (
                 <p className="mt-1 text-[11px] text-slate-500">
-                  Items are from {groups.size} different sellers — you&apos;ll pay each one separately via their own UPI ID.
+                  Items are from {groups.size} different sellers — you&apos;ll complete one payment per seller.
                 </p>
               )}
               <button
@@ -416,12 +523,10 @@ export default function CartPage() {
               </button>
             </div>
 
-            {checkingOut && checkoutProgress ? (
+            {checkingOut ? (
               <div className="flex flex-col items-center gap-3 py-10">
                 <Loader2 size={28} className="animate-spin text-orange-400" />
-                <p className="text-sm font-semibold text-slate-300 light:text-slate-700">
-                  Placing order {Math.min(checkoutProgress.done + 1, checkoutProgress.total)} of {checkoutProgress.total}...
-                </p>
+                <p className="text-sm font-semibold text-slate-300 light:text-slate-700">Starting checkout…</p>
               </div>
             ) : (
               <form onSubmit={handleCheckout} className="mt-4 space-y-3">

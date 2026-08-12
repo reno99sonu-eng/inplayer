@@ -13,10 +13,15 @@ import { orderTotalInr } from "@/app/lib/hammartOrderMath";
 // this vendor's orders" across the dashboard and the full orders page.
 //
 // "Confirmed" (vendor_confirmed) is the only status counted as actual
-// revenue — see app/lib/hammartOrders.ts's top comment: Hammart payments
-// move buyer -> vendor directly over UPI, so "placed" only means a buyer
-// clicked through and InPlayer's server has no way to confirm money
-// actually moved yet.
+// revenue here — that's fulfillment confirmation (the vendor has
+// shipped/received it), tracked separately from payment confirmation.
+// Hammart checkout uses one of two payment paths per vendor (see
+// app/api/hammart/checkout/route.ts): "paid" rows had their payment
+// verified server-side via the Razorpay webhook before ever reaching that
+// status; "placed" rows are the direct-UPI fallback for a vendor without
+// an active Razorpay account — the buyer paid the vendor's UPI ID
+// directly, and it's on the vendor's own word (same as it's always been
+// for that path) that the money actually arrived.
 interface VendorSalesStatsProps {
   orders: HammartOrder[];
   // Dashboard landing page gets a short at-a-glance summary; the full
@@ -33,7 +38,10 @@ interface ProductAggregate {
 
 export default function VendorSalesStats({ orders, compact = false }: VendorSalesStatsProps) {
   const confirmed = orders.filter((o) => o.status === "vendor_confirmed");
-  const placed = orders.filter((o) => o.status === "placed");
+  // Awaiting confirmation covers both payment paths — direct-UPI "placed"
+  // rows and Razorpay-verified "paid" rows — either way the vendor still
+  // needs to confirm the order.
+  const placed = orders.filter((o) => o.status === "placed" || o.status === "paid");
   const cancelled = orders.filter((o) => o.status === "vendor_cancelled");
 
   const totalRevenue = confirmed.reduce((sum, o) => sum + orderTotalInr(o), 0);

@@ -49,6 +49,9 @@ interface VendorKyc {
   reviewedBy: string | null;
   rejectionReason: string | null;
   suspended: boolean;
+  razorpayAccountId: string | null;
+  razorpayAccountStatus: "not_started" | "pending" | "active" | "failed";
+  razorpayAccountError: string | null;
   totalProducts?: number;
   totalSold?: number;
   totalRevenueInr?: number;
@@ -160,7 +163,11 @@ export default function AdminHammartVendorsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
 
-  const runAction = async (userId: string, action: "approve" | "reject" | "suspend" | "unsuspend", reason?: string) => {
+  const runAction = async (
+    userId: string,
+    action: "approve" | "reject" | "suspend" | "unsuspend" | "retry_razorpay" | "sync_razorpay",
+    reason?: string
+  ) => {
     setBusyId(userId);
     try {
       const res = await authedFetch("/api/admin/hammart-vendors", {
@@ -171,8 +178,14 @@ export default function AdminHammartVendorsPage() {
       if (res.ok) {
         if (action === "approve" || action === "reject") {
           setItems((prev) => prev.filter((i) => i.userId !== userId));
-        } else {
+        } else if (action === "suspend" || action === "unsuspend") {
           setItems((prev) => prev.map((i) => (i.userId === userId ? { ...i, suspended: action === "suspend" } : i)));
+        } else {
+          // retry_razorpay / sync_razorpay changed the vendor's Razorpay
+          // fields server-side — reload this vendor's real state instead
+          // of guessing at it client-side, since the whole point of these
+          // two actions is to find out what Razorpay actually says.
+          await load();
         }
         setRejectingId(null);
         setRejectReason("");
@@ -192,9 +205,14 @@ export default function AdminHammartVendorsPage() {
       <div>
         <h2 className="text-xl font-black text-white light:text-slate-900">Hammart Vendors — KYC review</h2>
         <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
-          Every submission here is a real vendor&apos;s real business documents. Approving unlocks their
-          ability to publish listings; buyers pay them directly via the UPI ID shown below — InPlayer
-          never routes that money.
+          Every submission here is a real vendor&apos;s real business documents. Approving unlocks their ability to
+          publish listings and immediately lets them sell — buyers can check out with them via direct UPI payment
+          right away, no Razorpay required. Approving also automatically attempts onboarding them onto Razorpay
+          Route (best-effort, using the bank/PAN details below) — this is purely an upgrade, never a requirement:
+          if/when their status below reads &quot;Active&quot;, checkout for that vendor switches to real Razorpay
+          payment (InPlayer keeps a flat ₹0.50 per order, the rest paid out automatically) instead of the UPI
+          fallback. Until then, or if Razorpay onboarding fails/stays pending, the vendor keeps selling via UPI —
+          checkout is never blocked over Razorpay status alone.
         </p>
       </div>
 
@@ -424,7 +442,55 @@ export default function AdminHammartVendorsPage() {
               )}
 
               {v.kycStatus === "verified" && (
-                <div className="mt-3">
+                <div className="mt-3 space-y-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span
+                      className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${
+                        v.razorpayAccountStatus === "active"
+                          ? "bg-emerald-500/15 text-emerald-300 light:text-emerald-700"
+                          : v.razorpayAccountStatus === "pending"
+                          ? "bg-amber-500/15 text-amber-300 light:text-amber-700"
+                          : v.razorpayAccountStatus === "failed"
+                          ? "bg-red-500/15 text-red-300 light:text-red-700"
+                          : "bg-white/10 text-slate-400 light:text-slate-600"
+                      }`}
+                    >
+                      Razorpay: {v.razorpayAccountStatus === "not_started" ? "not set up" : v.razorpayAccountStatus}
+                    </span>
+                    {v.razorpayAccountStatus !== "active" && (
+                      <>
+                        <button
+                          type="button"
+                          disabled={busyId === v.userId}
+                          onClick={() => runAction(v.userId, "retry_razorpay")}
+                          className="flex items-center gap-1.5 rounded-xl bg-indigo-500/15 px-3 py-1.5 text-xs font-bold text-indigo-300 transition hover:bg-indigo-500/25 disabled:opacity-60"
+                        >
+                          {busyId === v.userId ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}
+                          {v.razorpayAccountId ? "Retry setup" : "Set up Razorpay payouts"}
+                        </button>
+                        {v.razorpayAccountId && (
+                          <button
+                            type="button"
+                            disabled={busyId === v.userId}
+                            onClick={() => runAction(v.userId, "sync_razorpay")}
+                            className="flex items-center gap-1.5 rounded-xl bg-white/5 px-3 py-1.5 text-xs font-bold text-slate-300 light:text-slate-700 transition hover:bg-white/10 disabled:opacity-60"
+                          >
+                            Check status
+                          </button>
+                        )}
+                      </>
+                    )}
+                  </div>
+                  {v.razorpayAccountError && (
+                    <p className="text-[11px] text-red-400">{v.razorpayAccountError}</p>
+                  )}
+                  {v.razorpayAccountStatus !== "active" && (
+                    <p className="text-[11px] text-slate-500">
+                      Not required to sell — this vendor&apos;s listings use direct UPI checkout until this reads
+                      &quot;Active&quot;, then checkout switches to real Razorpay payment automatically.
+                    </p>
+                  )}
+
                   {v.suspended ? (
                     <button
                       type="button"

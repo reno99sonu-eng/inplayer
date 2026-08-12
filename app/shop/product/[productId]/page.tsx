@@ -2,18 +2,38 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
-import QRCode from "qrcode";
 import Link from "next/link";
-import { Loader2, ShoppingBag, IndianRupee, Store, ExternalLink, CheckCircle2, AlertTriangle, Star, Globe, Shield, MapPin, Send, ArrowLeft, X, RefreshCw, Minus, Plus, Heart, ShoppingCart } from "lucide-react";
+import { Loader2, ShoppingBag, IndianRupee, Store, ExternalLink, CheckCircle2, XCircle, Clock, Star, Globe, Shield, MapPin, Send, ArrowLeft, X, RefreshCw, Minus, Plus, Heart, ShoppingCart } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { authedFetch } from "@/app/lib/apiFetch";
-import { buildUpiLink } from "@/app/lib/upi";
-import { orderTotalInr } from "@/app/lib/hammartOrderMath";
+import {
+  loadRazorpayCheckoutScript,
+  postHammartCheckout,
+  openHammartCheckoutForGroup,
+  pollHammartOrderStatuses,
+  generateUpiQrDataUrl,
+} from "@/app/lib/hammartCheckoutClient";
 import LocationMapPicker, { type LocationAddress } from "@/app/components/hammart/LocationMapPicker";
 import ShopNavLinks from "@/app/components/hammart/ShopNavLinks";
 import type { HammartProduct } from "@/app/lib/hammartProducts";
 import type { HammartOrder } from "@/app/lib/hammartOrders";
 import type { HammartReview } from "@/app/lib/hammartReviews";
+
+// "awaiting_upi" is the direct-UPI fallback for a vendor without an
+// active Razorpay Route account (see app/api/hammart/checkout/route.ts) —
+// no gateway, no polling, just a QR/link to pay the vendor directly.
+type GroupStatus = "opening" | "verifying" | "paid" | "payment_failed" | "dismissed" | "failed" | "unavailable" | "awaiting_upi";
+
+interface GroupCheckoutState {
+  vendorId: string;
+  amountInr: number;
+  status: GroupStatus;
+  error?: string;
+  paymentMethod?: "razorpay" | "upi";
+  upiLink?: string;
+  vendorUpiId?: string;
+  qrDataUrl?: string;
+}
 
 export default function ProductPage() {
   const params = useParams();
@@ -36,8 +56,10 @@ export default function ProductPage() {
   const [submittingReview, setSubmittingReview] = useState(false);
   const [reviewError, setReviewError] = useState<string | null>(null);
 
-  const [order, setOrder] = useState<HammartOrder | null>(null);
-  const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
+  // "Buy Now" is always a single vendor group (one product, this
+  // product's own vendor) — see app/shop/cart/page.tsx for the
+  // multi-vendor version of this same flow.
+  const [checkoutGroup, setCheckoutGroup] = useState<GroupCheckoutState | null>(null);
   const [placing, setPlacing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reorderPrefilled, setReorderPrefilled] = useState(false);
@@ -259,6 +281,17 @@ export default function ProductPage() {
     }
   };
 
+  const updateCheckoutStatus = (status: GroupStatus, error?: string) => {
+    setCheckoutGroup((prev) => (prev ? { ...prev, status, error } : prev));
+  };
+
+  // Checkout for a single-product "Buy Now" — same underlying flow as
+  // app/shop/cart/page.tsx's multi-vendor version (see
+  // app/api/hammart/checkout/route.ts): either a real Razorpay Checkout
+  // popup (status only ever becomes "paid" from polling the
+  // webhook-verified result, never from Checkout's own client-side
+  // callback) or, for a vendor without an active Razorpay account, a
+  // direct UPI QR/link with no gateway involved at all.
   const handleConfirmOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!deliveryAddress.trim() || !buyerPhone.trim()) {
@@ -268,43 +301,79 @@ export default function ProductPage() {
 
     setError(null);
     setPlacing(true);
+
+    let response;
     try {
-      const res = await authedFetch("/api/hammart/orders", {
-        method: "POST",
-        body: JSON.stringify({
-          productId,
-          quantity: buyQuantity,
-          buyerName: buyerNameInput,
-          buyerPhone,
-          deliveryAddress,
-          city,
-          state: stateName,
-          pincode,
-        }),
+      response = await postHammartCheckout({
+        authedFetch,
+        items: [{ productId, quantity: buyQuantity }],
+        buyerName: buyerNameInput,
+        buyerEmail,
+        buyerPhone,
+        deliveryAddress,
+        city,
+        state: stateName,
+        pincode,
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setError(data.error || "Couldn't place your order.");
-        return;
-      }
-      setOrder(data.order);
-      setShowAddressModal(false);
-      const link = buildUpiLink({
-        vpa: data.order.vendorUpiId,
-        payeeName: data.order.vendorId,
-        amountInr: orderTotalInr(data.order),
-        note: data.order.productTitle,
-      });
-      try {
-        setQrDataUrl(await QRCode.toDataURL(link, { width: 240, margin: 1 }));
-      } catch (err) {
-        console.error("QR generation failed:", err);
-      }
     } catch (err) {
-      console.error("Failed to place order:", err);
-      setError("Something went wrong. Please try again.");
-    } finally {
+      setError(err instanceof Error ? err.message : "Couldn't start checkout right now.");
       setPlacing(false);
+      return;
+    }
+
+    setShowAddressModal(false);
+    setPlacing(false);
+
+    const group = response.groups[0];
+    if (!group || !group.success) {
+      setError(group?.error || response.failedItems[0]?.error || "Couldn't place your order.");
+      return;
+    }
+
+    if (group.paymentMethod === "upi") {
+      setCheckoutGroup({
+        vendorId: group.vendorId,
+        amountInr: group.amountInr || 0,
+        status: "awaiting_upi",
+        paymentMethod: "upi",
+        upiLink: group.upiLink,
+        vendorUpiId: group.vendorUpiId,
+      });
+      if (group.upiLink) {
+        const qrDataUrl = await generateUpiQrDataUrl(group.upiLink);
+        setCheckoutGroup((prev) => (prev ? { ...prev, qrDataUrl } : prev));
+      }
+      return;
+    }
+
+    try {
+      await loadRazorpayCheckoutScript();
+    } catch {
+      setCheckoutGroup({ vendorId: group.vendorId, amountInr: group.amountInr || 0, status: "unavailable" });
+      return;
+    }
+
+    setCheckoutGroup({ vendorId: group.vendorId, amountInr: group.amountInr || 0, status: "opening", paymentMethod: "razorpay" });
+
+    const outcome = await openHammartCheckoutForGroup(group, { buyerName: buyerNameInput, buyerEmail, buyerPhone });
+    if (outcome === "dismissed") {
+      updateCheckoutStatus("dismissed");
+      return;
+    }
+    if (outcome === "unavailable") {
+      updateCheckoutStatus("unavailable");
+      return;
+    }
+
+    updateCheckoutStatus("verifying");
+    const statuses = await pollHammartOrderStatuses({ authedFetch, orderIds: group.orderIds || [] });
+    const values = Object.values(statuses);
+    if (values.every((s) => s === "paid")) {
+      updateCheckoutStatus("paid");
+    } else if (values.some((s) => s === "payment_failed")) {
+      updateCheckoutStatus("payment_failed");
+    } else {
+      updateCheckoutStatus("verifying");
     }
   };
 
@@ -331,7 +400,6 @@ export default function ProductPage() {
   const photos = product.imageUrls && product.imageUrls.length > 0 ? product.imageUrls : (product.imageUrl ? [product.imageUrl] : []);
   const activePhoto = photos[activeImageIndex] || product.imageUrl;
 
-  const upiLink = order ? buildUpiLink({ vpa: order.vendorUpiId, payeeName: order.vendorId, amountInr: orderTotalInr(order), note: order.productTitle }) : null;
   const isOwnListing = user?.userId === product.vendorUserId;
 
   return (
@@ -450,7 +518,7 @@ export default function ProductPage() {
           <div className="mt-6 pt-4 border-t border-white/10 light:border-slate-300">
             {isOwnListing ? (
               <p className="text-xs font-semibold text-slate-500 light:text-slate-700">This is your own listing.</p>
-            ) : !order ? (
+            ) : !checkoutGroup ? (
               <>
                 <div className="flex items-center gap-3">
                   <div className="flex items-center rounded-xl border border-white/10 light:border-slate-300 bg-white/5 light:bg-white light:shadow-sm">
@@ -580,27 +648,59 @@ export default function ProductPage() {
         </div>
       </div>
 
-      {order && (
-        <div className="mt-8 rounded-2xl border border-orange-400/20 bg-orange-500/[0.05] p-5 text-center">
-          <CheckCircle2 size={22} className="mx-auto text-emerald-400" />
-          <p className="mt-2 text-sm font-bold text-white light:text-slate-900">Order placed — pay {order.vendorId} directly</p>
-          {(order.quantity ?? 1) > 1 && (
-            <p className="mt-1 text-xs text-slate-400">
-              Qty: {order.quantity} × ₹{order.priceInr.toLocaleString("en-IN")}
-            </p>
+      {checkoutGroup && (
+        <div
+          className={`mt-8 rounded-2xl border p-5 text-center ${
+            checkoutGroup.status === "paid"
+              ? "border-emerald-400/20 bg-emerald-500/[0.05]"
+              : checkoutGroup.status === "payment_failed" || checkoutGroup.status === "failed" || checkoutGroup.status === "unavailable"
+              ? "border-red-400/20 bg-red-500/[0.05]"
+              : "border-orange-400/20 bg-orange-500/[0.05]"
+          }`}
+        >
+          {checkoutGroup.status === "paid" ? (
+            <>
+              <CheckCircle2 size={22} className="mx-auto text-emerald-400" />
+              <p className="mt-2 text-sm font-bold text-white light:text-slate-900">Payment confirmed — {checkoutGroup.vendorId} has been notified</p>
+              <p className="mt-1 text-lg font-black text-orange-400">₹{checkoutGroup.amountInr.toLocaleString("en-IN")}</p>
+            </>
+          ) : checkoutGroup.status === "awaiting_upi" ? (
+            <>
+              <p className="text-sm font-bold text-white light:text-slate-900">Pay {checkoutGroup.vendorId} directly</p>
+              <p className="mt-1 text-lg font-black text-orange-400">₹{checkoutGroup.amountInr.toLocaleString("en-IN")}</p>
+              {checkoutGroup.qrDataUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={checkoutGroup.qrDataUrl} alt="UPI QR code" className="mx-auto mt-3 h-40 w-40 rounded-xl bg-white p-2" />
+              ) : (
+                <Loader2 size={20} className="mx-auto mt-3 animate-spin text-amber-400" />
+              )}
+              <p className="mt-2 text-xs text-slate-400">
+                UPI ID: <span className="font-mono">{checkoutGroup.vendorUpiId}</span>
+              </p>
+              <p className="mt-1 text-[11px] text-slate-500">
+                This seller hasn&apos;t set up automatic payments yet — scan the QR or use the UPI ID above to pay them
+                directly. They&apos;ll confirm your order once payment arrives.
+              </p>
+            </>
+          ) : checkoutGroup.status === "opening" || checkoutGroup.status === "verifying" ? (
+            <>
+              <Loader2 size={22} className="mx-auto animate-spin text-orange-400" />
+              <p className="mt-2 text-sm font-bold text-white light:text-slate-900">
+                {checkoutGroup.status === "opening" ? "Opening payment…" : "Confirming your payment…"}
+              </p>
+            </>
+          ) : checkoutGroup.status === "dismissed" ? (
+            <>
+              <Clock size={22} className="mx-auto text-amber-400" />
+              <p className="mt-2 text-sm font-bold text-white light:text-slate-900">Payment not completed</p>
+              <p className="mt-1 text-xs text-slate-400">Your order is saved as awaiting payment — retry anytime from My Orders.</p>
+            </>
+          ) : (
+            <>
+              <XCircle size={22} className="mx-auto text-red-400" />
+              <p className="mt-2 text-sm font-bold text-red-300">{checkoutGroup.error || "Payment failed — please try again."}</p>
+            </>
           )}
-          <p className="mt-1 text-lg font-black text-orange-400">₹{orderTotalInr(order).toLocaleString("en-IN")}</p>
-          {qrDataUrl && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={qrDataUrl} alt="UPI QR code" className="mx-auto mt-4 h-48 w-48 rounded-xl bg-white p-2" />
-          )}
-          <p className="mt-3 text-xs text-slate-400">
-            Scan with any UPI app, or{" "}
-            <a href={upiLink || "#"} className="font-semibold text-orange-300 underline">
-              tap to open your UPI app
-            </a>
-            . UPI ID: <span className="font-mono">{order.vendorUpiId}</span>
-          </p>
           <a
             href="/shop/orders"
             className="mt-4 flex items-center justify-center gap-1 text-xs font-semibold text-orange-300 hover:text-orange-200"

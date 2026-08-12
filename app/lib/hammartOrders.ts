@@ -3,21 +3,39 @@ import { randomUUID } from "crypto";
 import { docClient } from "@/app/lib/dynamodb";
 import { clampOrderQuantity } from "@/app/lib/hammartOrderMath";
 
-// Hammart orders. IMPORTANT — read before assuming this table means "a
-// payment happened": money for a Hammart order moves buyer -> vendor
-// DIRECTLY over UPI (buyer scans the vendor's own UPI QR/pays their VPA),
-// never through InPlayer/Razorpay. That means InPlayer's server has NO
-// way to confirm a payment actually landed — there's no gateway webhook
-// for peer-to-peer UPI transfers. This table is therefore a claim/record
-// system, not a payment ledger: "orderPlaced" means the buyer says they
-// paid and clicked through, "vendorConfirmed" means the vendor says they
-// received it and is fulfilling. Both sides can see the other's status,
-// same as any other marketplace with off-platform payment, but neither
-// status is cryptographic proof of money movement. This is communicated
-// to both buyer and vendor in the UI, not hidden.
+// Hammart orders. Since the Razorpay Route migration, a vendor's checkout
+// uses ONE OF TWO payment methods (chosen per vendor, never required —
+// see app/api/hammart/checkout/route.ts's header comment):
+//
+//   Razorpay Route — for a vendor whose linked account is "active". A
+//   real Razorpay Order + Route transfer, and status only ever reaches
+//   "paid" once app/api/webhooks/razorpay/route.ts's signature-verified
+//   payment.captured handler says so — never from a client-side claim.
+//   These rows go payment_pending -> paid/payment_failed.
+//
+//   Direct UPI — the fallback for a vendor who hasn't set up Razorpay
+//   Route (or isn't active yet). The buyer pays the vendor's own UPI ID
+//   directly; InPlayer never sees that money move. These rows are
+//   created straight into "placed" — the ORIGINAL meaning that status
+//   has always had ("buyer says they paid, InPlayer's server never saw
+//   it") — and stay there until the vendor confirms they actually
+//   received the payment. This is a live, ongoing payment path, not just
+//   a historical status left over from before Route existed.
+//
+// "vendor_confirmed" means "the vendor says they're fulfilling it"
+// either way — for a Razorpay-path order that's a fulfillment claim on
+// top of already-verified payment; for a UPI-path order it's the
+// vendor's word on BOTH the payment and the fulfillment, same trust
+// model Hammart has always used for that path.
 export const ORDERS_TABLE = "Hammart-Orders"; // PK: orderId
 
-export type OrderStatus = "placed" | "vendor_confirmed" | "vendor_cancelled";
+export type OrderStatus =
+  | "placed" // direct-UPI path (live) — see header comment above
+  | "payment_pending"
+  | "paid"
+  | "payment_failed"
+  | "vendor_confirmed"
+  | "vendor_cancelled";
 
 export type OrderFeedbackType = "feedback" | "complaint";
 export type OrderFeedbackStatus = "open" | "resolved";
@@ -62,20 +80,36 @@ export interface HammartOrder {
   vendorId: string;
   vendorUpiId: string;
   status: OrderStatus;
+  // Real payment fields — only set for orders created via the Razorpay
+  // Route checkout (app/api/hammart/checkout/route.ts). Multiple
+  // HammartOrder rows from the same vendor in one checkout share one
+  // razorpayOrderId/razorpayPaymentId (one Razorpay Order, one Route
+  // transfer, covering that whole vendor group) — see that route's
+  // comment for why they're grouped this way.
+  razorpayOrderId?: string | null;
+  razorpayPaymentId?: string | null;
+  platformFeeInr?: number;
+  vendorPayoutInr?: number;
   feedback?: OrderFeedback | null;
   createdAt: string;
   updatedAt: string;
 }
 
 export async function createOrder(
-  input: Omit<HammartOrder, "orderId" | "status" | "createdAt" | "updatedAt">
+  input: Omit<HammartOrder, "orderId" | "status" | "createdAt" | "updatedAt"> & { status?: OrderStatus }
 ): Promise<{ success: boolean; order?: HammartOrder; tableMissing?: boolean }> {
   const now = new Date().toISOString();
   const order: HammartOrder = {
     ...input,
     quantity: clampOrderQuantity(input.quantity ?? 1),
     orderId: randomUUID(),
-    status: "placed",
+    // app/api/hammart/checkout/route.ts always passes status explicitly —
+    // "payment_pending" for the Razorpay path (flipped to
+    // "paid"/"payment_failed" only from the verified webhook), or
+    // "placed" for the direct-UPI path. The "placed" default here is just
+    // a safety net so nothing else in the codebase silently breaks if
+    // some other caller creates a row without specifying a status.
+    status: input.status ?? "placed",
     createdAt: now,
     updatedAt: now,
   };
@@ -148,6 +182,66 @@ export async function setOrderStatus(orderId: string, status: OrderStatus): Prom
       ExpressionAttributeValues: { ":status": status, ":now": new Date().toISOString() },
     })
   );
+}
+
+// Called ONLY from app/api/webhooks/razorpay/route.ts's signature-verified
+// payment.captured handler — this is the single place a Hammart order is
+// allowed to become "paid". Idempotent (Razorpay can and does redeliver
+// the same webhook event) — writing the same status/payment id twice is a
+// harmless no-op, so this doesn't need the ConditionExpression dance
+// app/api/webhooks/razorpay/route.ts's creator-revenue-ledger path uses
+// (that one guards an ADD that would double-credit a balance; this is
+// just a status field). Always wins over a prior "payment_failed" — a
+// captured event is authoritative proof money moved, even if an earlier
+// attempt on the same order had failed first.
+//
+// platformFeeInr/vendorPayoutInr are NOT set here — they're already on
+// the row from the moment app/api/hammart/checkout/route.ts created it
+// (computed per order line, before payment even started), so there's no
+// need to reconstruct or re-derive them from the webhook payload.
+export async function markOrderPaid(
+  orderId: string,
+  payment: { razorpayOrderId: string; razorpayPaymentId: string }
+): Promise<void> {
+  await docClient.send(
+    new UpdateCommand({
+      TableName: ORDERS_TABLE,
+      Key: { orderId },
+      UpdateExpression: "SET #status = :status, razorpayOrderId = :roid, razorpayPaymentId = :rpid, updatedAt = :now",
+      ExpressionAttributeNames: { "#status": "status" },
+      ExpressionAttributeValues: {
+        ":status": "paid",
+        ":roid": payment.razorpayOrderId,
+        ":rpid": payment.razorpayPaymentId,
+        ":now": new Date().toISOString(),
+      },
+    })
+  );
+}
+
+// Only downgrades an order that's still genuinely unpaid — see
+// markOrderPaid's comment on why a captured event must always win instead
+// of a possible out-of-order failed event undoing it.
+export async function markOrderPaymentFailed(orderId: string, razorpayOrderId: string): Promise<void> {
+  await docClient.send(
+    new UpdateCommand({
+      TableName: ORDERS_TABLE,
+      Key: { orderId },
+      UpdateExpression: "SET #status = :status, razorpayOrderId = :roid, updatedAt = :now",
+      ConditionExpression: "#status = :pending",
+      ExpressionAttributeNames: { "#status": "status" },
+      ExpressionAttributeValues: {
+        ":status": "payment_failed",
+        ":pending": "payment_pending",
+        ":roid": razorpayOrderId,
+        ":now": new Date().toISOString(),
+      },
+    })
+  ).catch((err) => {
+    const name = (err as { name?: string } | undefined)?.name;
+    if (name === "ConditionalCheckFailedException") return; // already paid — leave it alone
+    throw err;
+  });
 }
 
 // Buyer leaves feedback or files a complaint on their own order — see

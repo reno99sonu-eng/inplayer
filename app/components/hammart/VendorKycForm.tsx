@@ -254,8 +254,10 @@ export default function VendorKycForm({
           A real person on the InPlayer team reviews every submission by hand before you can publish
           listings — usually within a few days. Once a decision is made, your photos and address are
           deleted automatically — only your legal name, PAN, {businessType === "business" ? "GST/Udyam number, " : ""}
-          and bank/UPI details stay on file. Buyers pay you directly via the UPI ID below — InPlayer never
-          touches that money.
+          and bank/UPI details stay on file. Once approved, buyers can pay you directly via the UPI ID below —
+          same as always, no setup needed from you. We&apos;ll also try setting you up for automatic online
+          payouts (optional, never required) — if that activates, buyers can pay online instead and your share
+          is sent to your bank account automatically, minus a flat ₹0.50 InPlayer commission per order.
         </p>
       </div>
 
@@ -376,11 +378,12 @@ export default function VendorKycForm({
         </div>
 
         <div>
-          <label className={labelClass}>UPI ID — buyers pay you here directly</label>
+          <label className={labelClass}>UPI ID — buyers can pay you here directly</label>
           <input required value={upiId} onChange={(e) => setUpiId(e.target.value)} className={inputClass} placeholder="yourname@okhdfcbank" />
           <p className="mt-1 text-[11px] text-slate-500">
-            Shown as a QR code and payment link at checkout on every order. InPlayer never routes this money —
-            it goes straight from the buyer to this UPI ID.
+            Shown as a QR code and payment link at checkout unless automatic online payouts have activated for
+            you — then buyers pay online instead and your payout (minus InPlayer&apos;s flat ₹0.50 commission) is
+            sent automatically to the bank account above. Either way, this UPI ID is required.
           </p>
         </div>
 

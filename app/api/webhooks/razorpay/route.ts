@@ -8,25 +8,32 @@ import {
   PAYOUTS_TABLE,
   CREATOR_SHARE,
 } from "@/app/lib/creatorPayouts";
-import { VENDORS_TABLE, VENDOR_SUBSCRIPTION_LEDGER_TABLE } from "@/app/lib/hammartVendors";
+import { VENDORS_TABLE, VENDOR_SUBSCRIPTION_LEDGER_TABLE, setVendorRazorpayAccount } from "@/app/lib/hammartVendors";
+import { getOrder, markOrderPaid, markOrderPaymentFailed } from "@/app/lib/hammartOrders";
+import { orderTotalInr } from "@/app/lib/hammartOrderMath";
+import { sendEmail } from "@/app/lib/ses";
 
 // This is the ONLY place real money ever gets credited to a creator's
-// balance in InPlayer. Everything else in the app (Checkout's browser
-// callback, the membership status endpoint, the UI) only ever reflects
-// what this handler has already written — a client can't unlock a paid
-// membership or credit a creator just by calling another route, because no
-// other route touches InPlayer-Revenue-Ledger or
-// InPlayer-Creator-Payouts.lifetimeEarnedInr.
+// balance in InPlayer, and (as of the Route migration) the ONLY place a
+// Hammart order is ever allowed to become "paid". Everything else in the
+// app (Checkout's browser callback, the membership status endpoint, the
+// UI) only ever reflects what this handler has already written — a
+// client can't unlock a paid membership, credit a creator, or mark a
+// Hammart order paid just by calling another route.
 //
 // Configure this in Razorpay Dashboard -> Settings -> Webhooks:
 //   URL: https://inplayer.in/api/webhooks/razorpay
-//   Events: subscription.charged, subscription.cancelled, subscription.halted
+//   Events: subscription.charged, subscription.cancelled, subscription.halted,
+//           payment.captured, payment.failed,
+//           account.activated, account.suspended, account.under_review
 //   Secret: whatever you generate there -> save as RAZORPAY_WEBHOOK_SECRET
 
 interface RazorpayPaymentEntity {
   id: string;
+  order_id?: string;
   amount: number; // paise
   status: string;
+  notes?: Record<string, string>;
 }
 
 interface RazorpaySubscriptionEntity {
@@ -35,11 +42,18 @@ interface RazorpaySubscriptionEntity {
   notes?: { subscriberId?: string; creatorId?: string; vendorId?: string };
 }
 
+interface RazorpayAccountEntity {
+  id: string;
+  status: string; // "activated" | "suspended" | "under_review" | ...
+  reference_id?: string; // InPlayer's userId — see createLinkedAccount's comment
+}
+
 interface RazorpayWebhookPayload {
   event: string;
   payload: {
     payment?: { entity: RazorpayPaymentEntity };
     subscription?: { entity: RazorpaySubscriptionEntity };
+    account?: { entity: RazorpayAccountEntity };
   };
 }
 
@@ -70,11 +84,24 @@ export async function POST(request: NextRequest) {
       case "subscription.halted":
         await handleDeactivated(event.payload, event.event === "subscription.cancelled" ? "cancelled" : "halted");
         break;
+      case "payment.captured":
+        await handleHammartPaymentCaptured(event.payload);
+        break;
+      case "payment.failed":
+        await handleHammartPaymentFailed(event.payload);
+        break;
+      case "account.activated":
+      case "account.suspended":
+      case "account.under_review":
+        await handleAccountStatusChanged(event.payload);
+        break;
       default:
         // Every other event (subscription.activated, subscription.authenticated,
-        // payment.failed, etc.) is intentionally a no-op: subscription.charged
-        // is the only event that carries proof a real payment landed, so it's
-        // the only one allowed to activate a membership or credit a creator.
+        // etc.) is intentionally a no-op: subscription.charged is the only
+        // event that carries proof a real subscription payment landed, so
+        // it's the only one allowed to activate a membership or credit a
+        // creator. Hammart order payments and Route account status have
+        // their own explicit events handled above instead.
         break;
     }
   } catch (err) {
@@ -263,4 +290,98 @@ async function handleDeactivated(
       ExpressionAttributeValues: { ":status": status, ":now": new Date().toISOString() },
     })
   );
+}
+
+// Hammart checkout (app/api/hammart/checkout/route.ts) stamps every
+// Razorpay Order's notes with hammartOrderIds (comma-joined HammartOrder
+// ids covering that one vendor-group payment) and hammartVendorId.
+// Subscription payments (memberships, vendor listing fees) also fire
+// payment.captured, but never carry this note — so this is a safe no-op
+// for every event that isn't actually a Hammart order.
+function parseHammartNotes(notes: Record<string, string> | undefined): { orderIds: string[]; vendorId: string } | null {
+  const orderIdsRaw = notes?.hammartOrderIds;
+  const vendorId = notes?.hammartVendorId;
+  if (!orderIdsRaw || !vendorId) return null;
+  const orderIds = orderIdsRaw.split(",").map((s) => s.trim()).filter(Boolean);
+  if (orderIds.length === 0) return null;
+  return { orderIds, vendorId };
+}
+
+async function handleHammartPaymentCaptured(payload: RazorpayWebhookPayload["payload"]) {
+  const paymentEntity = payload.payment?.entity;
+  if (!paymentEntity || paymentEntity.status !== "captured" || !paymentEntity.order_id) return;
+
+  const parsed = parseHammartNotes(paymentEntity.notes);
+  if (!parsed) return; // not a Hammart order payment — e.g. a subscription charge
+
+  await Promise.all(
+    parsed.orderIds.map(async (orderId) => {
+      try {
+        await markOrderPaid(orderId, {
+          razorpayOrderId: paymentEntity.order_id as string,
+          razorpayPaymentId: paymentEntity.id,
+        });
+      } catch (err) {
+        console.error(`razorpay webhook: markOrderPaid failed for ${orderId}:`, err);
+        return;
+      }
+
+      // Buyer confirmation email — deliberately sent from HERE, not from
+      // app/api/hammart/checkout/route.ts, so a buyer only ever gets
+      // "your order is confirmed" once a real, signature-verified payment
+      // actually landed, never for a Checkout popup they closed without
+      // paying.
+      try {
+        const { order } = await getOrder(orderId);
+        if (order?.buyerEmail) {
+          const total = orderTotalInr(order);
+          void sendEmail({
+            to: order.buyerEmail,
+            subject: `Payment confirmed — Hammart order [${orderId.slice(0, 8).toUpperCase()}]`,
+            text: `Your payment of ₹${total.toLocaleString("en-IN")} for "${order.productTitle}" from @${order.vendorId} is confirmed. The vendor has been notified and will ship to the address you provided.`,
+            html: `<h2>Payment confirmed</h2><p>Your payment of <strong>₹${total.toLocaleString("en-IN")}</strong> for <strong>${order.productTitle}</strong> from <strong>@${order.vendorId}</strong> is confirmed.</p><p>The vendor has been notified and will ship to the address you provided.</p>`,
+          }).catch((err) => console.error(`razorpay webhook: buyer confirmation email failed for ${orderId}:`, err));
+        }
+      } catch (err) {
+        console.error(`razorpay webhook: couldn't load order ${orderId} for confirmation email:`, err);
+      }
+    })
+  );
+}
+
+async function handleHammartPaymentFailed(payload: RazorpayWebhookPayload["payload"]) {
+  const paymentEntity = payload.payment?.entity;
+  if (!paymentEntity || !paymentEntity.order_id) return;
+
+  const parsed = parseHammartNotes(paymentEntity.notes);
+  if (!parsed) return;
+
+  await Promise.all(
+    parsed.orderIds.map((orderId) =>
+      markOrderPaymentFailed(orderId, paymentEntity.order_id as string).catch((err) =>
+        console.error(`razorpay webhook: markOrderPaymentFailed failed for ${orderId}:`, err)
+      )
+    )
+  );
+}
+
+// Route linked-account status changed on Razorpay's side — this is the
+// primary way a vendor's razorpayAccountStatus ever reaches "active"
+// (app/api/admin/hammart-vendors/route.ts's "sync_razorpay" admin action
+// is the manual fallback for whenever this event is missed). reference_id
+// is InPlayer's own userId (see createLinkedAccount's comment), so this
+// maps straight back to a VENDORS_TABLE row with no lookup table needed.
+async function handleAccountStatusChanged(payload: RazorpayWebhookPayload["payload"]) {
+  const accountEntity = payload.account?.entity;
+  const userId = accountEntity?.reference_id;
+  if (!accountEntity || !userId) return;
+
+  const status =
+    accountEntity.status === "activated" ? "active" : accountEntity.status === "suspended" ? "failed" : "pending";
+
+  await setVendorRazorpayAccount(userId, {
+    accountId: accountEntity.id,
+    status,
+    error: status === "active" ? null : `Razorpay status: ${accountEntity.status}`,
+  }).catch((err) => console.error(`razorpay webhook: account status update failed for ${userId}:`, err));
 }

@@ -48,6 +48,8 @@ export type AuditAction =
   | "vendor.kyc_reject"
   | "vendor.suspend"
   | "vendor.unsuspend"
+  | "vendor.razorpay_retry"
+  | "vendor.razorpay_sync"
   | "hammart_product.remove"
   | "hammart_product.restore"
   | "user.ban_strike"

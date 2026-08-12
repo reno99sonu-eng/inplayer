@@ -21,3 +21,24 @@ export function clampOrderQuantity(raw: unknown): number {
 export function orderTotalInr(order: { priceInr: number; quantity?: number }): number {
   return order.priceInr * clampOrderQuantity(order.quantity ?? 1);
 }
+
+// InPlayer's flat commission on every Hammart product order — Reno's own
+// call (same ₹0.50 figure as the vendor's per-listing fee in
+// hammartVendors.ts, just applied per-order here instead). Not a
+// percentage: every order, big or small, hands InPlayer exactly ₹0.50 and
+// the rest goes straight to the vendor's linked Razorpay account via a
+// Route transfer (see app/lib/razorpay.ts's createOrderWithTransfer and
+// app/api/hammart/checkout/route.ts).
+export const PLATFORM_COMMISSION_PER_ORDER_INR = 0.5;
+
+// Defensive floor for absurdly cheap listings: never take a commission
+// that would leave the vendor with nothing (or a negative payout). In
+// practice Hammart products should never be priced this low, but this
+// keeps the math safe instead of assuming that holds.
+export function platformCommissionInr(orderTotal: number): number {
+  return Math.min(PLATFORM_COMMISSION_PER_ORDER_INR, Math.round(orderTotal * 100) / 100);
+}
+
+export function vendorPayoutInr(orderTotal: number): number {
+  return Math.round((orderTotal - platformCommissionInr(orderTotal)) * 100) / 100;
+}

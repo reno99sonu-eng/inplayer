@@ -34,6 +34,31 @@ export type BusinessType = "individual" | "business";
 export type VendorKycStatus = "not_started" | "pending_review" | "verified" | "rejected";
 export type VendorSubscriptionStatus = "free" | "active" | "expired";
 
+// The vendor's Razorpay Route "Linked Account" — an OPTIONAL upgrade that
+// lets a buyer's payment for one of their products split automatically
+// (minus PLATFORM_COMMISSION_PER_ORDER_INR) straight to their own bank
+// account, with no manual transfer step. Never required to sell — a
+// vendor who isn't "active" here simply keeps using the direct-UPI
+// checkout fallback (see app/api/hammart/checkout/route.ts's header
+// comment). See app/lib/razorpay.ts's createLinkedAccount/
+// fetchLinkedAccount and app/api/webhooks/razorpay/route.ts's account.*
+// handlers.
+//
+//   not_started — no attempt made yet (vendor not KYC-verified, or this
+//                 feature didn't exist yet when they were approved) —
+//                 checkout for this vendor uses the UPI fallback
+//   pending     — account created at Razorpay, awaiting Razorpay's own
+//                 underwriting/activation — CANNOT receive a transfer yet,
+//                 checkout still uses the UPI fallback
+//   active      — Razorpay has activated it; checkout for this vendor
+//                 uses the real Razorpay path (see app/api/hammart/
+//                 checkout/route.ts)
+//   failed      — creation or activation failed; see razorpayAccountError.
+//                 Checkout falls back to UPI, same as "pending" — never
+//                 "fails open" into a Razorpay payment with nowhere real
+//                 for the vendor's share to land.
+export type RazorpayLinkedAccountStatus = "not_started" | "pending" | "active" | "failed";
+
 export interface VendorProfile {
   userId: string;
   vendorId: string;
@@ -49,6 +74,9 @@ export interface VendorProfile {
   suspended: boolean;
   razorpaySubscriptionId?: string | null;
   lastChargedAt?: string | null;
+  razorpayAccountId?: string | null;
+  razorpayAccountStatus?: RazorpayLinkedAccountStatus;
+  razorpayAccountError?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -212,6 +240,42 @@ export async function createVendorProfile(
       tableMissing: true,
     };
   }
+}
+
+// Records the outcome of a Razorpay Route linked-account attempt — called
+// right after admin approval (app/api/admin/hammart-vendors/route.ts) and
+// by the admin "retry"/"sync" actions, plus by the webhook's account.*
+// handlers once Razorpay itself reports a status change. Never throws on
+// its own — callers already wrap Razorpay calls in try/catch and decide
+// what to store based on success/failure, so this is just the write.
+//
+// `accountId` is optional on purpose: a pure status refresh (e.g. the
+// webhook telling us an already-created account just got activated) has
+// no reason to touch the existing id — only pass it when you actually
+// have a new/confirmed value.
+export async function setVendorRazorpayAccount(
+  userId: string,
+  update: { accountId?: string | null; status: RazorpayLinkedAccountStatus; error?: string | null }
+): Promise<void> {
+  const setExpressionParts = ["razorpayAccountStatus = :status", "razorpayAccountError = :error", "updatedAt = :now"];
+  const values: Record<string, unknown> = {
+    ":status": update.status,
+    ":error": update.error ?? null,
+    ":now": new Date().toISOString(),
+  };
+  if (update.accountId !== undefined) {
+    setExpressionParts.push("razorpayAccountId = :accountId");
+    values[":accountId"] = update.accountId;
+  }
+
+  await docClient.send(
+    new UpdateCommand({
+      TableName: VENDORS_TABLE,
+      Key: { userId },
+      UpdateExpression: `SET ${setExpressionParts.join(", ")}`,
+      ExpressionAttributeValues: values,
+    })
+  );
 }
 
 export async function acceptVendorTerms(userId: string): Promise<void> {

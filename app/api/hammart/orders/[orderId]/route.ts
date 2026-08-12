@@ -26,6 +26,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     return NextResponse.json({ error: "Invalid status." }, { status: 400 });
   }
 
+  // A vendor can only act on an order that's actually payable-confirmed:
+  // "placed" rows (direct-UPI path — trusted on the vendor's own word,
+  // same as it's always been) or "paid" rows (Razorpay path,
+  // webhook-verified real payment). Blocking "payment_pending" here
+  // closes off a vendor marking — and potentially shipping against — an
+  // order that was never actually paid for, regardless of what the UI
+  // shows.
+  if (order.status !== "placed" && order.status !== "paid") {
+    return NextResponse.json({ error: "This order can't be updated right now." }, { status: 400 });
+  }
+
   await setOrderStatus(orderId, body.status);
   return NextResponse.json({ success: true });
 }

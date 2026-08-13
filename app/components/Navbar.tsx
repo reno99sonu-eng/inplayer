@@ -51,19 +51,31 @@ export default function Navbar() {
   // wrapper shortly after mount (a tiny delay so the animation has clearly
   // started by the time we check, rather than racing paint).
   useEffect(() => {
-    const timer = window.setTimeout(() => {
+    const inspect = (label: string) => {
+      const matches = document.querySelectorAll(".animate-navbar-logo-reveal");
       const el = logoWrapperRef.current;
-      if (!el) {
-        setLogoAnimDebug("ref=null");
-        return;
+      const refRect = el ? el.getBoundingClientRect() : null;
+      const refParentChain: string[] = [];
+      let node: HTMLElement | null = el;
+      for (let i = 0; i < 4 && node; i++) {
+        const cs2 = window.getComputedStyle(node);
+        refParentChain.push(`${node.tagName}[d=${cs2.display},vis=${cs2.visibility}]`);
+        node = node.parentElement;
       }
-      const cs = window.getComputedStyle(el);
-      const rect = el.getBoundingClientRect();
-      setLogoAnimDebug(
-        `name=${cs.animationName} dur=${cs.animationDuration} state=${cs.animationPlayState} opacity=${cs.opacity} w=${Math.round(rect.width)} h=${Math.round(rect.height)}`
-      );
-    }, 500);
-    return () => window.clearTimeout(timer);
+      const line = `[${label}] matches=${matches.length} innerHTML.len=${el?.innerHTML.length ?? "N/A"} refRect=${
+        refRect ? `${Math.round(refRect.width)}x${Math.round(refRect.height)}` : "null"
+      } vw=${window.innerWidth} chain=${refParentChain.join(">")}`;
+      // Appended, not replaced — so a single screenshot taken any time after
+      // 3.5s shows BOTH the mid-animation and post-animation readings
+      // together, instead of needing two perfectly-timed screenshots.
+      setLogoAnimDebug((prev) => (prev === "checking..." ? line : `${prev} || ${line}`));
+    };
+    const t1 = window.setTimeout(() => inspect("t500"), 500);
+    const t2 = window.setTimeout(() => inspect("t3500"), 3500);
+    return () => {
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+    };
   }, []);
 
   useEffect(() => {
@@ -377,14 +389,15 @@ export default function Navbar() {
     <div ref={logoWrapperRef} className="animate-navbar-logo-reveal">
       <NavbarLogo />
     </div>
-    {/* TEMPORARY — now shows the browser's own computed animation state
-        for the wrapper above (name/duration/play-state/opacity/size),
-        read via getComputedStyle 500ms after mount. Remove this badge,
+    {/* TEMPORARY — fixed overlay (not squeezed into the tight navbar row)
+        showing the browser's own computed state for the wrapper above,
+        read once mid-animation (t500) and once after it should have
+        finished (t3500), appended together. Remove this block,
         logoAnimDebug/logoWrapperRef state, and the effect that fills it
         in once diagnosed. */}
-    <span className="ml-1 flex-shrink-0 rounded bg-fuchsia-600 px-1 py-0.5 text-[7px] font-black leading-tight text-white">
+    <div className="fixed bottom-2 left-2 right-2 z-[9999999] whitespace-pre-wrap break-words rounded-lg bg-fuchsia-700/95 px-2.5 py-2 text-[10px] font-mono leading-snug text-white shadow-lg">
       {logoAnimDebug}
-    </span>
+    </div>
 
     {/* Festive Occasion Graphic + greeting text, side by side — same fix
         as the desktop block above (see its comment): text used to sit

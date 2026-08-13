@@ -7,7 +7,6 @@ import Link from "next/link";
 import {
   LayoutDashboard,
   Film,
-  PlaySquare,
   Pencil,
   DollarSign,
   HelpCircle,
@@ -80,7 +79,7 @@ const emptyContentStats: ContentStats = {
   shares: 0,
 };
 
-type ActivePanel = "dashboard" | "videos" | "shorts" | "edit" | "profile" | "revenue" | "how-it-works";
+type ActivePanel = "dashboard" | "edit" | "profile" | "revenue" | "how-it-works";
 
 export default function MyVideosPage() {
   const { signedIn, authLoading, openSignIn, user } = useAuthModal();
@@ -245,7 +244,7 @@ export default function MyVideosPage() {
     setAiSuggestions([]);
     setAiTitleAssistOpen(false);
     setError(null);
-    setActiveTab("videos");
+    setActiveTab("dashboard");
   };
 
   const handleEditChange = <K extends keyof VideoMetadataValue>(
@@ -381,7 +380,7 @@ export default function MyVideosPage() {
             : v
         )
       );
-      setActiveTab(editValue.contentType === "short" ? "shorts" : "videos");
+      setActiveTab("dashboard");
       setEditingId(null);
       setEditValue(null);
     } catch (err) {
@@ -452,8 +451,6 @@ export default function MyVideosPage() {
 
   const sidebarNavItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { id: "videos", label: "Videos Library", icon: Film, count: videos.length },
-    { id: "shorts", label: "Raftaar Library", icon: PlaySquare, count: shortItems.length },
     { id: "edit", label: "Edit Content", icon: Pencil, disabled: false },
     { id: "profile", label: "Profile & Settings", icon: User },
     { id: "revenue", label: "Revenue & KYC", icon: DollarSign },
@@ -646,322 +643,191 @@ export default function MyVideosPage() {
                 trendAvailable={analytics?.trendAvailable ?? true}
                 loading={analyticsLoading}
               />
-            </div>
-          )}
 
-          {/* PANEL 2: VIDEOS LIBRARY */}
-          {activeTab === "videos" && (() => {
-            const displayedItems =
-              libraryFilter === "video"
-                ? videoItems
-                : libraryFilter === "short"
-                ? shortItems
-                : videos;
+              {/* Your Uploads (Videos + Raftaar, combined) */}
+                {(() => {
+              const displayedItems =
+                libraryFilter === "video"
+                  ? videoItems
+                  : libraryFilter === "short"
+                  ? shortItems
+                  : videos;
 
-            return (
-              <div className="space-y-5">
-                <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-[#071120] p-4 light:border-black/10 light:bg-white sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <h2 className="text-base font-black text-white light:text-slate-900 sm:text-lg">
-                      Videos Library
-                    </h2>
-                    <p className="text-xs text-slate-400 light:text-slate-600">
-                      {displayedItems.length} {displayedItems.length === 1 ? "item" : "items"} displayed ({videos.length} total uploads)
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2">
-                    <div className="flex items-center rounded-xl bg-black/20 p-1 light:bg-black/5">
-                      <button
-                        onClick={() => setLibraryFilter("all")}
-                        className={`rounded-lg px-3 py-1 text-xs font-bold transition ${
-                          libraryFilter === "all"
-                            ? "bg-gradient-to-r from-[#FF7A18] to-[#FF9A00] text-white shadow"
-                            : "text-slate-400 hover:text-white light:text-slate-600"
-                        }`}
-                      >
-                        All ({videos.length})
-                      </button>
-                      <button
-                        onClick={() => setLibraryFilter("video")}
-                        className={`rounded-lg px-3 py-1 text-xs font-bold transition ${
-                          libraryFilter === "video"
-                            ? "bg-gradient-to-r from-[#FF7A18] to-[#FF9A00] text-white shadow"
-                            : "text-slate-400 hover:text-white light:text-slate-600"
-                        }`}
-                      >
-                        Videos ({videoItems.length})
-                      </button>
-                      <button
-                        onClick={() => setLibraryFilter("short")}
-                        className={`rounded-lg px-3 py-1 text-xs font-bold transition ${
-                          libraryFilter === "short"
-                            ? "bg-gradient-to-r from-[#FF7A18] to-[#FF9A00] text-white shadow"
-                            : "text-slate-400 hover:text-white light:text-slate-600"
-                        }`}
-                      >
-                        Shorts ({shortItems.length})
-                      </button>
+              return (
+                <div className="space-y-5">
+                  <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-[#071120] p-4 light:border-black/10 light:bg-white sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h2 className="text-base font-black text-white light:text-slate-900 sm:text-lg">
+                        Videos Library
+                      </h2>
+                      <p className="text-xs text-slate-400 light:text-slate-600">
+                        {displayedItems.length} {displayedItems.length === 1 ? "item" : "items"} displayed ({videos.length} total uploads)
+                      </p>
                     </div>
 
-                    <Link
-                      href="/upload?type=video"
-                      className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-3.5 py-2 text-xs font-bold text-white shadow transition hover:-translate-y-0.5"
-                    >
-                      <Plus size={14} />
-                      Upload
-                    </Link>
-                  </div>
-                </div>
-
-                {displayedItems.length === 0 ? (
-                  <div className="flex flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/[0.02] py-14 text-center light:border-black/10 light:bg-black/[0.02]">
-                    <Film size={36} className="mb-2 text-slate-500" />
-                    <p className="font-bold text-white light:text-slate-900 text-sm">
-                      No content found in this filter
-                    </p>
-                    <p className="mt-1 text-xs text-slate-400 light:text-slate-600">
-                      Upload videos or shorts to build your channel.
-                    </p>
-                    <Link
-                      href="/upload"
-                      className="mt-4 rounded-xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-5 py-2 text-xs font-bold text-white"
-                    >
-                      Upload Content
-                    </Link>
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                    {displayedItems.map((video) => (
-                    <div
-                      key={video.videoId}
-                      className="group flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#071120] p-3 transition-all hover:border-orange-500/40 light:border-black/10 light:bg-white"
-                    >
-                      <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black/20">
-                        {video.thumbnailUrl && (
-                          <Image
-                            src={video.thumbnailUrl}
-                            alt={video.title}
-                            fill
-                            sizes="300px"
-                            className="object-cover transition-transform duration-300 group-hover:scale-105"
-                          />
-                        )}
-                        <span
-                          className={`absolute top-2 left-2 rounded-full px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider ${
-                            video.status === "ready"
-                              ? "bg-emerald-500/90 text-white shadow"
-                              : video.status === "processing"
-                              ? "bg-amber-500/90 text-white shadow"
-                              : "bg-red-500/90 text-white shadow"
+                    <div className="flex flex-wrap items-center gap-2">
+                      <div className="flex items-center rounded-xl bg-black/20 p-1 light:bg-black/5">
+                        <button
+                          onClick={() => setLibraryFilter("all")}
+                          className={`rounded-lg px-3 py-1 text-xs font-bold transition ${
+                            libraryFilter === "all"
+                              ? "bg-gradient-to-r from-[#FF7A18] to-[#FF9A00] text-white shadow"
+                              : "text-slate-400 hover:text-white light:text-slate-600"
                           }`}
                         >
-                          {video.status}
-                        </span>
-                        {video.visibility && (
-                          <span className="absolute top-2 right-2 rounded-full bg-black/60 backdrop-blur-md px-2 py-0.5 text-[9px] font-bold text-white capitalize">
-                            {video.visibility}
+                          All ({videos.length})
+                        </button>
+                        <button
+                          onClick={() => setLibraryFilter("video")}
+                          className={`rounded-lg px-3 py-1 text-xs font-bold transition ${
+                            libraryFilter === "video"
+                              ? "bg-gradient-to-r from-[#FF7A18] to-[#FF9A00] text-white shadow"
+                              : "text-slate-400 hover:text-white light:text-slate-600"
+                          }`}
+                        >
+                          Videos ({videoItems.length})
+                        </button>
+                        <button
+                          onClick={() => setLibraryFilter("short")}
+                          className={`rounded-lg px-3 py-1 text-xs font-bold transition ${
+                            libraryFilter === "short"
+                              ? "bg-gradient-to-r from-[#FF7A18] to-[#FF9A00] text-white shadow"
+                              : "text-slate-400 hover:text-white light:text-slate-600"
+                          }`}
+                        >
+                          Shorts ({shortItems.length})
+                        </button>
+                      </div>
+
+                      <Link
+                        href="/upload?type=video"
+                        className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-3.5 py-2 text-xs font-bold text-white shadow transition hover:-translate-y-0.5"
+                      >
+                        <Plus size={14} />
+                        Upload
+                      </Link>
+                    </div>
+                  </div>
+
+                  {displayedItems.length === 0 ? (
+                    <div className="flex flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/[0.02] py-14 text-center light:border-black/10 light:bg-black/[0.02]">
+                      <Film size={36} className="mb-2 text-slate-500" />
+                      <p className="font-bold text-white light:text-slate-900 text-sm">
+                        No content found in this filter
+                      </p>
+                      <p className="mt-1 text-xs text-slate-400 light:text-slate-600">
+                        Upload videos or shorts to build your channel.
+                      </p>
+                      <Link
+                        href="/upload"
+                        className="mt-4 rounded-xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-5 py-2 text-xs font-bold text-white"
+                      >
+                        Upload Content
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                      {displayedItems.map((video) => (
+                      <div
+                        key={video.videoId}
+                        className="group flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#071120] p-3 transition-all hover:border-orange-500/40 light:border-black/10 light:bg-white"
+                      >
+                        <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black/20">
+                          {video.thumbnailUrl && (
+                            <Image
+                              src={video.thumbnailUrl}
+                              alt={video.title}
+                              fill
+                              sizes="300px"
+                              className="object-cover transition-transform duration-300 group-hover:scale-105"
+                            />
+                          )}
+                          <span
+                            className={`absolute top-2 left-2 rounded-full px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider ${
+                              video.status === "ready"
+                                ? "bg-emerald-500/90 text-white shadow"
+                                : video.status === "processing"
+                                ? "bg-amber-500/90 text-white shadow"
+                                : "bg-red-500/90 text-white shadow"
+                            }`}
+                          >
+                            {video.status}
                           </span>
-                        )}
-                      </div>
-
-                      <div className="mt-2.5 flex-1 min-w-0">
-                        <h3 className="line-clamp-2 text-xs font-bold text-white light:text-slate-900 sm:text-sm">
-                          {video.title}
-                        </h3>
-                        <p className="mt-1 text-[11px] font-medium text-slate-400 light:text-slate-600">
-                          {video.category || "General"} • {formatViews(video.views || 0)} views • {formatTimeAgo(video.uploadedAt)}
-                        </p>
-                      </div>
-
-                      <div className="mt-3 flex items-center justify-between gap-1.5 border-t border-white/10 pt-2.5 light:border-black/10">
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => startEditing(video)}
-                            className="flex items-center gap-1 rounded-lg bg-orange-500/15 px-2.5 py-1 text-xs font-bold text-orange-400 transition hover:bg-orange-500 hover:text-white light:bg-orange-500/10 light:text-orange-600"
-                          >
-                            <Pencil size={12} />
-                            Edit
-                          </button>
-
-                          <Link
-                            href={`/watch/${video.videoId}`}
-                            className="flex items-center gap-1 rounded-lg bg-white/10 px-2.5 py-1 text-xs font-semibold text-slate-200 transition hover:bg-white/20 light:bg-black/5 light:text-slate-700"
-                          >
-                            <ExternalLink size={12} />
-                            Watch
-                          </Link>
+                          {video.visibility && (
+                            <span className="absolute top-2 right-2 rounded-full bg-black/60 backdrop-blur-md px-2 py-0.5 text-[9px] font-bold text-white capitalize">
+                              {video.visibility}
+                            </span>
+                          )}
                         </div>
 
-                        {confirmingDeleteId === video.videoId ? (
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => handleDelete(video.videoId)}
-                              disabled={deletingId === video.videoId}
-                              className="rounded-lg bg-red-500 px-2 py-1 text-[11px] font-bold text-white"
-                            >
-                              {deletingId === video.videoId ? "..." : "Confirm"}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setConfirmingDeleteId(null)}
-                              className="px-1 text-[11px] text-slate-400 hover:text-white"
-                            >
-                              Cancel
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => setConfirmingDeleteId(video.videoId)}
-                            className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-500/15 hover:text-red-400"
-                            title="Delete"
-                          >
-                            <Trash2 size={13} />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          );
-        })()}
+                        <div className="mt-2.5 flex-1 min-w-0">
+                          <h3 className="line-clamp-2 text-xs font-bold text-white light:text-slate-900 sm:text-sm">
+                            {video.title}
+                          </h3>
+                          <p className="mt-1 text-[11px] font-medium text-slate-400 light:text-slate-600">
+                            {video.category || "General"} • {formatViews(video.views || 0)} views • {formatTimeAgo(video.uploadedAt)}
+                          </p>
+                        </div>
 
-          {/* PANEL 3: SHORTS LIBRARY */}
-          {activeTab === "shorts" && (
-            <div className="space-y-5">
-              <div className="flex items-center justify-between gap-3 rounded-2xl border border-white/10 bg-[#071120] px-4 py-3 light:border-black/10 light:bg-white">
-                <div>
-                  <h2 className="text-base font-black text-white light:text-slate-900 sm:text-lg">
-                    Shorts Library
-                  </h2>
-                  <p className="text-xs text-slate-400 light:text-slate-600">
-                    {shortItems.length} {shortItems.length === 1 ? "short" : "shorts"} posted
-                  </p>
-                </div>
-                <Link
-                  href="/upload?type=short"
-                  className="flex items-center gap-1.5 rounded-xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-3.5 py-2 text-xs font-bold text-white shadow transition hover:-translate-y-0.5"
-                >
-                  <Plus size={14} />
-                  Upload Short
-                </Link>
+                        <div className="mt-3 flex items-center justify-between gap-1.5 border-t border-white/10 pt-2.5 light:border-black/10">
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => startEditing(video)}
+                              className="flex items-center gap-1 rounded-lg bg-orange-500/15 px-2.5 py-1 text-xs font-bold text-orange-400 transition hover:bg-orange-500 hover:text-white light:bg-orange-500/10 light:text-orange-600"
+                            >
+                              <Pencil size={12} />
+                              Edit
+                            </button>
+
+                            <Link
+                              href={`/watch/${video.videoId}`}
+                              className="flex items-center gap-1 rounded-lg bg-white/10 px-2.5 py-1 text-xs font-semibold text-slate-200 transition hover:bg-white/20 light:bg-black/5 light:text-slate-700"
+                            >
+                              <ExternalLink size={12} />
+                              Watch
+                            </Link>
+                          </div>
+
+                          {confirmingDeleteId === video.videoId ? (
+                            <div className="flex items-center gap-1">
+                              <button
+                                type="button"
+                                onClick={() => handleDelete(video.videoId)}
+                                disabled={deletingId === video.videoId}
+                                className="rounded-lg bg-red-500 px-2 py-1 text-[11px] font-bold text-white"
+                              >
+                                {deletingId === video.videoId ? "..." : "Confirm"}
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmingDeleteId(null)}
+                                className="px-1 text-[11px] text-slate-400 hover:text-white"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setConfirmingDeleteId(video.videoId)}
+                              className="flex h-7 w-7 items-center justify-center rounded-lg text-slate-400 transition hover:bg-red-500/15 hover:text-red-400"
+                              title="Delete"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-
-              {shortItems.length === 0 ? (
-                <div className="flex flex-col items-center justify-center rounded-2xl border border-white/10 bg-white/[0.02] py-14 text-center light:border-black/10 light:bg-black/[0.02]">
-                  <PlaySquare size={36} className="mb-2 text-slate-500" />
-                  <p className="font-bold text-white light:text-slate-900 text-sm">
-                    No Shorts posted yet
-                  </p>
-                  <p className="mt-1 text-xs text-slate-400 light:text-slate-600">
-                    Upload vertical short videos up to 60 seconds.
-                  </p>
-                  <Link
-                    href="/upload?type=short"
-                    className="mt-4 rounded-xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-5 py-2 text-xs font-bold text-white"
-                  >
-                    Upload Short
-                  </Link>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
-                  {shortItems.map((short) => (
-                    <div
-                      key={short.videoId}
-                      className="group flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#071120] p-2.5 transition-all hover:border-orange-500/40 light:border-black/10 light:bg-white"
-                    >
-                      <div className="relative aspect-[9/16] w-full overflow-hidden rounded-xl bg-black/20">
-                        {short.thumbnailUrl && (
-                          <Image
-                            src={short.thumbnailUrl}
-                            alt={short.title}
-                            fill
-                            sizes="250px"
-                            className="object-cover transition-transform duration-300 group-hover:scale-105"
-                          />
-                        )}
-                        <span
-                          className={`absolute top-2 left-2 rounded-full px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider ${
-                            short.status === "ready"
-                              ? "bg-emerald-500/90 text-white shadow"
-                              : short.status === "processing"
-                              ? "bg-amber-500/90 text-white shadow"
-                              : "bg-red-500/90 text-white shadow"
-                          }`}
-                        >
-                          {short.status}
-                        </span>
-                      </div>
-
-                      <div className="mt-2 flex-1 min-w-0">
-                        <h3 className="line-clamp-2 text-xs font-bold text-white light:text-slate-900">
-                          {short.title}
-                        </h3>
-                        <p className="mt-0.5 text-[10px] font-medium text-slate-400 light:text-slate-600">
-                          {short.category || "Shorts"} • {formatViews(short.views || 0)} views
-                        </p>
-                      </div>
-
-                      <div className="mt-2.5 flex items-center justify-between gap-1 border-t border-white/10 pt-2 light:border-black/10">
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => startEditing(short)}
-                            className="flex items-center gap-1 rounded-lg bg-orange-500/15 px-2 py-1 text-[11px] font-bold text-orange-400 transition hover:bg-orange-500 hover:text-white light:bg-orange-500/10 light:text-orange-600"
-                          >
-                            <Pencil size={11} />
-                            Edit
-                          </button>
-
-                          <Link
-                            href={`/shorts?v=${short.videoId}`}
-                            className="flex items-center gap-1 rounded-lg bg-white/10 px-2 py-1 text-[11px] font-semibold text-slate-200 transition hover:bg-white/20 light:bg-black/5 light:text-slate-700"
-                          >
-                            <ExternalLink size={11} />
-                            Watch
-                          </Link>
-                        </div>
-
-                        {confirmingDeleteId === short.videoId ? (
-                          <div className="flex items-center gap-0.5">
-                            <button
-                              type="button"
-                              onClick={() => handleDelete(short.videoId)}
-                              disabled={deletingId === short.videoId}
-                              className="rounded bg-red-500 px-1.5 py-0.5 text-[10px] font-bold text-white"
-                            >
-                              Yes
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setConfirmingDeleteId(null)}
-                              className="px-1 text-[10px] text-slate-400"
-                            >
-                              No
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => setConfirmingDeleteId(short.videoId)}
-                            className="flex h-6 w-6 items-center justify-center rounded-lg text-slate-400 hover:bg-red-500/15 hover:text-red-400"
-                            title="Delete"
-                          >
-                            <Trash2 size={12} />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+            );
+          })()}
             </div>
           )}
+
 
           {/* PANEL 4: DEDICATED EDIT CONTENT SCREEN */}
           {activeTab === "edit" && (
@@ -977,16 +843,10 @@ export default function MyVideosPage() {
                   </p>
                   <div className="mt-4 flex justify-center gap-2">
                     <button
-                      onClick={() => setActiveTab("videos")}
+                      onClick={() => setActiveTab("dashboard")}
                       className="rounded-xl bg-orange-500 px-4 py-2 text-xs font-bold text-white"
                     >
-                      Go to Videos Library
-                    </button>
-                    <button
-                      onClick={() => setActiveTab("shorts")}
-                      className="rounded-xl border border-white/10 px-4 py-2 text-xs font-semibold text-slate-300 light:border-black/10 light:text-slate-700"
-                    >
-                      Go to Shorts Library
+                      Go to Dashboard
                     </button>
                   </div>
                 </div>

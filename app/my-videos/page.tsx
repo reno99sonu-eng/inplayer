@@ -512,15 +512,6 @@ export default function MyVideosPage() {
                 >
                   <Icon size={15} />
                   <span>{item.label}</span>
-                  {"count" in item && (
-                    <span
-                      className={`rounded-full px-1.5 py-0.5 text-[10px] font-extrabold ${
-                        isActive ? "bg-white/20 text-white" : "bg-white/10 text-slate-400"
-                      }`}
-                    >
-                      {item.count}
-                    </span>
-                  )}
                 </button>
               );
             })}
@@ -565,16 +556,6 @@ export default function MyVideosPage() {
                       <Icon size={16} className={isActive ? "text-white" : "text-orange-400"} />
                       <span className="truncate">{item.label}</span>
                     </div>
-
-                    {"count" in item && (
-                      <span
-                        className={`ml-2 flex-shrink-0 rounded-full px-2 py-0.5 text-[10px] font-extrabold ${
-                          isActive ? "bg-white/20 text-white" : "bg-white/10 text-slate-400 light:bg-black/10 light:text-slate-600"
-                        }`}
-                      >
-                        {item.count}
-                      </span>
-                    )}
                   </button>
                 );
               })}

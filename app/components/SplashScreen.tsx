@@ -92,17 +92,6 @@ export default function SplashScreen() {
   const [leaving, setLeaving] = useState(false);
   const { user, authLoading } = useAuthModal();
 
-  // TEMPORARY DIAGNOSTIC — REMOVE ONCE THE MOBILE ANIMATION/SOUND REPORT IS
-  // RESOLVED. Shows exactly what this specific device/browser is doing
-  // (reduced-motion preference, whether the audio actually started playing
-  // or was blocked and why) as an on-screen readout, so Reno doesn't have
-  // to dig through OS settings menus to tell us what's going on. Rendered
-  // independently of the splash curtain's own visible/leaving state (see
-  // the return statement below) and kept on screen for 25s via its own
-  // timer, since under reduced-motion the curtain itself dismisses in
-  // ~180ms — far too fast to read otherwise.
-  const [debugInfo, setDebugInfo] = useState<string | null>(null);
-
   // Read inside the dismiss timer below (see the mount effect further
   // down), not as a hook dependency — a ref always has the latest value
   // without forcing that effect to re-run/restart the animation timers
@@ -198,24 +187,8 @@ export default function SplashScreen() {
     let sting: HTMLAudioElement | null = null;
     if (!reducedMotion) {
       sting = new Audio("/sounds/splash-logo-sting.mp3");
-      sting
-        .play()
-        .then(() => setDebugInfo(`motion=normal audio=PLAYING OK`))
-        .catch((err) =>
-          setDebugInfo(
-            `motion=normal audio=BLOCKED (${err?.name || "unknown"}: ${
-              err?.message || "no message"
-            })`
-          )
-        );
-    } else {
-      setDebugInfo("motion=REDUCED (device/browser setting) — animation+audio intentionally skipped");
+      sting.play().catch(() => {});
     }
-    // TEMPORARY — remove this whole block along with the debugInfo state
-    // once diagnosed. Keeps the readout on screen far longer than the
-    // curtain itself lives, specifically so it's readable even in the
-    // reduced-motion case where the curtain is gone in ~180ms.
-    const debugClearTimer = window.setTimeout(() => setDebugInfo(null), 25000);
 
     let leaveTimer: number | undefined;
     let removeTimer: number | undefined;
@@ -233,7 +206,6 @@ export default function SplashScreen() {
       window.clearTimeout(holdTimer);
       window.clearTimeout(leaveTimer);
       window.clearTimeout(removeTimer);
-      window.clearTimeout(debugClearTimer);
       // Stops the sting if this component instance is ever actually torn
       // down mid-play (e.g. navigating straight into /admin's separate
       // layout, which unmounts SplashScreen entirely — see SiteChrome.tsx)
@@ -252,19 +224,9 @@ export default function SplashScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  // TEMPORARY — this badge is intentionally rendered outside the curtain's
-  // own visible/leaving lifecycle (see debugClearTimer above) so it's still
-  // readable after the curtain itself has already dismissed.
-  const debugBadge = debugInfo ? (
-    <div className="fixed bottom-3 left-3 right-3 z-[9999999] rounded-lg bg-black/85 px-3 py-2 text-[11px] font-mono leading-snug text-lime-300 shadow-lg sm:right-auto sm:max-w-md">
-      {debugInfo}
-    </div>
-  ) : null;
-
-  if (!visible) return debugBadge;
+  if (!visible) return null;
 
   return (
-    <>
     <div
       id="app-splash-curtain"
       aria-hidden="true"
@@ -343,7 +305,5 @@ export default function SplashScreen() {
         </p>
       </div>
     </div>
-    {debugBadge}
-    </>
   );
 }

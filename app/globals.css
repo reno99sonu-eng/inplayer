@@ -1256,7 +1256,12 @@ animation: aiGlassSweep 5.5s linear infinite;
   }
 }
 .animate-navbar-logo-reveal {
-  animation: navbarLogoReveal 0.85s cubic-bezier(0.16, 1, 0.3, 1) both;
+  /* TEMPORARILY slowed from 0.85s to 3s for diagnostic purposes — Reno
+     reported not seeing this at all, so this makes it impossible to miss
+     on a fresh load. Once confirmed visible, dial back down to something
+     snappy (not necessarily all the way back to 0.85s, since that may have
+     simply been too fast to register). */
+  animation: navbarLogoReveal 3s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 @media (prefers-reduced-motion: reduce) {
   .animate-navbar-logo-reveal {

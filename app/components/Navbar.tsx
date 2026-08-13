@@ -20,13 +20,6 @@ import { CONTACT_EMAILS } from "@/app/lib/contactEmails";
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
 
-  // TEMPORARY DIAGNOSTIC — reads back what the browser itself thinks is
-  // actually applied to the mobile logo's animation wrapper, right after
-  // mount. Shown in the TEST-V2 badge below instead of a plain static
-  // label. Remove this state + the effect further down once diagnosed.
-  const [logoAnimDebug, setLogoAnimDebug] = useState("checking...");
-  const logoWrapperRef = useRef<HTMLDivElement>(null);
-
   const [subscribedChannels, setSubscribedChannels] = useState<
     {
       creatorId: string;
@@ -45,38 +38,6 @@ export default function Navbar() {
   const menuRef = useRef<HTMLDivElement>(null);
   const { signedIn, user, signOut, openSignIn, openSignUp } = useAuthModal();
   const [navbarTheme, setNavbarTheme] = useState<{ active: boolean; imageUrl: string; occasionId?: string; title?: string } | null>(null);
-
-  // TEMPORARY DIAGNOSTIC — see logoAnimDebug/logoWrapperRef declared above.
-  // Reads the real, browser-computed animation state of the mobile logo
-  // wrapper shortly after mount (a tiny delay so the animation has clearly
-  // started by the time we check, rather than racing paint).
-  useEffect(() => {
-    const inspect = (label: string) => {
-      const matches = document.querySelectorAll(".animate-navbar-logo-reveal");
-      const el = logoWrapperRef.current;
-      const refRect = el ? el.getBoundingClientRect() : null;
-      const refParentChain: string[] = [];
-      let node: HTMLElement | null = el;
-      for (let i = 0; i < 4 && node; i++) {
-        const cs2 = window.getComputedStyle(node);
-        refParentChain.push(`${node.tagName}[d=${cs2.display},vis=${cs2.visibility}]`);
-        node = node.parentElement;
-      }
-      const line = `[${label}] matches=${matches.length} innerHTML.len=${el?.innerHTML.length ?? "N/A"} refRect=${
-        refRect ? `${Math.round(refRect.width)}x${Math.round(refRect.height)}` : "null"
-      } vw=${window.innerWidth} chain=${refParentChain.join(">")}`;
-      // Appended, not replaced — so a single screenshot taken any time after
-      // 3.5s shows BOTH the mid-animation and post-animation readings
-      // together, instead of needing two perfectly-timed screenshots.
-      setLogoAnimDebug((prev) => (prev === "checking..." ? line : `${prev} || ${line}`));
-    };
-    const t1 = window.setTimeout(() => inspect("t500"), 500);
-    const t2 = window.setTimeout(() => inspect("t3500"), 3500);
-    return () => {
-      window.clearTimeout(t1);
-      window.clearTimeout(t2);
-    };
-  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -386,17 +347,8 @@ export default function Navbar() {
         page load (Navbar doesn't remount on client-side navigation,
         except when entering/leaving /admin's separate layout — an edge
         case not worth extra suppression logic for a harmless replay). */}
-    <div ref={logoWrapperRef} className="animate-navbar-logo-reveal">
+    <div className="animate-navbar-logo-reveal">
       <NavbarLogo />
-    </div>
-    {/* TEMPORARY — fixed overlay (not squeezed into the tight navbar row)
-        showing the browser's own computed state for the wrapper above,
-        read once mid-animation (t500) and once after it should have
-        finished (t3500), appended together. Remove this block,
-        logoAnimDebug/logoWrapperRef state, and the effect that fills it
-        in once diagnosed. */}
-    <div className="fixed bottom-2 left-2 right-2 z-[9999999] whitespace-pre-wrap break-words rounded-lg bg-fuchsia-700/95 px-2.5 py-2 text-[10px] font-mono leading-snug text-white shadow-lg">
-      {logoAnimDebug}
     </div>
 
     {/* Festive Occasion Graphic + greeting text, side by side — same fix

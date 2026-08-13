@@ -39,6 +39,51 @@ export default function Navbar() {
   const { signedIn, user, signOut, openSignIn, openSignUp } = useAuthModal();
   const [navbarTheme, setNavbarTheme] = useState<{ active: boolean; imageUrl: string; occasionId?: string; title?: string } | null>(null);
 
+  // Controls when the mobile logo entrance animation plays. Starts false so
+  // the animation doesn't fire while the splash screen is still covering the
+  // viewport (which would make it play invisibly behind the splash curtain).
+  // Flips to true when the splash dispatches its 'splashDismissed' event,
+  // which triggers the CSS animation at exactly the right moment — when the
+  // splash is fading out and the navbar is becoming visible for the first
+  // time. If no splash plays (e.g. module-level hasPlayedThisLoad was
+  // already true from an earlier mount in the same page load), the
+  // fallback timeout kicks in after 100ms so the logo still animates in
+  // promptly. This entirely replaces the old static
+  // `className="animate-navbar-logo-reveal"` approach that was broken
+  // because it always played on mount regardless of splash state.
+  const [mobileLogoReady, setMobileLogoReady] = useState(false);
+
+  useEffect(() => {
+    let fallbackTimer: ReturnType<typeof setTimeout>;
+
+    const onSplashDone = () => {
+      setMobileLogoReady(true);
+    };
+
+    // If the splash already dismissed before this component mounted (race
+    // condition on very fast loads, or admin routes where SplashScreen
+    // doesn't render at all), or if the splash was already played this
+    // load (hasPlayedThisLoad), start the animation after a short delay
+    // so it's not invisible.
+    const splashCurtain = document.getElementById("app-splash-curtain");
+    if (!splashCurtain) {
+      // No splash on screen — animate immediately (with a tiny delay so
+      // the browser has painted the navbar first).
+      fallbackTimer = setTimeout(() => setMobileLogoReady(true), 80);
+    } else {
+      // Splash is present — wait for it to dismiss.
+      window.addEventListener("splashDismissed", onSplashDone, { once: true });
+      // Safety fallback: if the event never fires (e.g. the failsafe
+      // script in layout.tsx force-killed the splash), animate after 3.5s.
+      fallbackTimer = setTimeout(() => setMobileLogoReady(true), 3500);
+    }
+
+    return () => {
+      window.removeEventListener("splashDismissed", onSplashDone);
+      clearTimeout(fallbackTimer);
+    };
+  }, []);
+
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -338,16 +383,14 @@ export default function Navbar() {
     {/* Pure Clean Mobile Logo — this wrapper (and ONLY this one; the
         desktop <NavbarLogo /> above in the `hidden lg:flex` block is
         untouched) plays a one-time "roll out, then settle back in" bounce
-        the instant it mounts, per Reno's ask for a mobile-only logo
-        entrance. This whole block already lives inside the `lg:hidden`
-        "Mobile Row" container above, so animate-navbar-logo-reveal never
-        needs its own responsive prefix to stay off desktop — it simply
-        never renders there. Pure CSS (see globals.css), no JS state: it
-        fires once because NavbarLogo itself only mounts once per real
-        page load (Navbar doesn't remount on client-side navigation,
-        except when entering/leaving /admin's separate layout — an edge
-        case not worth extra suppression logic for a harmless replay). */}
-    <div className="animate-navbar-logo-reveal">
+        once the splash screen has finished dismissing, per Reno's ask for
+        a mobile-only logo entrance. The animation class is applied via
+        the mobileLogoReady state (see the useEffect above) instead of
+        being hard-coded, so it doesn't fire invisibly behind the splash
+        curtain. Before the splash finishes, the logo is simply hidden
+        (opacity-0) so there's no layout shift — it pops in with the
+        bounce animation the moment the splash fades away. */}
+    <div className={mobileLogoReady ? "animate-navbar-logo-reveal" : "opacity-0"}>
       <NavbarLogo />
     </div>
 

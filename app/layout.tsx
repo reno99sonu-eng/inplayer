@@ -195,15 +195,19 @@ export default async function RootLayout({
        state), but the "Good Morning" etc. text people actually see. If
        React's effect DOES run afterward, its own render simply overwrites
        this with the fuller version — no conflict either way.
-    2. ~3.2s after the document starts loading, if the curtain is still in
+    2. ~3s after the document starts loading, if the curtain is still in
        the DOM (normal case: React has already removed it by ~2s, so this
-       finds nothing and is a no-op), this force-hides it and restores
-       page scrolling — trading the graceful fade for "the site is usable"
-       as the outcome that actually matters. */}
+       finds nothing and is a no-op), this force-hides it, dispatches the
+       splashDismissed event (so the mobile navbar logo animation still
+       plays), and restores page scrolling — trading the graceful fade for
+       "the site is usable" as the outcome that actually matters. The 3s
+       timeout is deliberately longer than the normal splash path (~1.5s)
+       to avoid racing it, while still being short enough to rescue a
+       genuinely stuck splash. */}
 <script
   dangerouslySetInnerHTML={{
     __html:
-      '(function(){function g(){try{var e=document.getElementById("app-splash-greeting");if(e&&!e.textContent){var h=new Date().getHours();var w=(h>=5&&h<12)?"Morning":(h>=12&&h<17)?"Afternoon":"Evening";e.textContent="Good "+w;}}catch(err){}}if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",g);}else{g();}setTimeout(function(){try{var el=document.getElementById("app-splash-curtain");if(el){el.style.transition="none";el.style.opacity="0";el.style.pointerEvents="none";el.style.display="none";}document.body.style.overflow="";document.documentElement.style.overflow="";}catch(e){}},1500);})();',
+      '(function(){function g(){try{var e=document.getElementById("app-splash-greeting");if(e&&!e.textContent){var h=new Date().getHours();var w=(h>=5&&h<12)?"Morning":(h>=12&&h<17)?"Afternoon":"Evening";e.textContent="Good "+w;}}catch(err){}}if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",g);}else{g();}setTimeout(function(){try{var el=document.getElementById("app-splash-curtain");if(el){el.style.transition="none";el.style.opacity="0";el.style.pointerEvents="none";el.style.display="none";try{window.dispatchEvent(new CustomEvent("splashDismissed"));}catch(ev){}}document.body.style.overflow="";document.documentElement.style.overflow="";}catch(e){}},3000);})();',
   }}
 />
 <ChunkErrorRecovery />

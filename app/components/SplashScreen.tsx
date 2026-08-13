@@ -177,17 +177,48 @@ export default function SplashScreen() {
     //
     // Mobile browsers (iOS Safari especially, Chrome on Android to a
     // lesser degree) block autoplay WITH SOUND until the visitor has
-    // interacted with the page at least once this session/origin — .play()
-    // rejects a promise rather than throwing in that case. Caught and
-    // ignored on purpose: no console noise, no broken UI, and the visual
-    // reveal plays out identically either way. This is a real platform
-    // restriction, not a bug — it means a brand-new visitor's very first
-    // load is silent, and the sting starts working from their next
-    // reload/visit once they've tapped anywhere on the site.
+    // interacted with the page at least once this session/origin. This
+    // version handles that better than a bare .play().catch():
+    //   1. Pre-load the audio and resume an AudioContext upfront (some
+    //      browsers honor context.resume() as a "the page wants audio"
+    //      signal even without an explicit user gesture).
+    //   2. If the initial .play() still fails (NotAllowedError), register
+    //      a one-shot listener on the first user interaction (click, tap,
+    //      keydown) that retries playback — so the sting still plays if
+    //      the user taps anywhere on the splash curtain or page before it
+    //      fades out, rather than being silently swallowed.
     let sting: HTMLAudioElement | null = null;
+    let interactionCleanup: (() => void) | null = null;
     if (!reducedMotion) {
       sting = new Audio("/sounds/splash-logo-sting.mp3");
-      sting.play().catch(() => {});
+      sting.preload = "auto";
+
+      // Try to "unlock" audio on browsers that allow AudioContext resume
+      // without a user gesture (Chrome desktop, some Android builds).
+      try {
+        const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)();
+        ctx.resume().catch(() => {});
+      } catch {
+        // AudioContext not available — fine, the fallback still works.
+      }
+
+      sting.play().catch(() => {
+        // Autoplay blocked — set up a one-shot interaction listener to
+        // retry on the user's first tap/click/keydown.
+        const retryPlay = () => {
+          sting?.play().catch(() => {});
+          cleanup();
+        };
+        const cleanup = () => {
+          for (const evt of ["click", "touchstart", "keydown"] as const) {
+            document.removeEventListener(evt, retryPlay, { capture: true });
+          }
+        };
+        for (const evt of ["click", "touchstart", "keydown"] as const) {
+          document.addEventListener(evt, retryPlay, { once: true, capture: true });
+        }
+        interactionCleanup = cleanup;
+      });
     }
 
     let leaveTimer: number | undefined;
@@ -195,7 +226,15 @@ export default function SplashScreen() {
 
     const holdTimer = window.setTimeout(() => {
       const extraDelay = authLoadingRef.current ? authGraceMs : 0;
-      leaveTimer = window.setTimeout(() => setLeaving(true), extraDelay);
+      leaveTimer = window.setTimeout(() => {
+        setLeaving(true);
+        // Notify the rest of the app (specifically Navbar's mobile logo
+        // animation) that the splash is now fading out and the navbar is
+        // becoming visible. Dispatched here (when leaving starts) rather
+        // than when visible flips false, so listeners can start their own
+        // entrance animation timed to the splash's fade-out transition.
+        window.dispatchEvent(new CustomEvent("splashDismissed"));
+      }, extraDelay);
       removeTimer = window.setTimeout(
         () => setVisible(false),
         extraDelay + fadeOutMs
@@ -216,6 +255,9 @@ export default function SplashScreen() {
       // deliberately left to finish its own natural decay/reverb tail in
       // that case rather than being cut off mid-note.
       sting?.pause();
+      // Remove any pending interaction-retry listeners (mobile audio
+      // fallback) if the component tears down before the user tapped.
+      interactionCleanup?.();
     };
     // Intentionally runs once on mount only — visible/leaving are only
     // ever set BY this effect, never read as a re-run trigger. authLoading

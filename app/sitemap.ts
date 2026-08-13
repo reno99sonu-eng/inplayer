@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { getReadyVideos } from "./lib/videoStore";
+import { playables } from "./data/playables";
 
 const SITE_URL = "https://inplayer.in";
 
@@ -38,6 +39,16 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     })
   );
 
+  // Each of these now has its own real title/description via
+  // generateMetadata (see app/play/[gameId]/page.tsx) — playables is a
+  // small static array, not a database read, so this is free and can't
+  // fail.
+  const gameEntries: MetadataRoute.Sitemap = playables.map((game) => ({
+    url: `${SITE_URL}/play/${game.id}`,
+    changeFrequency: "monthly" as const,
+    priority: 0.5,
+  }));
+
   // Video watch pages are the bulk of the site's real content, and
   // listing them explicitly here is exactly the missing signal that tells
   // Google "these are the canonical URLs for this content" — the gap
@@ -61,12 +72,12 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
           priority: 0.65,
         };
       });
-    return [...staticEntries, ...videoEntries];
+    return [...staticEntries, ...gameEntries, ...videoEntries];
   } catch (err) {
     console.error(
       "sitemap: failed to list videos, returning static routes only:",
       err
     );
-    return staticEntries;
+    return [...staticEntries, ...gameEntries];
   }
 }

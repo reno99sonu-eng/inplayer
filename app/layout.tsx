@@ -26,8 +26,74 @@ export const metadata: Metadata = {
   // "Duplicate without user-selected canonical" report (see middleware.ts
   // for the other half: redirecting the known alias domains to this one).
   metadataBase: new URL("https://inplayer.in"),
-  title: "INPLAYER",
-  description: "The Future of Entertainment",
+  // `template` lets every other page just set its own short title (e.g.
+  // generateMetadata on a watch page returning the real video title) and
+  // automatically get "<that title> | INPLAYER" — consistent branding on
+  // every single result Google shows for this site, without repeating
+  // "INPLAYER" by hand on every page. `default` is only used by pages that
+  // don't set their own title at all.
+  title: {
+    default: "INPLAYER — Stream Videos, Live TV, Shorts & Shop Online",
+    template: "%s | INPLAYER",
+  },
+  description:
+    "INPLAYER is an all-in-one entertainment platform — stream original videos and live shows, watch Raftaar shorts, discover creators, and shop, all in one place.",
+  applicationName: "INPLAYER",
+  // Also referenced by the JSON-LD Organization/WebSite block below, which
+  // is what actually helps Google tell this INPLAYER apart from unrelated
+  // companies/products that happen to share the name.
+  openGraph: {
+    type: "website",
+    url: "/",
+    siteName: "INPLAYER",
+    title: "INPLAYER — Stream Videos, Live TV, Shorts & Shop Online",
+    description:
+      "Stream original videos and live shows, watch Raftaar shorts, discover creators, and shop — all in one place.",
+    images: [
+      {
+        url: "/logos/inplayer-full.png",
+        width: 1200,
+        height: 630,
+        alt: "INPLAYER",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "INPLAYER — Stream Videos, Live TV, Shorts & Shop Online",
+    description:
+      "Stream original videos and live shows, watch Raftaar shorts, discover creators, and shop — all in one place.",
+    images: ["/logos/inplayer-full.png"],
+  },
+};
+
+// Tells Google (and any other engine that reads schema.org data) that
+// "INPLAYER" the word and "inplayer.in" the URL refer to the same one real
+// entity — the actual mechanism behind a Knowledge Panel / correct entity
+// match for a brand-name search, not something a title tag alone can do.
+// Deliberately omits `sameAs` (links to official social profiles) — the
+// Instagram/X icons in Footer.tsx aren't wired to real URLs yet (plain
+// decorative buttons, no href), and a wrong/guessed profile link in
+// structured data would actively mislead Google rather than help. Add
+// `sameAs: [...]` here the moment those real profile URLs exist.
+const ORGANIZATION_JSON_LD = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      name: "INPLAYER",
+      legalName: "Homox Prime Pvt Ltd",
+      url: "https://inplayer.in",
+      logo: "https://inplayer.in/logos/inplayer-full.png",
+      description:
+        "INPLAYER is an all-in-one entertainment platform — stream original videos and live shows, watch shorts, discover creators, and shop, all in one place.",
+    },
+    {
+      "@type": "WebSite",
+      name: "INPLAYER",
+      url: "https://inplayer.in",
+    },
+  ],
 };
 
 export default async function RootLayout({
@@ -81,6 +147,13 @@ export default async function RootLayout({
     duration-300
   `}
 >
+{/* Structured data (see ORGANIZATION_JSON_LD above) — a static, inert
+    JSON blob, same "runs independent of React ever mounting" reasoning as
+    the two plain-JS scripts below, just with nothing to execute. */}
+<script
+  type="application/ld+json"
+  dangerouslySetInnerHTML={{ __html: JSON.stringify(ORGANIZATION_JSON_LD) }}
+/>
 {/* Applies the correct light/dark class to <html> BEFORE first paint —
     must stay in sync with ThemeProvider.tsx's own resolveTheme() (same
     "inplayer-theme" localStorage key, same 6:00-17:59 local-time daytime

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import BackButton from "@/app/components/BackButton";
 import ChannelPageContent from "@/app/components/ChannelPageContent";
 import { getPublicProfile } from "@/app/lib/getPublicProfile";
@@ -6,6 +7,43 @@ export const dynamic = "force-dynamic";
 
 interface ChannelPageProps {
   params: Promise<{ username: string }>;
+}
+
+// Every creator channel used to show the same generic "INPLAYER" title —
+// this gives each one a real "<Creator Name> (@username) | INPLAYER" title
+// (via the root layout's title template), a description, and a
+// self-referencing canonical. Reuses the exact same getPublicProfile() call
+// the page body already makes (anonymous, same as every other visitor) —
+// Next.js does not dedupe two separate calls to a plain async function
+// across generateMetadata and the page component, so this is one extra
+// read, same cost class as the rest of this lookup already is.
+export async function generateMetadata({
+  params,
+}: ChannelPageProps): Promise<Metadata> {
+  const { username } = await params;
+  const result = await getPublicProfile(username, null);
+
+  if (!result.ok) {
+    return { title: "Channel not found" };
+  }
+
+  const displayName = result.data.name || result.data.username;
+  const title = `${displayName} (@${result.data.username})`;
+  const description = result.data.description?.trim()
+    ? result.data.description.slice(0, 160)
+    : `Watch videos from ${displayName} on INPLAYER.`;
+
+  return {
+    title,
+    description,
+    alternates: { canonical: `/u/${result.data.username}` },
+    openGraph: {
+      type: "profile",
+      title,
+      description,
+      images: result.data.avatarUrl ? [result.data.avatarUrl] : undefined,
+    },
+  };
 }
 
 // Server-rendered — this used to be a "use client" page that always

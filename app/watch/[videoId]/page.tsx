@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { after } from "next/server";
 import { docClient } from "@/app/lib/dynamodb";
@@ -13,6 +14,60 @@ export const dynamic = "force-dynamic";
 
 interface WatchPageProps {
   params: Promise<{ videoId: string }>;
+}
+
+// Every watch page used to render with the exact same generic "INPLAYER"
+// title/description regardless of which video was open — real content,
+// zero per-page search-result signal. This gives each one its own title
+// (via the root layout's "%s | INPLAYER" template — see app/layout.tsx),
+// description, and self-referencing canonical URL, the same missing piece
+// documented in the project log's SEO entry. A separate, cheap GetItem
+// (not the paginated Scan the page body uses) — safe to fail independently
+// of the page itself ever loading.
+export async function generateMetadata({
+  params,
+}: WatchPageProps): Promise<Metadata> {
+  const { videoId } = await params;
+
+  try {
+    const result = await docClient.send(
+      new GetCommand({
+        TableName: "InPlayer-Videos",
+        Key: { videoId },
+      })
+    );
+    const video = result.Item;
+
+    if (!video || video.moderationHidden === true) {
+      return { title: "Video not found" };
+    }
+
+    const title = (video.title as string)?.trim() || "Watch on INPLAYER";
+    const rawDescription = (video.description as string)?.trim();
+    const description = rawDescription
+      ? rawDescription.slice(0, 160)
+      : `Watch "${title}" on INPLAYER.`;
+
+    return {
+      title,
+      description,
+      alternates: { canonical: `/watch/${videoId}` },
+      openGraph: {
+        type: "video.other",
+        title,
+        description,
+        // Only ever the stored thumbnail field, never derived from
+        // muxPlaybackId here — a members-only video's playback ID must
+        // never end up in publicly-crawlable page metadata (see the same
+        // restriction already applied to muxPlaybackId further down in
+        // this file, in the actual page body).
+        images: video.thumbnailUrl ? [video.thumbnailUrl as string] : undefined,
+      },
+    };
+  } catch (err) {
+    console.error("generateMetadata: failed to load video for watch page:", err);
+    return { title: "Watch on INPLAYER" };
+  }
 }
 
 async function getRelatedVideos(currentVideoId: string, category: string) {

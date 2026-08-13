@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { after } from "next/server";
 import { docClient } from "@/app/lib/dynamodb";
@@ -18,6 +19,50 @@ export const dynamic = "force-dynamic";
 
 interface LiveViewerPageProps {
   params: Promise<{ videoId: string }>;
+}
+
+// Same reasoning as app/watch/[videoId]/page.tsx's generateMetadata — a
+// real per-stream title/description/canonical instead of the generic site
+// default. A separate, cheap GetItem, independent of the page body's own
+// read.
+export async function generateMetadata({
+  params,
+}: LiveViewerPageProps): Promise<Metadata> {
+  const { videoId } = await params;
+
+  try {
+    const result = await docClient.send(
+      new GetCommand({
+        TableName: "InPlayer-Videos",
+        Key: { videoId },
+      })
+    );
+    const video = result.Item;
+
+    if (!video || video.moderationHidden === true) {
+      return { title: "Live stream not found" };
+    }
+
+    const title = (video.title as string)?.trim() || "Live on INPLAYER";
+    const description = video.status === "live"
+      ? `Watch "${title}" live now on INPLAYER.`
+      : `"${title}" — this live stream has ended.`;
+
+    return {
+      title,
+      description,
+      alternates: { canonical: `/live/${videoId}` },
+      openGraph: {
+        type: "video.other",
+        title,
+        description,
+        images: video.thumbnailUrl ? [video.thumbnailUrl as string] : undefined,
+      },
+    };
+  } catch (err) {
+    console.error("generateMetadata: failed to load video for live page:", err);
+    return { title: "Live on INPLAYER" };
+  }
 }
 
 export default async function LiveViewerPage({ params }: LiveViewerPageProps) {

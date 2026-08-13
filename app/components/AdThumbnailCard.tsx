@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 interface HouseCreative {
   adId: string;
@@ -14,6 +14,11 @@ type AdResponse =
   | { source: "house"; creative: HouseCreative; creatives?: HouseCreative[] }
   | { source: "adsense"; adsensePublisherId: string };
 
+// Same pacing as FeaturedHeroAd.tsx's weekly_featured carousel, so a
+// sponsor's images rotate at a familiar, consistent speed everywhere on
+// the site rather than each slot feeling like a different speed.
+const SLIDE_DURATION = 4000;
+
 // A single ad slot styled and shaped exactly like a real video thumbnail
 // card, instead of a separate wide banner strip. Originally built for the
 // Homepage Banner slot (a random slot in RecommendationFeed's grid, among
@@ -26,13 +31,26 @@ type AdResponse =
 // placement here (AdSense units need their own fixed-size ad slot, not a
 // video-thumbnail-shaped box) — an AdSense source configured for either
 // slot simply means no ad shows, same as "off".
+//
+// Auto-rotates through EVERY active creative GET .../api/ads hands back for
+// this placement (not just one randomly-picked one), crossfading between
+// them exactly like FeaturedHeroAd.tsx does for the hero — so a sponsor who
+// uploaded 3 images genuinely sees them cycle within one page view instead
+// of only one ever showing per page load. With a single creative this is a
+// no-op, same as before: `(prev + 1) % 1` is always 0.
 export default function AdThumbnailCard({
   placement = "homepage",
 }: {
   placement?: "homepage" | "watch";
 }) {
   const [data, setData] = useState<AdResponse | null>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [isPaused, setIsPaused] = useState(false);
   const [imageBroken, setImageBroken] = useState(false);
+  // Tracks which adIds this mount has already fired an impression ping for,
+  // so re-renders (e.g. the isPaused toggle) never double-count the same
+  // creative — only an actual rotation to a NEW creative fires again.
+  const impressedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -51,9 +69,47 @@ export default function AdThumbnailCard({
     };
   }, [placement]);
 
-  if (!data || data.source !== "house") return null;
+  // Batch may be a single item (data.creatives absent/short — every caller
+  // from before this change) or several — either way this is the one list
+  // the rest of the component rotates through.
+  const creatives: HouseCreative[] =
+    data && data.source === "house"
+      ? data.creatives && data.creatives.length > 0
+        ? data.creatives
+        : data.creative
+        ? [data.creative]
+        : []
+      : [];
 
-  const creative = data.creative;
+  useEffect(() => {
+    if (isPaused || creatives.length <= 1) return;
+
+    const timer = setTimeout(() => {
+      setActiveIndex((prev) => (prev + 1) % creatives.length);
+    }, SLIDE_DURATION);
+
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- creatives.length is the only piece of `creatives` that should restart this timer
+  }, [activeIndex, isPaused, creatives.length]);
+
+  const creative = creatives[Math.min(activeIndex, Math.max(creatives.length - 1, 0))];
+
+  // Fire-and-forget impression ping, once per creative actually shown —
+  // GET .../api/ads itself no longer counts impressions (it now hands back
+  // a whole batch instead of one pre-picked item), so this is the real
+  // "was this shown to a visitor" signal, same spirit as the click POST
+  // below.
+  useEffect(() => {
+    if (!creative || imageBroken) return;
+    if (impressedRef.current.has(creative.adId)) return;
+    impressedRef.current.add(creative.adId);
+    fetch("/api/ads", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ adId: creative.adId, event: "impression" }),
+    }).catch(() => {});
+  }, [creative, imageBroken]);
+
   if (!creative || !creative.imageUrl || imageBroken) return null;
 
   const handleClick = () => {
@@ -65,13 +121,18 @@ export default function AdThumbnailCard({
   };
 
   return (
-    <article className="group">
+    <article
+      className="group"
+      onMouseEnter={() => setIsPaused(true)}
+      onMouseLeave={() => setIsPaused(false)}
+    >
       <a
+        key={creative.adId}
         href={creative.linkUrl}
         target="_blank"
         rel="noopener noreferrer sponsored"
         onClick={handleClick}
-        className="relative block aspect-video overflow-hidden rounded-2xl bg-[#111827]"
+        className="relative block aspect-video overflow-hidden rounded-2xl bg-[#111827] animate-fade-in"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
@@ -89,6 +150,19 @@ export default function AdThumbnailCard({
         <span className="absolute right-2 top-2 z-10 rounded-md bg-black/80 backdrop-blur-md px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-orange-400 border border-orange-500/30">
           Ad
         </span>
+
+        {creatives.length > 1 && (
+          <div className="absolute bottom-2 left-1/2 z-10 flex -translate-x-1/2 gap-1">
+            {creatives.map((c, i) => (
+              <span
+                key={c.adId}
+                className={`h-1.5 rounded-full transition-all duration-300 ${
+                  i === activeIndex ? "w-4 bg-white" : "w-1.5 bg-white/40"
+                }`}
+              />
+            ))}
+          </div>
+        )}
       </a>
 
       <div className="mt-4 flex items-start gap-3">

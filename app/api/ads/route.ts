@@ -8,10 +8,19 @@ import { AD_CREATIVES_TABLE, AdPlacement, getAllAdCreatives } from "@/app/lib/ad
 // what (if anything) to render in a given ad slot. Reads the real,
 // per-slot source Admin Panel -> Advertising sets (house creative /
 // AdSense / off — see app/lib/platformSettings.ts) and, for "house",
-// picks one real active creative for that placement at random so
-// multiple uploads for the same slot rotate naturally instead of only
-// the newest one ever showing.
+// returns every real active creative for that placement (shuffled, capped)
+// so AdThumbnailCard.tsx can rotate/crossfade through all of them in one
+// page view — same idea as FeaturedHeroAd.tsx's weekly_featured carousel —
+// instead of only ever showing a single randomly-picked one per page load.
 const VALID_PLACEMENTS: AdPlacement[] = ["homepage", "watch", "weekly_featured"];
+
+// A single sponsor tops out at 3 images per section (see
+// app/lib/sponsorships.ts), but several sponsors can run the same
+// placement at once — cap how many any one visitor's card cycles through
+// so a busy week (the "100 sponsors" case) never turns one small ad slot
+// into a multi-minute slideshow. Different visitors still get a different
+// random sample since the pool is shuffled on every request.
+const MAX_CREATIVES_PER_SLOT = 12;
 
 export async function GET(request: NextRequest) {
   const placement = request.nextUrl.searchParams.get("placement") as AdPlacement | null;
@@ -69,30 +78,35 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ source: "off" });
     }
 
-    const pick = items[Math.floor(Math.random() * items.length)];
+    // Fisher-Yates shuffle, then cap — every visitor gets a differently
+    // ordered, differently sampled rotation instead of everyone seeing the
+    // same items in the same DynamoDB scan order.
+    const shuffled = items.slice();
+    for (let i = shuffled.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    const picked = shuffled.slice(0, MAX_CREATIVES_PER_SLOT);
 
-    // Best-effort impression counter — never blocks or fails the actual
-    // response if this write hiccups.
-    docClient
-      .send(
-        new UpdateCommand({
-          TableName: AD_CREATIVES_TABLE,
-          Key: { adId: pick.adId },
-          UpdateExpression: "ADD impressions :one",
-          ExpressionAttributeValues: { ":one": 1 },
-        })
-      )
-      .catch((err) => console.error("ads: impression counter failed:", err));
+    const creatives = picked.map((item) => ({
+      adId: item.adId,
+      imageUrl: item.imageUrl,
+      imageUrlDesktop: item.imageUrlDesktop || undefined,
+      linkUrl: item.linkUrl,
+      title: item.title,
+    }));
 
+    // Impressions are now counted client-side, one per creative actually
+    // shown (see AdThumbnailCard.tsx's POST .../api/ads {event:
+    // "impression"} on every rotation step) instead of blindly incrementing
+    // here on every fetch — this endpoint now hands back a whole batch, not
+    // just the one item that used to get counted.
     return NextResponse.json({
       source: "house",
-      creative: {
-        adId: pick.adId,
-        imageUrl: pick.imageUrl,
-        imageUrlDesktop: pick.imageUrlDesktop || undefined,
-        linkUrl: pick.linkUrl,
-        title: pick.title,
-      },
+      // Kept for back-compat with any other consumer of this shape — the
+      // first item of the same shuffled batch below.
+      creative: creatives[0],
+      creatives,
     });
   } catch (err) {
     console.error("Ad creatives lookup failed (table may not exist yet):", err);
@@ -100,13 +114,22 @@ export async function GET(request: NextRequest) {
   }
 }
 
-// Real click-tracking — fired by the placement's ad component (see
-// AdThumbnailCard.tsx and FeaturedHeroAd.tsx) right before it navigates
-// the visitor to the creative's real linkUrl. Fire-and-forget on the
-// client side, so a slow/failed write never delays the click.
+// Real click-and-impression tracking — fired by the placement's ad
+// component (see AdThumbnailCard.tsx and FeaturedHeroAd.tsx). Fire-and-
+// forget on the client side, so a slow/failed write never delays a click's
+// navigation or a rotation's next frame.
+//
+// `event` defaults to "click" so every pre-existing caller (FeaturedHeroAd
+// and AdThumbnailCard's own click handler, both of which only ever sent
+// {adId}) keeps incrementing clicks exactly as before. AdThumbnailCard now
+// also sends {adId, event: "impression"} once per creative it actually
+// rotates into view, since GET .../api/ads no longer counts impressions
+// itself now that it hands back a whole batch instead of one pre-picked
+// item.
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const adId = body?.adId;
+  const event = body?.event === "impression" ? "impression" : "click";
   if (!adId || typeof adId !== "string") {
     return NextResponse.json({ error: "adId is required." }, { status: 400 });
   }
@@ -116,13 +139,13 @@ export async function POST(request: NextRequest) {
       new UpdateCommand({
         TableName: AD_CREATIVES_TABLE,
         Key: { adId },
-        UpdateExpression: "ADD clicks :one",
+        UpdateExpression: event === "impression" ? "ADD impressions :one" : "ADD clicks :one",
         ExpressionAttributeValues: { ":one": 1 },
       })
     );
     return NextResponse.json({ success: true });
   } catch (err) {
-    console.error("Ad click tracking failed:", err);
+    console.error(`Ad ${event} tracking failed:`, err);
     return NextResponse.json({ success: false });
   }
 }

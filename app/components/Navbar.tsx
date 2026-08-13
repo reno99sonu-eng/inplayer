@@ -335,8 +335,21 @@ export default function Navbar() {
 
   {/* Mobile / tablet logo + Festive Occasion Graphic */}
   <div className="flex-shrink-0 ml-2 flex items-center min-w-0">
-    {/* Pure Clean Mobile Logo */}
-    <NavbarLogo />
+    {/* Pure Clean Mobile Logo — this wrapper (and ONLY this one; the
+        desktop <NavbarLogo /> above in the `hidden lg:flex` block is
+        untouched) plays a one-time "roll out, then settle back in" bounce
+        the instant it mounts, per Reno's ask for a mobile-only logo
+        entrance. This whole block already lives inside the `lg:hidden`
+        "Mobile Row" container above, so animate-navbar-logo-reveal never
+        needs its own responsive prefix to stay off desktop — it simply
+        never renders there. Pure CSS (see globals.css), no JS state: it
+        fires once because NavbarLogo itself only mounts once per real
+        page load (Navbar doesn't remount on client-side navigation,
+        except when entering/leaving /admin's separate layout — an edge
+        case not worth extra suppression logic for a harmless replay). */}
+    <div className="animate-navbar-logo-reveal">
+      <NavbarLogo />
+    </div>
 
     {/* Festive Occasion Graphic + greeting text, side by side — same fix
         as the desktop block above (see its comment): text used to sit

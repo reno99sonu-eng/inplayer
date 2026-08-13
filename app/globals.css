@@ -1227,6 +1227,45 @@ animation: aiGlassSweep 5.5s linear infinite;
   }
 }
 
+/* ---------- Mobile navbar logo entrance (app/components/Navbar.tsx wraps
+   NavbarLogo.tsx with this on mount, mobile-only — the desktop logo
+   instance is untouched) ----------
+   A one-time "roll out, then roll back in and settle" bounce: the logo
+   starts small/hidden, overshoots past its normal size (the "roll out"),
+   then springs back down and settles at its normal resting size (the
+   "roll back in"), where it stays for good — no looping. Same spring
+   easing (cubic-bezier(0.16, 1, 0.3, 1)) as the splash screen's own logo
+   zoom above, for a consistent brand feel, just shorter and subtler since
+   this is a small, always-visible navbar element rather than a full-screen
+   moment. */
+@keyframes navbarLogoReveal {
+  0% {
+    opacity: 0;
+    transform: scale(0.35) translateX(-6px);
+  }
+  40% {
+    opacity: 1;
+    transform: scale(1.16) translateX(1px);
+  }
+  70% {
+    transform: scale(0.95) translateX(-1px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateX(0);
+  }
+}
+.animate-navbar-logo-reveal {
+  animation: navbarLogoReveal 0.85s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-navbar-logo-reveal {
+    animation: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* ---------- Site-wide announcement takeover (app/components/AnnouncementBanner.tsx) ---------- */
 @keyframes announcementFadeIn {
   0% {

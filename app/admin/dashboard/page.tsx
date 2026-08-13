@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchAuthSession } from "aws-amplify/auth";
 import {
   Users,
@@ -11,6 +11,7 @@ import {
   Loader2,
   AlertTriangle,
   Clock,
+  RefreshCw,
 } from "lucide-react";
 
 interface DashboardStats {
@@ -30,37 +31,68 @@ function formatNumber(n: number): string {
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const cancelledRef = useRef(false);
+
+  // The API (/api/admin/dashboard-stats) already runs a fresh, uncached
+  // DynamoDB scan on every single request — the numbers it returns are
+  // never stale. What WAS stale is this page: it used to fetch exactly
+  // once on mount and never again, so leaving the tab open showed the same
+  // frozen snapshot indefinitely (no error, just no update) — that's what
+  // read as "not real-time." Now it polls every 30s in the background,
+  // same convention already used by Admin > Notifications and Admin >
+  // Error Logs, plus this one function also backs the manual Refresh
+  // button for "check right now" without waiting for the next tick.
+  const load = useCallback(async (isBackgroundRefresh: boolean) => {
+    if (isBackgroundRefresh) setRefreshing(true);
+    try {
+      const session = await fetchAuthSession();
+      const idToken = session.tokens?.idToken?.toString();
+      if (!idToken) throw new Error("Session expired — please sign in again.");
+
+      const res = await fetch("/api/admin/dashboard-stats", {
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      if (!res.ok) throw new Error(`Couldn't load dashboard stats (HTTP ${res.status}).`);
+
+      const data = await res.json();
+      if (!cancelledRef.current) {
+        setStats(data);
+        setError(null);
+        setLastUpdated(new Date());
+      }
+    } catch (err) {
+      // A background/manual refresh failing (e.g. one dropped request)
+      // shouldn't blank out numbers that were showing correctly a moment
+      // ago — only the very first load (isBackgroundRefresh=false, the one
+      // call made on mount before anything has ever loaded) surfaces the
+      // error banner, since that's the only case with nothing on screen
+      // yet to fall back to.
+      if (!cancelledRef.current && !isBackgroundRefresh) {
+        setError(err instanceof Error ? err.message : "Something went wrong.");
+      } else if (!cancelledRef.current) {
+        console.error("Dashboard refresh failed:", err);
+      }
+    } finally {
+      if (!cancelledRef.current) {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    }
+  }, []);
 
   useEffect(() => {
-    let cancelled = false;
-
-    (async () => {
-      try {
-        const session = await fetchAuthSession();
-        const idToken = session.tokens?.idToken?.toString();
-        if (!idToken) throw new Error("Session expired — please sign in again.");
-
-        const res = await fetch("/api/admin/dashboard-stats", {
-          headers: { Authorization: `Bearer ${idToken}` },
-        });
-        if (!res.ok) throw new Error(`Couldn't load dashboard stats (HTTP ${res.status}).`);
-
-        const data = await res.json();
-        if (!cancelled) setStats(data);
-      } catch (err) {
-        if (!cancelled) {
-          setError(err instanceof Error ? err.message : "Something went wrong.");
-        }
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
+    cancelledRef.current = false;
+    load(false);
+    const interval = setInterval(() => load(true), 30000);
 
     return () => {
-      cancelled = true;
+      cancelledRef.current = true;
+      clearInterval(interval);
     };
-  }, []);
+  }, [load]);
 
   if (loading) {
     return (
@@ -120,11 +152,30 @@ export default function AdminDashboardPage() {
 
   return (
     <div>
-      <div>
-        <h2 className="text-xl font-black text-white light:text-slate-900">Overview</h2>
-        <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
-          Live counts straight from InPlayer&apos;s database — nothing here is estimated.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h2 className="text-xl font-black text-white light:text-slate-900">Overview</h2>
+          <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
+            Live counts straight from InPlayer&apos;s database — nothing here is estimated.
+            Refreshes itself every 30 seconds.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {lastUpdated && (
+            <span className="text-xs text-slate-500">
+              Updated {lastUpdated.toLocaleTimeString("en-IN")}
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={() => load(true)}
+            disabled={refreshing}
+            className="flex items-center gap-1.5 rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-1.5 text-xs font-bold text-slate-300 light:text-slate-700 transition hover:bg-white/10 light:hover:bg-black/10 disabled:opacity-50"
+          >
+            <RefreshCw size={12} className={refreshing ? "animate-spin" : ""} />
+            Refresh
+          </button>
+        </div>
       </div>
 
       {stats.reportsTableMissing && (

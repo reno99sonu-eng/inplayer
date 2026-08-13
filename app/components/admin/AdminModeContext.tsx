@@ -15,12 +15,18 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 // videos/users/revenue, Sponsorship's ad-sales/house-ads) — nothing one
 // mode does writes to data another mode reads, so flipping this switch is
 // purely cosmetic/navigational, never a source of cross-domain side
-// effects. Platform Settings and Audit Logs are the two deliberate
-// exceptions, reachable from every mode: Settings holds genuinely
-// site-wide toggles (maintenance mode, sign-ups, the announcement banner)
-// that are SUPPOSED to affect the whole site regardless of which mode you
-// opened them from, and Audit Logs is a read-only history of every admin
-// action across all three modes — viewing it never changes anything.
+// effects. Platform Settings, AI Moderation, Error Logs, and Bug Reports
+// are all reachable from more than one mode at the same /admin/... URL,
+// but each of those pages is itself mode-aware and reads/writes only that
+// panel's own fields (inplayerMaintenanceMode vs hammartMaintenanceMode,
+// etc — see app/lib/platformSettings.ts and app/lib/siteDomain.ts). That
+// used to NOT be true for maintenance mode and the announcement banner —
+// they were one flat global toggle each, so turning on Hammart's
+// maintenance mode also took down InPlayer and Sponsorship, which is
+// exactly the bug Reno reported. Audit Logs is the one genuine shared
+// exception: a read-only history of every admin action across all three
+// modes, since viewing it never changes anything and an admin action taken
+// from any panel is worth showing everywhere.
 export type AdminMode = "inplayer" | "hammart" | "sponsorship";
 
 const STORAGE_KEY = "inplayer-admin-mode";

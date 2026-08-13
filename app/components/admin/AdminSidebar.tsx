@@ -60,6 +60,9 @@ const hammartItems = [
   { id: "hammart-vendors", label: "Vendors & KYC", icon: Store, href: "/admin/hammart-vendors" },
   { id: "hammart-products", label: "Products", icon: ShoppingBag, href: "/admin/hammart-products" },
   { id: "hammart-orders", label: "Orders", icon: Receipt, href: "/admin/hammart-orders" },
+  { id: "ai-moderation", label: "AI Moderation", icon: Bot, href: "/admin/ai-moderation" },
+  { id: "bug-reports", label: "Bug Reports", icon: Bug, href: "/admin/bug-reports" },
+  { id: "error-logs", label: "Error Logs", icon: AlertTriangle, href: "/admin/error-logs" },
   { id: "settings", label: "Platform Settings", icon: Settings, href: "/admin/settings" },
   { id: "audit-logs", label: "Audit Logs", icon: ScrollText, href: "/admin/audit-logs" },
 ] as const;
@@ -67,6 +70,8 @@ const hammartItems = [
 const sponsorshipItems = [
   { id: "sponsorships", label: "Sponsorships", icon: Receipt, href: "/admin/sponsorships" },
   { id: "ads", label: "House Ads & AdSense", icon: Megaphone, href: "/admin/advertising" },
+  { id: "bug-reports", label: "Bug Reports", icon: Bug, href: "/admin/bug-reports" },
+  { id: "error-logs", label: "Error Logs", icon: AlertTriangle, href: "/admin/error-logs" },
   { id: "settings", label: "Platform Settings", icon: Settings, href: "/admin/settings" },
   { id: "audit-logs", label: "Audit Logs", icon: ScrollText, href: "/admin/audit-logs" },
 ] as const;

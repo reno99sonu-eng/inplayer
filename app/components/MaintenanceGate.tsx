@@ -1,25 +1,33 @@
 "use client";
 
 import { ReactNode } from "react";
+import { usePathname } from "next/navigation";
 import { Wrench } from "lucide-react";
 import { usePlatformSettings } from "@/app/hooks/usePlatformSettings";
+import { getSiteDomain, getDomainMaintenance, type DomainMaintenanceFields } from "@/app/lib/siteDomain";
 
 // Real maintenance mode — flip it on from Admin Panel -> Platform Settings
-// and EVERY visitor sees the splash below instead of the app. No bypass for
-// the signed-in admin anymore: this used to detect the admin and show them
-// the real site (navbar, homepage, everything) with a small amber banner on
-// top instead of the splash — Reno flagged that as exactly the wrong
-// behavior ("instead of the InPlayer website visible along with the
-// contents"), since it meant maintenance mode never actually looked like
-// maintenance mode to him, on any device. There's no risk of that leaving
-// him locked out of turning it back off: SiteChrome.tsx already routes
-// every /admin/* page around this component entirely (its own separate
-// sign-in-gated layout, see SiteChrome's own comment), so /admin stays
-// reachable no matter what this shows on the public site.
+// and EVERY visitor of that ONE panel (InPlayer, Hammart, or Sponsorship —
+// whichever the current URL belongs to, per getSiteDomain()) sees the
+// splash below instead of the app. The three panels each have their own
+// independent switch now (inplayerMaintenanceMode / hammartMaintenanceMode
+// / sponsorshipMaintenanceMode — see app/lib/platformSettings.ts): this
+// used to be one flat maintenanceMode field gating the whole site at once,
+// so turning on Hammart's maintenance mode from the admin panel also took
+// InPlayer and Sponsorship down with it — Reno's exact bug report. No
+// bypass for the signed-in admin: this used to detect the admin and show
+// them the real site with a small amber banner on top instead of the
+// splash — Reno flagged that as exactly the wrong behavior ("instead of
+// the InPlayer website visible along with the contents"), since it meant
+// maintenance mode never actually looked like maintenance mode to him, on
+// any device. There's no risk of that leaving him locked out of turning it
+// back off: SiteChrome.tsx already routes every /admin/* page around this
+// component entirely (its own separate sign-in-gated layout, see
+// SiteChrome's own comment), so /admin stays reachable no matter what this
+// shows on the public site.
 export default function MaintenanceGate({
   children,
-  initialMaintenanceMode,
-  initialMaintenanceMessage,
+  initialMaintenance,
 }: {
   children: ReactNode;
   // Server-fetched in app/layout.tsx (via getPlatformSettings(), the same
@@ -31,21 +39,23 @@ export default function MaintenanceGate({
   // a flash that's barely visible on a fast desktop connection but stretches
   // out (and reads as "maintenance mode isn't working right") on a slower
   // mobile connection. This makes the very first render already correct on
-  // every device, regardless of network speed.
-  initialMaintenanceMode: boolean;
-  initialMaintenanceMessage: string;
+  // every device, regardless of network speed. Carries all three panels'
+  // fields; the domain picked out below (via the current pathname) decides
+  // which pair actually gets used.
+  initialMaintenance: DomainMaintenanceFields;
 }) {
+  const pathname = usePathname();
+  const domain = getSiteDomain(pathname);
   const { settings, loading: settingsLoading } = usePlatformSettings();
 
+  const initial = getDomainMaintenance(initialMaintenance, domain);
   // Once the client's own fetch resolves, its (always-fresh) value takes
   // over; until then, fall back to the server-known value instead of an
   // "unknown, so just show the real site" default.
-  const maintenanceOn = settingsLoading
-    ? initialMaintenanceMode
-    : Boolean(settings?.maintenanceMode);
+  const maintenanceOn = settingsLoading ? initial.mode : Boolean(settings && getDomainMaintenance(settings, domain).mode);
   const maintenanceMessage = settingsLoading
-    ? initialMaintenanceMessage
-    : settings?.maintenanceMessage || initialMaintenanceMessage;
+    ? initial.message
+    : (settings && getDomainMaintenance(settings, domain).message) || initial.message;
 
   // Maintenance fully off — render normally, no gate at all.
   if (!maintenanceOn) {

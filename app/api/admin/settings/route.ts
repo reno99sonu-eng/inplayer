@@ -33,20 +33,34 @@ export async function PATCH(request: NextRequest) {
   // — never trust the request body wholesale into a DynamoDB write.
   const partial: Partial<PlatformSettings> = {};
 
-  if (typeof body.maintenanceMode === "boolean") partial.maintenanceMode = body.maintenanceMode;
-  if (typeof body.maintenanceMessage === "string") {
-    partial.maintenanceMessage = body.maintenanceMessage.trim().slice(0, 500);
+  // Maintenance mode + announcement are each three independent fields now
+  // (one per admin panel — see app/lib/siteDomain.ts and Reno's explicit
+  // correction that toggling Hammart's maintenance mode was also taking
+  // down InPlayer and Sponsorship). Looping the three domain prefixes
+  // instead of writing each block out three times keeps them from quietly
+  // drifting out of sync with each other again.
+  const DOMAINS = ["inplayer", "hammart", "sponsorship"] as const;
+  for (const domain of DOMAINS) {
+    const modeKey = `${domain}MaintenanceMode` as const;
+    const messageKey = `${domain}MaintenanceMessage` as const;
+    const annEnabledKey = `${domain}AnnouncementEnabled` as const;
+    const annTextKey = `${domain}AnnouncementText` as const;
+    const annLinkKey = `${domain}AnnouncementLinkUrl` as const;
+
+    if (typeof body[modeKey] === "boolean") partial[modeKey] = body[modeKey];
+    if (typeof body[messageKey] === "string") {
+      partial[messageKey] = body[messageKey].trim().slice(0, 500);
+    }
+    if (typeof body[annEnabledKey] === "boolean") partial[annEnabledKey] = body[annEnabledKey];
+    if (typeof body[annTextKey] === "string") {
+      partial[annTextKey] = body[annTextKey].trim().slice(0, 200);
+    }
+    if (typeof body[annLinkKey] === "string") {
+      partial[annLinkKey] = body[annLinkKey].trim().slice(0, 500);
+    }
   }
+
   if (typeof body.signupsEnabled === "boolean") partial.signupsEnabled = body.signupsEnabled;
-  if (typeof body.announcementEnabled === "boolean") {
-    partial.announcementEnabled = body.announcementEnabled;
-  }
-  if (typeof body.announcementText === "string") {
-    partial.announcementText = body.announcementText.trim().slice(0, 200);
-  }
-  if (typeof body.announcementLinkUrl === "string") {
-    partial.announcementLinkUrl = body.announcementLinkUrl.trim().slice(0, 500);
-  }
   if (typeof body.moderationEnabledComments === "boolean") {
     partial.moderationEnabledComments = body.moderationEnabledComments;
   }
@@ -55,6 +69,9 @@ export async function PATCH(request: NextRequest) {
   }
   if (typeof body.moderationEnabledUploads === "boolean") {
     partial.moderationEnabledUploads = body.moderationEnabledUploads;
+  }
+  if (typeof body.hammartModerationEnabledListings === "boolean") {
+    partial.hammartModerationEnabledListings = body.hammartModerationEnabledListings;
   }
   if (typeof body.adsenseEnabled === "boolean") partial.adsenseEnabled = body.adsenseEnabled;
   if (typeof body.adsensePublisherId === "string") {

@@ -37,6 +37,9 @@ const hammartItems = [
   { id: "hammart-vendors", label: "Vendors & KYC", href: "/admin/hammart-vendors" },
   { id: "hammart-products", label: "Products", href: "/admin/hammart-products" },
   { id: "hammart-orders", label: "Orders", href: "/admin/hammart-orders" },
+  { id: "ai-moderation", label: "AI Moderation", href: "/admin/ai-moderation" },
+  { id: "bug-reports", label: "Bug Reports", href: "/admin/bug-reports" },
+  { id: "error-logs", label: "Error Logs", href: "/admin/error-logs" },
   { id: "settings", label: "Settings", href: "/admin/settings" },
   { id: "audit-logs", label: "Audit Logs", href: "/admin/audit-logs" },
 ] as const;
@@ -44,6 +47,8 @@ const hammartItems = [
 const sponsorshipItems = [
   { id: "sponsorships", label: "Sponsorships", href: "/admin/sponsorships" },
   { id: "ads", label: "House Ads & AdSense", href: "/admin/advertising" },
+  { id: "bug-reports", label: "Bug Reports", href: "/admin/bug-reports" },
+  { id: "error-logs", label: "Error Logs", href: "/admin/error-logs" },
   { id: "settings", label: "Settings", href: "/admin/settings" },
   { id: "audit-logs", label: "Audit Logs", href: "/admin/audit-logs" },
 ] as const;

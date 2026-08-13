@@ -4,8 +4,9 @@ import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
 import { getVendorProfile, VENDORS_TABLE, FREE_LISTINGS_LIMIT } from "@/app/lib/hammartVendors";
 import { createProduct, listActiveProducts } from "@/app/lib/hammartProducts";
-import { checkBannedProduct } from "@/app/lib/hammartModeration";
+import { checkBannedProduct, UNCHECKED_BANNED_ITEM } from "@/app/lib/hammartModeration";
 import { THUMBNAIL_DATA_URL_MAX_LENGTH } from "@/app/lib/imageCompress";
+import { getPlatformSettings } from "@/app/lib/platformSettings";
 
 const MAX_IMAGE_LENGTH = THUMBNAIL_DATA_URL_MAX_LENGTH * 1.2;
 
@@ -66,7 +67,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Please enter a valid price." }, { status: 400 });
   }
 
-  const moderation = await checkBannedProduct({ title, description, category });
+  // Hammart's own AI Moderation toggle (Admin Panel -> Hammart ->
+  // AI Moderation), independent from InPlayer's three content toggles —
+  // previously this check always ran unconditionally with no way to turn
+  // it off. Off means the same UNCHECKED_BANNED_ITEM result the real check
+  // itself already falls back to on any error/timeout, so this reuses that
+  // exact fail-open shape instead of inventing a second one.
+  const { hammartModerationEnabledListings } = await getPlatformSettings();
+  const moderation = hammartModerationEnabledListings
+    ? await checkBannedProduct({ title, description, category })
+    : UNCHECKED_BANNED_ITEM;
 
   const result = await createProduct({
     vendorUserId: user.userId,

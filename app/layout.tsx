@@ -8,6 +8,7 @@ import AuthProvider from "./components/auth/AuthProvider";
 import SiteChrome from "./components/SiteChrome";
 import ChunkErrorRecovery from "./components/ChunkErrorRecovery";
 import { getPlatformSettings } from "./lib/platformSettings";
+import type { DomainMaintenanceFields } from "./lib/siteDomain";
 import { headers } from "next/headers";
 
 const jakarta = Plus_Jakarta_Sans({
@@ -37,7 +38,22 @@ export default async function RootLayout({
   // connection, which is exactly the bug this fixes. getPlatformSettings()
   // already fails open to defaults (maintenance off) on any read error, so
   // this can't accidentally lock real visitors out over a transient issue.
-  const { maintenanceMode, maintenanceMessage } = await getPlatformSettings();
+  //
+  // Fetches all three panels' maintenance fields, not just one — the root
+  // layout has no pathname access (Next.js root layouts render above the
+  // router), so it can't know here whether this request is for InPlayer,
+  // Hammart, or Sponsorship. SiteChrome (the first pathname-aware point in
+  // the tree, via usePathname()) and MaintenanceGate itself pick out the
+  // one domain that actually matters for the current page.
+  const settings = await getPlatformSettings();
+  const initialMaintenance: DomainMaintenanceFields = {
+    inplayerMaintenanceMode: settings.inplayerMaintenanceMode,
+    inplayerMaintenanceMessage: settings.inplayerMaintenanceMessage,
+    hammartMaintenanceMode: settings.hammartMaintenanceMode,
+    hammartMaintenanceMessage: settings.hammartMaintenanceMessage,
+    sponsorshipMaintenanceMode: settings.sponsorshipMaintenanceMode,
+    sponsorshipMaintenanceMessage: settings.sponsorshipMaintenanceMessage,
+  };
 
   // Vercel's edge network sets x-vercel-ip-country on every request based
   // on the real connecting IP. When it's absent (local dev, non-Vercel
@@ -114,8 +130,7 @@ export default async function RootLayout({
   <SettingsProvider>
     <ThemeProvider>
       <SiteChrome
-        initialMaintenanceMode={maintenanceMode}
-        initialMaintenanceMessage={maintenanceMessage}
+        initialMaintenance={initialMaintenance}
         initialGeoAllowed={geoAllowed}
       >
         {children}

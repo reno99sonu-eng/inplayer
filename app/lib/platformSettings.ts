@@ -7,19 +7,51 @@ export const PLATFORM_SETTINGS_TAG = "platform-settings";
 
 export type AdSlotSource = "house" | "adsense" | "off";
 
+// Maintenance mode and the announcement banner used to be ONE flat toggle
+// each, gating InPlayer, Hammart, and Sponsorship all at once — so turning
+// on maintenance mode from the Hammart admin panel took down InPlayer and
+// Sponsorship too, which is exactly the bug Reno reported and asked to be
+// fixed ("each and every configuration and settings should work
+// individually for the individual panel"). Both are now three independent
+// fields (one set per domain, see app/lib/siteDomain.ts for the shared
+// domain-picking helpers) so flipping one panel's switch never touches the
+// other two. Same idea for AI moderation: InPlayer's three content-type
+// toggles were already correctly InPlayer-only; hammartModerationEnabledListings
+// is the new equivalent on/off switch for Hammart's separate banned-item
+// listing check (app/lib/hammartModeration.ts), which previously had no
+// toggle at all and always ran unconditionally.
 export interface PlatformSettings {
-  maintenanceMode: boolean;
-  maintenanceMessage: string;
+  inplayerMaintenanceMode: boolean;
+  inplayerMaintenanceMessage: string;
+  hammartMaintenanceMode: boolean;
+  hammartMaintenanceMessage: string;
+  sponsorshipMaintenanceMode: boolean;
+  sponsorshipMaintenanceMessage: string;
+
+  // Not domain-split: there's one shared InPlayer sign-in used to access
+  // InPlayer, Hammart, and Sponsorship alike, so "pause new account
+  // creation" is genuinely a single platform-wide switch, not something
+  // that makes sense to fork into three copies.
   signupsEnabled: boolean;
-  announcementEnabled: boolean;
-  announcementText: string;
+
+  inplayerAnnouncementEnabled: boolean;
+  inplayerAnnouncementText: string;
   // Destination for the announcement overlay's CTA button — optional. When
   // empty, the overlay still shows (headline + close button), it just
   // doesn't render a button pointing nowhere real.
-  announcementLinkUrl: string;
+  inplayerAnnouncementLinkUrl: string;
+  hammartAnnouncementEnabled: boolean;
+  hammartAnnouncementText: string;
+  hammartAnnouncementLinkUrl: string;
+  sponsorshipAnnouncementEnabled: boolean;
+  sponsorshipAnnouncementText: string;
+  sponsorshipAnnouncementLinkUrl: string;
+
   moderationEnabledComments: boolean;
   moderationEnabledMessages: boolean;
   moderationEnabledUploads: boolean;
+  hammartModerationEnabledListings: boolean;
+
   adsenseEnabled: boolean;
   adsensePublisherId: string;
   homepageBannerSource: AdSlotSource;
@@ -32,15 +64,26 @@ export interface PlatformSettings {
 }
 
 export const DEFAULT_SETTINGS: PlatformSettings = {
-  maintenanceMode: false,
-  maintenanceMessage: "InPlayer is down for scheduled maintenance. We'll be back shortly.",
+  inplayerMaintenanceMode: false,
+  inplayerMaintenanceMessage: "InPlayer is down for scheduled maintenance. We'll be back shortly.",
+  hammartMaintenanceMode: false,
+  hammartMaintenanceMessage: "Hammart is down for scheduled maintenance. We'll be back shortly.",
+  sponsorshipMaintenanceMode: false,
+  sponsorshipMaintenanceMessage: "Sponsorships is down for scheduled maintenance. We'll be back shortly.",
   signupsEnabled: true,
-  announcementEnabled: false,
-  announcementText: "",
-  announcementLinkUrl: "",
+  inplayerAnnouncementEnabled: false,
+  inplayerAnnouncementText: "",
+  inplayerAnnouncementLinkUrl: "",
+  hammartAnnouncementEnabled: false,
+  hammartAnnouncementText: "",
+  hammartAnnouncementLinkUrl: "",
+  sponsorshipAnnouncementEnabled: false,
+  sponsorshipAnnouncementText: "",
+  sponsorshipAnnouncementLinkUrl: "",
   moderationEnabledComments: true,
   moderationEnabledMessages: true,
   moderationEnabledUploads: true,
+  hammartModerationEnabledListings: true,
   adsenseEnabled: false,
   adsensePublisherId: "",
   homepageBannerSource: "house",
@@ -54,12 +97,22 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
 
 export type PublicPlatformSettings = Pick<
   PlatformSettings,
-  | "maintenanceMode"
-  | "maintenanceMessage"
+  | "inplayerMaintenanceMode"
+  | "inplayerMaintenanceMessage"
+  | "hammartMaintenanceMode"
+  | "hammartMaintenanceMessage"
+  | "sponsorshipMaintenanceMode"
+  | "sponsorshipMaintenanceMessage"
   | "signupsEnabled"
-  | "announcementEnabled"
-  | "announcementText"
-  | "announcementLinkUrl"
+  | "inplayerAnnouncementEnabled"
+  | "inplayerAnnouncementText"
+  | "inplayerAnnouncementLinkUrl"
+  | "hammartAnnouncementEnabled"
+  | "hammartAnnouncementText"
+  | "hammartAnnouncementLinkUrl"
+  | "sponsorshipAnnouncementEnabled"
+  | "sponsorshipAnnouncementText"
+  | "sponsorshipAnnouncementLinkUrl"
   | "adsenseEnabled"
   | "adsensePublisherId"
   | "homepageBannerSource"
@@ -123,12 +176,22 @@ export async function updatePlatformSettings(
 
 export function toPublicSettings(settings: PlatformSettings): PublicPlatformSettings {
   return {
-    maintenanceMode: settings.maintenanceMode,
-    maintenanceMessage: settings.maintenanceMessage,
+    inplayerMaintenanceMode: settings.inplayerMaintenanceMode,
+    inplayerMaintenanceMessage: settings.inplayerMaintenanceMessage,
+    hammartMaintenanceMode: settings.hammartMaintenanceMode,
+    hammartMaintenanceMessage: settings.hammartMaintenanceMessage,
+    sponsorshipMaintenanceMode: settings.sponsorshipMaintenanceMode,
+    sponsorshipMaintenanceMessage: settings.sponsorshipMaintenanceMessage,
     signupsEnabled: settings.signupsEnabled,
-    announcementEnabled: settings.announcementEnabled,
-    announcementText: settings.announcementText,
-    announcementLinkUrl: settings.announcementLinkUrl || "",
+    inplayerAnnouncementEnabled: settings.inplayerAnnouncementEnabled,
+    inplayerAnnouncementText: settings.inplayerAnnouncementText,
+    inplayerAnnouncementLinkUrl: settings.inplayerAnnouncementLinkUrl || "",
+    hammartAnnouncementEnabled: settings.hammartAnnouncementEnabled,
+    hammartAnnouncementText: settings.hammartAnnouncementText,
+    hammartAnnouncementLinkUrl: settings.hammartAnnouncementLinkUrl || "",
+    sponsorshipAnnouncementEnabled: settings.sponsorshipAnnouncementEnabled,
+    sponsorshipAnnouncementText: settings.sponsorshipAnnouncementText,
+    sponsorshipAnnouncementLinkUrl: settings.sponsorshipAnnouncementLinkUrl || "",
     adsenseEnabled: settings.adsenseEnabled,
     adsensePublisherId: settings.adsensePublisherId,
     homepageBannerSource: settings.homepageBannerSource,

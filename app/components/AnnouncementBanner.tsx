@@ -1,13 +1,21 @@
 "use client";
 
 import { useState } from "react";
+import { usePathname } from "next/navigation";
 import { X, Megaphone, ArrowUpRight } from "lucide-react";
 import { usePlatformSettings } from "@/app/hooks/usePlatformSettings";
 import { useScrollLock } from "@/app/hooks/useScrollLock";
+import { getSiteDomain, getDomainAnnouncement } from "@/app/lib/siteDomain";
 
-// Real site-wide takeover, toggled from Admin Panel -> Platform Settings —
+// Real per-panel takeover, toggled from Admin Panel -> Platform Settings —
 // e.g. "Paid memberships are live" or a scheduled-downtime notice, shown
-// once as a full-screen premium overlay rather than a thin top strip.
+// once as a full-screen premium overlay rather than a thin top strip. Each
+// of InPlayer, Hammart, and Sponsorship has its own independent
+// announcement now (inplayerAnnouncement* / hammartAnnouncement* /
+// sponsorshipAnnouncement* — see app/lib/platformSettings.ts); this used to
+// be one flat announcementEnabled field shown everywhere at once, so
+// getSiteDomain(pathname) below picks out only the one that matches the
+// page actually being viewed.
 //
 // Per Reno's feedback, dismissing this now only hides it for the current
 // page view — it does NOT persist across reloads or new visits. This used
@@ -23,11 +31,14 @@ import { useScrollLock } from "@/app/hooks/useScrollLock";
 // client-side won't bring it back), but a live admin edit that changes
 // the text/link — or a fresh reload/visit — always starts undismissed.
 export default function AnnouncementBanner() {
+  const pathname = usePathname();
+  const domain = getSiteDomain(pathname);
   const { settings } = usePlatformSettings();
 
-  const text = settings?.announcementText || "";
-  const linkUrl = settings?.announcementLinkUrl?.trim() || "";
-  const active = Boolean(settings?.announcementEnabled) && text.trim().length > 0;
+  const domainAnnouncement = settings ? getDomainAnnouncement(settings, domain) : null;
+  const text = domainAnnouncement?.text || "";
+  const linkUrl = domainAnnouncement?.linkUrl?.trim() || "";
+  const active = Boolean(domainAnnouncement?.enabled) && text.trim().length > 0;
 
   if (!active) return null;
 

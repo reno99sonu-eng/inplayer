@@ -4,6 +4,8 @@ import { authedFetch } from "@/app/lib/apiFetch";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Loader2, AlertTriangle, ShieldCheck, Search, Trash2, ChevronDown, ChevronUp } from "lucide-react";
+import { useAdminMode } from "@/app/components/admin/AdminModeContext";
+import { getSiteDomain, DOMAIN_LABELS } from "@/app/lib/siteDomain";
 
 interface LogEntry {
   errorId: string;
@@ -23,6 +25,8 @@ function kindBadgeClasses(kind: string): string {
 }
 
 export default function AdminErrorLogsPage() {
+  const { mode } = useAdminMode();
+  const domainLabel = DOMAIN_LABELS[mode];
   const [logs, setLogs] = useState<LogEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -61,16 +65,23 @@ export default function AdminErrorLogsPage() {
     return () => clearInterval(interval);
   }, []);
 
+  // Crashes are automatic and can happen on any page across all three
+  // products — bucket each one by which panel its pathname belongs to
+  // (via the same getSiteDomain() MaintenanceGate/AnnouncementBanner use)
+  // so InPlayer, Hammart, and Sponsorship each only ever see their own
+  // crashes here, instead of one shared unfiltered list.
+  const domainLogs = useMemo(() => logs.filter((l) => getSiteDomain(l.pathname) === mode), [logs, mode]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return logs;
-    return logs.filter(
+    if (!q) return domainLogs;
+    return domainLogs.filter(
       (l) =>
         l.message.toLowerCase().includes(q) ||
         l.pathname.toLowerCase().includes(q) ||
         l.kind.toLowerCase().includes(q)
     );
-  }, [logs, query]);
+  }, [domainLogs, query]);
 
   const removeOne = async (errorId: string) => {
     setBusyId(errorId);
@@ -82,12 +93,21 @@ export default function AdminErrorLogsPage() {
     }
   };
 
+  // Deletes only THIS panel's entries, one at a time — the API only offers
+  // "delete one by id" or "delete literally everything", and a blanket
+  // clear-everything button here would wipe InPlayer's and Sponsorship's
+  // crash history right along with Hammart's, which is exactly the kind of
+  // cross-panel side effect Reno asked to have removed.
   const clearAll = async () => {
-    if (!window.confirm("Delete every error log entry? This can't be undone.")) return;
+    if (domainLogs.length === 0) return;
+    if (!window.confirm(`Delete all ${domainLogs.length} ${domainLabel} error log entries? This can't be undone. InPlayer/Hammart/Sponsorship's other logs are untouched.`)) return;
     setClearing(true);
     try {
-      const res = await authedFetch("/api/admin/error-logs", { method: "DELETE" });
-      if (res.ok) setLogs([]);
+      const ids = domainLogs.map((l) => l.errorId);
+      await Promise.all(
+        ids.map((id) => authedFetch(`/api/admin/error-logs?id=${encodeURIComponent(id)}`, { method: "DELETE" }))
+      );
+      setLogs((prev) => prev.filter((l) => !ids.includes(l.errorId)));
     } finally {
       setClearing(false);
     }
@@ -97,13 +117,14 @@ export default function AdminErrorLogsPage() {
     <div>
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h2 className="text-xl font-black text-white light:text-slate-900">Error Logs</h2>
+          <h2 className="text-xl font-black text-white light:text-slate-900">{domainLabel} Error Logs</h2>
           <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
-            Real crashes caught automatically on visitors&apos; devices — no report needed from them.
-            Refreshes itself every 30 seconds.
+            Real crashes caught automatically on {domainLabel} visitors&apos; devices — no report
+            needed from them. InPlayer, Hammart, and Sponsorship each show only their own crashes
+            here. Refreshes itself every 30 seconds.
           </p>
         </div>
-        {logs.length > 0 && (
+        {domainLogs.length > 0 && (
           <button
             type="button"
             onClick={clearAll}

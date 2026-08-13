@@ -10,6 +10,7 @@ const MobileBottomNav = dynamic(() => import("./MobileBottomNav"), { ssr: false 
 import MaintenanceGate from "./MaintenanceGate";
 import GeoGate from "./GeoGate";
 import SplashScreen from "./SplashScreen";
+import type { DomainMaintenanceFields } from "@/app/lib/siteDomain";
 
 // Splits the public site's chrome (top navbar/search/categories, the
 // site-wide announcement banner, the mobile bottom tab bar, and the
@@ -27,18 +28,20 @@ import SplashScreen from "./SplashScreen";
 // gating for everyone else who isn't the admin.
 export default function SiteChrome({
   children,
-  initialMaintenanceMode,
-  initialMaintenanceMessage,
+  initialMaintenance,
   initialGeoAllowed,
 }: {
   children: ReactNode;
   // Server-fetched in app/layout.tsx and threaded down here so
   // MaintenanceGate can render the correct state on the very first paint —
-  // see the comment on MaintenanceGate's own props for why.
-  initialMaintenanceMode: boolean;
-  initialMaintenanceMessage: string;
+  // see the comment on MaintenanceGate's own props for why. Carries all
+  // three panels' fields (InPlayer/Hammart/Sponsorship); MaintenanceGate
+  // itself picks out the one that matches the current pathname, since the
+  // root layout that fetched this has no pathname access to do that pick
+  // itself.
+  initialMaintenance: DomainMaintenanceFields;
   // Server-known geo status from Vercel's x-vercel-ip-country header,
-  // threaded the same way as initialMaintenanceMode so GeoGate has the
+  // threaded the same way as initialMaintenance so GeoGate has the
   // correct first-paint answer (Indian users never see a block flash).
   initialGeoAllowed: boolean;
 }) {
@@ -55,10 +58,7 @@ export default function SiteChrome({
           loads normally underneath it, so the splash never delays the
           actual page. */}
       <SplashScreen />
-      <MaintenanceGate
-        initialMaintenanceMode={initialMaintenanceMode}
-        initialMaintenanceMessage={initialMaintenanceMessage}
-      >
+      <MaintenanceGate initialMaintenance={initialMaintenance}>
         <GeoGate initialGeoAllowed={initialGeoAllowed}>
           <Navbar />
           <AnnouncementBanner />

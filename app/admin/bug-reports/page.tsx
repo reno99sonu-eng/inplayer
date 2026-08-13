@@ -4,6 +4,8 @@ import { authedFetch } from "@/app/lib/apiFetch";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Loader2, AlertTriangle, Bug, Search, Check, Clock } from "lucide-react";
+import { useAdminMode } from "@/app/components/admin/AdminModeContext";
+import { getSiteDomain, DOMAIN_LABELS } from "@/app/lib/siteDomain";
 
 type Tab = "open" | "in_progress" | "resolved";
 
@@ -21,6 +23,8 @@ interface Report {
 }
 
 export default function AdminBugReportsPage() {
+  const { mode } = useAdminMode();
+  const domainLabel = DOMAIN_LABELS[mode];
   const [tab, setTab] = useState<Tab>("open");
   const [reports, setReports] = useState<Report[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,13 +34,19 @@ export default function AdminBugReportsPage() {
   const [query, setQuery] = useState("");
   const [expanded, setExpanded] = useState<string | null>(null);
 
+  // User-submitted reports can come from any page across all three
+  // products — bucket by which panel the reported page belongs to (same
+  // getSiteDomain() helper Error Logs uses on its own pathname field) so
+  // each panel only ever sees its own reports.
+  const domainReports = useMemo(() => reports.filter((r) => getSiteDomain(r.pageUrl) === mode), [reports, mode]);
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return reports;
-    return reports.filter(
+    if (!q) return domainReports;
+    return domainReports.filter(
       (r) => r.description.toLowerCase().includes(q) || (r.reporterUsername || "").toLowerCase().includes(q) || r.pageUrl.toLowerCase().includes(q)
     );
-  }, [reports, query]);
+  }, [domainReports, query]);
 
   useEffect(() => {
     let cancelled = false;
@@ -76,9 +86,11 @@ export default function AdminBugReportsPage() {
 
   return (
     <div>
-      <h2 className="text-xl font-black text-white light:text-slate-900">Bug Reports</h2>
+      <h2 className="text-xl font-black text-white light:text-slate-900">{domainLabel} Bug Reports</h2>
       <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
-        Real reports submitted from Settings &gt; Legal &amp; Support &gt; Report a Problem.
+        Real reports submitted from Settings &gt; Legal &amp; Support &gt; Report a Problem, filtered
+        to reports made from a {domainLabel} page. InPlayer, Hammart, and Sponsorship each show
+        only their own reports here.
       </p>
 
       <div className="mt-4 flex items-center gap-2">

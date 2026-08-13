@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchAuthSession } from "aws-amplify/auth";
+import Link from "next/link";
 import {
   Users,
   Video,
@@ -111,42 +112,55 @@ export default function AdminDashboardPage() {
     );
   }
 
+  // Each card now links straight to the admin section it summarizes —
+  // Reno asked for the dashboard cards to actually take you somewhere
+  // instead of being read-only numbers. "Total Views" doesn't have its own
+  // dedicated page anywhere in the admin panel (it's a Videos+Shorts
+  // aggregate, not a section of its own), so it points at Analytics — the
+  // one existing page that breaks views down further — rather than a href
+  // that doesn't really represent what the number means.
   const cards = [
     {
       label: "Total Users",
       value: formatNumber(stats.totalUsers),
       icon: Users,
-      accent: "from-indigo-500/20 to-violet-400/10 border-indigo-400/20 text-indigo-300",
+      href: "/admin/users",
+      accent: "from-indigo-500/20 to-violet-400/10 border-indigo-400/20 text-indigo-300 light:text-indigo-700",
     },
     {
       label: "Total Videos",
       value: formatNumber(stats.totalVideos),
       icon: Video,
-      accent: "from-sky-500/20 to-cyan-400/10 border-sky-400/20 text-sky-300",
+      href: "/admin/videos?type=video",
+      accent: "from-sky-500/20 to-cyan-400/10 border-sky-400/20 text-sky-300 light:text-sky-700",
     },
     {
       label: "Total Shorts",
       value: formatNumber(stats.totalShorts),
       icon: Film,
-      accent: "from-fuchsia-500/20 to-pink-400/10 border-fuchsia-400/20 text-fuchsia-300",
+      href: "/admin/videos?type=short",
+      accent: "from-fuchsia-500/20 to-pink-400/10 border-fuchsia-400/20 text-fuchsia-300 light:text-fuchsia-700",
     },
     {
       label: "Total Views",
       value: formatNumber(stats.totalViews),
       icon: Eye,
-      accent: "from-emerald-500/20 to-teal-400/10 border-emerald-400/20 text-emerald-300",
+      href: "/admin/analytics",
+      accent: "from-emerald-500/20 to-teal-400/10 border-emerald-400/20 text-emerald-300 light:text-emerald-700",
     },
     {
       label: "Pending Reports",
       value: stats.reportsTableMissing ? "—" : formatNumber(stats.pendingReports),
       icon: Flag,
-      accent: "from-red-500/20 to-rose-400/10 border-red-400/20 text-red-300",
+      href: "/admin/moderation",
+      accent: "from-red-500/20 to-rose-400/10 border-red-400/20 text-red-300 light:text-red-700",
     },
     {
       label: "Processing Uploads",
       value: formatNumber(stats.processingCount),
       icon: Clock,
-      accent: "from-slate-500/20 to-slate-400/10 border-slate-400/20 text-slate-300",
+      href: "/admin/videos?status=processing",
+      accent: "from-slate-500/20 to-slate-400/10 border-slate-400/20 text-slate-300 light:text-slate-700",
     },
   ];
 
@@ -193,9 +207,10 @@ export default function AdminDashboardPage() {
         {cards.map((card) => {
           const Icon = card.icon;
           return (
-            <div
+            <Link
               key={card.label}
-              className={`rounded-3xl border bg-gradient-to-br p-5 ${card.accent}`}
+              href={card.href}
+              className={`block rounded-3xl border bg-gradient-to-br p-5 transition hover:brightness-110 hover:-translate-y-0.5 ${card.accent}`}
             >
               <div className="flex items-center gap-2">
                 <Icon size={18} />
@@ -206,7 +221,7 @@ export default function AdminDashboardPage() {
               <p className="mt-3 text-3xl font-black text-white light:text-slate-900">
                 {card.value}
               </p>
-            </div>
+            </Link>
           );
         })}
       </div>

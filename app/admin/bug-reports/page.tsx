@@ -170,7 +170,7 @@ export default function AdminBugReportsPage() {
                     type="button"
                     disabled={busyId === r.reportId}
                     onClick={() => setStatus(r.reportId, "in_progress")}
-                    className="flex items-center gap-1 rounded-xl bg-amber-500/15 px-3 py-1.5 text-xs font-bold text-amber-300 hover:bg-amber-500/25 disabled:opacity-50"
+                    className="flex items-center gap-1 rounded-xl bg-amber-500/15 light:bg-amber-100 px-3 py-1.5 text-xs font-bold text-amber-300 light:text-amber-800 hover:bg-amber-500/25 light:hover:bg-amber-200 disabled:opacity-50"
                   >
                     <Clock size={12} /> In progress
                   </button>
@@ -180,7 +180,7 @@ export default function AdminBugReportsPage() {
                     type="button"
                     disabled={busyId === r.reportId}
                     onClick={() => setStatus(r.reportId, "resolved")}
-                    className="flex items-center gap-1 rounded-xl bg-emerald-500/15 px-3 py-1.5 text-xs font-bold text-emerald-300 hover:bg-emerald-500/25 disabled:opacity-50"
+                    className="flex items-center gap-1 rounded-xl bg-emerald-500/15 light:bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-300 light:text-emerald-700 hover:bg-emerald-500/25 light:hover:bg-emerald-200 disabled:opacity-50"
                   >
                     <Check size={12} /> Resolved
                   </button>

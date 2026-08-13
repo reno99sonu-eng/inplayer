@@ -30,21 +30,43 @@ interface AdminVideoRow {
 }
 
 type TypeFilter = "all" | "video" | "short";
+// Mirrors STATUS_VALUES in app/api/admin/videos/route.ts — every real value
+// ever written to a video's `status` field. "ready" here also covers
+// videos with no status attribute at all (pre-dates the field), same as
+// the API's own "ready" filter.
+type StatusFilter = "all" | "live" | "processing" | "ready" | "error";
 
+const STATUS_TABS: { key: StatusFilter; label: string }[] = [
+  { key: "all", label: "All statuses" },
+  { key: "live", label: "Live" },
+  { key: "processing", label: "Processing" },
+  { key: "ready", label: "Uploaded" },
+  { key: "error", label: "Failed" },
+];
 
 function watchHref(v: AdminVideoRow): string {
   return v.contentType === "short" ? `/shorts?v=${v.videoId}` : `/watch/${v.videoId}`;
 }
 
+// Status pill shown on each row — "ready" (the normal, working state) is
+// intentionally silent, same as before this change; every other real value
+// gets its own clearly distinct color so a glance down the list tells you
+// which uploads need attention. (Previously checked for "errored", but
+// nothing ever actually wrote that string — every failure path writes
+// "error" instead, see app/api/webhooks/mux/route.ts and
+// app/lib/selfHealVideo.ts — so failed uploads were silently rendered in
+// the same amber as merely-processing ones. Fixed here.)
 function statusBadge(status: string | null) {
   if (!status || status === "ready") return null;
   const color =
-    status === "errored"
+    status === "error"
       ? "bg-red-500/15 text-red-300 light:bg-red-100 light:text-red-700 font-bold"
+      : status === "live"
+      ? "bg-rose-500/15 text-rose-300 light:bg-rose-100 light:text-rose-700 font-bold"
       : "bg-amber-500/15 text-amber-300 light:bg-amber-100 light:text-amber-800 font-bold";
   return (
     <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${color}`}>
-      {status}
+      {status === "error" ? "Failed" : status}
     </span>
   );
 }
@@ -52,13 +74,18 @@ function statusBadge(status: string | null) {
 export default function AdminVideosPage() {
   const searchParams = useSearchParams();
   const initialType = searchParams.get("type");
+  const initialStatus = searchParams.get("status");
   const [type, setType] = useState<TypeFilter>(
     initialType === "short" || initialType === "video" ? initialType : "all"
+  );
+  const [status, setStatus] = useState<StatusFilter>(
+    STATUS_TABS.some((t) => t.key === initialStatus) ? (initialStatus as StatusFilter) : "all"
   );
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
   const [rows, setRows] = useState<AdminVideoRow[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [counts, setCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -78,6 +105,7 @@ export default function AdminVideosPage() {
       try {
         const params = new URLSearchParams();
         if (type !== "all") params.set("type", type);
+        if (status !== "all") params.set("status", status);
         if (debouncedQuery) params.set("query", debouncedQuery);
 
         const res = await authedFetch(`/api/admin/videos?${params.toString()}`);
@@ -86,6 +114,7 @@ export default function AdminVideosPage() {
         if (!cancelled) {
           setRows(data.videos || []);
           setNextCursor(data.nextCursor || null);
+          if (data.counts) setCounts(data.counts);
         }
       } catch (err) {
         if (!cancelled) setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -97,7 +126,7 @@ export default function AdminVideosPage() {
     return () => {
       cancelled = true;
     };
-  }, [type, debouncedQuery]);
+  }, [type, status, debouncedQuery]);
 
   const loadMore = async () => {
     if (!nextCursor || debouncedQuery) return;
@@ -105,6 +134,7 @@ export default function AdminVideosPage() {
     try {
       const params = new URLSearchParams();
       if (type !== "all") params.set("type", type);
+      if (status !== "all") params.set("status", status);
       params.set("cursor", nextCursor);
 
       const res = await authedFetch(`/api/admin/videos?${params.toString()}`);
@@ -169,6 +199,37 @@ export default function AdminVideosPage() {
             }`}
           >
             {t.label}
+          </button>
+        ))}
+      </div>
+
+      {/* Status filter — separate row from Type above so the two dimensions
+          (content kind vs. processing state) stay visually distinct and can
+          be combined freely, e.g. "Shorts" + "Processing" together. Counts
+          come from the API's own computeStatusCounts, scoped to whichever
+          Type tab is currently active. */}
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        {STATUS_TABS.map((t) => (
+          <button
+            key={t.key}
+            type="button"
+            onClick={() => setStatus(t.key)}
+            className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${
+              status === t.key
+                ? "bg-indigo-600 text-white shadow-md shadow-indigo-500/20"
+                : "bg-white/5 text-slate-400 light:text-slate-700 light:bg-slate-200/80 hover:bg-white/10 hover:text-white light:hover:text-slate-900"
+            }`}
+          >
+            {t.label}
+            {t.key !== "all" && (
+              <span
+                className={`rounded-full px-1.5 py-0.5 text-[10px] font-black ${
+                  status === t.key ? "bg-white/20 text-white" : "bg-white/10 light:bg-black/10 text-slate-400 light:text-slate-700"
+                }`}
+              >
+                {counts[t.key] ?? 0}
+              </span>
+            )}
           </button>
         ))}
       </div>
@@ -255,7 +316,7 @@ export default function AdminVideosPage() {
                   type="button"
                   onClick={() => removeVideo(row)}
                   disabled={deletingId === row.videoId}
-                  className="flex items-center gap-1.5 rounded-xl bg-red-500/15 px-3 py-2 text-xs font-bold text-red-300 transition hover:bg-red-500/25 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex items-center gap-1.5 rounded-xl bg-red-500/15 light:bg-red-100 px-3 py-2 text-xs font-bold text-red-300 light:text-red-700 transition hover:bg-red-500/25 light:hover:bg-red-200 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {deletingId === row.videoId ? (
                     <Loader2 size={13} className="animate-spin" />

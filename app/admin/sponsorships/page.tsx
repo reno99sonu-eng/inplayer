@@ -32,11 +32,11 @@ const TAB_LABELS: { key: Tab; label: string }[] = [
 ];
 
 const STATUS_META: Record<string, { label: string; cls: string; Icon: typeof Clock }> = {
-  pending_payment: { label: "Awaiting payment", cls: "bg-amber-500/15 text-amber-300", Icon: Clock },
-  awaiting_assets: { label: "Awaiting assets", cls: "bg-sky-500/15 text-sky-300", Icon: Clock },
-  active: { label: "Live", cls: "bg-emerald-500/15 text-emerald-300", Icon: CheckCircle2 },
-  expired: { label: "Expired", cls: "bg-white/10 text-slate-400", Icon: XCircle },
-  cancelled: { label: "Cancelled", cls: "bg-red-500/15 text-red-300", Icon: Ban },
+  pending_payment: { label: "Awaiting payment", cls: "bg-amber-500/15 text-amber-300 light:bg-amber-100 light:text-amber-800", Icon: Clock },
+  awaiting_assets: { label: "Awaiting assets", cls: "bg-sky-500/15 text-sky-300 light:bg-sky-100 light:text-sky-700", Icon: Clock },
+  active: { label: "Live", cls: "bg-emerald-500/15 text-emerald-300 light:bg-emerald-100 light:text-emerald-700", Icon: CheckCircle2 },
+  expired: { label: "Expired", cls: "bg-white/10 light:bg-black/10 text-slate-400 light:text-slate-600", Icon: XCircle },
+  cancelled: { label: "Cancelled", cls: "bg-red-500/15 text-red-300 light:bg-red-100 light:text-red-700", Icon: Ban },
 };
 
 export default function AdminSponsorshipsPage() {

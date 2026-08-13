@@ -180,7 +180,7 @@ export default function AdminHammartProductsPage() {
                 </div>
 
                 {p.flagged && (
-                  <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-amber-500/10 px-2.5 py-1.5 text-[11px] text-amber-300">
+                  <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-amber-500/10 light:bg-amber-100 px-2.5 py-1.5 text-[11px] text-amber-300 light:text-amber-800">
                     <ShieldAlert size={12} className="mt-0.5 flex-shrink-0" />
                     Flagged as {p.flaggedCategory || "possibly banned"}
                     {p.flaggedReason ? `: "${p.flaggedReason}"` : "."}
@@ -196,7 +196,7 @@ export default function AdminHammartProductsPage() {
                       type="button"
                       disabled={busyId === p.productId}
                       onClick={() => runAction(p.productId, "restore")}
-                      className="flex items-center gap-1.5 rounded-xl bg-emerald-500/15 px-3 py-1.5 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500/25 disabled:opacity-60"
+                      className="flex items-center gap-1.5 rounded-xl bg-emerald-500/15 light:bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-300 light:text-emerald-700 transition hover:bg-emerald-500/25 light:hover:bg-emerald-200 disabled:opacity-60"
                     >
                       {busyId === p.productId ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}
                       Restore listing
@@ -206,7 +206,7 @@ export default function AdminHammartProductsPage() {
                       type="button"
                       disabled={busyId === p.productId}
                       onClick={() => runAction(p.productId, "remove")}
-                      className="flex items-center gap-1.5 rounded-xl bg-red-500/15 px-3 py-1.5 text-xs font-bold text-red-300 transition hover:bg-red-500/25 disabled:opacity-60"
+                      className="flex items-center gap-1.5 rounded-xl bg-red-500/15 light:bg-red-100 px-3 py-1.5 text-xs font-bold text-red-300 light:text-red-700 transition hover:bg-red-500/25 light:hover:bg-red-200 disabled:opacity-60"
                     >
                       {busyId === p.productId ? <Loader2 size={13} className="animate-spin" /> : <Ban size={13} />}
                       Remove listing

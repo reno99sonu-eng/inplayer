@@ -37,14 +37,14 @@ const TAB_LABELS: { key: Tab; label: string }[] = [
 
 function StatusBadge({ status }: { status: string }) {
   const map: Record<string, { label: string; cls: string; Icon: typeof Clock }> = {
-    placed: { label: "Awaiting vendor (UPI)", cls: "bg-amber-500/15 text-amber-300", Icon: Clock },
-    payment_pending: { label: "Awaiting payment", cls: "bg-amber-500/15 text-amber-300", Icon: Clock },
-    paid: { label: "Paid (Razorpay)", cls: "bg-sky-500/15 text-sky-300", Icon: CheckCircle2 },
-    vendor_confirmed: { label: "Confirmed", cls: "bg-emerald-500/15 text-emerald-300", Icon: CheckCircle2 },
-    payment_failed: { label: "Payment failed", cls: "bg-red-500/15 text-red-300", Icon: XCircle },
-    vendor_cancelled: { label: "Cancelled", cls: "bg-red-500/15 text-red-300", Icon: XCircle },
+    placed: { label: "Awaiting vendor (UPI)", cls: "bg-amber-500/15 text-amber-300 light:bg-amber-100 light:text-amber-800", Icon: Clock },
+    payment_pending: { label: "Awaiting payment", cls: "bg-amber-500/15 text-amber-300 light:bg-amber-100 light:text-amber-800", Icon: Clock },
+    paid: { label: "Paid (Razorpay)", cls: "bg-sky-500/15 text-sky-300 light:bg-sky-100 light:text-sky-700", Icon: CheckCircle2 },
+    vendor_confirmed: { label: "Confirmed", cls: "bg-emerald-500/15 text-emerald-300 light:bg-emerald-100 light:text-emerald-700", Icon: CheckCircle2 },
+    payment_failed: { label: "Payment failed", cls: "bg-red-500/15 text-red-300 light:bg-red-100 light:text-red-700", Icon: XCircle },
+    vendor_cancelled: { label: "Cancelled", cls: "bg-red-500/15 text-red-300 light:bg-red-100 light:text-red-700", Icon: XCircle },
   };
-  const entry = map[status] || { label: status, cls: "bg-white/10 text-slate-400", Icon: Clock };
+  const entry = map[status] || { label: status, cls: "bg-white/10 light:bg-black/10 text-slate-400 light:text-slate-600", Icon: Clock };
   const Icon = entry.Icon;
   return (
     <span className={`flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-wide ${entry.cls}`}>
@@ -192,7 +192,7 @@ export default function AdminHammartOrdersPage() {
                   ₹{o.totalInr.toLocaleString("en-IN")}{o.quantity > 1 ? ` (${o.quantity} × ₹${o.priceInr})` : ""} · Sold by {o.vendorId} · Buyer {o.buyerName} ({o.buyerEmail})
                 </p>
                 {o.buyerClaimedPaidAt && o.status === "placed" && (
-                  <p className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-sky-300">
+                  <p className="mt-1 flex items-center gap-1 text-[11px] font-semibold text-sky-300 light:text-sky-700">
                     <Send size={11} /> Buyer says they&apos;ve paid — vendor was notified {new Date(o.buyerClaimedPaidAt).toLocaleString("en-IN")}
                   </p>
                 )}

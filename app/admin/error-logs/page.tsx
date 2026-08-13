@@ -19,9 +19,9 @@ interface LogEntry {
 }
 
 function kindBadgeClasses(kind: string): string {
-  if (kind === "chunk-error") return "bg-amber-500/15 text-amber-300";
-  if (kind === "global-error") return "bg-red-500/15 text-red-300";
-  return "bg-slate-500/15 text-slate-300";
+  if (kind === "chunk-error") return "bg-amber-500/15 light:bg-amber-100 text-amber-300 light:text-amber-800";
+  if (kind === "global-error") return "bg-red-500/15 light:bg-red-100 text-red-300 light:text-red-700";
+  return "bg-slate-500/15 light:bg-slate-200 text-slate-300 light:text-slate-700";
 }
 
 export default function AdminErrorLogsPage() {
@@ -129,7 +129,7 @@ export default function AdminErrorLogsPage() {
             type="button"
             onClick={clearAll}
             disabled={clearing}
-            className="flex items-center gap-1.5 rounded-xl border border-red-500/20 bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-300 hover:bg-red-500/20 disabled:opacity-50"
+            className="flex items-center gap-1.5 rounded-xl border border-red-500/20 bg-red-500/10 light:bg-red-100 px-3 py-1.5 text-xs font-bold text-red-300 light:text-red-700 hover:bg-red-500/20 light:hover:bg-red-200 disabled:opacity-50"
           >
             {clearing ? <Loader2 size={12} className="animate-spin" /> : <Trash2 size={12} />}
             Clear all

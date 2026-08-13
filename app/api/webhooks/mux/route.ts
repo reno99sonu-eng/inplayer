@@ -7,6 +7,7 @@ import { docClient } from "@/app/lib/dynamodb";
 import { getMuxThumbnailUrl } from "@/app/lib/muxThumbnail";
 import { READY_VIDEOS_TAG } from "@/app/lib/videoStore";
 import { MIDROLL_ADS_TAG } from "@/app/lib/videoAds";
+import { deleteS3Prefix } from "@/app/lib/s3";
 import {
   CAPTION_TARGETS,
   resolveSourceLang,
@@ -98,8 +99,70 @@ export async function POST(request: NextRequest) {
     const asset = event.data;
     const uploadId = asset.upload_id;
 
+    // Every regular upload (video, Short, mid-roll ad) goes through Mux's
+    // direct-upload flow and always has an upload_id here — that's the
+    // path everything below this block still handles, completely
+    // unchanged. The one exception is a former livestream: its Mux asset
+    // was created directly from an S3 URL (see
+    // app/api/webhooks/ivs-recording/route.ts), which never has an
+    // upload_id at all. That gets its own small, self-contained handling
+    // right here — matched by muxAssetId (already stashed on the video
+    // item by that route) via the same findVideoByAssetId scan the
+    // track/rendition handlers further down this file already use — and
+    // then falls through to the shared "always respond 200" return at the
+    // bottom, without touching any of the upload_id logic below.
     if (!uploadId) {
-      console.error("video.asset.ready had no upload_id — asset:", asset.id);
+      const match = await findVideoByAssetId(asset.id);
+      if (!match) {
+        console.error("video.asset.ready had no upload_id and no matching live-recording asset:", asset.id);
+        return NextResponse.json({ received: true });
+      }
+
+      const playbackId = asset.playback_ids?.find(
+        (id: { id?: string; policy?: string }) => id.policy === "public"
+      )?.id;
+      if (!playbackId) {
+        console.error("video.asset.ready (live recording) had no public playback ID - asset:", asset.id);
+        return NextResponse.json(
+          { error: "Mux asset has no public playback ID" },
+          { status: 500 }
+        );
+      }
+
+      const thumbnailUrl = getMuxThumbnailUrl(playbackId, false);
+      await docClient.send(
+        new UpdateCommand({
+          TableName: "InPlayer-Videos",
+          Key: { videoId: match.videoId },
+          UpdateExpression:
+            "SET #status = :status, muxPlaybackId = :playbackId, #duration = :duration, thumbnailUrl = if_not_exists(customThumbnailUrl, :thumbnailUrl)",
+          ExpressionAttributeNames: { "#status": "status", "#duration": "duration" },
+          ExpressionAttributeValues: {
+            ":status": "ready",
+            ":playbackId": playbackId,
+            ":duration": asset.duration || 0,
+            ":thumbnailUrl": thumbnailUrl,
+          },
+        })
+      );
+
+      revalidateTag(READY_VIDEOS_TAG, "max");
+
+      // The S3 copy has now been fully superseded by the Mux asset that
+      // just went ready above — nothing on the site reads from it anymore,
+      // so this cleans it up. Best-effort and non-blocking: deleteS3Prefix
+      // never throws, and the video is already fully playable either way.
+      if (match.liveRecordingS3Bucket && match.liveRecordingS3Prefix) {
+        void deleteS3Prefix(
+          match.liveRecordingS3Bucket as string,
+          match.liveRecordingS3Prefix as string
+        );
+      }
+
+      // Deliberately no captions, download renditions, or subscriber email
+      // broadcast for a former livestream — those are upload-flow features
+      // this pipeline doesn't extend to (a livestream's subscribers were
+      // already notified when it WENT live, in ivs-create/route.ts).
       return NextResponse.json({ received: true });
     }
 

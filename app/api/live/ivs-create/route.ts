@@ -61,6 +61,18 @@ export async function POST(request: NextRequest) {
       type: "STANDARD",
       insecureIngest: false,
       authorized: false,
+      // Attaching a Recording Configuration is what makes IVS auto-record
+      // this channel's streams to S3 — the first half of turning a finished
+      // livestream into a real, permanently-watchable video afterward (see
+      // app/api/webhooks/ivs-recording/route.ts for the rest of that
+      // pipeline, and app/api/live/end/route.ts for why, without this, a
+      // stream that ends just sits on a "processing" status forever with
+      // nothing left to convert). Left out entirely when the env var isn't
+      // set — same as before this change, live streaming itself is
+      // completely unaffected either way, only auto-VOD is gated on it.
+      ...(process.env.IVS_RECORDING_CONFIG_ARN
+        ? { recordingConfigurationArn: process.env.IVS_RECORDING_CONFIG_ARN }
+        : {}),
     });
 
     const response = await ivsClient.send(command);

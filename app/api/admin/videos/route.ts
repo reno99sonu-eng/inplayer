@@ -51,14 +51,94 @@ function toRow(item: Record<string, unknown>): AdminVideoRow {
   };
 }
 
-function typeFilter(type: string | null) {
+// Real status values ever written to a video item's `status` field (see
+// app/api/upload/create, app/api/live/ivs-create, app/api/live/end, and the
+// Mux/IVS-recording webhooks): "ready" once playable, "processing" while
+// Mux (or, for a livestream, the live-to-VOD pipeline) is still working on
+// it, "live" for a stream currently broadcasting, and "error" if it failed.
+// A video with no status field at all predates the `status` attribute being
+// introduced and is treated the same as "ready" everywhere else in this
+// codebase (see e.g. app/lib/selfHealVideo.ts's `!== "processing"` checks) —
+// STATUS_VALUES lists every value the filter UI offers; "ready" additionally
+// matches "no status field" via the ConditionalStatus filter below.
+export const STATUS_VALUES = ["live", "processing", "ready", "error"] as const;
+export type VideoStatusFilter = (typeof STATUS_VALUES)[number];
+
+function isStatusFilter(value: string | null): value is VideoStatusFilter {
+  return !!value && (STATUS_VALUES as readonly string[]).includes(value);
+}
+
+// Combines the optional contentType (type=video|short) and status filters
+// into one FilterExpression — DynamoDB only allows one per Scan/Query, so
+// both dimensions have to be ANDed together here rather than applied
+// separately. "ready" is the one status that also has to match items with
+// no status attribute at all (every video uploaded before the status field
+// existed), which is why it gets its own OR clause instead of a plain
+// equality check. Uses "#st" for the status attribute name without
+// declaring it itself — every call site below already passes the shared
+// NAMES constant (which maps "#st" -> "status") alongside this filter, so
+// there's nothing to merge.
+function buildFilter(type: string | null, status: string | null) {
+  const clauses: string[] = [];
+  const values: Record<string, unknown> = {};
+
   if (type === "video" || type === "short") {
-    return {
-      FilterExpression: "contentType = :type",
-      ExpressionAttributeValues: { ":type": type },
-    };
+    clauses.push("contentType = :type");
+    values[":type"] = type;
   }
-  return null;
+
+  if (isStatusFilter(status)) {
+    if (status === "ready") {
+      clauses.push("(attribute_not_exists(#st) OR #st = :statusReady)");
+      values[":statusReady"] = "ready";
+    } else {
+      clauses.push("#st = :status");
+      values[":status"] = status;
+    }
+  }
+
+  if (clauses.length === 0) return null;
+  return {
+    FilterExpression: clauses.join(" AND "),
+    ExpressionAttributeValues: values,
+  };
+}
+
+// Real counts per status tab, respecting the active type filter (so "Shorts"
+// + "Processing" shows how many Shorts specifically are processing, not the
+// site-wide total) — same "actually scan for a real number" convention
+// dashboard-stats and the Hammart admin pages already use, just narrowed to
+// a 2-attribute projection so it stays cheap even as the table grows.
+async function computeStatusCounts(type: string | null): Promise<Record<string, number>> {
+  const counts: Record<string, number> = { live: 0, processing: 0, ready: 0, error: 0 };
+  const tf = type === "video" || type === "short"
+    ? { FilterExpression: "contentType = :type", ExpressionAttributeValues: { ":type": type } }
+    : null;
+
+  let exclusiveStartKey: Record<string, unknown> | undefined;
+  do {
+    const result = await docClient.send(
+      new ScanCommand({
+        TableName: "InPlayer-Videos",
+        ProjectionExpression: "contentType, #st",
+        ExpressionAttributeNames: { "#st": "status" },
+        ...(tf
+          ? { FilterExpression: tf.FilterExpression, ExpressionAttributeValues: tf.ExpressionAttributeValues }
+          : {}),
+        ExclusiveStartKey: exclusiveStartKey,
+      })
+    );
+
+    for (const item of result.Items || []) {
+      const status = (item.status as string) || "ready";
+      if (status in counts) counts[status]++;
+      else counts.ready++;
+    }
+
+    exclusiveStartKey = result.LastEvaluatedKey;
+  } while (exclusiveStartKey);
+
+  return counts;
 }
 
 // Exact videoId match — a cheap, direct GetCommand tried first so pasting
@@ -84,11 +164,11 @@ async function findVideoById(rawQuery: string): Promise<AdminVideoRow | null> {
 }
 
 // Title search: bounded, in-memory, case-insensitive — see SEARCH_SCAN_CAP.
-async function searchVideos(query: string, type: string | null): Promise<AdminVideoRow[]> {
+async function searchVideos(query: string, type: string | null, status: string | null): Promise<AdminVideoRow[]> {
   const byId = await findVideoById(query);
 
   const q = query.toLowerCase();
-  const tf = typeFilter(type);
+  const tf = buildFilter(type, status);
   const matches: AdminVideoRow[] = [];
   let exclusiveStartKey: Record<string, unknown> | undefined;
   let scanned = 0;
@@ -120,11 +200,16 @@ async function searchVideos(query: string, type: string | null): Promise<AdminVi
     exclusiveStartKey = result.LastEvaluatedKey;
   } while (exclusiveStartKey && scanned < SEARCH_SCAN_CAP && matches.length < PAGE_SIZE);
 
-  // An exact-ID match respects the active type filter (searching within
-  // "Shorts" for a videoId that turns out to be a regular video shouldn't
-  // surface it there), and is deduped against the title-match list.
+  // An exact-ID match respects the active type AND status filters (searching
+  // within "Shorts" + "Processing" for a videoId that turns out to be a
+  // ready regular video shouldn't surface it there), and is deduped against
+  // the title-match list.
+  const byIdStatus = byId?.status || "ready";
   const idMatchApplies =
-    byId && (!type || byId.contentType === type) && !matches.some((m) => m.videoId === byId.videoId);
+    byId &&
+    (!type || byId.contentType === type) &&
+    (!isStatusFilter(status) || byIdStatus === status) &&
+    !matches.some((m) => m.videoId === byId.videoId);
 
   const titleMatches = matches.slice(0, idMatchApplies ? PAGE_SIZE - 1 : PAGE_SIZE);
   return idMatchApplies ? [byId as AdminVideoRow, ...titleMatches] : titleMatches;
@@ -132,6 +217,7 @@ async function searchVideos(query: string, type: string | null): Promise<AdminVi
 
 async function listVideos(
   type: string | null,
+  status: string | null,
   cursor: string | null
 ): Promise<{ rows: AdminVideoRow[]; nextCursor: string | null }> {
   let exclusiveStartKey: Record<string, unknown> | undefined;
@@ -143,7 +229,7 @@ async function listVideos(
     }
   }
 
-  const tf = typeFilter(type);
+  const tf = buildFilter(type, status);
   const result = await docClient.send(
     new ScanCommand({
       TableName: "InPlayer-Videos",
@@ -181,17 +267,26 @@ export async function GET(request: NextRequest) {
   }
 
   const type = request.nextUrl.searchParams.get("type");
+  const status = request.nextUrl.searchParams.get("status");
   const query = request.nextUrl.searchParams.get("query")?.trim() || "";
   const cursor = request.nextUrl.searchParams.get("cursor");
+  // Skipped whenever a search query is active — the search path already
+  // walks the whole (capped) table itself, so a second full-table counts
+  // scan on every keystroke would double the DynamoDB cost of every search
+  // for a number the search results UI doesn't even need.
+  const includeCounts = !query && !cursor;
 
   try {
     if (query) {
-      const rows = await searchVideos(query, type);
+      const rows = await searchVideos(query, type, status);
       return NextResponse.json({ videos: rows, nextCursor: null });
     }
 
-    const { rows, nextCursor } = await listVideos(type, cursor);
-    return NextResponse.json({ videos: rows, nextCursor });
+    const [{ rows, nextCursor }, counts] = await Promise.all([
+      listVideos(type, status, cursor),
+      includeCounts ? computeStatusCounts(type) : Promise.resolve(undefined),
+    ]);
+    return NextResponse.json({ videos: rows, nextCursor, ...(counts ? { counts } : {}) });
   } catch (err) {
     console.error("Admin videos list failed:", err);
     return NextResponse.json({ error: "Couldn't load content right now." }, { status: 500 });

@@ -310,7 +310,7 @@ export default function AdminCreatorsPage() {
               </div>
 
               {c.rejectionReason && (
-                <p className="mt-2 rounded-lg bg-red-500/10 px-2.5 py-1.5 text-[11px] text-red-300">
+                <p className="mt-2 rounded-lg bg-red-500/10 light:bg-red-100 px-2.5 py-1.5 text-[11px] text-red-300 light:text-red-800">
                   Rejected: &quot;{c.rejectionReason}&quot;
                 </p>
               )}
@@ -345,7 +345,7 @@ export default function AdminCreatorsPage() {
                           type="button"
                           disabled={busyId === c.userId || !rejectReason.trim()}
                           onClick={() => submitReject(c.userId)}
-                          className="flex items-center gap-1 rounded-xl bg-red-500/20 px-3 py-2 text-xs font-bold text-red-300 disabled:opacity-50"
+                          className="flex items-center gap-1 rounded-xl bg-red-500/20 light:bg-red-100 px-3 py-2 text-xs font-bold text-red-300 light:text-red-700 disabled:opacity-50"
                         >
                           {busyId === c.userId ? (
                             <Loader2 size={13} className="animate-spin" />
@@ -372,7 +372,7 @@ export default function AdminCreatorsPage() {
                         type="button"
                         disabled={busyId === c.userId}
                         onClick={() => approve(c.userId)}
-                        className="flex items-center gap-1.5 rounded-xl bg-emerald-500/15 px-3 py-1.5 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500/25 disabled:opacity-60"
+                        className="flex items-center gap-1.5 rounded-xl bg-emerald-500/15 light:bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-300 light:text-emerald-700 transition hover:bg-emerald-500/25 light:hover:bg-emerald-200 disabled:opacity-60"
                       >
                         {busyId === c.userId ? (
                           <Loader2 size={13} className="animate-spin" />
@@ -385,7 +385,7 @@ export default function AdminCreatorsPage() {
                         type="button"
                         disabled={busyId === c.userId}
                         onClick={() => setRejectingId(c.userId)}
-                        className="flex items-center gap-1.5 rounded-xl bg-red-500/15 px-3 py-1.5 text-xs font-bold text-red-300 transition hover:bg-red-500/25 disabled:opacity-60"
+                        className="flex items-center gap-1.5 rounded-xl bg-red-500/15 light:bg-red-100 px-3 py-1.5 text-xs font-bold text-red-300 light:text-red-700 transition hover:bg-red-500/25 light:hover:bg-red-200 disabled:opacity-60"
                       >
                         <X size={13} /> Reject
                       </button>

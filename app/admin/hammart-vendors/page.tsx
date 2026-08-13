@@ -370,7 +370,7 @@ export default function AdminHammartVendorsPage() {
               </div>
 
               {v.rejectionReason && (
-                <p className="mt-2 rounded-lg bg-red-500/10 px-2.5 py-1.5 text-[11px] text-red-300">Rejected: &quot;{v.rejectionReason}&quot;</p>
+                <p className="mt-2 rounded-lg bg-red-500/10 light:bg-red-100 px-2.5 py-1.5 text-[11px] text-red-300 light:text-red-800">Rejected: &quot;{v.rejectionReason}&quot;</p>
               )}
 
               {v.kycStatus === "pending_review" ? (
@@ -401,7 +401,7 @@ export default function AdminHammartVendorsPage() {
                           type="button"
                           disabled={busyId === v.userId || !rejectReason.trim()}
                           onClick={() => runAction(v.userId, "reject", rejectReason.trim())}
-                          className="flex items-center gap-1 rounded-xl bg-red-500/20 px-3 py-2 text-xs font-bold text-red-300 disabled:opacity-50"
+                          className="flex items-center gap-1 rounded-xl bg-red-500/20 light:bg-red-100 px-3 py-2 text-xs font-bold text-red-300 light:text-red-700 disabled:opacity-50"
                         >
                           {busyId === v.userId ? <Loader2 size={13} className="animate-spin" /> : <X size={13} />}
                           Confirm reject
@@ -424,7 +424,7 @@ export default function AdminHammartVendorsPage() {
                         type="button"
                         disabled={busyId === v.userId}
                         onClick={() => runAction(v.userId, "approve")}
-                        className="flex items-center gap-1.5 rounded-xl bg-emerald-500/15 px-3 py-1.5 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500/25 disabled:opacity-60"
+                        className="flex items-center gap-1.5 rounded-xl bg-emerald-500/15 light:bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-300 light:text-emerald-700 transition hover:bg-emerald-500/25 light:hover:bg-emerald-200 disabled:opacity-60"
                       >
                         {busyId === v.userId ? <Loader2 size={13} className="animate-spin" /> : <Check size={13} />}
                         Approve
@@ -433,7 +433,7 @@ export default function AdminHammartVendorsPage() {
                         type="button"
                         disabled={busyId === v.userId}
                         onClick={() => setRejectingId(v.userId)}
-                        className="flex items-center gap-1.5 rounded-xl bg-red-500/15 px-3 py-1.5 text-xs font-bold text-red-300 transition hover:bg-red-500/25 disabled:opacity-60"
+                        className="flex items-center gap-1.5 rounded-xl bg-red-500/15 light:bg-red-100 px-3 py-1.5 text-xs font-bold text-red-300 light:text-red-700 transition hover:bg-red-500/25 light:hover:bg-red-200 disabled:opacity-60"
                       >
                         <X size={13} /> Reject
                       </button>
@@ -464,7 +464,7 @@ export default function AdminHammartVendorsPage() {
                           type="button"
                           disabled={busyId === v.userId}
                           onClick={() => runAction(v.userId, "retry_razorpay")}
-                          className="flex items-center gap-1.5 rounded-xl bg-indigo-500/15 px-3 py-1.5 text-xs font-bold text-indigo-300 transition hover:bg-indigo-500/25 disabled:opacity-60"
+                          className="flex items-center gap-1.5 rounded-xl bg-indigo-500/15 light:bg-indigo-100 px-3 py-1.5 text-xs font-bold text-indigo-300 light:text-indigo-700 transition hover:bg-indigo-500/25 light:hover:bg-indigo-200 disabled:opacity-60"
                         >
                           {busyId === v.userId ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}
                           {v.razorpayAccountId ? "Retry setup" : "Set up Razorpay payouts"}
@@ -483,7 +483,7 @@ export default function AdminHammartVendorsPage() {
                     )}
                   </div>
                   {v.razorpayAccountError && (
-                    <p className="text-[11px] text-red-400">{v.razorpayAccountError}</p>
+                    <p className="text-[11px] text-red-400 light:text-red-700">{v.razorpayAccountError}</p>
                   )}
                   {v.razorpayAccountStatus !== "active" && (
                     <p className="text-[11px] text-slate-500">
@@ -497,7 +497,7 @@ export default function AdminHammartVendorsPage() {
                       type="button"
                       disabled={busyId === v.userId}
                       onClick={() => runAction(v.userId, "unsuspend")}
-                      className="flex items-center gap-1.5 rounded-xl bg-emerald-500/15 px-3 py-1.5 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500/25 disabled:opacity-60"
+                      className="flex items-center gap-1.5 rounded-xl bg-emerald-500/15 light:bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-300 light:text-emerald-700 transition hover:bg-emerald-500/25 light:hover:bg-emerald-200 disabled:opacity-60"
                     >
                       {busyId === v.userId ? <Loader2 size={13} className="animate-spin" /> : <RotateCcw size={13} />}
                       Reinstate vendor
@@ -507,7 +507,7 @@ export default function AdminHammartVendorsPage() {
                       type="button"
                       disabled={busyId === v.userId}
                       onClick={() => runAction(v.userId, "suspend")}
-                      className="flex items-center gap-1.5 rounded-xl bg-red-500/15 px-3 py-1.5 text-xs font-bold text-red-300 transition hover:bg-red-500/25 disabled:opacity-60"
+                      className="flex items-center gap-1.5 rounded-xl bg-red-500/15 light:bg-red-100 px-3 py-1.5 text-xs font-bold text-red-300 light:text-red-700 transition hover:bg-red-500/25 light:hover:bg-red-200 disabled:opacity-60"
                     >
                       {busyId === v.userId ? <Loader2 size={13} className="animate-spin" /> : <Ban size={13} />}
                       Suspend vendor

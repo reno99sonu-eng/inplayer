@@ -350,7 +350,7 @@ export default function AdminModerationPage() {
                   <span className="rounded-full bg-white/10 light:bg-black/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-300 light:text-slate-700">
                     {r.targetType}
                   </span>
-                  <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-red-300">
+                  <span className="rounded-full bg-red-500/15 light:bg-red-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-red-300 light:text-red-700">
                     {reasonLabel(r.reason)}
                   </span>
                   {r.videoId && (
@@ -376,7 +376,7 @@ export default function AdminModerationPage() {
                     type="button"
                     onClick={() => resolveReport(r.reportId)}
                     disabled={busyId === r.reportId}
-                    className="flex items-center gap-1.5 rounded-xl bg-emerald-500/15 px-3 py-1.5 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500/25 disabled:opacity-60"
+                    className="flex items-center gap-1.5 rounded-xl bg-emerald-500/15 light:bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-300 light:text-emerald-700 transition hover:bg-emerald-500/25 light:hover:bg-emerald-200 disabled:opacity-60"
                   >
                     <Check size={13} /> Mark resolved
                   </button>
@@ -384,7 +384,7 @@ export default function AdminModerationPage() {
                     type="button"
                     onClick={() => removeReportedContent(r)}
                     disabled={busyId === r.reportId}
-                    className="flex items-center gap-1.5 rounded-xl bg-red-500/15 px-3 py-1.5 text-xs font-bold text-red-300 transition hover:bg-red-500/25 disabled:opacity-60"
+                    className="flex items-center gap-1.5 rounded-xl bg-red-500/15 light:bg-red-100 px-3 py-1.5 text-xs font-bold text-red-300 light:text-red-700 transition hover:bg-red-500/25 light:hover:bg-red-200 disabled:opacity-60"
                   >
                     {busyId === r.reportId ? (
                       <Loader2 size={13} className="animate-spin" />
@@ -414,7 +414,7 @@ export default function AdminModerationPage() {
                 className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4"
               >
                 <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-red-300">
+                  <span className="rounded-full bg-red-500/15 light:bg-red-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-red-300 light:text-red-700">
                     {s.aiModerationStrikes} strikes
                   </span>
                   {s.username ? (
@@ -446,7 +446,7 @@ export default function AdminModerationPage() {
                     type="button"
                     onClick={() => decideStrike(s, "uphold_ban")}
                     disabled={busyId === s.userId}
-                    className="flex items-center gap-1.5 rounded-xl bg-red-500/15 px-3 py-1.5 text-xs font-bold text-red-300 transition hover:bg-red-500/25 disabled:opacity-60"
+                    className="flex items-center gap-1.5 rounded-xl bg-red-500/15 light:bg-red-100 px-3 py-1.5 text-xs font-bold text-red-300 light:text-red-700 transition hover:bg-red-500/25 light:hover:bg-red-200 disabled:opacity-60"
                   >
                     {busyId === s.userId ? <Loader2 size={13} className="animate-spin" /> : <Ban size={13} />}
                     Uphold ban
@@ -455,7 +455,7 @@ export default function AdminModerationPage() {
                     type="button"
                     onClick={() => decideStrike(s, "lift_ban")}
                     disabled={busyId === s.userId}
-                    className="flex items-center gap-1.5 rounded-xl bg-emerald-500/15 px-3 py-1.5 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500/25 disabled:opacity-60"
+                    className="flex items-center gap-1.5 rounded-xl bg-emerald-500/15 light:bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-300 light:text-emerald-700 transition hover:bg-emerald-500/25 light:hover:bg-emerald-200 disabled:opacity-60"
                   >
                     <RotateCcw size={13} /> Lift ban &amp; reset strikes
                   </button>
@@ -485,7 +485,7 @@ export default function AdminModerationPage() {
                 {item.categories.map((c) => (
                   <span
                     key={c}
-                    className="rounded-full bg-amber-500/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-amber-300"
+                    className="rounded-full bg-amber-500/15 light:bg-amber-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-amber-300 light:text-amber-800"
                   >
                     {c.replace(/\//g, " · ")}
                   </span>
@@ -510,7 +510,7 @@ export default function AdminModerationPage() {
                   type="button"
                   onClick={() => restoreFlagged(item)}
                   disabled={busyId === item.id}
-                  className="flex items-center gap-1.5 rounded-xl bg-emerald-500/15 px-3 py-1.5 text-xs font-bold text-emerald-300 transition hover:bg-emerald-500/25 disabled:opacity-60"
+                  className="flex items-center gap-1.5 rounded-xl bg-emerald-500/15 light:bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-300 light:text-emerald-700 transition hover:bg-emerald-500/25 light:hover:bg-emerald-200 disabled:opacity-60"
                 >
                   <Check size={13} /> Restore
                 </button>
@@ -518,7 +518,7 @@ export default function AdminModerationPage() {
                   type="button"
                   onClick={() => removeFlagged(item)}
                   disabled={busyId === item.id}
-                  className="flex items-center gap-1.5 rounded-xl bg-red-500/15 px-3 py-1.5 text-xs font-bold text-red-300 transition hover:bg-red-500/25 disabled:opacity-60"
+                  className="flex items-center gap-1.5 rounded-xl bg-red-500/15 light:bg-red-100 px-3 py-1.5 text-xs font-bold text-red-300 light:text-red-700 transition hover:bg-red-500/25 light:hover:bg-red-200 disabled:opacity-60"
                 >
                   {busyId === item.id ? (
                     <Loader2 size={13} className="animate-spin" />

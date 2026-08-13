@@ -76,7 +76,7 @@ function DeleteUserModal({
         className="w-full max-w-md rounded-2xl border border-red-500/25 bg-[#0B1420] light:bg-[#FBF6EA] p-5"
       >
         <div className="flex items-start justify-between gap-2">
-          <h3 className="flex items-center gap-2 text-base font-black text-red-300">
+          <h3 className="flex items-center gap-2 text-base font-black text-red-300 light:text-red-700">
             <AlertTriangle size={18} /> Permanently delete this account?
           </h3>
           <button type="button" onClick={onCancel} className="text-slate-400 hover:text-white">
@@ -96,7 +96,7 @@ function DeleteUserModal({
         </p>
 
         <p className="mt-3 text-xs font-semibold text-slate-300 light:text-slate-700">
-          Type <span className="rounded bg-white/10 light:bg-black/10 px-1.5 py-0.5 font-mono text-indigo-300 light:text-indigo-700">{expected}</span>{" "}
+          Type <span className="rounded bg-white/10 light:bg-black/10 px-1.5 py-0.5 font-mono text-indigo-300 light:text-indigo-800">{expected}</span>{" "}
           to confirm:
         </p>
         <input
@@ -118,7 +118,7 @@ function DeleteUserModal({
             type="button"
             disabled={!canConfirm || deleting}
             onClick={onConfirm}
-            className="flex items-center gap-1.5 rounded-xl bg-red-500/20 px-4 py-2 text-xs font-bold text-red-300 disabled:cursor-not-allowed disabled:opacity-40"
+            className="flex items-center gap-1.5 rounded-xl bg-red-500/20 light:bg-red-100 px-4 py-2 text-xs font-bold text-red-300 light:text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
           >
             {deleting ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}
             Delete permanently
@@ -448,7 +448,7 @@ export default function AdminUsersPage() {
                       {u.name || "Unnamed"}
                     </p>
                     {u.isSuspended && (
-                      <span className="shrink-0 rounded-full bg-red-500/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-red-300">
+                      <span className="shrink-0 rounded-full bg-red-500/15 light:bg-red-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-red-300 light:text-red-700">
                         Suspended
                       </span>
                     )}
@@ -480,8 +480,8 @@ export default function AdminUsersPage() {
                   disabled={actioningId === u.userId}
                   className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-60 ${
                     u.isSuspended
-                      ? "bg-emerald-500/15 text-emerald-300 hover:bg-emerald-500/25"
-                      : "bg-red-500/15 text-red-300 hover:bg-red-500/25"
+                      ? "bg-emerald-500/15 light:bg-emerald-100 text-emerald-300 light:text-emerald-700 hover:bg-emerald-500/25 light:hover:bg-emerald-200"
+                      : "bg-red-500/15 light:bg-red-100 text-red-300 light:text-red-700 hover:bg-red-500/25 light:hover:bg-red-200"
                   }`}
                 >
                   {actioningId === u.userId ? (
@@ -497,7 +497,7 @@ export default function AdminUsersPage() {
                   type="button"
                   onClick={() => setDeletingUser(u)}
                   disabled={actioningId === u.userId}
-                  className="flex items-center gap-1.5 rounded-xl bg-white/5 light:bg-black/5 px-3 py-2 text-xs font-bold text-slate-400 light:text-slate-600 transition hover:bg-red-500/15 hover:text-red-300 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="flex items-center gap-1.5 rounded-xl bg-white/5 light:bg-black/5 px-3 py-2 text-xs font-bold text-slate-400 light:text-slate-600 transition hover:bg-red-500/15 hover:text-red-300 light:hover:bg-red-100 light:hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <Trash2 size={13} />
                   Delete

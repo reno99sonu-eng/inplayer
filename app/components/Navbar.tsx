@@ -350,6 +350,15 @@ export default function Navbar() {
     <div className="animate-navbar-logo-reveal">
       <NavbarLogo />
     </div>
+    {/* TEMPORARY — plain, non-animated, unmissable diagnostic label. Not
+        tied to CSS animation at all: if this text shows up on a real
+        device, that proves the new build reached that device/browser
+        (ruling out caching/CDN/service-worker as the cause). If it does
+        NOT show up, the animation was never going to be visible either,
+        since it's the exact same deployed bundle. Remove once diagnosed. */}
+    <span className="ml-1 flex-shrink-0 rounded bg-fuchsia-600 px-1.5 py-0.5 text-[9px] font-black text-white">
+      TEST-V2
+    </span>
 
     {/* Festive Occasion Graphic + greeting text, side by side — same fix
         as the desktop block above (see its comment): text used to sit

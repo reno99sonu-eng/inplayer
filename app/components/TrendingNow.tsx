@@ -68,15 +68,29 @@ export default function TrendingNow() {
     return null;
   }
 
-  // Create enough clones to ensure it fills the screen and loops seamlessly.
-  // Using 4 groups ensures even on ultra-wide screens we have enough content.
+  // Create enough clones to ensure it fills the screen and loops seamlessly
+  // — but ONLY when there are enough real distinct creators that repeating
+  // them doesn't read as an obvious, broken loop. With very few real
+  // trending creators (an early-stage platform may genuinely only have 1-5
+  // with tracked views right now — see trendingStore.ts, this is honest
+  // data, not a bug), the old unconditional repeat-to-12 logic cloned that
+  // same handful of faces up to ~24 times end-to-end, which looked exactly
+  // like "the same one person over and over" even though the ranking
+  // itself was correct. MIN_ITEMS_TO_LOOP existed as a constant for this
+  // exact purpose but was never actually wired up — it is now: below that
+  // threshold, show the real creators plainly once, no cloning, no
+  // auto-scroll marquee (nothing to loop yet). At/above the threshold,
+  // behavior is unchanged from before.
   const realItems = items ?? [];
-  const minItems = Math.max(1, Math.ceil(12 / (realItems.length || 1)));
+  const shouldLoop = realItems.length >= MIN_ITEMS_TO_LOOP;
+  const minItems = shouldLoop
+    ? Math.max(1, Math.ceil(12 / (realItems.length || 1)))
+    : 1;
   const baseSequence = Array.from({ length: minItems }, () => realItems).flat();
   // We need two identical halves for the CSS translateX(-50%) to work seamlessly
-  const firstHalf = [...baseSequence, ...baseSequence];
-  const secondHalf = [...baseSequence, ...baseSequence];
-  const loopGroups = [firstHalf, secondHalf];
+  const firstHalf = shouldLoop ? [...baseSequence, ...baseSequence] : realItems;
+  const secondHalf = shouldLoop ? [...baseSequence, ...baseSequence] : [];
+  const loopGroups = shouldLoop ? [firstHalf, secondHalf] : [firstHalf];
 
   return (
     <section className="mx-auto max-w-[1800px] px-3 py-1 lg:px-6 lg:py-1.5 overflow-hidden">
@@ -119,12 +133,18 @@ export default function TrendingNow() {
             ))}
           </div>
         ) : (
-          <div className="flex w-max gap-2 lg:gap-3 py-1 animate-trending-marquee hover:[animation-play-state:paused]">
+          <div
+            className={`flex gap-2 lg:gap-3 py-1 ${
+              shouldLoop
+                ? "w-max animate-trending-marquee hover:[animation-play-state:paused]"
+                : "w-full flex-wrap"
+            }`}
+          >
             {loopGroups.map((group, groupIndex) => (
               <div
                 key={groupIndex}
                 aria-hidden={groupIndex === 1}
-                className="flex w-max gap-2 lg:gap-3"
+                className={shouldLoop ? "flex w-max gap-2 lg:gap-3" : "flex flex-wrap gap-2 lg:gap-3"}
               >
                 {group.map((item, index) => (
                   <Link

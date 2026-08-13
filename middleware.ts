@@ -1,6 +1,53 @@
 import { NextRequest, NextResponse } from "next/server";
 
 // ──────────────────────────────────────────────────────────────────────
+// CANONICAL DOMAIN ENFORCEMENT — EDGE MIDDLEWARE (Layer 0, runs first)
+// ──────────────────────────────────────────────────────────────────────
+// Vercel also serves this exact same production build on a couple of its
+// own always-on project domains (see Vercel dashboard → Settings →
+// Domains), in addition to inplayer.in:
+//   - inplayer-plum.vercel.app
+//   - inplayer-reno99sonu-engs-projects.vercel.app
+// Both mirror inplayer.in's production content 1:1 at all times, and with
+// no canonical tag anywhere in the app telling Google which host is "the
+// real one", Search Console started reporting pages as "Duplicate without
+// user-selected canonical" — it had indexed the same page at more than one
+// of these hostnames.
+//
+// Fix: any request arriving on one of those two known alias hosts gets a
+// real 301 redirect to the same path on inplayer.in. On the next crawl,
+// Search Console will see "this URL redirects" for the alias — which is
+// the normal, healthy result for an alias domain (exactly how a
+// www→non-www or http→https redirect is supposed to look) — and will
+// index the inplayer.in copy as the one true canonical page.
+//
+// Deliberately NOT included here: the per-push git-branch preview domain
+// (inplayer-git-homepage-phase-2-....vercel.app). That's what lets Reno
+// sanity-check a new push before clicking "Promote to Production" in
+// Vercel — force-redirecting it away would break that workflow. It still
+// gets an `X-Robots-Tag: noindex` response header below so Google never
+// indexes it as a separate copy of the site either, without blocking
+// manual access to it.
+const CANONICAL_HOST = "inplayer.in";
+
+const DUPLICATE_ALIAS_HOSTS = new Set([
+  "inplayer-plum.vercel.app",
+  "inplayer-reno99sonu-engs-projects.vercel.app",
+]);
+
+function attachNoIndexIfNeeded(
+  response: NextResponse,
+  hostname: string
+): NextResponse {
+  const isNonCanonicalVercelHost =
+    hostname !== CANONICAL_HOST && hostname.endsWith(".vercel.app");
+  if (isNonCanonicalVercelHost) {
+    response.headers.set("X-Robots-Tag", "noindex, nofollow");
+  }
+  return response;
+}
+
+// ──────────────────────────────────────────────────────────────────────
 // INDIA-ONLY GEO-RESTRICTION — EDGE MIDDLEWARE (Layer 1)
 // ──────────────────────────────────────────────────────────────────────
 // Runs at Vercel's CDN edge BEFORE any page is served. Vercel attaches
@@ -60,6 +107,14 @@ const BYPASS_EXACT = new Set([
   "/robots.txt",
   "/sitemap.xml",
   "/manifest.json",
+  // Ad-network crawlers (GameMonetize, Google's ads.txt verifier, etc.)
+  // are essentially never based in India, so without this exemption this
+  // file was silently getting rewritten to /geo-blocked for every crawler
+  // that ever tried to read it — meaning ad revenue verification (see the
+  // GameMonetize "your website was approved... don't forget to add our
+  // snippet" email) could never actually succeed even after the real
+  // ads.txt content (public/ads.txt) was correctly filled in.
+  "/ads.txt",
 ]);
 
 function shouldBypass(pathname: string): boolean {
@@ -76,10 +131,22 @@ function shouldBypass(pathname: string): boolean {
 
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
+  const hostname = request.nextUrl.hostname;
+
+  // Known duplicate-content alias → always send straight to the real
+  // domain first, before any geo/bypass logic runs (an alias visitor
+  // should never see /geo-blocked either — they should just land on the
+  // canonical inplayer.in page, which then applies its own geo rules).
+  if (DUPLICATE_ALIAS_HOSTS.has(hostname)) {
+    const canonicalUrl = new URL(
+      `https://${CANONICAL_HOST}${pathname}${request.nextUrl.search}`
+    );
+    return NextResponse.redirect(canonicalUrl, 301);
+  }
 
   // Skip paths that must always be accessible
   if (shouldBypass(pathname)) {
-    return NextResponse.next();
+    return attachNoIndexIfNeeded(NextResponse.next(), hostname);
   }
 
   // Vercel's edge network sets this header based on the real connecting
@@ -89,18 +156,18 @@ export function middleware(request: NextRequest) {
 
   // No header = local dev or non-Vercel host → allow
   if (!country) {
-    return NextResponse.next();
+    return attachNoIndexIfNeeded(NextResponse.next(), hostname);
   }
 
   // India → allow
   if (country === "IN") {
-    return NextResponse.next();
+    return attachNoIndexIfNeeded(NextResponse.next(), hostname);
   }
 
   // Everything else → rewrite to the geo-blocked page
   const blockedUrl = request.nextUrl.clone();
   blockedUrl.pathname = "/geo-blocked";
-  return NextResponse.rewrite(blockedUrl);
+  return attachNoIndexIfNeeded(NextResponse.rewrite(blockedUrl), hostname);
 }
 
 // Only run the middleware on page navigations and API routes, not on

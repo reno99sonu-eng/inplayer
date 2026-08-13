@@ -18,6 +18,14 @@ const jakarta = Plus_Jakarta_Sans({
 });
 
 export const metadata: Metadata = {
+  // Base URL every relative/og/canonical link in the app resolves against.
+  // Without this, Next.js falls back to guessing from the request, which
+  // is exactly how the same page can end up looking like it lives at more
+  // than one address (inplayer.in vs the Vercel alias domains) with no
+  // single source of truth — part of the fix for Search Console's
+  // "Duplicate without user-selected canonical" report (see middleware.ts
+  // for the other half: redirecting the known alias domains to this one).
+  metadataBase: new URL("https://inplayer.in"),
   title: "INPLAYER",
   description: "The Future of Entertainment",
 };

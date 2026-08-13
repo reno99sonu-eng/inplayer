@@ -7,6 +7,7 @@ import {
   createSponsorshipOrder,
   attachRazorpayOrder,
 } from "@/app/lib/sponsorships";
+import { upsertSponsorProfile } from "@/app/lib/sponsorProfiles";
 
 // Starts a real sponsor purchase: creates the order row (status
 // "pending_payment"), then a real one-time Razorpay Order for the exact
@@ -92,6 +93,21 @@ export async function POST(request: NextRequest) {
       { status: 503 }
     );
   }
+
+  // Save/update this sponsor's reusable profile with whatever they just
+  // typed, so their NEXT purchase's checkout form (and the Profile &
+  // Settings tab) starts prefilled — never blocks or fails the actual
+  // order/payment if this write hiccups.
+  upsertSponsorProfile(user.userId, {
+    companyName,
+    contactName,
+    contactEmail,
+    contactPhone,
+    websiteUrl,
+    legalName,
+    panOrGst,
+    businessAddress,
+  }).catch((err) => console.error("sponsorships/checkout: profile save failed (non-fatal):", err));
 
   try {
     const razorpayOrder = await createPlainOrder({

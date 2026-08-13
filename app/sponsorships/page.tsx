@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
-import { Megaphone, Check, Loader2, AlertTriangle, ArrowLeft, Mail, ExternalLink, LayoutList } from "lucide-react";
+import { Megaphone, Check, Loader2, AlertTriangle, ArrowLeft, Mail, LayoutList, Tag, UserCog } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { authedFetch } from "@/app/lib/apiFetch";
 import { loadRazorpayCheckoutScript, openSponsorshipCheckout, pollSponsorshipPaymentStatus } from "@/app/lib/sponsorshipCheckoutClient";
 import type { SponsorshipPackageType } from "@/app/lib/sponsorships";
+import SponsorshipDashboardPanel from "@/app/components/sponsorships/SponsorshipDashboardPanel";
+import SponsorshipProfilePanel from "@/app/components/sponsorships/SponsorshipProfilePanel";
 
 interface PackageInfo {
   packageType: SponsorshipPackageType;
@@ -45,9 +46,12 @@ const SECTION_LABELS: Record<string, string> = {
 };
 
 type ViewState = "pricing" | "checkoutForm" | "processingPayment" | "paymentFailed" | "confirmed";
+type PanelTab = "buy" | "dashboard" | "profile";
 
 export default function SponsorshipsPage() {
   const { signedIn, authLoading, openSignIn, user } = useAuthModal();
+
+  const [activeTab, setActiveTab] = useState<PanelTab>("buy");
 
   const [packages, setPackages] = useState<PackageInfo[]>([]);
   const [durationDays, setDurationDays] = useState(7);
@@ -60,6 +64,14 @@ export default function SponsorshipsPage() {
   const [error, setError] = useState<string | null>(null);
   const [sponsorshipId, setSponsorshipId] = useState<string | null>(null);
   const [specs, setSpecs] = useState<Record<string, { assetType: string; count: string; ratio: string; notes: string }> | null>(null);
+
+  // A returning sponsor's saved details (see app/lib/sponsorProfiles.ts) —
+  // fetched once a real signed-in session exists, then used to prefill the
+  // checkout form in startCheckout() below so nobody retypes all 8 fields
+  // on a second purchase. Silently absent for a brand-new sponsor (never
+  // saved anything yet) or if the profile table isn't set up yet — the
+  // form just starts blank/session-prefilled in that case, same as before.
+  const [profile, setProfile] = useState<FormState | null>(null);
 
   useEffect(() => {
     (async () => {
@@ -76,6 +88,37 @@ export default function SponsorshipsPage() {
     })();
   }, []);
 
+  // Dashboard/Profile only make sense for a signed-in sponsor — if the
+  // session ends while one of those tabs is open (sign-out, expired token),
+  // fall back to the Buy tab instead of leaving the page looking blank.
+  useEffect(() => {
+    if (!signedIn) setActiveTab("buy");
+  }, [signedIn]);
+
+  useEffect(() => {
+    if (!signedIn) return;
+    (async () => {
+      try {
+        const res = await authedFetch("/api/sponsorships/profile");
+        const data = await res.json().catch(() => ({}));
+        if (res.ok && data.profile) {
+          setProfile({
+            companyName: data.profile.companyName || "",
+            contactName: data.profile.contactName || "",
+            contactEmail: data.profile.contactEmail || "",
+            contactPhone: data.profile.contactPhone || "",
+            websiteUrl: data.profile.websiteUrl || "",
+            legalName: data.profile.legalName || "",
+            panOrGst: data.profile.panOrGst || "",
+            businessAddress: data.profile.businessAddress || "",
+          });
+        }
+      } catch (err) {
+        console.error("Failed to load sponsor profile:", err);
+      }
+    })();
+  }, [signedIn]);
+
   const startCheckout = (pkg: PackageInfo) => {
     if (authLoading) return;
     if (!signedIn) {
@@ -83,7 +126,16 @@ export default function SponsorshipsPage() {
       return;
     }
     setSelectedPackage(pkg);
-    setForm((prev) => ({ ...prev, contactEmail: user?.email || prev.contactEmail, contactName: user?.name || prev.contactName }));
+    setForm({
+      companyName: profile?.companyName || "",
+      contactName: profile?.contactName || user?.name || "",
+      contactEmail: profile?.contactEmail || user?.email || "",
+      contactPhone: profile?.contactPhone || "",
+      websiteUrl: profile?.websiteUrl || "",
+      legalName: profile?.legalName || "",
+      panOrGst: profile?.panOrGst || "",
+      businessAddress: profile?.businessAddress || "",
+    });
     setError(null);
     setView("checkoutForm");
   };
@@ -169,18 +221,56 @@ export default function SponsorshipsPage() {
             Run your ad for {durationDays} days across InPlayer's real ad placements.
           </p>
         </div>
-        {signedIn && (
-          <Link
-            href="/sponsorships/dashboard"
-            className="ml-auto flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3.5 py-2 text-xs font-semibold text-slate-200 transition hover:bg-white/10 light:border-black/10 light:bg-black/5 light:text-slate-700"
-          >
-            <LayoutList size={14} />
-            My Sponsorships
-          </Link>
-        )}
       </div>
 
-      {view === "pricing" && (
+      {/* Buy / Dashboard / Profile — one panel, three tabs, so a signed-in
+          sponsor never has to leave this page to check on a running
+          campaign or update their saved details. Only shown once signed
+          in: a signed-out visitor has nothing to see in the other two tabs
+          yet, so Buy is all they get (clicking "Sponsor Now" prompts
+          sign-in, same as before). */}
+      {signedIn && (
+        <div className="mb-6 inline-flex rounded-full border border-white/10 bg-white/[0.04] p-1 light:border-black/10 light:bg-black/[0.04]">
+          <button
+            type="button"
+            onClick={() => setActiveTab("buy")}
+            className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${
+              activeTab === "buy"
+                ? "bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white shadow-lg shadow-orange-500/20"
+                : "text-slate-400 hover:text-slate-200 light:text-slate-600 light:hover:text-slate-900"
+            }`}
+          >
+            <Tag size={13} /> Buy a Sponsorship
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("dashboard")}
+            className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${
+              activeTab === "dashboard"
+                ? "bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white shadow-lg shadow-orange-500/20"
+                : "text-slate-400 hover:text-slate-200 light:text-slate-600 light:hover:text-slate-900"
+            }`}
+          >
+            <LayoutList size={13} /> My Dashboard
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab("profile")}
+            className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${
+              activeTab === "profile"
+                ? "bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white shadow-lg shadow-orange-500/20"
+                : "text-slate-400 hover:text-slate-200 light:text-slate-600 light:hover:text-slate-900"
+            }`}
+          >
+            <UserCog size={13} /> Profile & Settings
+          </button>
+        </div>
+      )}
+
+      {activeTab === "dashboard" && signedIn && <SponsorshipDashboardPanel />}
+      {activeTab === "profile" && signedIn && <SponsorshipProfilePanel />}
+
+      {activeTab === "buy" && view === "pricing" && (
         <div>
           {loadingPackages ? (
             <div className="flex min-h-[30vh] items-center justify-center">
@@ -198,7 +288,7 @@ export default function SponsorshipsPage() {
                   }`}
                 >
                   {pkg.packageType === "bundle" && (
-                    <span className="mb-2 inline-flex w-fit items-center rounded-full bg-orange-500/20 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-orange-300">
+                    <span className="mb-2 inline-flex w-fit items-center rounded-full bg-orange-500/20 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-orange-300 light:text-orange-700">
                       Everywhere on InPlayer
                     </span>
                   )}
@@ -242,7 +332,7 @@ export default function SponsorshipsPage() {
         </div>
       )}
 
-      {view === "checkoutForm" && selectedPackage && (
+      {activeTab === "buy" && view === "checkoutForm" && selectedPackage && (
         <div className="mx-auto max-w-lg">
           <button
             onClick={() => setView("pricing")}
@@ -304,7 +394,7 @@ export default function SponsorshipsPage() {
         </div>
       )}
 
-      {view === "processingPayment" && (
+      {activeTab === "buy" && view === "processingPayment" && (
         <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
           <Loader2 size={32} className="animate-spin text-orange-400" />
           <p className="font-bold text-white light:text-slate-900">Confirming your payment…</p>
@@ -312,7 +402,7 @@ export default function SponsorshipsPage() {
         </div>
       )}
 
-      {view === "paymentFailed" && (
+      {activeTab === "buy" && view === "paymentFailed" && (
         <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
           <AlertTriangle size={32} className="text-red-400" />
           <p className="font-bold text-white light:text-slate-900">Payment didn't go through</p>
@@ -326,7 +416,7 @@ export default function SponsorshipsPage() {
         </div>
       )}
 
-      {view === "confirmed" && (
+      {activeTab === "buy" && view === "confirmed" && (
         <div className="mx-auto max-w-lg rounded-2xl border border-emerald-500/30 bg-emerald-500/5 p-6 text-center">
           <Check size={32} className="mx-auto mb-2 text-emerald-400" />
           <p className="font-black text-white light:text-slate-900">Payment confirmed!</p>
@@ -341,7 +431,7 @@ export default function SponsorshipsPage() {
                   <p className="text-xs font-black text-white light:text-slate-900">{SECTION_LABELS[section] || section}</p>
                   <p className="mt-1 text-[11px] text-slate-400 light:text-slate-600">{spec.assetType} · {spec.count}</p>
                   <p className="text-[11px] text-slate-400 light:text-slate-600">Ratio: {spec.ratio}</p>
-                  <p className="mt-1 text-[11px] text-amber-300">{spec.notes}</p>
+                  <p className="mt-1 text-[11px] text-amber-300 light:text-amber-700">{spec.notes}</p>
                 </div>
               ))}
             </div>
@@ -357,12 +447,13 @@ export default function SponsorshipsPage() {
             </p>
           </div>
 
-          <Link
-            href="/sponsorships/dashboard"
-            className="mt-5 flex items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-4 py-2.5 text-sm font-bold text-white"
+          <button
+            type="button"
+            onClick={() => setActiveTab("dashboard")}
+            className="mt-5 flex w-full items-center justify-center gap-1.5 rounded-xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-4 py-2.5 text-sm font-bold text-white"
           >
-            <ExternalLink size={14} /> Go to My Sponsorships
-          </Link>
+            <LayoutList size={14} /> Go to My Dashboard
+          </button>
         </div>
       )}
     </div>

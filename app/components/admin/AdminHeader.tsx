@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ShieldCheck, LogOut, Sun, Moon, Store, LayoutDashboard } from "lucide-react";
+import { ShieldCheck, LogOut, Sun, Moon, Store, LayoutDashboard, Megaphone } from "lucide-react";
 import { useTheme } from "@/app/components/ThemeProvider";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
-import { useAdminMode } from "@/app/components/admin/AdminModeContext";
+import { useAdminMode, AdminMode } from "@/app/components/admin/AdminModeContext";
 
 // The Admin Panel's own dedicated header — deliberately NOT the public
 // site's Navbar (no search bar, no category bar, no "Your Channel"/
@@ -24,12 +24,15 @@ export default function AdminHeader({ email }: { email: string | null }) {
   const [isDark, setIsDark] = useState(true);
 
   // Switching modes also navigates to that side's home page, so clicking
-  // "Hammart" always lands somewhere real (the vendor KYC queue) instead
-  // of leaving an admin stranded on a page the new sidebar doesn't list.
-  const switchMode = (next: "inplayer" | "hammart") => {
+  // "Hammart" or "Sponsorship" always lands somewhere real (the vendor KYC
+  // queue / the sponsorship orders list) instead of leaving an admin
+  // stranded on a page the new sidebar doesn't list.
+  const switchMode = (next: AdminMode) => {
     if (next === mode) return;
     setMode(next);
-    router.push(next === "hammart" ? "/admin/hammart-vendors" : "/admin/dashboard");
+    router.push(
+      next === "hammart" ? "/admin/hammart-vendors" : next === "sponsorship" ? "/admin/sponsorships" : "/admin/dashboard"
+    );
   };
 
   useEffect(() => {
@@ -151,11 +154,13 @@ export default function AdminHeader({ email }: { email: string | null }) {
         </div>
       </div>
 
-      {/* InPlayer / Hammart switcher — one Admin Panel, two section lists.
-          AdminSidebar/AdminMobileNav read this same mode to decide which
-          items to render. */}
+      {/* InPlayer / Hammart / Sponsorship switcher — one Admin Panel, three
+          fully independent section lists. AdminSidebar/AdminMobileNav read
+          this same mode to decide which items to render; each mode only
+          ever surfaces its own domain's pages (see AdminModeContext's own
+          comment for exactly what "independent" means here). */}
       <div className="relative z-10 px-4 pb-4 sm:px-5 sm:pb-5">
-        <div className="inline-flex rounded-full border border-white/10 light:border-black/10 bg-white/[0.04] light:bg-black/[0.04] p-1">
+        <div className="inline-flex flex-wrap rounded-full border border-white/10 light:border-black/10 bg-white/[0.04] light:bg-black/[0.04] p-1">
           <button
             type="button"
             onClick={() => switchMode("inplayer")}
@@ -177,6 +182,17 @@ export default function AdminHeader({ email }: { email: string | null }) {
             }`}
           >
             <Store size={13} /> Hammart
+          </button>
+          <button
+            type="button"
+            onClick={() => switchMode("sponsorship")}
+            className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${
+              mode === "sponsorship"
+                ? "bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-400 text-white shadow-lg shadow-orange-500/25"
+                : "text-slate-400 light:text-slate-600 hover:text-slate-200"
+            }`}
+          >
+            <Megaphone size={13} /> Sponsorship
           </button>
         </div>
       </div>

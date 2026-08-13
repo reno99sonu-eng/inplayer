@@ -4,12 +4,15 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useAdminMode } from "@/app/components/admin/AdminModeContext";
 
-// Same two section lists as AdminSidebar (see that file's comment),
+// Same three section lists as AdminSidebar (see that file's comment),
 // condensed into a horizontally scrollable strip for phones (that sidebar
 // is `hidden lg:block`). Kept as separate small lists here (not imported
 // from AdminSidebar) since this only needs id/label/href, not icons —
-// keep both in sync with AdminSidebar.tsx's own arrays when a section's
-// route changes.
+// keep all three in sync with AdminSidebar.tsx's own arrays when a
+// section's route changes. (Fixed while adding the Sponsorship mode: this
+// list was previously missing the "Orders" hammart page and the
+// "Sponsorships" inplayer page that AdminSidebar already had — both real
+// gaps, now closed.)
 const inplayerItems = [
   { id: "dashboard", label: "Dashboard", href: "/admin/dashboard" },
   { id: "users", label: "Users", href: "/admin/users" },
@@ -21,7 +24,6 @@ const inplayerItems = [
   { id: "reports", label: "Reports", href: "/admin/moderation" },
   { id: "copyright", label: "Copyright", href: "/admin/copyright" },
   { id: "revenue", label: "Revenue", href: "/admin/revenue" },
-  { id: "ads", label: "Advertising", href: "/admin/advertising" },
   { id: "navbar-theme", label: "Navbar Theme", href: "/admin/navbar-theme" },
   { id: "analytics", label: "Analytics", href: "/admin/analytics" },
   { id: "ai-moderation", label: "AI Moderation", href: "/admin/ai-moderation" },
@@ -34,6 +36,14 @@ const inplayerItems = [
 const hammartItems = [
   { id: "hammart-vendors", label: "Vendors & KYC", href: "/admin/hammart-vendors" },
   { id: "hammart-products", label: "Products", href: "/admin/hammart-products" },
+  { id: "hammart-orders", label: "Orders", href: "/admin/hammart-orders" },
+  { id: "settings", label: "Settings", href: "/admin/settings" },
+  { id: "audit-logs", label: "Audit Logs", href: "/admin/audit-logs" },
+] as const;
+
+const sponsorshipItems = [
+  { id: "sponsorships", label: "Sponsorships", href: "/admin/sponsorships" },
+  { id: "ads", label: "House Ads & AdSense", href: "/admin/advertising" },
   { id: "settings", label: "Settings", href: "/admin/settings" },
   { id: "audit-logs", label: "Audit Logs", href: "/admin/audit-logs" },
 ] as const;
@@ -42,7 +52,7 @@ export default function AdminMobileNav() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { mode } = useAdminMode();
-  const items = mode === "hammart" ? hammartItems : inplayerItems;
+  const items = mode === "hammart" ? hammartItems : mode === "sponsorship" ? sponsorshipItems : inplayerItems;
   const query = searchParams.toString();
   const currentPath = query ? `${pathname}?${query}` : pathname;
 

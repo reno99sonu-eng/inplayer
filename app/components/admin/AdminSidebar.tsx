@@ -27,10 +27,15 @@ import {
 } from "lucide-react";
 import { useAdminMode } from "@/app/components/admin/AdminModeContext";
 
-// Two section lists, one per AdminMode (see AdminModeContext + the
-// switcher in AdminHeader). Hammart's own items stay out of the InPlayer
-// list and vice versa — that's the actual "separate Hammart admin
-// section" Reno asked for, not just one more flat sidebar row.
+// Three section lists, one per AdminMode (see AdminModeContext + the
+// switcher in AdminHeader). Each mode's own items stay out of the other
+// two lists — that's the actual "separate, independent admin sections"
+// Reno asked for, not just one more flat sidebar row. Advertising (house
+// ads + AdSense) moved here from the InPlayer list into Sponsorship's —
+// both House/AdSense ads and paid sponsor campaigns feed the exact same
+// rendering slots (see app/api/ads/route.ts), so they belong under one
+// "Sponsorship" roof even though only one of the two involves an outside
+// sponsor paying InPlayer.
 const inplayerItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, href: "/admin/dashboard" },
   { id: "users", label: "Users", icon: Users, href: "/admin/users" },
@@ -42,8 +47,6 @@ const inplayerItems = [
   { id: "reports", label: "Reports & Moderation", icon: Flag, href: "/admin/moderation" },
   { id: "copyright", label: "Copyright Center", icon: Copyright, href: "/admin/copyright" },
   { id: "revenue", label: "Revenue", icon: DollarSign, href: "/admin/revenue" },
-  { id: "ads", label: "Advertising", icon: Megaphone, href: "/admin/advertising" },
-  { id: "sponsorships", label: "Sponsorships", icon: Receipt, href: "/admin/sponsorships" },
   { id: "navbar-theme", label: "Navbar Theme", icon: Palette, href: "/admin/navbar-theme" },
   { id: "analytics", label: "Analytics", icon: BarChart3, href: "/admin/analytics" },
   { id: "ai-moderation", label: "AI Moderation", icon: Bot, href: "/admin/ai-moderation" },
@@ -61,11 +64,18 @@ const hammartItems = [
   { id: "audit-logs", label: "Audit Logs", icon: ScrollText, href: "/admin/audit-logs" },
 ] as const;
 
+const sponsorshipItems = [
+  { id: "sponsorships", label: "Sponsorships", icon: Receipt, href: "/admin/sponsorships" },
+  { id: "ads", label: "House Ads & AdSense", icon: Megaphone, href: "/admin/advertising" },
+  { id: "settings", label: "Platform Settings", icon: Settings, href: "/admin/settings" },
+  { id: "audit-logs", label: "Audit Logs", icon: ScrollText, href: "/admin/audit-logs" },
+] as const;
+
 export default function AdminSidebar() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { mode } = useAdminMode();
-  const items = mode === "hammart" ? hammartItems : inplayerItems;
+  const items = mode === "hammart" ? hammartItems : mode === "sponsorship" ? sponsorshipItems : inplayerItems;
   // Full current path including query (e.g. "/admin/videos?type=short"),
   // so Videos and Shorts — which share the same page and are only told
   // apart by ?type= — never both light up (or both stay dark) at once.

@@ -20,6 +20,13 @@ import { CONTACT_EMAILS } from "@/app/lib/contactEmails";
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
 
+  // TEMPORARY DIAGNOSTIC — reads back what the browser itself thinks is
+  // actually applied to the mobile logo's animation wrapper, right after
+  // mount. Shown in the TEST-V2 badge below instead of a plain static
+  // label. Remove this state + the effect further down once diagnosed.
+  const [logoAnimDebug, setLogoAnimDebug] = useState("checking...");
+  const logoWrapperRef = useRef<HTMLDivElement>(null);
+
   const [subscribedChannels, setSubscribedChannels] = useState<
     {
       creatorId: string;
@@ -38,6 +45,26 @@ export default function Navbar() {
   const menuRef = useRef<HTMLDivElement>(null);
   const { signedIn, user, signOut, openSignIn, openSignUp } = useAuthModal();
   const [navbarTheme, setNavbarTheme] = useState<{ active: boolean; imageUrl: string; occasionId?: string; title?: string } | null>(null);
+
+  // TEMPORARY DIAGNOSTIC — see logoAnimDebug/logoWrapperRef declared above.
+  // Reads the real, browser-computed animation state of the mobile logo
+  // wrapper shortly after mount (a tiny delay so the animation has clearly
+  // started by the time we check, rather than racing paint).
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      const el = logoWrapperRef.current;
+      if (!el) {
+        setLogoAnimDebug("ref=null");
+        return;
+      }
+      const cs = window.getComputedStyle(el);
+      const rect = el.getBoundingClientRect();
+      setLogoAnimDebug(
+        `name=${cs.animationName} dur=${cs.animationDuration} state=${cs.animationPlayState} opacity=${cs.opacity} w=${Math.round(rect.width)} h=${Math.round(rect.height)}`
+      );
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -347,17 +374,16 @@ export default function Navbar() {
         page load (Navbar doesn't remount on client-side navigation,
         except when entering/leaving /admin's separate layout — an edge
         case not worth extra suppression logic for a harmless replay). */}
-    <div className="animate-navbar-logo-reveal">
+    <div ref={logoWrapperRef} className="animate-navbar-logo-reveal">
       <NavbarLogo />
     </div>
-    {/* TEMPORARY — plain, non-animated, unmissable diagnostic label. Not
-        tied to CSS animation at all: if this text shows up on a real
-        device, that proves the new build reached that device/browser
-        (ruling out caching/CDN/service-worker as the cause). If it does
-        NOT show up, the animation was never going to be visible either,
-        since it's the exact same deployed bundle. Remove once diagnosed. */}
-    <span className="ml-1 flex-shrink-0 rounded bg-fuchsia-600 px-1.5 py-0.5 text-[9px] font-black text-white">
-      TEST-V2
+    {/* TEMPORARY — now shows the browser's own computed animation state
+        for the wrapper above (name/duration/play-state/opacity/size),
+        read via getComputedStyle 500ms after mount. Remove this badge,
+        logoAnimDebug/logoWrapperRef state, and the effect that fills it
+        in once diagnosed. */}
+    <span className="ml-1 flex-shrink-0 rounded bg-fuchsia-600 px-1 py-0.5 text-[7px] font-black leading-tight text-white">
+      {logoAnimDebug}
     </span>
 
     {/* Festive Occasion Graphic + greeting text, side by side — same fix

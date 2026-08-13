@@ -167,6 +167,29 @@ export default function SplashScreen() {
     // almost immediately, well before holdMs) see no change at all.
     const authGraceMs = reducedMotion ? 200 : 700;
 
+    // Logo sting — fires the instant this effect runs, i.e. right as the
+    // zoom/flash reveal above starts, so its own front-loaded hit (no lead-
+    // in silence in the source file) lands close to the flash-burst beat.
+    // Skipped entirely under reduced-motion: that mode compresses the whole
+    // curtain down to ~180ms on screen, so a ~2.2s cinematic sting would
+    // just be trailing, disconnected noise rather than something synced to
+    // a visual moment that's essentially not happening.
+    //
+    // Mobile browsers (iOS Safari especially, Chrome on Android to a
+    // lesser degree) block autoplay WITH SOUND until the visitor has
+    // interacted with the page at least once this session/origin — .play()
+    // rejects a promise rather than throwing in that case. Caught and
+    // ignored on purpose: no console noise, no broken UI, and the visual
+    // reveal plays out identically either way. This is a real platform
+    // restriction, not a bug — it means a brand-new visitor's very first
+    // load is silent, and the sting starts working from their next
+    // reload/visit once they've tapped anywhere on the site.
+    let sting: HTMLAudioElement | null = null;
+    if (!reducedMotion) {
+      sting = new Audio("/sounds/splash-logo-sting.mp3");
+      sting.play().catch(() => {});
+    }
+
     let leaveTimer: number | undefined;
     let removeTimer: number | undefined;
 
@@ -183,6 +206,16 @@ export default function SplashScreen() {
       window.clearTimeout(holdTimer);
       window.clearTimeout(leaveTimer);
       window.clearTimeout(removeTimer);
+      // Stops the sting if this component instance is ever actually torn
+      // down mid-play (e.g. navigating straight into /admin's separate
+      // layout, which unmounts SplashScreen entirely — see SiteChrome.tsx)
+      // rather than leaving a brand sting audibly playing over a screen it
+      // no longer has anything to do with. Does NOT fire on the normal
+      // "curtain fades out" path above, since that's setVisible(false) on
+      // the same still-mounted instance, not a real unmount — the sting is
+      // deliberately left to finish its own natural decay/reverb tail in
+      // that case rather than being cut off mid-note.
+      sting?.pause();
     };
     // Intentionally runs once on mount only — visible/leaving are only
     // ever set BY this effect, never read as a re-run trigger. authLoading

@@ -23,6 +23,7 @@ import {
   Bug,
   ShoppingBag,
   AlertTriangle,
+  Receipt,
 } from "lucide-react";
 import { useAdminMode } from "@/app/components/admin/AdminModeContext";
 
@@ -54,6 +55,7 @@ const inplayerItems = [
 const hammartItems = [
   { id: "hammart-vendors", label: "Vendors & KYC", icon: Store, href: "/admin/hammart-vendors" },
   { id: "hammart-products", label: "Products", icon: ShoppingBag, href: "/admin/hammart-products" },
+  { id: "hammart-orders", label: "Orders", icon: Receipt, href: "/admin/hammart-orders" },
   { id: "settings", label: "Platform Settings", icon: Settings, href: "/admin/settings" },
   { id: "audit-logs", label: "Audit Logs", icon: ScrollText, href: "/admin/audit-logs" },
 ] as const;

@@ -91,6 +91,15 @@ export interface HammartOrder {
   platformFeeInr?: number;
   vendorPayoutInr?: number;
   feedback?: OrderFeedback | null;
+  // Direct-UPI path only — set the moment a buyer clicks "I've completed
+  // this payment" on the checkout results screen (see
+  // app/api/hammart/orders/mark-buyer-paid/route.ts). This is NOT proof of
+  // payment and never changes `status` on its own — it's purely a nudge
+  // timestamp so the vendor's confirmation email/notification can go out
+  // faster than waiting for them to happen to check their Orders page.
+  // The real state transition still only ever happens when the vendor
+  // themselves confirms (see the PATCH handler below).
+  buyerClaimedPaidAt?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -172,6 +181,29 @@ export async function listVendorOrders(vendorUserId: string): Promise<{ orders: 
   }
 }
 
+// Admin-only, unfiltered — every order across every vendor, for
+// app/admin/hammart-orders/page.tsx. Same unfiltered-scan-then-filter-in-UI
+// shape as app/api/admin/hammart-vendors/route.ts's GET, so tab counts
+// there can be accurate without a second round-trip per tab.
+export async function listAllOrdersForAdmin(): Promise<{ orders: HammartOrder[]; tableMissing: boolean }> {
+  try {
+    const items: HammartOrder[] = [];
+    let exclusiveStartKey: Record<string, unknown> | undefined;
+    do {
+      const result = await docClient.send(
+        new ScanCommand({ TableName: ORDERS_TABLE, ExclusiveStartKey: exclusiveStartKey })
+      );
+      items.push(...((result.Items || []) as HammartOrder[]));
+      exclusiveStartKey = result.LastEvaluatedKey;
+    } while (exclusiveStartKey);
+    items.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    return { orders: items, tableMissing: false };
+  } catch (err) {
+    console.error("listAllOrdersForAdmin: scan failed (table may not exist yet):", err);
+    return { orders: [], tableMissing: true };
+  }
+}
+
 export async function setOrderStatus(orderId: string, status: OrderStatus): Promise<void> {
   await docClient.send(
     new UpdateCommand({
@@ -180,6 +212,20 @@ export async function setOrderStatus(orderId: string, status: OrderStatus): Prom
       UpdateExpression: "SET #status = :status, updatedAt = :now",
       ExpressionAttributeNames: { "#status": "status" },
       ExpressionAttributeValues: { ":status": status, ":now": new Date().toISOString() },
+    })
+  );
+}
+
+// See buyerClaimedPaidAt's comment on HammartOrder above — purely a nudge
+// timestamp, never a status change. Called from
+// app/api/hammart/orders/mark-buyer-paid/route.ts.
+export async function markBuyerClaimedPaid(orderId: string): Promise<void> {
+  await docClient.send(
+    new UpdateCommand({
+      TableName: ORDERS_TABLE,
+      Key: { orderId },
+      UpdateExpression: "SET buyerClaimedPaidAt = :now, updatedAt = :now",
+      ExpressionAttributeValues: { ":now": new Date().toISOString() },
     })
   );
 }

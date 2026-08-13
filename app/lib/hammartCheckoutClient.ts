@@ -158,19 +158,32 @@ export async function generateUpiQrDataUrl(upiLink: string): Promise<string | un
 }
 
 // Polls GET /api/hammart/orders (the same endpoint /shop/orders already
-// uses) until every orderId in the set has left "payment_pending", or the
-// attempt budget runs out. Reused instead of a dedicated single-order
-// status endpoint since the buyer's full order list is already fetched
-// elsewhere — one source of truth for "what does this order's status say
-// right now."
+// uses) until every orderId in the set has left its starting "pending"
+// status, or the attempt budget runs out. Reused instead of a dedicated
+// single-order status endpoint since the buyer's full order list is
+// already fetched elsewhere — one source of truth for "what does this
+// order's status say right now."
+//
+// `pendingStatus` is which status counts as "still waiting" — this
+// differs by payment method because the two paths start from different
+// initial statuses (see app/lib/hammartOrders.ts's OrderStatus/header
+// comment): Razorpay-path orders start "payment_pending" (the default
+// here, for backward compatibility with existing callers), direct-UPI
+// orders start "placed". Getting this wrong would make the poll resolve
+// on the very FIRST check, before the vendor has done anything — e.g.
+// passing the Razorpay default against a UPI order would immediately
+// return "placed" as if it were already a final answer, since "placed"
+// !== "payment_pending" is true from attempt zero.
 export async function pollHammartOrderStatuses(params: {
   authedFetch: (url: string, init?: RequestInit) => Promise<Response>;
   orderIds: string[];
   maxAttempts?: number;
   intervalMs?: number;
+  pendingStatus?: string;
 }): Promise<Record<string, string>> {
   const maxAttempts = params.maxAttempts ?? 12; // ~36s at 3s intervals — Route transfers settle near-instantly once captured
   const intervalMs = params.intervalMs ?? 3000;
+  const pendingStatus = params.pendingStatus ?? "payment_pending";
   const remaining = new Set(params.orderIds);
   const statuses: Record<string, string> = {};
 
@@ -181,7 +194,7 @@ export async function pollHammartOrderStatuses(params: {
       const data = await res.json().catch(() => ({}));
       const orders: { orderId: string; status: string }[] = data.orders || [];
       for (const order of orders) {
-        if (remaining.has(order.orderId) && order.status !== "payment_pending") {
+        if (remaining.has(order.orderId) && order.status !== pendingStatus) {
           statuses[order.orderId] = order.status;
           remaining.delete(order.orderId);
         }
@@ -191,10 +204,10 @@ export async function pollHammartOrderStatuses(params: {
     }
   }
 
-  // Anything still pending after the budget just stays "payment_pending"
-  // in the caller's eyes — not an error, just not resolved yet (the
-  // buyer's own /shop/orders page will reflect the real status the
-  // moment the webhook does land, even if this poll gave up first).
-  for (const orderId of remaining) statuses[orderId] = "payment_pending";
+  // Anything still pending after the budget just stays at its starting
+  // pending status in the caller's eyes — not an error, just not resolved
+  // yet (the buyer's own /shop/orders page will reflect the real status
+  // the moment it actually changes, even if this poll gave up first).
+  for (const orderId of remaining) statuses[orderId] = pendingStatus;
   return statuses;
 }

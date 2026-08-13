@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Loader2, ShoppingCart, IndianRupee, Minus, Plus, Trash2, Store, ArrowLeft, CheckCircle2, XCircle, Clock, X, MapPin } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { authedFetch } from "@/app/lib/apiFetch";
@@ -29,10 +30,22 @@ interface CartLineItem {
 // One entry per vendor group in the checkout attempt — a multi-vendor
 // cart is one payment per seller (see app/api/hammart/checkout/route.ts),
 // not one per product line. Which kind of payment depends on that
-// vendor: "awaiting_upi" is the direct-UPI fallback (no gateway, no
-// polling — the vendor self-confirms once paid); everything else is the
-// Razorpay Route path.
-type GroupStatus = "opening" | "verifying" | "paid" | "payment_failed" | "dismissed" | "failed" | "unavailable" | "awaiting_upi";
+// vendor: "awaiting_upi" is the direct-UPI fallback — no payment gateway,
+// so instead of polling a webhook, this polls the order's own status,
+// which only changes once the vendor confirms or cancels it
+// (app/api/hammart/orders/[orderId]/route.ts). "vendor_confirmed" /
+// "vendor_cancelled" are that real outcome, not a client-side guess.
+type GroupStatus =
+  | "opening"
+  | "verifying"
+  | "paid"
+  | "payment_failed"
+  | "dismissed"
+  | "failed"
+  | "unavailable"
+  | "awaiting_upi"
+  | "vendor_confirmed"
+  | "vendor_cancelled";
 
 interface GroupCheckoutState {
   vendorId: string;
@@ -43,6 +56,16 @@ interface GroupCheckoutState {
   upiLink?: string;
   vendorUpiId?: string;
   qrDataUrl?: string;
+  orderIds?: string[];
+  buyerClaimed?: boolean;
+  claimingPaid?: boolean;
+}
+
+// A checkout attempt is "done" once nothing is still actively in flight —
+// used both to decide when it's safe to auto-navigate away, and to gate
+// that navigation on at least one group actually having succeeded.
+function isTerminalGroupStatus(status: GroupStatus): boolean {
+  return status !== "opening" && status !== "verifying" && status !== "awaiting_upi";
 }
 
 interface ItemFailureState {
@@ -53,6 +76,7 @@ interface ItemFailureState {
 
 export default function CartPage() {
   const { user, authLoading } = useAuthModal();
+  const router = useRouter();
   const [items, setItems] = useState<CartLineItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [tableMissing, setTableMissing] = useState(false);
@@ -156,6 +180,51 @@ export default function CartPage() {
     setGroupResults((prev) => prev?.map((g) => (g.vendorId === vendorId ? { ...g, status, error } : g)) ?? prev);
   };
 
+  // Direct-UPI path only. Reuses the Razorpay path's own polling helper
+  // but against a much longer budget — a vendor manually checking their
+  // UPI app realistically takes minutes, not the ~36s Razorpay's
+  // near-instant Route settlement is tuned for. Running the budget out
+  // just leaves this group exactly as it was (still "awaiting_upi") —
+  // never shown as an error, since nothing failed, it's just not
+  // confirmed yet. The buyer can always leave and check My Orders later.
+  const pollUpiVendorConfirmation = async (vendorId: string, orderIds: string[]) => {
+    if (orderIds.length === 0) return;
+    const statuses = await pollHammartOrderStatuses({
+      authedFetch,
+      orderIds,
+      maxAttempts: 40,
+      intervalMs: 5000, // ~200s total
+      pendingStatus: "placed", // direct-UPI orders start here, not "payment_pending"
+    });
+    const values = Object.values(statuses);
+    if (values.some((s) => s === "vendor_cancelled")) {
+      updateGroupStatus(vendorId, "vendor_cancelled");
+    } else if (values.length > 0 && values.every((s) => s === "vendor_confirmed")) {
+      updateGroupStatus(vendorId, "vendor_confirmed");
+    }
+  };
+
+  // "I've completed this payment" — a nudge, not a payment confirmation.
+  // See app/api/hammart/orders/mark-buyer-paid/route.ts's header comment:
+  // this only emails the vendor to check sooner, it never changes the
+  // order's real status on its own.
+  const handleClaimBuyerPaid = async (vendorId: string, orderIds: string[] | undefined) => {
+    if (!orderIds?.length) return;
+    setGroupResults((prev) => prev?.map((g) => (g.vendorId === vendorId ? { ...g, claimingPaid: true } : g)) ?? prev);
+    try {
+      await authedFetch("/api/hammart/orders/mark-buyer-paid", {
+        method: "POST",
+        body: JSON.stringify({ orderIds }),
+      });
+    } catch (err) {
+      console.error("Failed to notify vendor of claimed payment:", err);
+    } finally {
+      setGroupResults((prev) =>
+        prev?.map((g) => (g.vendorId === vendorId ? { ...g, buyerClaimed: true, claimingPaid: false } : g)) ?? prev
+      );
+    }
+  };
+
   // One payment per vendor group (see app/api/hammart/checkout/route.ts) —
   // each group comes back as either "razorpay" (real gateway Checkout
   // popup, opened one at a time since only one popup can meaningfully be
@@ -223,6 +292,7 @@ export default function CartPage() {
         paymentMethod: g.paymentMethod,
         upiLink: g.upiLink,
         vendorUpiId: g.vendorUpiId,
+        orderIds: g.orderIds,
       }))
     );
 
@@ -243,6 +313,14 @@ export default function CartPage() {
         setGroupResults((prev) => prev?.map((g) => (g.vendorId === group.vendorId ? { ...g, qrDataUrl } : g)) ?? prev);
       })
     );
+
+    // Kick off background polling for every UPI group so this screen can
+    // reach a real "Order placed!" state on its own once its vendor
+    // confirms — not awaited, runs alongside whatever Razorpay groups do
+    // below.
+    upiGroups.forEach((group) => {
+      void pollUpiVendorConfirmation(group.vendorId, group.orderIds || []);
+    });
 
     // Razorpay groups: sequential, not Promise.all — only one Checkout
     // popup can be meaningfully open at a time.
@@ -273,6 +351,22 @@ export default function CartPage() {
       }
     }
   };
+
+  // Once every vendor group in this checkout attempt has reached a real,
+  // final outcome — Razorpay's webhook-verified "paid", or a vendor's own
+  // "vendor_confirmed"/"vendor_cancelled" on the direct-UPI path — and at
+  // least one of them actually succeeded, take the buyer back to their
+  // order list automatically. Deliberately waits for ALL groups (not just
+  // one) so a multi-vendor cart never navigates away while another
+  // group's QR code or Razorpay popup is still mid-flight.
+  useEffect(() => {
+    if (!groupResults || groupResults.length === 0) return;
+    const allTerminal = groupResults.every((g) => isTerminalGroupStatus(g.status));
+    const anySucceeded = groupResults.some((g) => g.status === "paid" || g.status === "vendor_confirmed");
+    if (!allTerminal || !anySucceeded) return;
+    const timer = setTimeout(() => router.push("/shop/orders"), 2500);
+    return () => clearTimeout(timer);
+  }, [groupResults, router]);
 
   if (authLoading || (loading && user?.userId)) {
     return (
@@ -310,9 +404,9 @@ export default function CartPage() {
             <div
               key={g.vendorId}
               className={`rounded-2xl border p-4 text-center ${
-                g.status === "paid"
+                g.status === "paid" || g.status === "vendor_confirmed"
                   ? "border-emerald-400/20 bg-emerald-500/[0.05]"
-                  : g.status === "payment_failed" || g.status === "failed"
+                  : g.status === "payment_failed" || g.status === "failed" || g.status === "vendor_cancelled"
                   ? "border-red-400/20 bg-red-500/[0.05]"
                   : "border-amber-400/20 bg-amber-500/[0.05]"
               }`}
@@ -322,6 +416,20 @@ export default function CartPage() {
                   <CheckCircle2 size={20} className="mx-auto text-emerald-400" />
                   <p className="mt-1.5 text-sm font-bold text-white light:text-slate-900">Paid — order from {g.vendorId} confirmed</p>
                   <p className="mt-1 text-lg font-black text-orange-400">₹{g.amountInr.toLocaleString("en-IN")}</p>
+                </>
+              ) : g.status === "vendor_confirmed" ? (
+                <>
+                  <CheckCircle2 size={20} className="mx-auto text-emerald-400" />
+                  <p className="mt-1.5 text-sm font-bold text-white light:text-slate-900">Order placed! {g.vendorId} confirmed your payment</p>
+                  <p className="mt-1 text-lg font-black text-orange-400">₹{g.amountInr.toLocaleString("en-IN")}</p>
+                </>
+              ) : g.status === "vendor_cancelled" ? (
+                <>
+                  <XCircle size={20} className="mx-auto text-red-400" />
+                  <p className="mt-1.5 text-sm font-bold text-white light:text-slate-900">{g.vendorId} cancelled this order</p>
+                  <p className="mt-1 text-xs text-slate-400">
+                    If you already paid via UPI and haven&apos;t heard about a refund, contact the seller directly.
+                  </p>
                 </>
               ) : g.status === "awaiting_upi" ? (
                 <>
@@ -339,6 +447,25 @@ export default function CartPage() {
                   <p className="mt-1 text-[11px] text-slate-500">
                     This seller hasn&apos;t set up automatic payments yet — scan the QR or use the UPI ID above to pay them
                     directly. They&apos;ll confirm your order once payment arrives.
+                  </p>
+
+                  {g.buyerClaimed ? (
+                    <p className="mt-3 flex items-center justify-center gap-1.5 text-xs font-semibold text-sky-300">
+                      <Loader2 size={13} className="animate-spin" /> We&apos;ve let {g.vendorId} know — confirming your payment…
+                    </p>
+                  ) : (
+                    <button
+                      type="button"
+                      disabled={g.claimingPaid}
+                      onClick={() => handleClaimBuyerPaid(g.vendorId, g.orderIds)}
+                      className="mt-3 rounded-xl bg-orange-500/15 px-4 py-2 text-xs font-bold text-orange-300 transition hover:bg-orange-500/25 disabled:opacity-60"
+                    >
+                      {g.claimingPaid ? "Notifying…" : "I've completed this payment"}
+                    </button>
+                  )}
+                  <p className="mt-2 text-[10px] text-slate-600">
+                    This will update automatically once {g.vendorId} confirms — feel free to leave and check My
+                    Orders anytime.
                   </p>
                 </>
               ) : g.status === "opening" || g.status === "verifying" ? (

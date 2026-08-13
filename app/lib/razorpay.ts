@@ -280,6 +280,38 @@ export async function createOrderWithTransfer(params: {
   return data as RazorpayOrderResponse;
 }
 
+// --- Plain one-time Order (no transfers) -------------------------------
+//
+// Used by the ad-sponsorship feature (app/api/sponsorships/checkout) — a
+// sponsor pays InPlayer directly for a 7-day ad placement. Deliberately
+// NOT createOrderWithTransfer: there's no third party being paid here at
+// all, the money simply lands in InPlayer's own Razorpay balance exactly
+// like a Hammart vendor's own commission or a membership charge, so this
+// never needs Route and is never affected by the RBI turnover threshold
+// that gates Route (see createLinkedAccount's comment above, and
+// claude/website-fixes-log.md).
+export async function createPlainOrder(params: {
+  amountInr: number;
+  receipt: string;
+  notes: Record<string, string>;
+}): Promise<RazorpayOrderResponse> {
+  const res = await fetch(`${RAZORPAY_API_BASE}/orders`, {
+    method: "POST",
+    headers: { Authorization: authHeader(), "Content-Type": "application/json" },
+    body: JSON.stringify({
+      amount: Math.round(params.amountInr * 100),
+      currency: "INR",
+      receipt: params.receipt,
+      notes: params.notes,
+    }),
+  });
+  const data = await res.json();
+  if (!res.ok) {
+    throw new Error((data?.error?.description as string) || "Razorpay order creation failed.");
+  }
+  return data as RazorpayOrderResponse;
+}
+
 // Verifies the X-Razorpay-Signature header on an incoming webhook — this
 // is what proves a POST to /api/webhooks/razorpay actually came from
 // Razorpay and not an attacker forging "a payment succeeded" to unlock a

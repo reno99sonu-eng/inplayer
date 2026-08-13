@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, Suspense } from "react";
 import { fetchAuthSession } from "aws-amplify/auth";
 import NavbarLogo from "./NavbarLogo";
 import NavbarLinks from "./NavbarLinks";
-import { Menu, X, Search, Home, PlaySquare, ChevronRight, ChevronDown, LogOut, Mail, Copy, Check, Gamepad2 } from "lucide-react";
+import { Menu, X, Search, Home, PlaySquare, ChevronRight, ChevronDown, LogOut, Mail, Copy, Check, Gamepad2, Megaphone } from "lucide-react";
 import { useAuthModal } from "./auth/AuthProvider";
 import NavbarSearch from "./NavbarSearch";
 import NavbarActions from "./NavbarActions";
@@ -583,6 +583,32 @@ lg:right-auto
               >
                 <Gamepad2 size={19} />
                 <span className="text-sm font-semibold">InJoy</span>
+              </button>
+
+              <button
+                onClick={() => goTo("/sponsorships")}
+                className="
+                  flex
+                  w-full
+                  items-center
+                  gap-4
+                  rounded-xl
+                  px-3
+                  py-2
+                  text-left
+                  text-slate-200
+                  light:text-slate-700
+                  transition-all
+                  duration-300
+                  hover:bg-white/5
+                  light:hover:bg-black/5
+                  hover:translate-x-1
+                  hover:text-orange-300
+                  light:hover:text-orange-600
+                "
+              >
+                <Megaphone size={19} />
+                <span className="text-sm font-semibold">Sponsor an Ad</span>
               </button>
             </div>
 

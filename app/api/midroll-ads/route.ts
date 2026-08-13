@@ -32,6 +32,7 @@ export async function GET() {
   // on a busy video that was one uncached Scan per viewer per view.
   try {
     const allAds = await getAllMidrollAds();
+    const now = Date.now();
     // Video ad creatives go through Mux processing and carry a `status`
     // ("processing" -> "ready", set by app/api/webhooks/mux/route.ts) —
     // without this check, a just-uploaded video ad that's still
@@ -40,11 +41,13 @@ export async function GET() {
     // no fallback for an empty/unready imageUrl). Static image ad
     // creatives never get a `status` field at all, so their absence of
     // one is treated as "ready" — this only excludes items that HAVE a
-    // status and it isn't "ready" yet.
+    // status and it isn't "ready" yet. expiresAt is the same paid-sponsor
+    // expiry check as the banner placements (see app/lib/adCreatives.ts).
     const items = allAds.filter(
       (item) =>
         item.active === true &&
-        (item.status === undefined || item.status === "ready")
+        (item.status === undefined || item.status === "ready") &&
+        (!item.expiresAt || new Date(item.expiresAt as string).getTime() > now)
     );
 
     if (items.length === 0) {

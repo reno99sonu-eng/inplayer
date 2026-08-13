@@ -67,6 +67,23 @@ export interface AdCreative {
   createdAt: string;
   impressions: number;
   clicks: number;
+  // Present only on a paid sponsor's creative (see app/lib/sponsorships.ts
+  // and app/api/admin/sponsorships/[sponsorshipId]/activate/route.ts) —
+  // undefined/absent for an admin's own regular house creatives, which
+  // never expire on their own. expiresAt is what actually pulls a sponsor's
+  // ad out of rotation the moment their paid window is up (see the filters
+  // below and in app/api/ads/route.ts) — independent of whether the daily
+  // expire-sponsorships cron has run yet.
+  sponsorshipId?: string;
+  sponsorName?: string;
+  expiresAt?: string;
+}
+
+// True for any creative that hasn't passed its own expiresAt yet — always
+// true for a plain house creative (no expiresAt at all), and true for a
+// sponsor creative right up until its paid 7 days are actually up.
+function isNotExpired(item: { expiresAt?: string }): boolean {
+  return !item.expiresAt || new Date(item.expiresAt).getTime() > Date.now();
 }
 
 // Server-side equivalent of what app/api/ads/route.ts does for a visitor's
@@ -79,7 +96,7 @@ export async function getActiveAdCreative(placement: AdPlacement): Promise<AdCre
   try {
     const allCreatives = await getAllAdCreatives();
     const items = allCreatives.filter(
-      (item) => item.placement === placement && item.active === true
+      (item) => item.placement === placement && item.active === true && isNotExpired(item)
     );
     if (items.length === 0) return null;
 
@@ -109,6 +126,9 @@ export async function getActiveAdCreative(placement: AdPlacement): Promise<AdCre
       createdAt: pick.createdAt as string,
       impressions: (pick.impressions as number) || 0,
       clicks: (pick.clicks as number) || 0,
+      sponsorshipId: (pick.sponsorshipId as string) || undefined,
+      sponsorName: (pick.sponsorName as string) || undefined,
+      expiresAt: (pick.expiresAt as string) || undefined,
     };
   } catch (err) {
     console.error(`adCreatives: getActiveAdCreative(${placement}) failed:`, err);
@@ -126,7 +146,7 @@ export async function getActiveAdCreatives(placement: AdPlacement): Promise<AdCr
   try {
     const allCreatives = await getAllAdCreatives();
     const items = allCreatives.filter(
-      (item) => item.placement === placement && item.active === true
+      (item) => item.placement === placement && item.active === true && isNotExpired(item)
     );
     if (items.length === 0) return [];
 
@@ -163,6 +183,9 @@ export async function getActiveAdCreatives(placement: AdPlacement): Promise<AdCr
       createdAt: pick.createdAt as string,
       impressions: (pick.impressions as number) || 0,
       clicks: (pick.clicks as number) || 0,
+      sponsorshipId: (pick.sponsorshipId as string) || undefined,
+      sponsorName: (pick.sponsorName as string) || undefined,
+      expiresAt: (pick.expiresAt as string) || undefined,
     }));
   } catch (err) {
     console.error(`adCreatives: getActiveAdCreatives(${placement}) failed:`, err);

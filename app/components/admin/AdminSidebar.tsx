@@ -43,6 +43,7 @@ const inplayerItems = [
   { id: "copyright", label: "Copyright Center", icon: Copyright, href: "/admin/copyright" },
   { id: "revenue", label: "Revenue", icon: DollarSign, href: "/admin/revenue" },
   { id: "ads", label: "Advertising", icon: Megaphone, href: "/admin/advertising" },
+  { id: "sponsorships", label: "Sponsorships", icon: Receipt, href: "/admin/sponsorships" },
   { id: "navbar-theme", label: "Navbar Theme", icon: Palette, href: "/admin/navbar-theme" },
   { id: "analytics", label: "Analytics", icon: BarChart3, href: "/admin/analytics" },
   { id: "ai-moderation", label: "AI Moderation", icon: Bot, href: "/admin/ai-moderation" },

@@ -56,7 +56,10 @@ export type AuditAction =
   | "user.ban_lift"
   | "midroll_ad.create"
   | "midroll_ad.update"
-  | "midroll_ad.delete";
+  | "midroll_ad.delete"
+  | "sponsorship.banner_assets_uploaded"
+  | "sponsorship.activate"
+  | "sponsorship.cancel";
 
 export type AuditTargetType =
   | "user"
@@ -69,7 +72,8 @@ export type AuditTargetType =
   | "ad"
   | "vendor"
   | "hammart_product"
-  | "midroll_ad";
+  | "midroll_ad"
+  | "sponsorship";
 
 interface LogAdminActionInput {
   // The route's own request object — required, not optional, so every

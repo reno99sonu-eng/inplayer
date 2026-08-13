@@ -18,6 +18,7 @@ import {
 import { getOrder, markOrderPaid, markOrderPaymentFailed } from "@/app/lib/hammartOrders";
 import { orderTotalInr } from "@/app/lib/hammartOrderMath";
 import { sendEmail } from "@/app/lib/ses";
+import { getSponsorship, markSponsorshipPaid, markSponsorshipPaymentFailed } from "@/app/lib/sponsorships";
 
 // This is the ONLY place real money ever gets credited to a creator's
 // balance in InPlayer, and (as of the Route migration) the ONLY place a
@@ -92,9 +93,11 @@ export async function POST(request: NextRequest) {
         break;
       case "payment.captured":
         await handleHammartPaymentCaptured(event.payload);
+        await handleSponsorshipPaymentCaptured(event.payload);
         break;
       case "payment.failed":
         await handleHammartPaymentFailed(event.payload);
+        await handleSponsorshipPaymentFailed(event.payload);
         break;
       case "account.activated":
       case "account.suspended":
@@ -368,6 +371,75 @@ async function handleHammartPaymentFailed(payload: RazorpayWebhookPayload["paylo
         console.error(`razorpay webhook: markOrderPaymentFailed failed for ${orderId}:`, err)
       )
     )
+  );
+}
+
+// Ad-sponsorship checkout (app/api/sponsorships/checkout/route.ts) stamps
+// every Razorpay Order's notes with { type: "sponsorship", sponsorshipId }
+// — a plain one-time Order, never carrying hammartOrderIds, so this is a
+// safe no-op for every payment.captured/failed event that isn't actually a
+// sponsorship purchase (Hammart orders, memberships, vendor subscriptions
+// all fall through parseSponsorshipNotes returning null).
+function parseSponsorshipNotes(notes: Record<string, string> | undefined): string | null {
+  if (notes?.type !== "sponsorship" || !notes?.sponsorshipId) return null;
+  return notes.sponsorshipId;
+}
+
+async function handleSponsorshipPaymentCaptured(payload: RazorpayWebhookPayload["payload"]) {
+  const paymentEntity = payload.payment?.entity;
+  if (!paymentEntity || paymentEntity.status !== "captured" || !paymentEntity.order_id) return;
+
+  const sponsorshipId = parseSponsorshipNotes(paymentEntity.notes);
+  if (!sponsorshipId) return;
+
+  try {
+    await markSponsorshipPaid(sponsorshipId, paymentEntity.id);
+  } catch (err) {
+    console.error(`razorpay webhook: markSponsorshipPaid failed for ${sponsorshipId}:`, err);
+    return;
+  }
+
+  // Two emails on a genuine, webhook-confirmed payment: the sponsor is
+  // told exactly what to do next (email their assets in), and InPlayer's
+  // own admin inbox — the SAME inplayerdigital@gmail.com address the
+  // assets themselves get emailed to — gets a heads-up so a paid order
+  // doesn't just sit unnoticed in Admin -> Sponsorships waiting to be
+  // activated.
+  try {
+    const sponsorship = await getSponsorship(sponsorshipId);
+    if (!sponsorship) return;
+
+    const sectionLabels = sponsorship.sections
+      .map((s) => (s === "midroll" ? "Mid-Roll Video Ad" : s === "homepage_banner" ? "Homepage Banner" : "Watch Page Banner"))
+      .join(", ");
+
+    void sendEmail({
+      to: sponsorship.contactEmail,
+      subject: "Payment confirmed — send your ad assets to activate your InPlayer sponsorship",
+      text: `Your payment of ₹${sponsorship.amountInr.toLocaleString("en-IN")} for ${sectionLabels} is confirmed (reference ${sponsorshipId}). To go live, email your ad assets and website URL to inplayerdigital@gmail.com, mentioning reference ${sponsorshipId}. Your 7-day run starts the moment InPlayer activates your ad.`,
+      html: `<h2>Payment confirmed</h2><p>Your payment of <strong>₹${sponsorship.amountInr.toLocaleString("en-IN")}</strong> for <strong>${sectionLabels}</strong> is confirmed.</p><p>Reference: <strong>${sponsorshipId}</strong></p><p>To go live, email your ad assets (and your website URL, if it's changed) to <strong>inplayerdigital@gmail.com</strong>, mentioning your reference above. Your 7-day run starts the moment InPlayer activates your ad.</p>`,
+    }).catch((err) => console.error(`razorpay webhook: sponsor confirmation email failed for ${sponsorshipId}:`, err));
+
+    void sendEmail({
+      to: "inplayerdigital@gmail.com",
+      subject: `New paid sponsorship awaiting assets — ${sponsorship.companyName}`,
+      text: `${sponsorship.companyName} (${sponsorship.contactEmail}) just paid ₹${sponsorship.amountInr.toLocaleString("en-IN")} for ${sectionLabels}. Reference ${sponsorshipId}. Once their assets arrive by email, activate this in Admin -> Sponsorships.`,
+      html: `<p><strong>${sponsorship.companyName}</strong> (${sponsorship.contactEmail}) just paid <strong>₹${sponsorship.amountInr.toLocaleString("en-IN")}</strong> for <strong>${sectionLabels}</strong>.</p><p>Reference: ${sponsorshipId}</p><p>Once their assets arrive by email, activate this in Admin → Sponsorships.</p>`,
+    }).catch((err) => console.error(`razorpay webhook: admin notify email failed for ${sponsorshipId}:`, err));
+  } catch (err) {
+    console.error(`razorpay webhook: couldn't load sponsorship ${sponsorshipId} for notification emails:`, err);
+  }
+}
+
+async function handleSponsorshipPaymentFailed(payload: RazorpayWebhookPayload["payload"]) {
+  const paymentEntity = payload.payment?.entity;
+  if (!paymentEntity) return;
+
+  const sponsorshipId = parseSponsorshipNotes(paymentEntity.notes);
+  if (!sponsorshipId) return;
+
+  await markSponsorshipPaymentFailed(sponsorshipId).catch((err) =>
+    console.error(`razorpay webhook: markSponsorshipPaymentFailed failed for ${sponsorshipId}:`, err)
   );
 }
 

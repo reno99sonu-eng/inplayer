@@ -22,6 +22,7 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { compressImageToBanner, compressDataUrlToBanner, aiCropAndRedesignImage, extractVideoFramePoster } from "@/app/lib/imageCompress";
+import { MIDROLL_VIDEO_MAX_BYTES } from "@/app/lib/videoAds";
 
 type AdSlotSource = "house" | "adsense" | "off";
 type Placement = "homepage" | "watch" | "weekly_featured";
@@ -487,8 +488,12 @@ function AdvertisingPage() {
       if (file.type !== "video/mp4" && file.type !== "video/webm") {
         throw new Error(`"${file.name}": mid-roll videos must be MP4 or WebM.`);
       }
-      if (file.size > 550_000_000) {
-        throw new Error(`"${file.name}": mid-roll videos must be 550 MB or smaller.`);
+      // Reduced from the old 550MB ceiling — a mid-roll break plays
+      // full-screen mid-playback, so it needs to load instantly. 50MB is
+      // generous for a short, well-compressed break video (see
+      // MIDROLL_VIDEO_MAX_BYTES's comment in app/lib/videoAds.ts).
+      if (file.size > MIDROLL_VIDEO_MAX_BYTES) {
+        throw new Error(`"${file.name}": mid-roll videos must be 50 MB or smaller (well-compressed MP4/WebM loads instantly mid-playback).`);
       }
       return { dataUrl: URL.createObjectURL(file), fileType: "video", rawFile: file };
     }

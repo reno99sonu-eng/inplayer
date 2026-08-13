@@ -54,8 +54,15 @@ export async function GET(request: NextRequest) {
   // FilterExpression on the Scan itself now just runs in memory.
   try {
     const allCreatives = await getAllAdCreatives();
+    const now = Date.now();
     const items = allCreatives.filter(
-      (item) => item.placement === placement && item.active === true
+      (item) =>
+        item.placement === placement &&
+        item.active === true &&
+        // A sponsor's paid creative carries its own expiresAt (see
+        // app/lib/sponsorships.ts) — once that's passed it drops out of
+        // rotation immediately, independent of the daily expiry cron.
+        (!item.expiresAt || new Date(item.expiresAt as string).getTime() > now)
     );
 
     if (items.length === 0) {

@@ -39,8 +39,21 @@ export const getAllMidrollAds = unstable_cache(scanAllMidrollAds, [MIDROLL_ADS_T
 // Same budget as AD_IMAGE_DATA_URL_MAX_LENGTH in adCreatives.ts.
 export const MIDROLL_IMAGE_DATA_URL_MAX_LENGTH = 150_000;
 // DynamoDB's 400KB item limit leaves room for the rest of the creative row
-// when an uploaded video is base64 encoded as a data URL.
+// when an uploaded video is base64 encoded as a data URL. This tiny path
+// (used by the quick "paste a data URL" admin form) is NOT what real
+// sponsor videos go through — those use the Mux upload path
+// (app/api/admin/midroll-ads/create-upload) instead, capped by
+// MIDROLL_VIDEO_MAX_BYTES below, since a real video is nowhere near small
+// enough to fit as base64 in one DynamoDB item.
 export const MIDROLL_VIDEO_DATA_URL_MAX_LENGTH = 350_000;
+
+// Real hard cap for a mid-roll video ad uploaded through Mux (both a
+// sponsor's paid ad and a house one) — 50MB is generous for a short,
+// well-compressed break video and keeps it loading instantly mid-playback
+// rather than stalling a viewer's video. Enforced client-side before the
+// upload even starts (app/admin/advertising/page.tsx) so a rejection is
+// instant, not after minutes of uploading.
+export const MIDROLL_VIDEO_MAX_BYTES = 50 * 1024 * 1024;
 
 export interface MidrollAdCreative {
   adId: string;
@@ -52,6 +65,12 @@ export interface MidrollAdCreative {
   impressions: number;
   clicks: number;
   skips: number;
+  status?: string;
+  // Present only on a paid sponsor's creative — see the identical fields
+  // on AdCreative in app/lib/adCreatives.ts for the full explanation.
+  sponsorshipId?: string;
+  sponsorName?: string;
+  expiresAt?: string;
 }
 
 // The actual "tiered skip timers" — how many seconds of the ad break a

@@ -39,25 +39,17 @@ export default function Navbar() {
   const { signedIn, user, signOut, openSignIn, openSignUp } = useAuthModal();
   const [navbarTheme, setNavbarTheme] = useState<{ active: boolean; imageUrl: string; occasionId?: string; title?: string } | null>(null);
 
-  // Controls when the mobile logo entrance animation plays. Starts false so
-  // the animation doesn't fire while the splash screen is still covering the
-  // viewport (which would make it play invisibly behind the splash curtain).
-  // Flips to true when the splash dispatches its 'splashDismissed' event,
-  // which triggers the CSS animation at exactly the right moment — when the
-  // splash is fading out and the navbar is becoming visible for the first
-  // time. If no splash plays (e.g. module-level hasPlayedThisLoad was
-  // already true from an earlier mount in the same page load), the
-  // fallback timeout kicks in after 100ms so the logo still animates in
-  // promptly. This entirely replaces the old static
-  // `className="animate-navbar-logo-reveal"` approach that was broken
-  // because it always played on mount regardless of splash state.
   const [mobileLogoReady, setMobileLogoReady] = useState(false);
+  const [mobileLogoShrink, setMobileLogoShrink] = useState(false);
 
   useEffect(() => {
     let fallbackTimer: ReturnType<typeof setTimeout>;
+    let shrinkTimer: ReturnType<typeof setTimeout>;
 
     const onSplashDone = () => {
       setMobileLogoReady(true);
+      // Wait 2.5 seconds after reveal, then shrink down to the triangle
+      shrinkTimer = setTimeout(() => setMobileLogoShrink(true), 2500);
     };
 
     // If the splash already dismissed before this component mounted (race
@@ -69,18 +61,25 @@ export default function Navbar() {
     if (!splashCurtain) {
       // No splash on screen — animate immediately (with a tiny delay so
       // the browser has painted the navbar first).
-      fallbackTimer = setTimeout(() => setMobileLogoReady(true), 80);
+      fallbackTimer = setTimeout(() => {
+        setMobileLogoReady(true);
+        shrinkTimer = setTimeout(() => setMobileLogoShrink(true), 2500);
+      }, 80);
     } else {
       // Splash is present — wait for it to dismiss.
       window.addEventListener("splashDismissed", onSplashDone, { once: true });
       // Safety fallback: if the event never fires (e.g. the failsafe
       // script in layout.tsx force-killed the splash), animate after 3.5s.
-      fallbackTimer = setTimeout(() => setMobileLogoReady(true), 3500);
+      fallbackTimer = setTimeout(() => {
+        setMobileLogoReady(true);
+        shrinkTimer = setTimeout(() => setMobileLogoShrink(true), 2500);
+      }, 3500);
     }
 
     return () => {
       window.removeEventListener("splashDismissed", onSplashDone);
       clearTimeout(fallbackTimer);
+      clearTimeout(shrinkTimer);
     };
   }, []);
 
@@ -391,7 +390,31 @@ export default function Navbar() {
         (opacity-0) so there's no layout shift — it pops in with the
         bounce animation the moment the splash fades away. */}
     <div className={mobileLogoReady ? "animate-navbar-logo-reveal" : "opacity-0"}>
-      <NavbarLogo />
+      <button
+        type="button"
+        onClick={() => router.push("/")}
+        aria-label="INPLAYER — Home"
+        className={`flex items-center overflow-hidden transition-[width] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+          mobileLogoShrink ? "w-[30px] sm:w-[32px]" : "w-[124px] sm:w-[134px]"
+        }`}
+      >
+        <div className="w-[124px] sm:w-[134px] flex-shrink-0 flex items-center justify-start">
+          {/* Dark Mode */}
+          <img
+            src="/logos/inplayer-mark-dark.png"
+            alt="INPLAYER"
+            draggable={false}
+            className="light:hidden h-8 sm:h-9 w-auto max-w-none object-contain drop-shadow-[0_2px_10px_rgba(0,0,0,0.35)]"
+          />
+          {/* Light Mode */}
+          <img
+            src="/logos/inplayer-mark-light.png"
+            alt="INPLAYER"
+            draggable={false}
+            className="hidden light:block h-8 sm:h-9 w-auto max-w-none object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.12)]"
+          />
+        </div>
+      </button>
     </div>
 
     {/* Festive Occasion Graphic + greeting text, side by side — same fix

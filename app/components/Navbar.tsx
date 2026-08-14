@@ -391,7 +391,7 @@ export default function Navbar() {
         className={`flex items-center overflow-hidden transition-[width] duration-[1200ms] ease-in-out ${
           mobileLogoState === "rolled-out"
             ? "w-[124px] sm:w-[134px]"
-            : "w-[30px] sm:w-[32px]"
+            : "w-[26px] sm:w-[28px]"
         }`}
       >
         <div className="w-[124px] sm:w-[134px] flex-shrink-0 flex items-center justify-start">

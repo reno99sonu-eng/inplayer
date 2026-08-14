@@ -450,13 +450,18 @@ export default function ConversationThreadPage() {
           backgroundImage: theme.backgroundImageUrl ? `url(${theme.backgroundImageUrl})` : undefined,
           backgroundSize: "cover",
           backgroundPosition: "center",
-          opacity: 0.13,
+          opacity: 0.28,
+          mixBlendMode: "luminosity",
         }}
       />
       <div
         aria-hidden="true"
         className="pointer-events-none fixed inset-0 -z-10"
-        style={{ backgroundImage: theme.texturePattern }}
+        style={{ 
+          backgroundImage: theme.texturePattern,
+          backgroundRepeat: "repeat",
+          opacity: 0.6
+        }}
       />
 
       <div className="flex items-center gap-3 border-b border-white/10 light:border-black/10 px-4 py-3">
@@ -596,7 +601,7 @@ export default function ConversationThreadPage() {
         </div>
       )}
 
-      <div className="mx-auto w-full max-w-4xl flex-1 space-y-1.5 overflow-y-auto px-3 sm:px-4 py-3">
+      <div className="mx-auto w-full max-w-4xl flex-1 min-h-0 space-y-1.5 overflow-y-auto px-3 sm:px-4 py-3">
         {messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center py-16 text-center">
             <p className="text-sm text-inherit opacity-60">

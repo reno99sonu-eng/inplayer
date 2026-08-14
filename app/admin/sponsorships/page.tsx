@@ -1,9 +1,10 @@
 "use client";
 
 import { authedFetch } from "@/app/lib/apiFetch";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import Link from "next/link";
 import { Loader2, AlertTriangle, Search, Megaphone, Clock, CheckCircle2, XCircle, Ban } from "lucide-react";
+import { useAdminRefresh } from "@/app/components/admin/AdminRefreshContext";
 
 type Tab = "all" | "pending_payment" | "awaiting_assets" | "active" | "expired" | "cancelled";
 
@@ -46,6 +47,7 @@ export default function AdminSponsorshipsPage() {
   const [error, setError] = useState<string | null>(null);
   const [tableMissing, setTableMissing] = useState(false);
   const [query, setQuery] = useState("");
+  const { setRefreshing, setLastUpdated, globalRefreshTrigger } = useAdminRefresh();
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -66,23 +68,36 @@ export default function AdminSponsorshipsPage() {
     return c;
   }, [items]);
 
-  useEffect(() => {
-    (async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const res = await authedFetch("/api/admin/sponsorships");
-        const data = await res.json();
-        if (!res.ok) throw new Error(data.error || "Couldn't load sponsorships.");
-        setItems(data.items || []);
-        setTableMissing(Boolean(data.tableMissing));
-      } catch (err) {
+  const load = useCallback(async (isBackgroundRefresh = false) => {
+    if (!isBackgroundRefresh) setLoading(true);
+    if (isBackgroundRefresh) setRefreshing(true);
+    setError(null);
+    try {
+      const res = await authedFetch("/api/admin/sponsorships");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Couldn't load sponsorships.");
+      setItems(data.items || []);
+      setTableMissing(Boolean(data.tableMissing));
+      setLastUpdated(new Date());
+    } catch (err) {
+      if (!isBackgroundRefresh) {
         setError(err instanceof Error ? err.message : "Something went wrong.");
-      } finally {
-        setLoading(false);
       }
-    })();
-  }, []);
+    } finally {
+      setLoading(false);
+      if (isBackgroundRefresh) setRefreshing(false);
+    }
+  }, [setLastUpdated, setRefreshing]);
+
+  useEffect(() => {
+    load(false);
+  }, [load]);
+
+  useEffect(() => {
+    if (globalRefreshTrigger > 0) {
+      load(true);
+    }
+  }, [globalRefreshTrigger, load]);
 
   return (
     <div>

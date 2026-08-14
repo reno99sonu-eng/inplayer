@@ -43,6 +43,16 @@ export const CHAT_THEMES: Record<string, ChatTheme> = {
     texturePattern: WHATSAPP_DOODLE_TEXTURE,
     backgroundImageUrl: "https://images.unsplash.com/photo-1518531933037-91b2f5f229cc?auto=format&fit=crop&w=1920&q=80",
   },
+  emeraldLight: {
+    id: "emeraldLight",
+    name: "WhatsApp Light Signature",
+    previewBg: "bg-[#EFEAE2] border-[#25D366]",
+    containerClass: "bg-[#EFEAE2] text-slate-900",
+    bubbleMine: "bg-[#D9FDD3] text-slate-900 shadow-sm border border-emerald-500/20",
+    bubbleOther: "bg-white/95 backdrop-blur-md text-slate-900 shadow-sm border border-slate-200",
+    texturePattern: WHATSAPP_DOODLE_TEXTURE,
+    backgroundImageUrl: "https://images.unsplash.com/photo-1557682250-33bd709cbe85?auto=format&fit=crop&w=1920&q=80",
+  },
   cyberpunk: {
     id: "cyberpunk",
     name: "Cyberpunk Neon Mesh",

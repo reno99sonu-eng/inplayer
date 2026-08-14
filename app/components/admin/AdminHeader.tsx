@@ -3,10 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ShieldCheck, LogOut, Sun, Moon, Store, LayoutDashboard, Megaphone } from "lucide-react";
+import { ShieldCheck, LogOut, Sun, Moon, Store, LayoutDashboard, Megaphone, RefreshCw } from "lucide-react";
 import { useTheme } from "@/app/components/ThemeProvider";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { useAdminMode, AdminMode } from "@/app/components/admin/AdminModeContext";
+import { useAdminRefresh } from "@/app/components/admin/AdminRefreshContext";
 
 // The Admin Panel's own dedicated header — deliberately NOT the public
 // site's Navbar (no search bar, no category bar, no "Your Channel"/
@@ -20,6 +21,7 @@ export default function AdminHeader({ email }: { email: string | null }) {
   const { setTheme } = useTheme();
   const { signOut } = useAuthModal();
   const { mode, setMode } = useAdminMode();
+  const { triggerRefresh, isRefreshing, lastUpdated } = useAdminRefresh();
   const router = useRouter();
   const [isDark, setIsDark] = useState(true);
 
@@ -104,6 +106,15 @@ export default function AdminHeader({ email }: { email: string | null }) {
           <div className="flex flex-shrink-0 items-center gap-2 sm:hidden">
             <button
               type="button"
+              onClick={triggerRefresh}
+              disabled={isRefreshing}
+              className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 text-indigo-300 light:text-indigo-700 transition hover:bg-white/10 light:hover:bg-black/10 disabled:opacity-50"
+              aria-label="Refresh data"
+            >
+              <RefreshCw size={14} className={isRefreshing ? "animate-spin" : ""} />
+            </button>
+            <button
+              type="button"
               onClick={toggleTheme}
               aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
               className="flex h-9 w-9 items-center justify-center rounded-full border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 text-slate-300 light:text-slate-600 transition hover:border-indigo-400/40 hover:text-indigo-300"
@@ -136,6 +147,22 @@ export default function AdminHeader({ email }: { email: string | null }) {
         </div>
 
         <div className="hidden flex-shrink-0 items-center gap-2 sm:flex">
+          <div className="flex items-center gap-2 mr-2">
+            {lastUpdated && (
+              <span className="text-xs font-medium text-slate-500">
+                Updated {lastUpdated.toLocaleTimeString("en-IN")}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={triggerRefresh}
+              disabled={isRefreshing}
+              className="flex items-center gap-1.5 rounded-full border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-xs font-bold text-indigo-300 light:text-indigo-700 transition hover:bg-white/10 light:hover:bg-black/10 disabled:opacity-50"
+            >
+              <RefreshCw size={13} className={isRefreshing ? "animate-spin" : ""} />
+              Refresh
+            </button>
+          </div>
           <button
             type="button"
             onClick={toggleTheme}

@@ -439,7 +439,7 @@ export default function ConversationThreadPage() {
   const theme = CHAT_THEMES[conversation?.chatTheme || "default"] || CHAT_THEMES.default;
 
   return (
-    <div className={`relative flex min-h-screen flex-col ${theme.containerClass}`}>
+    <div className={`relative flex h-[100dvh] overflow-hidden flex-col ${theme.containerClass}`}>
       {/* Wallpaper layer — fixed (not absolute) so it stays put behind the
           chat instead of scrolling away with the message list, same as
           WhatsApp's own chat wallpaper. */}
@@ -596,12 +596,12 @@ export default function ConversationThreadPage() {
         </div>
       )}
 
-<div className="mx-auto w-full max-w-3xl flex-1 space-y-2 overflow-y-auto px-4 py-4">
+      <div className="mx-auto w-full max-w-4xl flex-1 space-y-1.5 overflow-y-auto px-3 sm:px-4 py-3">
         {messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center py-16 text-center">
-            <p className="text-sm text-slate-400 light:text-slate-800">
-  This is the start of your conversation with @{displayUsername}.
-</p>
+            <p className="text-sm text-inherit opacity-60">
+              This is the start of your conversation with @{displayUsername}.
+            </p>
           </div>
         ) : (
           messages.map((m, index) => {
@@ -629,9 +629,9 @@ const showAvatar =
       <div className="w-8 flex-shrink-0" />
     ))}
 
-  <div className={`flex max-w-[72%] items-end gap-1.5 ${mine ? "flex-row-reverse" : ""}`}>
+  <div className={`flex max-w-[75%] sm:max-w-[65%] items-end gap-1.5 ${mine ? "flex-row-reverse" : ""}`}>
     <div
-      className={`rounded-2xl px-3.5 py-2 text-sm ${
+      className={`rounded-2xl px-3 py-1.5 text-[15px] sm:text-sm leading-[1.3] ${
         m.deletedForEveryone
           ? "border border-dashed border-white/15 light:border-black/15 text-slate-500 light:text-slate-600 italic"
           : mine
@@ -734,7 +734,7 @@ const showAvatar =
         <div ref={messagesEndRef} />
       </div>
 
-      <div className="border-t border-white/10 light:border-black/10 px-4 py-3">
+      <div className="border-t border-white/10 light:border-black/10 bg-inherit px-2 sm:px-4 py-2 sm:py-3 z-10">
         {isBlocked ? (
           <p className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.02] light:bg-black/[0.02] px-4 py-3 text-center text-xs text-slate-400 light:text-slate-600">
             {conversation?.blocked
@@ -742,7 +742,7 @@ const showAvatar =
               : "You can't message this user."}
           </p>
         ) : pendingImage ? (
-          <div className="mx-auto flex w-full max-w-3xl items-center gap-2.5">
+          <div className="mx-auto flex w-full max-w-4xl items-center gap-2.5">
             <div className="relative flex-shrink-0">
               {/* eslint-disable-next-line @next/next/no-img-element -- local preview of a not-yet-sent compressed data URL. */}
               <img
@@ -779,11 +779,11 @@ const showAvatar =
             </button>
           </div>
         ) : voiceMode ? (
-          <div className="mx-auto flex w-full max-w-3xl items-center gap-2.5">
+          <div className="mx-auto flex w-full max-w-4xl items-center gap-2.5">
             <VoiceRecorder onSend={handleSendVoice} onCancel={() => setVoiceMode(false)} />
           </div>
         ) : (
-          <div className="mx-auto flex w-full max-w-3xl items-center gap-2">
+          <div className="mx-auto flex w-full max-w-4xl items-center gap-2">
             <input
               ref={fileInputRef}
               type="file"

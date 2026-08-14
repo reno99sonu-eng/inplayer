@@ -1,7 +1,7 @@
 "use client";
 
 import { authedFetch } from "@/app/lib/apiFetch";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import Link from "next/link";
 import {
   Loader2,
@@ -15,6 +15,7 @@ import {
   Ban,
   RotateCcw,
 } from "lucide-react";
+import { useAdminRefresh } from "@/app/components/admin/AdminRefreshContext";
 
 type Tab = "pending_review" | "verified" | "rejected" | "not_started" | "all";
 
@@ -122,6 +123,7 @@ export default function AdminHammartVendorsPage() {
   const [rejectingId, setRejectingId] = useState<string | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [query, setQuery] = useState("");
+  const { setRefreshing, setLastUpdated, globalRefreshTrigger } = useAdminRefresh();
 
   const filteredItems = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -138,8 +140,9 @@ export default function AdminHammartVendorsPage() {
     );
   }, [items, query]);
 
-  const load = async () => {
-    setLoading(true);
+  const load = useCallback(async (isBackgroundRefresh = false) => {
+    if (!isBackgroundRefresh) setLoading(true);
+    if (isBackgroundRefresh) setRefreshing(true);
     setError(null);
     try {
       const res = await authedFetch(`/api/admin/hammart-vendors?tab=${tab}`);
@@ -150,19 +153,29 @@ export default function AdminHammartVendorsPage() {
       if (data.counts) {
         setCounts((prev) => ({ ...prev, ...data.counts }));
       }
+      setLastUpdated(new Date());
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
+      if (!isBackgroundRefresh) {
+        setError(err instanceof Error ? err.message : "Something went wrong.");
+      }
     } finally {
       setLoading(false);
+      if (isBackgroundRefresh) setRefreshing(false);
     }
-  };
+  }, [tab, setLastUpdated, setRefreshing]);
 
   useEffect(() => {
     (async () => {
-      await load();
+      await load(false);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tab]);
+
+  useEffect(() => {
+    if (globalRefreshTrigger > 0) {
+      load(true);
+    }
+  }, [globalRefreshTrigger, load]);
 
   const runAction = async (
     userId: string,

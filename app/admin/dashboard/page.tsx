@@ -12,8 +12,8 @@ import {
   Loader2,
   AlertTriangle,
   Clock,
-  RefreshCw,
 } from "lucide-react";
+import { useAdminRefresh } from "@/app/components/admin/AdminRefreshContext";
 
 interface DashboardStats {
   totalUsers: number;
@@ -32,10 +32,9 @@ function formatNumber(n: number): string {
 export default function AdminDashboardPage() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const cancelledRef = useRef(false);
+  const { setRefreshing, setLastUpdated, globalRefreshTrigger } = useAdminRefresh();
 
   // The API (/api/admin/dashboard-stats) already runs a fresh, uncached
   // DynamoDB scan on every single request — the numbers it returns are
@@ -65,12 +64,6 @@ export default function AdminDashboardPage() {
         setLastUpdated(new Date());
       }
     } catch (err) {
-      // A background/manual refresh failing (e.g. one dropped request)
-      // shouldn't blank out numbers that were showing correctly a moment
-      // ago — only the very first load (isBackgroundRefresh=false, the one
-      // call made on mount before anything has ever loaded) surfaces the
-      // error banner, since that's the only case with nothing on screen
-      // yet to fall back to.
       if (!cancelledRef.current && !isBackgroundRefresh) {
         setError(err instanceof Error ? err.message : "Something went wrong.");
       } else if (!cancelledRef.current) {
@@ -82,7 +75,7 @@ export default function AdminDashboardPage() {
         setRefreshing(false);
       }
     }
-  }, []);
+  }, [setLastUpdated, setRefreshing]);
 
   useEffect(() => {
     cancelledRef.current = false;
@@ -94,6 +87,12 @@ export default function AdminDashboardPage() {
       clearInterval(interval);
     };
   }, [load]);
+
+  useEffect(() => {
+    if (globalRefreshTrigger > 0) {
+      load(true);
+    }
+  }, [globalRefreshTrigger, load]);
 
   if (loading) {
     return (
@@ -173,22 +172,6 @@ export default function AdminDashboardPage() {
             Live counts straight from InPlayer&apos;s database — nothing here is estimated.
             Refreshes itself every 30 seconds.
           </p>
-        </div>
-        <div className="flex items-center gap-2">
-          {lastUpdated && (
-            <span className="text-xs text-slate-500">
-              Updated {lastUpdated.toLocaleTimeString("en-IN")}
-            </span>
-          )}
-          <button
-            type="button"
-            onClick={() => load(true)}
-            disabled={refreshing}
-            className="flex items-center gap-1.5 rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-1.5 text-xs font-bold text-slate-300 light:text-slate-700 transition hover:bg-white/10 light:hover:bg-black/10 disabled:opacity-50"
-          >
-            <RefreshCw size={12} className={refreshing ? "animate-spin" : ""} />
-            Refresh
-          </button>
         </div>
       </div>
 

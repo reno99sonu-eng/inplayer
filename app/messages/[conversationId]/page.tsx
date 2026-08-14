@@ -438,33 +438,43 @@ export default function ConversationThreadPage() {
   const isBlocked = !!(conversation?.blocked || conversation?.blockedByOther);
   const theme = CHAT_THEMES[conversation?.chatTheme || "default"] || CHAT_THEMES.default;
 
+  // Extract the background color class from the theme's containerClass so we can place it on a dedicated layer.
+  // containerClass usually looks like "bg-[#0B141A] text-white"
+  const bgClassMatch = theme.containerClass.match(/bg-\[#?[a-zA-Z0-9]+\]|bg-\w+-\d+/);
+  const bgColorClass = bgClassMatch ? bgClassMatch[0] : "bg-black";
+  const textColorClass = theme.containerClass.replace(bgColorClass, "").trim();
+
   return (
-    <div className={`relative flex h-[100dvh] overflow-hidden flex-col ${theme.containerClass}`}>
-      {/* Wallpaper layer — fixed (not absolute) so it stays put behind the
-          chat instead of scrolling away with the message list, same as
-          WhatsApp's own chat wallpaper. */}
+    <div className={`fixed inset-0 overflow-hidden flex flex-col ${textColorClass} bg-transparent`}>
+      {/* 1. Base Background Color (Lowest Layer) */}
+      <div className={`absolute inset-0 z-0 pointer-events-none ${bgColorClass}`} />
+
+      {/* 2. High-res Photo Wallpaper (Middle Layer) */}
       <div
         aria-hidden="true"
-        className="pointer-events-none fixed inset-0 -z-10"
+        className="absolute inset-0 z-0 pointer-events-none"
         style={{
           backgroundImage: theme.backgroundImageUrl ? `url(${theme.backgroundImageUrl})` : undefined,
           backgroundSize: "cover",
           backgroundPosition: "center",
-          opacity: 0.28,
-          mixBlendMode: "luminosity",
-        }}
-      />
-      <div
-        aria-hidden="true"
-        className="pointer-events-none fixed inset-0 -z-10"
-        style={{ 
-          backgroundImage: theme.texturePattern,
-          backgroundRepeat: "repeat",
-          opacity: 0.6
+          opacity: 0.15,
         }}
       />
 
-      <div className="flex items-center gap-3 border-b border-white/10 light:border-black/10 px-4 py-3">
+      {/* 3. SVG Texture Pattern (Top Background Layer) */}
+      <div
+        aria-hidden="true"
+        className="absolute inset-0 z-0 pointer-events-none"
+        style={{ 
+          backgroundImage: theme.texturePattern,
+          backgroundRepeat: "repeat",
+          opacity: 0.4
+        }}
+      />
+
+      {/* --- CHAT CONTENT (z-10 relative so it sits on top of all backgrounds) --- */}
+      <div className="relative z-10 flex flex-col h-full w-full">
+        <div className="flex items-center gap-3 border-b border-white/10 light:border-black/10 px-4 py-3 bg-inherit">
         <button
           onClick={() => router.back()}
           className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 transition hover:bg-white/15 light:hover:bg-black/10"
@@ -904,6 +914,7 @@ const showAvatar =
         onToggleBlock={() => handleAction(conversation?.blocked ? "unblock" : "block")}
         onToggleDisappearing={() => handleAction("toggle_disappearing")}
       />
+      </div>
     </div>
   );
 }

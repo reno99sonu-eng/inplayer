@@ -391,7 +391,7 @@ export default function Navbar() {
         className={`flex items-center overflow-hidden transition-[width] duration-[1200ms] ease-in-out ${
           mobileLogoState === "rolled-out"
             ? "w-[124px] sm:w-[134px]"
-            : "w-[26px] sm:w-[28px]"
+            : "w-[22px] sm:w-[24px]"
         }`}
       >
         <div className="w-[124px] sm:w-[134px] flex-shrink-0 flex items-center justify-start">
@@ -400,14 +400,14 @@ export default function Navbar() {
             src="/logos/inplayer-mark-dark.png"
             alt="INPLAYER"
             draggable={false}
-            className="light:hidden h-8 sm:h-9 w-auto max-w-none object-contain drop-shadow-[0_2px_10px_rgba(0,0,0,0.35)]"
+            className="light:hidden h-8 sm:h-9 w-auto max-w-none object-contain object-left drop-shadow-[0_2px_10px_rgba(0,0,0,0.35)]"
           />
           {/* Light Mode */}
           <img
             src="/logos/inplayer-mark-light.png"
             alt="INPLAYER"
             draggable={false}
-            className="hidden light:block h-8 sm:h-9 w-auto max-w-none object-contain drop-shadow-[0_2px_8px_rgba(0,0,0,0.12)]"
+            className="hidden light:block h-8 sm:h-9 w-auto max-w-none object-contain object-left drop-shadow-[0_2px_8px_rgba(0,0,0,0.12)]"
           />
         </div>
       </button>

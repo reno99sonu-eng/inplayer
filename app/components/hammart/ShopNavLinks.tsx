@@ -24,7 +24,7 @@ export default function ShopNavLinks() {
       reset();
       return;
     }
-    (async () => {
+    const fetchCounts = async () => {
       try {
         const [cartRes, wishlistRes] = await Promise.all([
           authedFetch("/api/hammart/cart"),
@@ -37,7 +37,13 @@ export default function ShopNavLinks() {
       } catch (err) {
         console.error("Failed to load cart/wishlist counts:", err);
       }
-    })();
+    };
+
+    fetchCounts();
+
+    const handleUpdate = () => fetchCounts();
+    window.addEventListener("hammart-cart-updated", handleUpdate);
+    return () => window.removeEventListener("hammart-cart-updated", handleUpdate);
   }, [signedIn]);
 
   if (!signedIn) return null;

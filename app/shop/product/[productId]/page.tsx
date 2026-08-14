@@ -226,6 +226,7 @@ export default function ProductPage() {
         setCartError(data.error || "Couldn't add that to your cart.");
         return;
       }
+      window.dispatchEvent(new Event("hammart-cart-updated"));
       setAddedToCart(true);
       setTimeout(() => setAddedToCart(false), 1800);
     } catch (err) {

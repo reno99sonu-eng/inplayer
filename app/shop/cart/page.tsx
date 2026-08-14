@@ -390,10 +390,19 @@ export default function CartPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-8 text-white light:text-slate-900">
-      <div className="flex items-center justify-between gap-3">
-        <h1 className="flex items-center gap-2 text-xl font-black text-white light:text-slate-900">
-          <ShoppingCart size={20} className="text-orange-400" /> Your Cart
-        </h1>
+      <div className="mb-6 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Link
+            href="/shop"
+            className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/5 light:bg-slate-100 text-slate-400 light:text-slate-500 transition hover:bg-white/10 hover:text-white light:hover:bg-slate-200 light:hover:text-slate-900"
+            title="Back to shop"
+          >
+            <ArrowLeft size={18} />
+          </Link>
+          <h1 className="flex items-center gap-2 text-xl font-black text-white light:text-slate-900">
+            <ShoppingCart size={20} className="text-orange-400" /> Your Cart
+          </h1>
+        </div>
         <ShopNavLinks />
       </div>
 

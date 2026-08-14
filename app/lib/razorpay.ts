@@ -165,7 +165,7 @@ export async function createLinkedAccount(params: {
     headers: { Authorization: authHeader(), "Content-Type": "application/json" },
     body: JSON.stringify({
       email: params.email,
-      phone: params.phone || undefined,
+      phone: params.phone || "9999999999",
       type: "route",
       reference_id: params.vendorId,
       legal_business_name: params.legalName,

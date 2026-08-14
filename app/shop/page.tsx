@@ -77,6 +77,7 @@ export default function ShopPage() {
         body: JSON.stringify({ productId: product.productId, quantity: 1 }),
       });
       if (res.ok) {
+        window.dispatchEvent(new Event("hammart-cart-updated"));
         setAddedProductIds((prev) => new Set(prev).add(product.productId));
         setTimeout(() => {
           setAddedProductIds((prev) => {

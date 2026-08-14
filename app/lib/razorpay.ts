@@ -167,6 +167,7 @@ export async function createLinkedAccount(params: {
       type: "route",
       reference_id: params.vendorId,
       legal_business_name: params.legalName,
+      customer_facing_business_name: params.legalName.substring(0, 50), // razorpay limit
       business_type: isBusiness ? "partnership" : "individual",
       contact_name: params.legalName,
       profile: {

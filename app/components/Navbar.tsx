@@ -46,6 +46,7 @@ export default function Navbar() {
     let shrinkTimer: ReturnType<typeof setTimeout>;
 
     const onSplashDone = () => {
+      clearTimeout(fallbackTimer);
       setMobileLogoState("rolled-out");
       // Wait 2.5 seconds after reveal, then shrink down to the triangle
       shrinkTimer = setTimeout(() => setMobileLogoState("rolled-in"), 2500);

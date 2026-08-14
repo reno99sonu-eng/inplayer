@@ -59,6 +59,17 @@ export interface PlatformSettings {
   weeklyFeaturedEnabled: boolean;
   midrollEnabled: boolean;
   midrollIntervalSeconds: number;
+  
+  // Monetization Configuration
+  monetizationEnabled: boolean;
+  monetizationRequiredSubscribers: number;
+  monetizationRequiredVideoViews: number;
+  monetizationRequiredShortViews: number;
+  monetizationRequireBoth: boolean;
+  monetizationRequireGoodStanding: boolean;
+  monetizationCreatorShare: number;
+  monetizationPlatformShare: number;
+
   updatedAt: string | null;
   updatedBy: string | null;
 }
@@ -91,6 +102,14 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
   weeklyFeaturedEnabled: true, // ON by default
   midrollEnabled: true,
   midrollIntervalSeconds: 900,
+  monetizationEnabled: false,
+  monetizationRequiredSubscribers: 500,
+  monetizationRequiredVideoViews: 50000,
+  monetizationRequiredShortViews: 1000000,
+  monetizationRequireBoth: true,
+  monetizationRequireGoodStanding: true,
+  monetizationCreatorShare: 0.8,
+  monetizationPlatformShare: 0.2,
   updatedAt: null,
   updatedBy: null,
 };
@@ -120,6 +139,14 @@ export type PublicPlatformSettings = Pick<
   | "weeklyFeaturedEnabled"
   | "midrollEnabled"
   | "midrollIntervalSeconds"
+  | "monetizationEnabled"
+  | "monetizationRequiredSubscribers"
+  | "monetizationRequiredVideoViews"
+  | "monetizationRequiredShortViews"
+  | "monetizationRequireBoth"
+  | "monetizationRequireGoodStanding"
+  | "monetizationCreatorShare"
+  | "monetizationPlatformShare"
 >;
 
 async function readPlatformSettings(): Promise<PlatformSettings> {
@@ -199,5 +226,13 @@ export function toPublicSettings(settings: PlatformSettings): PublicPlatformSett
     weeklyFeaturedEnabled: settings.weeklyFeaturedEnabled !== false,
     midrollEnabled: settings.midrollEnabled,
     midrollIntervalSeconds: settings.midrollIntervalSeconds,
+    monetizationEnabled: settings.monetizationEnabled,
+    monetizationRequiredSubscribers: settings.monetizationRequiredSubscribers,
+    monetizationRequiredVideoViews: settings.monetizationRequiredVideoViews,
+    monetizationRequiredShortViews: settings.monetizationRequiredShortViews,
+    monetizationRequireBoth: settings.monetizationRequireBoth,
+    monetizationRequireGoodStanding: settings.monetizationRequireGoodStanding,
+    monetizationCreatorShare: settings.monetizationCreatorShare,
+    monetizationPlatformShare: settings.monetizationPlatformShare,
   };
 }

@@ -179,7 +179,7 @@ export async function createLinkedAccount(params: {
             street1: "Not provided",
             city: "Unknown",
             state: "Unknown",
-            postal_code: "000000",
+            postal_code: 110001,
             country: "IN",
           },
         },

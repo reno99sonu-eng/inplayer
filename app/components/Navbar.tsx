@@ -418,7 +418,7 @@ export default function Navbar() {
       ml-auto pushes it to the right side of the Mobile Row container, so it
       won't shift leftwards when the logo rolls back inside. */}
   {navbarTheme?.active && navbarTheme.imageUrl && (
-    <div className="ml-auto pr-8 sm:pr-10 md:pr-12 flex items-center gap-1.5 flex-shrink-0 min-w-0">
+    <div className="ml-auto pr-5 sm:pr-6 md:pr-8 flex items-center gap-1.5 flex-shrink-0 min-w-0">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={navbarTheme.imageUrl}

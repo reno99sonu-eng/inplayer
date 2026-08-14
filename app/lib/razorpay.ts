@@ -177,6 +177,7 @@ export async function createLinkedAccount(params: {
         addresses: {
           registered: {
             street1: "Not provided",
+            street2: "Not provided",
             city: "New Delhi",
             state: "Delhi",
             postal_code: 110001,

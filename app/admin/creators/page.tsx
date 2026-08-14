@@ -39,6 +39,7 @@ interface CreatorKyc {
   reviewedBy: string | null;
   rejectionReason: string | null;
   documents: Record<string, string>;
+  monetizationStatus?: string;
 }
 
 const DOC_LABELS: Record<string, string> = {
@@ -184,6 +185,34 @@ export default function AdminCreatorsPage() {
     }
   };
 
+  const handleMonetizationAction = async (userId: string, action: "suspend" | "unsuspend") => {
+    if (!window.confirm(`Are you sure you want to ${action} this creator's monetization?`)) return;
+    setBusyId(userId);
+    try {
+      const res = await authedFetch("/api/admin/creators", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, action, reason: action === "suspend" ? "Admin suspension" : undefined }),
+      });
+      if (res.ok) {
+        setItems((prev) =>
+          prev.map((i) =>
+            i.userId === userId
+              ? { ...i, monetizationStatus: action === "suspend" ? "SUSPENDED" : "MONETIZED" }
+              : i
+          )
+        );
+      } else {
+        const data = await res.json().catch(() => ({}));
+        window.alert(data.error || `Couldn't ${action} right now.`);
+      }
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   return (
     <div>
       <div>
@@ -283,6 +312,19 @@ export default function AdminCreatorsPage() {
                     Bank a/c: {c.bankAccountNumber || "—"}
                     {c.bankIfsc ? ` (IFSC ${c.bankIfsc})` : ""}
                   </p>
+                  <div className="mt-1 flex items-center gap-2">
+                    <span
+                      className={`inline-block rounded-md px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                        c.monetizationStatus === "MONETIZED"
+                          ? "bg-green-500/20 text-green-400"
+                          : c.monetizationStatus === "SUSPENDED"
+                          ? "bg-red-500/20 text-red-400"
+                          : "bg-slate-500/20 text-slate-400"
+                      }`}
+                    >
+                      {c.monetizationStatus || "NOT_ELIGIBLE"}
+                    </span>
+                  </div>
                   {c.addressLine1 && (
                     <p className="mt-0.5 text-xs text-slate-500">
                       {c.addressLine1}, {c.city}, {c.state} {c.pincode}
@@ -391,6 +433,29 @@ export default function AdminCreatorsPage() {
                       </button>
                     </div>
                   )}
+                </div>
+              )}
+              {tab === "verified" && c.monetizationStatus && (
+                <div className="mt-3">
+                  {c.monetizationStatus === "MONETIZED" ? (
+                    <button
+                      type="button"
+                      disabled={busyId === c.userId}
+                      onClick={() => handleMonetizationAction(c.userId, "suspend")}
+                      className="rounded-xl bg-red-500/15 light:bg-red-100 px-3 py-1.5 text-xs font-bold text-red-300 light:text-red-700 transition hover:bg-red-500/25 light:hover:bg-red-200 disabled:opacity-60"
+                    >
+                      {busyId === c.userId ? "Wait..." : "Suspend Monetization"}
+                    </button>
+                  ) : c.monetizationStatus === "SUSPENDED" ? (
+                    <button
+                      type="button"
+                      disabled={busyId === c.userId}
+                      onClick={() => handleMonetizationAction(c.userId, "unsuspend")}
+                      className="rounded-xl bg-emerald-500/15 light:bg-emerald-100 px-3 py-1.5 text-xs font-bold text-emerald-300 light:text-emerald-700 transition hover:bg-emerald-500/25 light:hover:bg-emerald-200 disabled:opacity-60"
+                    >
+                      {busyId === c.userId ? "Wait..." : "Reactivate Monetization"}
+                    </button>
+                  ) : null}
                 </div>
               )}
             </div>

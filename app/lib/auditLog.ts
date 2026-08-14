@@ -30,6 +30,8 @@ export type AuditAction =
   | "video.restore"
   | "kyc.approve"
   | "kyc.reject"
+  | "monetization.suspend"
+  | "monetization.unsuspend"
   | "comment.restore"
   | "comment.delete"
   | "message.restore"

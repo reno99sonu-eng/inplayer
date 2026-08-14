@@ -11,6 +11,7 @@ import {
 } from "@/app/lib/creatorPayouts";
 import { resolveUsernames } from "@/app/lib/resolveUsernames";
 import { logAdminAction } from "@/app/lib/auditLog";
+import { BatchGetCommand } from "@aws-sdk/lib-dynamodb";
 
 const USERS_TABLE = process.env.DYNAMODB_USERS_TABLE || "InPlayer-Users";
 const VIDEOS_TABLE = process.env.DYNAMODB_VIDEOS_TABLE || "InPlayer-Videos";
@@ -160,6 +161,41 @@ export async function GET(request: NextRequest) {
 
   const usernames = await resolveUsernames(allItems.map((i) => String(i.userId)));
 
+  const monetizationStatuses = new Map<string, string>();
+  const distinctIds = Array.from(new Set(allItems.map((i) => String(i.userId))));
+  for (let index = 0; index < distinctIds.length; index += 100) {
+    const keys = distinctIds.slice(index, index + 100).map((userId) => ({ userId }));
+    try {
+      let pendingKeys = keys;
+      do {
+        const result = await docClient.send(
+          new BatchGetCommand({
+            RequestItems: {
+              [USERS_TABLE]: {
+                Keys: pendingKeys,
+                ProjectionExpression: "userId, monetizationStatus",
+              },
+            },
+          })
+        ).catch(() => null);
+
+        const items = result?.Responses?.[USERS_TABLE] || [];
+        for (const item of items) {
+          monetizationStatuses.set(item.userId as string, (item.monetizationStatus as string) || "NOT_ELIGIBLE");
+        }
+
+        const unprocessed = result?.UnprocessedKeys?.[USERS_TABLE]?.Keys;
+        if (unprocessed && unprocessed.length > 0) {
+          pendingKeys = unprocessed as { userId: string }[];
+        } else {
+          break;
+        }
+      } while (true);
+    } catch (err) {
+      console.error("admin/creators: monetizationStatus batch get failed:", err);
+    }
+  }
+
   const withDocs = await Promise.all(
     allItems.map(async (item) => {
       const userId = String(item.userId);
@@ -198,11 +234,13 @@ export async function GET(request: NextRequest) {
         state: (item.state as string | null) || null,
         pincode: (item.pincode as string | null) || null,
         payoutFrequency: (item.payoutFrequency as string | null) || null,
- minPayoutAmount: (item.minPayoutAmount as number | null) || null,
+        minPayoutAmount: (item.minPayoutAmount as number | null) || null,
         submittedAt: (item.submittedAt as string | null) || null,
         reviewedAt: (item.reviewedAt as string | null) || null,
         reviewedBy: (item.reviewedBy as string | null) || null,
         rejectionReason: (item.rejectionReason as string | null) || null,
+        kycStatus: (item.kycStatus as string | null) || null,
+        monetizationStatus: monetizationStatuses.get(userId) || "NOT_ELIGIBLE",
         documents,
       };
     })
@@ -225,7 +263,7 @@ export async function POST(request: NextRequest) {
   if (!userId || typeof userId !== "string") {
     return NextResponse.json({ error: "userId is required." }, { status: 400 });
   }
-  if (action !== "approve" && action !== "reject") {
+  if (action !== "approve" && action !== "reject" && action !== "suspend" && action !== "unsuspend") {
     return NextResponse.json({ error: "Invalid action." }, { status: 400 });
   }
   if (action === "reject" && !reason?.trim()) {
@@ -255,7 +293,7 @@ export async function POST(request: NextRequest) {
           },
         })
       );
-    } else {
+    } else if (action === "reject") {
       await docClient.send(
         new UpdateCommand({
           TableName: PAYOUTS_TABLE,
@@ -271,6 +309,25 @@ export async function POST(request: NextRequest) {
           },
         })
       );
+    } else if (action === "suspend") {
+      await docClient.send(
+        new UpdateCommand({
+          TableName: USERS_TABLE,
+          Key: { userId },
+          UpdateExpression: "SET monetizationStatus = :status",
+          ExpressionAttributeValues: { ":status": "SUSPENDED" },
+        })
+      );
+    } else if (action === "unsuspend") {
+      await docClient.send(
+        new UpdateCommand({
+          TableName: USERS_TABLE,
+          Key: { userId },
+          UpdateExpression: "SET monetizationStatus = :status",
+          // Let them go back to MONETIZED immediately if they were suspended
+          ExpressionAttributeValues: { ":status": "MONETIZED" },
+        })
+      );
     }
   } catch (err) {
     console.error(`admin/creators: ${action} failed for ${userId}:`, err);
@@ -281,16 +338,20 @@ export async function POST(request: NextRequest) {
     request,
     adminId: admin.userId,
     adminEmail: admin.email,
-    action: action === "approve" ? "kyc.approve" : "kyc.reject",
+    action: action === "approve" ? "kyc.approve" :
+            action === "reject" ? "kyc.reject" :
+            action === "suspend" ? "monetization.suspend" : "monetization.unsuspend",
     targetType: "user",
     targetId: userId,
-    details: action === "reject" ? reason.trim() : undefined,
+    details: action === "reject" || action === "suspend" ? reason?.trim() : undefined,
   });
 
-  try {
-    await purgeDocuments(userId);
-  } catch (err) {
-    console.error(`admin/creators: document purge FAILED for ${userId}:`, err);
+  if (action === "approve" || action === "reject") {
+    try {
+      await purgeDocuments(userId);
+    } catch (err) {
+      console.error(`admin/creators: document purge FAILED for ${userId}:`, err);
+    }
   }
 
   return NextResponse.json({ success: true });

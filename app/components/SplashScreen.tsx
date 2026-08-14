@@ -285,14 +285,12 @@ export default function SplashScreen() {
         leaving ? "pointer-events-none opacity-0" : "opacity-100"
       }`}
     >
-      {!reducedMotion && (
-        <audio 
-          ref={audioRef} 
-          src="/sounds/splash-logo-sting.mp3" 
-          preload="auto" 
-          playsInline 
-        />
-      )}
+      <audio 
+        ref={audioRef} 
+        src="/sounds/splash-logo-sting.mp3" 
+        preload="auto" 
+        playsInline 
+      />
 
       {/* The flash burst — a brief, bright wash timed to hit exactly when
           the logo's zoom peaks, like a camera flash / lens flare at the

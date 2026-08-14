@@ -160,7 +160,7 @@ export async function createLinkedAccount(params: {
   bankAccountNumber: string;
   bankIfsc: string;
 }): Promise<RazorpayLinkedAccountResponse> {
-  const res = await fetch(`${RAZORPAY_API_BASE}/accounts`, {
+  const res = await fetch("https://api.razorpay.com/v2/accounts", {
     method: "POST",
     headers: { Authorization: authHeader(), "Content-Type": "application/json" },
     body: JSON.stringify({
@@ -195,7 +195,7 @@ export async function createLinkedAccount(params: {
   // second one), so the caller stores razorpayAccountStatus = "failed"
   // with this error rather than silently losing track of the id.
   try {
-    await fetch(`${RAZORPAY_API_BASE}/accounts/${encodeURIComponent(data.id)}/products`, {
+    const pRes = await fetch(`https://api.razorpay.com/v2/accounts/${encodeURIComponent(data.id)}/products`, {
       method: "POST",
       headers: { Authorization: authHeader(), "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -208,8 +208,16 @@ export async function createLinkedAccount(params: {
         },
       }),
     });
+    
+    // Check if the products call actually succeeded, so the caller doesn't assume success.
+    const pData = await pRes.json().catch(() => null);
+    if (!pRes.ok) {
+       throw new Error((pData?.error?.description as string) || "Razorpay products (settlement) config failed.");
+    }
   } catch (err) {
     console.error(`razorpay: settlement config failed for linked account ${data.id}:`, err);
+    // Throw so attemptRazorpayOnboarding sees this as a failure and allows retrying!
+    throw err;
   }
 
   return data as RazorpayLinkedAccountResponse;
@@ -221,7 +229,7 @@ export async function createLinkedAccount(params: {
 // either hasn't fired yet or was missed, so Reno never has to just guess
 // whether a vendor is actually ready to receive real transfers.
 export async function fetchLinkedAccount(accountId: string): Promise<RazorpayLinkedAccountResponse> {
-  const res = await fetch(`${RAZORPAY_API_BASE}/accounts/${encodeURIComponent(accountId)}`, {
+  const res = await fetch(`https://api.razorpay.com/v2/accounts/${encodeURIComponent(accountId)}`, {
     headers: { Authorization: authHeader() },
   });
   const data = await res.json();

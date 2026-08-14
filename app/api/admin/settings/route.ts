@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/app/lib/isAdmin";
 import { getPlatformSettings, updatePlatformSettings, PlatformSettings } from "@/app/lib/platformSettings";
 import { logAdminAction } from "@/app/lib/auditLog";
+import { docClient, MONETIZATION_CONFIG_HISTORY_TABLE } from "@/app/lib/dynamodb";
+import { PutCommand } from "@aws-sdk/lib-dynamodb";
+import { randomUUID } from "crypto";
 
 const AD_SLOT_SOURCES = ["house", "adsense", "off"];
 
@@ -94,11 +97,54 @@ export async function PATCH(request: NextRequest) {
     partial.midrollIntervalSeconds = Math.max(60, Math.min(3600, Math.round(body.midrollIntervalSeconds)));
   }
 
+  if (typeof body.monetizationEnabled === "boolean") partial.monetizationEnabled = body.monetizationEnabled;
+  if (typeof body.monetizationRequiredSubscribers === "number") partial.monetizationRequiredSubscribers = Math.max(0, body.monetizationRequiredSubscribers);
+  if (typeof body.monetizationRequiredVideoViews === "number") partial.monetizationRequiredVideoViews = Math.max(0, body.monetizationRequiredVideoViews);
+  if (typeof body.monetizationRequiredShortViews === "number") partial.monetizationRequiredShortViews = Math.max(0, body.monetizationRequiredShortViews);
+  if (typeof body.monetizationRequireBoth === "boolean") partial.monetizationRequireBoth = body.monetizationRequireBoth;
+  if (typeof body.monetizationRequireGoodStanding === "boolean") partial.monetizationRequireGoodStanding = body.monetizationRequireGoodStanding;
+  if (typeof body.monetizationCreatorShare === "number") partial.monetizationCreatorShare = Math.max(0, Math.min(1, body.monetizationCreatorShare));
+  if (typeof body.monetizationPlatformShare === "number") partial.monetizationPlatformShare = Math.max(0, Math.min(1, body.monetizationPlatformShare));
+
   if (Object.keys(partial).length === 0) {
     return NextResponse.json({ error: "No valid settings provided." }, { status: 400 });
   }
 
+  // Load old settings to compare
+  const currentSettings = await getPlatformSettings();
+
   const updated = await updatePlatformSettings(partial, admin.email);
+
+  // If revenue config changed, log a new version
+  const revenueConfigChanged = 
+    (typeof partial.monetizationEnabled === "boolean" && partial.monetizationEnabled !== currentSettings.monetizationEnabled) ||
+    (typeof partial.monetizationCreatorShare === "number" && partial.monetizationCreatorShare !== currentSettings.monetizationCreatorShare) ||
+    (typeof partial.monetizationPlatformShare === "number" && partial.monetizationPlatformShare !== currentSettings.monetizationPlatformShare) ||
+    (typeof partial.monetizationRequiredSubscribers === "number" && partial.monetizationRequiredSubscribers !== currentSettings.monetizationRequiredSubscribers);
+    
+  if (revenueConfigChanged) {
+    try {
+      const version = randomUUID();
+      await docClient.send(
+        new PutCommand({
+          TableName: MONETIZATION_CONFIG_HISTORY_TABLE,
+          Item: {
+            version,
+            createdAt: new Date().toISOString(),
+            adminEmail: admin.email,
+            enabled: updated.monetizationEnabled,
+            creatorShare: updated.monetizationCreatorShare,
+            platformShare: updated.monetizationPlatformShare,
+            requiredSubscribers: updated.monetizationRequiredSubscribers,
+            requiredVideoViews: updated.monetizationRequiredVideoViews,
+            requiredShortViews: updated.monetizationRequiredShortViews,
+          }
+        })
+      );
+    } catch (err) {
+      console.error("Failed to write Monetization-Config-History", err);
+    }
+  }
 
   await logAdminAction({
     request,

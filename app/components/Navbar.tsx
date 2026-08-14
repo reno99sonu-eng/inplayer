@@ -378,7 +378,7 @@ export default function Navbar() {
 
   {/* Mobile / tablet logo */}
   <div className="flex-shrink-0 ml-2 flex items-center min-w-0">
-    <div className={`transition-all duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
+    <div className={`transition-all duration-[1200ms] ease-in-out ${
       mobileLogoState === "hidden"
         ? "opacity-0 translate-y-1 scale-95"
         : "opacity-100 translate-y-0 scale-100"
@@ -387,7 +387,7 @@ export default function Navbar() {
         type="button"
         onClick={() => router.push("/")}
         aria-label="INPLAYER — Home"
-        className={`flex items-center overflow-hidden transition-[width] duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
+        className={`flex items-center overflow-hidden transition-[width] duration-[1200ms] ease-in-out ${
           mobileLogoState === "rolled-out"
             ? "w-[124px] sm:w-[134px]"
             : "w-[30px] sm:w-[32px]"
@@ -417,12 +417,12 @@ export default function Navbar() {
       ml-auto pushes it to the right side of the Mobile Row container, so it
       won't shift leftwards when the logo rolls back inside. */}
   {navbarTheme?.active && navbarTheme.imageUrl && (
-    <div className="ml-auto pr-2 sm:pr-4 flex items-center gap-1.5 flex-shrink-0 min-w-0">
+    <div className="ml-auto pr-8 sm:pr-10 md:pr-12 flex items-center gap-1.5 flex-shrink-0 min-w-0">
       {/* eslint-disable-next-line @next/next/no-img-element */}
       <img
         src={navbarTheme.imageUrl}
         alt="Occasion Graphic"
-        className="h-8 sm:h-9 md:h-10 w-auto flex-shrink-0 object-contain drop-shadow-[0_2px_12px_rgba(255,165,0,0.45)]"
+        className="h-8 sm:h-9 md:h-10 w-auto flex-shrink-0 object-contain drop-shadow-[0_2px_14px_rgba(255,140,0,0.85)]"
       />
 
       <div className="flex flex-col items-start justify-center text-left leading-[0.95] py-0.5 min-w-0">
@@ -443,7 +443,7 @@ export default function Navbar() {
           return lines.map((line, idx) => (
             <span
               key={idx}
-                className="whitespace-nowrap text-[9px] sm:text-[10px] font-black uppercase tracking-tight bg-gradient-to-r from-amber-300 via-orange-400 to-pink-400 bg-clip-text text-transparent animate-pulse drop-shadow-[0_1.5px_4px_rgba(0,0,0,0.85)]"
+                className="whitespace-nowrap text-[9px] sm:text-[10px] font-black uppercase tracking-tight bg-gradient-to-r from-amber-200 via-orange-500 to-pink-500 bg-clip-text text-transparent animate-pulse drop-shadow-[0_2px_6px_rgba(0,0,0,0.95)]"
               >
                 {line}
               </span>

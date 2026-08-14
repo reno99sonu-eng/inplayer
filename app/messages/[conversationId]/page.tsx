@@ -445,7 +445,7 @@ export default function ConversationThreadPage() {
   const textColorClass = theme.containerClass.replace(bgColorClass, "").trim();
 
   return (
-    <div className={`fixed inset-0 overflow-hidden flex flex-col ${textColorClass} bg-transparent`}>
+    <div className={`relative flex flex-col overflow-hidden h-[calc(100dvh-128px)] lg:h-[calc(100dvh-64px)] ${textColorClass} bg-transparent`}>
       {/* 1. Base Background Color (Lowest Layer) */}
       <div className={`absolute inset-0 z-0 pointer-events-none ${bgColorClass}`} />
 

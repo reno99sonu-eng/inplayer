@@ -7,7 +7,7 @@ import {
   Save,
   CheckCircle2,
   AlertTriangle,
-  DollarSign,
+  IndianRupee,
   Users,
   Eye,
   Shield,
@@ -210,7 +210,7 @@ export default function MonetizationSettingsPage() {
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3">
               <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-indigo-500/10">
-                <DollarSign size={16} className="text-indigo-300" />
+                <IndianRupee size={16} className="text-indigo-300" />
               </div>
               <div>
                 <h3 className="font-bold text-white light:text-slate-900">Global Monetization Enabled</h3>

@@ -10,6 +10,7 @@ import {
   Film,
   Flag,
   Copyright,
+  IndianRupee,
   DollarSign,
   Megaphone,
   Palette,
@@ -52,7 +53,7 @@ const inplayerItems = [
   { id: "ai-moderation", label: "AI Moderation", icon: Bot, href: "/admin/ai-moderation" },
   { id: "notifications", label: "Notifications", icon: Bell, href: "/admin/notifications" },
   { id: "settings", label: "Platform Settings", icon: Settings, href: "/admin/settings" },
-  { id: "monetization-settings", label: "Monetization Config", icon: DollarSign, href: "/admin/monetization-settings" },
+  { id: "monetization-settings", label: "Monetization Config", icon: IndianRupee, href: "/admin/monetization-settings" },
   { id: "audit-logs", label: "Audit Logs", icon: ScrollText, href: "/admin/audit-logs" },
   { id: "captions", label: "Maintenance", icon: Wrench, href: "/admin/captions" },
 ] as const;

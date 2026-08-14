@@ -6,8 +6,10 @@ import {
   REVENUE_LEDGER_TABLE,
   MEMBERSHIPS_TABLE,
   PAYOUTS_TABLE,
-  CREATOR_SHARE,
 } from "@/app/lib/creatorPayouts";
+import { getPlatformSettings } from "@/app/lib/platformSettings";
+import { GetCommand } from "@aws-sdk/lib-dynamodb";
+import { randomUUID } from "crypto";
 import {
   VENDORS_TABLE,
   VENDOR_SUBSCRIPTION_LEDGER_TABLE,
@@ -156,7 +158,29 @@ async function handleCharged(payload: RazorpayWebhookPayload["payload"]) {
   }
 
   const amountInr = paymentEntity.amount / 100;
-  const creatorShareInr = Math.round(amountInr * CREATOR_SHARE * 100) / 100;
+
+  // 1. Fetch live settings for the dynamic split
+  const settings = await getPlatformSettings();
+  const creatorShareRatio = typeof settings.monetizationCreatorShare === "number" ? settings.monetizationCreatorShare : 0.8;
+
+  // 2. Enforce Phase 5 monetization status
+  let isMonetized = false;
+  try {
+    const creatorUser = await docClient.send(
+      new GetCommand({
+        TableName: "InPlayer-Users",
+        Key: { userId: creatorId },
+        ProjectionExpression: "monetizationStatus"
+      })
+    );
+    isMonetized = creatorUser.Item?.monetizationStatus === "MONETIZED";
+  } catch (err) {
+    console.error(`Failed to verify monetization status for creator ${creatorId}`, err);
+  }
+
+  // Only calculate a non-zero share if they are explicitly monetized and global monetization is on
+  const canEarn = isMonetized && settings.monetizationEnabled !== false;
+  const creatorShareInr = canEarn ? Math.round(amountInr * creatorShareRatio * 100) / 100 : 0;
 
   // Idempotency gate: Razorpay retries webhook delivery on anything but a
   // 2xx response, and can also just legitimately send the same event more
@@ -188,16 +212,39 @@ async function handleCharged(payload: RazorpayWebhookPayload["payload"]) {
     throw err;
   }
 
-  // Only reached once, for a payment that was just recorded for the first
-  // time — credit the creator's real, running lifetime balance.
-  await docClient.send(
-    new UpdateCommand({
-      TableName: PAYOUTS_TABLE,
-      Key: { userId: creatorId },
-      UpdateExpression: "ADD lifetimeEarnedInr :share SET lastChargeAt = :now",
-      ExpressionAttributeValues: { ":share": creatorShareInr, ":now": new Date().toISOString() },
-    })
-  );
+  // Only reached once, for a payment that was just recorded for the first time.
+  // If they are monetized, credit the running balances and write to the earnings ledger.
+  if (canEarn && creatorShareInr > 0) {
+    const now = new Date().toISOString();
+    
+    // Credit running lifetime balance
+    await docClient.send(
+      new UpdateCommand({
+        TableName: PAYOUTS_TABLE,
+        Key: { userId: creatorId },
+        UpdateExpression: "ADD lifetimeEarnedInr :share SET lastChargeAt = :now",
+        ExpressionAttributeValues: { ":share": creatorShareInr, ":now": now },
+      })
+    );
+
+    // Record the specific transaction in the new Creator Earnings table
+    await docClient.send(
+      new PutCommand({
+        TableName: "InPlayer-Creator-Earnings",
+        Item: {
+          earningId: randomUUID(),
+          creatorId: creatorId,
+          source: "MEMBERSHIP",
+          amountInr: creatorShareInr,
+          grossAmountInr: amountInr,
+          status: "PENDING",
+          createdAt: now,
+          razorpayPaymentId: paymentEntity.id,
+          razorpaySubscriptionId: subEntity.id,
+        }
+      })
+    );
+  }
 
   await docClient.send(
     new UpdateCommand({

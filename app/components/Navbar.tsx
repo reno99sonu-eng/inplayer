@@ -39,17 +39,16 @@ export default function Navbar() {
   const { signedIn, user, signOut, openSignIn, openSignUp } = useAuthModal();
   const [navbarTheme, setNavbarTheme] = useState<{ active: boolean; imageUrl: string; occasionId?: string; title?: string } | null>(null);
 
-  const [mobileLogoReady, setMobileLogoReady] = useState(false);
-  const [mobileLogoShrink, setMobileLogoShrink] = useState(false);
+  const [mobileLogoState, setMobileLogoState] = useState<"hidden" | "rolled-out" | "rolled-in">("hidden");
 
   useEffect(() => {
     let fallbackTimer: ReturnType<typeof setTimeout>;
     let shrinkTimer: ReturnType<typeof setTimeout>;
 
     const onSplashDone = () => {
-      setMobileLogoReady(true);
+      setMobileLogoState("rolled-out");
       // Wait 2.5 seconds after reveal, then shrink down to the triangle
-      shrinkTimer = setTimeout(() => setMobileLogoShrink(true), 2500);
+      shrinkTimer = setTimeout(() => setMobileLogoState("rolled-in"), 2500);
     };
 
     // If the splash already dismissed before this component mounted (race
@@ -62,8 +61,8 @@ export default function Navbar() {
       // No splash on screen — animate immediately (with a tiny delay so
       // the browser has painted the navbar first).
       fallbackTimer = setTimeout(() => {
-        setMobileLogoReady(true);
-        shrinkTimer = setTimeout(() => setMobileLogoShrink(true), 2500);
+        setMobileLogoState("rolled-out");
+        shrinkTimer = setTimeout(() => setMobileLogoState("rolled-in"), 2500);
       }, 80);
     } else {
       // Splash is present — wait for it to dismiss.
@@ -71,8 +70,8 @@ export default function Navbar() {
       // Safety fallback: if the event never fires (e.g. the failsafe
       // script in layout.tsx force-killed the splash), animate after 3.5s.
       fallbackTimer = setTimeout(() => {
-        setMobileLogoReady(true);
-        shrinkTimer = setTimeout(() => setMobileLogoShrink(true), 2500);
+        setMobileLogoState("rolled-out");
+        shrinkTimer = setTimeout(() => setMobileLogoState("rolled-in"), 2500);
       }, 3500);
     }
 
@@ -377,25 +376,21 @@ export default function Navbar() {
     </button>
   </div>
 
-  {/* Mobile / tablet logo + Festive Occasion Graphic */}
+  {/* Mobile / tablet logo */}
   <div className="flex-shrink-0 ml-2 flex items-center min-w-0">
-    {/* Pure Clean Mobile Logo — this wrapper (and ONLY this one; the
-        desktop <NavbarLogo /> above in the `hidden lg:flex` block is
-        untouched) plays a one-time "roll out, then settle back in" bounce
-        once the splash screen has finished dismissing, per Reno's ask for
-        a mobile-only logo entrance. The animation class is applied via
-        the mobileLogoReady state (see the useEffect above) instead of
-        being hard-coded, so it doesn't fire invisibly behind the splash
-        curtain. Before the splash finishes, the logo is simply hidden
-        (opacity-0) so there's no layout shift — it pops in with the
-        bounce animation the moment the splash fades away. */}
-    <div className={mobileLogoReady ? "animate-navbar-logo-reveal" : "opacity-0"}>
+    <div className={`transition-all duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
+      mobileLogoState === "hidden"
+        ? "opacity-0 translate-y-1 scale-95"
+        : "opacity-100 translate-y-0 scale-100"
+    }`}>
       <button
         type="button"
         onClick={() => router.push("/")}
         aria-label="INPLAYER — Home"
-        className={`flex items-center overflow-hidden transition-[width] duration-700 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-          mobileLogoShrink ? "w-[30px] sm:w-[32px]" : "w-[124px] sm:w-[134px]"
+        className={`flex items-center overflow-hidden transition-[width] duration-[800ms] ease-[cubic-bezier(0.16,1,0.3,1)] ${
+          mobileLogoState === "rolled-out"
+            ? "w-[124px] sm:w-[134px]"
+            : "w-[30px] sm:w-[32px]"
         }`}
       >
         <div className="w-[124px] sm:w-[134px] flex-shrink-0 flex items-center justify-start">
@@ -416,38 +411,38 @@ export default function Navbar() {
         </div>
       </button>
     </div>
+  </div>
 
-    {/* Festive Occasion Graphic + greeting text, side by side — same fix
-        as the desktop block above (see its comment): text used to sit
-        directly behind/under the image in the same box, so the graphic
-        always covered part of it. Side by side, both stay fully visible. */}
-    {navbarTheme?.active && navbarTheme.imageUrl && (
-      <div className="ml-4 sm:ml-6 flex items-center gap-1.5 flex-shrink-0 min-w-0">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          src={navbarTheme.imageUrl}
-          alt="Occasion Graphic"
-          className="h-8 sm:h-9 md:h-10 w-auto flex-shrink-0 object-contain drop-shadow-[0_2px_12px_rgba(255,165,0,0.45)]"
-        />
+  {/* Festive Occasion Graphic + greeting text, side by side — moved to the right!
+      ml-auto pushes it to the right side of the Mobile Row container, so it
+      won't shift leftwards when the logo rolls back inside. */}
+  {navbarTheme?.active && navbarTheme.imageUrl && (
+    <div className="ml-auto pr-2 sm:pr-4 flex items-center gap-1.5 flex-shrink-0 min-w-0">
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={navbarTheme.imageUrl}
+        alt="Occasion Graphic"
+        className="h-8 sm:h-9 md:h-10 w-auto flex-shrink-0 object-contain drop-shadow-[0_2px_12px_rgba(255,165,0,0.45)]"
+      />
 
-        <div className="flex flex-col items-start justify-center text-left leading-[0.95] py-0.5 min-w-0">
-          {(() => {
-            const occId = navbarTheme.occasionId;
-            let lines: string[] = ["OCCASION", "CELEBRATION", "THEME"];
-            if (occId === "independence_day") lines = ["HAPPY", "INDEPENDENCE", "DAY"];
-            else if (occId === "diwali") lines = ["HAPPY", "DIWALI", "FESTIVAL"];
-            else if (occId === "holi") lines = ["HAPPY", "HOLI", "FESTIVAL"];
-            else if (occId === "republic_day") lines = ["HAPPY", "REPUBLIC", "DAY"];
-            else if (occId === "new_year") lines = ["HAPPY", "NEW YEAR", "2026"];
-            else if (occId === "cyberpunk") lines = ["CYBERPUNK", "TECH", "MODE"];
-            else if (navbarTheme.title) {
-              const parts = navbarTheme.title.toUpperCase().split(" ");
-              lines = parts.length >= 3 ? parts.slice(0, 3) : [parts[0] || "OCCASION", parts[1] || "CELEBRATION", parts[2] || "THEME"];
-            }
+      <div className="flex flex-col items-start justify-center text-left leading-[0.95] py-0.5 min-w-0">
+        {(() => {
+          const occId = navbarTheme.occasionId;
+          let lines: string[] = ["OCCASION", "CELEBRATION", "THEME"];
+          if (occId === "independence_day") lines = ["HAPPY", "INDEPENDENCE", "DAY"];
+          else if (occId === "diwali") lines = ["HAPPY", "DIWALI", "FESTIVAL"];
+          else if (occId === "holi") lines = ["HAPPY", "HOLI", "FESTIVAL"];
+          else if (occId === "republic_day") lines = ["HAPPY", "REPUBLIC", "DAY"];
+          else if (occId === "new_year") lines = ["HAPPY", "NEW YEAR", "2026"];
+          else if (occId === "cyberpunk") lines = ["CYBERPUNK", "TECH", "MODE"];
+          else if (navbarTheme.title) {
+            const parts = navbarTheme.title.toUpperCase().split(" ");
+            lines = parts.length >= 3 ? parts.slice(0, 3) : [parts[0] || "OCCASION", parts[1] || "CELEBRATION", parts[2] || "THEME"];
+          }
 
-            return lines.map((line, idx) => (
-              <span
-                key={idx}
+          return lines.map((line, idx) => (
+            <span
+              key={idx}
                 className="whitespace-nowrap text-[9px] sm:text-[10px] font-black uppercase tracking-tight bg-gradient-to-r from-amber-300 via-orange-400 to-pink-400 bg-clip-text text-transparent animate-pulse drop-shadow-[0_1.5px_4px_rgba(0,0,0,0.85)]"
               >
                 {line}
@@ -457,7 +452,6 @@ export default function Navbar() {
         </div>
       </div>
     )}
-  </div>
 
 </div>
 

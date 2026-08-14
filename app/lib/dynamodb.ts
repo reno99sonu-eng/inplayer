@@ -20,3 +20,6 @@ export function getDocClient() {
 }
 
 export const docClient = getDocClient();
+
+export const MONETIZATION_CONFIG_HISTORY_TABLE = "InPlayer-Monetization-Config-History";
+export const CREATOR_EARNINGS_TABLE = "InPlayer-Creator-Earnings";

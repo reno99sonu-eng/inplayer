@@ -160,16 +160,14 @@ export async function createLinkedAccount(params: {
   bankAccountNumber: string;
   bankIfsc: string;
 }): Promise<RazorpayLinkedAccountResponse> {
-  const res = await fetch("https://api.razorpay.com/v2/accounts", {
-    method: "POST",
-    headers: { Authorization: authHeader(), "Content-Type": "application/json" },
-    body: JSON.stringify({
+    const isBusiness = params.businessType === "business";
+    const payload: any = {
       email: params.email,
       phone: params.phone || "9999999999",
       type: "route",
       reference_id: params.vendorId,
       legal_business_name: params.legalName,
-      business_type: params.businessType === "business" ? "partnership" : "individual",
+      business_type: isBusiness ? "partnership" : "individual",
       contact_name: params.legalName,
       profile: {
         category: "ecommerce",
@@ -185,11 +183,19 @@ export async function createLinkedAccount(params: {
           },
         },
       },
-      legal_info: {
-        pan: params.panNumber,
-      },
-    }),
-  });
+    };
+
+    if (isBusiness) {
+      payload.legal_info = { pan: params.panNumber };
+    } else {
+      payload.profile.pan = params.panNumber;
+    }
+
+    const res = await fetch("https://api.razorpay.com/v2/accounts", {
+      method: "POST",
+      headers: { Authorization: authHeader(), "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
   const data = await res.json();
   if (!res.ok) {
     throw new Error((data?.error?.description as string) || "Razorpay linked account creation failed.");

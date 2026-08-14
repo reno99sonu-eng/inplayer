@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { fetchAuthSession } from "aws-amplify/auth";
 import {
   IndianRupee,
@@ -15,13 +15,11 @@ import {
   PlaySquare,
 } from "lucide-react";
 import {
-  ELIGIBILITY_THRESHOLD,
   PAYOUT_FREQUENCIES,
   PayoutFrequency,
   MIN_PAYOUT_AMOUNT_DEFAULT,
   MIN_PAYOUT_AMOUNT_BOUNDS,
   MEMBERSHIP_PRICE_INR,
-  CREATOR_SHARE,
   calculateRevenueBalance,
   getNextPayoutWindow,
 } from "@/app/lib/creatorPayouts";
@@ -86,9 +84,53 @@ export default function RevenueSection({
   const [amountError, setAmountError] = useState<string | null>(null);
   const [amountSaved, setAmountSaved] = useState(false);
 
-  const meetsThreshold =
-    subscriberCount >= ELIGIBILITY_THRESHOLD.subscribers &&
-    (totalViews >= ELIGIBILITY_THRESHOLD.videoViews || totalViews >= ELIGIBILITY_THRESHOLD.shortViews);
+  const [monetizeData, setMonetizeData] = useState<any>(null);
+  const [monetizeLoading, setMonetizeLoading] = useState(true);
+  const [activating, setActivating] = useState(false);
+
+  useEffect(() => {
+    async function fetchStatus() {
+      try {
+        const session = await fetchAuthSession();
+        const idToken = session.tokens?.idToken?.toString();
+        if (!idToken) return;
+        const res = await fetch("/api/creator/monetize/status", {
+          headers: { Authorization: `Bearer ${idToken}` }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          setMonetizeData(data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch monetization status", err);
+      } finally {
+        setMonetizeLoading(false);
+      }
+    }
+    fetchStatus();
+  }, []);
+
+  const handleActivateMonetization = async () => {
+    setActivating(true);
+    try {
+      const session = await fetchAuthSession();
+      const idToken = session.tokens?.idToken?.toString();
+      const res = await fetch("/api/creator/monetize/activate", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${idToken}` }
+      });
+      if (res.ok) {
+        setMonetizeData((prev: any) => ({
+          ...prev,
+          state: { ...prev?.state, status: "MONETIZED" }
+        }));
+      }
+    } catch (err) {
+      console.error("Failed to activate monetization", err);
+    } finally {
+      setActivating(false);
+    }
+  };
 
   // Real number now: lifetimeEarnedInr is credited by the Razorpay webhook
   // handler on every confirmed paid-membership charge (this creator's 80%
@@ -190,7 +232,7 @@ export default function RevenueSection({
 </h3>
       </div>
 
-      {loading || !payoutStatus ? (
+      {loading || monetizeLoading || !payoutStatus || !monetizeData ? (
         <div className="mt-4 flex items-center justify-center py-10 text-slate-500">
           <Loader2 size={20} className="animate-spin" />
         </div>
@@ -228,7 +270,7 @@ export default function RevenueSection({
               </div>
             </div>
             <p className="mt-2.5 text-xs leading-relaxed text-slate-500 light:text-slate-600">
-              Your {Math.round(CREATOR_SHARE * 100)}% share of every paid
+              Your {Math.round((monetizeData?.eligibility?.thresholds?.revenueShare || 0.8) * 100)}% share of every paid
               InPlayer membership (₹{MEMBERSHIP_PRICE_INR}/month per member) —{" "}
               {meetsPayoutThreshold
                 ? `you're over your ₹${minPayoutAmount.toLocaleString("en-IN")} minimum, so this queues for transfer in the payout window above`
@@ -357,7 +399,7 @@ export default function RevenueSection({
             </button>
           </div>
         )
-      ) : meetsThreshold ? (
+      ) : monetizeData?.state?.status === "MONETIZED" ? (
         showKycForm ? (
           <KycForm
             onSubmitted={() =>
@@ -372,12 +414,10 @@ export default function RevenueSection({
         ) : (
           <div className="mt-4 rounded-xl border border-orange-400/20 bg-orange-500/[0.06] px-3 py-3">
             <p className="flex items-center gap-1.5 text-sm font-bold text-orange-300 light:text-orange-700">
-              <CheckCircle2 size={16} /> You&apos;ve unlocked monetization
+              <CheckCircle2 size={16} /> Monetization Active
             </p>
             <p className="mt-1 text-xs leading-relaxed text-slate-400 light:text-slate-600">
-              You&apos;re past {ELIGIBILITY_THRESHOLD.subscribers} In-Family members
-              and {ELIGIBILITY_THRESHOLD.views.toLocaleString()} views. Complete
-              a short KYC to start generating revenue.
+              You are now earning revenue from memberships! Complete a short KYC to set up your bank account payouts.
             </p>
             <button
               onClick={() => setShowKycForm(true)}
@@ -387,11 +427,27 @@ export default function RevenueSection({
             </button>
           </div>
         )
+      ) : monetizeData?.state?.status === "ELIGIBLE" ? (
+        <div className="mt-4 rounded-xl border border-orange-400/20 bg-orange-500/[0.06] px-3 py-3">
+          <p className="flex items-center gap-1.5 text-sm font-bold text-orange-300 light:text-orange-700">
+            <CheckCircle2 size={16} /> You're Eligible for Monetization!
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-slate-400 light:text-slate-600">
+            You've reached the required milestones. Activate monetization to start earning your {Math.round((monetizeData?.eligibility?.thresholds?.revenueShare || 0.8) * 100)}% share of membership fees.
+          </p>
+          <button
+            onClick={handleActivateMonetization}
+            disabled={activating}
+            className="mt-3 rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-5 py-2 text-xs font-bold text-white shadow-[0_10px_25px_rgba(255,153,0,.3)] transition-all hover:-translate-y-0.5 disabled:opacity-60"
+          >
+            {activating ? "Activating..." : "Activate Monetization"}
+          </button>
+        </div>
       ) : (
         <div className="mt-4 space-y-4">
           <p className="text-xs text-slate-500 light:text-slate-600">
-            Monetization unlocks automatically when you reach {ELIGIBILITY_THRESHOLD.subscribers} In-Family members
-            AND either {ELIGIBILITY_THRESHOLD.videoViews.toLocaleString()} video views or 1,000,000 (1 Million) Raftaar reels views on your channel!
+            Monetization unlocks automatically when you reach {monetizeData?.eligibility?.thresholds?.subscribers?.toLocaleString() || 500} In-Family members
+            AND either {monetizeData?.eligibility?.thresholds?.videoViews?.toLocaleString() || 50000} video views or {(monetizeData?.eligibility?.thresholds?.shortViews || 1000000).toLocaleString()} Raftaar reels views!
           </p>
 
           <div>
@@ -400,10 +456,10 @@ export default function RevenueSection({
                 <Users size={13} /> In-Family members
               </span>
               <span className="text-slate-500">
-                {subscriberCount.toLocaleString()} / {ELIGIBILITY_THRESHOLD.subscribers.toLocaleString()}
+                {monetizeData?.eligibility?.metrics?.subscribers?.toLocaleString() || 0} / {monetizeData?.eligibility?.thresholds?.subscribers?.toLocaleString() || 500}
               </span>
             </div>
-            <ProgressBar value={subscriberCount} max={ELIGIBILITY_THRESHOLD.subscribers} />
+            <ProgressBar value={monetizeData?.eligibility?.metrics?.subscribers || 0} max={monetizeData?.eligibility?.thresholds?.subscribers || 500} />
           </div>
 
           <div>
@@ -412,22 +468,22 @@ export default function RevenueSection({
                 <Eye size={13} /> Longform Video Views
               </span>
               <span className="text-slate-500">
-                {totalViews.toLocaleString()} / {ELIGIBILITY_THRESHOLD.videoViews.toLocaleString()}
+                {monetizeData?.eligibility?.metrics?.videoViews?.toLocaleString() || 0} / {monetizeData?.eligibility?.thresholds?.videoViews?.toLocaleString() || 50000}
               </span>
             </div>
-            <ProgressBar value={totalViews} max={ELIGIBILITY_THRESHOLD.videoViews} />
+            <ProgressBar value={monetizeData?.eligibility?.metrics?.videoViews || 0} max={monetizeData?.eligibility?.thresholds?.videoViews || 50000} />
           </div>
 
           <div>
             <div className="mb-1 flex items-center justify-between text-xs">
               <span className="flex items-center gap-1.5 font-semibold text-slate-300 light:text-slate-700">
-                <PlaySquare size={13} /> Raftaar Reels Views (1M Requirement)
+                <PlaySquare size={13} /> Raftaar Reels Views
               </span>
               <span className="text-slate-500">
-                {totalViews.toLocaleString()} / {ELIGIBILITY_THRESHOLD.shortViews.toLocaleString()} (1M)
+                {monetizeData?.eligibility?.metrics?.shortViews?.toLocaleString() || 0} / {monetizeData?.eligibility?.thresholds?.shortViews?.toLocaleString() || 1000000}
               </span>
             </div>
-            <ProgressBar value={totalViews} max={ELIGIBILITY_THRESHOLD.shortViews} />
+            <ProgressBar value={monetizeData?.eligibility?.metrics?.shortViews || 0} max={monetizeData?.eligibility?.thresholds?.shortViews || 1000000} />
           </div>
         </div>
       )}

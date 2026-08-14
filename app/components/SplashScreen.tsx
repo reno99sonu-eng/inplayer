@@ -90,6 +90,8 @@ export default function SplashScreen() {
     return true;
   });
   const [leaving, setLeaving] = useState(false);
+  
+  const audioRef = useRef<HTMLAudioElement>(null);
   const { user, authLoading } = useAuthModal();
 
   // Read inside the dismiss timer below (see the mount effect further
@@ -187,12 +189,10 @@ export default function SplashScreen() {
     //      keydown) that retries playback — so the sting still plays if
     //      the user taps anywhere on the splash curtain or page before it
     //      fades out, rather than being silently swallowed.
-    let sting: HTMLAudioElement | null = null;
     let interactionCleanup: (() => void) | null = null;
     let isSplashActive = true;
-    if (!reducedMotion) {
-      sting = new Audio("/sounds/splash-logo-sting.mp3");
-      sting.preload = "auto";
+    if (!reducedMotion && audioRef.current) {
+      const sting = audioRef.current;
 
       // Try to "unlock" audio on browsers that allow AudioContext resume
       // without a user gesture (Chrome desktop, some Android builds).
@@ -261,7 +261,9 @@ export default function SplashScreen() {
       // the same still-mounted instance, not a real unmount — the sting is
       // deliberately left to finish its own natural decay/reverb tail in
       // that case rather than being cut off mid-note.
-      sting?.pause();
+      if (audioRef.current) {
+        audioRef.current.pause();
+      }
       // Remove any pending interaction-retry listeners (mobile audio
       // fallback) if the component tears down before the user tapped.
       interactionCleanup?.();
@@ -283,6 +285,15 @@ export default function SplashScreen() {
         leaving ? "pointer-events-none opacity-0" : "opacity-100"
       }`}
     >
+      {!reducedMotion && (
+        <audio 
+          ref={audioRef} 
+          src="/sounds/splash-logo-sting.mp3" 
+          preload="auto" 
+          playsInline 
+        />
+      )}
+
       {/* The flash burst — a brief, bright wash timed to hit exactly when
           the logo's zoom peaks, like a camera flash / lens flare at the
           moment of impact. This is the single "punchy" beat the whole

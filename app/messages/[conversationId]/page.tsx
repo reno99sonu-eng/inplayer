@@ -516,8 +516,14 @@ export default function ConversationThreadPage() {
           </button>
 
           {settingsOpen && (
-            <div className="absolute right-0 z-20 mt-2 w-64 overflow-hidden rounded-2xl border border-white/10 light:border-black/10 bg-[#0B1524] light:bg-white shadow-[0_20px_50px_rgba(0,0,0,.4)]">
-              <button
+            <>
+              {/* Invisible overlay to catch outside clicks and close the menu */}
+              <div
+                className="fixed inset-0 z-10"
+                onClick={() => setSettingsOpen(false)}
+              />
+              <div className="absolute right-0 z-20 mt-2 w-64 overflow-hidden rounded-2xl border border-white/10 light:border-black/10 bg-[#0B1524] light:bg-white shadow-[0_20px_50px_rgba(0,0,0,.4)]">
+                <button
                 onClick={() => handleAction(conversation?.muted ? "unmute" : "mute")}
                 disabled={actionBusy}
                 className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-sm font-semibold text-slate-200 light:text-slate-800 transition hover:bg-white/5 light:hover:bg-black/5 disabled:opacity-50"
@@ -583,6 +589,7 @@ export default function ConversationThreadPage() {
                 {conversation?.blocked ? "Unblock" : "Block"} @{displayUsername}
               </button>
             </div>
+            </>
           )}
         </div>
       </div>

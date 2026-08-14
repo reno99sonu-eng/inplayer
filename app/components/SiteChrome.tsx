@@ -62,7 +62,7 @@ export default function SiteChrome({
         <GeoGate initialGeoAllowed={initialGeoAllowed}>
           <Navbar />
           <AnnouncementBanner />
-          <div className="pb-20 lg:pb-0">{children}</div>
+          <div className="pb-20 lg:pb-0 flex-1 flex flex-col w-full h-full min-h-0">{children}</div>
           <MobileBottomNav />
         </GeoGate>
       </MaintenanceGate>

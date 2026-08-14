@@ -174,6 +174,15 @@ export async function createLinkedAccount(params: {
       profile: {
         category: "ecommerce",
         subcategory: "ecommerce",
+        addresses: {
+          registered: {
+            street1: "Not provided",
+            city: "Unknown",
+            state: "Unknown",
+            postal_code: "000000",
+            country: "IN",
+          },
+        },
       },
       legal_info: {
         pan: params.panNumber,

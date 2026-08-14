@@ -189,6 +189,7 @@ export default function SplashScreen() {
     //      fades out, rather than being silently swallowed.
     let sting: HTMLAudioElement | null = null;
     let interactionCleanup: (() => void) | null = null;
+    let isSplashActive = true;
     if (!reducedMotion) {
       sting = new Audio("/sounds/splash-logo-sting.mp3");
       sting.preload = "auto";
@@ -206,7 +207,9 @@ export default function SplashScreen() {
         // Autoplay blocked — set up a one-shot interaction listener to
         // retry on the user's first tap/click/keydown.
         const retryPlay = () => {
-          sting?.play().catch(() => {});
+          if (isSplashActive) {
+            sting?.play().catch(() => {});
+          }
           cleanup();
         };
         const cleanup = () => {
@@ -236,7 +239,11 @@ export default function SplashScreen() {
         window.dispatchEvent(new CustomEvent("splashDismissed"));
       }, extraDelay);
       removeTimer = window.setTimeout(
-        () => setVisible(false),
+        () => {
+          isSplashActive = false;
+          interactionCleanup?.();
+          setVisible(false);
+        },
         extraDelay + fadeOutMs
       );
     }, holdMs);

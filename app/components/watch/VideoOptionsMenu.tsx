@@ -17,6 +17,7 @@ import {
   Flag,
   ThumbsUp,
   ThumbsDown,
+  Share2,
 } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 
@@ -99,6 +100,8 @@ export default function VideoOptionsMenu({
   contentType,
 }: VideoOptionsMenuProps) {
   const { signedIn, openSignIn } = useAuthModal();
+
+  const [shared, setShared] = useState(false);
 
   const [open, setOpen] = useState(false);
   const [view, setView] = useState<PanelView>("main");
@@ -362,6 +365,21 @@ export default function VideoOptionsMenu({
     }
   };
 
+  const handleShare = async () => {
+    const url = `${window.location.origin}/watch/${videoId}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ url });
+      } else {
+        await navigator.clipboard.writeText(url);
+        setShared(true);
+        setTimeout(() => setShared(false), 2000);
+      }
+    } catch (err) {
+      // Ignored
+    }
+  };
+
   return (
     <div className="relative">
       <button
@@ -429,6 +447,11 @@ export default function VideoOptionsMenu({
                     icon={<ListMusic size={18} />}
                     label="Save to playlist"
                     onClick={() => setView("playlists")}
+                  />
+                  <MenuRow
+                    icon={shared ? <Check size={18} className="text-emerald-400" /> : <Share2 size={18} />}
+                    label={shared ? "Link copied" : "Share"}
+                    onClick={handleShare}
                   />
                   <MenuRow
                     icon={<Bookmark size={18} className={saved ? "fill-current text-orange-300" : ""} />}

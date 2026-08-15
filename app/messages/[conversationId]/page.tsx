@@ -128,7 +128,18 @@ export default function ConversationThreadPage() {
       const res = await fetch(`/api/messages/${params.conversationId}/messages`, { headers });
       if (res.ok) {
         const data = await res.json();
-        setMessages(data.messages || []);
+        const newMessages = data.messages || [];
+        setMessages((prev) => {
+          // Play sound if a new message arrived from the other user
+          if (prev.length > 0 && newMessages.length > prev.length) {
+            const latestMsg = newMessages[newMessages.length - 1];
+            if (latestMsg.senderId !== user?.userId) {
+              const audio = new Audio("/sounds/pop.mp3");
+              audio.play().catch(() => {});
+            }
+          }
+          return newMessages;
+        });
         setOtherLastReadAt(data.otherLastReadAt || null);
         setOtherIsTyping(!!data.otherIsTyping);
       }

@@ -210,62 +210,58 @@ export default function SponsorshipsPage() {
   };
 
   return (
-    <div className="mx-auto max-w-[1100px] px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mb-6 flex items-center gap-3">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[#FF7A18] via-[#FF9A00] to-[#FFD54A]">
-          <Megaphone size={22} className="text-white" />
+    <div className="mx-auto max-w-[900px] px-4 py-6 sm:px-6 lg:px-8">
+      <div className="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
+        <div className="flex items-center gap-3">
+          <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] shadow-lg shadow-orange-500/20">
+            <Megaphone size={22} className="text-white" />
+          </div>
+          <div>
+            <h1 className="text-xl font-black text-white light:text-slate-900 sm:text-2xl">Sponsor an Ad</h1>
+            <p className="text-xs text-slate-400 light:text-slate-600">
+              Run your ad for {durationDays} days across InPlayer.
+            </p>
+          </div>
         </div>
-        <div>
-          <h1 className="text-xl font-black text-white light:text-slate-900 sm:text-2xl">Sponsor an Ad on InPlayer</h1>
-          <p className="text-xs text-slate-400 light:text-slate-600 sm:text-sm">
-            Run your ad for {durationDays} days across InPlayer's real ad placements.
-          </p>
-        </div>
-      </div>
 
-      {/* Buy / Dashboard / Profile — one panel, three tabs, so a signed-in
-          sponsor never has to leave this page to check on a running
-          campaign or update their saved details. Only shown once signed
-          in: a signed-out visitor has nothing to see in the other two tabs
-          yet, so Buy is all they get (clicking "Sponsor Now" prompts
-          sign-in, same as before). */}
-      {signedIn && (
-        <div className="mb-6 inline-flex rounded-full border border-white/10 bg-white/[0.04] p-1 light:border-black/10 light:bg-black/[0.04]">
-          <button
-            type="button"
-            onClick={() => setActiveTab("buy")}
-            className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${
-              activeTab === "buy"
-                ? "bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white shadow-lg shadow-orange-500/20"
-                : "text-slate-400 hover:text-slate-200 light:text-slate-600 light:hover:text-slate-900"
-            }`}
-          >
-            <Tag size={13} /> Buy a Sponsorship
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("dashboard")}
-            className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${
-              activeTab === "dashboard"
-                ? "bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white shadow-lg shadow-orange-500/20"
-                : "text-slate-400 hover:text-slate-200 light:text-slate-600 light:hover:text-slate-900"
-            }`}
-          >
-            <LayoutList size={13} /> My Dashboard
-          </button>
-          <button
-            type="button"
-            onClick={() => setActiveTab("profile")}
-            className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${
-              activeTab === "profile"
-                ? "bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white shadow-lg shadow-orange-500/20"
-                : "text-slate-400 hover:text-slate-200 light:text-slate-600 light:hover:text-slate-900"
-            }`}
-          >
-            <UserCog size={13} /> Profile & Settings
-          </button>
-        </div>
-      )}
+        {signedIn && (
+          <div className="inline-flex flex-shrink-0 rounded-full border border-white/10 bg-white/[0.04] p-1 light:border-black/10 light:bg-black/[0.04]">
+            <button
+              type="button"
+              onClick={() => setActiveTab("buy")}
+              className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${
+                activeTab === "buy"
+                  ? "bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white shadow-lg shadow-orange-500/20"
+                  : "text-slate-400 hover:text-slate-200 light:text-slate-600 light:hover:text-slate-900"
+              }`}
+            >
+              <Tag size={13} /> Buy
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("dashboard")}
+              className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${
+                activeTab === "dashboard"
+                  ? "bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white shadow-lg shadow-orange-500/20"
+                  : "text-slate-400 hover:text-slate-200 light:text-slate-600 light:hover:text-slate-900"
+              }`}
+            >
+              <LayoutList size={13} /> Dashboard
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab("profile")}
+              className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${
+                activeTab === "profile"
+                  ? "bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white shadow-lg shadow-orange-500/20"
+                  : "text-slate-400 hover:text-slate-200 light:text-slate-600 light:hover:text-slate-900"
+              }`}
+            >
+              <UserCog size={13} /> Profile
+            </button>
+          </div>
+        )}
+      </div>
 
       {activeTab === "dashboard" && signedIn && <SponsorshipDashboardPanel />}
       {activeTab === "profile" && signedIn && <SponsorshipProfilePanel />}
@@ -281,12 +277,13 @@ export default function SponsorshipsPage() {
               {packages.map((pkg) => (
                 <div
                   key={pkg.packageType}
-                  className={`flex flex-col rounded-2xl border p-5 ${
+                  className={`group relative flex flex-col overflow-hidden rounded-2xl border p-5 transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl ${
                     pkg.packageType === "bundle"
-                      ? "border-orange-500/40 bg-gradient-to-br from-orange-500/10 to-amber-400/5"
-                      : "border-white/10 bg-[#071120] light:border-black/10 light:bg-white"
+                      ? "border-orange-500/40 bg-gradient-to-br from-orange-500/10 to-amber-400/5 hover:border-orange-500/60 hover:shadow-orange-500/20"
+                      : "border-white/10 bg-white/5 backdrop-blur-md light:border-black/10 light:bg-black/5 hover:border-white/20 light:hover:border-black/20"
                   }`}
                 >
+                  <div className="absolute inset-0 -z-10 bg-gradient-to-br from-white/0 to-white/5 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
                   {pkg.packageType === "bundle" && (
                     <span className="mb-2 inline-flex w-fit items-center rounded-full bg-orange-500/20 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wide text-orange-300 light:text-orange-700">
                       Everywhere on InPlayer
@@ -296,7 +293,7 @@ export default function SponsorshipsPage() {
                   <p className="mt-1 text-sm text-slate-400 light:text-slate-600">{pkg.description}</p>
                   <div className="mt-3 flex flex-wrap gap-1.5">
                     {pkg.sections.map((s) => (
-                      <span key={s} className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] font-bold text-slate-300 light:bg-black/5 light:text-slate-700">
+                      <span key={s} className="rounded-full bg-white/10 px-2.5 py-0.5 text-[10px] font-bold text-slate-200 backdrop-blur-sm light:bg-black/5 light:text-slate-700">
                         {SECTION_LABELS[s] || s}
                       </span>
                     ))}
@@ -307,7 +304,7 @@ export default function SponsorshipsPage() {
                   </div>
                   <button
                     onClick={() => startCheckout(pkg)}
-                    className="mt-4 rounded-xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-4 py-2.5 text-sm font-bold text-white shadow-md transition hover:-translate-y-0.5"
+                    className="mt-4 w-full rounded-xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-4 py-2.5 text-sm font-bold text-white shadow-md transition-all duration-300 hover:scale-[1.02] hover:shadow-orange-500/30 active:scale-95"
                   >
                     Sponsor Now
                   </button>
@@ -316,60 +313,55 @@ export default function SponsorshipsPage() {
             </div>
           )}
 
-          <div className="mt-6 rounded-2xl border border-white/10 bg-white/[0.02] p-4 text-xs leading-5 text-slate-400 light:border-black/10 light:bg-black/[0.02] light:text-slate-600">
-            <p className="font-bold text-slate-300 light:text-slate-700">How it works</p>
-            <p className="mt-1">
-              1. Pick a package and pay securely — the exact poster ratios/specs for your placement(s) are shown right after payment.
-            </p>
-            <p className="mt-1">
-              2. Email your ad assets (and your website URL) to <strong>inplayerdigital@gmail.com</strong>, mentioning your reference number.
-            </p>
-            <p className="mt-1">
-              3. InPlayer activates your ad — your {durationDays}-day run starts the moment it goes live, and you can track views/clicks
-              anytime from <strong>My Sponsorships</strong> once signed in.
-            </p>
+          <div className="mt-6 flex flex-col gap-4 rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-md transition-all duration-300 hover:border-white/20 sm:flex-row sm:items-start light:border-black/10 light:bg-black/5 light:hover:border-black/20">
+            <div className="flex-shrink-0 text-sm font-black text-white light:text-slate-900">How it works</div>
+            <div className="flex flex-col gap-3 text-xs leading-5 text-slate-400 light:text-slate-600 sm:flex-row sm:gap-6">
+              <p className="flex-1"><strong className="text-white light:text-slate-900">1. Pay securely</strong> — The exact poster ratios and specs are shown right after payment.</p>
+              <p className="flex-1"><strong className="text-white light:text-slate-900">2. Email assets</strong> — Send your assets and URL to <strong>inplayerdigital@gmail.com</strong> with your reference ID.</p>
+              <p className="flex-1"><strong className="text-white light:text-slate-900">3. Go live</strong> — Your {durationDays}-day run starts when live. Track it in your Dashboard.</p>
+            </div>
           </div>
         </div>
       )}
 
       {activeTab === "buy" && view === "checkoutForm" && selectedPackage && (
-        <div className="mx-auto max-w-lg">
+        <div className="mx-auto max-w-2xl">
           <button
             onClick={() => setView("pricing")}
-            className="mb-4 flex items-center gap-1.5 text-xs font-semibold text-slate-400 hover:text-white light:text-slate-600 light:hover:text-slate-900"
+            className="mb-4 flex items-center gap-1.5 text-xs font-semibold text-slate-400 transition hover:-translate-x-1 hover:text-white light:text-slate-600 light:hover:text-slate-900"
           >
             <ArrowLeft size={14} /> Back to packages
           </button>
 
-          <div className="rounded-2xl border border-white/10 bg-[#071120] p-5 light:border-black/10 light:bg-white">
-            <div className="mb-4 flex items-center justify-between border-b border-white/10 pb-4 light:border-black/10">
+          <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-md shadow-2xl light:border-black/10 light:bg-white">
+            <div className="mb-6 flex items-center justify-between border-b border-white/10 pb-4 light:border-black/10">
               <div>
-                <p className="text-sm font-black text-white light:text-slate-900">{selectedPackage.label}</p>
-                <p className="text-xs text-slate-400 light:text-slate-600">{durationDays} days</p>
+                <p className="text-base font-black text-white light:text-slate-900">{selectedPackage.label}</p>
+                <p className="text-xs font-medium text-slate-400 light:text-slate-600">{durationDays} days campaign</p>
               </div>
-              <p className="text-xl font-black text-white light:text-slate-900">₹{selectedPackage.amountInr.toLocaleString("en-IN")}</p>
+              <p className="text-2xl font-black text-white light:text-slate-900">₹{selectedPackage.amountInr.toLocaleString("en-IN")}</p>
             </div>
 
-            <div className="space-y-3">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               {([
                 ["companyName", "Company / brand name"],
                 ["contactName", "Contact person's name"],
                 ["contactEmail", "Contact email"],
                 ["contactPhone", "Contact phone"],
-                ["websiteUrl", "Website URL (where clicks redirect to)"],
+                ["websiteUrl", "Website URL"],
                 ["legalName", "Legal business name (KYC)"],
                 ["panOrGst", "PAN or GST number (KYC)"],
                 ["businessAddress", "Business address (KYC)"],
               ] as [keyof FormState, string][]).map(([field, label]) => (
                 <div key={field}>
-                  <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-400 light:text-slate-600">
+                  <label className="mb-1.5 block text-[10px] font-black uppercase tracking-wide text-slate-400 light:text-slate-600">
                     {label}
                   </label>
                   <input
                     type="text"
                     value={form[field]}
                     onChange={(e) => handleFormChange(field, e.target.value)}
-                    className="w-full rounded-xl border border-white/10 bg-[#060D18] px-3 py-2 text-sm text-white outline-none focus:border-orange-400/50 light:border-black/10 light:bg-white light:text-slate-900"
+                    className="w-full rounded-xl border border-white/10 bg-[#060D18]/50 px-3 py-2.5 text-sm text-white outline-none transition focus:border-orange-400/50 focus:bg-[#060D18] light:border-black/10 light:bg-black/5 light:text-slate-900 light:focus:bg-white"
                   />
                 </div>
               ))}
@@ -385,10 +377,10 @@ export default function SponsorshipsPage() {
             <button
               onClick={handleSubmitPayment}
               disabled={submitting}
-              className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-4 py-3 text-sm font-bold text-white shadow-md transition hover:-translate-y-0.5 disabled:opacity-60"
+              className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-4 py-3.5 text-sm font-black text-white shadow-lg transition-all duration-300 hover:scale-[1.02] hover:shadow-orange-500/30 disabled:opacity-60 active:scale-95"
             >
-              {submitting ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />}
-              {submitting ? "Opening payment…" : `Pay ₹${selectedPackage.amountInr.toLocaleString("en-IN")}`}
+              {submitting ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
+              {submitting ? "Opening payment gateway…" : `Pay ₹${selectedPackage.amountInr.toLocaleString("en-IN")}`}
             </button>
           </div>
         </div>

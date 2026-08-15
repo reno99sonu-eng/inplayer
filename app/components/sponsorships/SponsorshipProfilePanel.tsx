@@ -121,29 +121,29 @@ export default function SponsorshipProfilePanel() {
   }
 
   return (
-    <div className="mx-auto max-w-lg">
+    <div className="mx-auto max-w-2xl">
       <div className="mb-4 flex items-start gap-3">
-        <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-orange-500/10">
+        <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-orange-500/10 shadow-sm shadow-orange-500/10">
           <UserCog size={16} className="text-orange-300 light:text-orange-700" />
         </div>
-        <p className="text-xs text-slate-400 light:text-slate-600">
+        <p className="text-xs leading-5 text-slate-400 light:text-slate-600">
           Saved here once, reused to prefill every future sponsorship you buy — you'll never have to
           retype your company/contact/KYC details again.
         </p>
       </div>
 
-      <div className="rounded-2xl border border-white/10 bg-[#071120] p-5 light:border-black/10 light:bg-white">
-        <div className="space-y-3">
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur-md shadow-2xl light:border-black/10 light:bg-white">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           {FIELDS.map(([field, label]) => (
             <div key={field}>
-              <label className="mb-1 block text-[11px] font-bold uppercase tracking-wide text-slate-400 light:text-slate-600">
+              <label className="mb-1.5 block text-[10px] font-black uppercase tracking-wide text-slate-400 light:text-slate-600">
                 {label}
               </label>
               <input
                 type="text"
                 value={form[field]}
                 onChange={(e) => update(field, e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-[#060D18] px-3 py-2 text-sm text-white outline-none focus:border-orange-400/50 light:border-black/10 light:bg-white light:text-slate-900"
+                className="w-full rounded-xl border border-white/10 bg-[#060D18]/50 px-3 py-2.5 text-sm text-white outline-none transition focus:border-orange-400/50 focus:bg-[#060D18] light:border-black/10 light:bg-black/5 light:text-slate-900 light:focus:bg-white"
               />
             </div>
           ))}
@@ -162,13 +162,13 @@ export default function SponsorshipProfilePanel() {
           </div>
         )}
 
-        <div className="mt-5 flex items-center justify-between">
+        <div className="mt-6 flex items-center justify-between border-t border-white/10 pt-4 light:border-black/10">
           <button
             onClick={save}
             disabled={saving}
-            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-4 py-2.5 text-sm font-bold text-white shadow-md transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60"
+            className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-5 py-2.5 text-sm font-black text-white shadow-lg transition-all duration-300 hover:scale-[1.02] hover:shadow-orange-500/30 disabled:cursor-not-allowed disabled:opacity-60 active:scale-95"
           >
-            {saving ? <Loader2 size={15} className="animate-spin" /> : <Save size={15} />}
+            {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
             Save changes
           </button>
           {updatedAt && (

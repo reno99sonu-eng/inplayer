@@ -135,10 +135,10 @@ export default function SponsorshipDashboardPanel() {
             const rowAnalytics = analytics[row.sponsorshipId] || [];
 
             return (
-              <div key={row.sponsorshipId} className="rounded-2xl border border-white/10 bg-[#071120] p-4 light:border-black/10 light:bg-white">
+              <div key={row.sponsorshipId} className="rounded-2xl border border-white/10 bg-white/5 p-4 backdrop-blur-md transition-all duration-300 hover:border-white/20 sm:p-5 light:border-black/10 light:bg-black/5 light:hover:border-black/20">
                 <button
                   onClick={() => toggleExpand(row.sponsorshipId)}
-                  className="flex w-full flex-wrap items-center justify-between gap-2 text-left"
+                  className="flex w-full flex-wrap items-center justify-between gap-2 text-left transition hover:-translate-x-0.5"
                 >
                   <div>
                     <div className="flex flex-wrap items-center gap-2">

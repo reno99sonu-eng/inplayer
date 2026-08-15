@@ -308,34 +308,27 @@ export default function NavbarActions() {
                     </>
                   );
 
-                  const className = `rounded-xl px-3 py-2.5 ${
+                  const className = `block w-full text-left transition hover:brightness-110 rounded-xl px-3 py-2.5 ${
                     n.read
                       ? "bg-white/5 light:bg-black/5"
                       : "bg-orange-500/10 border border-orange-400/20"
                   }`;
 
-                  // Only the new message-related types navigate anywhere
-                  // — like/comment/subscribe notifications keep their
-                  // existing (purely display) behavior untouched.
-                  if (isMessageType && n.conversationId) {
-                    return (
-                      <button
-                        key={n.notificationId}
-                        onClick={() => {
-                          setNotifOpen(false);
-                          router.push(`/messages/${n.conversationId}`);
-                        }}
-                        className={`block w-full text-left transition hover:brightness-110 ${className}`}
-                      >
-                        {content}
-                      </button>
-                    );
-                  }
-
                   return (
-                    <div key={n.notificationId} className={className}>
+                    <button
+                      key={n.notificationId}
+                      onClick={() => {
+                        setNotifOpen(false);
+                        if (isMessageType && n.conversationId) {
+                          router.push(`/messages/${n.conversationId}`);
+                        } else if (n.videoId) {
+                          router.push(`/watch/${n.videoId}`);
+                        }
+                      }}
+                      className={className}
+                    >
                       {content}
-                    </div>
+                    </button>
                   );
                 })}
               </div>

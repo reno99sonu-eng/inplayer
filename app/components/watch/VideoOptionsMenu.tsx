@@ -406,7 +406,7 @@ export default function VideoOptionsMenu({
           >
             <div
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-[380px] rounded-2xl border border-white/10 light:border-black/10 bg-[#0A1424] light:bg-[#FBF6EA] p-3 shadow-[0_25px_70px_-20px_rgba(0,0,0,.6)]"
+              className="w-full max-w-[320px] rounded-2xl border border-white/10 light:border-black/10 bg-[#0A1424]/75 light:bg-[#FBF6EA]/80 backdrop-blur-xl p-3 shadow-[0_25px_70px_-20px_rgba(0,0,0,.6)]"
             >
               <div className="mb-1 flex items-center justify-between px-1 pb-2">
                 <div className="flex items-center gap-1.5">

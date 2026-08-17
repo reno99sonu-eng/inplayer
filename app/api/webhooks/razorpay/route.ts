@@ -489,6 +489,14 @@ async function handleSponsorshipPaymentCaptured(payload: RazorpayWebhookPayload[
       html: `<h2>Payment confirmed</h2><p>Your payment of <strong>₹${sponsorship.amountInr.toLocaleString("en-IN")}</strong> for <strong>${sectionLabels}</strong> is confirmed.</p><p>Reference: <strong>${sponsorshipId}</strong></p><p>To go live, email your ad assets (and your website URL, if it's changed) to <strong>inplayerdigital@gmail.com</strong>, mentioning your reference above. Your 7-day run starts the moment InPlayer activates your ad.</p>`,
     }).catch((err) => console.error(`razorpay webhook: sponsor confirmation email failed for ${sponsorshipId}:`, err));
 
+    if (sponsorship.contactPhone && sponsorship.contactName) {
+       void sendOrderConfirmationMessage(
+         sponsorship.contactPhone,
+         sponsorship.contactName,
+         `₹${sponsorship.amountInr.toLocaleString("en-IN")}`
+       ).catch((err) => console.error(`razorpay webhook: WhatsApp confirmation failed for sponsor ${sponsorshipId}:`, err));
+    }
+
     void sendEmail({
       to: "inplayerdigital@gmail.com",
       subject: `New paid sponsorship awaiting assets — ${sponsorship.companyName}`,

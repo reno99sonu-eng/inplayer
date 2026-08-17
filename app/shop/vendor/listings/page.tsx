@@ -8,7 +8,7 @@ import { authedFetch } from "@/app/lib/apiFetch";
 import { compressImageToThumbnail } from "@/app/lib/imageCompress";
 import type { HammartProduct } from "@/app/lib/hammartProducts";
 
-const CATEGORIES = ["Merchandise", "Digital Products", "Handicrafts", "Fashion", "Electronics", "Home & Living", "Other"];
+const CATEGORIES = ["Merchandise", "Digital Products", "Handicrafts", "Fashion", "Electronics", "Home & Living", "InPlay Originals", "Other"];
 
 const COUNTRIES = ["India", "United States", "Germany", "Japan", "China", "United Kingdom", "United Arab Emirates", "France", "Vietnam", "Taiwan", "Other"];
 

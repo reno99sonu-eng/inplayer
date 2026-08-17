@@ -24,6 +24,7 @@ const CATEGORIES = [
   "Fashion",
   "Electronics",
   "Home & Living",
+  "InPlay Originals",
   "Other",
 ];
 

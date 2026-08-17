@@ -7,12 +7,13 @@ import { CAPTION_TARGETS } from "@/app/lib/captions";
 
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { videoId: string } }
+  { params }: { params: Promise<{ videoId: string }> }
 ) {
   try {
     const auth = await verifyAuth(request);
     if (!auth) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
+    const { videoId } = await params;
     const { languageCode, vttContent } = await request.json();
     if (!languageCode || !vttContent) {
       return NextResponse.json({ error: "Missing parameters" }, { status: 400 });
@@ -25,7 +26,7 @@ export async function PATCH(
     const getRes = await docClient.send(
       new GetCommand({
         TableName: "InPlayer-Videos",
-        Key: { videoId: params.videoId }
+        Key: { videoId }
       })
     );
 
@@ -41,7 +42,7 @@ export async function PATCH(
     await docClient.send(
       new UpdateCommand({
         TableName: "InPlayer-Videos",
-        Key: { videoId: params.videoId },
+        Key: { videoId },
         UpdateExpression: "SET captionsVtt = :captions",
         ExpressionAttributeValues: {
           ":captions": currentCaptions
@@ -65,7 +66,7 @@ export async function PATCH(
           
           // Add new track pointing to our internal endpoint
           await mux.video.assets.createTrack(video.muxAssetId, {
-             url: `${origin}/api/videos/${params.videoId}/captions/${languageCode}`,
+             url: `${origin}/api/videos/${videoId}/captions/${languageCode}`,
              type: "text",
              text_type: "subtitles",
              language_code: languageCode,

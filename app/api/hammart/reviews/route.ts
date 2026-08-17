@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
   const result = await createReview({
     productId: body.productId,
     userId: user.userId,
-    userName: user.name,
+    userName: user.name || "Anonymous",
     userAvatar: user.profilePictureUrl || undefined,
     rating: body.rating,
     comment: body.comment || "",

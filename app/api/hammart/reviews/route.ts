@@ -19,7 +19,6 @@ export async function POST(request: NextRequest) {
     productId: body.productId,
     userId: user.userId,
     userName: user.name || "Anonymous",
-    userAvatar: user.profilePictureUrl || undefined,
     rating: body.rating,
     comment: body.comment || "",
   });

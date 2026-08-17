@@ -834,14 +834,20 @@ const showAvatar =
                 <Smile size={19} />
               </button>
               {emojiPickerOpen && (
-                <div className="absolute bottom-full left-0 z-20 mb-2">
-                  <EmojiPicker
-                    onSelect={(emoji) => {
-                      setText((prev) => prev + emoji);
-                      pingTyping();
-                    }}
+                <>
+                  <div
+                    className="fixed inset-0 z-10"
+                    onClick={() => setEmojiPickerOpen(false)}
                   />
-                </div>
+                  <div className="absolute bottom-full left-0 z-20 mb-2">
+                    <EmojiPicker
+                      onSelect={(emoji) => {
+                        setText((prev) => prev + emoji);
+                        pingTyping();
+                      }}
+                    />
+                  </div>
+                </>
               )}
             </div>
 

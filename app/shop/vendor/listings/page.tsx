@@ -20,6 +20,7 @@ function AddListingForm({ onCreated }: { onCreated: () => void }) {
   const [countryOfOrigin, setCountryOfOrigin] = useState("India");
   const [category, setCategory] = useState(CATEGORIES[0]);
   const [priceInr, setPriceInr] = useState("");
+  const [stockQuantity, setStockQuantity] = useState("1");
   const [imageUrls, setImageUrls] = useState<string[]>([]);
   const [processingImage, setProcessingImage] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -66,6 +67,11 @@ function AddListingForm({ onCreated }: { onCreated: () => void }) {
       setError("Please enter a valid price.");
       return;
     }
+    const parsedStock = parseInt(stockQuantity, 10);
+    if (!Number.isFinite(parsedStock) || parsedStock < 0) {
+      setError("Please enter a valid stock quantity (0 or more).");
+      return;
+    }
 
     setSubmitting(true);
     try {
@@ -79,6 +85,7 @@ function AddListingForm({ onCreated }: { onCreated: () => void }) {
           countryOfOrigin,
           category,
           priceInr: price,
+          stockQuantity: parsedStock,
           imageUrl: imageUrls.length > 0 ? imageUrls[0] : null,
           imageUrls,
         }),
@@ -99,6 +106,7 @@ function AddListingForm({ onCreated }: { onCreated: () => void }) {
       setHsCode("");
       setCountryOfOrigin("India");
       setPriceInr("");
+      setStockQuantity("1");
       setImageUrls([]);
       onCreated();
     } catch (err) {
@@ -209,7 +217,7 @@ function AddListingForm({ onCreated }: { onCreated: () => void }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         <div>
           <label className="block text-[11px] font-semibold text-slate-400 light:text-slate-700 mb-1">Category</label>
           <select
@@ -236,6 +244,18 @@ function AddListingForm({ onCreated }: { onCreated: () => void }) {
               className="w-full rounded-xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-white py-2.5 pl-8 pr-3 text-sm text-white light:text-slate-900 outline-none focus:border-orange-400/50"
             />
           </div>
+        </div>
+
+        <div>
+          <label className="block text-[11px] font-semibold text-slate-400 light:text-slate-700 mb-1">Stock Qty</label>
+          <input
+            type="number"
+            inputMode="numeric"
+            value={stockQuantity}
+            onChange={(e) => setStockQuantity(e.target.value)}
+            placeholder="Quantity"
+            className="w-full rounded-xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-white px-3 py-2.5 text-sm text-white light:text-slate-900 outline-none focus:border-orange-400/50"
+          />
         </div>
       </div>
 
@@ -369,7 +389,9 @@ export default function VendorListingsPage() {
               )}
               <div className="min-w-0 flex-1">
                 <p className="truncate text-sm font-semibold text-white light:text-slate-900">{p.title}</p>
-                <p className="text-xs text-slate-400 light:text-slate-600">₹{p.priceInr.toLocaleString("en-IN")} · {p.category}</p>
+                <p className="text-xs text-slate-400 light:text-slate-600">
+                  ₹{p.priceInr.toLocaleString("en-IN")} · {p.category} · Stock: {p.stockQuantity}
+                </p>
                 {p.flagged && (
                   <p className="mt-0.5 flex items-center gap-1 text-[11px] text-amber-400">
                     <AlertTriangle size={11} /> Flagged — hidden from buyers

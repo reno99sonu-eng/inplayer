@@ -67,6 +67,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Please enter a valid price." }, { status: 400 });
   }
 
+  const stockQuantity = typeof body.stockQuantity === "number" ? body.stockQuantity : undefined;
+
   // Hammart's own AI Moderation toggle (Admin Panel -> Hammart ->
   // AI Moderation), independent from InPlayer's three content toggles —
   // previously this check always ran unconditionally with no way to turn
@@ -88,6 +90,7 @@ export async function POST(request: NextRequest) {
     countryOfOrigin,
     category,
     priceInr,
+    stockQuantity: stockQuantity ?? 9999, // Fallback if missing
     imageUrl,
     imageUrls: imageUrls.length > 0 ? imageUrls : (imageUrl ? [imageUrl] : []),
     flagged: moderation.checked && moderation.banned,

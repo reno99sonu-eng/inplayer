@@ -605,6 +605,13 @@ export default function ProductPage() {
           <div className="mt-6 pt-4 border-t border-white/10 light:border-slate-300">
             {isOwnListing ? (
               <p className="text-xs font-semibold text-slate-500 light:text-slate-700">This is your own listing.</p>
+            ) : product && product.stockQuantity !== undefined && product.stockQuantity <= 0 ? (
+              <div className="flex flex-col gap-2">
+                <span className="self-start rounded-md bg-red-500/10 px-3 py-1.5 text-xs font-bold text-red-500">
+                  Out of Stock
+                </span>
+                <p className="text-xs text-slate-400">This item is currently unavailable.</p>
+              </div>
             ) : !checkoutGroup ? (
               <>
                 <div className="flex items-center gap-3">
@@ -619,7 +626,10 @@ export default function ProductPage() {
                     <span className="w-8 text-center text-sm font-bold text-white light:text-slate-900">{buyQuantity}</span>
                     <button
                       type="button"
-                      onClick={() => setBuyQuantity((q) => Math.min(20, q + 1))}
+                      onClick={() => {
+                        const maxQty = product?.stockQuantity ? Math.min(20, product.stockQuantity) : 20;
+                        setBuyQuantity((q) => Math.min(maxQty, q + 1));
+                      }}
                       className="flex h-10 w-10 items-center justify-center text-slate-300 light:text-slate-700 hover:text-orange-400 light:hover:text-orange-600"
                     >
                       <Plus size={14} />

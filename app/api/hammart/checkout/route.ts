@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAuth } from "@/app/lib/verifyAuth";
-import { getProduct, type HammartProduct } from "@/app/lib/hammartProducts";
+import { getProduct, decrementProductStock, type HammartProduct } from "@/app/lib/hammartProducts";
 import { getVendorProfile } from "@/app/lib/hammartVendors";
 import { createOrder } from "@/app/lib/hammartOrders";
 import type { HammartOrder } from "@/app/lib/hammartOrders";
@@ -10,6 +10,7 @@ import { createOrderWithTransfer } from "@/app/lib/razorpay";
 import { buildUpiLink } from "@/app/lib/upi";
 import { sendEmail } from "@/app/lib/ses";
 import { resolveCognitoEmails } from "@/app/lib/cognitoClient";
+import { sendOrderConfirmationMessage, sendVendorOrderMessage } from "@/app/lib/whatsapp";
 
 // Hammart checkout — one order-batch per VENDOR GROUP, not per product
 // line: a cart with 3 items from the same seller becomes one payment (of
@@ -107,6 +108,10 @@ export async function POST(request: NextRequest) {
     }
     if (product.vendorUserId === user.userId) {
       failedItems.push({ productId, productTitle: product.title, error: "You can't buy your own listing." });
+      continue;
+    }
+    if (product.stockQuantity !== undefined && quantity > product.stockQuantity) {
+      failedItems.push({ productId, productTitle: product.title, error: `Only ${product.stockQuantity} available in stock.` });
       continue;
     }
     resolvedItems.push({ productId, quantity, product });
@@ -209,7 +214,10 @@ export async function POST(request: NextRequest) {
           ? { platformFeeInr: platformCommissionInr(lineTotal), vendorPayoutInr: vendorPayoutInr(lineTotal) }
           : {}),
       });
-      if (result.success && result.order) createdOrders.push(result.order);
+      if (result.success && result.order) {
+        createdOrders.push(result.order);
+        await decrementProductStock(item.product.productId, item.quantity).catch(err => console.error("Failed to decrement stock:", err));
+      }
     }
 
     if (createdOrders.length === 0) {
@@ -308,6 +316,12 @@ export async function POST(request: NextRequest) {
         }).catch((err) => console.error("Failed to email buyer UPI order confirmation:", err));
       }
 
+      void sendOrderConfirmationMessage(
+        buyerPhone,
+        buyerName,
+        `₹${groupSubtotal.toLocaleString("en-IN")}`
+      ).catch((err) => console.error("Failed to send WhatsApp UPI order confirmation:", err));
+
       if (vendorEmail) {
         void sendEmail({
           to: vendorEmail,
@@ -315,6 +329,14 @@ export async function POST(request: NextRequest) {
           text: `A buyer has placed an order for:\n${itemLines}\n\nTotal to collect: ₹${groupSubtotal.toLocaleString("en-IN")}\n\nThe buyer will pay you directly via your UPI ID (${vendor.upiId}). Confirm this order from your Orders page only once you've actually verified the payment arrived.\n\nCustomer: ${buyerName} · ${buyerPhone}\nDelivery: ${[deliveryAddress, city, state, pincode].filter(Boolean).join(", ")}`,
           html: `<p>A buyer has placed an order for:</p><pre>${itemLines}</pre><p><strong>Total to collect:</strong> ₹${groupSubtotal.toLocaleString("en-IN")}</p><p>The buyer will pay you directly via your UPI ID (<strong>${vendor.upiId}</strong>). Confirm this order from your Orders page only once you've actually verified the payment arrived.</p><p><strong>Customer:</strong> ${buyerName} · ${buyerPhone}<br/><strong>Delivery:</strong> ${[deliveryAddress, city, state, pincode].filter(Boolean).join(", ")}</p>`,
         }).catch((err) => console.error("Failed to email vendor of new UPI Hammart order:", err));
+      }
+
+      if (vendor.whatsappNumber) {
+        void sendVendorOrderMessage(
+          vendor.whatsappNumber,
+          vendor.vendorId,
+          `Order(s) ${orderIdsDisplay}: ${createdOrders.length} item(s) (₹${groupSubtotal.toLocaleString("en-IN")}) to collect via UPI.`
+        ).catch((err) => console.error(`WhatsApp vendor notification failed for UPI order ${orderIdsDisplay}:`, err));
       }
     }
   }

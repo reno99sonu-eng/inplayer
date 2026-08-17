@@ -148,6 +148,13 @@ export default function CartPage() {
   const [itemFailures, setItemFailures] = useState<ItemFailureState[]>([]);
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
 
+  // OTP Verification State
+  const [showOtpModal, setShowOtpModal] = useState(false);
+  const [otpInput, setOtpInput] = useState("");
+  const [otpError, setOtpError] = useState<string | null>(null);
+  const [verifyingOtp, setVerifyingOtp] = useState(false);
+  const [sendingOtp, setSendingOtp] = useState(false);
+
   const openCheckout = () => {
     setBuyerNameInput(user?.name || "");
     setBuyerEmail(user?.email || "");
@@ -243,6 +250,57 @@ export default function CartPage() {
     }
 
     setCheckoutError(null);
+    setSendingOtp(true);
+    
+    try {
+      const res = await authedFetch("/api/whatsapp/send-otp", {
+        method: "POST",
+        body: JSON.stringify({ phone: buyerPhone }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to send OTP.");
+      }
+      setShowOtpModal(true);
+    } catch (err) {
+       console.error("OTP send failed:", err);
+       setCheckoutError(err instanceof Error ? err.message : "Couldn't send OTP right now.");
+    } finally {
+       setSendingOtp(false);
+    }
+  };
+
+  const handleVerifyOtp = async () => {
+     if (!otpInput.trim() || otpInput.length < 6) {
+        setOtpError("Please enter a valid 6-digit OTP.");
+        return;
+     }
+     
+     setOtpError(null);
+     setVerifyingOtp(true);
+
+     try {
+       const res = await authedFetch("/api/whatsapp/verify-otp", {
+         method: "POST",
+         body: JSON.stringify({ phone: buyerPhone, otp: otpInput.trim() }),
+       });
+       const data = await res.json();
+       if (!res.ok) {
+          throw new Error(data.error || "Invalid OTP.");
+       }
+       
+       setShowOtpModal(false);
+       setOtpInput("");
+       executeCheckout();
+     } catch (err) {
+        console.error("OTP verification failed:", err);
+        setOtpError(err instanceof Error ? err.message : "Verification failed.");
+     } finally {
+        setVerifyingOtp(false);
+     }
+  };
+
+  const executeCheckout = async () => {
     setCheckingOut(true);
 
     let response;
@@ -564,7 +622,7 @@ export default function CartPage() {
                         <button
                           type="button"
                           onClick={() => updateQuantity(it.productId, it.quantity + 1)}
-                          disabled={busyProductId === it.productId || it.quantity >= 20}
+                          disabled={busyProductId === it.productId || it.quantity >= (it.product.stockQuantity ?? 20)}
                           className="flex h-7 w-7 items-center justify-center text-slate-300 light:text-slate-700 disabled:opacity-40"
                         >
                           <Plus size={12} />

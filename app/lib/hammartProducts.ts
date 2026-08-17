@@ -35,6 +35,7 @@ export interface HammartProduct {
   flagged: boolean;
   flaggedCategory: string | null;
   flaggedReason: string | null;
+  stockQuantity: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -54,6 +55,7 @@ export interface CreateProductInput {
   flagged: boolean;
   flaggedCategory: string | null;
   flaggedReason: string | null;
+  stockQuantity: number;
 }
 
 export async function createProduct(
@@ -81,6 +83,7 @@ export async function createProduct(
     flagged: input.flagged,
     flaggedCategory: input.flaggedCategory,
     flaggedReason: input.flaggedReason,
+    stockQuantity: input.stockQuantity,
     createdAt: now,
     updatedAt: now,
   };
@@ -171,6 +174,31 @@ export async function setProductStatus(productId: string, status: ProductStatus)
 
 export async function deleteProduct(productId: string): Promise<void> {
   await docClient.send(new DeleteCommand({ TableName: PRODUCTS_TABLE, Key: { productId } }));
+}
+
+export async function decrementProductStock(productId: string, decrementBy: number): Promise<{ success: boolean; outOfStock?: boolean }> {
+  try {
+    await docClient.send(
+      new UpdateCommand({
+        TableName: PRODUCTS_TABLE,
+        Key: { productId },
+        UpdateExpression: "SET stockQuantity = stockQuantity - :dec, updatedAt = :now",
+        ConditionExpression: "stockQuantity >= :dec",
+        ExpressionAttributeValues: {
+          ":dec": decrementBy,
+          ":now": new Date().toISOString(),
+        },
+      })
+    );
+    return { success: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "";
+    if (message.includes("ConditionalCheckFailed")) {
+      return { success: false, outOfStock: true };
+    }
+    console.error("decrementProductStock: failed:", err);
+    return { success: false };
+  }
 }
 
 // scanAll uses "#status" as an ExpressionAttributeName alias since "status"

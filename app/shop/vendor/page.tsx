@@ -321,12 +321,15 @@ export default function VendorDashboardPage() {
             <ShieldCheck size={12} />
             Unlimited Product Listings Enabled.
           </p>
-          <div className="mt-1 flex gap-2">
+          <div className="mt-1 flex flex-wrap justify-center gap-2">
             <Link href="/shop/vendor/listings" className="rounded-xl border border-white/10 light:border-black/10 px-4 py-2 text-xs font-bold text-slate-200 light:text-slate-800 hover:bg-white/5">
               My Listings
             </Link>
             <Link href="/shop/vendor/orders" className="rounded-xl border border-white/10 light:border-black/10 px-4 py-2 text-xs font-bold text-slate-200 light:text-slate-800 hover:bg-white/5">
               Orders Received
+            </Link>
+            <Link href="/shop/vendor/settings" className="rounded-xl border border-white/10 light:border-black/10 px-4 py-2 text-xs font-bold text-slate-200 light:text-slate-800 hover:bg-white/5">
+              Settings
             </Link>
           </div>
         </div>

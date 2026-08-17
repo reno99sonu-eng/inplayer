@@ -431,24 +431,30 @@ export default function ShopPage() {
                         </div>
                       )}
 
-                      {/* Quick Add to Cart — preventDefault/stopPropagation
-                          so it doesn't trigger the card's own Link
-                          navigation to the product page. */}
-                      <button
-                        type="button"
-                        onClick={(e) => handleQuickAddToCart(e, p)}
-                        disabled={addingProductId === p.productId}
-                        title="Add to cart"
-                        className="absolute bottom-1.5 right-1.5 flex h-8 w-8 items-center justify-center rounded-full bg-orange-500 text-white shadow-lg transition hover:bg-orange-600 disabled:opacity-70"
-                      >
-                        {addingProductId === p.productId ? (
-                          <Loader2 size={14} className="animate-spin" />
-                        ) : addedProductIds.has(p.productId) ? (
-                          <Check size={14} />
-                        ) : (
-                          <ShoppingCart size={14} />
-                        )}
-                      </button>
+                      {/* Out of Stock overlay or Quick Add to Cart */}
+                      {p.stockQuantity !== undefined && p.stockQuantity <= 0 ? (
+                        <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                          <span className="rounded-md bg-red-500/90 px-2 py-1 text-[10px] font-bold text-white uppercase tracking-wider">
+                            Out of Stock
+                          </span>
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={(e) => handleQuickAddToCart(e, p)}
+                          disabled={addingProductId === p.productId}
+                          title="Add to cart"
+                          className="absolute bottom-1.5 right-1.5 flex h-8 w-8 items-center justify-center rounded-full bg-orange-500 text-white shadow-lg transition hover:bg-orange-600 disabled:opacity-70"
+                        >
+                          {addingProductId === p.productId ? (
+                            <Loader2 size={14} className="animate-spin" />
+                          ) : addedProductIds.has(p.productId) ? (
+                            <Check size={14} />
+                          ) : (
+                            <ShoppingCart size={14} />
+                          )}
+                        </button>
+                      )}
                     </div>
 
                     <div className="p-2.5">

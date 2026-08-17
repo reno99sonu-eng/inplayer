@@ -79,6 +79,7 @@ export interface VendorProfile {
   razorpayAccountId?: string | null;
   razorpayAccountStatus?: RazorpayLinkedAccountStatus;
   razorpayAccountError?: string | null;
+  whatsappNumber?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -203,6 +204,7 @@ export async function createVendorProfile(
     subscriptionStatus: "free",
     freeListingsUsed: 0,
     upiId: null,
+    whatsappNumber: null,
     suspended: false,
     createdAt: now,
     updatedAt: now,
@@ -316,6 +318,20 @@ export async function acceptVendorTerms(userId: string): Promise<void> {
       ExpressionAttributeValues: {
         ":t": true,
         ":at": new Date().toISOString(),
+        ":u": new Date().toISOString(),
+      },
+    })
+  );
+}
+
+export async function setVendorWhatsappNumber(userId: string, whatsappNumber: string | null): Promise<void> {
+  await docClient.send(
+    new UpdateCommand({
+      TableName: VENDORS_TABLE,
+      Key: { userId },
+      UpdateExpression: "SET whatsappNumber = :w, updatedAt = :u",
+      ExpressionAttributeValues: {
+        ":w": whatsappNumber,
         ":u": new Date().toISOString(),
       },
     })

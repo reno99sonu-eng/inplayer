@@ -21,6 +21,7 @@ import { getOrder, markOrderPaid, markOrderPaymentFailed } from "@/app/lib/hamma
 import { orderTotalInr } from "@/app/lib/hammartOrderMath";
 import { sendEmail } from "@/app/lib/ses";
 import { getSponsorship, markSponsorshipPaid, markSponsorshipPaymentFailed } from "@/app/lib/sponsorships";
+import { sendOrderConfirmationMessage, sendVendorOrderMessage } from "@/app/lib/whatsapp";
 
 // This is the ONLY place real money ever gets credited to a creator's
 // balance in InPlayer, and (as of the Route migration) the ONLY place a
@@ -389,14 +390,35 @@ async function handleHammartPaymentCaptured(payload: RazorpayWebhookPayload["pay
       // paying.
       try {
         const { order } = await getOrder(orderId);
-        if (order?.buyerEmail) {
-          const total = orderTotalInr(order);
-          void sendEmail({
-            to: order.buyerEmail,
-            subject: `Payment confirmed — Hammart order [${orderId.slice(0, 8).toUpperCase()}]`,
-            text: `Your payment of ₹${total.toLocaleString("en-IN")} for "${order.productTitle}" from @${order.vendorId} is confirmed. The vendor has been notified and will ship to the address you provided.`,
-            html: `<h2>Payment confirmed</h2><p>Your payment of <strong>₹${total.toLocaleString("en-IN")}</strong> for <strong>${order.productTitle}</strong> from <strong>@${order.vendorId}</strong> is confirmed.</p><p>The vendor has been notified and will ship to the address you provided.</p>`,
-          }).catch((err) => console.error(`razorpay webhook: buyer confirmation email failed for ${orderId}:`, err));
+        if (order) {
+          if (order.buyerEmail) {
+            const total = orderTotalInr(order);
+            void sendEmail({
+              to: order.buyerEmail,
+              subject: `Payment confirmed — Hammart order [${orderId.slice(0, 8).toUpperCase()}]`,
+              text: `Your payment of ₹${total.toLocaleString("en-IN")} for "${order.productTitle}" from @${order.vendorId} is confirmed. The vendor has been notified and will ship to the address you provided.`,
+              html: `<h2>Payment confirmed</h2><p>Your payment of <strong>₹${total.toLocaleString("en-IN")}</strong> for <strong>${order.productTitle}</strong> from <strong>@${order.vendorId}</strong> is confirmed.</p><p>The vendor has been notified and will ship to the address you provided.</p>`,
+            }).catch((err) => console.error(`razorpay webhook: buyer confirmation email failed for ${orderId}:`, err));
+          }
+          
+          if (order.buyerPhone && order.buyerName) {
+             const total = orderTotalInr(order);
+             void sendOrderConfirmationMessage(
+               order.buyerPhone,
+               order.buyerName,
+               `₹${total.toLocaleString("en-IN")}`
+             ).catch((err) => console.error(`razorpay webhook: WhatsApp confirmation failed for ${orderId}:`, err));
+          }
+
+          const { vendor } = await getVendorProfile(order.vendorUserId);
+          if (vendor?.whatsappNumber) {
+            const total = orderTotalInr(order);
+            void sendVendorOrderMessage(
+              vendor.whatsappNumber,
+              vendor.vendorId,
+              `Order ${orderId.slice(0, 8).toUpperCase()}: ${order.productTitle} (₹${total.toLocaleString("en-IN")})`
+            ).catch((err) => console.error(`razorpay webhook: WhatsApp vendor notification failed for ${orderId}:`, err));
+          }
         }
       } catch (err) {
         console.error(`razorpay webhook: couldn't load order ${orderId} for confirmation email:`, err);

@@ -762,6 +762,14 @@ export default function MyVideosPage() {
                             </button>
 
                             <Link
+                              href={`/creators/studio/${video.videoId}/localization`}
+                              className="flex items-center gap-1 rounded-lg bg-blue-500/15 px-2.5 py-1 text-xs font-bold text-blue-400 transition hover:bg-blue-500 hover:text-white"
+                            >
+                              <Globe size={12} />
+                              Translate
+                            </Link>
+
+                            <Link
                               href={`/watch/${video.videoId}`}
                               className="flex items-center gap-1 rounded-lg bg-white/10 px-2.5 py-1 text-xs font-semibold text-slate-200 transition hover:bg-white/20 light:bg-black/5 light:text-slate-700"
                             >

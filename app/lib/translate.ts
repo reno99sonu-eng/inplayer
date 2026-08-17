@@ -74,6 +74,7 @@ async function runVttTransform(userPrompt: string, systemPrompt?: string): Promi
 }
 
 import { translateVttWithGoogle } from "./googleTranslate";
+import { translateVttWithBhashini } from "./bhashiniTranslate";
 
 export async function translateVtt(
   vtt: string,
@@ -88,7 +89,19 @@ export async function translateVtt(
         return googleResult;
       }
     } catch (err) {
-      console.error("Google Translate failed — falling back to OpenAI/Groq:", err);
+      console.error("Google Translate failed — falling back to next provider:", err);
+    }
+  }
+
+  // Secondary option: Bhashini API for Indian languages
+  if (targetLangCode && (process.env.BHASHINI_API_KEY && process.env.BHASHINI_USER_ID)) {
+    try {
+      const bhashiniResult = await translateVttWithBhashini(vtt, targetLangCode);
+      if (bhashiniResult && bhashiniResult.startsWith("WEBVTT")) {
+        return bhashiniResult;
+      }
+    } catch (err) {
+      console.error("Bhashini Translate failed — falling back to OpenAI/Groq:", err);
     }
   }
 

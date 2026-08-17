@@ -17,7 +17,7 @@ function VendorOrderCard({
 }: {
   order: HammartOrder;
   busy: boolean;
-  onUpdateStatus: (orderId: string, status: "vendor_confirmed" | "vendor_cancelled") => void;
+  onUpdateStatus: (orderId: string, status: "vendor_confirmed" | "vendor_cancelled" | "delivered") => void;
   onFeedbackResolved: (orderId: string, vendorResponse: string) => void;
 }) {
   const [replyOpen, setReplyOpen] = useState(false);
@@ -123,9 +123,21 @@ function VendorOrderCard({
         <p className="mt-2 text-[11px] font-semibold text-amber-300">Awaiting payment</p>
       ) : order.status === "payment_failed" ? (
         <p className="mt-2 text-[11px] font-semibold text-red-300">Payment failed</p>
+      ) : order.status === "vendor_confirmed" ? (
+        <div className="mt-2 flex items-center justify-between">
+          <p className="text-[11px] font-semibold text-emerald-300">Confirmed</p>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => onUpdateStatus(order.orderId, "delivered")}
+            className="flex items-center gap-1 rounded-lg bg-orange-500 px-2.5 py-1.5 text-xs font-bold text-white hover:bg-orange-600 disabled:opacity-50 shadow-md shadow-orange-500/20"
+          >
+            <Package size={12} /> Mark as Delivered
+          </button>
+        </div>
       ) : (
-        <p className={`mt-2 text-[11px] font-semibold ${order.status === "vendor_confirmed" ? "text-emerald-300" : "text-red-300"}`}>
-          {order.status === "vendor_confirmed" ? "Confirmed" : "Cancelled"}
+        <p className={`mt-2 text-[11px] font-semibold ${order.status === "delivered" ? "text-emerald-400" : "text-red-300"}`}>
+          {order.status === "delivered" ? "Delivered" : "Cancelled"}
         </p>
       )}
 
@@ -223,7 +235,7 @@ export default function VendorOrdersPage() {
     })();
   }, [user?.userId]);
 
-  const updateStatus = async (orderId: string, status: "vendor_confirmed" | "vendor_cancelled") => {
+  const updateStatus = async (orderId: string, status: "vendor_confirmed" | "vendor_cancelled" | "delivered") => {
     setBusyId(orderId);
     try {
       await authedFetch(`/api/hammart/orders/${orderId}`, { method: "PATCH", body: JSON.stringify({ status }) });

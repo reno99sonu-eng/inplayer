@@ -7,6 +7,7 @@ import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { authedFetch } from "@/app/lib/apiFetch";
 import ShopNavLinks from "@/app/components/hammart/ShopNavLinks";
 import type { HammartProduct } from "@/app/lib/hammartProducts";
+import type { HammartAddress } from "@/app/lib/hammartAddressBook";
 
 interface VendorItem {
   vendorId: string;
@@ -67,6 +68,19 @@ export default function ShopPage() {
   const [locationError, setLocationError] = useState("");
   const [availablePincodes, setAvailablePincodes] = useState<string[]>([]);
   const [isClient, setIsClient] = useState(false);
+  const [savedAddresses, setSavedAddresses] = useState<HammartAddress[]>([]);
+
+  const loadAddresses = async () => {
+    try {
+      const res = await authedFetch("/api/hammart/addresses");
+      if (res.ok) {
+        const data = await res.json();
+        setSavedAddresses(data.addresses || []);
+      }
+    } catch (e) {
+      console.error("Failed to load addresses", e);
+    }
+  };
 
   useEffect(() => {
     setIsClient(true);
@@ -78,7 +92,10 @@ export default function ShopPage() {
     } else {
       setLocationPromptOpen(true);
     }
-  }, []);
+    if (signedIn) {
+      loadAddresses();
+    }
+  }, [signedIn]);
 
   // Quick "Add to Cart" straight from the browse grid — no need to open
   // the product page first. Wishlist toggling lives on the product detail
@@ -163,6 +180,18 @@ export default function ShopPage() {
     } finally {
       setLocationLoading(false);
     }
+  };
+
+  const handleSelectSavedAddress = (addr: HammartAddress) => {
+    if (!addr.lat || !addr.lng) {
+      setPincodeInput(addr.pincode);
+      handleSetLocation();
+      return;
+    }
+    const newLoc = { pincode: addr.pincode, lat: addr.lat, lng: addr.lng };
+    setCustomerLocation(newLoc);
+    localStorage.setItem("hammart_location", JSON.stringify(newLoc));
+    setLocationPromptOpen(false);
   };
 
   // Extract unique sellers/vendors from the products list for the left slim sidebar
@@ -364,6 +393,34 @@ export default function ShopPage() {
                 {locationLoading ? <Loader2 size={18} className="animate-spin" /> : "Save Location"}
               </button>
             </div>
+            
+            {savedAddresses.length > 0 && (
+              <div className="mt-6 pt-6 border-t border-white/10 light:border-slate-200">
+                <p className="text-xs font-bold text-slate-500 light:text-slate-500 uppercase tracking-wider mb-3">
+                  Or select a saved address
+                </p>
+                <div className="flex flex-col gap-2">
+                  {savedAddresses.map(addr => (
+                    <button
+                      key={addr.addressId}
+                      onClick={() => handleSelectSavedAddress(addr)}
+                      className="flex items-center justify-between p-3 rounded-xl border border-white/10 light:border-slate-200 bg-white/5 light:bg-slate-50 hover:border-orange-500/50 hover:bg-orange-500/10 transition group text-left"
+                    >
+                      <div className="flex-1 min-w-0 pr-4">
+                        <div className="flex items-center gap-1.5 mb-1">
+                          {addr.label === "Home" ? <Store size={14} className="text-orange-400" /> : <MapPin size={14} className="text-orange-400" />}
+                          <span className="text-xs font-bold text-slate-200 light:text-slate-800">{addr.label}</span>
+                        </div>
+                        <p className="text-xs text-slate-400 light:text-slate-600 truncate">{addr.deliveryAddress}</p>
+                      </div>
+                      <div className="text-right flex-shrink-0">
+                        <span className="text-[10px] font-black text-orange-400 bg-orange-500/10 px-2 py-1 rounded-md">{addr.pincode}</span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       )}

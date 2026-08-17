@@ -35,7 +35,8 @@ export type OrderStatus =
   | "paid"
   | "payment_failed"
   | "vendor_confirmed"
-  | "vendor_cancelled";
+  | "vendor_cancelled"
+  | "delivered";
 
 export type OrderFeedbackType = "feedback" | "complaint";
 export type OrderFeedbackStatus = "open" | "resolved";

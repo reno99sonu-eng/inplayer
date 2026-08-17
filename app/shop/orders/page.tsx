@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2, Package, IndianRupee, RefreshCw, MessageSquare, AlertTriangle } from "lucide-react";
+import { Loader2, Package, IndianRupee, RefreshCw, MessageSquare, AlertTriangle, Star, StarHalf, X } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { authedFetch } from "@/app/lib/apiFetch";
 import { orderTotalInr } from "@/app/lib/hammartOrderMath";
@@ -16,6 +16,7 @@ const STATUS_LABEL: Record<string, { label: string; tone: string }> = {
   payment_failed: { label: "Payment failed", tone: "text-red-300" },
   vendor_confirmed: { label: "Confirmed by vendor", tone: "text-emerald-300" },
   vendor_cancelled: { label: "Cancelled by vendor", tone: "text-red-300" },
+  delivered: { label: "Delivered", tone: "text-emerald-400" },
 };
 
 function OrderCard({ order, onFeedbackSubmitted }: { order: HammartOrder; onFeedbackSubmitted: (orderId: string, updated: HammartOrder["feedback"]) => void }) {
@@ -24,6 +25,14 @@ function OrderCard({ order, onFeedbackSubmitted }: { order: HammartOrder; onFeed
   const [feedbackMessage, setFeedbackMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+
+  // Ratings modal state
+  const [ratingModalOpen, setRatingModalOpen] = useState(false);
+  const [ratingStars, setRatingStars] = useState(5);
+  const [ratingComment, setRatingComment] = useState("");
+  const [submittingRating, setSubmittingRating] = useState(false);
+  const [ratingError, setRatingError] = useState<string | null>(null);
+  const [alreadyRated, setAlreadyRated] = useState(false); // Quick local state hack to hide button after success
 
   const handleSubmitFeedback = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -57,6 +66,37 @@ function OrderCard({ order, onFeedbackSubmitted }: { order: HammartOrder; onFeed
       setSubmitError("Something went wrong. Please try again.");
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleRateProduct = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setSubmittingRating(true);
+    setRatingError(null);
+
+    try {
+      const res = await authedFetch("/api/hammart/reviews", {
+        method: "POST",
+        body: JSON.stringify({
+          productId: order.productId,
+          rating: ratingStars,
+          comment: ratingComment,
+        }),
+      });
+      
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || "Failed to submit rating");
+      }
+      
+      setRatingModalOpen(false);
+      setAlreadyRated(true);
+      alert("Thank you for your rating!");
+    } catch (err) {
+      console.error(err);
+      setRatingError(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setSubmittingRating(false);
     }
   };
 
@@ -98,6 +138,14 @@ function OrderCard({ order, onFeedbackSubmitted }: { order: HammartOrder; onFeed
             className="inline-flex items-center gap-1 rounded-lg border border-white/10 light:border-black/10 px-2 py-1 text-[10px] font-bold text-slate-300 light:text-slate-700 hover:bg-white/5"
           >
             <MessageSquare size={11} /> Feedback / Report Issue
+          </button>
+        )}
+        {order.status === "delivered" && !alreadyRated && (
+          <button
+            onClick={() => setRatingModalOpen(true)}
+            className="inline-flex items-center gap-1 rounded-lg bg-orange-500/15 px-2 py-1 text-[10px] font-bold text-orange-300 hover:bg-orange-500/25"
+          >
+            <Star size={11} /> Rate Product
           </button>
         )}
       </div>
@@ -174,6 +222,59 @@ function OrderCard({ order, onFeedbackSubmitted }: { order: HammartOrder; onFeed
             {submitting ? "Sending..." : "Send"}
           </button>
         </form>
+      )}
+
+      {/* Rating Modal */}
+      {ratingModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4">
+          <div className="w-full max-w-sm rounded-3xl border border-white/10 bg-slate-900 p-6 shadow-2xl relative">
+            <button
+              onClick={() => setRatingModalOpen(false)}
+              className="absolute right-4 top-4 text-slate-500 hover:text-white"
+            >
+              <X size={20} />
+            </button>
+            
+            <h3 className="text-lg font-black text-white mb-1">Rate this product</h3>
+            <p className="text-xs text-slate-400 mb-5">{order.productTitle}</p>
+            
+            <form onSubmit={handleRateProduct}>
+              <div className="flex justify-center gap-2 mb-6">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    type="button"
+                    onClick={() => setRatingStars(star)}
+                    className={`p-1 transition ${star <= ratingStars ? "text-orange-400" : "text-slate-600 hover:text-orange-400/50"}`}
+                  >
+                    <Star size={32} fill={star <= ratingStars ? "currentColor" : "none"} />
+                  </button>
+                ))}
+              </div>
+              
+              <div className="mb-4">
+                <label className="text-[11px] font-bold text-slate-400 uppercase mb-1 block">Write a review (Optional)</label>
+                <textarea
+                  value={ratingComment}
+                  onChange={(e) => setRatingComment(e.target.value)}
+                  placeholder="What did you like or dislike?"
+                  rows={3}
+                  className="w-full rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-white placeholder:text-slate-600 outline-none focus:border-orange-400"
+                />
+              </div>
+              
+              {ratingError && <p className="text-xs text-red-400 font-bold mb-4">{ratingError}</p>}
+              
+              <button
+                type="submit"
+                disabled={submittingRating}
+                className="w-full flex justify-center items-center rounded-xl bg-orange-500 py-3 text-sm font-black text-white disabled:opacity-50 transition hover:bg-orange-600"
+              >
+                {submittingRating ? <Loader2 size={18} className="animate-spin" /> : "Submit Review"}
+              </button>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

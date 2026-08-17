@@ -18,6 +18,7 @@ import LocationMapPicker, { type LocationAddress } from "@/app/components/hammar
 import IndiaLocationFields from "@/app/components/hammart/IndiaLocationFields";
 import ShopNavLinks from "@/app/components/hammart/ShopNavLinks";
 import type { HammartProduct } from "@/app/lib/hammartProducts";
+import type { HammartAddress } from "@/app/lib/hammartAddressBook";
 
 interface CartLineItem {
   productId: string;
@@ -81,6 +82,7 @@ export default function CartPage() {
   const [loading, setLoading] = useState(true);
   const [tableMissing, setTableMissing] = useState(false);
   const [busyProductId, setBusyProductId] = useState<string | null>(null);
+  const [savedAddresses, setSavedAddresses] = useState<HammartAddress[]>([]);
 
   const load = async () => {
     setLoading(true);
@@ -96,6 +98,18 @@ export default function CartPage() {
     }
   };
 
+  const loadAddresses = async () => {
+    try {
+      const res = await authedFetch("/api/hammart/addresses");
+      if (res.ok) {
+        const data = await res.json();
+        setSavedAddresses(data.addresses || []);
+      }
+    } catch (e) {
+      console.error("Failed to load addresses", e);
+    }
+  };
+
   useEffect(() => {
     const markNotLoading = () => setLoading(false);
     if (!user?.userId) {
@@ -104,6 +118,7 @@ export default function CartPage() {
     }
     (async () => {
       await load();
+      await loadAddresses();
     })();
   }, [user?.userId]);
 
@@ -142,6 +157,8 @@ export default function CartPage() {
   const [stateName, setStateName] = useState("");
   const [pincode, setPincode] = useState("");
   const [showMapPicker, setShowMapPicker] = useState(false);
+  const [saveAddressToBook, setSaveAddressToBook] = useState(true);
+  const [newAddressLabel, setNewAddressLabel] = useState("Home");
 
   const [checkingOut, setCheckingOut] = useState(false);
   const [groupResults, setGroupResults] = useState<GroupCheckoutState[] | null>(null);
@@ -302,6 +319,27 @@ export default function CartPage() {
 
   const executeCheckout = async () => {
     setCheckingOut(true);
+    setCheckoutError(null);
+
+    // If they want to save this new address
+    if (saveAddressToBook && !savedAddresses.some(a => a.deliveryAddress === deliveryAddress && a.pincode === pincode)) {
+      try {
+        await authedFetch("/api/hammart/addresses", {
+          method: "POST",
+          body: JSON.stringify({
+            label: newAddressLabel,
+            name: buyerNameInput,
+            phone: buyerPhone,
+            deliveryAddress,
+            city,
+            state: stateName,
+            pincode,
+          }),
+        });
+      } catch (err) {
+        console.error("Failed to save address:", err);
+      }
+    }
 
     let response;
     try {
@@ -739,6 +777,42 @@ export default function CartPage() {
                     className="mt-1 w-full rounded-xl border border-white/10 light:border-slate-300 bg-white/5 light:bg-white px-3 py-2 text-xs text-white light:text-slate-900 placeholder:text-slate-500 light:placeholder:text-slate-600 outline-none focus:border-orange-400 font-medium"
                   />
                 </div>
+                
+                {savedAddresses.length > 0 && (
+                  <div className="mb-4">
+                    <label className="text-[11px] font-bold text-slate-300 light:text-slate-800 uppercase mb-2 block">Use a Saved Address</label>
+                    <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-none">
+                      {savedAddresses.map((addr) => (
+                        <button
+                          key={addr.addressId}
+                          type="button"
+                          onClick={() => {
+                            setBuyerNameInput(addr.name);
+                            setBuyerPhone(addr.phone);
+                            setDeliveryAddress(addr.deliveryAddress);
+                            setCity(addr.city);
+                            setStateName(addr.state);
+                            setPincode(addr.pincode);
+                            setSaveAddressToBook(false);
+                          }}
+                          className={`flex-shrink-0 text-left rounded-xl border p-2.5 transition ${
+                            deliveryAddress === addr.deliveryAddress && pincode === addr.pincode
+                              ? "border-orange-500 bg-orange-500/10"
+                              : "border-white/10 light:border-slate-300 bg-white/5 light:bg-slate-50 hover:bg-white/10"
+                          }`}
+                        >
+                          <div className="flex items-center gap-1 mb-1">
+                            {addr.label === "Home" ? <Store size={12} className="text-orange-400" /> : <MapPin size={12} className="text-orange-400" />}
+                            <span className="text-[10px] font-bold uppercase text-orange-400">{addr.label}</span>
+                          </div>
+                          <p className="text-xs font-bold text-white light:text-slate-900 truncate w-32">{addr.deliveryAddress}</p>
+                          <p className="text-[10px] text-slate-400">{addr.city}, {addr.pincode}</p>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div>
                   <label className="text-[11px] font-bold text-slate-300 light:text-slate-800 uppercase">Customer Email Address</label>
                   <input
@@ -800,6 +874,30 @@ export default function CartPage() {
                     />
                   </div>
                 </div>
+
+                {(!savedAddresses.some(a => a.deliveryAddress === deliveryAddress && a.pincode === pincode)) && (
+                  <div className="flex items-center gap-2 mt-3 p-3 rounded-xl bg-white/5 border border-white/5">
+                    <input 
+                      type="checkbox" 
+                      id="saveAddress" 
+                      checked={saveAddressToBook} 
+                      onChange={(e) => setSaveAddressToBook(e.target.checked)} 
+                      className="w-4 h-4 accent-orange-500" 
+                    />
+                    <label htmlFor="saveAddress" className="text-xs font-bold text-slate-300 cursor-pointer flex-1">Save this address for future orders</label>
+                    {saveAddressToBook && (
+                      <select 
+                        value={newAddressLabel} 
+                        onChange={(e) => setNewAddressLabel(e.target.value)}
+                        className="bg-black/50 border border-white/20 rounded-lg text-xs p-1 text-white outline-none"
+                      >
+                        <option value="Home">Home</option>
+                        <option value="Work">Work</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    )}
+                  </div>
+                )}
 
                 {checkoutError && <p className="text-xs font-bold text-red-400">{checkoutError}</p>}
 

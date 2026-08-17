@@ -2,7 +2,8 @@ import { PutCommand, QueryCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { randomUUID } from "crypto";
 import { docClient } from "@/app/lib/dynamodb";
 
-export const REVIEWS_TABLE = "Hammart-Reviews"; // PK: reviewId, GSI: productId
+export const REVIEWS_TABLE = "Hammart-Reviews"; // PK: reviewId
+export const REVIEWS_PRODUCT_INDEX = "productId-index"; // GSI PK: productId
 
 export interface HammartReview {
   reviewId: string;
@@ -53,9 +54,10 @@ export async function listProductReviews(
 ): Promise<{ reviews: HammartReview[]; averageRating: number; totalReviews: number; tableMissing: boolean }> {
   try {
     const result = await docClient.send(
-      new ScanCommand({
+      new QueryCommand({
         TableName: REVIEWS_TABLE,
-        FilterExpression: "productId = :pid",
+        IndexName: REVIEWS_PRODUCT_INDEX,
+        KeyConditionExpression: "productId = :pid",
         ExpressionAttributeValues: { ":pid": productId },
       })
     );

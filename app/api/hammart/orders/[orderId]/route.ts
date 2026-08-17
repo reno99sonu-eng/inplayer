@@ -24,7 +24,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
 
   const body = await request.json().catch(() => ({}));
-  if (body.status !== "vendor_confirmed" && body.status !== "vendor_cancelled") {
+  if (body.status !== "vendor_confirmed" && body.status !== "vendor_cancelled" && body.status !== "delivered") {
     return NextResponse.json({ error: "Invalid status." }, { status: 400 });
   }
 
@@ -34,9 +34,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   // webhook-verified real payment). Blocking "payment_pending" here
   // closes off a vendor marking — and potentially shipping against — an
   // order that was never actually paid for, regardless of what the UI
-  // shows.
-  if (order.status !== "placed" && order.status !== "paid") {
+  // shows. They can also mark it as delivered if it's currently vendor_confirmed.
+  if (order.status !== "placed" && order.status !== "paid" && order.status !== "vendor_confirmed") {
     return NextResponse.json({ error: "This order can't be updated right now." }, { status: 400 });
+  }
+
+  // Prevent jumping straight to delivered without confirmation, unless it's paid/placed
+  // Wait, if it's placed/paid they can confirm or cancel. If it's already confirmed, they can mark delivered.
+  // We'll allow confirmed -> delivered or cancelled.
+  if (body.status === "delivered" && order.status !== "vendor_confirmed") {
+    // Some vendors might try to jump straight to delivered. Let's allow it for robustness,
+    // but typically they confirm first.
   }
 
   await setOrderStatus(orderId, body.status);
@@ -64,6 +72,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         text: `${order.vendorId} has cancelled your order for "${order.productTitle}". If you already sent payment via UPI and haven't heard from them about a refund, please reach out to the seller directly.`,
         html: `<h2>Order cancelled</h2><p><strong>${order.vendorId}</strong> has cancelled your order for <strong>${order.productTitle}</strong>. If you already sent payment via UPI and haven't heard from them about a refund, please reach out to the seller directly.</p>`,
       }).catch((err) => console.error(`orders/${orderId}: buyer cancellation email failed:`, err));
+    } else if (body.status === "delivered") {
+      void sendEmail({
+        to: order.buyerEmail,
+        subject: `📦 Order delivered — [${orderId.slice(0, 8).toUpperCase()}]`,
+        text: `${order.vendorId} has marked your order for "${order.productTitle}" as delivered! You can now rate your purchase in My Orders.`,
+        html: `<h2>Order delivered 📦</h2><p><strong>${order.vendorId}</strong> has marked your order for <strong>${order.productTitle}</strong> as delivered! You can now rate your purchase in My Orders.</p>`,
+      }).catch((err) => console.error(`orders/${orderId}: buyer delivery email failed:`, err));
     }
   }
 

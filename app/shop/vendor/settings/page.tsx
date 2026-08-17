@@ -13,6 +13,8 @@ export default function VendorSettingsPage() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [whatsappNumber, setWhatsappNumber] = useState("");
+  const [address, setAddress] = useState("");
+  const [pincode, setPincode] = useState("");
   const [message, setMessage] = useState<{ text: string; type: "success" | "error" } | null>(null);
 
   useEffect(() => {
@@ -27,6 +29,8 @@ export default function VendorSettingsPage() {
         if (data.vendor) {
           setVendor(data.vendor);
           setWhatsappNumber(data.vendor.whatsappNumber || "");
+          setAddress(data.vendor.address || "");
+          setPincode(data.vendor.pincode || "");
         }
       } catch (err) {
         console.error("Failed to load vendor settings:", err);
@@ -44,7 +48,11 @@ export default function VendorSettingsPage() {
     try {
       const res = await authedFetch("/api/hammart/vendor/settings", {
         method: "POST",
-        body: JSON.stringify({ whatsappNumber: whatsappNumber.trim() }),
+        body: JSON.stringify({ 
+          whatsappNumber: whatsappNumber.trim(),
+          address: address.trim(),
+          pincode: pincode.trim()
+        }),
       });
       const data = await res.json().catch(() => ({}));
       if (res.ok) {
@@ -113,6 +121,43 @@ export default function VendorSettingsPage() {
             <p className="text-[11px] leading-relaxed text-slate-500">
               Include your country code (e.g. +91). Leave this blank if you only want to receive order notifications via email.
             </p>
+          </div>
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6">
+          <div className="mb-4">
+            <h2 className="text-base font-bold text-white light:text-slate-900">Hyperlocal Delivery Area</h2>
+            <p className="text-xs text-slate-400">Set your store's base location. Customers within 15km of this area will be able to see and buy your products.</p>
+          </div>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-white light:text-slate-900">
+                Pincode <span className="text-red-400">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                maxLength={6}
+                value={pincode}
+                onChange={(e) => setPincode(e.target.value.replace(/\D/g, ''))}
+                placeholder="e.g. 110001"
+                className="w-full rounded-xl border border-white/10 bg-[#07111F] px-4 py-3 text-sm text-white outline-none focus:border-orange-400/50"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <label className="block text-sm font-semibold text-white light:text-slate-900">
+                Full Street Address
+              </label>
+              <textarea
+                value={address}
+                onChange={(e) => setAddress(e.target.value)}
+                placeholder="Shop Number, Street Name, Area..."
+                rows={3}
+                className="w-full resize-none rounded-xl border border-white/10 bg-[#07111F] px-4 py-3 text-sm text-white outline-none focus:border-orange-400/50"
+              />
+            </div>
           </div>
         </div>
 

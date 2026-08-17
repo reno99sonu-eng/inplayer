@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import Link from "next/link";
-import { Loader2, Store, IndianRupee, ShoppingBag, ShoppingCart, Users, LayoutGrid, Search, X, SlidersHorizontal, ChevronDown, Check } from "lucide-react";
+import { Loader2, Store, IndianRupee, ShoppingBag, ShoppingCart, Users, LayoutGrid, Search, X, SlidersHorizontal, ChevronDown, Check, MapPin } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { authedFetch } from "@/app/lib/apiFetch";
 import ShopNavLinks from "@/app/components/hammart/ShopNavLinks";
@@ -59,6 +59,27 @@ export default function ShopPage() {
   const [addingProductId, setAddingProductId] = useState<string | null>(null);
   const [addedProductIds, setAddedProductIds] = useState<Set<string>>(new Set());
 
+  // Location State
+  const [customerLocation, setCustomerLocation] = useState<{ pincode: string; lat: number; lng: number } | null>(null);
+  const [locationPromptOpen, setLocationPromptOpen] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [pincodeInput, setPincodeInput] = useState("");
+  const [locationError, setLocationError] = useState("");
+  const [availablePincodes, setAvailablePincodes] = useState<string[]>([]);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+    const savedLoc = localStorage.getItem("hammart_location");
+    if (savedLoc) {
+      try {
+        setCustomerLocation(JSON.parse(savedLoc));
+      } catch (e) {}
+    } else {
+      setLocationPromptOpen(true);
+    }
+  }, []);
+
   // Quick "Add to Cart" straight from the browse grid — no need to open
   // the product page first. Wishlist toggling lives on the product detail
   // page itself (see app/shop/product/[productId]/page.tsx), since that's
@@ -95,11 +116,20 @@ export default function ShopPage() {
   };
 
   useEffect(() => {
+    if (customerLocation === null && !locationPromptOpen) return;
+
+    let url = "/api/hammart/products";
+    if (customerLocation) {
+      url += `?lat=${customerLocation.lat}&lng=${customerLocation.lng}`;
+    }
+
     (async () => {
       try {
-        const res = await fetch("/api/hammart/products");
+        setLoading(true);
+        const res = await fetch(url);
         const data = await res.json().catch(() => ({}));
         setProducts(data.products || []);
+        setAvailablePincodes(data.availablePincodes || []);
         setTableMissing(Boolean(data.tableMissing));
       } catch (err) {
         console.error("Failed to load Hammart listings:", err);
@@ -107,7 +137,33 @@ export default function ShopPage() {
         setLoading(false);
       }
     })();
-  }, []);
+  }, [customerLocation, locationPromptOpen]);
+
+  const handleSetLocation = async () => {
+    if (!pincodeInput || pincodeInput.length < 6) {
+      setLocationError("Please enter a valid 6-digit pincode.");
+      return;
+    }
+    setLocationLoading(true);
+    setLocationError("");
+    try {
+      const res = await fetch(`/api/hammart/geocode?pincode=${encodeURIComponent(pincodeInput)}`);
+      if (res.ok) {
+        const data = await res.json();
+        const newLoc = { pincode: pincodeInput, lat: data.latitude, lng: data.longitude };
+        setCustomerLocation(newLoc);
+        localStorage.setItem("hammart_location", JSON.stringify(newLoc));
+        setLocationPromptOpen(false);
+      } else {
+        const err = await res.json();
+        setLocationError(err.error || "Could not find this pincode. Please try another.");
+      }
+    } catch (err) {
+      setLocationError("Network error. Please try again.");
+    } finally {
+      setLocationLoading(false);
+    }
+  };
 
   // Extract unique sellers/vendors from the products list for the left slim sidebar
   const vendorsList = useMemo(() => {
@@ -177,6 +233,23 @@ export default function ShopPage() {
             </p>
           </div>
         </div>
+
+        {isClient && (
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                setPincodeInput(customerLocation?.pincode || "");
+                setLocationPromptOpen(true);
+              }}
+              className="flex items-center gap-1.5 rounded-full border border-white/10 light:border-slate-300 bg-white/5 light:bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-200 light:text-slate-700 transition hover:bg-white/10"
+            >
+              <MapPin size={14} className="text-orange-400" />
+              <span>
+                {customerLocation ? `Delivering to ${customerLocation.pincode}` : "Set Delivery Location"}
+              </span>
+            </button>
+          </div>
+        )}
 
         <div className="flex items-center gap-2.5">
           <ShopNavLinks />
@@ -248,8 +321,8 @@ export default function ShopPage() {
                           : "text-slate-300 light:text-slate-800 hover:bg-white/10 light:hover:bg-slate-100"
                       }`}
                     >
-                      <span>{option.label}</span>
-                      {activeFilter === option.id && <Check size={14} className="text-orange-400 light:text-amber-800" />}
+                      {option.label}
+                      {activeFilter === option.id && <Check size={14} />}
                     </button>
                   ))}
                 </div>
@@ -258,6 +331,43 @@ export default function ShopPage() {
           )}
         </div>
       </div>
+
+      {isClient && locationPromptOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
+          <div className="w-full max-w-md rounded-3xl border border-white/10 light:border-slate-200 bg-[#07111F] light:bg-white p-6 shadow-2xl">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-black text-white light:text-slate-900">Set Delivery Location</h2>
+              {customerLocation && (
+                <button onClick={() => setLocationPromptOpen(false)} className="text-slate-400 hover:text-white">
+                  <X size={20} />
+                </button>
+              )}
+            </div>
+            <p className="text-sm text-slate-400 light:text-slate-600 mb-6">
+              Enter your Pincode to see products and vendors available for delivery in your 15km neighborhood.
+            </p>
+            <div className="space-y-4">
+              <input
+                type="text"
+                maxLength={6}
+                value={pincodeInput}
+                onChange={(e) => setPincodeInput(e.target.value.replace(/\D/g, ""))}
+                placeholder="e.g. 110001"
+                className="w-full rounded-xl border border-white/10 light:border-slate-300 bg-white/5 light:bg-white px-4 py-3 text-lg font-bold text-white light:text-slate-900 outline-none focus:border-orange-400"
+              />
+              {locationError && <p className="text-sm text-red-400">{locationError}</p>}
+              <button
+                onClick={handleSetLocation}
+                disabled={locationLoading || pincodeInput.length < 6}
+                className="flex w-full items-center justify-center gap-2 rounded-xl bg-orange-500 px-4 py-3 font-bold text-white disabled:opacity-50"
+              >
+                {locationLoading ? <Loader2 size={18} className="animate-spin" /> : "Save Location"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* Category Filter Pills */}
       <div className="flex gap-2 overflow-x-auto pb-3 mb-4 scrollbar-none">
@@ -398,15 +508,35 @@ export default function ShopPage() {
             )}
 
             {filteredProducts.length === 0 ? (
-              <div className="mt-12 flex flex-col items-center gap-2 text-center py-12">
-                <ShoppingBag size={32} className="text-slate-500 light:text-slate-600" />
-                <p className="text-sm font-semibold text-slate-400 light:text-slate-700">
-                  {searchQuery
-                    ? `No listings matching "${searchQuery}".`
-                    : selectedVendorId
-                    ? `No active listings found for @${selectedVendorId}.`
-                    : "No listings yet — be the first to sell here."}
+              <div className="mt-12 flex flex-col items-center gap-2 text-center py-12 px-4 bg-white/5 light:bg-slate-50 rounded-3xl border border-white/10 light:border-slate-200">
+                <Store size={48} className="text-orange-400 mb-2 opacity-80" />
+                <h3 className="text-xl font-black text-white light:text-slate-900">
+                  {customerLocation ? "Coming soon to your neighborhood!" : "No products found."}
+                </h3>
+                <p className="text-sm font-semibold text-slate-400 light:text-slate-600 max-w-md">
+                  {customerLocation 
+                    ? `We don't have any sellers within 15km of ${customerLocation.pincode} yet. We're expanding rapidly!`
+                    : searchQuery
+                      ? `No listings matching "${searchQuery}".`
+                      : selectedVendorId
+                      ? `No active listings found for @${selectedVendorId}.`
+                      : "No listings yet — be the first to sell here."}
                 </p>
+
+                {customerLocation && availablePincodes.length > 0 && (
+                  <div className="mt-6 pt-6 border-t border-white/10 light:border-slate-300 w-full max-w-sm">
+                    <p className="text-xs font-bold text-slate-500 light:text-slate-500 uppercase tracking-wider mb-3">
+                      Currently Available In:
+                    </p>
+                    <div className="flex flex-wrap gap-2 justify-center">
+                      {availablePincodes.map(pin => (
+                        <span key={pin} className="px-2.5 py-1 rounded-md bg-orange-500/10 text-orange-400 border border-orange-500/20 text-xs font-bold">
+                          {pin}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             ) : (
               /* Compact Product Cards Grid (Swiggy Instamart style smaller photos) */

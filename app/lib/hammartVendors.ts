@@ -70,6 +70,10 @@ export interface VendorProfile {
   kycStatus: VendorKycStatus;
   vendorTermsAccepted: boolean;
   vendorTermsAcceptedAt: string | null;
+  address?: string;
+  pincode?: string;
+  latitude?: number;
+  longitude?: number;
   subscriptionStatus: VendorSubscriptionStatus;
   freeListingsUsed: number;
   upiId: string | null;
@@ -324,16 +328,52 @@ export async function acceptVendorTerms(userId: string): Promise<void> {
   );
 }
 
-export async function setVendorWhatsappNumber(userId: string, whatsappNumber: string | null): Promise<void> {
+export async function updateVendorSettings(
+  userId: string,
+  settings: {
+    whatsappNumber?: string | null;
+    address?: string;
+    pincode?: string;
+    latitude?: number;
+    longitude?: number;
+  }
+): Promise<void> {
+  const updateParts: string[] = [];
+  const expressionAttributeValues: Record<string, any> = {
+    ":u": new Date().toISOString(),
+  };
+
+  if (settings.whatsappNumber !== undefined) {
+    updateParts.push("whatsappNumber = :w");
+    expressionAttributeValues[":w"] = settings.whatsappNumber;
+  }
+  if (settings.address !== undefined) {
+    updateParts.push("address = :a");
+    expressionAttributeValues[":a"] = settings.address;
+  }
+  if (settings.pincode !== undefined) {
+    updateParts.push("pincode = :p");
+    expressionAttributeValues[":p"] = settings.pincode;
+  }
+  if (settings.latitude !== undefined) {
+    updateParts.push("latitude = :lat");
+    expressionAttributeValues[":lat"] = settings.latitude;
+  }
+  if (settings.longitude !== undefined) {
+    updateParts.push("longitude = :lng");
+    expressionAttributeValues[":lng"] = settings.longitude;
+  }
+
+  if (updateParts.length === 0) return;
+
+  const updateExpression = `SET ${updateParts.join(", ")}, updatedAt = :u`;
+
   await docClient.send(
     new UpdateCommand({
       TableName: VENDORS_TABLE,
       Key: { userId },
-      UpdateExpression: "SET whatsappNumber = :w, updatedAt = :u",
-      ExpressionAttributeValues: {
-        ":w": whatsappNumber,
-        ":u": new Date().toISOString(),
-      },
+      UpdateExpression: updateExpression,
+      ExpressionAttributeValues: expressionAttributeValues,
     })
   );
 }

@@ -2,9 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
-import { getVendorProfile, VENDORS_TABLE, FREE_LISTINGS_LIMIT } from "@/app/lib/hammartVendors";
-import { createProduct, listActiveProducts } from "@/app/lib/hammartProducts";
+import { getVendorProfile, VENDORS_TABLE, FREE_LISTINGS_LIMIT, VendorProfile } from "@/app/lib/hammartVendors";
+import { createProduct, listActiveProducts, HammartProduct } from "@/app/lib/hammartProducts";
 import { checkBannedProduct, UNCHECKED_BANNED_ITEM } from "@/app/lib/hammartModeration";
+import { BatchGetCommand } from "@aws-sdk/lib-dynamodb";
+import { calculateDistanceKm } from "@/app/lib/geocoding";
 import { THUMBNAIL_DATA_URL_MAX_LENGTH } from "@/app/lib/imageCompress";
 import { getPlatformSettings } from "@/app/lib/platformSettings";
 
@@ -15,12 +17,69 @@ const MAX_IMAGE_LENGTH = THUMBNAIL_DATA_URL_MAX_LENGTH * 1.2;
 export async function GET(request: NextRequest) {
   const category = request.nextUrl.searchParams.get("category") || undefined;
   const vendorId = request.nextUrl.searchParams.get("vendorId") || undefined;
+  const latParam = request.nextUrl.searchParams.get("lat");
+  const lngParam = request.nextUrl.searchParams.get("lng");
 
   const { products: allProducts, tableMissing } = await listActiveProducts({ category });
-  const products = vendorId
+  let products = vendorId
     ? allProducts.filter((p) => p.vendorId === vendorId || p.vendorUserId === vendorId)
     : allProducts;
-  return NextResponse.json({ products, tableMissing });
+
+  const availablePincodes = new Set<string>();
+
+  if (products.length > 0) {
+    // 1. Extract unique vendor userIds from the products
+    const uniqueVendorUserIds = Array.from(new Set(products.map((p) => p.vendorUserId)));
+    
+    // 2. Fetch those vendors in batches (DynamoDB BatchGet limits to 100 items per request)
+    const vendorsMap = new Map<string, VendorProfile>();
+    for (let i = 0; i < uniqueVendorUserIds.length; i += 100) {
+      const batch = uniqueVendorUserIds.slice(i, i + 100);
+      try {
+        const batchRes = await docClient.send(
+          new BatchGetCommand({
+            RequestItems: {
+              [VENDORS_TABLE]: {
+                Keys: batch.map((userId) => ({ userId })),
+              },
+            },
+          })
+        );
+        const fetchedVendors = (batchRes.Responses?.[VENDORS_TABLE] as VendorProfile[]) || [];
+        for (const v of fetchedVendors) {
+          vendorsMap.set(v.userId, v);
+          if (v.pincode) availablePincodes.add(v.pincode);
+        }
+      } catch (err) {
+        console.error("BatchGet vendors error:", err);
+      }
+    }
+
+    // 3. Filter products if a customer location is provided
+    if (latParam && lngParam) {
+      const customerLat = parseFloat(latParam);
+      const customerLng = parseFloat(lngParam);
+      
+      const nearbyVendorUserIds = new Set<string>();
+      
+      for (const [userId, v] of vendorsMap.entries()) {
+        if (v.latitude !== undefined && v.longitude !== undefined) {
+          const distance = calculateDistanceKm(customerLat, customerLng, v.latitude, v.longitude);
+          if (distance <= 15) {
+            nearbyVendorUserIds.add(userId);
+          }
+        }
+      }
+      
+      products = products.filter((p) => nearbyVendorUserIds.has(p.vendorUserId));
+    }
+  }
+
+  return NextResponse.json({ 
+    products, 
+    availablePincodes: Array.from(availablePincodes),
+    tableMissing 
+  });
 }
 
 // POST /api/hammart/products — a verified, non-suspended vendor publishes

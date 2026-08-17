@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAuth } from "@/app/lib/verifyAuth";
-import { getVendorProfile, setVendorWhatsappNumber } from "@/app/lib/hammartVendors";
+import { getVendorProfile, updateVendorSettings } from "@/app/lib/hammartVendors";
+import { geocodePincode } from "@/app/lib/geocoding";
 
 export async function POST(request: NextRequest) {
   let user;
@@ -21,8 +22,31 @@ export async function POST(request: NextRequest) {
   if (whatsappNumber === "") whatsappNumber = null;
   else if (typeof whatsappNumber === "string") whatsappNumber = whatsappNumber.trim().slice(0, 20);
 
+  const address = typeof body.address === "string" ? body.address.trim() : "";
+  const pincode = typeof body.pincode === "string" ? body.pincode.trim() : "";
+
+  let latitude: number | undefined = undefined;
+  let longitude: number | undefined = undefined;
+
+  if (pincode) {
+    const geo = await geocodePincode(pincode);
+    if (geo) {
+      latitude = geo.latitude;
+      longitude = geo.longitude;
+    } else {
+      // If they provide a pincode but we can't find it, we shouldn't necessarily block them, 
+      // but ideally we'd want valid coordinates. For MVP, we'll just leave it undefined if not found.
+    }
+  }
+
   try {
-    await setVendorWhatsappNumber(user.userId, whatsappNumber || null);
+    await updateVendorSettings(user.userId, { 
+      whatsappNumber: whatsappNumber || null,
+      address,
+      pincode,
+      latitude,
+      longitude
+    });
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error("Failed to update vendor settings:", err);

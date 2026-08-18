@@ -56,13 +56,12 @@ interface VideoPlayerProps {
   filterLook?: VideoLookFilter;
 }
 
-// Background music under a long-form video's OWN real audio (narration,
-// dialogue, whatever the creator recorded) needs to sit well underneath it
-// rather than compete — unlike a Short, which is often silent-camera-roll
-// footage where the soundtrack IS the audio. Fixed, modest gain rather than
-// full volume; the creator can always skip picking a soundtrack at all for
-// content where any background music would be wrong (interviews, podcasts).
-const BACKGROUND_MUSIC_VOLUME = 0.22;
+// A chosen soundtrack now fully REPLACES a Video's own recorded audio,
+// same as it already does for Raftaar Shorts (see the equivalent comment
+// in ShortsPageContent.tsx) — this was previously a fixed, quiet 0.22
+// background mix instead, by earlier product decision. Changed on
+// Reno's explicit instruction; if a video needs its own narration/dialogue
+// audible, the fix is to not pick a soundtrack for it at all.
 
 // Multi-tap seek tuning (touch devices): taps on the left/right third of
 // the video within this window chain together — 2 taps = 10s, 3 = 20s,
@@ -142,6 +141,13 @@ export default function VideoPlayer({
   const playerRef = useRef<MuxPlayerRefAttributes>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const backgroundAudioRef = useRef<HTMLAudioElement | null>(null);
+  // Guards against a self-triggering feedback loop in syncBackgroundAudioMute:
+  // forcing player.muted = true fires its OWN async "volumechange" event, which
+  // would otherwise re-run the handler and immediately re-mute the soundtrack
+  // right after a genuine user unmute. Set to true right before we force the
+  // player mute; the next handler invocation consumes it and bails out instead
+  // of treating it as a real user action.
+  const forcingMuteRef = useRef(false);
   // Real Settings → Playback → "Closed Captions" toggle — off by default
   // (matching "captions default off unless a viewer turns them on"), on
   // for any viewer who's actually turned the setting on.
@@ -311,14 +317,18 @@ export default function VideoPlayer({
     pulseTimerRef.current = setTimeout(() => setPulse(null), 700);
   };
 
-  // Background soundtrack (see app/components/ShortsPageContent.tsx for the
-  // equivalent on Shorts). Unlike Shorts, a long-form video isn't cut to a
-  // fixed clip length here — it just loops the track for as long as the
-  // video plays, at a fixed low volume under the video's own real audio.
+  // Soundtrack (see app/components/ShortsPageContent.tsx for the equivalent
+  // on Shorts). Unlike Shorts, a long-form video isn't cut to a fixed clip
+  // length here — it just loops the track for as long as the video plays.
   // Point the shared <audio> at the track whenever the video/soundtrack
-  // changes; actual play/pause is driven by the MuxPlayer onPlay/onPause
-  // handlers below so it always stays in lockstep with real playback state
-  // (manual toggle, autoplay, or a mid-roll ad pausing the video).
+  // changes, and — since the soundtrack now REPLACES the video's own audio
+  // rather than sitting quietly under it — force the player's own track
+  // silent right away too, rather than waiting for the first volumechange
+  // event to catch it (see syncBackgroundAudioMute below for the ongoing
+  // enforcement once playback is underway). Actual play/pause is driven by
+  // the MuxPlayer onPlay/onPause handlers below so it always stays in
+  // lockstep with real playback state (manual toggle, autoplay, or a
+  // mid-roll ad pausing the video).
   useEffect(() => {
     const audio = backgroundAudioRef.current;
     if (!audio) return;
@@ -329,12 +339,28 @@ export default function VideoPlayer({
     }
     audio.src = soundtrack.url;
     audio.loop = true;
-    audio.volume = BACKGROUND_MUSIC_VOLUME;
     audio.currentTime = 0;
+    // Starts wherever the player's own volume/mute currently sits — kept
+    // in sync from here on by syncBackgroundAudioMute, the same real
+    // control surfaces (Mux's own volume slider, the touch-drag gesture,
+    // any keyboard shortcut) just end up driving the soundtrack instead of
+    // the now-permanently-silenced original track.
+    const player = playerRef.current;
+    audio.volume = player ? player.volume : 1;
+    audio.muted = player ? player.muted : false;
+    if (player && !player.muted) {
+      // Same async-echo hazard as syncBackgroundAudioMute below: this write
+      // fires its own later volumechange event, which must be swallowed so
+      // it doesn't stomp the audio.muted we just correctly set above.
+      forcingMuteRef.current = true;
+      player.muted = true;
+    } else if (player) {
+      player.muted = true;
+    }
     // If the video is already playing by the time the soundtrack loads
     // (e.g. autoplay beat this effect), start the music too rather than
     // waiting for the next play/pause event.
-    if (playerRef.current && !playerRef.current.paused) {
+    if (player && !player.paused) {
       audio.play().catch(() => {});
     }
   }, [soundtrack]);
@@ -346,12 +372,42 @@ export default function VideoPlayer({
     else audio.pause();
   };
 
-  // Keeps the soundtrack's mute state glued to the video's — muting the
-  // video should genuinely silence everything, not just the dialogue.
+  // When this video has a soundtrack, that track IS the audio — the
+  // camera's own recorded sound must never be audible alongside it. Mux's
+  // own volume slider/mute button and the touch-drag volume gesture below
+  // both write straight to `player.volume`/`player.muted` on the real
+  // media element, bypassing this component's own state entirely, so
+  // there's no single place to "turn off" that control. Instead, every
+  // volumechange is mirrored onto the soundtrack — so those same controls
+  // keep working exactly as before, just aimed at the soundtrack now — and
+  // the original track is immediately re-silenced afterward. Without a
+  // soundtrack, this is unchanged from before: just keeps a soundtrack-less
+  // video's (non-existent) background audio mute glued to the video's, a
+  // no-op today but harmless if that ever changes.
   const syncBackgroundAudioMute = () => {
     const audio = backgroundAudioRef.current;
     const player = playerRef.current;
     if (!audio || !player) return;
+
+    if (soundtrack) {
+      // Swallow the echo volumechange event caused by our own forced
+      // player.muted = true below (fires async, not synchronously with the
+      // write) — otherwise this handler re-runs, reads player.muted as the
+      // value we ourselves just forced, and incorrectly re-mutes the
+      // soundtrack right after a genuine user unmute was correctly applied.
+      if (forcingMuteRef.current) {
+        forcingMuteRef.current = false;
+        return;
+      }
+      audio.volume = player.volume;
+      audio.muted = player.muted;
+      if (!player.muted) {
+        forcingMuteRef.current = true;
+        player.muted = true;
+      }
+      return;
+    }
+
     audio.muted = player.muted;
   };
 
@@ -975,6 +1031,12 @@ export default function VideoPlayer({
         // "any": try to autoplay WITH sound first; if the browser blocks
         // that, Mux automatically retries muted instead of giving up.
         autoPlay="any"
+        // Reliable INITIAL state for a soundtrack video's own track — the
+        // soundtrack effect above also forces this imperatively once
+        // mounted, and syncBackgroundAudioMute re-asserts it on every
+        // subsequent volumechange, but this covers the very first render/
+        // autoplay attempt before either of those has had a chance to run.
+        muted={Boolean(soundtrack)}
         // Real poster frame instead of a flat black rectangle.
         thumbnailTime={0}
         onPlay={() => {

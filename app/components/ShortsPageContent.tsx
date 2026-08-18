@@ -20,6 +20,22 @@ import {
 
 import type { Short } from "../data/shorts";
 import { getSoundtrackById } from "../data/soundtracks";
+
+// A Short with a chosen soundtrack is meant to have that track REPLACE the
+// camera's own recorded audio entirely — see the identical comment in
+// VideoPlayer.tsx contrasting this with long-form Videos, where a
+// soundtrack instead mixes in quietly underneath real narration/dialogue.
+// That replacement never actually happened here: the Mux player's own
+// `muted` prop was only ever driven by the viewer's tap-to-mute state, so
+// whenever autoplay-unmuted succeeded, the Short's original audio played
+// at full volume AT THE SAME TIME as the separate soundtrack <audio>
+// element below — the reported "sound overlapping" bug. This helper is
+// the single source of truth both the render below and the effects above
+// use to force the Mux player's own track silent whenever a soundtrack
+// is present, regardless of the viewer's mute/unmute preference.
+function shortHasSoundtrack(short: Short | undefined): boolean {
+  return Boolean(short?.soundtrack || short?.soundtrackId);
+}
 import { cssFilterFor } from "../lib/videoFilters";
 import { useAuthModal } from "./auth/AuthProvider";
 import { useSettings } from "./settings/SettingsProvider";
@@ -212,6 +228,15 @@ export default function ShortsPageContent({
     const player = playerRef.current;
     if (!player) return;
 
+    // When the active Short has a soundtrack, the player's own `muted` is
+    // hardcoded true below (its real audio must never play) — that's not a
+    // signal of the viewer's actual sound preference, so syncing it into
+    // `muted` here would immediately re-silence the separate soundtrack
+    // <audio> element the moment the viewer taps unmute. Skip the sync
+    // entirely for these Shorts; the soundtrack's own effects below already
+    // drive `muted` correctly from real taps instead.
+    if (shortHasSoundtrack(shorts[activeIndex])) return;
+
     function syncMuted() {
       if (!player) return;
       setMuted(player.muted);
@@ -220,7 +245,7 @@ export default function ShortsPageContent({
     syncMuted();
     player.addEventListener("volumechange", syncMuted);
     return () => player.removeEventListener("volumechange", syncMuted);
-  }, [activeIndex]);
+  }, [activeIndex, shorts]);
 
   // Point the shared <audio> element at whichever soundtrack the active
   // Short was published with (none = play silently, no soundtrack was
@@ -443,7 +468,13 @@ export default function ShortsPageContent({
     setMuted((m) => {
       const next = !m;
       const player = playerRef.current;
-      if (player) {
+      // A soundtrack Short's own player must stay muted permanently (see
+      // shortHasSoundtrack and the muted prop below) — only the separate
+      // soundtrack <audio> element should ever respond to mute/unmute for
+      // these, via the [muted] effect above. Touching player.muted here
+      // for one would undo that and bring the overlap right back on the
+      // very next unmute tap.
+      if (player && !shortHasSoundtrack(shorts[activeIndex])) {
         player.muted = next;
         if (!next) {
           player.play?.().catch(() => {});
@@ -875,7 +906,12 @@ export default function ShortsPageContent({
                         streamType="on-demand"
                         autoPlay="any"
                         loop
-                        muted={muted}
+                        // Force-muted whenever this Short has a soundtrack —
+                        // that track IS the audio (see shortHasSoundtrack
+                        // above); the camera's own recorded sound must never
+                        // play alongside it. Otherwise, unchanged: driven by
+                        // the viewer's real tap-to-mute preference.
+                        muted={muted || shortHasSoundtrack(short)}
                         thumbnailTime={0}
                         // Real Settings → Playback → "Closed Captions"
                         // toggle — off by default; Mux Player's own

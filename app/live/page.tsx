@@ -30,10 +30,48 @@ export default function LivePage() {
   const [isVideoMuted, setIsVideoMuted] = useState(false);
 
   const previewRef = useRef<HTMLCanvasElement>(null);
-  
+
   // Store the client and stream instance so we can stop it later
   const broadcastClientRef = useRef<any>(null);
   const streamRef = useRef<MediaStream | null>(null);
+
+  // ── Camera safety watchdog ──────────────────────────────────────────
+  // startBroadcast() below turns the camera and mic on (getUserMedia)
+  // several steps BEFORE the broadcast itself actually goes live. If any
+  // of the steps in between never resolves — most realistically
+  // `client.startBroadcast()` hanging on a bad or dropped connection
+  // rather than rejecting — the camera stays on indefinitely with nothing
+  // being streamed: the recording light stays lit, the mic stays open, and
+  // the person may well have walked away assuming nothing is running. An
+  // outright throw is already handled (the catch calls stopBroadcast), but
+  // a hang is not, because a promise that never settles never reaches
+  // either branch.
+  //
+  // This is the backstop for exactly that: armed the moment the camera is
+  // acquired, cancelled the moment the broadcast genuinely starts. If five
+  // minutes pass with the camera live and the stream still not started, it
+  // shuts the camera and mic off and says so on screen, rather than
+  // leaving hardware running silently.
+  const CAMERA_START_TIMEOUT_MS = 5 * 60 * 1000;
+  const cameraWatchdogRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Read inside the watchdog callback instead of `isBroadcasting` directly:
+  // the callback closes over the render it was created in, so it would
+  // otherwise always see the stale `false` captured at arm time.
+  const isBroadcastingRef = useRef(false);
+  const [cameraTimeoutNotice, setCameraTimeoutNotice] = useState<string | null>(
+    null
+  );
+
+  useEffect(() => {
+    isBroadcastingRef.current = isBroadcasting;
+  }, [isBroadcasting]);
+
+  const clearCameraWatchdog = () => {
+    if (cameraWatchdogRef.current) {
+      clearTimeout(cameraWatchdogRef.current);
+      cameraWatchdogRef.current = null;
+    }
+  };
 
   // Pre-broadcast metadata state
   const [title, setTitle] = useState("");
@@ -121,6 +159,9 @@ export default function LivePage() {
   };
 
   const stopBroadcast = () => {
+    // Whatever the reason we're stopping (user pressed End, an error, the
+    // watchdog below, or unmount), the pending camera watchdog is now moot.
+    clearCameraWatchdog();
     if (broadcastClientRef.current) {
       try {
         broadcastClientRef.current.stopBroadcast();
@@ -175,6 +216,8 @@ export default function LivePage() {
 
     setLoading(true);
     setError(null);
+    // Clear any previous "camera switched off" notice — they're trying again.
+    setCameraTimeoutNotice(null);
 
     try {
       const session = await fetchAuthSession();
@@ -222,6 +265,18 @@ export default function LivePage() {
       });
       streamRef.current = stream;
 
+      // 3b. Camera is now genuinely live — arm the safety watchdog (see the
+      // long note next to cameraWatchdogRef). Cancelled on a successful
+      // start below, and by stopBroadcast() on every other exit path.
+      clearCameraWatchdog();
+      cameraWatchdogRef.current = setTimeout(() => {
+        if (isBroadcastingRef.current) return; // already live — nothing to do
+        stopBroadcast();
+        setCameraTimeoutNotice(
+          "Your camera and microphone were switched off automatically because the live stream didn't start within 5 minutes. Nothing was broadcast. You can set it up and try going live again whenever you're ready."
+        );
+      }, CAMERA_START_TIMEOUT_MS);
+
       // 4. Attach preview
       if (previewRef.current) {
         client.attachPreview(previewRef.current);
@@ -244,7 +299,11 @@ export default function LivePage() {
 
       // 6. Start Broadcast!
       await client.startBroadcast(data.streamKey);
-      
+
+      // Genuinely live now — stand the camera watchdog down before it can
+      // ever fire against a healthy broadcast.
+      clearCameraWatchdog();
+      isBroadcastingRef.current = true;
       setIsBroadcasting(true);
     } catch (err) {
       console.error("Failed to start live stream:", err);
@@ -405,6 +464,30 @@ export default function LivePage() {
         {error && (
           <div className="p-4 bg-red-500/10 border-t border-red-500/20 text-red-400 text-sm font-medium text-center">
             {error}
+          </div>
+        )}
+
+        {/* Camera safety watchdog notice (see cameraWatchdogRef above).
+            Amber rather than red on purpose — nothing went wrong and
+            nothing was lost; the camera was simply released because the
+            stream never started. Dismissible, and cleared automatically
+            the moment they try going live again. */}
+        {cameraTimeoutNotice && (
+          <div className="flex items-start gap-3 border-t border-amber-500/20 bg-amber-500/10 p-4 text-left">
+            <VideoOff
+              size={18}
+              className="mt-0.5 flex-shrink-0 text-amber-400 light:text-amber-600"
+            />
+            <p className="flex-1 text-sm font-medium text-amber-300 light:text-amber-700">
+              {cameraTimeoutNotice}
+            </p>
+            <button
+              type="button"
+              onClick={() => setCameraTimeoutNotice(null)}
+              className="flex-shrink-0 rounded-lg px-2 py-1 text-xs font-bold text-amber-300 light:text-amber-700 transition hover:bg-amber-500/15"
+            >
+              Dismiss
+            </button>
           </div>
         )}
       </div>

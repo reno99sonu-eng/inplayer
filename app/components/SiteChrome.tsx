@@ -7,6 +7,11 @@ import Navbar from "./Navbar";
 // Non-critical for first paint — lazy-loaded
 const AnnouncementBanner = dynamic(() => import("./AnnouncementBanner"), { ssr: false });
 const MobileBottomNav = dynamic(() => import("./MobileBottomNav"), { ssr: false });
+// Pure client-side idle watcher with nothing to render until it actually
+// fires, so it never needs to be in the server-rendered HTML. It scopes
+// itself to the InPlayer domain internally (see the component) rather than
+// being conditionally mounted here, so this stays a one-line addition.
+const IdleViewerPrompt = dynamic(() => import("./IdleViewerPrompt"), { ssr: false });
 import MaintenanceGate from "./MaintenanceGate";
 import GeoGate from "./GeoGate";
 import SplashScreen from "./SplashScreen";
@@ -64,6 +69,7 @@ export default function SiteChrome({
           <AnnouncementBanner />
           <div className="pb-20 lg:pb-0">{children}</div>
           <MobileBottomNav />
+          <IdleViewerPrompt />
         </GeoGate>
       </MaintenanceGate>
     </>

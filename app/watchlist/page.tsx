@@ -7,6 +7,7 @@ import Link from "next/link";
 import { Loader2 } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { formatTimeAgo } from "@/app/lib/formatters";
+import BackButton from "@/app/components/BackButton";
 
 interface WatchlistItem {
   videoId: string;
@@ -59,22 +60,26 @@ export default function WatchlistPage() {
 
   if (!signedIn) {
     return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 text-center">
-        <h2 className="text-2xl font-black text-white light:text-slate-900">
-          Sign in to see your Watch Later list
-        </h2>
-        <button
-          onClick={openSignIn}
-          className="mt-6 rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-8 py-3 font-bold text-white shadow-[0_15px_35px_rgba(255,153,0,.3)] transition-all hover:-translate-y-0.5"
-        >
-          Sign In
-        </button>
+      <div className="mx-auto max-w-[1000px] px-4 py-8 sm:py-12">
+        <BackButton />
+        <div className="flex min-h-[50vh] flex-col items-center justify-center px-6 text-center">
+          <h2 className="text-2xl font-black text-white light:text-slate-900">
+            Sign in to see your Watch Later list
+          </h2>
+          <button
+            onClick={openSignIn}
+            className="mt-6 rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-8 py-3 font-bold text-white shadow-[0_15px_35px_rgba(255,153,0,.3)] transition-all hover:-translate-y-0.5"
+          >
+            Sign In
+          </button>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="mx-auto max-w-[1000px] px-4 py-8 sm:py-12">
+      <BackButton />
       <h1 className="text-2xl sm:text-3xl font-black text-white light:text-slate-900">
         Watch Later
       </h1>

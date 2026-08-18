@@ -6,6 +6,7 @@ import { Loader2, Heart, IndianRupee, Store, ShoppingBag, ShoppingCart, Check, X
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { authedFetch } from "@/app/lib/apiFetch";
 import ShopNavLinks from "@/app/components/hammart/ShopNavLinks";
+import BackButton from "@/app/components/BackButton";
 import type { HammartProduct } from "@/app/lib/hammartProducts";
 
 interface WishlistLineItem {
@@ -101,6 +102,7 @@ export default function WishlistPage() {
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-8 text-white light:text-slate-900">
+      <BackButton />
       <div className="flex items-center justify-between gap-3">
         <h1 className="flex items-center gap-2 text-xl font-black text-white light:text-slate-900">
           <Heart size={20} className="text-orange-400" /> Your Wishlist

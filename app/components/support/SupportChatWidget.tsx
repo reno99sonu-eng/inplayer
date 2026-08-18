@@ -61,9 +61,22 @@ export default function SupportChatWidget() {
   const [ticketId, setTicketId] = useState<string | null>(null);
   const [reference, setReference] = useState<string | null>(null);
   const [resolved, setResolved] = useState(false);
+  const [detectingRole, setDetectingRole] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  // On InPlayer, the launcher no longer floats on screen — it moved into
+  // the hamburger menu (Navbar.tsx's drawer dispatches "openSupportChat").
+  // Hammart keeps its own floating launcher untouched. This widget stays
+  // mounted site-wide either way so the listener below always works.
+  const hideFloatingLauncher = domain === "inplayer";
+
+  useEffect(() => {
+    const onOpenRequest = () => setOpen(true);
+    window.addEventListener("openSupportChat", onOpenRequest);
+    return () => window.removeEventListener("openSupportChat", onOpenRequest);
+  }, []);
 
   // Reset everything when moving between products, so a Hammart order
   // question can never bleed into an InPlayer creator conversation.
@@ -91,6 +104,35 @@ export default function SupportChatWidget() {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [open]);
+
+  // Hammart doesn't ask "are you a buyer or a seller?" anymore — it checks
+  // for real. /api/hammart/vendor/me is the same lookup the vendor
+  // dashboard itself uses to decide what to show, so "has a vendor profile"
+  // here means the same thing it means everywhere else in the app. A vendor
+  // who also happens to shop still gets the seller playbook, matching what
+  // Vendor Settings already assumes about that account.
+  useEffect(() => {
+    if (!open || domain !== "hammart" || !signedIn || role) return;
+    let cancelled = false;
+    setDetectingRole(true);
+    authedFetch("/api/hammart/vendor/me")
+      .then((res) => res.json().catch(() => ({})))
+      .then((data) => {
+        if (cancelled) return;
+        setRole(data?.vendor ? "vendor" : "customer");
+      })
+      .catch((err) => {
+        console.error("Support role auto-detect failed:", err);
+        // Default to the more common case rather than blocking the chat.
+        if (!cancelled) setRole("customer");
+      })
+      .finally(() => {
+        if (!cancelled) setDetectingRole(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, domain, signedIn, role]);
 
   const send = useCallback(
     async (text: string) => {
@@ -176,8 +218,12 @@ export default function SupportChatWidget() {
           The open panel uses z-[480]: above page content and all the
           floating buttons, but still below the app's real modal band
           (z-[500]/z-[999], e.g. LocationMapPicker) and far below the
-          splash curtain. */}
-      {!open && (
+          splash curtain.
+
+          hideFloatingLauncher: on InPlayer this button no longer renders at
+          all — access moved into the hamburger menu (see Navbar.tsx), which
+          dispatches "openSupportChat" to open the panel below directly. */}
+      {!open && !hideFloatingLauncher && (
         <button
           type="button"
           onClick={() => setOpen(true)}
@@ -225,7 +271,7 @@ export default function SupportChatWidget() {
                 </p>
                 <p className="flex items-center gap-1 truncate text-[11px] font-medium text-slate-400 light:text-slate-600">
                   <Sparkles size={10} className="text-orange-400 light:text-orange-600" />
-                  AI assistant · replies instantly
+                  Priority Support Desk · replies instantly
                 </p>
               </div>
               <button
@@ -261,10 +307,23 @@ export default function SupportChatWidget() {
                     Sign in
                   </button>
                 </div>
+              ) : isHammart && (detectingRole || !role) ? (
+                /* Hammart no longer asks "buyer or seller?" — it's detected
+                   automatically from whether the account has a vendor
+                   profile (see the auto-detect effect above). This is just
+                   the brief moment while that lookup is in flight. */
+                <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center">
+                  <Loader2 size={22} className="animate-spin text-orange-400 light:text-orange-600" />
+                  <p className="text-xs font-medium text-slate-400 light:text-slate-600">
+                    One moment — setting up your chat…
+                  </p>
+                </div>
               ) : !role ? (
-                /* Role picker — this is what makes the answers land: a buyer
-                   and a seller asking "when do I get paid" need completely
-                   different replies. */
+                /* Role picker — InPlayer only now (viewer vs creator can't
+                   be auto-detected the way Hammart's vendor-profile check
+                   can). This is what makes the answers land: a viewer and a
+                   creator asking about payouts need completely different
+                   replies. */
                 <div className="flex h-full flex-col justify-center gap-3">
                   <p className="text-center text-sm font-semibold text-white light:text-slate-900">
                     First — which of these is you?
@@ -414,7 +473,7 @@ export default function SupportChatWidget() {
                   </button>
                 </div>
                 <p className="mt-1.5 px-1 text-[10px] font-medium text-slate-500 light:text-slate-600">
-                  AI assistant — never share passwords, OTPs or card details.
+                  Support Desk — never share passwords, OTPs or card details.
                 </p>
               </div>
             )}

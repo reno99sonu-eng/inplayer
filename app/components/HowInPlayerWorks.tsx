@@ -9,7 +9,6 @@ import {
   ShieldCheck,
   Landmark,
   Clock,
-  HelpCircle,
 } from "lucide-react";
 import {
   ELIGIBILITY_THRESHOLD,
@@ -75,21 +74,60 @@ function MonetizationAnswer() {
   );
 }
 
-// The trending-banner/hero-content placement question doesn't have a
-// published answer yet — this is an explicit, clearly-labeled placeholder
-// rather than a guess, so it can be swapped for the real criteria later
-// without misleading anyone in the meantime.
-function TrendingPlaceholderAnswer() {
+// The real, currently-live mechanism — pulled straight from
+// app/lib/trendingStore.ts (getFeaturedThisWeek, the exact function that
+// fills the homepage hero) and app/page.tsx's getHeroContent(), so this
+// answer can't drift out of sync with what the homepage actually does.
+function TrendingAnswer() {
+  const steps: { icon: ReactNode; title: string; body: string }[] = [
+    {
+      icon: <TrendingUp size={15} />,
+      title: "It's fully automatic",
+      body: "There's no application, form, or admin approval. Every public video is silently eligible the moment it's published.",
+    },
+    {
+      icon: <Clock size={15} />,
+      title: "Ranked by real views, trailing 7 days",
+      body: "The hero rotates the videos with the most real watch views across a rolling 7-day window (today plus the previous 6) — the same daily-view data that powers Trending Now. It recalculates daily, not once a week.",
+    },
+    {
+      icon: <ShieldCheck size={15} />,
+      title: "Two requirements",
+      body: "The video must be Public (not Unlisted or Private) and be a longform upload with your creator channel attached — Raftaar shorts have their own feed and never appear here.",
+    },
+    {
+      icon: <Sparkles size={15} />,
+      title: "Higher views this week = better odds",
+      body: "Up to 6 slides are shown, picked purely by view count in that window. There's no manual curation to ask for — the fastest way in is genuine watch time on a public upload.",
+    },
+  ];
+
   return (
-    <div className="rounded-xl border border-dashed border-amber-400/25 bg-amber-500/[0.05] p-3">
-      <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-amber-400">
-        <HelpCircle size={13} /> Coming soon
-      </p>
-      <p className="mt-1.5 text-xs leading-relaxed text-slate-400 light:text-slate-600">
-        We&apos;re still finalizing the exact criteria for hero/trending
-        banner placement. This answer will be published here as soon as
-        it&apos;s ready — in the meantime, reach out through Support in the
-        navbar footer if you have questions.
+    <div className="space-y-0">
+      {steps.map((step, i) => (
+        <div key={step.title} className="flex gap-3">
+          <div className="flex flex-col items-center">
+            <div className="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-orange-500/20 to-amber-400/10 text-orange-400">
+              {step.icon}
+            </div>
+            {i < steps.length - 1 && (
+              <div className="my-1 w-px flex-1 bg-white/10 light:bg-black/10" />
+            )}
+          </div>
+          <div className="pb-3.5">
+            <p className="text-sm font-bold text-white light:text-slate-900">
+              {step.title}
+            </p>
+            <p className="mt-0.5 text-xs leading-relaxed text-slate-400 light:text-slate-600">
+              {step.body}
+            </p>
+          </div>
+        </div>
+      ))}
+      <p className="text-[11px] leading-relaxed text-slate-500">
+        Note: admins can occasionally swap this real carousel for a sponsored
+        banner (Advertising settings). When that's off — the default — the
+        hero always shows genuine top videos, never a made-up placement.
       </p>
     </div>
   );
@@ -114,8 +152,7 @@ const QA_ITEMS: QAItem[] = [
     id: "trending",
     question: "How do you put your video in the trending banner (hero content)?",
     icon: <Sparkles size={16} />,
-    placeholder: true,
-    render: () => <TrendingPlaceholderAnswer />,
+    render: () => <TrendingAnswer />,
   },
 ];
 

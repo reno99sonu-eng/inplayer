@@ -8,6 +8,7 @@ import VideoMetadataFields, { VideoMetadataValue, SpokenLanguage, Visibility } f
 import AITitleAssistModal from "@/app/components/AITitleAssistModal";
 import { buildAIGeneratePrompt, parseAITitleSuggestions } from "@/app/lib/aiPrompts";
 import { CONTENT_CATEGORIES } from "@/app/data/categories";
+import BackButton from "@/app/components/BackButton";
 
 const CATEGORIES = CONTENT_CATEGORIES;
 
@@ -324,25 +325,34 @@ export default function LivePage() {
 
   if (!signedIn) {
     return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 text-center">
-        <h2 className="text-2xl font-black text-white light:text-slate-900">
-          Sign in to go live
-        </h2>
-        <p className="mt-2 max-w-sm text-sm text-slate-400 light:text-slate-600">
-          You need an InPlayer account to start a live stream.
-        </p>
-        <button
-          onClick={openSignIn}
-          className="mt-6 rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-8 py-3 font-bold text-white shadow-[0_15px_35px_rgba(255,153,0,.3)] transition-all hover:-translate-y-0.5"
-        >
-          Sign In
-        </button>
-      </div>
+      <>
+        <div className="mx-auto max-w-[820px] px-4 pt-6">
+          <BackButton />
+        </div>
+        <div className="flex min-h-[50vh] flex-col items-center justify-center px-6 text-center">
+          <h2 className="text-2xl font-black text-white light:text-slate-900">
+            Sign in to go live
+          </h2>
+          <p className="mt-2 max-w-sm text-sm text-slate-400 light:text-slate-600">
+            You need an InPlayer account to start a live stream.
+          </p>
+          <button
+            onClick={openSignIn}
+            className="mt-6 rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-8 py-3 font-bold text-white shadow-[0_15px_35px_rgba(255,153,0,.3)] transition-all hover:-translate-y-0.5"
+          >
+            Sign In
+          </button>
+        </div>
+      </>
     );
   }
 
   return (
     <div className="mx-auto max-w-[820px] px-4 py-8 sm:py-12">
+      {/* Hidden while actually broadcasting so nobody navigates away from a
+          live stream by accident — same reasoning as not offering it during
+          checkout flows elsewhere in the app. */}
+      {!isBroadcasting && <BackButton />}
       <div className="flex items-center gap-3">
         <span className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-amber-400 text-white shadow-lg shadow-orange-500/20">
           <Radio size={22} className={isBroadcasting ? "animate-pulse" : ""} />

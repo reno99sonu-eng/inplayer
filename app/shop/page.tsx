@@ -277,7 +277,7 @@ export default function ShopPage() {
           <div className="min-w-0">
             <h1 className="text-lg sm:text-xl font-black text-white light:text-slate-900 leading-tight">HamMart</h1>
             <p className="text-[11px] text-slate-400 light:text-slate-700 font-medium">
-              Buy directly from verified creators & vendors with instant UPI checkout
+              Local vendors, instant UPI checkout
             </p>
           </div>
         </div>

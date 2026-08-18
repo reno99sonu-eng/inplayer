@@ -8,6 +8,7 @@ import { loadRazorpayCheckoutScript, openSponsorshipCheckout, pollSponsorshipPay
 import type { SponsorshipPackageType } from "@/app/lib/sponsorships";
 import SponsorshipDashboardPanel from "@/app/components/sponsorships/SponsorshipDashboardPanel";
 import SponsorshipProfilePanel from "@/app/components/sponsorships/SponsorshipProfilePanel";
+import BackButton from "@/app/components/BackButton";
 
 interface PackageInfo {
   packageType: SponsorshipPackageType;
@@ -211,6 +212,7 @@ export default function SponsorshipsPage() {
 
   return (
     <div className="mx-auto max-w-[900px] px-4 py-6 sm:px-6 lg:px-8">
+      <BackButton />
       <div className="mb-6 flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         <div className="flex items-center gap-3">
           <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] shadow-lg shadow-orange-500/20">

@@ -28,6 +28,33 @@ async function verifyOwnership(videoId: string, userId: string) {
   return { video: result.Item } as const;
 }
 
+// GET was missing entirely — the Localization Console
+// (app/creators/studio/[videoId]/localization/page.tsx) fetches this exact
+// route with a plain GET on load. With no GET handler here, Next.js
+// answered every request with 405, `res.ok` was always false, `video`
+// stayed null, and the page rendered "Video not found." for every video,
+// even ones the creator genuinely owned. This is the fix — same ownership
+// check PATCH/DELETE already use, just returning the video instead of
+// mutating it.
+export async function GET(request: NextRequest, { params }: Params) {
+  let user;
+
+  try {
+    user = await verifyAuth(request);
+  } catch {
+    return NextResponse.json({ error: "Please sign in." }, { status: 401 });
+  }
+
+  const { videoId } = await params;
+  const ownership = await verifyOwnership(videoId, user.userId);
+
+  if ("error" in ownership) {
+    return NextResponse.json({ error: ownership.error }, { status: ownership.status });
+  }
+
+  return NextResponse.json({ video: ownership.video });
+}
+
 export async function PATCH(request: NextRequest, { params }: Params) {
   let user;
 

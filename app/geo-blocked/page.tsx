@@ -1,5 +1,6 @@
 import { Metadata } from "next";
 import { Globe } from "lucide-react";
+import BackButton from "@/app/components/BackButton";
 
 export const metadata: Metadata = {
   title: "Region Not Available — INPLAYER",
@@ -9,6 +10,7 @@ export const metadata: Metadata = {
 export default function GeoBlockedPage() {
   return (
     <div className="flex min-h-dvh flex-col items-center justify-center bg-[#06101D] px-6 text-center light:bg-[#F5EEDC]">
+      <div className="mb-4 self-start"><BackButton /></div>
       <div className="flex h-16 w-16 items-center justify-center rounded-full border border-orange-400/30 bg-orange-500/10">
         <Globe size={28} className="text-orange-300" />
       </div>

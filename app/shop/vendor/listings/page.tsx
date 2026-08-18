@@ -6,6 +6,7 @@ import { Loader2, Plus, Upload, Trash2, Eye, EyeOff, AlertTriangle, IndianRupee 
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { authedFetch } from "@/app/lib/apiFetch";
 import { compressImageToThumbnail } from "@/app/lib/imageCompress";
+import BackButton from "@/app/components/BackButton";
 import type { HammartProduct } from "@/app/lib/hammartProducts";
 
 const CATEGORIES = ["Merchandise", "Digital Products", "Handicrafts", "Fashion", "Electronics", "Home & Living", "Other"];
@@ -353,6 +354,7 @@ export default function VendorListingsPage() {
 
   return (
     <div className="mx-auto max-w-xl px-6 py-8">
+      <BackButton />
       <div className="flex items-center justify-between">
         <h1 className="text-xl font-black text-white light:text-slate-900">My Listings</h1>
         <button

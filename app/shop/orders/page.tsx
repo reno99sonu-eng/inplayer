@@ -7,6 +7,7 @@ import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { authedFetch } from "@/app/lib/apiFetch";
 import { orderTotalInr } from "@/app/lib/hammartOrderMath";
 import ShopNavLinks from "@/app/components/hammart/ShopNavLinks";
+import BackButton from "@/app/components/BackButton";
 import type { HammartOrder } from "@/app/lib/hammartOrders";
 
 const STATUS_LABEL: Record<string, { label: string; tone: string }> = {
@@ -320,6 +321,7 @@ export default function MyOrdersPage() {
 
   return (
     <div className="mx-auto max-w-xl px-6 py-8">
+      <BackButton />
       <div className="flex items-center justify-between gap-3">
         <h1 className="text-xl font-black text-white light:text-slate-900">My Orders</h1>
         <ShopNavLinks />

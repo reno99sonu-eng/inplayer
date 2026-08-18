@@ -8,7 +8,6 @@ import {
   Sparkles,
   User,
   ChevronDown,
-  AlertCircle,
 } from "lucide-react";
 import { authedFetch } from "@/app/lib/apiFetch";
 import { useAdminMode } from "@/app/components/admin/AdminModeContext";
@@ -72,7 +71,6 @@ export default function AdminSupportPage() {
 
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [counts, setCounts] = useState<Counts | null>(null);
-  const [tableMissing, setTableMissing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<SupportTicketStatus | "all">("all");
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -92,7 +90,6 @@ export default function AdminSupportPage() {
       if (res.ok) {
         setTickets(data.tickets || []);
         setCounts(data.counts || null);
-        setTableMissing(Boolean(data.tableMissing));
       }
     } catch (err) {
       console.error("Failed to load support tickets:", err);
@@ -199,19 +196,6 @@ export default function AdminSupportPage() {
           );
         })}
       </div>
-
-      {tableMissing && (
-        <div className="mb-4 flex items-start gap-2 rounded-2xl border border-amber-500/25 bg-amber-500/10 px-4 py-3">
-          <AlertCircle size={16} className="mt-0.5 flex-shrink-0 text-amber-400 light:text-amber-600" />
-          <p className="text-xs font-medium leading-5 text-amber-300 light:text-amber-800">
-            The <span className="font-mono font-bold">InPlayer-Support-Tickets</span>{" "}
-            table doesn&apos;t exist in DynamoDB yet — create it with{" "}
-            <span className="font-mono font-bold">ticketId</span> as the partition
-            key. Until then, support chat still answers people normally; the
-            conversations just aren&apos;t being recorded here.
-          </p>
-        </div>
-      )}
 
       {loading ? (
         <div className="flex items-center justify-center py-16">

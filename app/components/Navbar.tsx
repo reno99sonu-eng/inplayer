@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, Suspense } from "react";
 import { fetchAuthSession } from "aws-amplify/auth";
 import NavbarLogo from "./NavbarLogo";
 import NavbarLinks from "./NavbarLinks";
-import { Menu, X, Search, Home, PlaySquare, ChevronRight, ChevronDown, LogOut, Mail, Copy, Check, Gamepad2, Megaphone } from "lucide-react";
+import { Menu, X, Search, Home, PlaySquare, ChevronRight, ChevronDown, LogOut, Mail, Copy, Check, Gamepad2, Megaphone, Sparkles, Headset } from "lucide-react";
 import { useAuthModal } from "./auth/AuthProvider";
 import NavbarSearch from "./NavbarSearch";
 import NavbarActions from "./NavbarActions";
@@ -12,13 +12,17 @@ import NavbarProfile from "./NavbarProfile";
 import MobileMenu from "./MobileMenu";
 import NavigationCategories from "./NavigationCategories";
 import MobileSearchOverlay from "./MobileSearchOverlay";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { CONTACT_EMAILS } from "@/app/lib/contactEmails";
+import { getSiteDomain } from "@/app/lib/siteDomain";
 
 
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const pathname = usePathname();
+  const isHomePage = pathname === "/";
+  const siteDomain = getSiteDomain(pathname);
 
   const [subscribedChannels, setSubscribedChannels] = useState<
     {
@@ -706,6 +710,77 @@ lg:right-auto
                 <Megaphone size={19} />
                 <span className="text-sm font-semibold">Sponsor an Ad</span>
               </button>
+
+              {/* AI Studio moved here from a floating button — but only on
+                  the homepage, where FloatingAIButton.tsx hides itself and
+                  relies on this entry instead. Every other page still shows
+                  the floating button bottom-right, so it isn't duplicated
+                  here. */}
+              {isHomePage && (
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    window.dispatchEvent(new CustomEvent("openAIStudio"));
+                  }}
+                  className="
+                    flex
+                    w-full
+                    items-center
+                    gap-4
+                    rounded-xl
+                    px-3
+                    py-2
+                    text-left
+                    text-slate-200
+                    light:text-slate-700
+                    transition-all
+                    duration-300
+                    hover:bg-white/5
+                    light:hover:bg-black/5
+                    hover:translate-x-1
+                    hover:text-orange-300
+                    light:hover:text-orange-600
+                  "
+                >
+                  <Sparkles size={19} />
+                  <span className="text-sm font-semibold">AI Studio</span>
+                </button>
+              )}
+
+              {/* Support moved here from a floating button, InPlayer only —
+                  SupportChatWidget.tsx hides its own floating launcher on
+                  this domain and listens for "openSupportChat" instead.
+                  Hammart keeps its floating Support button untouched. */}
+              {siteDomain === "inplayer" && (
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    window.dispatchEvent(new CustomEvent("openSupportChat"));
+                  }}
+                  className="
+                    flex
+                    w-full
+                    items-center
+                    gap-4
+                    rounded-xl
+                    px-3
+                    py-2
+                    text-left
+                    text-slate-200
+                    light:text-slate-700
+                    transition-all
+                    duration-300
+                    hover:bg-white/5
+                    light:hover:bg-black/5
+                    hover:translate-x-1
+                    hover:text-orange-300
+                    light:hover:text-orange-600
+                  "
+                >
+                  <Headset size={19} />
+                  <span className="text-sm font-semibold">Support</span>
+                </button>
+              )}
             </div>
 
             {signedIn && (

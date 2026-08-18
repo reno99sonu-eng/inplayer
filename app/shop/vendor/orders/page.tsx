@@ -7,6 +7,7 @@ import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { authedFetch } from "@/app/lib/apiFetch";
 import { orderTotalInr } from "@/app/lib/hammartOrderMath";
 import VendorSalesStats from "@/app/components/hammart/VendorSalesStats";
+import BackButton from "@/app/components/BackButton";
 import type { HammartOrder } from "@/app/lib/hammartOrders";
 
 function VendorOrderCard({
@@ -269,6 +270,7 @@ export default function VendorOrdersPage() {
 
   return (
     <div className="mx-auto max-w-xl px-6 py-8">
+      <BackButton />
       <h1 className="text-xl font-black text-white light:text-slate-900">Orders Received</h1>
       <p className="mt-1 text-xs text-slate-500">
         Orders paid through your Razorpay setup are verified automatically — just confirm once shipped. Orders

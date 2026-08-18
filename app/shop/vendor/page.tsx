@@ -8,6 +8,7 @@ import { authedFetch } from "@/app/lib/apiFetch";
 import VendorKycForm from "@/app/components/hammart/VendorKycForm";
 import VendorSubscribeButton from "@/app/components/hammart/VendorSubscribeButton";
 import VendorSalesStats from "@/app/components/hammart/VendorSalesStats";
+import BackButton from "@/app/components/BackButton";
 import { FREE_LISTINGS_LIMIT, type BusinessType, type VendorProfile } from "@/app/lib/hammartVendors";
 import type { HammartOrder } from "@/app/lib/hammartOrders";
 
@@ -292,6 +293,7 @@ export default function VendorDashboardPage() {
 
   return (
     <div className="mx-auto max-w-2xl px-6 py-10 text-center">
+      <div className="text-left"><BackButton /></div>
       <Store size={32} className="mx-auto text-orange-400" />
       <h1 className="mt-4 text-2xl font-black text-white light:text-slate-900">Vendor Dashboard</h1>
 

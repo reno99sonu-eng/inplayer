@@ -1,5 +1,4 @@
 import { Suspense } from "react";
-import FloatingAIButton from "./components/FloatingAIButton";
 import FeaturedHero from "./components/featuredHero/FeaturedHero";
 import FeaturedHeroAd from "./components/featuredHero/FeaturedHeroAd";
 import RecommendationFeed from "./components/RecommendationFeed";
@@ -249,8 +248,6 @@ export default async function Home({ searchParams }: HomeProps) {
           <HomeContent activeView={activeView} isVertical={isVertical} />
         </Suspense>
       </div>
-
-      <FloatingAIButton />
     </main>
   );
 }

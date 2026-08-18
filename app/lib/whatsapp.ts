@@ -15,7 +15,12 @@ function formatPhoneNumber(phone: string): string {
 export async function sendWhatsAppMessage(
   toPhone: string,
   templateName: string,
-  languageCode: string = "en_US",
+  // Meta's Message Templates dashboard shows "order_confirmation" and
+  // "vendor_order_notification" under Language = plain "English", which is
+  // the `en` code — NOT `en_US` ("English (US)"), which is a different
+  // language variant to Meta's API and will 132001-fail to match. Confirmed
+  // directly against the live WhatsApp Manager template list on 18 Aug 2026.
+  languageCode: string = "en",
   components: any[] = []
 ): Promise<boolean> {
   const WHATSAPP_PHONE_NUMBER_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
@@ -66,6 +71,12 @@ export async function sendWhatsAppMessage(
 }
 
 export async function sendOtpMessage(phone: string, otp: string): Promise<boolean> {
+  // NOTE: "otp_verification" wasn't visible in the confirmed screenshots
+  // (it may be under WhatsApp Manager's collapsed "See more" template row) —
+  // its language wasn't verified. Left as en_US; if OTP sends start failing
+  // with error 132001, check this template's Language column the same way
+  // order_confirmation/vendor_order_notification were confirmed, and change
+  // this one call to "en" if it also shows plain "English".
   return await sendWhatsAppMessage(phone, "otp_verification", "en_US", [
     {
       type: "body",
@@ -85,7 +96,7 @@ export async function sendOtpMessage(phone: string, otp: string): Promise<boolea
 }
 
 export async function sendOrderConfirmationMessage(phone: string, buyerName: string, amount: string): Promise<boolean> {
-  return await sendWhatsAppMessage(phone, "order_confirmation", "en_US", [
+  return await sendWhatsAppMessage(phone, "order_confirmation", "en", [
     {
       type: "body",
       parameters: [
@@ -97,7 +108,7 @@ export async function sendOrderConfirmationMessage(phone: string, buyerName: str
 }
 
 export async function sendVendorOrderMessage(phone: string, vendorName: string, orderDetails: string): Promise<boolean> {
-  return await sendWhatsAppMessage(phone, "vendor_order_notification", "en_US", [
+  return await sendWhatsAppMessage(phone, "vendor_order_notification", "en", [
     {
       type: "body",
       parameters: [

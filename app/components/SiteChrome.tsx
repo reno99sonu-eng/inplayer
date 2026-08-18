@@ -7,6 +7,11 @@ import Navbar from "./Navbar";
 // Non-critical for first paint — lazy-loaded
 const AnnouncementBanner = dynamic(() => import("./AnnouncementBanner"), { ssr: false });
 const MobileBottomNav = dynamic(() => import("./MobileBottomNav"), { ssr: false });
+// Previously only mounted on the homepage (app/page.tsx). Moved here so it
+// renders bottom-right on every page site-wide; it hides itself on the
+// homepage internally and is reachable there via the hamburger menu instead
+// (see FloatingAIButton.tsx and Navbar.tsx's "AI Studio" drawer entry).
+const FloatingAIButton = dynamic(() => import("./FloatingAIButton"), { ssr: false });
 // Pure client-side idle watcher with nothing to render until it actually
 // fires, so it never needs to be in the server-rendered HTML. It scopes
 // itself to the InPlayer domain internally (see the component) rather than
@@ -76,6 +81,7 @@ export default function SiteChrome({
           <MobileBottomNav />
           <IdleViewerPrompt />
           <SupportChatWidget />
+          <FloatingAIButton />
         </GeoGate>
       </MaintenanceGate>
     </>

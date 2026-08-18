@@ -25,6 +25,7 @@ import {
   ShoppingBag,
   AlertTriangle,
   Receipt,
+  LifeBuoy,
 } from "lucide-react";
 import { useAdminMode } from "@/app/components/admin/AdminModeContext";
 
@@ -41,6 +42,7 @@ const inplayerItems = [
   { id: "dashboard", label: "Dashboard", icon: LayoutDashboard, href: "/admin/dashboard" },
   { id: "users", label: "Users", icon: Users, href: "/admin/users" },
   { id: "creators", label: "Creators", icon: Star, href: "/admin/creators" },
+  { id: "support", label: "Support Desk", icon: LifeBuoy, href: "/admin/support" },
   { id: "bug-reports", label: "Bug Reports", icon: Bug, href: "/admin/bug-reports" },
   { id: "error-logs", label: "Error Logs", icon: AlertTriangle, href: "/admin/error-logs" },
   { id: "videos", label: "Videos", icon: Video, href: "/admin/videos" },
@@ -63,6 +65,7 @@ const hammartItems = [
   { id: "hammart-products", label: "Products", icon: ShoppingBag, href: "/admin/hammart-products" },
   { id: "hammart-orders", label: "Orders", icon: Receipt, href: "/admin/hammart-orders" },
   { id: "ai-moderation", label: "AI Moderation", icon: Bot, href: "/admin/ai-moderation" },
+  { id: "support", label: "Support Desk", icon: LifeBuoy, href: "/admin/support" },
   { id: "bug-reports", label: "Bug Reports", icon: Bug, href: "/admin/bug-reports" },
   { id: "error-logs", label: "Error Logs", icon: AlertTriangle, href: "/admin/error-logs" },
   { id: "settings", label: "Platform Settings", icon: Settings, href: "/admin/settings" },

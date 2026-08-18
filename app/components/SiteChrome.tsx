@@ -12,6 +12,11 @@ const MobileBottomNav = dynamic(() => import("./MobileBottomNav"), { ssr: false 
 // itself to the InPlayer domain internally (see the component) rather than
 // being conditionally mounted here, so this stays a one-line addition.
 const IdleViewerPrompt = dynamic(() => import("./IdleViewerPrompt"), { ssr: false });
+// AI Support Desk launcher. Client-only and lazy for the same reason as the
+// two above — it renders nothing but a floating button until opened, and it
+// picks its own product playbook (InPlayer vs Hammart) off the pathname
+// internally, so mounting it once here covers both storefronts.
+const SupportChatWidget = dynamic(() => import("./support/SupportChatWidget"), { ssr: false });
 import MaintenanceGate from "./MaintenanceGate";
 import GeoGate from "./GeoGate";
 import SplashScreen from "./SplashScreen";
@@ -70,6 +75,7 @@ export default function SiteChrome({
           <div className="pb-20 lg:pb-0">{children}</div>
           <MobileBottomNav />
           <IdleViewerPrompt />
+          <SupportChatWidget />
         </GeoGate>
       </MaintenanceGate>
     </>

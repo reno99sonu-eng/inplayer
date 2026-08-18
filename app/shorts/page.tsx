@@ -1,4 +1,4 @@
-import { getReadyVideos } from "@/app/lib/videoStore";
+import { getVisibleVideos } from "@/app/lib/contentAccessServer";
 import type { Short } from "@/app/data/shorts";
 import ShortsPageContent from "@/app/components/ShortsPageContent";
 import { resolveUsernames } from "@/app/lib/resolveUsernames";
@@ -17,7 +17,7 @@ async function getShorts(startVideoId?: string): Promise<Short[]> {
   try {
     // Shared 30-second cached list (see lib/videoStore) — no per-request
     // table Scan. Already sorted newest-first.
-    const items = (await getReadyVideos()).filter(
+    const items = (await getVisibleVideos()).filter(
       (video) =>
         video.contentType === "short" &&
         (!video.visibility || video.visibility === "public")

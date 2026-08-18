@@ -4,6 +4,7 @@ import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
 import { THUMBNAIL_DATA_URL_MAX_LENGTH } from "@/app/lib/imageCompress";
 import { deleteVideoCascade } from "@/app/lib/cascadeDelete";
+import { audienceFlags, normalizeVideoAudience } from "@/app/lib/contentAccess";
 
 const VISIBILITY_VALUES = ["public", "unlisted", "private"];
 const SPOKEN_LANGUAGE_VALUES = ["auto", "en", "hi", "bn"];
@@ -78,6 +79,7 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     category,
     tags,
     visibility,
+    audience,
     madeForKids,
     ageRestricted,
     commentsEnabled,
@@ -139,13 +141,27 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     sets.push("visibility = :visibility");
     values[":visibility"] = visibility;
   }
-  if (madeForKids !== undefined) {
-    sets.push("madeForKids = :madeForKids");
-    values[":madeForKids"] = !!madeForKids;
-  }
-  if (ageRestricted !== undefined) {
-    sets.push("ageRestricted = :ageRestricted");
-    values[":ageRestricted"] = !!ageRestricted;
+  // Audience is the single source of truth (app/lib/contentAccess.ts) and
+  // rewrites both legacy booleans from itself, so the three can never drift
+  // apart on an edit. The standalone madeForKids/ageRestricted branches
+  // below only run for callers that still send the old shape without an
+  // `audience` — they're kept purely so nothing already working breaks.
+  const resolvedAudience = normalizeVideoAudience(audience);
+  if (resolvedAudience) {
+    const flags = audienceFlags(resolvedAudience);
+    sets.push("audience = :audience", "madeForKids = :madeForKids", "ageRestricted = :ageRestricted");
+    values[":audience"] = resolvedAudience;
+    values[":madeForKids"] = flags.madeForKids;
+    values[":ageRestricted"] = flags.ageRestricted;
+  } else {
+    if (madeForKids !== undefined) {
+      sets.push("madeForKids = :madeForKids");
+      values[":madeForKids"] = !!madeForKids;
+    }
+    if (ageRestricted !== undefined) {
+      sets.push("ageRestricted = :ageRestricted");
+      values[":ageRestricted"] = !!ageRestricted;
+    }
   }
   if (commentsEnabled !== undefined) {
     sets.push("commentsEnabled = :commentsEnabled");

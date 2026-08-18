@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
-import { getReadyVideos } from "@/app/lib/videoStore";
+import { getVisibleVideos } from "@/app/lib/contentAccessServer";
 
 // "Up Next" for the video watch page — Videos only (Shorts are excluded
 // entirely; they live in their own swipeable feed) and, for signed-in
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
   const excludeVideoId = request.nextUrl.searchParams.get("excludeVideoId") || "";
   const category = request.nextUrl.searchParams.get("category") || "";
 
-  const candidates = (await getReadyVideos()).filter(
+  const candidates = (await getVisibleVideos()).filter(
     (v) =>
       v.videoId !== excludeVideoId &&
       v.contentType !== "short" &&

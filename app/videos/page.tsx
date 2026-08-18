@@ -1,4 +1,4 @@
-import { getReadyVideos } from "@/app/lib/videoStore";
+import { getVisibleVideos } from "@/app/lib/contentAccessServer";
 import { searchUsersByUsername } from "@/app/lib/userSearch";
 import Link from "next/link";
 import Image from "next/image";
@@ -34,7 +34,7 @@ export default async function VideosPage({ searchParams }: VideosPageProps) {
 
   // Shared 30-second cached list (see lib/videoStore) — no per-request
   // table Scan. Already sorted newest-first.
-  let videos: VideoCard[] = (await getReadyVideos())
+  let videos: VideoCard[] = (await getVisibleVideos())
     // Only public videos appear in listings (unlisted stays link-only,
     // private stays hidden from discovery).
     .filter((v) => !v.visibility || v.visibility === "public")

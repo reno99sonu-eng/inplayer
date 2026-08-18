@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { UploadCloud, X, Globe, Link2, Lock, Film, PlaySquare, Loader2, Sparkles } from "lucide-react";
+import { AUDIENCE_OPTIONS, type VideoAudience } from "@/app/lib/contentAccess";
 
 export const CONTENT_TYPES = [
   { value: "video", label: "Video" },
@@ -32,6 +33,12 @@ export interface VideoMetadataValue {
   contentType: "video" | "short";
   spokenLanguage: SpokenLanguage;
   visibility: Visibility;
+  // The single source of truth for who may see this video (see
+  // app/lib/contentAccess.ts). madeForKids/ageRestricted below are the
+  // older booleans, still written and still read by existing surfaces —
+  // derive them with audienceFlags(audience) rather than setting them by
+  // hand, so the three can never disagree.
+  audience: VideoAudience;
   madeForKids: boolean;
   ageRestricted: boolean;
   commentsEnabled: boolean;
@@ -56,6 +63,11 @@ interface VideoMetadataFieldsProps {
   onChange: <K extends keyof VideoMetadataValue>(field: K, value: VideoMetadataValue[K]) => void;
   categories: readonly string[];
   allowContentTypeChange?: boolean;
+  // Go Live reuses this whole form but has no audience state to drive (a
+  // stream is classified as general-audience — see app/live/page.tsx), so
+  // it hides the picker rather than showing a control that does nothing
+  // when clicked. Defaults to shown for the upload and edit forms.
+  allowAudienceChange?: boolean;
   thumbnail?: ThumbnailPickerProps;
   tagInput: string;
   onTagInputChange: (value: string) => void;
@@ -108,6 +120,7 @@ export default function VideoMetadataFields({
   onChange,
   categories,
   allowContentTypeChange = true,
+  allowAudienceChange = true,
   thumbnail,
   tagInput,
   onTagInputChange,
@@ -410,35 +423,42 @@ export default function VideoMetadataFields({
             </div>
           </div>
 
-          {/* Audience */}
-          <div>
+          {/* Audience — one 3-way choice replacing what used to be a
+              2-way "Not for kids / Made for kids" picker PLUS a separate
+              "Restrict to 18+" toggle further down. Those two could
+              contradict each other (nothing stopped a video being both),
+              and neither actually filtered anything. This drives the real
+              platform-wide filter in app/lib/contentAccess.ts; the old
+              madeForKids/ageRestricted booleans are still written, derived
+              from this, so every existing reader keeps working. */}
+          <div className={allowAudienceChange ? "" : "hidden"}>
             <label className="mb-1 block text-xs font-bold text-slate-300 light:text-slate-700">
               Audience
             </label>
-            <div className="grid grid-cols-2 gap-1.5">
-              <button
-                type="button"
-                onClick={() => onChange("madeForKids", false)}
-                className={`rounded-xl border py-1.5 text-xs font-semibold transition-all ${
-                  !value.madeForKids
-                    ? "border-orange-400/60 bg-orange-500/15 text-orange-300 light:text-orange-700"
-                    : "border-white/10 bg-[#060D18] text-slate-400 hover:border-white/20 light:border-black/10 light:bg-white light:text-slate-600"
-                }`}
-              >
-                Not for kids
-              </button>
-              <button
-                type="button"
-                onClick={() => onChange("madeForKids", true)}
-                className={`rounded-xl border py-1.5 text-xs font-semibold transition-all ${
-                  value.madeForKids
-                    ? "border-orange-400/60 bg-orange-500/15 text-orange-300 light:text-orange-700"
-                    : "border-white/10 bg-[#060D18] text-slate-400 hover:border-white/20 light:border-black/10 light:bg-white light:text-slate-600"
-                }`}
-              >
-                Made for kids
-              </button>
+            <div className="grid grid-cols-3 gap-1.5">
+              {AUDIENCE_OPTIONS.map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  title={option.hint}
+                  onClick={() => onChange("audience", option.value)}
+                  className={`rounded-xl border py-1.5 text-xs font-semibold transition-all ${
+                    value.audience === option.value
+                      ? "border-orange-400/60 bg-orange-500/15 text-orange-300 light:text-orange-700"
+                      : "border-white/10 bg-[#060D18] text-slate-400 hover:border-white/20 light:border-black/10 light:bg-white light:text-slate-600"
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
             </div>
+            <p className="mt-1 text-[10px] leading-4 text-slate-500">
+              {value.audience === "adult"
+                ? "Only viewers who have unlocked 18+ content in their settings will see this anywhere on InPlayer."
+                : value.audience === "kids"
+                  ? "Appears normally, and also in the Kids row for viewers in Kids-only mode."
+                  : "Visible to everyone except viewers in Kids-only mode."}
+            </p>
           </div>
 
           {/* Tags */}
@@ -480,14 +500,10 @@ export default function VideoMetadataFields({
             </div>
           </div>
 
-          {/* Toggles */}
+          {/* Toggles — "Restrict to 18+" used to live here; it's now the
+              third option in the Audience picker above, so a video can't be
+              tagged both "Made for kids" and 18+ at the same time. */}
           <div className="space-y-1">
-            <ToggleRow
-              label="Restrict to 18+"
-              desc="Age gate playback"
-              on={value.ageRestricted}
-              onChange={() => onChange("ageRestricted", !value.ageRestricted)}
-            />
             <ToggleRow
               label="Allow comments"
               desc="Enable viewer comments"

@@ -2,7 +2,9 @@ import type { Metadata } from "next";
 import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { after } from "next/server";
 import { docClient } from "@/app/lib/dynamodb";
-import { getReadyVideos } from "@/app/lib/videoStore";
+import { getVisibleVideos, getAudienceMode } from "@/app/lib/contentAccessServer";
+import { isVideoVisible, videoAudience } from "@/app/lib/contentAccess";
+import { Lock } from "lucide-react";
 import { resolveUsernames } from "@/app/lib/resolveUsernames";
 import BackButton from "@/app/components/BackButton";
 import WatchHistoryRecorder from "@/app/components/WatchHistoryRecorder";
@@ -78,7 +80,7 @@ async function getRelatedVideos(currentVideoId: string, category: string) {
   // this "Up Next" list. This is the SSR fallback shown before (and if)
   // the client-side personalized fetch in WatchPageContent replaces it —
   // see app/api/videos/related.
-  const items = (await getReadyVideos()).filter(
+  const items = (await getVisibleVideos()).filter(
     (v) =>
       v.videoId !== currentVideoId &&
       v.contentType !== "short" &&
@@ -121,6 +123,38 @@ export default async function WatchPage({ params }: WatchPageProps) {
           className="mt-4 rounded-2xl border border-white/10 light:border-black/10 px-5 py-2 text-sm font-semibold text-slate-200 light:text-slate-700 transition hover:border-orange-400/30 hover:bg-white/5 light:hover:bg-black/5 lg:mt-6 lg:px-6 lg:py-2.5"
         >
           Back to Videos
+        </Link>
+      </div>
+    );
+  }
+
+  // The hard gate. Filtering the listings keeps 18+ content out of every
+  // feed, but a direct link would still play it — so the same rule is
+  // re-applied here, server-side, before any playback ID or Mux token is
+  // ever put into the page. This is what makes the Settings lock real
+  // rather than cosmetic: without the passkey there is no request that
+  // returns this video's playable details at all.
+  const audienceMode = await getAudienceMode();
+  if (!isVideoVisible(video, audienceMode)) {
+    const isAdultBlock = videoAudience(video) === "adult";
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 text-center lg:px-6">
+        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full border border-orange-400/30 bg-orange-500/10">
+          <Lock size={26} className="text-orange-300" />
+        </div>
+        <h2 className="text-2xl font-black text-white light:text-slate-900">
+          {isAdultBlock ? "This video is 18+" : "Not available in Kids mode"}
+        </h2>
+        <p className="mt-1.5 max-w-sm text-sm text-slate-400 light:text-slate-600 lg:mt-2">
+          {isAdultBlock
+            ? "Your content settings are currently hiding 18+ videos. Turn 18+ content on in Settings with your 6-digit passkey to watch this."
+            : "Kids-only mode is on, so only videos marked for kids can play. Change this in Settings with your 6-digit passkey."}
+        </p>
+        <Link
+          href="/settings"
+          className="mt-4 rounded-2xl border border-white/10 light:border-black/10 px-5 py-2 text-sm font-semibold text-slate-200 light:text-slate-700 transition hover:border-orange-400/30 hover:bg-white/5 light:hover:bg-black/5 lg:mt-6 lg:px-6 lg:py-2.5"
+        >
+          Open Settings
         </Link>
       </div>
     );

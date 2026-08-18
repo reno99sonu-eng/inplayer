@@ -9,6 +9,11 @@ import { moderateText, UNCHECKED } from "@/app/lib/moderation";
 import { getPlatformSettings } from "@/app/lib/platformSettings";
 import { applyModerationStrike } from "@/app/lib/moderationStrikes";
 import { CUSTOM_AUDIO_MAX_SECONDS } from "@/app/data/soundtracks";
+import {
+  audienceFlags,
+  audienceFromFlags,
+  normalizeVideoAudience,
+} from "@/app/lib/contentAccess";
 
 // Defensive re-validation of a client-supplied soundtrack pick (see
 // ShortCreationTools/soundtracks.ts's ResolvedSoundtrack shape) before it's
@@ -98,6 +103,7 @@ export async function POST(request: NextRequest) {
       contentType,
       visibility,
       tags,
+      audience,
       madeForKids,
       ageRestricted,
       commentsEnabled,
@@ -277,8 +283,18 @@ export async function POST(request: NextRequest) {
                 .slice(0, 15)
                 .map((t: string) => t.trim())
             : [],
-          madeForKids: !!madeForKids,
-          ageRestricted: !!ageRestricted,
+          // Who may see this video, platform-wide (app/lib/contentAccess.ts).
+          // Trust the explicit `audience` when the client sends a valid one;
+          // otherwise fall back to the older booleans so a stale client, or
+          // any other caller still posting the old shape, still classifies
+          // correctly instead of silently landing in "everyone".
+          // madeForKids/ageRestricted are then rewritten FROM the resolved
+          // audience, so the three fields can never disagree on an item.
+          ...(() => {
+            const resolved =
+              normalizeVideoAudience(audience) ?? audienceFromFlags(madeForKids, ageRestricted);
+            return { audience: resolved, ...audienceFlags(resolved) };
+          })(),
           // Defaults to on unless explicitly disabled.
           commentsEnabled: commentsEnabled !== false,
           // Real member-only gating — see app/watch/[videoId]/page.tsx,

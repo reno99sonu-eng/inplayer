@@ -1,15 +1,9 @@
 "use client";
 
-import {
-  Globe,
-  Shield,
-  Baby,
-} from "lucide-react";
+import { Globe } from "lucide-react";
 
 import SettingsCard from "../common/SettingsCard";
 import SettingsRow from "../common/SettingsRow";
-import SettingsToggle from "../common/SettingsToggle";
-import { useSettings } from "../SettingsProvider";
 
 // Wired to the real SettingsProvider instead of local-only useState — see
 // PrivacySection.tsx for the same fix and why it matters. "Earn Stars" was
@@ -17,15 +11,14 @@ import { useSettings } from "../SettingsProvider";
 // page, and no backing feature anywhere in the app, so it was a dead link
 // dressed up to look like a real settings row (chevron and all).
 //
-// Restricted Mode / Child Mode below are marked "Coming soon" and
-// disabled rather than wired up — actually hiding mature content or
-// creating a safer child experience needs a real content-classification
-// system (per-video maturity ratings, moderation review) that doesn't
-// exist yet. Flipping the switch used to just flip a localStorage flag
-// nothing else ever read.
+// Restricted Mode and Child Mode used to live here, disabled and marked
+// "Coming soon", because actually hiding mature content needed a real
+// content-classification system that didn't exist — flipping either just
+// set a localStorage flag nothing ever read. That system exists now (the
+// Audience picker on the upload form + app/lib/contentAccess.ts), so both
+// have been replaced by the working, passkey-locked toggles in
+// ContentAccessSection.tsx, which is its own card on the Settings page.
 export default function GeneralSection() {
-  const { general, updateGeneral } = useSettings();
-
   return (
     <SettingsCard
       icon={<Globe size={24} />}
@@ -40,30 +33,6 @@ export default function GeneralSection() {
           description="InPlayer is currently available in English only."
           value="English"
         />
-
-        <SettingsRow
-          icon={<Shield size={20} />}
-          title="Restricted Mode"
-          description="Coming soon — hide potentially mature content."
-        >
-          <SettingsToggle
-            checked={general.restrictedMode}
-            onChange={(checked) => updateGeneral({ restrictedMode: checked })}
-            disabled
-          />
-        </SettingsRow>
-
-        <SettingsRow
-          icon={<Baby size={20} />}
-          title="Child Mode"
-          description="Coming soon — create a safer experience for children."
-        >
-          <SettingsToggle
-            checked={general.childMode}
-            onChange={(checked) => updateGeneral({ childMode: checked })}
-            disabled
-          />
-        </SettingsRow>
 
       </div>
     </SettingsCard>

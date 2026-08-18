@@ -1,7 +1,7 @@
 import { BatchGetCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "./dynamodb";
 import { getMuxThumbnailUrl } from "./muxThumbnail";
-import { getReadyVideos } from "./videoStore";
+import { getVisibleVideos } from "./contentAccessServer";
 import { ensureUsername } from "./ensureUsername";
 
 const DAILY_VIEWS_TABLE = "InPlayer-Video-Daily-Views";
@@ -82,7 +82,7 @@ async function rankByWindow(
 
   if (totals.size === 0) return [];
 
-  const allVideos = await getReadyVideos();
+  const allVideos = await getVisibleVideos();
   const byId = new Map(allVideos.map((v) => [v.videoId as string, v]));
 
   return Array.from(totals.entries())

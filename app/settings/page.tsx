@@ -6,6 +6,7 @@ import SettingsSidebar from "../components/settings/common/SettingsSidebar";
 import SettingsContent from "../components/settings/common/SettingsContent";
 import AppearanceSection from "../components/settings/sections/AppearanceSection";
 import GeneralSection from "../components/settings/sections/GeneralSection";
+import ContentAccessSection from "../components/settings/sections/ContentAccessSection";
 import MobileSettingsTabs from "../components/settings/common/MobileSettingsTabs";
 
 type Section =
@@ -38,7 +39,12 @@ export default function SettingsPage() {
     <SettingsContent
       active={activeSection}
       appearance={<AppearanceSection />}
-      general={<GeneralSection />}
+      general={
+        <div className="space-y-6">
+          <GeneralSection />
+          <ContentAccessSection />
+        </div>
+      }
     />
   </div>
 </div>
@@ -56,7 +62,12 @@ export default function SettingsPage() {
       <SettingsContent
         active={activeSection}
         appearance={<AppearanceSection />}
-        general={<GeneralSection />}
+        general={
+          <div className="space-y-6">
+            <GeneralSection />
+            <ContentAccessSection />
+          </div>
+        }
       />
     </SettingsLayout>
   </div>

@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { getReadyVideos } from "./lib/videoStore";
+import { filterByAudience, DEFAULT_AUDIENCE_MODE } from "./lib/contentAccess";
 import { playables } from "./data/playables";
 
 const SITE_URL = "https://inplayer.in";
@@ -59,7 +60,11 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // app/lib/trendingStore.ts) — a sitemap hiccup must never take the
   // whole route down.
   try {
-    const videos = await getReadyVideos();
+    // Deliberately filtered at the DEFAULT (safe) audience mode rather than
+    // any particular viewer's: a sitemap is generated with no request and
+    // no cookie, and 18+ URLs have no business being handed to search
+    // engines regardless of who can unlock them inside the app.
+    const videos = filterByAudience(await getReadyVideos(), DEFAULT_AUDIENCE_MODE);
     const videoEntries: MetadataRoute.Sitemap = videos
       .filter((video) => Boolean(video.videoId))
       .slice(0, 5000) // sitemap protocol's own per-file entry cap

@@ -17,8 +17,12 @@ import {
 
 export interface GeneralSettings {
   language: string;
-  restrictedMode: boolean;
-  childMode: boolean;
+  // NOTE: content restriction is deliberately NOT stored here. The old
+  // restrictedMode/childMode flags lived in this localStorage blob and were
+  // never read by anything; they've been replaced by a real, passkey-locked
+  // control (see ContentAccessSection.tsx). That one lives in an HttpOnly
+  // cookie set server-side, precisely so it CAN'T be flipped from the
+  // browser the way anything in here can.
 }
 
 export interface PlaybackSettings {
@@ -58,8 +62,6 @@ interface SettingsState {
 const DEFAULTS: SettingsState = {
   general: {
     language: "English",
-    restrictedMode: false,
-    childMode: false,
   },
   playback: {
     mobileQuality: "Auto",

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getReadyVideos } from "@/app/lib/videoStore";
+import { getVisibleVideos } from "@/app/lib/contentAccessServer";
 
 // Live search-as-you-type suggestions, drawn from the exact same
 // 30-second-cached ready-videos list every other listing surface already
@@ -15,7 +15,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const videos = await getReadyVideos();
+    const videos = await getVisibleVideos();
 
     const matches = videos.filter((video) => {
       const title = ((video.title as string) || "").toLowerCase();

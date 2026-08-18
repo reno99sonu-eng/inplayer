@@ -19,6 +19,7 @@ import VideoMetadataFields, {
 import AITitleAssistModal from "@/app/components/AITitleAssistModal";
 import ShortCreationTools, { ShortSettings } from "@/app/components/ShortCreationTools";
 import { extractLocalVideoThumbnails } from "@/app/lib/videoThumbnailExtractor";
+import { audienceFlags, type VideoAudience } from "@/app/lib/contentAccess";
 
 // Same categories as the nav bar's category chips (shared source).
 const CATEGORIES = CONTENT_CATEGORIES;
@@ -46,8 +47,12 @@ export default function UploadPage() {
 
   // YouTube-style upload options.
   const [visibility, setVisibility] = useState<Visibility>("public");
-  const [madeForKids, setMadeForKids] = useState(false);
-  const [ageRestricted, setAgeRestricted] = useState(false);
+  // One 3-way choice (Everyone / Kids / 18+) replacing what used to be a
+  // separate "made for kids" picker AND a "restrict to 18+" toggle that
+  // could contradict each other. The two old booleans are still sent to
+  // the API, derived from this via audienceFlags(), so every existing
+  // reader of them keeps working unchanged.
+  const [audience, setAudience] = useState<VideoAudience>("everyone");
   const [commentsEnabled, setCommentsEnabled] = useState(true);
   const [membersOnly, setMembersOnly] = useState(false);
   const [tags, setTags] = useState<string[]>([]);
@@ -109,8 +114,8 @@ export default function UploadPage() {
     contentType,
     spokenLanguage,
     visibility,
-    madeForKids,
-    ageRestricted,
+    audience,
+    ...audienceFlags(audience),
     commentsEnabled,
     tags,
     membersOnly,
@@ -139,12 +144,11 @@ export default function UploadPage() {
       case "visibility":
         setVisibility(val as Visibility);
         break;
-      case "madeForKids":
-        setMadeForKids(val as boolean);
+      case "audience":
+        setAudience(val as VideoAudience);
         break;
-      case "ageRestricted":
-        setAgeRestricted(val as boolean);
-        break;
+      // madeForKids/ageRestricted are derived from `audience` above and
+      // never set directly, so there's deliberately no case for them here.
       case "commentsEnabled":
         setCommentsEnabled(val as boolean);
         break;
@@ -310,8 +314,8 @@ export default function UploadPage() {
           contentType,
           spokenLanguage,
           visibility,
-          madeForKids,
-          ageRestricted,
+          audience,
+          ...audienceFlags(audience),
           commentsEnabled,
           tags,
           membersOnly: contentType === "video" ? membersOnly : undefined,

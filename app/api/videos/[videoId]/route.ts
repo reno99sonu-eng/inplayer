@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getReadyVideos } from "@/app/lib/videoStore";
+import { getVisibleVideos } from "@/app/lib/contentAccessServer";
 import { resolveUsernames } from "@/app/lib/resolveUsernames";
 
 export const dynamic = "force-dynamic";
@@ -11,7 +11,7 @@ export async function GET(
   const { videoId } = await params;
   
   try {
-    const allReady = await getReadyVideos();
+    const allReady = await getVisibleVideos();
     const video = allReady.find((v) => v.videoId === videoId);
     
     if (!video) {

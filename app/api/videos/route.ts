@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getReadyVideos } from "@/app/lib/videoStore";
+import { getVisibleVideos } from "@/app/lib/contentAccessServer";
 import { resolveUsernames } from "@/app/lib/resolveUsernames";
 
 export const dynamic = "force-dynamic";
@@ -9,7 +9,7 @@ export async function GET(request: Request) {
   const channelId = searchParams.get("channelId");
   
   try {
-    const allReady = await getReadyVideos();
+    const allReady = await getVisibleVideos();
     let items = allReady.filter(
       (v) => !v.visibility || v.visibility === "public"
     );

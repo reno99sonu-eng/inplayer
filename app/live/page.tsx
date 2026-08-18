@@ -379,6 +379,9 @@ export default function LivePage() {
               contentType: "video",
               spokenLanguage: "auto",
               visibility,
+              // Livestreams aren't classifiable at start time — they go out
+              // as general-audience content.
+              audience: "everyone",
               madeForKids: false,
               ageRestricted: false,
               commentsEnabled,
@@ -388,6 +391,9 @@ export default function LivePage() {
             onChange={handleMetadataChange}
             categories={CATEGORIES}
             allowContentTypeChange={false}
+            // No audience state to drive on a livestream — hidden rather
+            // than rendered as a control that silently does nothing.
+            allowAudienceChange={false}
             aiGenerating={aiGenerating}
             onOpenAITitleAssist={() => setAiTitleAssistOpen(true)}
             aiError={aiType === "title" ? aiError : null}

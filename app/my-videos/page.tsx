@@ -29,6 +29,11 @@ import RevenueSection, { PayoutStatus } from "@/app/components/analytics/Revenue
 import { TrendPoint } from "@/app/components/analytics/TrendChart";
 import HowInPlayerWorks from "@/app/components/HowInPlayerWorks";
 import { compressImageToThumbnail } from "@/app/lib/imageCompress";
+import {
+  audienceFlags,
+  audienceFromFlags,
+  normalizeVideoAudience,
+} from "@/app/lib/contentAccess";
 import { buildAIGeneratePrompt, parseAITitleSuggestions } from "@/app/lib/aiPrompts";
 import VideoMetadataFields, {
   VideoMetadataValue,
@@ -55,6 +60,11 @@ interface MyVideo {
   contentType?: string;
   tags?: string[];
   visibility?: string;
+  // Single source of truth for who may see this video (see
+  // app/lib/contentAccess.ts). madeForKids/ageRestricted are the older
+  // booleans, kept because videos published before it exists only have
+  // those — audienceFromFlags() reads them as a fallback.
+  audience?: string;
   madeForKids?: boolean;
   ageRestricted?: boolean;
   commentsEnabled?: boolean;
@@ -218,8 +228,12 @@ export default function MyVideosPage() {
       visibility: (VISIBILITY_VALUES.includes(video.visibility || "")
         ? video.visibility
         : "public") as Visibility,
-      madeForKids: !!video.madeForKids,
-      ageRestricted: !!video.ageRestricted,
+      ...(() => {
+        const resolved =
+          normalizeVideoAudience(video.audience) ??
+          audienceFromFlags(video.madeForKids, video.ageRestricted);
+        return { audience: resolved, ...audienceFlags(resolved) };
+      })(),
       commentsEnabled: video.commentsEnabled !== false,
       tags: Array.isArray(video.tags) ? video.tags : [],
       membersOnly: !!video.membersOnly,
@@ -341,8 +355,7 @@ export default function MyVideosPage() {
           category: editValue.category,
           tags: editValue.tags,
           visibility: editValue.visibility,
-          madeForKids: editValue.madeForKids,
-          ageRestricted: editValue.ageRestricted,
+          audience: editValue.audience,
           commentsEnabled: editValue.commentsEnabled,
           spokenLanguage: editValue.spokenLanguage,
           membersOnly: editValue.contentType === "video" ? editValue.membersOnly : undefined,
@@ -367,6 +380,7 @@ export default function MyVideosPage() {
                 category: editValue.category,
                 tags: editValue.tags,
                 visibility: editValue.visibility,
+                audience: editValue.audience,
                 madeForKids: editValue.madeForKids,
                 ageRestricted: editValue.ageRestricted,
                 commentsEnabled: editValue.commentsEnabled,

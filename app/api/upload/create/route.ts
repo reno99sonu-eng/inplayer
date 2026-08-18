@@ -8,6 +8,7 @@ import { ensureUsername } from "@/app/lib/ensureUsername";
 import { moderateText, UNCHECKED } from "@/app/lib/moderation";
 import { getPlatformSettings } from "@/app/lib/platformSettings";
 import { applyModerationStrike } from "@/app/lib/moderationStrikes";
+import { CUSTOM_AUDIO_MAX_SECONDS } from "@/app/data/soundtracks";
 
 // Defensive re-validation of a client-supplied soundtrack pick (see
 // ShortCreationTools/soundtracks.ts's ResolvedSoundtrack shape) before it's
@@ -24,7 +25,7 @@ function sanitizeSoundtrack(input: unknown): {
   artist: string;
   url: string;
   durationSeconds: number;
-  source: "inplayer" | "jamendo";
+  source: "inplayer" | "jamendo" | "custom";
   licenseUrl?: string;
 } | null {
   if (!input || typeof input !== "object") return null;
@@ -36,13 +37,27 @@ function sanitizeSoundtrack(input: unknown): {
   if (!isBoundedString(t.id) || !isBoundedString(t.title) || !isBoundedString(t.artist) || !isBoundedString(t.url)) {
     return null;
   }
-  if (t.source !== "inplayer" && t.source !== "jamendo") return null;
+  if (t.source !== "inplayer" && t.source !== "jamendo" && t.source !== "custom") return null;
   if (typeof t.url === "string" && !/^https?:\/\//.test(t.url) && !t.url.startsWith("/")) return null;
 
-  const durationSeconds =
+  // Creator-supplied audio (an uploaded file or a pasted link) must be
+  // served over HTTPS — a plain-http track would be blocked as mixed content
+  // by the browser at playback anyway, so reject it here rather than storing
+  // a soundtrack that can never be heard.
+  if (t.source === "custom" && typeof t.url === "string" && !/^https:\/\//.test(t.url)) {
+    return null;
+  }
+
+  const claimedDuration =
     typeof t.durationSeconds === "number" && Number.isFinite(t.durationSeconds) && t.durationSeconds > 0
       ? Math.min(t.durationSeconds, 3600)
       : 30;
+
+  // Re-clamp the copyright cap server-side. Both players already enforce it
+  // (see soundtrackClipSeconds), but a hand-crafted request must not be able
+  // to publish a custom track that claims a longer playable duration.
+  const durationSeconds =
+    t.source === "custom" ? Math.min(claimedDuration, CUSTOM_AUDIO_MAX_SECONDS) : claimedDuration;
 
   return {
     id: (t.id as string).trim(),
@@ -51,7 +66,10 @@ function sanitizeSoundtrack(input: unknown): {
     url: (t.url as string).trim(),
     durationSeconds,
     source: t.source,
-    ...(isBoundedString(t.licenseUrl) && { licenseUrl: (t.licenseUrl as string).trim() }),
+    // A licence page only means anything for a Jamendo CC track — never
+    // carry one over onto the creator's own audio.
+    ...(t.source === "jamendo" &&
+      isBoundedString(t.licenseUrl) && { licenseUrl: (t.licenseUrl as string).trim() }),
   };
 }
 

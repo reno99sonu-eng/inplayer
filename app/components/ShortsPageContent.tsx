@@ -19,7 +19,7 @@ import {
 } from "lucide-react";
 
 import type { Short } from "../data/shorts";
-import { getSoundtrackById } from "../data/soundtracks";
+import { getSoundtrackById, soundtrackClipSeconds } from "../data/soundtracks";
 
 // A Short with a chosen soundtrack is meant to have that track REPLACE the
 // camera's own recorded audio entirely — see the identical comment in
@@ -266,9 +266,17 @@ export default function ShortsPageContent({
     // already-live Shorts' soundtracks from silently breaking.
     const legacyTrack = !short?.soundtrack ? getSoundtrackById(short?.soundtrackId) : null;
     const track = short?.soundtrack
-      ? { url: short.soundtrack.url, durationSeconds: short.soundtrack.durationSeconds }
+      ? {
+          url: short.soundtrack.url,
+          durationSeconds: short.soundtrack.durationSeconds,
+          source: short.soundtrack.source,
+        }
       : legacyTrack
-        ? { url: legacyTrack.url, durationSeconds: legacyTrack.durationSeconds }
+        ? {
+            url: legacyTrack.url,
+            durationSeconds: legacyTrack.durationSeconds,
+            source: "inplayer" as const,
+          }
         : null;
 
     if (!audio || !track) {
@@ -276,7 +284,12 @@ export default function ShortsPageContent({
       return;
     }
 
-    const clipSeconds = Math.min(short?.musicClipSeconds || 30, track.durationSeconds);
+    // The creator's chosen 20s/30s clip length, further clamped to
+    // CUSTOM_AUDIO_MAX_SECONDS when this is the creator's own uploaded/linked
+    // audio — see soundtrackClipSeconds in app/data/soundtracks.ts. Falls
+    // back to the previous behaviour exactly for licensed tracks.
+    const clipSeconds =
+      soundtrackClipSeconds(track, short?.musicClipSeconds || 30) ?? track.durationSeconds;
 
     if (!audio.src || !audio.src.endsWith(track.url)) {
       audio.src = track.url;

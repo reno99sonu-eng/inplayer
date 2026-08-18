@@ -13,7 +13,9 @@ interface MembersOnlyVideoPlayerProps {
   title: string;
   uploaderId: string;
   uploaderName: string;
-  soundtrack?: { url: string; durationSeconds: number } | null;
+  // `source` rides along so VideoPlayer can apply the 29s copyright cap to
+  // the creator's own uploaded/linked audio — see soundtrackClipSeconds.
+  soundtrack?: { url: string; durationSeconds: number; source?: string | null } | null;
   filterLook?: VideoLookFilter;
 }
 

@@ -6,6 +6,7 @@ const MuxPlayer = dynamic(() => import("@mux/mux-player-react"), { ssr: false })
 import type { MuxCSSProperties, MuxPlayerRefAttributes } from "@mux/mux-player-react";
 import { useSettings } from "@/app/components/settings/SettingsProvider";
 import { cssFilterFor, type VideoLookFilter } from "@/app/lib/videoFilters";
+import { soundtrackClipSeconds } from "@/app/data/soundtracks";
 
 // Safari-only fullscreen APIs (`webkit*`) predate the standard Fullscreen
 // API and were never added to lib.dom.d.ts — these two small extensions
@@ -52,7 +53,13 @@ interface VideoPlayerProps {
   // Both absent/undefined for the (still-default) "no soundtrack, original
   // look" case, which is exactly how every video published before this
   // feature existed keeps behaving.
-  soundtrack?: { url: string; durationSeconds: number } | null;
+  // `source` distinguishes InPlayer's own instrumentals and Creative Commons
+  // tracks from the creator's own uploaded/linked audio ("custom"), which is
+  // hard-capped at CUSTOM_AUDIO_MAX_SECONDS of playback — see
+  // soundtrackClipSeconds in app/data/soundtracks.ts. Optional so older
+  // callers/items with no source recorded keep the previous uncapped
+  // behaviour for their (licensed) tracks.
+  soundtrack?: { url: string; durationSeconds: number; source?: string | null } | null;
   filterLook?: VideoLookFilter;
 }
 
@@ -363,6 +370,23 @@ export default function VideoPlayer({
     if (player && !player.paused) {
       audio.play().catch(() => {});
     }
+
+    // Copyright cap for the creator's own uploaded/linked audio: wrap back
+    // to the start once CUSTOM_AUDIO_MAX_SECONDS have played, so no more
+    // than that much of an unlicensed track is ever heard. Returns null for
+    // InPlayer/Jamendo tracks, in which case nothing is attached here at all
+    // and `loop` alone governs playback exactly as it did before.
+    const clipSeconds = soundtrackClipSeconds(soundtrack, null);
+    if (clipSeconds === null) return;
+
+    const enforceClip = () => {
+      if (audio.currentTime >= clipSeconds) {
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
+      }
+    };
+    audio.addEventListener("timeupdate", enforceClip);
+    return () => audio.removeEventListener("timeupdate", enforceClip);
   }, [soundtrack]);
 
   const syncBackgroundAudioToPlayer = (playing: boolean) => {

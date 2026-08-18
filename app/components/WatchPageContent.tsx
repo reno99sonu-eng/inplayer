@@ -43,7 +43,9 @@ interface VideoData {
   // Optional background soundtrack + visual "Look" picked at upload time
   // (see app/lib/videoFilters and app/components/ShortCreationTools) —
   // both undefined for the default "none picked" case.
-  soundtrack?: { url: string; durationSeconds: number } | null;
+  // `source` is forwarded straight through to VideoPlayer so it can apply
+  // the 29s copyright cap to the creator's own uploaded/linked audio.
+  soundtrack?: { url: string; durationSeconds: number; source?: string | null } | null;
   filterLook?: VideoLookFilter;
 }
 

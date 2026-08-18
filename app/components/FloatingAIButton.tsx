@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
 
 // 13KB modal — only loaded when the user actually clicks the button
@@ -10,14 +9,12 @@ const AIStudioModal = dynamic(() => import("./AIStudioModal"), { ssr: false });
 // Previously this component was only ever mounted on the homepage
 // (app/page.tsx used to render it directly), so it never appeared anywhere
 // else in the app at all. Now it's mounted once, site-wide, in
-// SiteChrome.tsx — bottom-right on every page — EXCEPT the homepage, where
-// it's deliberately hidden and reachable instead from the hamburger menu's
-// "AI Studio" entry (Navbar.tsx dispatches "openAIStudio" to open the same
-// modal from there).
+// SiteChrome.tsx — bottom-right on EVERY page, homepage included. It was
+// briefly hidden on the homepage in favour of a hamburger entry; Reno asked
+// for the homepage back exactly as it was, so the orb shows there again and
+// the hamburger "AI Studio" entry has been removed. Only the Support Desk
+// launcher lives in the hamburger now (see SupportChatWidget.tsx).
 export default function FloatingAIButton() {
-  const pathname = usePathname();
-  const isHome = pathname === "/";
-
   const [hidden, setHidden] = useState(false);
   const [open, setOpen] = useState(false);
 
@@ -38,18 +35,11 @@ export default function FloatingAIButton() {
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
-  useEffect(() => {
-    const onOpenRequest = () => setOpen(true);
-    window.addEventListener("openAIStudio", onOpenRequest);
-    return () => window.removeEventListener("openAIStudio", onOpenRequest);
-  }, []);
-
   return (
     <>
-      {!isHome && (
-        <button
-          onClick={() => setOpen(true)}
-          className={`
+      <button
+        onClick={() => setOpen(true)}
+        className={`
             fixed
             bottom-20
             right-4
@@ -83,10 +73,9 @@ export default function FloatingAIButton() {
                 : "translate-y-0 opacity-100"
             }
           `}
-        >
-          <span className="text-2xl text-amber-300 light:text-orange-500">✦</span>
-        </button>
-      )}
+      >
+        <span className="text-2xl text-amber-300 light:text-orange-500">✦</span>
+      </button>
 
       <AIStudioModal
         open={open}

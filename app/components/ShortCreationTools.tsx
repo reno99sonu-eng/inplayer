@@ -1,8 +1,14 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Loader2, Music2, Pause, Play, SlidersHorizontal, Wand2 } from "lucide-react";
-import { searchSoundtracks, toResolvedSoundtrack, ResolvedSoundtrack } from "@/app/data/soundtracks";
+import { fetchAuthSession } from "aws-amplify/auth";
+import { Link2, Loader2, Music2, Pause, Play, ShieldCheck, SlidersHorizontal, Upload, Wand2 } from "lucide-react";
+import {
+  searchSoundtracks,
+  toResolvedSoundtrack,
+  ResolvedSoundtrack,
+  CUSTOM_AUDIO_MAX_SECONDS,
+} from "@/app/data/soundtracks";
 
 export interface ShortSettings {
   soundtrack: ResolvedSoundtrack | null;
@@ -35,6 +41,153 @@ export default function ShortCreationTools({
   const [query, setQuery] = useState("");
   const [previewingId, setPreviewingId] = useState<string | null>(null);
   const previewAudioRef = useRef<HTMLAudioElement | null>(null);
+
+  // --- "Your own music": upload a file, or paste a direct link -----------
+  // Third source alongside the local catalog and CC search. Whatever the
+  // creator brings here is stored with source: "custom", which every player
+  // treats as hard-capped at CUSTOM_AUDIO_MAX_SECONDS (see
+  // soundtrackClipSeconds in app/data/soundtracks.ts) — InPlayer holds no
+  // licence for it, so only that much of it may ever be heard.
+  const [customTab, setCustomTab] = useState<"upload" | "link">("upload");
+  const [linkUrl, setLinkUrl] = useState("");
+  const [customBusy, setCustomBusy] = useState(false);
+  const [customError, setCustomError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+
+  // Loads the audio far enough to confirm the browser can actually decode
+  // and play it, and reports its true length. Used for both tabs: a pasted
+  // link that 404s or isn't really audio fails here rather than silently
+  // publishing a Short with a soundtrack that never plays. Cross-origin
+  // media needs no CORS headers for plain playback/metadata, so this works
+  // against any ordinary direct audio URL.
+  const probeAudio = (src: string) =>
+    new Promise<number>((resolve, reject) => {
+      const probe = new Audio();
+      probe.preload = "metadata";
+      const cleanup = () => {
+        probe.onloadedmetadata = null;
+        probe.onerror = null;
+        probe.src = "";
+      };
+      const timer = setTimeout(() => {
+        cleanup();
+        reject(new Error("Timed out loading that audio."));
+      }, 20_000);
+      probe.onloadedmetadata = () => {
+        clearTimeout(timer);
+        const seconds = Number.isFinite(probe.duration) && probe.duration > 0 ? probe.duration : 0;
+        cleanup();
+        resolve(seconds);
+      };
+      probe.onerror = () => {
+        clearTimeout(timer);
+        cleanup();
+        reject(new Error("That doesn't seem to be a playable audio file."));
+      };
+      probe.src = src;
+    });
+
+  const selectCustomTrack = (track: ResolvedSoundtrack) => {
+    onChange({ ...value, soundtrack: track });
+  };
+
+  // Passed straight to onClick rather than wrapped in an inline arrow, for
+  // the same React Compiler lint reason documented on handlePreviewClick
+  // below: a ref-touching function called through a closure created fresh
+  // each render is something the rule can't positively verify.
+  const openFilePicker = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFileChosen = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    // Let the same file be re-picked after an error without the input
+    // silently ignoring it as "unchanged".
+    event.target.value = "";
+    if (!file) return;
+
+    setCustomError(null);
+    setCustomBusy(true);
+    try {
+      // Confirm it's real, decodable audio in the browser before spending a
+      // round-trip uploading it.
+      const objectUrl = URL.createObjectURL(file);
+      try {
+        await probeAudio(objectUrl);
+      } finally {
+        URL.revokeObjectURL(objectUrl);
+      }
+
+      const session = await fetchAuthSession();
+      const idToken = session.tokens?.idToken?.toString();
+
+      const body = new FormData();
+      body.append("file", file);
+
+      const res = await fetch("/api/music/upload", {
+        method: "POST",
+        headers: idToken ? { Authorization: `Bearer ${idToken}` } : undefined,
+        body,
+      });
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok) {
+        // 501 = storage isn't configured yet; the link tab still works, so
+        // point the creator straight at it instead of a dead end.
+        if (res.status === 501) setCustomTab("link");
+        throw new Error(data?.error || "Couldn't upload that file.");
+      }
+
+      selectCustomTrack(data.track as ResolvedSoundtrack);
+    } catch (err) {
+      setCustomError(err instanceof Error ? err.message : "Couldn't upload that file.");
+    } finally {
+      setCustomBusy(false);
+    }
+  };
+
+  const handleLinkAdd = async () => {
+    const url = linkUrl.trim();
+    if (!url || customBusy) return;
+
+    setCustomError(null);
+
+    if (!/^https:\/\//i.test(url)) {
+      setCustomError("Use a direct https:// link to an audio file (MP3, M4A, WAV, OGG).");
+      return;
+    }
+
+    setCustomBusy(true);
+    try {
+      const seconds = await probeAudio(url);
+      let name = "My audio";
+      try {
+        const last = new URL(url).pathname.split("/").pop();
+        if (last) name = decodeURIComponent(last).replace(/\.[^.]+$/, "").slice(0, 120) || name;
+      } catch {
+        // Unparseable URL still probed fine — keep the default title.
+      }
+
+      selectCustomTrack({
+        id: `custom:${url}`,
+        title: name,
+        artist: "Your own music",
+        url,
+        // Never claim more than the cap: nothing will play past it anyway.
+        durationSeconds: seconds > 0 ? Math.min(seconds, CUSTOM_AUDIO_MAX_SECONDS) : CUSTOM_AUDIO_MAX_SECONDS,
+        source: "custom",
+      });
+      setLinkUrl("");
+    } catch (err) {
+      setCustomError(
+        err instanceof Error
+          ? `${err.message} Make sure it's a direct link to the audio file itself, not a page it's embedded on.`
+          : "Couldn't load that link."
+      );
+    } finally {
+      setCustomBusy(false);
+    }
+  };
 
   const localResults = searchSoundtracks(query).map(toResolvedSoundtrack);
 
@@ -247,28 +400,185 @@ export default function ShortCreationTools({
         )}
       </div>
 
-      {contentType === "short" ? (
-        <div className="mt-4 flex flex-wrap items-center gap-2">
-          <span className="text-xs font-bold text-slate-300 light:text-slate-700">Music clip</span>
-          {([20, 30] as const).map((seconds) => (
+      {/* Your own music — upload a file or paste a direct link. Kept in its
+          own bordered block, below the two licensed catalogs, because the
+          rules are different: InPlayer has no rights to this audio, so only
+          the first CUSTOM_AUDIO_MAX_SECONDS of it is ever played back. */}
+      <div className="mt-4 rounded-2xl border border-white/10 bg-black/10 p-3 light:border-black/10 light:bg-white/40">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs font-bold uppercase tracking-[.16em] text-slate-400 light:text-slate-600">
+            Your own music
+          </p>
+          <div className="flex gap-1 rounded-full bg-white/5 p-0.5 light:bg-black/5">
+            {(
+              [
+                { key: "upload", label: "Upload", icon: Upload },
+                { key: "link", label: "Link", icon: Link2 },
+              ] as const
+            ).map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => {
+                  setCustomTab(tab.key);
+                  setCustomError(null);
+                }}
+                className={`flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-bold transition ${
+                  customTab === tab.key
+                    ? "bg-orange-500 text-white"
+                    : "text-slate-400 hover:text-slate-200 light:hover:text-slate-700"
+                }`}
+              >
+                <tab.icon size={12} />
+                {tab.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {customTab === "upload" ? (
+          <div className="mt-2.5">
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="audio/*"
+              onChange={handleFileChosen}
+              className="hidden"
+            />
             <button
-              key={seconds}
               type="button"
-              onClick={() => onChange({ ...value, musicClipSeconds: seconds })}
-              className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
-                value.musicClipSeconds === seconds
-                  ? "bg-orange-500 text-white"
-                  : "bg-white/5 text-slate-400 hover:bg-white/10 light:bg-black/5"
-              }`}
+              disabled={customBusy}
+              onClick={openFilePicker}
+              className="flex w-full items-center justify-center gap-2 rounded-xl border border-dashed border-white/20 bg-white/[.03] px-3 py-3 text-xs font-semibold text-slate-300 transition hover:border-orange-400/50 hover:text-white disabled:cursor-not-allowed disabled:opacity-60 light:border-black/20 light:text-slate-700 light:hover:text-slate-900"
             >
-              {seconds}s
+              {customBusy ? (
+                <>
+                  <Loader2 size={14} className="animate-spin" /> Uploading…
+                </>
+              ) : (
+                <>
+                  <Upload size={14} className="text-orange-400" /> Choose an audio file
+                </>
+              )}
             </button>
-          ))}
+            <p className="mt-1.5 text-[10px] text-slate-500">
+              MP3, M4A, WAV, OGG or FLAC · up to 4MB
+            </p>
+          </div>
+        ) : (
+          <div className="mt-2.5">
+            <div className="flex gap-2">
+              <input
+                type="url"
+                inputMode="url"
+                value={linkUrl}
+                onChange={(e) => setLinkUrl(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    void handleLinkAdd();
+                  }
+                }}
+                placeholder="https://example.com/my-track.mp3"
+                className="min-w-0 flex-1 rounded-xl border border-white/10 bg-[#07111F] px-3 py-2 text-xs text-white outline-none focus:border-orange-400/50 light:border-black/10 light:bg-black/[0.03] light:text-slate-900"
+              />
+              <button
+                type="button"
+                onClick={handleLinkAdd}
+                disabled={customBusy || !linkUrl.trim()}
+                className="flex-shrink-0 rounded-xl bg-orange-500 px-3 py-2 text-xs font-bold text-white transition hover:bg-orange-400 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {customBusy ? <Loader2 size={13} className="animate-spin" /> : "Add"}
+              </button>
+            </div>
+            <p className="mt-1.5 text-[10px] text-slate-500">
+              A direct link to the audio file itself — not a YouTube/Spotify page.
+            </p>
+          </div>
+        )}
+
+        {customError && <p className="mt-2 text-[11px] text-red-300">{customError}</p>}
+
+        {value.soundtrack?.source === "custom" && (
+          <div className="mt-2.5 flex items-center gap-2 rounded-xl border border-orange-400/60 bg-orange-500/15 p-2.5">
+            <button
+              type="button"
+              data-track-id={value.soundtrack.id}
+              data-url={value.soundtrack.url}
+              onClick={handlePreviewClick}
+              aria-label={
+                previewingId === value.soundtrack.id
+                  ? `Pause preview of ${value.soundtrack.title}`
+                  : `Preview ${value.soundtrack.title}`
+              }
+              className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-white/10 text-white transition hover:bg-white/20 light:bg-black/10 light:text-slate-900"
+            >
+              {previewingId === value.soundtrack.id ? <Pause size={13} /> : <Play size={13} />}
+            </button>
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-xs font-bold text-white light:text-slate-900">
+                {value.soundtrack.title}
+              </p>
+              <p className="mt-0.5 flex items-center gap-1.5 text-[11px] text-slate-400 light:text-slate-600">
+                <span className="rounded-full bg-sky-500/15 px-1.5 py-0.5 text-[9px] font-black uppercase tracking-wide text-sky-300">
+                  Your music
+                </span>
+                <span>Plays for {CUSTOM_AUDIO_MAX_SECONDS}s</span>
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => onChange({ ...value, soundtrack: null })}
+              className="flex-shrink-0 text-[11px] font-semibold text-orange-300 hover:text-orange-200"
+            >
+              Remove
+            </button>
+          </div>
+        )}
+
+        <p className="mt-2.5 flex items-start gap-1.5 text-[10px] leading-4 text-slate-500">
+          <ShieldCheck size={12} className="mt-px flex-shrink-0 text-emerald-400" />
+          <span>
+            Only the first {CUSTOM_AUDIO_MAX_SECONDS} seconds of your own music will ever play — it
+            loops back to the start after that. Make sure you have the right to use the audio you add.
+          </span>
+        </p>
+      </div>
+
+      {contentType === "short" ? (
+        <div className="mt-4">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs font-bold text-slate-300 light:text-slate-700">Music clip</span>
+            {([20, 30] as const).map((seconds) => (
+              <button
+                key={seconds}
+                type="button"
+                onClick={() => onChange({ ...value, musicClipSeconds: seconds })}
+                className={`rounded-full px-3 py-1.5 text-xs font-bold transition ${
+                  value.musicClipSeconds === seconds
+                    ? "bg-orange-500 text-white"
+                    : "bg-white/5 text-slate-400 hover:bg-white/10 light:bg-black/5"
+                }`}
+              >
+                {seconds}s
+              </button>
+            ))}
+          </div>
+          {/* The 30s option can't be honoured for the creator's own audio —
+              be upfront about it here rather than silently playing 29s. */}
+          {value.soundtrack?.source === "custom" && value.musicClipSeconds > CUSTOM_AUDIO_MAX_SECONDS && (
+            <p className="mt-1.5 text-[10px] text-slate-500">
+              Your own music is capped at {CUSTOM_AUDIO_MAX_SECONDS}s, so this clip will play for{" "}
+              {CUSTOM_AUDIO_MAX_SECONDS}s.
+            </p>
+          )}
         </div>
       ) : (
         value.soundtrack && (
           <p className="mt-4 text-[11px] text-slate-400 light:text-slate-600">
-            The soundtrack loops quietly for the whole video, underneath your own audio.
+            {value.soundtrack.source === "custom"
+              ? `The first ${CUSTOM_AUDIO_MAX_SECONDS} seconds loop for the whole video, replacing the video's own audio.`
+              : "The soundtrack loops for the whole video, replacing the video's own audio."}
           </p>
         )
       )}

@@ -20,13 +20,18 @@ export interface Short {
   // duration/source) — set for every Short uploaded after the Jamendo
   // real-music integration shipped, and resolved directly at playback time
   // with no external lookup needed (see ShortsPageContent.tsx).
+  //
+  // "custom" is the creator's own audio — a file they uploaded or a link
+  // they pasted in. Playback of those is hard-capped at 29s (see
+  // CUSTOM_AUDIO_MAX_SECONDS / soundtrackClipSeconds in
+  // app/data/soundtracks.ts) because InPlayer holds no licence for it.
   soundtrack?: {
     id: string;
     title: string;
     artist: string;
     url: string;
     durationSeconds: number;
-    source: "inplayer" | "jamendo";
+    source: "inplayer" | "jamendo" | "custom";
     licenseUrl?: string;
   } | null;
   // `soundtrackId` is the legacy, id-only form used by Shorts published

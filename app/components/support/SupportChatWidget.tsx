@@ -66,11 +66,11 @@ export default function SupportChatWidget() {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  // On InPlayer, the launcher no longer floats on screen — it moved into
-  // the hamburger menu (Navbar.tsx's drawer dispatches "openSupportChat").
-  // Hammart keeps its own floating launcher untouched. This widget stays
+  // The floating launcher is Hammart-ONLY. Everywhere else (InPlayer and
+  // the Sponsorship panel) it moved into the hamburger menu, whose entry
+  // dispatches "openSupportChat" — see Navbar.tsx. This widget stays
   // mounted site-wide either way so the listener below always works.
-  const hideFloatingLauncher = domain === "inplayer";
+  const hideFloatingLauncher = domain !== "hammart";
 
   useEffect(() => {
     const onOpenRequest = () => setOpen(true);
@@ -220,9 +220,11 @@ export default function SupportChatWidget() {
           (z-[500]/z-[999], e.g. LocationMapPicker) and far below the
           splash curtain.
 
-          hideFloatingLauncher: on InPlayer this button no longer renders at
-          all — access moved into the hamburger menu (see Navbar.tsx), which
-          dispatches "openSupportChat" to open the panel below directly. */}
+          hideFloatingLauncher: this button now renders on Hammart ONLY.
+          On InPlayer and Sponsorship access moved into the hamburger menu
+          (see Navbar.tsx), which dispatches "openSupportChat" to open the
+          panel below directly. The AI orb still floats on every page, so
+          the offsets above remain the ones that matter on Hammart. */}
       {!open && !hideFloatingLauncher && (
         <button
           type="button"

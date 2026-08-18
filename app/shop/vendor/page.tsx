@@ -20,6 +20,8 @@ function BecomeVendorForm({ onRegistered }: { onRegistered: () => void }) {
   const [businessType, setBusinessType] = useState<BusinessType>("individual");
   const [vendorId, setVendorId] = useState("");
   const [businessName, setBusinessName] = useState("");
+  // Required — see the comment on the input below and on the register route.
+  const [pincode, setPincode] = useState("");
   const [check, setCheck] = useState<{ status: "idle" | "checking" | "available" | "unavailable"; reason?: string }>({
     status: "idle",
   });
@@ -63,11 +65,15 @@ function BecomeVendorForm({ onRegistered }: { onRegistered: () => void }) {
       setError("Please enter your registered business name.");
       return;
     }
+    if (!/^[1-9][0-9]{5}$/.test(pincode.trim())) {
+      setError("Please enter a valid 6-digit delivery pincode.");
+      return;
+    }
     setSubmitting(true);
     try {
       const res = await authedFetch("/api/hammart/vendor/register", {
         method: "POST",
-        body: JSON.stringify({ vendorId: vendorId.trim(), businessType, businessName: businessType === "business" ? businessName.trim() : null }),
+        body: JSON.stringify({ vendorId: vendorId.trim(), businessType, businessName: businessType === "business" ? businessName.trim() : null, pincode: pincode.trim() }),
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -107,6 +113,25 @@ function BecomeVendorForm({ onRegistered }: { onRegistered: () => void }) {
         />
         {check.status === "unavailable" && <p className="mt-1 text-[11px] text-red-400">{check.reason}</p>}
         {check.status === "available" && <p className="mt-1 text-[11px] text-emerald-400">inplayer.in/shop/{vendorId.trim()}</p>}
+      </div>
+
+      {/* Delivery pincode — required, and genuinely load-bearing rather than
+          just another field. Customers only ever see vendors within 15km of
+          their own pincode, so a vendor without one cannot be placed on the
+          map at all and is invisible to every buyer on the platform. This
+          used not to be collected anywhere in registration, which is exactly
+          how sellers ended up live but unreachable. */}
+      <div>
+        <input
+          value={pincode}
+          onChange={(e) => setPincode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+          inputMode="numeric"
+          placeholder="Delivery pincode (e.g. 401107)"
+          className="w-full rounded-xl border border-white/10 light:border-black/10 bg-[#07111F] light:bg-white px-3 py-2.5 text-sm text-white light:text-slate-900 outline-none focus:border-orange-400/50"
+        />
+        <p className="mt-1 text-[11px] text-slate-400 light:text-slate-600">
+          Buyers within 15km of this pincode will see your shop.
+        </p>
       </div>
 
       {error && <p className="text-xs text-red-400">{error}</p>}

@@ -28,26 +28,46 @@ export async function POST(request: NextRequest) {
   let latitude: number | undefined = undefined;
   let longitude: number | undefined = undefined;
 
+  let geocodeFailed = false;
+
   if (pincode) {
     const geo = await geocodePincode(pincode);
     if (geo) {
       latitude = geo.latitude;
       longitude = geo.longitude;
     } else {
-      // If they provide a pincode but we can't find it, we shouldn't necessarily block them, 
-      // but ideally we'd want valid coordinates. For MVP, we'll just leave it undefined if not found.
+      // Deliberately still saves the rest of their settings rather than
+      // blocking the whole save on a third-party lookup. But it must not
+      // pass silently: with no coordinates this vendor is excluded from the
+      // storefront's 15km filter entirely, and until now the only symptom
+      // was an empty shop with no explanation to anybody.
+      //
+      // Two things cover it now — `geocodeFailed` comes back so the vendor
+      // UI can say so plainly, and the storefront retries the lookup on read
+      // via ensureVendorCoordinates(), so a transient Nominatim failure
+      // repairs itself instead of permanently hiding a real seller.
+      geocodeFailed = true;
+      console.warn(
+        `vendor/settings: could not geocode pincode "${pincode}" for ${user.userId} — saved without coordinates; will retry on read.`
+      );
     }
   }
 
   try {
-    await updateVendorSettings(user.userId, { 
+    await updateVendorSettings(user.userId, {
       whatsappNumber: whatsappNumber || null,
       address,
       pincode,
       latitude,
       longitude
     });
-    return NextResponse.json({ success: true });
+    return NextResponse.json({
+      success: true,
+      geocodeFailed,
+      // True when this vendor cannot appear in any customer's storefront at
+      // all, because there is no pincode to place them by.
+      needsLocation: !pincode,
+    });
   } catch (err) {
     console.error("Failed to update vendor settings:", err);
     return NextResponse.json({ error: "Failed to update settings." }, { status: 500 });

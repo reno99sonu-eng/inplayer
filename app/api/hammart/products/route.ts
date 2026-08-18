@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
-import { getVendorProfile, VENDORS_TABLE, FREE_LISTINGS_LIMIT, VendorProfile } from "@/app/lib/hammartVendors";
+import { getVendorProfile, VENDORS_TABLE, FREE_LISTINGS_LIMIT, VendorProfile, ensureVendorCoordinates } from "@/app/lib/hammartVendors";
 import { createProduct, listActiveProducts, HammartProduct } from "@/app/lib/hammartProducts";
 import { checkBannedProduct, UNCHECKED_BANNED_ITEM } from "@/app/lib/hammartModeration";
 import { BatchGetCommand } from "@aws-sdk/lib-dynamodb";
@@ -61,9 +61,31 @@ export async function GET(request: NextRequest) {
       const customerLng = parseFloat(lngParam);
       
       const nearbyVendorUserIds = new Set<string>();
-      
+
+      // Backfill coordinates for any vendor that has a pincode saved but no
+      // lat/lng yet — geocoding previously failed, or their row predates the
+      // feature. Without this they stay invisible to every customer forever
+      // and nothing anywhere explains why (see ensureVendorCoordinates).
+      //
+      // Only runs for vendors actually missing coordinates, so on a healthy
+      // dataset this does no work and issues no network calls at all. The
+      // repair is persisted, so it happens at most once per vendor.
+      const vendorsNeedingBackfill = Array.from(vendorsMap.values()).filter(
+        (v) =>
+          (typeof v.latitude !== "number" || typeof v.longitude !== "number") &&
+          Boolean(v.pincode?.trim())
+      );
+      if (vendorsNeedingBackfill.length) {
+        const healed = await Promise.all(
+          vendorsNeedingBackfill.map((v) => ensureVendorCoordinates(v))
+        );
+        for (const v of healed) {
+          vendorsMap.set(v.userId, v);
+        }
+      }
+
       for (const [userId, v] of vendorsMap.entries()) {
-        if (v.latitude !== undefined && v.longitude !== undefined) {
+        if (typeof v.latitude === "number" && typeof v.longitude === "number") {
           const distance = calculateDistanceKm(customerLat, customerLng, v.latitude, v.longitude);
           if (distance <= 15) {
             nearbyVendorUserIds.add(userId);

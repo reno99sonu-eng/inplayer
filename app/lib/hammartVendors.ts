@@ -180,6 +180,15 @@ export interface CreateVendorInput {
   vendorId: string;
   businessType: BusinessType;
   businessName: string | null;
+  // Delivery pincode, collected at registration and REQUIRED. A vendor with
+  // no pincode has no coordinates, and a vendor with no coordinates is
+  // filtered out of every customer's 15km storefront silently — invisible
+  // forever, with nothing telling them why. Collecting it up front is what
+  // stops that state from being reachable at all; ensureVendorCoordinates()
+  // below only repairs rows that already have a pincode.
+  pincode: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 // Creates the vendor row AND reserves the vendorId atomically (one fails,
@@ -210,6 +219,12 @@ export async function createVendorProfile(
     upiId: null,
     whatsappNumber: null,
     suspended: false,
+    pincode: input.pincode,
+    // Undefined when the geocode lookup failed at registration. The vendor
+    // is still created — we never block sign-up on a third-party service —
+    // and ensureVendorCoordinates() retries on the next storefront read.
+    ...(typeof input.latitude === "number" ? { latitude: input.latitude } : {}),
+    ...(typeof input.longitude === "number" ? { longitude: input.longitude } : {}),
     createdAt: now,
     updatedAt: now,
   };
@@ -440,4 +455,74 @@ export interface VendorKycRow {
   reviewedAt: string | null;
   reviewedBy: string | null;
   rejectionReason: string | null;
+}
+
+// ── Self-healing vendor coordinates ─────────────────────────────────────
+// The storefront's 15km radius filter (app/api/hammart/products) can only
+// see a vendor that has BOTH `latitude` and `longitude` stored. A vendor
+// with neither is silently invisible to every customer, everywhere, with
+// no error shown to anyone — which is exactly the failure that made the
+// shop read "Coming soon to your neighbourhood" while real vendors and
+// real products existed in the database.
+//
+// Two ways a vendor ends up in that state:
+//   1. They registered before the pincode/geocoding feature existed
+//      (app/api/hammart/vendor/register still collects no pincode at all,
+//      so this is EVERY vendor at the moment they sign up).
+//   2. They saved a pincode but the Nominatim lookup failed or timed out —
+//      vendor/settings deliberately does not block the save in that case,
+//      so the row is left with a pincode and no coordinates.
+//
+// This backfills case 2 lazily, the same way ensureUsername() repairs a
+// missing username reservation and selfHealVideo() repairs a stale video
+// row: fix it on read, persist the fix, move on. Case 1 cannot be repaired
+// automatically — there is no pincode to geocode — so it is reported via
+// `needsLocation` instead, for the vendor dashboard to prompt on.
+//
+// Deliberately best-effort and non-throwing: a geocoding hiccup must never
+// take down the storefront listing request that triggered it.
+export async function ensureVendorCoordinates(
+  vendor: VendorProfile
+): Promise<VendorProfile> {
+  const hasCoords =
+    typeof vendor.latitude === "number" && typeof vendor.longitude === "number";
+  if (hasCoords) return vendor;
+
+  const pincode = vendor.pincode?.trim();
+  if (!pincode) return vendor; // case 1 — nothing to geocode
+
+  try {
+    // Imported lazily so the geocoding module (and its fetch) is never
+    // pulled into a code path that doesn't actually need it.
+    const { geocodePincode } = await import("@/app/lib/geocoding");
+    const geo = await geocodePincode(pincode);
+    if (!geo) return vendor;
+
+    await docClient.send(
+      new UpdateCommand({
+        TableName: VENDORS_TABLE,
+        Key: { userId: vendor.userId },
+        UpdateExpression: "SET latitude = :lat, longitude = :lng",
+        ExpressionAttributeValues: { ":lat": geo.latitude, ":lng": geo.longitude },
+      })
+    );
+
+    return { ...vendor, latitude: geo.latitude, longitude: geo.longitude };
+  } catch (err) {
+    console.error(
+      `ensureVendorCoordinates: could not backfill ${vendor.userId}:`,
+      err
+    );
+    return vendor;
+  }
+}
+
+/**
+ * True when this vendor cannot appear in ANY customer's storefront because
+ * they have no delivery pincode set. Surfaced to the vendor dashboard so
+ * the fix is obvious to them, instead of them wondering why they get no
+ * orders.
+ */
+export function vendorNeedsLocation(vendor: VendorProfile): boolean {
+  return !vendor.pincode?.trim();
 }

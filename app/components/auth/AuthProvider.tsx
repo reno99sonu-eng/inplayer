@@ -460,20 +460,39 @@ export default function AuthProvider({
     // and can register as a vendor again later from Settings.
     const pendingVendorRaw = localStorage.getItem("inplayer-pending-vendor");
     if (pendingVendorRaw && idToken) {
+      let pendingVendor: { pincode?: unknown } | null = null;
       try {
-        const pendingVendor = JSON.parse(pendingVendorRaw);
-        await fetch("/api/hammart/vendor/register", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${idToken}`,
-          },
-          body: JSON.stringify(pendingVendor),
-        });
-      } catch (err) {
-        console.error("Hammart vendor registration failed (account creation still succeeded):", err);
-      } finally {
+        pendingVendor = JSON.parse(pendingVendorRaw);
+      } catch {
+        // Corrupt payload — drop it rather than retrying forever.
         localStorage.removeItem("inplayer-pending-vendor");
+      }
+
+      // A delivery pincode is now required to register a vendor (see
+      // app/api/hammart/vendor/register — without one the seller has no
+      // coordinates and is invisible in every customer's 15km storefront).
+      // A hand-off saved by an older build won't have one, so rather than
+      // firing a request that is guaranteed to 400 and then deleting the
+      // hand-off — silently losing their intent to sell — this leaves the
+      // record in place. /shop/vendor picks it up and asks for the pincode.
+      const hasPincode =
+        typeof pendingVendor?.pincode === "string" && pendingVendor.pincode.trim() !== "";
+
+      if (pendingVendor && hasPincode) {
+        try {
+          await fetch("/api/hammart/vendor/register", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Authorization: `Bearer ${idToken}`,
+            },
+            body: JSON.stringify(pendingVendor),
+          });
+        } catch (err) {
+          console.error("Hammart vendor registration failed (account creation still succeeded):", err);
+        } finally {
+          localStorage.removeItem("inplayer-pending-vendor");
+        }
       }
     }
 

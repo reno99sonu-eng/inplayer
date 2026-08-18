@@ -156,20 +156,39 @@ export default function SupportChatWidget() {
 
   return (
     <>
-      {/* Launcher — sits above the mobile bottom nav (which is h-16/pb-20 on
-          small screens) so it can never cover those tab targets. */}
+      {/* Launcher — deliberately the LOWEST thing in the floating stack.
+          This widget originally shipped at z-[9990]/[9991], which put it
+          above every other floating surface in the app (the AI orb, the
+          map picker, admin drawers, the shorts overlay) because the rest
+          of the app lives in a z-90..999 band. It also sat at exactly
+          `lg:bottom-6 lg:right-6` — the same coordinates as
+          FloatingAIButton — so on desktop the two buttons were stacked on
+          top of each other.
+
+          Corrected stack, bottom-most first:
+            z-[95]  MobileBottomNav
+            z-[96]  FloatingAIButton (the AI orb)
+            z-[94]  this launcher — under both, so it can never cover them
+          and vertically offset to sit ABOVE the AI orb rather than on it
+          (the orb is h-14 at bottom-20 on mobile, h-16 at bottom-6 on
+          desktop, so bottom-36 / lg:bottom-24 clears it with a gap).
+
+          The open panel uses z-[480]: above page content and all the
+          floating buttons, but still below the app's real modal band
+          (z-[500]/z-[999], e.g. LocationMapPicker) and far below the
+          splash curtain. */}
       {!open && (
         <button
           type="button"
           onClick={() => setOpen(true)}
           aria-label={`Get ${productName} support`}
           className="
-            fixed bottom-24 right-4 z-[9990] flex items-center gap-2 rounded-full
+            fixed bottom-36 right-4 z-[94] flex items-center gap-2 rounded-full
             bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A]
             px-4 py-3 text-sm font-bold text-white
             shadow-[0_10px_30px_rgba(255,153,0,.35)]
             transition-transform duration-300 hover:-translate-y-0.5 active:scale-95
-            lg:bottom-6 lg:right-6
+            lg:bottom-24 lg:right-6
           "
         >
           <Headset size={18} />
@@ -179,7 +198,7 @@ export default function SupportChatWidget() {
 
       {open && (
         <div
-          className="fixed inset-0 z-[9991] flex items-end justify-end bg-black/50 p-0 backdrop-blur-sm light:bg-black/30 sm:p-4 lg:p-6"
+          className="fixed inset-0 z-[480] flex items-end justify-end bg-black/50 p-0 backdrop-blur-sm light:bg-black/30 sm:p-4 lg:p-6"
           onClick={() => setOpen(false)}
           role="dialog"
           aria-modal="true"

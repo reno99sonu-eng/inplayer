@@ -281,8 +281,30 @@ export default function Navbar() {
 
 {/* Desktop Logo & Festive Occasion Graphic */}
 <div className="hidden lg:flex flex-shrink-0 items-center">
-  {/* Pure Clean Logo */}
-  <NavbarLogo />
+  {/* Pure Clean Logo — now gets its own entrance reveal, driven by the
+      exact same splash-dismissed signal as the mobile logo above
+      (mobileLogoState). This instance was deliberately left un-animated
+      before, on the reasoning that the entrance was a mobile-only touch —
+      but that had a practical consequence nobody accounted for: the whole
+      Mobile Row is `lg:hidden`, so at any browser width over 1024px there
+      is no animated logo rendered at all, and a desktop check shows a
+      static logo whether the animation is working perfectly or completely
+      broken. That is the single biggest reason this feature kept being
+      reported as "not working at all" across several rounds of fixes.
+
+      Intentionally only the fade/slide/scale reveal — NOT the mobile
+      row's subsequent shrink-to-triangle collapse, which exists to
+      reclaim horizontal space on a phone and would be pointless (and
+      visually odd) on a wide desktop navbar. */}
+  <div
+    className={`transition-all duration-[900ms] ease-out ${
+      mobileLogoState === "hidden"
+        ? "opacity-0 -translate-x-2 scale-90"
+        : "opacity-100 translate-x-0 scale-100"
+    }`}
+  >
+    <NavbarLogo />
+  </div>
 
   {/* Festive Occasion Graphic + greeting text, side by side */}
   {navbarTheme?.active && navbarTheme.imageUrl && (

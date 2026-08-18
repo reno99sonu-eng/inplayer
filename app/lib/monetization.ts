@@ -66,6 +66,40 @@ export interface EligibilityResult {
   hasGoodStanding: boolean;
   meetsSubscriberRequirement: boolean;
   meetsViewRequirement: boolean;
+  // ── Why these two extra groupings exist ────────────────────────────
+  // This object is returned verbatim to the browser as
+  // `eligibility` by app/api/creator/monetize/status/route.ts, and the
+  // Revenue & KYC panel (app/components/analytics/RevenueSection.tsx)
+  // reads its numbers as `eligibility.metrics.videoViews`,
+  // `eligibility.thresholds.subscribers`, `eligibility.thresholds
+  // .revenueShare` and so on — i.e. it expects them nested under
+  // `metrics` and `thresholds`, which this type never actually had.
+  //
+  // Every one of those reads was therefore `undefined` and silently fell
+  // back to the component's own hardcoded defaults (`|| 0` for the
+  // creator's numbers, `|| 500` / `|| 50000` / `|| 1000000` for the
+  // targets). That is the real cause of the reported bug: the Revenue &
+  // KYC section always showed 0 views and 0 subscribers, while the
+  // Dashboard tab showed the correct totals — the two panels read from
+  // different endpoints, and only the Dashboard's happened to match its
+  // consumer's expected shape.
+  //
+  // The flat fields above are kept exactly as they were so nothing that
+  // already reads them (the eligibility engine's own callers, the
+  // activate route) changes behavior — this is purely additive.
+  metrics: {
+    subscribers: number;
+    videoViews: number;
+    shortViews: number;
+  };
+  thresholds: {
+    subscribers: number;
+    videoViews: number;
+    shortViews: number;
+    /** Creator's share as a fraction (0.8 = 80%), matching how the UI renders it. */
+    revenueShare: number;
+    requireBoth: boolean;
+  };
 }
 
 // Phase 2: Monetization Eligibility Engine
@@ -172,6 +206,22 @@ export async function checkMonetizationEligibility(userId: string): Promise<Elig
     shortViews,
     hasGoodStanding,
     meetsSubscriberRequirement,
-    meetsViewRequirement
+    meetsViewRequirement,
+    // Same real numbers as above, in the shape the Revenue & KYC panel
+    // actually reads (see the interface comment) — these are what make
+    // that panel show the creator's true views/subscribers and the real
+    // admin-configured targets instead of zeros and hardcoded defaults.
+    metrics: {
+      subscribers,
+      videoViews,
+      shortViews,
+    },
+    thresholds: {
+      subscribers: settings.monetizationRequiredSubscribers,
+      videoViews: settings.monetizationRequiredVideoViews,
+      shortViews: settings.monetizationRequiredShortViews,
+      revenueShare: settings.monetizationCreatorShare,
+      requireBoth: settings.monetizationRequireBoth,
+    },
   };
 }

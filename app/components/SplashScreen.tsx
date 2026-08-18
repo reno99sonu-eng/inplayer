@@ -189,8 +189,18 @@ export default function SplashScreen() {
     //      keydown) that retries playback — so the sting still plays if
     //      the user taps anywhere on the splash curtain or page before it
     //      fades out, rather than being silently swallowed.
+    //
+    // THE BUG THIS ROUND FIXES (why the sting still never played even
+    // after the retry listener above was added): the retry listeners were
+    // being torn down at `extraDelay + fadeOutMs` — i.e. ~780ms after page
+    // load, the instant the curtain unmounts — and `isSplashActive` gated
+    // playback to that same sub-second window. A real visitor essentially
+    // never taps, clicks or types within the first 0.78s of a page load,
+    // so the listener was always removed before it could ever fire, and
+    // the fallback could not possibly do anything. It now stays armed
+    // until the visitor's first real gesture (capped at 30s, and cleared
+    // on unmount), which is the whole point of having a fallback.
     let interactionCleanup: (() => void) | null = null;
-    let isSplashActive = true;
     if (!reducedMotion && audioRef.current) {
       const sting = audioRef.current;
 
@@ -204,21 +214,40 @@ export default function SplashScreen() {
       }
 
       sting.play().catch(() => {
-        // Autoplay blocked — set up a one-shot interaction listener to
-        // retry on the user's first tap/click/keydown.
-        const retryPlay = () => {
-          if (isSplashActive) {
-            sting?.play().catch(() => {});
-          }
-          cleanup();
-        };
+        // Autoplay blocked — arm a one-shot retry on the visitor's first
+        // real gesture. Deliberately NOT limited to "while the curtain is
+        // still up" (see the note above): the whole reason this fallback
+        // exists is that the block is only lifted once a gesture happens,
+        // and gestures essentially never happen inside the splash's own
+        // ~0.78s lifetime.
+        const GESTURE_EVENTS = ["pointerdown", "touchstart", "click", "keydown"];
+
         const cleanup = () => {
-          for (const evt of ["click", "touchstart", "keydown"] as const) {
+          window.clearTimeout(giveUpTimer);
+          for (const evt of GESTURE_EVENTS) {
             document.removeEventListener(evt, retryPlay, { capture: true });
           }
         };
-        for (const evt of ["click", "touchstart", "keydown"] as const) {
-          document.addEventListener(evt, retryPlay, { once: true, capture: true });
+
+        function retryPlay() {
+          sting.play().catch(() => {
+            // Somehow still refused — stop here rather than retrying in a
+            // loop on every subsequent click for the rest of the session.
+          });
+          cleanup();
+        }
+
+        // Hard stop: if the visitor never interacts at all, drop the
+        // listeners rather than firing a brand sting at them minutes into
+        // a session.
+        const giveUpTimer = window.setTimeout(cleanup, 30000);
+
+        for (const evt of GESTURE_EVENTS) {
+          document.addEventListener(evt, retryPlay, {
+            once: true,
+            capture: true,
+            passive: true,
+          });
         }
         interactionCleanup = cleanup;
       });
@@ -240,8 +269,11 @@ export default function SplashScreen() {
       }, extraDelay);
       removeTimer = window.setTimeout(
         () => {
-          isSplashActive = false;
-          interactionCleanup?.();
+          // NOTE: deliberately does NOT tear down the audio retry
+          // listeners here any more — doing that was the bug that kept
+          // the sting silent (see the long note next to interactionCleanup
+          // above). They now survive the curtain and are cleared on first
+          // gesture, on their own 30s cap, or on unmount.
           setVisible(false);
         },
         extraDelay + fadeOutMs

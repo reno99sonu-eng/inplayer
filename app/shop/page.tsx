@@ -6,6 +6,7 @@ import { Loader2, Store, IndianRupee, ShoppingBag, ShoppingCart, Users, LayoutGr
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { authedFetch } from "@/app/lib/apiFetch";
 import ShopNavLinks from "@/app/components/hammart/ShopNavLinks";
+import HammartBrandMark from "@/app/components/hammart/HammartBrandMark";
 import type { HammartProduct } from "@/app/lib/hammartProducts";
 import type { HammartAddress } from "@/app/lib/hammartAddressBook";
 
@@ -253,9 +254,27 @@ export default function ShopPage() {
     <div className="mx-auto max-w-7xl px-4 py-3 text-white light:text-slate-900">
       {/* Top Edge Compact Header Bar */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 light:border-slate-300 pb-3 mb-4">
-        <div className="flex items-center gap-2">
-          <Store className="text-orange-400 flex-shrink-0" size={22} />
-          <div>
+        <div className="flex min-w-0 items-center gap-2 sm:gap-3">
+          {/* Ham Mart brand badge. Replaces the generic lucide <Store />
+              placeholder icon that stood in before the real artwork
+              existed.
+
+              Sizing is deliberately responsive and height-driven
+              (h-9 phone → h-11 small tablet → h-14 desktop, with w-auto)
+              so the badge scales with the header instead of forcing it
+              taller on a narrow screen — the surrounding bar already wraps
+              via flex-wrap, and `min-w-0` on this group lets the text
+              beside it truncate rather than push the action buttons off
+              the right edge on a phone.
+
+              The "HAM MART" wordmark is baked into the artwork, but it's
+              far too small to read at header size, so the live <h1> text
+              beside it stays — it carries the actual legibility, the page
+              heading semantics, and the SEO value. If the file is missing
+              the onError below swaps back to the original Store icon, so a
+              missing asset can never leave a broken image in the header. */}
+          <HammartBrandMark />
+          <div className="min-w-0">
             <h1 className="text-lg sm:text-xl font-black text-white light:text-slate-900 leading-tight">HamMart</h1>
             <p className="text-[11px] text-slate-400 light:text-slate-700 font-medium">
               Buy directly from verified creators & vendors with instant UPI checkout

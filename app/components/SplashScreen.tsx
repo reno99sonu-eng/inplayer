@@ -307,22 +307,39 @@ export default function SplashScreen() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  if (!visible) return null;
-
   return (
-    <div
-      id="app-splash-curtain"
-      aria-hidden="true"
-      className={`fixed inset-0 z-[999999] flex items-center justify-center overflow-hidden bg-[#020203] light:bg-[#F4ECDA] transition-opacity duration-[450ms] ease-out ${
-        leaving ? "pointer-events-none opacity-0" : "opacity-100"
-      }`}
-    >
-      <audio 
-        ref={audioRef} 
-        src="/sounds/splash-logo-sting.mp3" 
-        preload="auto" 
-        playsInline 
+    <>
+      {/* ── Why this <audio> lives OUTSIDE the curtain below ────────────
+          This element used to sit inside the curtain, which meant it was
+          removed from the document the moment the curtain unmounted at
+          ~780ms. The gesture-retry fallback (see the effect above) then
+          held a JS reference to a DETACHED audio element — and that is
+          precisely why the sting played on desktop but stayed silent on
+          phones: desktop browsers will happily play a detached
+          HTMLAudioElement, while mobile browsers (iOS Safari especially)
+          refuse to play any media element that is not in the document.
+          Since a real visitor's first tap essentially always lands after
+          the curtain is gone, on mobile the retry was always firing
+          against a detached element and being ignored.
+
+          Keeping it mounted for the component's whole life fixes that. It
+          is inert and invisible — no layout box, no cost — and the curtain
+          itself is still conditionally rendered exactly as before. */}
+      <audio
+        ref={audioRef}
+        src="/sounds/splash-logo-sting.mp3"
+        preload="auto"
+        playsInline
       />
+
+      {visible && (
+        <div
+          id="app-splash-curtain"
+          aria-hidden="true"
+          className={`fixed inset-0 z-[999999] flex items-center justify-center overflow-hidden bg-[#020203] light:bg-[#F4ECDA] transition-opacity duration-[450ms] ease-out ${
+            leaving ? "pointer-events-none opacity-0" : "opacity-100"
+          }`}
+        >
 
       {/* The flash burst — a brief, bright wash timed to hit exactly when
           the logo's zoom peaks, like a camera flash / lens flare at the
@@ -393,7 +410,9 @@ export default function SplashScreen() {
             ? `Good ${greetingWord}${user?.name ? `, ${user.name}` : ""}`
             : ""}
         </p>
-      </div>
-    </div>
+          </div>
+        </div>
+      )}
+    </>
   );
 }

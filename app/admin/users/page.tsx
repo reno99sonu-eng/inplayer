@@ -269,6 +269,22 @@ function UserSessionsPanel({ userId }: { userId: string }) {
 export default function AdminUsersPage() {
   const [query, setQuery] = useState("");
   const [debouncedQuery, setDebouncedQuery] = useState("");
+
+  // Accept ?q=<userId|name|email> so other admin pages can deep-link
+  // straight to a specific account — the Moderation queue's "Open in Users"
+  // link on each flagged item is what needs this. Read off
+  // window.location rather than useSearchParams() on purpose: the hook
+  // requires a <Suspense> boundary around the whole page in Next 16 and
+  // fails the build without one, and this page is client-only regardless.
+  useEffect(() => {
+    const initial = new URLSearchParams(window.location.search).get("q");
+    if (initial) {
+      setQuery(initial);
+      // Seed the debounced value too, so the first fetch below already
+      // carries the search instead of loading the unfiltered list first.
+      setDebouncedQuery(initial);
+    }
+  }, []);
   const [users, setUsers] = useState<AdminUserRow[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);

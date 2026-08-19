@@ -57,12 +57,36 @@ export async function GET(request: NextRequest) {
       "contentType, #st, #v",
       { "#st": "status", "#v": "views" }
     );
+    // Status buckets have to match what /admin/videos actually filters on
+    // (STATUS_VALUES there: live | processing | ready | error), because
+    // these Dashboard cards LINK straight to that page.
+    //
+    // This previously read `if (status && status !== "ready") {
+    // processingCount++; continue; }`, which was wrong twice over:
+    //   - live streams and failed uploads were both counted as "Processing
+    //     Uploads", so that card's number never matched the list it links
+    //     to (/admin/videos?status=processing);
+    //   - and because of the `continue`, those same items were excluded
+    //     from Total Videos / Total Shorts / Total Views, so "Total Videos"
+    //     undercounted against /admin/videos?type=video.
+    //
+    // A missing status field means "ready" — it predates the attribute,
+    // the same equivalence app/api/admin/videos/route.ts's filter makes.
     for (const item of items) {
-      const status = item.status as string | undefined;
-      if (status && status !== "ready") {
+      const status = (item.status as string | undefined) || "ready";
+
+      if (status === "processing") {
         processingCount++;
         continue;
       }
+
+      // An errored upload never became real content — no playable asset,
+      // no views — so it belongs in neither the totals nor the processing
+      // count.
+      if (status === "error") continue;
+
+      // "ready" and "live" are both real, watchable content; a live stream
+      // accrues views like anything else.
       if (item.contentType === "short") {
         totalShorts++;
       } else {

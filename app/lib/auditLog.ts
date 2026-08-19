@@ -77,6 +77,29 @@ export type AuditTargetType =
   | "midroll_ad"
   | "sponsorship";
 
+// Which admin panel an action belongs to. Derived from the action name
+// rather than stored on the row, deliberately: every entry already written
+// gets classified correctly with no backfill, and a new action can never be
+// logged with a domain that contradicts what it actually did.
+//
+// Without this the Audit Logs page mixes all three panels into one list,
+// which makes it useless for answering "what changed on Hammart today" —
+// the whole point of having separate panels (app/lib/siteDomain.ts already
+// scopes maintenance mode, announcements and AI moderation the same way).
+export type AuditDomain = "inplayer" | "hammart" | "sponsorship";
+
+export function auditDomainForAction(action: string): AuditDomain {
+  if (action.startsWith("vendor.") || action.startsWith("hammart_product.")) {
+    return "hammart";
+  }
+  if (action.startsWith("sponsorship.")) {
+    return "sponsorship";
+  }
+  // Everything else — users, videos, comments, messages, reports,
+  // copyright, monetization, KYC, ads, settings — belongs to InPlayer.
+  return "inplayer";
+}
+
 interface LogAdminActionInput {
   // The route's own request object — required, not optional, so every
   // single log entry actually carries real device/location context rather

@@ -14,7 +14,6 @@ import { logAdminAction } from "@/app/lib/auditLog";
 import { BatchGetCommand } from "@aws-sdk/lib-dynamodb";
 
 const USERS_TABLE = process.env.DYNAMODB_USERS_TABLE || "InPlayer-Users";
-const VIDEOS_TABLE = process.env.DYNAMODB_VIDEOS_TABLE || "InPlayer-Videos";
 
 async function purgeDocuments(userId: string) {
   await Promise.all(
@@ -41,17 +40,32 @@ export async function GET(request: NextRequest) {
     tabParam === "verified" || tabParam === "rejected" ? tabParam : "pending_review";
 
   const payoutItems: Record<string, unknown>[] = [];
+  // The page already renders an amber "table not created in AWS yet" banner
+  // off this flag, but the route never actually sent it — so a missing
+  // InPlayer-Creator-Payouts table rendered as a cheerful "Nothing waiting
+  // on review", which is indistinguishable from a genuinely empty queue and
+  // exactly the wrong thing to tell an admin.
+  let tableMissing = false;
   try {
     let exclusiveStartKey: Record<string, unknown> | undefined;
     do {
-      const result = await docClient.send(
-        new ScanCommand({
-          TableName: PAYOUTS_TABLE,
-          FilterExpression: "kycStatus = :status",
-          ExpressionAttributeValues: { ":status": status },
-          ExclusiveStartKey: exclusiveStartKey,
-        })
-      ).catch(() => null);
+      const result = await docClient
+        .send(
+          new ScanCommand({
+            TableName: PAYOUTS_TABLE,
+            FilterExpression: "kycStatus = :status",
+            ExpressionAttributeValues: { ":status": status },
+            ExclusiveStartKey: exclusiveStartKey,
+          })
+        )
+        .catch((err: unknown) => {
+          if ((err as { name?: string })?.name === "ResourceNotFoundException") {
+            tableMissing = true;
+          } else {
+            console.error("admin/creators: payouts scan page failed:", err);
+          }
+          return null;
+        });
 
       if (result?.Items) {
         payoutItems.push(...(result.Items as Record<string, unknown>[]));
@@ -62,96 +76,33 @@ export async function GET(request: NextRequest) {
     console.error("admin/creators: payouts scan failed:", err);
   }
 
-  // Also query users & video uploaders to discover existing creators on InPlayer
-  const additionalCreators: Record<string, unknown>[] = [];
-  const knownUserIds = new Set(payoutItems.map((i) => String(i.userId)));
+  // ── REMOVED: synthesized "creator" rows ────────────────────────────
+  //
+  // This used to Scan InPlayer-Users and InPlayer-Videos (Limit: 100 each)
+  // and manufacture a KYC submission for every account and every video
+  // uploader it found — hardcoding kycStatus: "verified", reviewedBy:
+  // "System", payoutFrequency: "monthly", minPayoutAmount: 1000 and a
+  // submittedAt taken from the account's creation date.
+  //
+  // None of those people had submitted anything. The page presents this
+  // list under the words "Every submission here is a real person's real
+  // documents", so the Verified tab was entirely fictional and the Pending
+  // tab listed the whole user base as awaiting review.
+  //
+  // Worse, it wasn't only cosmetic: pressing Approve on one of these ghosts
+  // ran an UpdateCommand against InPlayer-Creator-Payouts for a userId with
+  // no payout row, and DynamoDB UpdateItem upserts — so it CREATED a payout
+  // record with kycStatus: "verified". That record then satisfies the
+  // kycStatus !== "not_started" filter in app/api/admin/revenue, putting a
+  // fabricated creator permanently into the Revenue ledger. An admin
+  // clearing what looked like a review backlog was silently writing junk
+  // into payouts.
+  //
+  // The real source of truth is InPlayer-Creator-Payouts, scanned above: a
+  // row exists there only once a creator has actually gone through the KYC
+  // form. An empty queue now correctly means "nobody has applied yet".
 
-  if (status === "verified" || status === "pending_review") {
-    try {
-      // Scan InPlayer-Users table for users marked as creators/uploaders
-      const userScan = await docClient.send(
-        new ScanCommand({
-          TableName: USERS_TABLE,
-          Limit: 100,
-        })
-      ).catch(() => null);
-
-      if (userScan?.Items) {
-        for (const u of userScan.Items as Record<string, unknown>[]) {
-          const uid = String(u.userId || u.id || u.sub || "");
-          if (uid && !knownUserIds.has(uid)) {
-            knownUserIds.add(uid);
-            additionalCreators.push({
-              userId: uid,
-              legalName: (u.displayName || u.username || u.name || "Creator") as string,
-              username: (u.username || u.handle || null) as string | null,
-              panNumber: null,
-              idProofType: null,
-              aadhaarNumber: null,
-              passportNumber: null,
-              bankAccountNumber: null,
-              bankIfsc: null,
-              addressLine1: null,
-              city: null,
-              state: null,
-              pincode: null,
-              payoutFrequency: "monthly",
-              minPayoutAmount: 1000,
-              submittedAt: (u.createdAt || new Date().toISOString()) as string,
-              reviewedAt: null,
-              reviewedBy: "System",
-              rejectionReason: null,
-              kycStatus: "verified",
-            });
-          }
-        }
-      }
-
-      // Also scan video uploaders from InPlayer-Videos
-      const videoScan = await docClient.send(
-        new ScanCommand({
-          TableName: VIDEOS_TABLE,
-          Limit: 100,
-        })
-      ).catch(() => null);
-
-      if (videoScan?.Items) {
-        for (const v of videoScan.Items as Record<string, unknown>[]) {
-          const uid = String(v.uploaderId || v.userId || "");
-          const name = String(v.uploaderName || v.creator || "Creator");
-          if (uid && !knownUserIds.has(uid)) {
-            knownUserIds.add(uid);
-            additionalCreators.push({
-              userId: uid,
-              legalName: name,
-              username: (v.uploaderUsername || null) as string | null,
-              panNumber: null,
-              idProofType: null,
-              aadhaarNumber: null,
-              passportNumber: null,
-              bankAccountNumber: null,
-              bankIfsc: null,
-              addressLine1: null,
-              city: null,
-              state: null,
-              pincode: null,
-              payoutFrequency: "monthly",
-              minPayoutAmount: 1000,
-              submittedAt: (v.uploadedAt || new Date().toISOString()) as string,
-              reviewedAt: null,
-              reviewedBy: "System",
-              rejectionReason: null,
-              kycStatus: "verified",
-            });
-          }
-        }
-      }
-    } catch (err) {
-      console.error("admin/creators: user/video fallback scan failed:", err);
-    }
-  }
-
-  const allItems = [...payoutItems, ...additionalCreators];
+  const allItems = [...payoutItems];
 
   allItems.sort(
     (a, b) =>
@@ -246,7 +197,7 @@ export async function GET(request: NextRequest) {
     })
   );
 
-  return NextResponse.json({ items: withDocs });
+  return NextResponse.json({ items: withDocs, tableMissing });
 }
 
 export async function POST(request: NextRequest) {

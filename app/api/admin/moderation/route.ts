@@ -129,8 +129,23 @@ export async function GET(request: NextRequest) {
         )
         .slice(0, 150);
 
+      // Reports previously carried only raw ids. Resolving both sides means
+      // an admin can see who complained and who they complained about
+      // without copy-pasting a UUID into the Users page.
+      const reportUserIds = sorted.flatMap((r) =>
+        [r.reporterId as string | undefined, r.targetUserId as string | undefined].filter(
+          (id): id is string => Boolean(id)
+        )
+      );
+      const reportUsernames = await resolveUsernames(reportUserIds);
+
       const items = await Promise.all(
-        sorted.map(async (r) => ({ ...r, snippet: await hydrateReportSnippet(r) }))
+        sorted.map(async (r) => ({
+          ...r,
+          snippet: await hydrateReportSnippet(r),
+          reporterUsername: reportUsernames.get(r.reporterId as string) || null,
+          targetUsername: reportUsernames.get(r.targetUserId as string) || null,
+        }))
       );
 
       return NextResponse.json({ items });
@@ -164,6 +179,18 @@ export async function GET(request: NextRequest) {
       ),
     ]);
 
+    // WHO posted each flagged item. Without this an admin sees the offending
+    // text but has no way to tell whose account it came from — so there's no
+    // route from "this is bad" to "suspend the person who did it", which is
+    // the whole point of the queue. Resolved in ONE batched lookup across
+    // all three content types rather than per row.
+    const authorIds = [
+      ...comments.map((c) => c.userId as string | undefined),
+      ...messages.map((m) => m.senderId as string | undefined),
+      ...videos.map((v) => v.uploaderId as string | undefined),
+    ].filter((id): id is string => Boolean(id));
+    const authorUsernames = await resolveUsernames(authorIds);
+
     const items = [
       ...comments.map((c) => ({
         id: `comment#${c.videoId}#${c.commentId}`,
@@ -173,6 +200,9 @@ export async function GET(request: NextRequest) {
         categories: (c.flaggedCategories as string[]) || [],
         snippet: (c.text as string) || "",
         createdAt: (c.moderatedAt as string) || (c.createdAt as string),
+        authorId: (c.userId as string) || null,
+        authorName: (c.userName as string) || (c.name as string) || null,
+        authorUsername: authorUsernames.get(c.userId as string) || null,
       })),
       ...messages.map((m) => ({
         id: `message#${m.conversationId}#${m.messageId}`,
@@ -182,6 +212,9 @@ export async function GET(request: NextRequest) {
         categories: (m.flaggedCategories as string[]) || [],
         snippet: (m.text as string) || "",
         createdAt: (m.moderatedAt as string) || (m.createdAt as string),
+        authorId: (m.senderId as string) || null,
+        authorName: (m.senderName as string) || null,
+        authorUsername: authorUsernames.get(m.senderId as string) || null,
       })),
       ...videos.map((v) => ({
         id: `video#${v.videoId}`,
@@ -190,6 +223,9 @@ export async function GET(request: NextRequest) {
         categories: (v.flaggedCategories as string[]) || [],
         snippet: (v.title as string) || "Untitled",
         createdAt: (v.moderatedAt as string) || (v.uploadedAt as string),
+        authorId: (v.uploaderId as string) || null,
+        authorName: (v.uploaderName as string) || null,
+        authorUsername: authorUsernames.get(v.uploaderId as string) || null,
         // Audience-mismatch detail, so an admin can see BOTH sides — what
         // the creator picked and what the AI read it as — plus the specific
         // signals, rather than just a generic "flagged" badge. Only present

@@ -1811,7 +1811,7 @@ function AdvertisingPage() {
                     Matches the player's fixed 16:9 ad-break frame
                     (VideoPlayer.tsx). */}
                 <p className="mb-1.5 text-[11px] text-slate-500">
-                  Recommended for video ads: MP4 or WebM, 16:9 (1920×1080), 30 seconds or less, under 550MB. A video outside these won&apos;t fail to upload, but may be cropped, stretched, or feel too long during the ad break.
+                  Recommended for video ads: MP4 or WebM, 16:9 (1920×1080), 30 seconds or less. Hard limit: 50MB — anything larger is rejected. A video outside the other guidelines still uploads, but may be cropped, stretched, or feel too long during the ad break.
                   Pick one file to preview &amp; review before publishing, or select several at once to publish them all
                   immediately under the Title/Link above (each gets numbered).
                 </p>
@@ -1902,7 +1902,7 @@ function AdvertisingPage() {
                         // used to for every "mux:"-prefixed ad, ready or
                         // not — see the isMuxVideo fix just above) reads as
                         // "this is broken" when it's really just still
-                        // processing. Large 550MB uploads can take a few
+                        // processing. Uploads near the 50MB ceiling can take a few
                         // minutes.
                         <span className="text-[11px] font-semibold text-slate-400">Processing on Mux…</span>
                       ) : isMuxVideo ? (

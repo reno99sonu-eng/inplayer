@@ -31,6 +31,11 @@ interface ReportItem {
   reason: string;
   details?: string;
   reporterId: string;
+  // Resolved server-side so a report names both people involved instead of
+  // showing two raw UUIDs an admin has to look up by hand.
+  reporterUsername?: string | null;
+  targetUserId?: string | null;
+  targetUsername?: string | null;
   createdAt: string;
   snippet: string | null;
 }
@@ -45,6 +50,11 @@ interface AutoFlagItem {
   categories: string[];
   snippet: string;
   createdAt: string;
+  // WHO posted it. Without this the queue shows offending content with no
+  // way to reach the account behind it.
+  authorId?: string | null;
+  authorName?: string | null;
+  authorUsername?: string | null;
   // Video-only. Set when the AI's read of the audience disagreed with what
   // the creator declared at upload — see app/lib/audienceClassifier.ts.
   audienceMismatch?: boolean;
@@ -123,6 +133,9 @@ export default function AdminModerationPage() {
         (item.commentId || "").toLowerCase().includes(q) ||
         (item.messageId || "").toLowerCase().includes(q) ||
         (item.snippet || "").toLowerCase().includes(q) ||
+        (item.authorId || "").toLowerCase().includes(q) ||
+        (item.authorName || "").toLowerCase().includes(q) ||
+        (item.authorUsername || "").toLowerCase().includes(q) ||
         item.categories.some((c) => c.toLowerCase().includes(q))
     );
   }, [autoFlagged, query]);
@@ -374,6 +387,54 @@ export default function AdminModerationPage() {
                   )}
                 </div>
 
+                <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
+                  <span className="flex items-center gap-1.5">
+                    <span className="font-black uppercase tracking-wide text-slate-500">
+                      Reported by
+                    </span>
+                    {r.reporterUsername ? (
+                      <Link
+                        href={`/u/${r.reporterUsername}`}
+                        target="_blank"
+                        className="font-semibold text-indigo-300 hover:text-indigo-200"
+                      >
+                        @{r.reporterUsername}
+                      </Link>
+                    ) : null}
+                    <Link
+                      href={`/admin/users?q=${encodeURIComponent(r.reporterId)}`}
+                      className="select-all font-mono text-[10px] text-slate-400 hover:text-amber-200 light:text-slate-600"
+                      title="Reporter user ID — opens in Users"
+                    >
+                      {r.reporterId}
+                    </Link>
+                  </span>
+
+                  {r.targetUserId && (
+                    <span className="flex items-center gap-1.5">
+                      <span className="font-black uppercase tracking-wide text-slate-500">
+                        Against
+                      </span>
+                      {r.targetUsername ? (
+                        <Link
+                          href={`/u/${r.targetUsername}`}
+                          target="_blank"
+                          className="font-semibold text-indigo-300 hover:text-indigo-200"
+                        >
+                          @{r.targetUsername}
+                        </Link>
+                      ) : null}
+                      <Link
+                        href={`/admin/users?q=${encodeURIComponent(r.targetUserId)}`}
+                        className="select-all font-mono text-[10px] text-slate-400 hover:text-amber-200 light:text-slate-600"
+                        title="Reported user ID — opens in Users"
+                      >
+                        {r.targetUserId}
+                      </Link>
+                    </span>
+                  )}
+                </div>
+
                 <p className="mt-2 truncate text-sm text-slate-200 light:text-slate-800">
                   {r.snippet || "(content not available)"}
                 </p>
@@ -510,6 +571,46 @@ export default function AdminModerationPage() {
                   </Link>
                 )}
               </div>
+
+              {(item.authorId || item.authorName || item.authorUsername) && (
+                <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px]">
+                  <span className="font-black uppercase tracking-wide text-slate-500">
+                    Posted by
+                  </span>
+                  {item.authorName && (
+                    <span className="font-bold text-white light:text-slate-900">
+                      {item.authorName}
+                    </span>
+                  )}
+                  {item.authorUsername && (
+                    <Link
+                      href={`/u/${item.authorUsername}`}
+                      target="_blank"
+                      className="font-semibold text-indigo-300 hover:text-indigo-200"
+                    >
+                      @{item.authorUsername}
+                    </Link>
+                  )}
+                  {item.authorId && (
+                    <>
+                      {/* The raw id is what the Users page searches on, so it's
+                          shown in full and selectable rather than truncated. */}
+                      <span
+                        className="select-all font-mono text-[10px] text-slate-400 light:text-slate-600"
+                        title="User ID"
+                      >
+                        {item.authorId}
+                      </span>
+                      <Link
+                        href={`/admin/users?q=${encodeURIComponent(item.authorId)}`}
+                        className="font-semibold text-amber-300 hover:text-amber-200"
+                      >
+                        Open in Users
+                      </Link>
+                    </>
+                  )}
+                </div>
+              )}
 
               <p className="mt-2 truncate text-sm text-slate-200 light:text-slate-800">
                 {item.snippet || "(no text)"}

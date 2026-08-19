@@ -712,45 +712,6 @@ lg:right-auto
                 <span className="text-sm font-semibold">Sponsor an Ad</span>
               </button>
 
-              {/* Support moved here from a floating button on every panel
-                  EXCEPT Hammart — SupportChatWidget.tsx hides its own
-                  floating launcher off Hammart and listens for
-                  "openSupportChat" instead. Hammart keeps its floating
-                  Support button and so doesn't need this entry.
-
-                  (There is deliberately no "AI Studio" entry here: the AI
-                  orb is a floating button on every page, homepage included,
-                  exactly as it was originally.) */}
-              {siteDomain !== "hammart" && (
-                <button
-                  onClick={() => {
-                    setMenuOpen(false);
-                    window.dispatchEvent(new CustomEvent("openSupportChat"));
-                  }}
-                  className="
-                    flex
-                    w-full
-                    items-center
-                    gap-4
-                    rounded-xl
-                    px-3
-                    py-2
-                    text-left
-                    text-slate-200
-                    light:text-slate-700
-                    transition-all
-                    duration-300
-                    hover:bg-white/5
-                    light:hover:bg-black/5
-                    hover:translate-x-1
-                    hover:text-orange-300
-                    light:hover:text-orange-600
-                  "
-                >
-                  <Headset size={19} />
-                  <span className="text-sm font-semibold">Support</span>
-                </button>
-              )}
             </div>
 
             {signedIn && (
@@ -1172,6 +1133,47 @@ lg:right-auto
                 </div>
               </div>
             </div>
+
+            {/* Support — deliberately the LAST entry in the drawer, just
+                above the copyright line. It's a "when something's wrong"
+                action, not a browsing destination, so it sits at the end
+                rather than among the navigation links at the top.
+
+                Shown on every panel EXCEPT Hammart: SupportChatWidget.tsx
+                keeps its own floating launcher there, and this entry would
+                duplicate it. Everywhere else that floating launcher is
+                suppressed and this is the only way in, so it dispatches
+                "openSupportChat" to open the same panel. */}
+            {siteDomain !== "hammart" && (
+              <div className="mt-4 border-t border-white/10 light:border-black/10 px-3 pt-3">
+                <button
+                  onClick={() => {
+                    setMenuOpen(false);
+                    window.dispatchEvent(new CustomEvent("openSupportChat"));
+                  }}
+                  className="
+                    flex
+                    w-full
+                    items-center
+                    gap-3
+                    rounded-xl
+                    px-0
+                    py-1
+                    text-left
+                    text-slate-200
+                    light:text-slate-700
+                    transition-all
+                    duration-300
+                    hover:translate-x-1
+                    hover:text-orange-300
+                    light:hover:text-orange-600
+                  "
+                >
+                  <Headset size={16} />
+                  <span className="text-sm font-semibold">Support</span>
+                </button>
+              </div>
+            )}
 
             <div className="mt-4 border-t border-white/10 light:border-black/10 px-3 pt-3">
               <p className="text-[10px] text-slate-500">© 2026 Homox Prime Pvt Ltd</p>

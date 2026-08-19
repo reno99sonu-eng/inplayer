@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { requireAdmin } from "@/app/lib/isAdmin";
-import { AUDIT_LOGS_TABLE } from "@/app/lib/auditLog";
+import { AUDIT_LOGS_TABLE, auditDomainForAction } from "@/app/lib/auditLog";
 import { resolveUsernames } from "@/app/lib/resolveUsernames";
 import { getRequestLocation, getRequestDevice } from "@/app/lib/requestInfo";
 
@@ -37,7 +37,25 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ items: [], tableMissing: true });
   }
 
-  const sorted = items
+  // Panel scoping. The domain is derived from the action name
+  // (auditDomainForAction) rather than read off the row, so every entry
+  // written before this existed classifies correctly with no backfill.
+  //
+  // NOTE the filter runs BEFORE the MAX_ROWS slice on purpose: slicing
+  // first and filtering after would mean asking for Hammart returns only
+  // whatever Hammart rows happened to survive a cut taken across all three
+  // panels — on a busy InPlayer day that's frequently none at all.
+  const domainParam = request.nextUrl.searchParams.get("domain");
+  const domain =
+    domainParam === "inplayer" || domainParam === "hammart" || domainParam === "sponsorship"
+      ? domainParam
+      : null;
+
+  const scoped = domain
+    ? items.filter((l) => auditDomainForAction(String(l.action || "")) === domain)
+    : items;
+
+  const sorted = scoped
     .sort(
       (a, b) =>
         new Date((b.createdAt as string) || 0).getTime() -
@@ -59,6 +77,7 @@ export async function GET(request: NextRequest) {
     createdAt: l.createdAt,
     adminEmail: l.adminEmail,
     action: l.action,
+    domain: auditDomainForAction(String(l.action || "")),
     targetType: l.targetType,
     targetId: l.targetId,
     targetLabel:

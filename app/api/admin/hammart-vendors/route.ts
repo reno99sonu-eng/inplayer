@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { ScanCommand, QueryCommand, UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { requireAdmin } from "@/app/lib/isAdmin";
+import { clampOrderQuantity, orderTotalInr } from "@/app/lib/hammartOrderMath";
 import {
   VENDORS_TABLE,
   VENDOR_KYC_DOCUMENTS_TABLE,
@@ -165,29 +166,82 @@ export async function GET(request: NextRequest) {
   // Scan products and orders once to aggregate vendor stats
   const vendorProductsMap = new Map<string, number>();
   try {
-    const prodRes = await docClient.send(new ScanCommand({ TableName: "Hammart-Products" }));
-    (prodRes.Items || []).forEach((p) => {
-      const vKey = (p.vendorUserId as string) || (p.vendorId as string);
-      if (vKey) {
-        vendorProductsMap.set(vKey, (vendorProductsMap.get(vKey) || 0) + 1);
-      }
-    });
+    // Paginated for the same reason as the orders scan below: a single
+    // un-paginated Scan silently stops at DynamoDB's 1MB page, so the
+    // product count per vendor would just quietly go wrong at scale.
+    let exclusiveStartKey: Record<string, unknown> | undefined;
+    do {
+      const prodRes = await docClient.send(
+        new ScanCommand({
+          TableName: "Hammart-Products",
+          ExclusiveStartKey: exclusiveStartKey,
+        })
+      );
+      (prodRes.Items || []).forEach((p) => {
+        const vKey = (p.vendorUserId as string) || (p.vendorId as string);
+        if (vKey) {
+          vendorProductsMap.set(vKey, (vendorProductsMap.get(vKey) || 0) + 1);
+        }
+      });
+      exclusiveStartKey = prodRes.LastEvaluatedKey as Record<string, unknown> | undefined;
+    } while (exclusiveStartKey);
   } catch (err) {
     console.error("admin/hammart-vendors: failed to scan products for stats:", err);
   }
 
+  // Per-vendor "N sold" and "Total revenue", shown as authoritative badges
+  // on the vendors list. This was wrong in three separate ways:
+  //
+  //   1. It counted EVERY order row regardless of status, so
+  //      payment_failed, payment_pending and vendor_cancelled orders were
+  //      all reported as sales and as revenue.
+  //   2. It summed the UNIT price (`o.priceInr`) and ignored `quantity`
+  //      entirely, so a 5-unit order counted as one unit of revenue. The
+  //      correct helper already existed and is what the Orders page uses:
+  //      orderTotalInr() in app/lib/hammartOrderMath.ts.
+  //   3. The Scan wasn't paginated, unlike every other scan in this file,
+  //      so it silently truncated at DynamoDB's 1MB page — meaning the
+  //      numbers quietly stopped being right once Hammart had enough
+  //      orders to matter.
+  const COUNTED_ORDER_STATUSES = new Set([
+    "placed",
+    "paid",
+    "vendor_confirmed",
+    "delivered",
+  ]);
+
   const vendorSalesMap = new Map<string, { count: number; revenue: number }>();
   try {
-    const ordersRes = await docClient.send(new ScanCommand({ TableName: "Hammart-Orders" }));
-    (ordersRes.Items || []).forEach((o) => {
-      const vKey = (o.vendorUserId as string) || (o.vendorId as string);
-      if (vKey) {
+    let exclusiveStartKey: Record<string, unknown> | undefined;
+    do {
+      const ordersRes = await docClient.send(
+        new ScanCommand({
+          TableName: "Hammart-Orders",
+          ExclusiveStartKey: exclusiveStartKey,
+        })
+      );
+
+      (ordersRes.Items || []).forEach((o) => {
+        const vKey = (o.vendorUserId as string) || (o.vendorId as string);
+        if (!vKey) return;
+
+        // A row with no status predates the field and was, at the time,
+        // always a real placed order — same reading as elsewhere.
+        const status = (o.status as string) || "placed";
+        if (!COUNTED_ORDER_STATUSES.has(status)) return;
+
         const current = vendorSalesMap.get(vKey) || { count: 0, revenue: 0 };
-        current.count += 1;
-        current.revenue += Number(o.priceInr) || 0;
+        const quantity = clampOrderQuantity(o.quantity ?? 1);
+        current.count += quantity;
+        current.revenue += orderTotalInr({
+          priceInr: Number(o.priceInr) || 0,
+          quantity: o.quantity as number | undefined,
+        });
         vendorSalesMap.set(vKey, current);
-      }
-    });
+      });
+
+      exclusiveStartKey = ordersRes.LastEvaluatedKey as Record<string, unknown> | undefined;
+    } while (exclusiveStartKey);
   } catch (err) {
     console.error("admin/hammart-vendors: failed to scan orders for stats:", err);
   }

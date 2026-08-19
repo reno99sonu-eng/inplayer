@@ -12,6 +12,16 @@ const PAGE_SIZE = 25;
 // scale; it would need a real search index (OpenSearch, etc.) well before
 // the library gets anywhere near this many items.
 const SEARCH_SCAN_CAP = 1000;
+// How many raw items each Scan round-trip in listVideos examines. Bigger
+// than PAGE_SIZE on purpose: with a FilterExpression active, most examined
+// items don't survive it, so scanning exactly PAGE_SIZE per round-trip is
+// what produced the empty-filtered-page bug documented in listVideos.
+const SCAN_CHUNK = 200;
+// Hard ceiling on those round-trips per request, so a filter that matches
+// nothing (or almost nothing) can't walk the entire table on every load.
+// 20 x 200 = up to 4,000 items examined for one page — well beyond what any
+// real filter needs, and still a bounded cost.
+const MAX_SCAN_PAGES = 20;
 
 export interface AdminVideoRow {
   videoId: string;
@@ -230,25 +240,64 @@ async function listVideos(
   }
 
   const tf = buildFilter(type, status);
-  const result = await docClient.send(
-    new ScanCommand({
-      TableName: "InPlayer-Videos",
-      ProjectionExpression: PROJECTION,
-      ExpressionAttributeNames: NAMES,
-      ...(tf
-        ? {
-            FilterExpression: tf.FilterExpression,
-            ExpressionAttributeValues: tf.ExpressionAttributeValues,
-          }
-        : {}),
-      Limit: PAGE_SIZE,
-      ExclusiveStartKey: exclusiveStartKey,
-    })
-  );
 
-  const rows = (result.Items || []).map(toRow);
-  const nextCursor = result.LastEvaluatedKey
-    ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString("base64")
+  // KEEP SCANNING UNTIL THERE IS ACTUALLY A PAGE OF MATCHES.
+  //
+  // This was a single Scan with `Limit: PAGE_SIZE`, which is the classic
+  // DynamoDB trap: Limit caps how many items are EXAMINED, not how many
+  // survive the FilterExpression. With a filter active (status=processing
+  // especially), the first 25 items examined are typically all older
+  // "ready" videos, so the response came back with ZERO rows even though
+  // matches existed further into the table.
+  //
+  // The visible symptom was a Processing tab showing an empty list next to
+  // its own non-zero count badge — because computeStatusCounts above
+  // paginates correctly and this did not. The only way to find a processing
+  // upload was to sit on "All statuses" and scroll for it.
+  //
+  // Now it pages until it has PAGE_SIZE matches, the table is exhausted, or
+  // MAX_SCAN_PAGES is reached — that last bound is what stops a filter
+  // matching nothing from walking the whole table on every request.
+  //
+  // Rows may overshoot PAGE_SIZE slightly (by up to one chunk), which is
+  // deliberate: trimming would desync the returned cursor from
+  // LastEvaluatedKey and silently drop the trimmed rows from the next page.
+  const rows: AdminVideoRow[] = [];
+  let pagesScanned = 0;
+  let lastEvaluatedKey: Record<string, unknown> | undefined;
+
+  do {
+    const result = await docClient.send(
+      new ScanCommand({
+        TableName: "InPlayer-Videos",
+        ProjectionExpression: PROJECTION,
+        ExpressionAttributeNames: NAMES,
+        ...(tf
+          ? {
+              FilterExpression: tf.FilterExpression,
+              ExpressionAttributeValues: tf.ExpressionAttributeValues,
+            }
+          : {}),
+        // Only over-scan when a filter is actually active. With no filter
+        // every examined item survives, so PAGE_SIZE is exactly right and
+        // the loop exits after one round-trip — identical behaviour and
+        // payload size to before this fix for the default "All" view.
+        Limit: tf ? SCAN_CHUNK : PAGE_SIZE,
+        ExclusiveStartKey: exclusiveStartKey,
+      })
+    );
+
+    for (const item of result.Items || []) {
+      rows.push(toRow(item as Record<string, unknown>));
+    }
+
+    lastEvaluatedKey = result.LastEvaluatedKey as Record<string, unknown> | undefined;
+    exclusiveStartKey = lastEvaluatedKey;
+    pagesScanned++;
+  } while (exclusiveStartKey && rows.length < PAGE_SIZE && pagesScanned < MAX_SCAN_PAGES);
+
+  const nextCursor = lastEvaluatedKey
+    ? Buffer.from(JSON.stringify(lastEvaluatedKey)).toString("base64")
     : null;
 
   return { rows, nextCursor };

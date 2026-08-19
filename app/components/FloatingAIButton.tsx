@@ -17,15 +17,18 @@ const AIStudioModal = dynamic(() => import("./AIStudioModal"), { ssr: false });
 // the hamburger "AI Studio" entry has been removed. Only the Support Desk
 // launcher lives in the hamburger now (see SupportChatWidget.tsx).
 //
-// The one exception is the immersive screens listed in
-// hideFloatingLaunchers() — Messages, Shorts, Live — where the orb would
-// land directly on top of the chat composer / Shorts action rail /
-// broadcast controls. Being homepage-only originally, it never used to be
-// able to collide with anything; going site-wide is what made that opt-out
-// necessary.
+// SCOPE: the InPlayer HOMEPAGE ONLY — pathname exactly "/". It was briefly
+// mounted site-wide, which put it on Hammart, the Sponsorship panel and
+// every immersive screen; Reno asked for it back on the homepage alone.
+// The check is an exact match rather than a prefix so it can't leak onto
+// /shop, /sponsorships or anything else.
+//
+// It stays mounted (rather than being conditionally rendered by
+// SiteChrome) so this one rule lives in one place — the component decides
+// where it belongs, no caller has to know.
 export default function FloatingAIButton() {
   const pathname = usePathname();
-  const suppressed = hideFloatingLaunchers(pathname);
+  const suppressed = pathname !== "/" || hideFloatingLaunchers(pathname);
 
   const [hidden, setHidden] = useState(false);
   const [open, setOpen] = useState(false);

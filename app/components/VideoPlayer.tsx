@@ -7,6 +7,13 @@ import type { MuxCSSProperties, MuxPlayerRefAttributes } from "@mux/mux-player-r
 import { useSettings } from "@/app/components/settings/SettingsProvider";
 import { cssFilterFor, type VideoLookFilter } from "@/app/lib/videoFilters";
 import { soundtrackClipSeconds } from "@/app/data/soundtracks";
+import { usePremium } from "@/app/hooks/usePremium";
+import { effectiveMaxResolution, normalizeQuality } from "@/app/lib/premium";
+import {
+  getPlaybackPosition,
+  savePlaybackPosition,
+  clearPlaybackPosition,
+} from "@/app/lib/playbackPositions";
 
 // Safari-only fullscreen APIs (`webkit*`) predate the standard Fullscreen
 // API and were never added to lib.dom.d.ts — these two small extensions
@@ -159,6 +166,8 @@ export default function VideoPlayer({
   // (matching "captions default off unless a viewer turns them on"), on
   // for any viewer who's actually turned the setting on.
   const { playback } = useSettings();
+  // Viewer's tier — decides the maximum rendition below.
+  const premium = usePremium();
 
   // --- Mid-roll ad breaks -------------------------------------------------
   // Real ad interruptions, not a stub: on mount, fetch once whether
@@ -212,6 +221,26 @@ export default function VideoPlayer({
       cancelled = true;
     };
   }, []);
+
+  // "Remember playback position" (Settings › Playback). Throttled to once
+  // every few seconds because timeupdate fires ~4x/second and this writes to
+  // localStorage — saving on every tick would be a needless synchronous
+  // write on the playback hot path.
+  const lastPositionSaveRef = useRef(0);
+
+  const handleTimeUpdate = () => {
+    const player = playerRef.current;
+
+    if (player && playback.rememberPosition) {
+      const now = Date.now();
+      if (now - lastPositionSaveRef.current > 4000) {
+        lastPositionSaveRef.current = now;
+        savePlaybackPosition(videoId, player.currentTime || 0, player.duration || 0);
+      }
+    }
+
+    handleMidrollTimeUpdate();
+  };
 
   const handleMidrollTimeUpdate = () => {
     const player = playerRef.current;
@@ -388,6 +417,37 @@ export default function VideoPlayer({
     audio.addEventListener("timeupdate", enforceClip);
     return () => audio.removeEventListener("timeupdate", enforceClip);
   }, [soundtrack]);
+
+  // Seek to the saved position the first time this video becomes seekable.
+  // Uses loadedmetadata (not mount) because currentTime can't be set until
+  // the media has a duration — an earlier write is silently discarded.
+  const resumeAppliedRef = useRef(false);
+  useEffect(() => {
+    resumeAppliedRef.current = false;
+  }, [playbackId]);
+
+  const applyResumePosition = () => {
+    const player = playerRef.current;
+    if (!player || resumeAppliedRef.current) return;
+    resumeAppliedRef.current = true;
+
+    if (!playback.rememberPosition) return;
+
+    const saved = getPlaybackPosition(videoId);
+    const duration = player.duration || 0;
+    // Guard against a stale point past the end of a re-encoded video —
+    // seeking beyond duration would strand the viewer on a black frame.
+    if (saved && saved > 0 && (!duration || saved < duration - 5)) {
+      try {
+        player.currentTime = saved;
+      } catch {
+        // Some browsers reject a seek before the media is fully ready;
+        // starting from 0 is an acceptable outcome, an exception isn't.
+      }
+    } else if (saved) {
+      clearPlaybackPosition(videoId);
+    }
+  };
 
   const syncBackgroundAudioToPlayer = (playing: boolean) => {
     const audio = backgroundAudioRef.current;
@@ -1051,6 +1111,33 @@ export default function VideoPlayer({
         // mid-playback either way — this prop only sets the very first
         // render's default state.
         defaultHiddenCaptions={!playback.captions}
+        // PREMIUM RESOLUTION GATE.
+        //
+        // Playback was previously pure Mux ABR with no ceiling of any kind —
+        // every viewer could reach whatever the top rendition was (uploads
+        // request up to 2160p, see app/api/upload/create). This caps the
+        // ladder at the viewer's tier: free tops out at 1080p, Premium gets
+        // the full 4K. Because it's a MAX RESOLUTION on the player, the
+        // higher renditions are never fetched at all — it isn't a UI that
+        // merely hides them from the quality menu.
+        //
+        // The ceiling comes from the server (/api/premium/me reads the
+        // account), not from anything the browser could edit, and
+        // effectiveMaxResolution() additionally clamps whatever the viewer
+        // picked in Settings > Playback down to what their tier allows.
+        //
+        // Spread through a loosely-typed object on purpose: mux-player
+        // exposes this as `maxResolution`, and typing it inline would make a
+        // future rename in that package a hard build failure on a prop that
+        // is a nice-to-have, not load-bearing.
+        {...({
+          maxResolution: effectiveMaxResolution(
+            premium.premium,
+            normalizeQuality(playback.wifiQuality) === "auto"
+              ? null
+              : normalizeQuality(playback.wifiQuality)
+          ),
+        } as Record<string, string>)}
         playbackRates={[0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]}
         // "any": try to autoplay WITH sound first; if the browser blocks
         // that, Mux automatically retries muted instead of giving up.
@@ -1072,7 +1159,8 @@ export default function VideoPlayer({
           syncBackgroundAudioToPlayer(false);
         }}
         onVolumeChange={syncBackgroundAudioMute}
-        onTimeUpdate={handleMidrollTimeUpdate}
+        onTimeUpdate={handleTimeUpdate}
+        onLoadedMetadata={applyResumePosition}
         style={
           {
             width: "100%",

@@ -22,11 +22,25 @@ export default function SettingsRow({
   children,
   onClick,
 }: SettingsRowProps) {
+  // The row used to ALWAYS be a <button>, while `children` is typically a
+  // SettingsToggle — which is itself a <button>. Nested interactive buttons
+  // are invalid HTML: parsing the server-rendered markup implicitly closes
+  // the outer button at the inner start tag, producing a DOM that doesn't
+  // match React's tree (a hydration mismatch) with the toggle and the
+  // trailing value/chevron falling outside the row until React repairs it.
+  //
+  // So: only render a real <button> when the row itself is clickable. When
+  // it just hosts a control, it's a plain <div> — which also fixes the
+  // second half of the problem, that non-clickable rows were styled as
+  // pressable (hover-lift, border highlight) and so felt broken when
+  // clicking the row did nothing.
+  const interactive = typeof onClick === "function";
+  const Wrapper = interactive ? "button" : "div";
+
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="
+    <Wrapper
+      {...(interactive ? { type: "button" as const, onClick } : {})}
+      className={`
         group
         flex
         w-full
@@ -40,10 +54,12 @@ export default function SettingsRow({
         text-left
         transition-all
         duration-300
-        hover:border-orange-400/20
-        hover:bg-white/[0.04] light:hover:bg-black/[0.04]
-        hover:-translate-y-0.5
-      "
+        ${
+          interactive
+            ? "hover:border-orange-400/20 hover:bg-white/[0.04] light:hover:bg-black/[0.04] hover:-translate-y-0.5"
+            : ""
+        }
+      `}
     >
       <div className="flex items-center gap-4">
 
@@ -93,7 +109,10 @@ export default function SettingsRow({
           </span>
         )}
 
-        {!children && (
+        {/* The chevron means "this row goes somewhere" — only true when the
+            row is actually clickable. It was previously shown on every row
+            without children, including inert ones. */}
+        {!children && interactive && (
           <ChevronRight
             size={18}
             className="
@@ -107,6 +126,6 @@ export default function SettingsRow({
 
       </div>
 
-    </button>
+    </Wrapper>
   );
 }

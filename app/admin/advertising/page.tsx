@@ -5,6 +5,7 @@ import { authedFetch } from "@/app/lib/apiFetch";
 import {
   Loader2,
   AlertTriangle,
+  CheckCircle2,
   Save,
   Upload,
   Trash2,
@@ -947,14 +948,20 @@ function AdvertisingPage() {
 
   const submitMidrollAd = async () => {
     if (midrollUploading) return;
-    if (!Boolean(midrollPreview)) {
-      return alert("Please select an ad media file first.");
+    // Kept as a real backstop (the button is now disabled, but this can
+    // still be reached programmatically), surfaced inline rather than as a
+    // browser alert() so it reads like the rest of the page.
+    if (!midrollPreview) {
+      setMidrollUploadError("Please select an ad media file first.");
+      return;
     }
     if (midrollTitle.trim().length === 0) {
-      return alert("Please enter a title for the ad.");
+      setMidrollUploadError("Please enter a title for the ad.");
+      return;
     }
     if (!/^https?:\/\//.test(midrollLink.trim())) {
-      return alert("Please enter a valid link URL starting with http:// or https://");
+      setMidrollUploadError("Please enter a valid link URL starting with http:// or https://");
+      return;
     }
 
     setMidrollUploading(true);
@@ -1232,6 +1239,17 @@ function AdvertisingPage() {
             >
               <RefreshCw size={12} /> Reload Section
             </button>
+          </div>
+        )}
+
+        {/* `saved` was being set in seven different handlers and rendered
+            nowhere, so every successful save on this page was silent — the
+            one admin page that gave no confirmation at all. Same banner as
+            app/admin/settings/page.tsx, for consistency. */}
+        {saved && (
+          <div className="flex items-start gap-2 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-xs text-emerald-300 light:text-emerald-700">
+            <CheckCircle2 size={14} className="mt-0.5 flex-shrink-0" />
+            <span>Saved — changes are already live.</span>
           </div>
         )}
 
@@ -1872,10 +1890,20 @@ function AdvertisingPage() {
                 </div>
               )}
 
+              {/* canUploadMidroll was computed above and never used, so this
+                  button rendered fully enabled on an empty form and relied on
+                  three alert() calls inside submitMidrollAd to stop you —
+                  inconsistent with the banner and welcome uploaders beside
+                  it, which both gate on their own equivalent flag. */}
               <button
                 type="button"
                 onClick={submitMidrollAd}
-                disabled={midrollUploading}
+                disabled={!canUploadMidroll || midrollUploading}
+                title={
+                  canUploadMidroll
+                    ? undefined
+                    : "Add a media file, a title and a link starting with http:// or https:// first."
+                }
                 className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-50 cursor-pointer"
               >
                 {midrollUploading ? <Loader2 size={13} className="animate-spin" /> : <Upload size={13} />} Save Mid-Roll Ad

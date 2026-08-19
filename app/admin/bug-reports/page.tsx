@@ -76,9 +76,24 @@ export default function AdminBugReportsPage() {
     try {
       const res = await authedFetch("/api/admin/bug-reports", {
         method: "POST",
+        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ reportId, status }),
       });
-      if (res.ok) setReports((prev) => prev.filter((r) => r.reportId !== reportId));
+
+      if (res.ok) {
+        setReports((prev) => prev.filter((r) => r.reportId !== reportId));
+        return;
+      }
+
+      // Previously this was a bare `if (res.ok)` with no else and no catch —
+      // so a 401 or a 500 left the row exactly where it was and said nothing,
+      // which is indistinguishable from the button not being wired up at all.
+      // Every comparable handler on the sibling admin pages surfaces the
+      // error (see app/admin/hammart-products and app/admin/creators).
+      const data = await res.json().catch(() => ({}));
+      window.alert(data?.error || `Couldn't update this report (HTTP ${res.status}).`);
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setBusyId(null);
     }

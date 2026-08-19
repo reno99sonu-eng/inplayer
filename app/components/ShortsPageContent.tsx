@@ -20,6 +20,8 @@ import {
 
 import type { Short } from "../data/shorts";
 import { getSoundtrackById, soundtrackClipSeconds } from "../data/soundtracks";
+import { usePremium } from "@/app/hooks/usePremium";
+import { effectiveMaxResolution, normalizeQuality } from "@/app/lib/premium";
 
 // A Short with a chosen soundtrack is meant to have that track REPLACE the
 // camera's own recorded audio entirely — see the identical comment in
@@ -79,6 +81,9 @@ export default function ShortsPageContent({
   // (matching "captions default off unless a viewer turns them on"), on
   // for any viewer who's actually turned the setting on.
   const { playback } = useSettings();
+  // Viewer's tier — caps the rendition ladder below, same rule as the
+  // main watch player (see VideoPlayer.tsx).
+  const premium = usePremium();
 
   const shorts = initialShorts;
   const [activeIndex, setActiveIndex] = useState(0);
@@ -931,6 +936,17 @@ export default function ShortsPageContent({
                         // captions menu still lets a viewer turn a
                         // language on manually either way.
                         defaultHiddenCaptions={!playback.captions}
+                        // Premium resolution gate — see the long note on the
+                        // equivalent prop in VideoPlayer.tsx. Capped here too
+                        // so the Shorts feed isn't a way around the tier.
+                        {...({
+                          maxResolution: effectiveMaxResolution(
+                            premium.premium,
+                            normalizeQuality(playback.mobileQuality) === "auto"
+                              ? null
+                              : normalizeQuality(playback.mobileQuality)
+                          ),
+                        } as Record<string, string>)}
                         // Full download instead of Mux Player's default
                         // "metadata" preload — this is the active Raftaar
                         // slide, so it should already be buffering by the

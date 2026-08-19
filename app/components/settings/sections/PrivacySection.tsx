@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Shield,
   Eye,
@@ -38,7 +38,31 @@ export default function PrivacySection() {
   const { user, refreshUser } = useAuthModal();
   const [savingPrivacy, setSavingPrivacy] = useState(false);
 
-  const isPrivate = (user?.usernamePrivacy || "public") !== "public";
+  // usernamePrivacy is a THREE-value field — "public" | "connections" |
+  // "private" (PRIVACY_VALUES in app/api/profile/settings/route.ts), and the
+  // Profile page exposes all three. This toggle can only express two, and
+  // previously wrote a flat "private"/"public" — so a creator set to
+  // "connections" showed as ON here, and one off/on tap silently rewrote
+  // them to "private" with no way back from this screen. getPublicProfile
+  // treats those two very differently, so that was real data loss.
+  //
+  // Fixed by making the toggle non-destructive: it remembers the exact
+  // value it turned off from and restores THAT on the way back, and a
+  // "connections" account is labelled as such rather than being flattened.
+  const currentPrivacy = (user?.usernamePrivacy || "public") as
+    | "public"
+    | "connections"
+    | "private";
+  const isPrivate = currentPrivacy !== "public";
+  const restrictedModeRef = useRef<"connections" | "private">(
+    currentPrivacy === "connections" ? "connections" : "private"
+  );
+
+  useEffect(() => {
+    if (currentPrivacy !== "public") {
+      restrictedModeRef.current = currentPrivacy;
+    }
+  }, [currentPrivacy]);
 
   const handlePrivateAccountToggle = async (checked: boolean) => {
     if (savingPrivacy) return;
@@ -55,7 +79,9 @@ export default function PrivacySection() {
         },
         body: JSON.stringify({
           action: "update_privacy",
-          usernamePrivacy: checked ? "private" : "public",
+          // Restores whichever restricted value was in effect before,
+          // instead of always collapsing to "private".
+          usernamePrivacy: checked ? restrictedModeRef.current : "public",
         }),
       });
 
@@ -79,7 +105,11 @@ export default function PrivacySection() {
 
         <SettingsRow
           icon={<Eye size={20} />}
-          title="Private Account"
+          title={
+            currentPrivacy === "connections"
+              ? "Restricted Account (Connections only)"
+              : "Private Account"
+          }
           description="Only approved followers can view your profile."
         >
           <SettingsToggle

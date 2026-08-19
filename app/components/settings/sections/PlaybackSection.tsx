@@ -19,6 +19,10 @@ import SettingsRow from "../common/SettingsRow";
 import SettingsToggle from "../common/SettingsToggle";
 import SettingsSelect from "../common/SettingsSelect";
 import { useSettings } from "../SettingsProvider";
+import { clearAllPlaybackPositions } from "@/app/lib/playbackPositions";
+import { usePremium } from "@/app/hooks/usePremium";
+import { QUALITY_OPTIONS, requiresPremium, normalizeQuality } from "@/app/lib/premium";
+import { Lock } from "lucide-react";
 
 // Wired to the real SettingsProvider instead of local-only useState — see
 // PrivacySection.tsx for the same fix. Data Saver in particular was the
@@ -28,18 +32,46 @@ import { useSettings } from "../SettingsProvider";
 // zero effect on that downstream behavior. Closed Captions is likewise
 // real now (see VideoPlayer.tsx / ShortsPageContent.tsx / live/page.tsx).
 //
-// The rest of the controls below (quality selects, autoplay, PiP, resume
-// position, skip intro, mobile downloads, background playback) would each
-// need real player-level engineering — adaptive bitrate selection,
-// picture-in-picture wiring, a saved-position store, intro-detection,
-// offline downloads, a background-audio session — none of which exist
-// yet. Rather than let them keep silently doing nothing when touched,
-// they're marked disabled/"Coming soon" here, matching the same honest
-// pattern already used for Premium billing (PlansSection.tsx) and the
-// removed "Earn Stars" row (GeneralSection.tsx) — no dummy controls that
-// look functional but aren't.
+// STREAMING QUALITY IS NOW REAL. The two quality selects were previously
+// disabled "Coming soon" stubs writing to provider fields nothing read.
+// They now feed the max-resolution cap passed straight to the Mux player
+// (see the maxResolution prop in VideoPlayer.tsx / ShortsPageContent.tsx),
+// so choosing 720p genuinely stops higher renditions being fetched — it is
+// a real bandwidth control, not a label.
+//
+// Resolutions above 1080p are Premium-only (app/lib/premium.ts). The
+// options stay VISIBLE to free viewers rather than being hidden, marked
+// with a lock, because a paywall you can't see isn't an upsell — but
+// picking one does nothing for a free account: effectiveMaxResolution()
+// clamps it server-tier-side, so it cannot be defeated from the browser.
+//
+// Audio Quality, Autoplay, PiP, resume position, skip intro and background
+// playback remain genuinely unbuilt — each needs real player engineering
+// that doesn't exist yet. They stay disabled and labelled rather than
+// silently doing nothing when touched.
 export default function PlaybackSection() {
   const { playback, updatePlayback } = useSettings();
+  const premium = usePremium();
+
+  // Labels carry a lock for anything above the free ceiling, so the reason a
+  // choice won't stick is visible on the control itself rather than only
+  // discovered afterwards.
+  const qualityOptionLabels = QUALITY_OPTIONS.map((option) =>
+    option.value !== "auto" && requiresPremium(option.value) && !premium.premium
+      ? `${option.label} — Premium`
+      : option.label
+  );
+
+  // Maps a displayed label back to the stored value. Kept explicit rather
+  // than parsing the label, so the " — Premium" suffix can change freely.
+  const labelToValue = (label: string) => {
+    const index = qualityOptionLabels.indexOf(label);
+    return index >= 0 ? QUALITY_OPTIONS[index].value : "auto";
+  };
+  const valueToLabel = (value: string) => {
+    const index = QUALITY_OPTIONS.findIndex((o) => o.value === normalizeQuality(value));
+    return index >= 0 ? qualityOptionLabels[index] : qualityOptionLabels[0];
+  };
 
   return (
     <SettingsCard
@@ -55,44 +87,50 @@ export default function PlaybackSection() {
 
         <SettingsRow
           icon={<Smartphone size={20} />}
-          title="Mobile Streaming"
-          description="Coming soon — quality while using mobile data."
+          title="Shorts & mobile quality"
+          description={
+            premium.premium
+              ? "Caps the quality used in the Shorts feed. Auto uses the best your connection allows."
+              : `Caps the quality used in the Shorts feed. Free accounts stream up to 1080p.`
+          }
         >
           <SettingsSelect
-            value={playback.mobileQuality}
-            onChange={(value) => updatePlayback({ mobileQuality: value })}
-            options={[
-              "Auto",
-              "480p",
-              "720p",
-              "1080p",
-            ]}
-            disabled
+            value={valueToLabel(playback.mobileQuality)}
+            onChange={(label) => updatePlayback({ mobileQuality: labelToValue(label) })}
+            options={qualityOptionLabels}
           />
         </SettingsRow>
 
         <SettingsRow
           icon={<Wifi size={20} />}
-          title="Wi-Fi Streaming"
-          description="Coming soon — quality while connected to Wi-Fi."
+          title="Video quality"
+          description={
+            premium.premium
+              ? "Caps the quality on watch pages. Auto streams up to 4K Ultra HD."
+              : "Caps the quality on watch pages. Free accounts stream up to 1080p — 2K and 4K need Premium."
+          }
         >
           <SettingsSelect
-            value={playback.wifiQuality}
-            onChange={(value) => updatePlayback({ wifiQuality: value })}
-            options={[
-              "720p",
-              "1080p",
-              "1440p",
-              "Ultra HD (4K)",
-            ]}
-            disabled
+            value={valueToLabel(playback.wifiQuality)}
+            onChange={(label) => updatePlayback({ wifiQuality: labelToValue(label) })}
+            options={qualityOptionLabels}
           />
         </SettingsRow>
+
+        {!premium.premium && premium.ready && (
+          <p className="flex items-start gap-2 px-5 text-xs leading-5 text-slate-500">
+            <Lock size={13} className="mt-0.5 flex-shrink-0 text-orange-400" />
+            <span>
+              Your account streams up to 1080p (Full HD). 1440p and 4K Ultra HD
+              are part of InPlayer Premium — see Plans &amp; Purchases.
+            </span>
+          </p>
+        )}
 
         <SettingsRow
           icon={<Volume2 size={20} />}
           title="Audio Quality"
-          description="Coming soon — preferred streaming audio quality."
+          description="Not available yet — uploads are transcoded to a single audio ladder, so there is nothing to choose between."
         >
           <SettingsSelect
             value={playback.audioQuality}
@@ -113,7 +151,7 @@ export default function PlaybackSection() {
         <SettingsRow
           icon={<PlayCircle size={20} />}
           title="Autoplay Next Video"
-          description="Coming soon — automatically continue watching."
+          description="Not available yet — needs an up-next queue, which the watch page doesn\u2019t have."
         >
           <SettingsToggle
             checked={playback.autoplay}
@@ -125,7 +163,7 @@ export default function PlaybackSection() {
         <SettingsRow
           icon={<PictureInPicture2 size={20} />}
           title="Picture in Picture"
-          description="Coming soon — continue watching while using other apps."
+          description="Not available yet — your browser\u2019s own picture-in-picture button already does this from the player."
         >
           <SettingsToggle
             checked={playback.pip}
@@ -163,22 +201,31 @@ export default function PlaybackSection() {
   />
 </SettingsRow>
 
+{/* Real, and on by default. VideoPlayer.tsx saves a position per video
+    while you watch and offers to resume next time — see
+    app/lib/playbackPositions.ts. Turning this off both stops new saves
+    and clears everything already stored. */}
 <SettingsRow
   icon={<History size={20} />}
-  title="Remember Playback Position"
-  description="Coming soon — resume videos where you left off."
+  title="Remember playback position"
+  description="Pick up long videos where you left off."
 >
   <SettingsToggle
     checked={playback.rememberPosition}
-    onChange={(checked) => updatePlayback({ rememberPosition: checked })}
-    disabled
+    onChange={(checked) => {
+      updatePlayback({ rememberPosition: checked });
+      // Turning it off has to actually forget what was already saved —
+      // otherwise "off" just means "stop adding to the pile", and old
+      // positions keep resuming, which is the opposite of what was asked.
+      if (!checked) clearAllPlaybackPositions();
+    }}
   />
 </SettingsRow>
 
 <SettingsRow
   icon={<FastForward size={20} />}
   title="Skip Intro Automatically"
-  description="Coming soon — skip intros when available."
+  description="Not available yet — needs automatic intro detection, which nothing generates at upload."
 >
   <SettingsToggle
     checked={playback.skipIntro}
@@ -190,7 +237,7 @@ export default function PlaybackSection() {
 <SettingsRow
   icon={<PlayCircle size={20} />}
   title="Background Playback"
-  description="Coming soon — continue playing while using other apps."
+  description="Not available on the web — browsers stop playback when a tab is backgrounded. Planned for the app."
 >
   <SettingsToggle
     checked={playback.backgroundPlayback}

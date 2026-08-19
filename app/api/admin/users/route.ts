@@ -14,6 +14,8 @@ export interface AdminUserRow {
   avatarUrl: string | null;
   createdAt: string | null;
   isSuspended: boolean;
+  /** ISO expiry of InPlayer Premium, or null. See app/lib/premium.ts. */
+  premiumUntil: string | null;
   email: string | null;
 }
 
@@ -25,6 +27,9 @@ function toRow(item: Record<string, unknown>): AdminUserRow {
     avatarUrl: (item.avatarUrl as string) || null,
     createdAt: (item.createdAt as string) || null,
     isSuspended: item.isSuspended === true,
+    // Surfaced so an admin can see, and change, who actually has Premium —
+    // previously the only way to set it was editing DynamoDB by hand.
+    premiumUntil: (item.premiumUntil as string) || null,
     // Filled in afterward by attachEmails() — Cognito is the only place
     // InPlayer stores real email addresses, so this starts null and gets
     // hydrated with one ListUsers-by-sub lookup per row.
@@ -44,7 +49,7 @@ async function attachEmails(rows: AdminUserRow[]): Promise<AdminUserRow[]> {
 }
 
 const USER_PROJECTION =
-  "userId, username, #n, avatarUrl, createdAt, isSuspended";
+  "userId, username, #n, avatarUrl, createdAt, isSuspended, premiumUntil";
 const USER_PROJECTION_NAMES = { "#n": "name" };
 
 // Free-text search: real accounts only, matched by username (InPlayer's

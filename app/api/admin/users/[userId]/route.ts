@@ -38,9 +38,66 @@ export async function PATCH(
   }
 
   const body = await request.json().catch(() => null);
-  if (!body || typeof body.isSuspended !== "boolean") {
+  if (!body || typeof body !== "object") {
+    return NextResponse.json({ error: "Invalid request body." }, { status: 400 });
+  }
+
+  // ── Grant / revoke InPlayer Premium ─────────────────────────────────
+  //
+  // Premium is stored as a single `premiumUntil` date on the user's row and
+  // read by app/lib/premium.ts's isPremiumFromRecord — anything absent,
+  // expired or unparseable is simply "free". Billing isn't wired up yet
+  // (nothing charges anyone), so until it is, this is how an account
+  // actually becomes Premium; without it the only way was editing DynamoDB
+  // by hand, which isn't a thing to ask of whoever is running the site.
+  //
+  // When billing does land, the Razorpay webhook writes this same field and
+  // nothing else has to change.
+  if (typeof body.premiumMonths === "number" || body.premium === false) {
+    let premiumUntil: string | null = null;
+
+    if (body.premium !== false) {
+      const months = Math.max(1, Math.min(120, Math.floor(body.premiumMonths)));
+      const expiry = new Date();
+      // setMonth handles year rollover and clamps day-of-month itself, so
+      // granting 1 month on the 31st lands correctly in a 30-day month.
+      expiry.setMonth(expiry.getMonth() + months);
+      premiumUntil = expiry.toISOString();
+    }
+
+    await docClient.send(
+      new UpdateCommand({
+        TableName: "InPlayer-Users",
+        Key: { userId },
+        // Revoking REMOVEs the attribute rather than writing a past date —
+        // a stale date left lying around reads as "was premium until X",
+        // which is misleading when it was actually revoked.
+        UpdateExpression: premiumUntil
+          ? "SET premiumUntil = :p, updatedAt = :u"
+          : "REMOVE premiumUntil SET updatedAt = :u",
+        ExpressionAttributeValues: premiumUntil
+          ? { ":p": premiumUntil, ":u": new Date().toISOString() }
+          : { ":u": new Date().toISOString() },
+      })
+    );
+
+    await logAdminAction({
+      request,
+      adminId: admin.userId,
+      adminEmail: admin.email,
+      action: premiumUntil ? "premium.grant" : "premium.revoke",
+      targetType: "user",
+      targetId: userId,
+      details: premiumUntil ? `Premium until ${premiumUntil}` : "Premium revoked",
+    });
+
+    return NextResponse.json({ success: true, premiumUntil });
+  }
+
+  // ── Suspend / unsuspend ─────────────────────────────────────────────
+  if (typeof body.isSuspended !== "boolean") {
     return NextResponse.json(
-      { error: "isSuspended (true/false) is required." },
+      { error: "isSuspended (true/false) or premiumMonths is required." },
       { status: 400 }
     );
   }

@@ -8,7 +8,7 @@ import { useSettings } from "@/app/components/settings/SettingsProvider";
 import { cssFilterFor, type VideoLookFilter } from "@/app/lib/videoFilters";
 import { soundtrackClipSeconds } from "@/app/data/soundtracks";
 import { usePremium } from "@/app/hooks/usePremium";
-import { effectiveMaxResolution, normalizeQuality } from "@/app/lib/premium";
+import { effectiveMaxResolution, preferredResolution } from "@/app/lib/premium";
 import {
   getPlaybackPosition,
   savePlaybackPosition,
@@ -1126,18 +1126,12 @@ export default function VideoPlayer({
         // effectiveMaxResolution() additionally clamps whatever the viewer
         // picked in Settings > Playback down to what their tier allows.
         //
-        // Spread through a loosely-typed object on purpose: mux-player
-        // exposes this as `maxResolution`, and typing it inline would make a
-        // future rename in that package a hard build failure on a prop that
-        // is a nice-to-have, not load-bearing.
-        {...({
-          maxResolution: effectiveMaxResolution(
-            premium.premium,
-            normalizeQuality(playback.wifiQuality) === "auto"
-              ? null
-              : normalizeQuality(playback.wifiQuality)
-          ),
-        } as Record<string, string>)}
+        // Passed as a real, typed prop. `maxResolution` and its exact value
+        // union were verified against the installed @mux/playback-core types
+        // rather than assumed, so the compiler now guards this: if the prop
+        // is ever renamed the build fails loudly instead of the cap silently
+        // ceasing to apply.
+        maxResolution={effectiveMaxResolution(premium.premium, preferredResolution(playback.wifiQuality))}
         playbackRates={[0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2]}
         // "any": try to autoplay WITH sound first; if the browser blocks
         // that, Mux automatically retries muted instead of giving up.

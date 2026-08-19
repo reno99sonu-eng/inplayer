@@ -67,7 +67,9 @@ type AuditAction =
   | "hammart_product.restore"
   | "sponsorship.activate"
   | "sponsorship.cancel"
-  | "sponsorship.banner_assets_uploaded";
+  | "sponsorship.banner_assets_uploaded"
+  | "premium.grant"
+  | "premium.revoke";
 
 type AuditDomain = "inplayer" | "hammart" | "sponsorship";
 
@@ -137,6 +139,8 @@ const ACTION_META: Record<
   "sponsorship.activate": { label: "Activated a sponsorship", icon: ShieldCheck, tone: "emerald" },
   "sponsorship.cancel": { label: "Cancelled a sponsorship", icon: ShieldX, tone: "red" },
   "sponsorship.banner_assets_uploaded": { label: "Uploaded sponsor banner assets", icon: Megaphone, tone: "sky" },
+  "premium.grant": { label: "Granted InPlayer Premium", icon: ShieldCheck, tone: "emerald" },
+  "premium.revoke": { label: "Revoked InPlayer Premium", icon: ShieldX, tone: "amber" },
 };
 
 // Which admin panel each log belongs to. Previously every panel's actions

@@ -16,15 +16,24 @@
 // and its enforcement are real and testable now, and turning billing on
 // later only has to write that one field.
 
-/** Mux rendition ladder actually produced for uploads — see the
- *  max_resolution_tier request in app/api/upload/create/route.ts and the
- *  ladder recorded in app/api/webhooks/mux/route.ts. */
-export type PlaybackResolution = "480p" | "540p" | "720p" | "1080p" | "1440p" | "2160p";
+// The values Mux Player's `maxResolution` prop actually accepts. Verified
+// against the installed package, not assumed:
+//   @mux/playback-core/dist/types/types.d.ts →
+//     MaxResolution = { upTo720p: "720p", upTo1080p: "1080p",
+//                       upTo1440p: "1440p", upTo2160p: "2160p" }
+//
+// NOTE there is deliberately no 480p or 540p here even though Mux encodes
+// those renditions. They are valid MIN resolutions but not valid MAX ones —
+// passing "480p" as a cap is rejected by the player, which would silently
+// leave that choice uncapped. An earlier version of this file offered 480p
+// in the quality menu for exactly that reason; don't add it back.
+export type PlaybackResolution = "720p" | "1080p" | "1440p" | "2160p";
+
+/** What a viewer picked in Settings — a real cap, or "let the tier decide". */
+export type QualityChoice = PlaybackResolution | "auto";
 
 /** Ordered worst → best, so a cap can be compared numerically. */
 export const RESOLUTION_ORDER: PlaybackResolution[] = [
-  "480p",
-  "540p",
   "720p",
   "1080p",
   "1440p",
@@ -84,17 +93,27 @@ export function isPremiumFromRecord(
 }
 
 /** Options offered by the quality selects, with whether each needs Premium. */
-export const QUALITY_OPTIONS: { value: PlaybackResolution | "auto"; label: string }[] = [
+export const QUALITY_OPTIONS: { value: QualityChoice; label: string }[] = [
   { value: "auto", label: "Auto" },
-  { value: "480p", label: "480p" },
-  { value: "720p", label: "720p" },
+  { value: "720p", label: "720p (HD)" },
   { value: "1080p", label: "1080p (Full HD)" },
   { value: "1440p", label: "1440p (2K)" },
   { value: "2160p", label: "2160p (4K Ultra HD)" },
 ];
 
-export function normalizeQuality(raw: unknown): PlaybackResolution | "auto" {
+export function normalizeQuality(raw: unknown): QualityChoice {
   return QUALITY_OPTIONS.some((option) => option.value === raw)
-    ? (raw as PlaybackResolution | "auto")
+    ? (raw as QualityChoice)
     : "auto";
+}
+
+/** Settings value → the `preferred` argument effectiveMaxResolution wants.
+ *  "auto" (and anything unrecognised, including the old "Ultra HD (4K)" /
+ *  "Auto" labels stored by the previous version of the settings UI) becomes
+ *  null, i.e. "no preference, give me my tier's ceiling". Having this as its
+ *  own function rather than an inline ternary at each call site is what
+ *  keeps the union narrow enough for the compiler. */
+export function preferredResolution(raw: unknown): PlaybackResolution | null {
+  const choice = normalizeQuality(raw);
+  return choice === "auto" ? null : choice;
 }

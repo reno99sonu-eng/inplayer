@@ -8,6 +8,7 @@ import {
   Loader2,
   AlertTriangle,
   ShieldOff,
+  Crown,
   ShieldCheck,
   ExternalLink,
   UserRound,
@@ -27,8 +28,19 @@ interface AdminUserRow {
   createdAt: string | null;
   isSuspended: boolean;
   email: string | null;
+  /** ISO expiry of InPlayer Premium, or null if never granted / expired.
+   *  See app/lib/premium.ts — anything absent or past reads as free. */
+  premiumUntil: string | null;
 }
 
+
+// Mirrors isPremiumFromRecord in app/lib/premium.ts — an absent, expired or
+// unparseable date is simply not Premium.
+function isPremiumActive(premiumUntil: string | null): boolean {
+  if (!premiumUntil) return false;
+  const expiry = new Date(premiumUntil).getTime();
+  return Number.isFinite(expiry) && expiry > Date.now();
+}
 
 function formatDate(iso: string | null): string {
   if (!iso) return "Unknown";
@@ -378,6 +390,63 @@ export default function AdminUsersPage() {
     }
   };
 
+  // Grant or revoke InPlayer Premium. Premium is a single `premiumUntil`
+  // date on the user row (app/lib/premium.ts); billing isn't wired up yet,
+  // so until it is this is the only way an account becomes Premium — the
+  // alternative was editing DynamoDB by hand.
+  const togglePremium = async (userRow: AdminUserRow) => {
+    const label = userRow.username || userRow.name || "this user";
+    const active = isPremiumActive(userRow.premiumUntil);
+
+    let months = 12;
+    if (active) {
+      if (
+        !window.confirm(
+          `Revoke Premium for ${label}? They'll drop back to the free tier immediately — video quality capped at 1080p.`
+        )
+      ) {
+        return;
+      }
+    } else {
+      const answer = window.prompt(
+        `Grant Premium to ${label} for how many months?`,
+        "12"
+      );
+      if (answer === null) return;
+      const parsed = Math.floor(Number(answer));
+      if (!Number.isFinite(parsed) || parsed < 1) {
+        window.alert("Enter a whole number of months, 1 or more.");
+        return;
+      }
+      months = Math.min(parsed, 120);
+    }
+
+    setActioningId(userRow.userId);
+    try {
+      const res = await authedFetch(`/api/admin/users/${userRow.userId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(
+          active ? { premium: false } : { premiumMonths: months }
+        ),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || "Couldn't update Premium.");
+
+      setUsers((prev) =>
+        prev.map((u) =>
+          u.userId === userRow.userId
+            ? { ...u, premiumUntil: data.premiumUntil ?? null }
+            : u
+        )
+      );
+    } catch (err) {
+      window.alert(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setActioningId(null);
+    }
+  };
+
   const confirmDelete = async () => {
     if (!deletingUser) return;
     setDeleteBusy(true);
@@ -468,6 +537,14 @@ export default function AdminUsersPage() {
                         Suspended
                       </span>
                     )}
+                    {isPremiumActive(u.premiumUntil) && (
+                      <span
+                        className="shrink-0 rounded-full bg-orange-500/15 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-orange-300"
+                        title={`Premium until ${formatDate(u.premiumUntil)}`}
+                      >
+                        Premium
+                      </span>
+                    )}
                   </div>
                   <p className="truncate text-xs text-slate-400 light:text-slate-600">
                     {u.username ? `@${u.username}` : "No username yet"} · Joined{" "}
@@ -490,6 +567,24 @@ export default function AdminUsersPage() {
                     Profile
                   </Link>
                 )}
+                <button
+                  type="button"
+                  onClick={() => togglePremium(u)}
+                  disabled={actioningId === u.userId}
+                  title={
+                    isPremiumActive(u.premiumUntil)
+                      ? `Premium until ${formatDate(u.premiumUntil)}`
+                      : "Grant InPlayer Premium (4K streaming)"
+                  }
+                  className={`flex items-center gap-1.5 rounded-xl px-3 py-2 text-xs font-bold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                    isPremiumActive(u.premiumUntil)
+                      ? "bg-orange-500/20 text-orange-200 hover:bg-orange-500/30"
+                      : "bg-white/5 light:bg-black/5 text-slate-400 light:text-slate-600 hover:bg-orange-500/15 hover:text-orange-300"
+                  }`}
+                >
+                  <Crown size={13} />
+                  {isPremiumActive(u.premiumUntil) ? "Premium" : "Make Premium"}
+                </button>
                 <button
                   type="button"
                   onClick={() => toggleSuspend(u)}

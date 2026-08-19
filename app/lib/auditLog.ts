@@ -61,7 +61,9 @@ export type AuditAction =
   | "midroll_ad.delete"
   | "sponsorship.banner_assets_uploaded"
   | "sponsorship.activate"
-  | "sponsorship.cancel";
+  | "sponsorship.cancel"
+  | "premium.grant"
+  | "premium.revoke";
 
 export type AuditTargetType =
   | "user"

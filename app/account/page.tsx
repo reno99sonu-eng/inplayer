@@ -22,7 +22,7 @@ export default function AccountPage() {
   const menu = [
     { icon: UserCog, title: "Edit Profile", href: "/profile" },
     { icon: User, title: "Your Channel", href: "/my-videos" },
-    { icon: MessageCircle, title: "My Messages", href: "/messages" },
+    { icon: MessageCircle, title: "MilonBook", href: "/messages" },
     { icon: Settings, title: "Settings", href: "/settings" },
     { icon: HelpCircle, title: "Help & Support", href: "/help" },
   ];
@@ -61,7 +61,7 @@ export default function AccountPage() {
         <div className="flex flex-col items-center justify-center px-6 py-20 text-center">
           <h3 className="text-xl font-black">Sign in to InPlayer</h3>
           <p className="mt-2 text-sm text-slate-400 light:text-slate-600">
-          Access your channel, messages, history, and more.
+          Access your channel, MilonBook, history, and more.
           </p>
           <button
             onClick={openSignIn}

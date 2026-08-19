@@ -113,6 +113,21 @@ export function togglesFromMode(mode: AudienceMode): { showAdult: boolean; kidsO
   };
 }
 
+// Which mode changes actually need the 6-digit passkey.
+//
+// Only "all" does. It is the single mode that REVEALS something previously
+// hidden (18+), so it is the only one worth locking. "family" and "kids"
+// both narrow what is shown — a child flipping either of them can only ever
+// see less than they could a moment ago, so demanding a code there buys no
+// safety and just makes the control annoying to use.
+//
+// This is why the Kids switch in the hamburger has no passcode at all: both
+// of its directions ("kids" on, "family" off) are non-loosening. Turning
+// 18+ ON is the one action that stops and asks.
+export function modeRequiresPasskey(mode: AudienceMode): boolean {
+  return mode === "all";
+}
+
 // ── Backwards compatibility with the two older per-video flags ────────
 //
 // Before this, a video carried TWO independent booleans that could

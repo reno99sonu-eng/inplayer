@@ -14,8 +14,12 @@ interface PackageInfo {
   packageType: SponsorshipPackageType;
   label: string;
   sections: string[];
-  amountInr: number;
+  /** Absent for signed-out visitors — the packages API only returns the
+   *  figure once there's a session, and the grid never renders it either
+   *  way. It shows up on the checkout screen and nowhere else. */
+  amountInr?: number;
   description: string;
+  benefits: string[];
 }
 
 interface FormState {
@@ -74,20 +78,34 @@ export default function SponsorshipsPage() {
   // form just starts blank/session-prefilled in that case, same as before.
   const [profile, setProfile] = useState<FormState | null>(null);
 
+  // Refetched when the session changes, and authenticated once there is
+  // one: the endpoint withholds amountInr from anonymous callers, so the
+  // signed-in fetch is what puts the real figure in memory for the
+  // checkout screen. Waits for authLoading to settle first, otherwise the
+  // very first call always goes out anonymous and a just-signed-in sponsor
+  // reaches checkout with no price.
   useEffect(() => {
+    if (authLoading) return;
+    let cancelled = false;
     (async () => {
       try {
-        const res = await fetch("/api/sponsorships/packages");
+        const res = signedIn
+          ? await authedFetch("/api/sponsorships/packages")
+          : await fetch("/api/sponsorships/packages");
         const data = await res.json();
+        if (cancelled) return;
         setPackages(data.packages || []);
         setDurationDays(data.durationDays || 7);
       } catch (err) {
         console.error("Failed to load sponsorship packages:", err);
       } finally {
-        setLoadingPackages(false);
+        if (!cancelled) setLoadingPackages(false);
       }
     })();
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [signedIn, authLoading]);
 
   // Dashboard/Profile only make sense for a signed-in sponsor — if the
   // session ends while one of those tabs is open (sign-out, expired token),
@@ -210,6 +228,17 @@ export default function SponsorshipsPage() {
     }
   };
 
+  // Always read the figure off the CURRENT packages list rather than the
+  // snapshot captured in selectedPackage. Someone who lands signed-out and
+  // signs in mid-flow holds a snapshot with no amountInr; the list has been
+  // refetched with one by then. Undefined stays renderable ("—" / "Continue
+  // to payment") because the server prices the order anyway — the display
+  // figure is never what's charged.
+  const checkoutAmountInr = selectedPackage
+    ? packages.find((p) => p.packageType === selectedPackage.packageType)?.amountInr ??
+      selectedPackage.amountInr
+    : undefined;
+
   return (
     <div className="mx-auto max-w-[900px] px-4 py-6 sm:px-6 lg:px-8">
       <BackButton />
@@ -300,16 +329,28 @@ export default function SponsorshipsPage() {
                       </span>
                     ))}
                   </div>
-                  <div className="mt-4 flex items-baseline gap-1.5">
-                    <span className="text-2xl font-black text-white light:text-slate-900">₹{pkg.amountInr.toLocaleString("en-IN")}</span>
-                    <span className="text-xs font-semibold text-slate-400 light:text-slate-600">/ {durationDays} days</span>
-                  </div>
+                  {/* What you get, not what it costs. The price is
+                      deliberately absent here for everyone, signed in or
+                      not — it appears on the checkout screen once a
+                      package has actually been picked. */}
+                  <ul className="mt-4 flex-1 space-y-1.5">
+                    {pkg.benefits.map((benefit) => (
+                      <li key={benefit} className="flex items-start gap-2 text-xs leading-5 text-slate-300 light:text-slate-700">
+                        <Check size={13} className="mt-0.5 flex-shrink-0 text-orange-400 light:text-orange-600" />
+                        <span>{benefit}</span>
+                      </li>
+                    ))}
+                  </ul>
+
                   <button
                     onClick={() => startCheckout(pkg)}
                     className="mt-4 w-full rounded-xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-4 py-2.5 text-sm font-bold text-white shadow-md transition-all duration-300 hover:scale-[1.02] hover:shadow-orange-500/30 active:scale-95"
                   >
-                    Sponsor Now
+                    {signedIn ? "Continue — see pricing" : "Sign in to sponsor"}
                   </button>
+                  <p className="mt-2 text-center text-[10px] font-semibold text-slate-500">
+                    Pricing shown at checkout · {durationDays}-day run
+                  </p>
                 </div>
               ))}
             </div>
@@ -341,7 +382,11 @@ export default function SponsorshipsPage() {
                 <p className="text-base font-black text-white light:text-slate-900">{selectedPackage.label}</p>
                 <p className="text-xs font-medium text-slate-400 light:text-slate-600">{durationDays} days campaign</p>
               </div>
-              <p className="text-2xl font-black text-white light:text-slate-900">₹{selectedPackage.amountInr.toLocaleString("en-IN")}</p>
+              <p className="text-2xl font-black text-white light:text-slate-900">
+                {checkoutAmountInr === undefined
+                  ? "—"
+                  : `₹${checkoutAmountInr.toLocaleString("en-IN")}`}
+              </p>
             </div>
 
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -382,7 +427,11 @@ export default function SponsorshipsPage() {
               className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-4 py-3.5 text-sm font-black text-white shadow-lg transition-all duration-300 hover:scale-[1.02] hover:shadow-orange-500/30 disabled:opacity-60 active:scale-95"
             >
               {submitting ? <Loader2 size={18} className="animate-spin" /> : <Check size={18} />}
-              {submitting ? "Opening payment gateway…" : `Pay ₹${selectedPackage.amountInr.toLocaleString("en-IN")}`}
+              {submitting
+                ? "Opening payment gateway…"
+                : checkoutAmountInr === undefined
+                  ? "Continue to payment"
+                  : `Pay ₹${checkoutAmountInr.toLocaleString("en-IN")}`}
             </button>
           </div>
         </div>

@@ -10,6 +10,7 @@ import NavbarSearch from "./NavbarSearch";
 import NavbarActions from "./NavbarActions";
 import NavbarProfile from "./NavbarProfile";
 import MobileMenu from "./MobileMenu";
+import ContentAccessMenu from "./ContentAccessMenu";
 import NavigationCategories from "./NavigationCategories";
 import MobileSearchOverlay from "./MobileSearchOverlay";
 import { useRouter, usePathname } from "next/navigation";
@@ -713,6 +714,16 @@ lg:right-auto
               </button>
 
             </div>
+
+            {/* Content access — the 18+ / Kids-only switches, moved here out
+                of Settings. They belong at the top of the drawer, not buried
+                in a settings tab: deciding "this device is being handed to a
+                child right now" has to be one tap away or it doesn't get
+                used. Everything about the pair (single underlying mode,
+                passkey only on the 18+ unlock) lives in
+                ContentAccessMenu.tsx. */}
+            <div className="my-3 border-t border-white/10 light:border-black/10" />
+            <ContentAccessMenu />
 
             {signedIn && (
               <>

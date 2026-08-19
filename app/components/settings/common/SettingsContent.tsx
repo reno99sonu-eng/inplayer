@@ -43,12 +43,11 @@ export default function SettingsContent({
           return <PrivacySection />;
 
     case "payments":
-      // A real, fully-built Plans & Purchases section (real free-vs-Premium
-      // feature comparison, honest "Premium billing launches soon" state on
-      // the actual paid tier — see PlansSection.tsx) existed in the codebase
-      // but was never wired up here, so every visitor saw this generic,
-      // contentless placeholder instead. Not a "coming soon" case at all —
-      // the section was done, just not connected.
+      // A real, fully-built Plans & Purchases section existed in the
+      // codebase but was never wired up here, so every visitor saw a
+      // generic, contentless placeholder instead. It now also SELLS
+      // Premium — real Razorpay order, granted by the signed webhook. See
+      // PlansSection.tsx.
       return <PlansSection />;
 
     case "analytics":

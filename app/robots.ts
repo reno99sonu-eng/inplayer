@@ -17,6 +17,7 @@ export default function robots(): MetadataRoute.Robots {
         "/account",
         "/settings",
         "/messages",
+        "/milonbook",
         "/upload",
         "/my-videos",
         "/liked-videos",

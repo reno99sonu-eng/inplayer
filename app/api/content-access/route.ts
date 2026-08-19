@@ -8,11 +8,20 @@ import {
   AUDIENCE_COOKIE_MAX_AGE,
   DEFAULT_AUDIENCE_MODE,
   isValidPasskey,
+  modeRequiresPasskey,
   normalizeAudienceMode,
 } from "@/app/lib/contentAccess";
 
 // The 6-digit passkey that guards who can change what content is shown —
-// the lock behind Settings > General's 18+ / Kids-only toggles.
+// the lock behind the 18+ switch in the hamburger drawer
+// (app/components/ContentAccessMenu.tsx).
+//
+// WHAT IS AND ISN'T LOCKED: only turning 18+ ON. Switching to "kids" or
+// back to "family" needs no passkey and no account at all, because both
+// show strictly LESS than "all" — a code there would protect nothing while
+// making the safest setting the most awkward to reach. modeRequiresPasskey()
+// in app/lib/contentAccess.ts is the single definition of that line, shared
+// by this route and the UI.
 //
 // WHY THE PASSKEY LIVES ON THE ACCOUNT, NOT THE DEVICE: a parental control
 // stored in localStorage is defeated by clearing site data. This stores
@@ -82,7 +91,50 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({ mode, hasPasskey });
 }
 
+function audienceCookieResponse(mode: string) {
+  const response = NextResponse.json({ ok: true, mode });
+  response.cookies.set({
+    name: AUDIENCE_COOKIE,
+    value: mode,
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/",
+    maxAge: AUDIENCE_COOKIE_MAX_AGE,
+  });
+  return response;
+}
+
 export async function POST(request: NextRequest) {
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body !== "object") {
+    return NextResponse.json({ error: "Invalid request." }, { status: 400 });
+  }
+
+  const { action } = body as { action?: string };
+
+  // ── Narrowing a mode needs no account and no passkey ───────────────
+  //
+  // Handled BEFORE the sign-in check on purpose. "family" and "kids" both
+  // show strictly less than the browser could see a moment ago (see
+  // modeRequiresPasskey), and the person most likely to want the Kids
+  // switch — a parent handing over an unlocked phone — is often not signed
+  // in at all. Gating it behind an account would make the safest setting
+  // the hardest one to reach.
+  //
+  // Unlocking 18+ still falls through to the authenticated branch below.
+  if (action === "set_mode") {
+    const requestedMode = normalizeAudienceMode((body as { mode?: unknown }).mode);
+    if (!modeRequiresPasskey(requestedMode)) {
+      return audienceCookieResponse(requestedMode);
+    }
+  }
+
+  // Same reasoning: dropping back to the safe default only ever restricts.
+  if (action === "reset_mode") {
+    return audienceCookieResponse(DEFAULT_AUDIENCE_MODE);
+  }
+
   let user;
   try {
     user = await verifyAuth(request);
@@ -93,12 +145,6 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const body = await request.json().catch(() => null);
-  if (!body || typeof body !== "object") {
-    return NextResponse.json({ error: "Invalid request." }, { status: 400 });
-  }
-
-  const { action } = body as { action?: string };
   const existing = await readPasskeyRecord(user.userId);
 
   // ── Create or change the passkey ───────────────────────────────────
@@ -148,10 +194,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, hasPasskey: true });
   }
 
-  // ── Change what this browser is allowed to see ─────────────────────
+  // ── Unlock 18+ ─────────────────────────────────────────────────────
+  // Only reached for modes modeRequiresPasskey() says are loosening —
+  // every narrowing mode already returned above.
   if (action === "set_mode") {
-    const { mode: rawMode, passkey } = body as { mode?: unknown; passkey?: unknown };
-    const mode = normalizeAudienceMode(rawMode);
+    const { passkey } = body as { passkey?: unknown };
+    const mode = normalizeAudienceMode((body as { mode?: unknown }).mode);
 
     if (!existing) {
       return NextResponse.json(
@@ -164,34 +212,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "That passkey is incorrect." }, { status: 403 });
     }
 
-    const response = NextResponse.json({ ok: true, mode });
-    response.cookies.set({
-      name: AUDIENCE_COOKIE,
-      value: mode,
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: AUDIENCE_COOKIE_MAX_AGE,
-    });
-    return response;
-  }
-
-  // ── Drop back to the safe default ──────────────────────────────────
-  // No passkey needed: this only ever makes things MORE restrictive, and
-  // it's the escape hatch if someone forgets their code.
-  if (action === "reset_mode") {
-    const response = NextResponse.json({ ok: true, mode: DEFAULT_AUDIENCE_MODE });
-    response.cookies.set({
-      name: AUDIENCE_COOKIE,
-      value: DEFAULT_AUDIENCE_MODE,
-      httpOnly: true,
-      sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
-      path: "/",
-      maxAge: AUDIENCE_COOKIE_MAX_AGE,
-    });
-    return response;
+    return audienceCookieResponse(mode);
   }
 
   return NextResponse.json({ error: "Unknown action." }, { status: 400 });

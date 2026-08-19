@@ -21,6 +21,8 @@ import { getOrder, markOrderPaid, markOrderPaymentFailed } from "@/app/lib/hamma
 import { orderTotalInr } from "@/app/lib/hammartOrderMath";
 import { sendEmail } from "@/app/lib/ses";
 import { getSponsorship, markSponsorshipPaid, markSponsorshipPaymentFailed } from "@/app/lib/sponsorships";
+import { grantPremiumFromPayment } from "@/app/lib/premiumBilling";
+import { PREMIUM_PLANS, isPremiumPlanId } from "@/app/lib/premiumPlans";
 import { sendOrderConfirmationMessage, sendVendorOrderMessage } from "@/app/lib/whatsapp";
 
 // This is the ONLY place real money ever gets credited to a creator's
@@ -97,6 +99,7 @@ export async function POST(request: NextRequest) {
       case "payment.captured":
         await handleHammartPaymentCaptured(event.payload);
         await handleSponsorshipPaymentCaptured(event.payload);
+        await handlePremiumPaymentCaptured(event.payload);
         break;
       case "payment.failed":
         await handleHammartPaymentFailed(event.payload);
@@ -550,4 +553,54 @@ async function handleAccountStatusChanged(payload: RazorpayWebhookPayload["paylo
   if (justActivated) {
     await notifyVendorPayoutsActive(userId);
   }
+}
+
+// ── InPlayer Premium ───────────────────────────────────────────────────
+//
+// app/api/premium/checkout/route.ts stamps every Premium Order's notes with
+// { type: "premium", planId, userId }. Like the sponsorship handler above,
+// this is a safe no-op for every other payment.captured event — Hammart
+// orders, memberships and sponsorships all fall straight through the note
+// check.
+//
+// There is no payment.failed counterpart on purpose: a failed Premium
+// payment leaves nothing to roll back. The user simply isn't Premium, which
+// is already the state they were in. Sponsorships need one only because a
+// pending order row exists to be marked failed.
+async function handlePremiumPaymentCaptured(payload: RazorpayWebhookPayload["payload"]) {
+  const paymentEntity = payload.payment?.entity;
+  if (!paymentEntity || paymentEntity.status !== "captured") return;
+
+  const notes = paymentEntity.notes;
+  if (notes?.type !== "premium") return;
+
+  const { planId, userId } = notes;
+  if (!isPremiumPlanId(planId) || !userId) {
+    console.error(
+      `razorpay webhook: premium payment ${paymentEntity.id} has unusable notes`,
+      notes
+    );
+    return;
+  }
+
+  const outcome = await grantPremiumFromPayment({
+    userId,
+    planId,
+    paymentId: paymentEntity.id,
+  });
+
+  if (outcome === "failed") {
+    console.error(
+      `razorpay webhook: PAID BUT NOT GRANTED — premium payment ${paymentEntity.id} for user ${userId} (${planId}). Grant manually in Admin -> Users.`
+    );
+    return;
+  }
+  if (outcome === "duplicate") {
+    // Webhook redelivery for a payment already honoured. Nothing to do.
+    return;
+  }
+
+  console.log(
+    `razorpay webhook: granted ${PREMIUM_PLANS[planId].durationDays} days of Premium to ${userId} (payment ${paymentEntity.id})`
+  );
 }

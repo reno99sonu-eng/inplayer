@@ -42,8 +42,19 @@ export interface SponsorshipPackage {
   sections: SponsorshipSection[];
   amountInr: number;
   description: string;
+  /** What a sponsor GETS. This is what the public pricing grid shows in
+   *  place of the price — see the note on amountInr below. */
+  benefits: string[];
 }
 
+// WHERE THE PRICE IS ALLOWED TO APPEAR: nowhere public. The packages API
+// strips amountInr for unauthenticated callers, and the pricing grid never
+// renders it at all — a visitor sees `benefits` instead, and the figure
+// only appears on the checkout screen, once they have signed in and picked
+// a package. Same principle already applied to SPONSORSHIP_ASSET_SPECS
+// below: a sponsor learns the commercial detail when they commit, not from
+// a public rate card competitors can read.
+//
 // Pricing exactly as specified — the "bundle" (all three sections) is
 // priced at a flat ₹7,000 even though buying the three individual sections
 // separately would total ₹6,100. That's an intentional business call (a
@@ -57,6 +68,13 @@ export const SPONSORSHIP_PACKAGES: Record<SponsorshipPackageType, SponsorshipPac
     sections: ["midroll", "homepage_banner", "watch_banner"],
     amountInr: 7000,
     description: "Your ad runs in all three placements below — mid-roll video, homepage banner, and watch-page banner — for 7 days.",
+    benefits: [
+      "Runs in all three placements at once — mid-roll, homepage banner and watch-page banner",
+      "The widest reach InPlayer sells: every visitor, every watch page, every video break",
+      "One creative set, one invoice, one 7-day window",
+      "Cheaper than buying the three placements separately",
+      "Live views and clicks in your Sponsorship Dashboard",
+    ],
   },
   midroll: {
     packageType: "midroll",
@@ -64,6 +82,12 @@ export const SPONSORSHIP_PACKAGES: Record<SponsorshipPackageType, SponsorshipPac
     sections: ["midroll"],
     amountInr: 2500,
     description: "Your video plays as a full-screen mid-roll break inside InPlayer videos for 7 days.",
+    benefits: [
+      "A full-screen break inside videos people are already watching",
+      "Plays in the same slot as InPlayer's own ads — not a sidebar people scroll past",
+      "Your video, your link, 7 days",
+      "Live views and clicks in your Sponsorship Dashboard",
+    ],
   },
   homepage_banner: {
     packageType: "homepage_banner",
@@ -71,6 +95,12 @@ export const SPONSORSHIP_PACKAGES: Record<SponsorshipPackageType, SponsorshipPac
     sections: ["homepage_banner"],
     amountInr: 1800,
     description: "Your creative rotates in the homepage banner slot for 7 days.",
+    benefits: [
+      "Front page — seen by everyone who opens InPlayer, signed in or not",
+      "Rotates in the same banner slot InPlayer uses for its own campaigns",
+      "Your creative, your link, 7 days",
+      "Live views and clicks in your Sponsorship Dashboard",
+    ],
   },
   watch_banner: {
     packageType: "watch_banner",
@@ -78,6 +108,12 @@ export const SPONSORSHIP_PACKAGES: Record<SponsorshipPackageType, SponsorshipPac
     sections: ["watch_banner"],
     amountInr: 1800,
     description: "Your creative rotates in the watch-page banner slot for 7 days.",
+    benefits: [
+      "Sits beside the video on every watch page, where attention already is",
+      "Rotates in the same banner slot InPlayer uses for its own campaigns",
+      "Your creative, your link, 7 days",
+      "Live views and clicks in your Sponsorship Dashboard",
+    ],
   },
 };
 

@@ -436,7 +436,7 @@ export default function ConversationThreadPage() {
       <div className="flex min-h-screen flex-col items-center justify-center bg-[#06101D] light:bg-[#FAF5E9] px-6 text-center text-white light:text-slate-900">
         <p className="font-semibold">That conversation link isn&apos;t valid.</p>
         <Link href="/messages" className="mt-4 text-sm font-semibold text-orange-400">
-          Back to Messages
+          Back to MilonBook
         </Link>
       </div>
     );

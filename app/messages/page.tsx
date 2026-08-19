@@ -172,7 +172,7 @@ export default function MessagesPage() {
   if (!signedIn) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center bg-[#06101D] light:bg-[#FAF5E9] px-6 text-center text-white light:text-slate-900">
-        <h2 className="text-2xl font-black">Sign in to see your messages</h2>
+        <h2 className="text-2xl font-black">Sign in to open MilonBook</h2>
         <button
           onClick={openSignIn}
           className="mt-6 rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-8 py-3 font-bold text-white shadow-[0_15px_35px_rgba(255,153,0,.3)] transition-all hover:-translate-y-0.5"
@@ -196,7 +196,7 @@ export default function MessagesPage() {
         </button>
 
         <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-black">Messages</h1>
+          <h1 className="text-lg font-black">MilonBook</h1>
           <p className="text-sm text-slate-400 light:text-slate-600">
             {conversations.length} conversation{conversations.length === 1 ? "" : "s"}
           </p>
@@ -260,7 +260,7 @@ export default function MessagesPage() {
                 : "border border-white/10 light:border-black/10 text-slate-300 light:text-slate-700 hover:bg-white/5 light:hover:bg-black/5"
             }`}
           >
-            Messages
+            Chats
           </button>
           <button
             onClick={() => setTab("requests")}

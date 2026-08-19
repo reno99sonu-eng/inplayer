@@ -22,7 +22,7 @@ export default function AccountPage() {
   const menu = [
     { icon: UserCog, title: "Edit Profile", href: "/profile" },
     { icon: User, title: "Your Channel", href: "/my-videos" },
-    { icon: MessageCircle, title: "MilonBook", href: "/messages" },
+    { icon: MessageCircle, title: "My MilonBook", href: "/messages" },
     { icon: Settings, title: "Settings", href: "/settings" },
     { icon: HelpCircle, title: "Help & Support", href: "/help" },
   ];

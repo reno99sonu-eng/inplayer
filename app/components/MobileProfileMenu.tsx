@@ -38,7 +38,9 @@ export default function MobileProfileMenu({
     { label: "Your Channel", icon: User, href: "/my-videos" },
     { label: "My Profile", icon: User, href: "/profile" },
     { label: "Watchlist", icon: Heart, href: "/watchlist" },
-    { label: "Messages", icon: MessageSquare, href: "/messages" },
+    // Same rename as the desktop avatar menu (NavbarProfile.tsx) and the
+    // Account screen — the route stays /messages on purpose.
+    { label: "My MilonBook", icon: MessageSquare, href: "/messages" },
     { label: "Settings", icon: Settings, href: "/settings" },
   ];
 

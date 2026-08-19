@@ -4,6 +4,7 @@ import { after } from "next/server";
 import { docClient } from "@/app/lib/dynamodb";
 import { getVisibleVideos, getAudienceMode } from "@/app/lib/contentAccessServer";
 import { isVideoVisible, videoAudience } from "@/app/lib/contentAccess";
+import { buildVideoJsonLd, serializeJsonLd } from "@/app/lib/videoSchema";
 import { Lock } from "lucide-react";
 import { resolveUsernames } from "@/app/lib/resolveUsernames";
 import BackButton from "@/app/components/BackButton";
@@ -236,8 +237,50 @@ export default async function WatchPage({ params }: WatchPageProps) {
     ),
   ]);
 
+  // VideoObject structured data. Search Console reported "Discovered
+  // videos: 0" across the whole sitemap and "No video indexed" — with no
+  // markup, Google has no way to show a thumbnail, a duration badge or a
+  // play affordance beside an InPlayer result, which is what actually earns
+  // the click on a video search.
+  //
+  // Deliberately built HERE rather than in generateMetadata, past every gate
+  // above: by this line the video is known to exist, be un-moderated, to
+  // have finished processing, and to be visible to THIS request's audience
+  // mode. So the markup can only ever describe a video that is genuinely on
+  // the page Google received. buildVideoJsonLd additionally refuses
+  // members-only and 18+ videos outright — see its own comment for why each
+  // is unsafe.
+  const videoJsonLd = buildVideoJsonLd({
+    videoId,
+    title: video.title,
+    description: video.description,
+    uploadedAt: video.uploadedAt,
+    duration: video.duration,
+    views: video.views,
+    thumbnailUrl: video.thumbnailUrl,
+    // Same withholding rule as the player below: never publish a
+    // members-only video's public playback ID.
+    muxPlaybackId: video.membersOnly ? undefined : video.muxPlaybackId,
+    contentType: video.contentType,
+    uploaderName: video.uploaderName,
+    uploaderUsername,
+    membersOnly: !!video.membersOnly,
+    audience: videoAudience(video),
+  });
+
   return (
     <div className="mx-auto max-w-[1600px] px-3 py-4 lg:px-4 lg:py-8">
+      {videoJsonLd && (
+        <script
+          type="application/ld+json"
+          // serializeJsonLd, not JSON.stringify: the title and description
+          // are creator-supplied, and JSON.stringify leaves "<" intact — a
+          // video titled "</script><script>..." would otherwise break out
+          // of this block and run as page script. See videoSchema.ts.
+          dangerouslySetInnerHTML={{ __html: serializeJsonLd(videoJsonLd) }}
+        />
+      )}
+
       {/* Desktop/tablet only — removed from the video-playing screen on
           mobile per the current design pass. Untouched for the
           processing/error states above, and for every other BackButton

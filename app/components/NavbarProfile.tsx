@@ -45,7 +45,10 @@ export default function NavbarProfile() {
     { icon: User, title: "Your Channel", href: "/my-videos" },
     { icon: User, title: "My Profile", href: "/profile" },
     { icon: Heart, title: "Watchlist", href: "/watchlist" },
-    { icon: MessageSquare, title: "My Messages", href: "/messages" },
+    // MilonBook is the product name for what still routes as /messages —
+    // the route is deliberately unchanged (every deep link and notification
+    // points at it); /milonbook exists as an alias. See app/milonbook.
+    { icon: MessageSquare, title: "My MilonBook", href: "/messages" },
     { icon: Settings, title: "Settings", href: "/settings" },
     { icon: HelpCircle, title: "Help & Support", href: "/help" },
   ];

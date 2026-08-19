@@ -103,7 +103,7 @@ export default function WatchPageContent({ video, relatedVideos: initialRelatedV
       <div className={`grid grid-cols-1 gap-6 transition-all duration-500 ${theaterMode ? "" : "xl:grid-cols-[minmax(0,1fr)_360px]"}`}>
         <div className="min-w-0">
           <div id="watch-player" className={`group relative scroll-mt-5 ${isShort ? "mx-auto max-w-[420px]" : "-mx-3 lg:mx-0"}`}>
-            <div className={`overflow-hidden border-white/10 bg-black light:border-black/10 ${isShort ? "aspect-[9/16] rounded-3xl border shadow-2xl" : "rounded-none border-0 shadow-none lg:rounded-[28px] lg:border lg:shadow-[0_25px_70px_rgba(0,0,0,.4)]"} ${theaterMode ? "mx-auto max-w-[1300px]" : ""}`}>
+            <div className={`overflow-hidden border-white/10 bg-black light:border-black/10 ${isShort ? "aspect-[9/16] rounded-3xl border shadow-2xl" : "rounded-none border-0 shadow-none lg:rounded-[28px] lg:border lg:shadow-[0_25px_70px_rgba(0,0,0,.4)]"} ${theaterMode && !isShort ? "mx-auto max-w-[1300px]" : ""}`}>
               {showPlayer ? (
                 video.membersOnly ? (
                   <MembersOnlyVideoPlayer
@@ -113,6 +113,7 @@ export default function WatchPageContent({ video, relatedVideos: initialRelatedV
                     uploaderName={video.uploaderName}
                     soundtrack={video.soundtrack}
                     filterLook={video.filterLook}
+                    vertical={isShort}
                   />
                 ) : (
                   <VideoPlayer
@@ -121,17 +122,27 @@ export default function WatchPageContent({ video, relatedVideos: initialRelatedV
                     videoId={video.videoId}
                     soundtrack={video.soundtrack}
                     filterLook={video.filterLook}
+                    // A Raftaar/Short is 9:16. The frame above already
+                    // switches to aspect-[9/16] for one; this is what makes
+                    // the PLAYER fill that frame instead of rendering a
+                    // 16:9 strip at the top of it with the video
+                    // letterboxed to a sliver inside — the bug someone hit
+                    // by opening a Short's shared link.
+                    vertical={isShort}
                   />
                 )
               ) : (
-                <div className="flex aspect-video w-full flex-col items-center justify-center gap-4 bg-black px-6 text-center">
+                <div className={`flex w-full flex-col items-center justify-center gap-4 bg-black px-6 text-center ${isShort ? "h-full" : "aspect-video"}`}>
                   <div className="flex h-14 w-14 items-center justify-center rounded-full bg-red-500/15 text-red-400"><ShieldAlert size={26} /></div>
                   <div><p className="text-base font-bold text-white">Age-restricted video</p><p className="mt-1 max-w-sm text-sm text-slate-400">This video is intended for viewers 18 and older.</p></div>
                   <button onClick={() => setAgeConfirmed(true)} className="rounded-full bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-6 py-2.5 text-sm font-bold text-white shadow-[0_10px_25px_rgba(255,153,0,.3)] transition hover:-translate-y-0.5">I&apos;m 18 or older — continue</button>
                 </div>
               )}
             </div>
-            <button onClick={() => setTheaterMode((active) => !active)} title={theaterMode ? "Exit theater mode" : "Theater mode"} className="absolute right-3 top-3 z-10 hidden h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/65 text-white opacity-0 backdrop-blur transition hover:scale-110 hover:border-orange-400/50 group-hover:opacity-100 lg:flex">{theaterMode ? <Minimize2 size={17} /> : <Maximize2 size={17} />}</button>
+            {/* Theater mode is for widescreen video only. On a 9:16 Short the
+                same max-w-[1300px] would stretch the frame to ~2300px tall,
+                so the control simply isn't offered. */}
+            {!isShort && <button onClick={() => setTheaterMode((active) => !active)} title={theaterMode ? "Exit theater mode" : "Theater mode"} className="absolute right-3 top-3 z-10 hidden h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/65 text-white opacity-0 backdrop-blur transition hover:scale-110 hover:border-orange-400/50 group-hover:opacity-100 lg:flex">{theaterMode ? <Minimize2 size={17} /> : <Maximize2 size={17} />}</button>}
           </div>
 
           {/* Title + views/date/category, directly under the player — the

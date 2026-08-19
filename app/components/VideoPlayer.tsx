@@ -68,6 +68,19 @@ interface VideoPlayerProps {
   // behaviour for their (licensed) tracks.
   soundtrack?: { url: string; durationSeconds: number; source?: string | null } | null;
   filterLook?: VideoLookFilter;
+  // TRUE for a Raftaar/Short — a 9:16 video — opened on the watch page
+  // (the URL the Shorts feed's Share button hands out).
+  //
+  // Without this the player hardcoded aspect-ratio 16/9. Inside the watch
+  // page's aspect-[9/16] box that produced a 420x236 strip at the top of a
+  // 420x747 frame, with the vertical video letterboxed down to ~133px wide
+  // inside it — which is exactly the "cropped, doesn't fill the player"
+  // report. Vertical mode instead fills the container the way the Shorts
+  // feed does, so a shared link looks like the feed it came from.
+  //
+  // Defaults to false, so every ordinary 16:9 video keeps byte-for-byte the
+  // behaviour it had before.
+  vertical?: boolean;
 }
 
 // A chosen soundtrack now fully REPLACES a Video's own recorded audio,
@@ -151,6 +164,7 @@ export default function VideoPlayer({
   token,
   soundtrack,
   filterLook,
+  vertical = false,
 }: VideoPlayerProps) {
   const playerRef = useRef<MuxPlayerRefAttributes>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1073,9 +1087,15 @@ export default function VideoPlayer({
       // touch-action only suppresses the browser's native gesture handling,
       // never JS event delivery, so click/pointer events still reach both
       // our handlers and Mux's own shadow-DOM controls exactly as before.
+      // vertical-video is read by globals.css to switch the video surface to
+      // object-fit: cover (matching the Shorts feed) everywhere EXCEPT
+      // fullscreen, where the screen's shape is unpredictable and covering
+      // would crop a 9:16 video down to a slice. h-full w-full lets the
+      // player actually fill the aspect-[9/16] frame WatchPageContent draws
+      // around it instead of sitting as a short strip at the top of it.
       className={`premium-player relative touch-none overflow-hidden rounded-2xl bg-black ${
-        cssFullscreen ? "fake-fullscreen" : ""
-      }`}
+        vertical ? "vertical-video h-full w-full" : ""
+      } ${cssFullscreen ? "fake-fullscreen" : ""}`}
       onClickCapture={handlePlayerClickCapture}
       // Suppresses Chrome's native long-press "Copy video frame /
       // Picture-in-Picture" menu on the <video> inside Mux's shadow DOM —
@@ -1158,7 +1178,10 @@ export default function VideoPlayer({
         style={
           {
             width: "100%",
-            aspectRatio: "16 / 9",
+            // A fixed 16:9 frame for ordinary videos; a vertical one instead
+            // stretches to whatever height its 9:16 parent gives it. Setting
+            // BOTH would let aspect-ratio win and re-create the bug.
+            ...(vertical ? { height: "100%" } : { aspectRatio: "16 / 9" }),
             "--controls-backdrop-color": "rgba(0, 0, 0, 0.7)",
             // Netflix/YouTube-style left-half brightness swipe (see
             // handlePlayerPointerMove) combined with the creator's chosen

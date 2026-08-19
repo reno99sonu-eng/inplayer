@@ -901,6 +901,35 @@ animation: aiGlassSweep 5.5s linear infinite;
   }
 }
 
+/* ── Vertical (Raftaar / Short) video on the watch page ────────────────
+   A Short shared out of the Raftaar feed opens at /watch/<id>, where
+   WatchPageContent draws an aspect-[9/16] frame around the player and
+   VideoPlayer is given vertical={true}.
+
+   COVER, matching .shorts-player in the feed, so a shared link looks
+   exactly like the feed it came from. For genuinely 9:16 footage inside a
+   9:16 frame this crops nothing at all — it only matters for a Short shot
+   at some other ratio, which the feed already crops the same way.
+
+   Higher specificity than the fullscreen rules above (extra class), so
+   the exception below wins regardless of source order. */
+.premium-player.vertical-video mux-player {
+  --media-object-fit: cover;
+}
+
+/* ...but NEVER while fullscreen. There the frame is the screen, whose
+   shape is nothing like 9:16 — covering a portrait video across a
+   landscape monitor (or a rotated phone) would crop it down to a narrow
+   middle slice. Contain shows the whole frame with side bars, which is
+   the correct reading of a vertical video on a wide screen. This
+   deliberately opts vertical videos out of the "cover on touch
+   fullscreen" rule directly above, which exists for 16:9 content. */
+.premium-player.vertical-video:fullscreen mux-player,
+.premium-player.vertical-video:-webkit-full-screen mux-player,
+.premium-player.vertical-video.fake-fullscreen mux-player {
+  --media-object-fit: contain;
+}
+
 /* Double/triple-tap seek feedback pill — quick pop in, fade out. */
 @keyframes seekFlash {
   0% {

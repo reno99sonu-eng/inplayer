@@ -17,6 +17,10 @@ interface MembersOnlyVideoPlayerProps {
   // the creator's own uploaded/linked audio — see soundtrackClipSeconds.
   soundtrack?: { url: string; durationSeconds: number; source?: string | null } | null;
   filterLook?: VideoLookFilter;
+  /** True for a Raftaar/Short (9:16). Forwarded to VideoPlayer, and used by
+   *  the loading/paywall panels below so they fill the same 9:16 frame
+   *  rather than forcing a 16:9 strip inside it. */
+  vertical?: boolean;
 }
 
 // Real gating, not a UI-only lock: this never receives a playable Mux
@@ -34,6 +38,7 @@ export default function MembersOnlyVideoPlayer({
   uploaderName,
   soundtrack,
   filterLook,
+  vertical = false,
 }: MembersOnlyVideoPlayerProps) {
   const { signedIn, openSignIn } = useAuthModal();
   const [state, setState] = useState<
@@ -88,20 +93,21 @@ export default function MembersOnlyVideoPlayer({
         videoId={videoId}
         soundtrack={soundtrack}
         filterLook={filterLook}
+        vertical={vertical}
       />
     );
   }
 
   if (state.status === "loading") {
     return (
-      <div className="flex aspect-video w-full items-center justify-center bg-black">
+      <div className={`flex w-full items-center justify-center bg-black ${vertical ? "h-full" : "aspect-video"}`}>
         <Loader2 size={26} className="animate-spin text-orange-400" />
       </div>
     );
   }
 
   return (
-    <div className="flex aspect-video w-full flex-col items-center justify-center gap-4 bg-black px-6 text-center">
+    <div className={`flex w-full flex-col items-center justify-center gap-4 bg-black px-6 text-center ${vertical ? "h-full" : "aspect-video"}`}>
       <div className="flex h-14 w-14 items-center justify-center rounded-full bg-amber-500/15 text-amber-400">
         <Crown size={26} />
       </div>

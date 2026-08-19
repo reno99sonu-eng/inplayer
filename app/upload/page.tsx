@@ -386,8 +386,7 @@ export default function UploadPage() {
     setShortSettings({ soundtrack: null, musicClipSeconds: 30, filter: "original" });
     setSpokenLanguage("auto");
     setVisibility("public");
-    setMadeForKids(false);
-    setAgeRestricted(false);
+    setAudience("everyone");
     setCommentsEnabled(true);
     setTags([]);
     setTagInput("");

@@ -129,6 +129,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
     ":description": description?.trim() || "",
     ":category": category.trim(),
   };
+  // Populated only when an attribute name needs aliasing away from a
+  // DynamoDB reserved word — see the #audience note below.
+  const names: Record<string, string> = {};
 
   if (Array.isArray(tags)) {
     sets.push("tags = :tags");
@@ -149,7 +152,14 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   const resolvedAudience = normalizeVideoAudience(audience);
   if (resolvedAudience) {
     const flags = audienceFlags(resolvedAudience);
-    sets.push("audience = :audience", "madeForKids = :madeForKids", "ageRestricted = :ageRestricted");
+    // `audience` goes through an ExpressionAttributeNames alias rather than
+    // bare. This codebase has already been bitten once by a bare attribute
+    // name colliding with a DynamoDB reserved word (`hidden`, in
+    // app/api/admin/moderation — every call threw ValidationException and
+    // the tab silently returned nothing). The alias costs nothing and makes
+    // the question moot.
+    sets.push("#audience = :audience", "madeForKids = :madeForKids", "ageRestricted = :ageRestricted");
+    names["#audience"] = "audience";
     values[":audience"] = resolvedAudience;
     values[":madeForKids"] = flags.madeForKids;
     values[":ageRestricted"] = flags.ageRestricted;
@@ -199,6 +209,9 @@ export async function PATCH(request: NextRequest, { params }: Params) {
       Key: { videoId },
       UpdateExpression: `SET ${sets.join(", ")}`,
       ExpressionAttributeValues: values,
+      // Omitted entirely when empty — DynamoDB rejects an empty
+      // ExpressionAttributeNames map rather than ignoring it.
+      ...(Object.keys(names).length > 0 && { ExpressionAttributeNames: names }),
     })
   );
 

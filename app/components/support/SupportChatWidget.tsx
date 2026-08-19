@@ -14,7 +14,7 @@ import {
 } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { authedFetch } from "@/app/lib/apiFetch";
-import { getSiteDomain } from "@/app/lib/siteDomain";
+import { getSiteDomain, hideFloatingLaunchers } from "@/app/lib/siteDomain";
 // Presets only — NOT supportKnowledge.ts, which holds the server-side
 // system prompt and must never reach the client bundle.
 import {
@@ -70,7 +70,13 @@ export default function SupportChatWidget() {
   // the Sponsorship panel) it moved into the hamburger menu, whose entry
   // dispatches "openSupportChat" — see Navbar.tsx. This widget stays
   // mounted site-wide either way so the listener below always works.
-  const hideFloatingLauncher = domain !== "hammart";
+  //
+  // It's additionally suppressed on the immersive screens in
+  // hideFloatingLaunchers() (Messages, Shorts, Live), where a floating
+  // bubble lands on top of the chat composer / action rail / broadcast
+  // controls. The panel itself still opens normally from the hamburger on
+  // those screens — only the bubble is withheld.
+  const hideFloatingLauncher = domain !== "hammart" || hideFloatingLaunchers(pathname);
 
   useEffect(() => {
     const onOpenRequest = () => setOpen(true);

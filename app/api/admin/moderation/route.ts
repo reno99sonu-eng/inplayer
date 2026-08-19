@@ -149,7 +149,19 @@ export async function GET(request: NextRequest) {
     const [comments, messages, videos] = await Promise.all([
       scanAll("InPlayer-Comments", "#hidden = :t", { ":t": true }, { "#hidden": "hidden" }),
       scanAll("InPlayer-Messages", "#hidden = :t", { ":t": true }, { "#hidden": "hidden" }),
-      scanAll("InPlayer-Videos", "moderationHidden = :t", { ":t": true }),
+      // Videos reach this queue for either of two independent reasons: the
+      // general policy check hid them (moderationHidden), OR the audience
+      // classifier disagreed with what the creator declared
+      // (audienceMismatch — see app/lib/audienceClassifier.ts). The second
+      // kind is often deliberately NOT hidden: a weak signal shouldn't bury
+      // a legitimate video, it should just get a human to look at it. Both
+      // still need reviewing, so this is one OR'd scan rather than two
+      // passes over the same table.
+      scanAll(
+        "InPlayer-Videos",
+        "moderationHidden = :t OR audienceMismatch = :t",
+        { ":t": true }
+      ),
     ]);
 
     const items = [
@@ -178,6 +190,18 @@ export async function GET(request: NextRequest) {
         categories: (v.flaggedCategories as string[]) || [],
         snippet: (v.title as string) || "Untitled",
         createdAt: (v.moderatedAt as string) || (v.uploadedAt as string),
+        // Audience-mismatch detail, so an admin can see BOTH sides — what
+        // the creator picked and what the AI read it as — plus the specific
+        // signals, rather than just a generic "flagged" badge. Only present
+        // on video rows; the other content types have no audience.
+        audienceMismatch: v.audienceMismatch === true,
+        audienceDeclared: (v.audienceDeclared as string) || null,
+        audienceSuggested: (v.audienceSuggested as string) || null,
+        audienceSignals: (v.audienceSignals as string[]) || [],
+        // Whether it's actually hidden right now. A mismatch on a weak
+        // signal stays publicly visible pending review, and the admin
+        // needs to know which of the two they're looking at.
+        moderationHidden: v.moderationHidden === true,
       })),
     ].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 

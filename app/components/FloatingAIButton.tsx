@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { usePathname } from "next/navigation";
 import dynamic from "next/dynamic";
+import { hideFloatingLaunchers } from "@/app/lib/siteDomain";
 
 // 13KB modal — only loaded when the user actually clicks the button
 const AIStudioModal = dynamic(() => import("./AIStudioModal"), { ssr: false });
@@ -14,7 +16,17 @@ const AIStudioModal = dynamic(() => import("./AIStudioModal"), { ssr: false });
 // for the homepage back exactly as it was, so the orb shows there again and
 // the hamburger "AI Studio" entry has been removed. Only the Support Desk
 // launcher lives in the hamburger now (see SupportChatWidget.tsx).
+//
+// The one exception is the immersive screens listed in
+// hideFloatingLaunchers() — Messages, Shorts, Live — where the orb would
+// land directly on top of the chat composer / Shorts action rail /
+// broadcast controls. Being homepage-only originally, it never used to be
+// able to collide with anything; going site-wide is what made that opt-out
+// necessary.
 export default function FloatingAIButton() {
+  const pathname = usePathname();
+  const suppressed = hideFloatingLaunchers(pathname);
+
   const [hidden, setHidden] = useState(false);
   const [open, setOpen] = useState(false);
 
@@ -34,6 +46,10 @@ export default function FloatingAIButton() {
 
     return () => window.removeEventListener("scroll", onScroll);
   }, []);
+
+  // Hooks above always run (they must — a conditional hook would break the
+  // rules of hooks); only the rendered output is suppressed.
+  if (suppressed) return null;
 
   return (
     <>

@@ -17,6 +17,31 @@ export function getSiteDomain(pathname: string | null | undefined): SiteDomain {
   return "inplayer";
 }
 
+// Screens where NO floating launcher may render — not the AI orb
+// (FloatingAIButton.tsx), not the Support Desk bubble
+// (support/SupportChatWidget.tsx).
+//
+// These are full-bleed, self-contained surfaces whose own UI already owns
+// the bottom-right corner: the chat composer on Messages, the like/comment/
+// share rail and mute control on Shorts, the broadcast controls on Live. A
+// floating bubble there doesn't just look wrong — it sits on top of a
+// control the person is trying to press.
+//
+// This matters more than it used to. The AI orb was originally mounted only
+// on the homepage, so it could never collide with anything; now that it's
+// site-wide, every immersive screen has to opt out explicitly, and this
+// list is that opt-out. Add a prefix here rather than adding another
+// pathname check inside an individual widget, so the two launchers can't
+// drift apart on which screens they respect.
+const NO_FLOATING_LAUNCHER_PREFIXES = ["/messages", "/shorts", "/live"];
+
+export function hideFloatingLaunchers(pathname: string | null | undefined): boolean {
+  if (!pathname) return false;
+  return NO_FLOATING_LAUNCHER_PREFIXES.some(
+    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
+}
+
 // Shape shared by PlatformSettings and PublicPlatformSettings — picking the
 // right domain's maintenance fields out of either type goes through this
 // one function so MaintenanceGate never has to know the field-naming

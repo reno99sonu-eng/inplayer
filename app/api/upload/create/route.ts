@@ -14,6 +14,7 @@ import {
   audienceFromFlags,
   normalizeVideoAudience,
 } from "@/app/lib/contentAccess";
+import { classifyAudience, decideAudience } from "@/app/lib/audienceClassifier";
 
 // Defensive re-validation of a client-supplied soundtrack pick (see
 // ShortCreationTools/soundtracks.ts's ResolvedSoundtrack shape) before it's
@@ -162,7 +163,25 @@ export async function POST(request: NextRequest) {
     const uploadModeration = platformSettings.moderationEnabledUploads
       ? await moderateText(`${title} ${description || ""}`)
       : UNCHECKED;
-    const moderationHidden = uploadModeration.checked && uploadModeration.flagged;
+    // Automatic audience classification, reusing the moderation categories
+    // already fetched just above — no second model call, no extra cost. It
+    // compares what the creator declared (Everyone / Kids / 18+) against
+    // what the AI reads the content as, and records any disagreement for
+    // an admin. See app/lib/audienceClassifier.ts for the exact rules; the
+    // one that matters most is that adult-signalled content can never stay
+    // tagged Kids, however weak the signal.
+    const declaredAudience =
+      normalizeVideoAudience(audience) ?? audienceFromFlags(madeForKids, ageRestricted);
+    const audienceDecision = decideAudience(
+      declaredAudience,
+      classifyAudience(`${title} ${description || ""}`, uploadModeration)
+    );
+
+    // Hidden from every public listing if EITHER the general moderation
+    // check flagged it, or the audience classifier decided this must not be
+    // publicly visible pending review.
+    const moderationHidden =
+      (uploadModeration.checked && uploadModeration.flagged) || audienceDecision.hide;
     // Ground truth for which language the video is spoken in — trusted
     // over Mux's own "auto" detection by the caption pipeline (see
     // app/api/webhooks/mux), since Mux has no ASR model for Hindi/Bengali
@@ -243,10 +262,22 @@ export async function POST(request: NextRequest) {
           commentCount: 0,
           ...(moderationHidden && {
             flagged: true,
-            flaggedCategories: uploadModeration.categories,
+            // The audience classifier's own reasons are folded in alongside
+            // the raw moderation categories, so the admin queue explains
+            // WHY something is here even when it was the audience mismatch
+            // (not the policy check) that hid it.
+            flaggedCategories: [
+              ...uploadModeration.categories,
+              ...(audienceDecision.audienceMismatch ? ["audience-mismatch"] : []),
+            ],
             moderationHidden: true,
             moderatedAt: new Date().toISOString(),
           }),
+          // A mismatch that did NOT warrant hiding still needs a timestamp,
+          // because the admin queue sorts on moderatedAt — without one these
+          // rows would sort to the bottom on an invalid date.
+          ...(audienceDecision.audienceMismatch &&
+            !moderationHidden && { moderatedAt: new Date().toISOString() }),
           // A creator-picked thumbnail. customThumbnailUrl is the durable
           // "did the creator set one" marker — the Mux webhook's
           // video.asset.ready handler checks it via if_not_exists() so it
@@ -284,17 +315,20 @@ export async function POST(request: NextRequest) {
                 .map((t: string) => t.trim())
             : [],
           // Who may see this video, platform-wide (app/lib/contentAccess.ts).
-          // Trust the explicit `audience` when the client sends a valid one;
-          // otherwise fall back to the older booleans so a stale client, or
-          // any other caller still posting the old shape, still classifies
-          // correctly instead of silently landing in "everyone".
-          // madeForKids/ageRestricted are then rewritten FROM the resolved
-          // audience, so the three fields can never disagree on an item.
-          ...(() => {
-            const resolved =
-              normalizeVideoAudience(audience) ?? audienceFromFlags(madeForKids, ageRestricted);
-            return { audience: resolved, ...audienceFlags(resolved) };
-          })(),
+          // This is the AI-reconciled result, not the raw client value —
+          // see audienceDecision above. madeForKids/ageRestricted are then
+          // rewritten FROM it, so the three fields can never disagree.
+          audience: audienceDecision.audience,
+          ...audienceFlags(audienceDecision.audience),
+          // What the creator actually picked, kept separately so an admin
+          // reviewing a mismatch can see both sides rather than only the
+          // corrected value.
+          audienceDeclared: declaredAudience,
+          audienceSuggested: audienceDecision.audienceSuggested,
+          ...(audienceDecision.audienceMismatch && {
+            audienceMismatch: true,
+            audienceSignals: audienceDecision.audienceSignals.slice(0, 10),
+          }),
           // Defaults to on unless explicitly disabled.
           commentsEnabled: commentsEnabled !== false,
           // Real member-only gating — see app/watch/[videoId]/page.tsx,

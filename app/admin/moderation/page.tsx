@@ -45,6 +45,16 @@ interface AutoFlagItem {
   categories: string[];
   snippet: string;
   createdAt: string;
+  // Video-only. Set when the AI's read of the audience disagreed with what
+  // the creator declared at upload — see app/lib/audienceClassifier.ts.
+  audienceMismatch?: boolean;
+  audienceDeclared?: string | null;
+  audienceSuggested?: string | null;
+  audienceSignals?: string[];
+  // Whether it's actually hidden from the public right now. A mismatch on a
+  // weak signal deliberately stays visible pending review, so an admin needs
+  // to tell the two apart at a glance.
+  moderationHidden?: boolean;
 }
 
 interface StrikeItem {
@@ -504,6 +514,55 @@ export default function AdminModerationPage() {
               <p className="mt-2 truncate text-sm text-slate-200 light:text-slate-800">
                 {item.snippet || "(no text)"}
               </p>
+
+              {/* Audience mismatch detail — shows BOTH sides (what the
+                  creator picked vs what the AI read) plus the specific
+                  signals, so the decision to restore or remove is an
+                  informed one rather than a coin flip on a badge. */}
+              {item.audienceMismatch && (
+                <div className="mt-2 rounded-xl border border-amber-400/30 bg-amber-500/[0.07] p-2.5">
+                  <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                    <span className="font-black uppercase tracking-wide text-amber-300">
+                      Audience mismatch
+                    </span>
+                    <span className="text-slate-300 light:text-slate-700">
+                      creator said{" "}
+                      <b className="text-white light:text-slate-900">
+                        {item.audienceDeclared || "—"}
+                      </b>
+                      , AI read it as{" "}
+                      <b className="text-white light:text-slate-900">
+                        {item.audienceSuggested || "—"}
+                      </b>
+                    </span>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${
+                        item.moderationHidden
+                          ? "bg-red-500/15 text-red-300"
+                          : "bg-slate-500/20 text-slate-300"
+                      }`}
+                    >
+                      {item.moderationHidden ? "Hidden" : "Still public"}
+                    </span>
+                  </div>
+                  {item.audienceSignals && item.audienceSignals.length > 0 && (
+                    <ul className="mt-1.5 space-y-0.5">
+                      {item.audienceSignals.map((signal) => (
+                        <li
+                          key={signal}
+                          className="text-[11px] text-slate-400 light:text-slate-600"
+                        >
+                          · {signal}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  <p className="mt-1.5 text-[10px] leading-4 text-slate-500">
+                    Restoring puts the audience back to what the creator chose and
+                    clears the flag. Remove deletes the video permanently.
+                  </p>
+                </div>
+              )}
 
               <div className="mt-3 flex items-center gap-2">
                 <button

@@ -4,6 +4,8 @@ import { areUsersConnected } from "@/app/lib/connections";
 import { normalizeUsername } from "@/app/lib/username";
 import { ensureUsername } from "@/app/lib/ensureUsername";
 import { selfHealVideoBatch } from "@/app/lib/selfHealVideo";
+import { getAudienceMode } from "@/app/lib/contentAccessServer";
+import { isVideoVisible } from "@/app/lib/contentAccess";
 
 export interface PublicProfileVideo {
   videoId: string;
@@ -185,10 +187,21 @@ export async function getPublicProfile(
       })(),
     ]);
 
+    // Audience filtering applies here too, not just to the shared feeds
+    // (app/lib/contentAccessServer.ts). A channel page is a public browsing
+    // surface reachable from search, a comment, or a shared link — without
+    // this it would be a straightforward way around Kids mode and the 18+
+    // setting, listing exactly the content those hide everywhere else.
+    //
+    // The owner is exempt: a creator must always be able to see and manage
+    // their own uploads from their own channel, whatever viewing mode their
+    // browser happens to be in.
+    const audienceMode = await getAudienceMode();
     const publicVideos = videosResult.filter(
       (video) =>
         (isOwner || video.status === "ready") &&
-        (isOwner || !video.visibility || video.visibility === "public")
+        (isOwner || !video.visibility || video.visibility === "public") &&
+        (isOwner || isVideoVisible(video, audienceMode))
     );
     const totalViews = publicVideos.reduce(
       (sum, video) => sum + (Number(video.views) || 0),

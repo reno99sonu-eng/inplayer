@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { GetCommand, PutCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
+import { filterListByAudience } from "@/app/lib/contentAccessServer";
 
 export async function GET(request: NextRequest) {
   let user;
@@ -20,8 +21,18 @@ export async function GET(request: NextRequest) {
     })
   );
 
-  const history = (result.Items || []).sort(
+  const sorted = (result.Items || []).sort(
     (a, b) => new Date(b.watchedAt).getTime() - new Date(a.watchedAt).getTime()
+  );
+
+  // Watch History is a saved snapshot per row (title/thumbnail copied at
+  // watch time), so it carries no audience of its own — resolved against
+  // the shared cached video list instead. Without this, history would list
+  // exactly the titles Kids mode and a hidden-18+ setting are meant to
+  // hide, on a device someone else may have set those modes for.
+  const history = await filterListByAudience(
+    sorted,
+    (item) => item.videoId as string | undefined
   );
 
   return NextResponse.json({ history });

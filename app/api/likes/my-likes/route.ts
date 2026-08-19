@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { QueryCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
+import { getAudienceMode } from "@/app/lib/contentAccessServer";
+import { isVideoVisible } from "@/app/lib/contentAccess";
 
 export async function GET(request: NextRequest) {
   let user;
@@ -46,7 +48,16 @@ export async function GET(request: NextRequest) {
       })
     );
 
-    const validVideos = videos.filter(Boolean);
+    // Audience filtering (app/lib/contentAccess.ts). A personal list is
+    // still a way to SEE a video's title and thumbnail, so Kids mode and a
+    // hidden-18+ setting have to apply here too — otherwise the Liked page
+    // becomes an index of exactly the content those modes hide. Playback
+    // was already blocked by the watch page's own gate; this stops the
+    // listing itself from leaking.
+    const audienceMode = await getAudienceMode();
+    const validVideos = videos
+      .filter(Boolean)
+      .filter((video) => isVideoVisible(video as Record<string, unknown>, audienceMode));
 
     return NextResponse.json({ videos: validVideos });
   } catch (err) {

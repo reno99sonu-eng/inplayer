@@ -7,6 +7,7 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
+import { filterListByAudience } from "@/app/lib/contentAccessServer";
 
 export async function GET(request: NextRequest) {
   const videoId = request.nextUrl.searchParams.get("videoId");
@@ -29,8 +30,17 @@ export async function GET(request: NextRequest) {
       })
     );
 
-    const items = (result.Items || []).sort(
+    const sorted = (result.Items || []).sort(
       (a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime()
+    );
+
+    // Same reasoning as Watch History: these rows are snapshots with no
+    // audience field, so they're resolved against the shared cached video
+    // list. Otherwise Watch Later would list the titles and thumbnails of
+    // exactly the content Kids mode / hidden-18+ is hiding elsewhere.
+    const items = await filterListByAudience(
+      sorted,
+      (item) => item.videoId as string | undefined
     );
 
     return NextResponse.json({ items });

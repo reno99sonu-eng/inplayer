@@ -4,6 +4,7 @@ import {
   AUDIENCE_COOKIE,
   DEFAULT_AUDIENCE_MODE,
   filterByAudience,
+  isVideoVisible,
   normalizeAudienceMode,
   type AudienceMode,
 } from "./contentAccess";
@@ -41,4 +42,37 @@ export async function getAudienceMode(): Promise<AudienceMode> {
 export async function getVisibleVideos(): Promise<Record<string, unknown>[]> {
   const [videos, mode] = await Promise.all([getReadyVideos(), getAudienceMode()]);
   return filterByAudience(videos, mode);
+}
+
+// For the personal lists — Watchlist, Watch History, Playlists — whose rows
+// are snapshots (title/thumbnail copied when the item was saved) and carry
+// no audience field of their own. Rather than a GetItem per row, this
+// resolves each id against the same 30-second shared cache every feed
+// already uses, so a 200-item history costs one cached read and a map
+// lookup per row.
+//
+// An id missing from that list is treated as a bare video with no audience
+// recorded — deliberately, because that resolves to "everyone", which is
+// visible in family mode but correctly hidden in Kids-only mode. Those ids
+// are ones that aren't publicly listable anyway (private, unlisted, still
+// processing, or moderation-hidden), and the watch page's own gate is what
+// actually stops playback in every case.
+export async function filterListByAudience<T>(
+  items: T[],
+  getVideoId: (item: T) => string | null | undefined
+): Promise<T[]> {
+  const mode = await getAudienceMode();
+  if (mode === "all") return items;
+
+  const all = await getReadyVideos();
+  const byId = new Map(all.map((video) => [video.videoId as string, video]));
+
+  return items.filter((item) => {
+    const videoId = getVideoId(item);
+    // A row with no id at all is treated exactly like an unresolvable one —
+    // no special case. That resolves to "everyone": kept in family mode,
+    // dropped in Kids-only mode, which is the safe direction for a row we
+    // can't actually classify.
+    return isVideoVisible(videoId ? byId.get(videoId) ?? {} : {}, mode);
+  });
 }

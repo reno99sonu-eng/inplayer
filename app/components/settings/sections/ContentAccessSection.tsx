@@ -107,6 +107,31 @@ export default function ContentAccessSection() {
     setNextModeAfterCreate(hasPasskey ? null : next);
   };
 
+  const [resetError, setResetError] = useState<string | null>(null);
+
+  // The no-passkey escape hatch. Only ever moves TO the safe default, never
+  // away from it, so it needs no authorisation — see the button's comment.
+  const resetToSafeDefault = async () => {
+    if (busy) return;
+    setResetError(null);
+    setBusy(true);
+    try {
+      const res = await authedFetch("/api/content-access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "reset_mode" }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Couldn't reset content settings.");
+      setMode(DEFAULT_AUDIENCE_MODE);
+      router.refresh();
+    } catch (err) {
+      setResetError(err instanceof Error ? err.message : "Couldn't reset content settings.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const applyMode = async (next: AudienceMode, code: string) => {
     const res = await authedFetch("/api/content-access", {
       method: "POST",
@@ -237,6 +262,32 @@ export default function ContentAccessSection() {
             setError(null);
           }}
         />
+
+        {/* Forgot passkey. Changing a passkey requires the old one, so
+            without this someone who forgets theirs is stuck on whatever
+            mode they last set, forever. This is safe to expose unlocked
+            precisely because it can only ever make things MORE restrictive:
+            it drops the browser back to the safe default (18+ hidden) and
+            doesn't reveal, clear or change the passkey itself. Anyone who
+            wants a different mode afterwards still needs the real code. */}
+        {signedIn && hasPasskey && mode !== DEFAULT_AUDIENCE_MODE && (
+          <div className="px-5 pb-1">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={resetToSafeDefault}
+              className="text-xs font-semibold text-orange-300 transition hover:text-orange-200 disabled:opacity-60"
+            >
+              Forgot your passkey? Reset to the safe default
+            </button>
+            <p className="mt-0.5 text-[11px] text-slate-500">
+              Hides 18+ content again without needing your passkey. To change
+              the passkey itself you&apos;ll still need the current one.
+            </p>
+          </div>
+        )}
+
+        {resetError && <p className="px-5 text-xs text-red-300">{resetError}</p>}
 
         {!signedIn && !loading && (
           <p className="px-5 pb-1 text-xs text-slate-500">

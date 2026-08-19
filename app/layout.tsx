@@ -40,6 +40,23 @@ export const metadata: Metadata = {
   description:
     "INPLAYER is an all-in-one entertainment platform — stream original videos and live shows, watch Raftaar shorts, discover creators, and shop, all in one place.",
   applicationName: "INPLAYER",
+  // Google Search Console ownership proof. Next renders this as
+  //   <meta name="google-site-verification" content="..." />
+  // in every page's <head>, which is what Google's verifier looks for.
+  //
+  // Not a secret — it proves control of the domain, it doesn't grant
+  // access to anything. It has to STAY here permanently: Google re-checks
+  // it periodically and silently unverifies the property if it disappears,
+  // taking the sitemap and indexing reports with it.
+  //
+  // Google's verifier fetches this from outside India, so it depends on
+  // the "google-site-verification" entry in app/lib/searchCrawlers.ts to
+  // get past the geo-block. Before that exemption existed, verifying this
+  // domain by HTML tag was impossible — the verifier only ever saw the
+  // "Region Not Available" page, which has no such tag in it.
+  verification: {
+    google: "mZqMR3AMeJ64HxrdTP96XmrzRCCTtJ5L-ojAuUbWtuc",
+  },
   // Also referenced by the JSON-LD Organization/WebSite block below, which
   // is what actually helps Google tell this INPLAYER apart from unrelated
   // companies/products that happen to share the name.

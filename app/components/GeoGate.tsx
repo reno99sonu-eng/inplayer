@@ -2,6 +2,7 @@
 
 import { useEffect, useState, ReactNode } from "react";
 import { Globe } from "lucide-react";
+import { isSearchCrawler } from "@/app/lib/searchCrawlers";
 
 // ──────────────────────────────────────────────────────────────────────
 // GEO-RESTRICTION CLIENT GATE — Layers 2 & 3
@@ -86,6 +87,35 @@ export default function GeoGate({
   const [checking, setChecking] = useState(false);
 
   useEffect(() => {
+    // Search crawlers and link-preview bots skip Layers 2 and 3 entirely.
+    //
+    // Googlebot RENDERS JavaScript, so without this it would sail past the
+    // middleware exemption and then be blocked here instead: /api/geo/verify
+    // would flag its US datacenter IP as hosting, and there is obviously no
+    // GPS in a crawler. The rendered page Google finally indexed would still
+    // be "Sorry, we're not available in your region yet".
+    //
+    // Layers 2 and 3 exist to catch a HUMAN using a VPN. A crawler is not
+    // one, so they are skipped.
+    //
+    // BE HONEST ABOUT WHAT THIS COSTS: together with the middleware
+    // exemption, this means a person outside India who sets their browser's
+    // user-agent string to contain "Googlebot" bypasses all three layers.
+    // A user-agent is a self-reported string; no layer that trusts it can
+    // be spoof-proof. That hole is the unavoidable price of being findable
+    // on Google at all, and every geo-restricted site pays it — but it is a
+    // real hole, not one GeoGate closes.
+    //
+    // If it ever needs closing, the fix is to stop trusting the string and
+    // verify the CLIENT: check the connecting IP against Google's published
+    // crawler ranges (developers.google.com/search/apis/ipranges/googlebot.json)
+    // or do a reverse-DNS lookup on it. Keep this token list narrow until
+    // then — every entry added is another word someone can put in a header.
+    if (isSearchCrawler(navigator.userAgent)) {
+      setAllowed(true);
+      return;
+    }
+
     // Server already said non-Indian IP → stay blocked, skip all checks
     if (!initialGeoAllowed) {
       setAllowed(false);

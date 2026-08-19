@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isSearchCrawler } from "@/app/lib/searchCrawlers";
 
 // ──────────────────────────────────────────────────────────────────────
 // CANONICAL DOMAIN ENFORCEMENT — EDGE MIDDLEWARE (Layer 0, runs first)
@@ -146,6 +147,32 @@ export function middleware(request: NextRequest) {
 
   // Skip paths that must always be accessible
   if (shouldBypass(pathname)) {
+    return attachNoIndexIfNeeded(NextResponse.next(), hostname);
+  }
+
+  // ── Search crawlers and link-preview bots are never geo-checked ────
+  //
+  // THIS IS THE SINGLE MOST IMPORTANT EXEMPTION IN THIS FILE.
+  //
+  // Googlebot crawls from US IPs, so before this every page on the site —
+  // the homepage, all 150 URLs in the sitemap — answered Googlebot with
+  // "Sorry, we're not available in your region yet". Because that is a
+  // REWRITE, the URL never changed and `Disallow: /geo-blocked` in
+  // robots.ts never applied: Google recorded the blocked page as the real
+  // content of inplayer.in, saw 150 identical thin pages, and the site
+  // could not rank for anything at all — not even the word "inplayer".
+  //
+  // The same was true of WhatsApp/Facebook/X link previews: an Indian user
+  // sharing a video link got a preview card reading "not available in your
+  // region", because the preview is fetched by Meta's servers, not by the
+  // person sharing it.
+  //
+  // Neither is a visitor to geo-check — exactly like the Mux/Razorpay
+  // webhooks and the ads.txt crawlers exempted above. See
+  // app/lib/searchCrawlers.ts for the list, why this is not cloaking, and
+  // why user-agent spoofing doesn't undermine the restriction (GeoGate's
+  // VPN and GPS layers still run in any real browser).
+  if (isSearchCrawler(request.headers.get("user-agent"))) {
     return attachNoIndexIfNeeded(NextResponse.next(), hostname);
   }
 

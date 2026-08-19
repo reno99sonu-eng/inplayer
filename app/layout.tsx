@@ -10,6 +10,7 @@ import ChunkErrorRecovery from "./components/ChunkErrorRecovery";
 import { getPlatformSettings } from "./lib/platformSettings";
 import type { DomainMaintenanceFields } from "./lib/siteDomain";
 import { headers } from "next/headers";
+import { isSearchCrawler } from "@/app/lib/searchCrawlers";
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -132,9 +133,18 @@ export default async function RootLayout({
   // Vercel's edge network sets x-vercel-ip-country on every request based
   // on the real connecting IP. When it's absent (local dev, non-Vercel
   // host), default to allowed so development isn't blocked.
+  //
+  // Search crawlers and link-preview bots are allowed regardless of
+  // country, and MUST be checked here as well as in middleware.ts. The
+  // middleware decides whether the request reaches this page at all; this
+  // line decides what GeoGate paints once it does. Exempting a crawler in
+  // only one of the two places still leaves it looking at "Sorry, we're not
+  // available in your region yet" — the middleware would let Googlebot in,
+  // and then geoAllowed=false would have GeoGate render the block screen
+  // for it anyway. See app/lib/searchCrawlers.ts.
   const hdrs = await headers();
   const ipCountry = hdrs.get("x-vercel-ip-country") || "IN";
-  const geoAllowed = ipCountry === "IN";
+  const geoAllowed = ipCountry === "IN" || isSearchCrawler(hdrs.get("user-agent"));
 
   return (
     <html lang="en">

@@ -15,11 +15,12 @@ import {
   Film,
   Video as VideoIcon,
 } from "lucide-react";
+import { CONTENT_TYPE_LABEL, CONTENT_TYPE_WORD, normalizeContentType, watchHrefFor } from "@/app/lib/contentTypes";
 
 interface AdminVideoRow {
   videoId: string;
   title: string;
-  contentType: "video" | "short";
+  contentType: "video" | "short" | "music";
   status: string | null;
   visibility: string | null;
   views: number;
@@ -150,7 +151,7 @@ export default function AdminVideosPage() {
   };
 
   const removeVideo = async (row: AdminVideoRow) => {
-    const label = row.contentType === "short" ? "Short" : "video";
+    const label = CONTENT_TYPE_WORD[normalizeContentType(row.contentType)];
     if (
       !window.confirm(
         `Permanently delete this ${label} — "${row.title}"? This removes it everywhere on InPlayer and can't be undone.`
@@ -294,7 +295,7 @@ export default function AdminVideosPage() {
                     )}
                   </div>
                   <p className="truncate text-xs text-slate-400 light:text-slate-600">
-                    {row.contentType === "short" ? "Short" : "Video"} · {row.uploaderName || "Unknown uploader"}
+                    {CONTENT_TYPE_LABEL[normalizeContentType(row.contentType)]} · {row.uploaderName || "Unknown uploader"}
                     {" · "}
                     <span className="inline-flex items-center gap-1">
                       <Eye size={11} /> {row.views.toLocaleString("en-IN")}

@@ -5,6 +5,7 @@ import { GetCommand, ScanCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import mux from "@/app/lib/mux";
 import { docClient } from "@/app/lib/dynamodb";
 import { getMuxThumbnailUrl } from "@/app/lib/muxThumbnail";
+import { isMusicType, normalizeContentType } from "@/app/lib/contentTypes";
 import { READY_VIDEOS_TAG } from "@/app/lib/videoStore";
 import { MIDROLL_ADS_TAG } from "@/app/lib/videoAds";
 import { deleteS3Prefix } from "@/app/lib/s3";
@@ -251,7 +252,14 @@ export async function POST(request: NextRequest) {
     }
 
     const isShort = existing.Item.contentType === "short";
-    const thumbnailUrl = getMuxThumbnailUrl(playbackId, isShort);
+    // Music has no video track, so Mux cannot render a frame and the URL
+    // getMuxThumbnailUrl builds would 404. In practice the if_not_exists
+    // below always picks the mandatory cover instead — but computing a URL
+    // known to be broken and leaving it sitting there as the fallback is
+    // how a later edit quietly ships one.
+    const thumbnailUrl = isMusicType(existing.Item.contentType)
+      ? ((existing.Item.customThumbnailUrl as string | undefined) ?? "")
+      : getMuxThumbnailUrl(playbackId, isShort);
 
     const updateResult = await docClient.send(
       new UpdateCommand({
@@ -304,7 +312,7 @@ export async function POST(request: NextRequest) {
         uploaderId: videoAttributes.uploaderId,
         uploaderName: videoAttributes.uploaderName || "Creator",
         uploaderAvatarUrl: videoAttributes.uploaderAvatarUrl,
-        contentType: videoAttributes.contentType === "short" ? "short" : "video",
+        contentType: normalizeContentType(videoAttributes.contentType),
       }).catch((err) => console.error("Failed to broadcast new video email to subscribers:", err));
     }
 
@@ -323,7 +331,11 @@ export async function POST(request: NextRequest) {
       (track: { type?: string; id?: string }) => track.type === "audio"
     );
 
-    if (audioTrack?.id && contentType !== "short") {
+    // Videos only. Shorts never get captions (deliberate, long-standing),
+    // and music is excluded too — running speech recognition over a song
+    // bills real money to produce a transcript of lyrics-as-misheard, which
+    // is worse on a track page than having no captions at all.
+    if (audioTrack?.id && normalizeContentType(contentType) === "video") {
       try {
         // Mux's ASR only accepts an explicit language hint for a fixed set
         // of (mostly European) languages — Hindi and Bengali aren't in that

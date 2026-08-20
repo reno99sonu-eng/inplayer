@@ -30,7 +30,7 @@ export interface VideoMetadataValue {
   title: string;
   description: string;
   category: string;
-  contentType: "video" | "short";
+  contentType: "video" | "short" | "music";
   spokenLanguage: SpokenLanguage;
   visibility: Visibility;
   // The single source of truth for who may see this video (see

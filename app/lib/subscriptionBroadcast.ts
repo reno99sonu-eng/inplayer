@@ -11,7 +11,7 @@ interface VideoBroadcastParams {
   uploaderId: string;
   uploaderName: string;
   uploaderAvatarUrl?: string;
-  contentType?: "video" | "short";
+  contentType?: "video" | "short" | "music";
 }
 
 /**
@@ -19,6 +19,11 @@ interface VideoBroadcastParams {
  */
 export async function broadcastNewVideoToSubscribers(params: VideoBroadcastParams): Promise<number> {
   const { videoId, title, description, thumbnailUrl, uploaderId, uploaderName, uploaderAvatarUrl, contentType = "video" } = params;
+
+  // "Short" / "video" / "track" — a song announced as a "new video" reads
+  // as a mistake to the person who gets the email.
+  const noun =
+    contentType === "short" ? "Short" : contentType === "music" ? "track" : "video";
 
   try {
     // 1. Query all subscribers of the creator from InPlayer-Subscriptions GSI (creatorId-index)
@@ -47,7 +52,7 @@ export async function broadcastNewVideoToSubscribers(params: VideoBroadcastParam
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://inplayer.app";
     const watchUrl = `${baseUrl}/${contentType === "short" ? "shorts" : "watch"}?v=${videoId}`;
-    const subject = `🔴 New ${contentType === "short" ? "Short" : "video"} from ${uploaderName}: "${title}"`;
+    const subject = `🔴 New ${noun} from ${uploaderName}: "${title}"`;
 
     let sentCount = 0;
 
@@ -66,7 +71,7 @@ export async function broadcastNewVideoToSubscribers(params: VideoBroadcastParam
             }
             <div>
               <div style="font-size: 15px; font-weight: 700; color: #f8fafc;">${uploaderName}</div>
-              <div style="font-size: 12px; color: #94a3b8;">Uploaded a new ${contentType === "short" ? "Short" : "video"}</div>
+              <div style="font-size: 12px; color: #94a3b8;">Uploaded a new ${noun}</div>
             </div>
           </div>
 

@@ -81,6 +81,16 @@ interface VideoPlayerProps {
   // Defaults to false, so every ordinary 16:9 video keeps byte-for-byte the
   // behaviour it had before.
   vertical?: boolean;
+  // TRUE for an audio-only upload (contentType "music"). The asset has no
+  // video track, so Mux renders a black rectangle — this swaps that for the
+  // creator's cover art: a blurred fill behind, the square sleeve floating
+  // centred on top, and Mux's own controls left completely untouched over
+  // the lot. Everything else about the player is identical to a video,
+  // which is the point.
+  music?: boolean;
+  /** The cover image. Mandatory for music at upload time, so this is
+   *  effectively always set when `music` is true. */
+  coverUrl?: string;
 }
 
 // A chosen soundtrack now fully REPLACES a Video's own recorded audio,
@@ -165,6 +175,8 @@ export default function VideoPlayer({
   soundtrack,
   filterLook,
   vertical = false,
+  music = false,
+  coverUrl,
 }: VideoPlayerProps) {
   const playerRef = useRef<MuxPlayerRefAttributes>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1111,6 +1123,44 @@ export default function VideoPlayer({
       onPointerCancel={handlePlayerPointerEnd}
       onPointerLeave={handlePlayerPointerEnd}
     >
+      {/* Music artwork. Sits BELOW the player in the stack (the MuxPlayer
+          that follows creates its own layer above this), so Mux's controls,
+          the tap-seek overlays and the settings menu all still work exactly
+          as they do on a video — nothing here intercepts a pointer.
+          pointer-events-none makes that guarantee explicit.
+
+          Two layers: the cover blown up and blurred to fill the frame, so a
+          square image doesn't leave dead black bars in a 16:9 box; and the
+          sleeve itself floating centred at its true aspect ratio. */}
+      {music && coverUrl && (
+        <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element -- may be a data: URL from the upload form's compressor. */}
+          <img
+            src={coverUrl}
+            alt=""
+            aria-hidden
+            className="absolute inset-0 h-full w-full scale-110 object-cover opacity-40 blur-2xl"
+          />
+          <div className="absolute inset-0 bg-black/40" />
+          {/* Extra bottom padding lifts the sleeve clear of Mux's control
+              bar, which is ~34px tall in portrait and ~42px in landscape
+              (see .premium-player in globals.css) and would otherwise cut
+              straight across the artwork whenever the controls are shown.
+              The art ends up optically centred in the space above them,
+              which is also how every music player people already use
+              arranges it. */}
+          <div className="absolute inset-0 flex items-center justify-center p-5 pb-16 sm:p-6 sm:pb-20">
+            {/* eslint-disable-next-line @next/next/no-img-element -- same. */}
+            <img
+              src={coverUrl}
+              alt={title}
+              className="max-h-full w-auto max-w-full rounded-2xl object-contain shadow-[0_25px_70px_rgba(0,0,0,.6)] ring-1 ring-white/10"
+              style={{ aspectRatio: "1 / 1" }}
+            />
+          </div>
+        </div>
+      )}
+
       <MuxPlayer
         ref={playerRef}
         playbackId={playbackId}
@@ -1178,6 +1228,10 @@ export default function VideoPlayer({
         style={
           {
             width: "100%",
+            // Music only: let the artwork behind show through. Mux Player's
+            // default background is opaque black, which would hide the
+            // cover entirely. z-10 keeps the controls above the art layer.
+            ...(music ? { background: "transparent", position: "relative", zIndex: 10 } : {}),
             // A fixed 16:9 frame for ordinary videos; a vertical one instead
             // stretches to whatever height its 9:16 parent gives it. Setting
             // BOTH would let aspect-ratio win and re-create the bug.

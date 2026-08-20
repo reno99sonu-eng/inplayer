@@ -3,12 +3,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { fetchAuthSession } from "aws-amplify/auth";
-import { UploadCloud, Film, PlaySquare, Loader2, X } from "lucide-react";
+import { UploadCloud, Film, PlaySquare, Loader2, X , Music2 } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import ProcessingStatus from "@/app/components/ProcessingStatus";
 import UploadThumbnailStep from "@/app/components/UploadThumbnailStep";
 import BackButton from "@/app/components/BackButton";
 import { CONTENT_CATEGORIES } from "@/app/data/categories";
+import { CONTENT_TYPE_LABEL, UPLOAD_ACCEPT, type ContentType } from "@/app/lib/contentTypes";
 import { compressImageToThumbnail } from "@/app/lib/imageCompress";
 import { buildAIGeneratePrompt, parseAITitleSuggestions } from "@/app/lib/aiPrompts";
 import VideoMetadataFields, {
@@ -37,7 +38,7 @@ export default function UploadPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState(CATEGORIES[0]);
-  const [contentType, setContentType] = useState<"video" | "short">("video");
+  const [contentType, setContentType] = useState<ContentType>("video");
   const [shortSettings, setShortSettings] = useState<ShortSettings>({
     soundtrack: null,
     musicClipSeconds: 30,
@@ -77,6 +78,7 @@ export default function UploadPage() {
         const typeParam = params.get("type");
         if (typeParam === "short") setContentType("short");
         if (typeParam === "video") setContentType("video");
+        if (typeParam === "music") setContentType("music");
 
         const preset = sessionStorage.getItem("inplayer-upload-preset");
         if (preset === "podcast" && CATEGORIES.includes("Podcasts")) {
@@ -136,7 +138,7 @@ export default function UploadPage() {
         setCategory(val as string);
         break;
       case "contentType":
-        setContentType(val as "video" | "short");
+        setContentType(val as ContentType);
         break;
       case "spokenLanguage":
         setSpokenLanguage(val as SpokenLanguage);
@@ -174,7 +176,22 @@ export default function UploadPage() {
   const handleFile = async (selected: File | null) => {
     if (!selected) return;
 
-    if (!selected.type.startsWith("video/")) {
+    const isMusicUpload = contentType === "music";
+
+    // Browsers disagree about audio MIME types — the same .m4a arrives as
+    // audio/mp4, audio/x-m4a, video/mp4 or "" depending on OS and browser,
+    // and .flac is frequently blank. So for music the extension is trusted
+    // when the reported type is unhelpful, rather than rejecting a file the
+    // user can plainly see is a song.
+    if (isMusicUpload) {
+      const looksAudio =
+        selected.type.startsWith("audio/") ||
+        /\.(mp3|m4a|aac|wav|flac|ogg|oga|opus)$/i.test(selected.name);
+      if (!looksAudio) {
+        setError("Please choose an audio file (MP3, M4A, WAV, FLAC).");
+        return;
+      }
+    } else if (!selected.type.startsWith("video/")) {
       setError("Please choose a video file.");
       return;
     }
@@ -187,7 +204,13 @@ export default function UploadPage() {
 
     setStage("details");
 
-    // Instantly extract 4 candidate frame snapshots from the local video file!
+    // Instantly extract 4 candidate frame snapshots from the local video
+    // file. Skipped entirely for music: there are no frames in an audio
+    // file, so the extractor would spin up a <video> element that never
+    // produces anything. The cover image is supplied by the creator
+    // instead, and is mandatory — see handlePublish.
+    if (isMusicUpload) return;
+
     try {
       const frames = await extractLocalVideoThumbnails(selected, 4);
       if (frames.length > 0) {
@@ -283,6 +306,16 @@ export default function UploadPage() {
 
     if (!title.trim()) {
       setError("Please give your upload a title.");
+      return;
+    }
+
+    // Music has no video frame for Mux to build a thumbnail from, so the
+    // cover art is the only image this track will ever have — on its card,
+    // in search, in playlists and behind the player. The server enforces
+    // this too (app/api/upload/create); this is just the friendlier place
+    // to find out.
+    if (contentType === "music" && !thumbnailPreview) {
+      setError("Please add cover art — a music upload needs an image.");
       return;
     }
 
@@ -436,12 +469,14 @@ export default function UploadPage() {
 
       <div className="text-center sm:text-left">
         <h1 className="text-2xl font-black text-white light:text-slate-900 sm:text-3xl">
-          {contentType === "short" ? "Shorts Upload Panel" : "Videos Upload Panel"}
+          {contentType === "short" ? "Shorts Upload Panel" : contentType === "music" ? "Music Upload Panel" : "Videos Upload Panel"}
         </h1>
         <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
           {contentType === "short"
             ? "Upload vertical short videos (9:16 format) up to 60 seconds with music and filters."
-            : "Upload 16:9 long-form videos, tutorials, podcasts, and movies for your channel."}
+            : contentType === "music"
+              ? "Upload a song or audio track. It plays in the normal player with your cover art on screen, and behaves like a video everywhere else."
+              : "Upload 16:9 long-form videos, tutorials, podcasts, and movies for your channel."}
         </p>
       </div>
 
@@ -472,6 +507,19 @@ export default function UploadPage() {
           <PlaySquare size={18} />
           <span>Shorts Panel</span>
         </button>
+
+        <button
+          type="button"
+          onClick={() => setContentType("music")}
+          className={`flex items-center gap-2.5 rounded-2xl px-6 py-3 text-sm font-bold transition-all duration-300 ${
+            contentType === "music"
+              ? "bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white shadow-[0_10px_25px_rgba(255,153,0,.35)] scale-105"
+              : "border border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/10 hover:text-white light:border-black/10 light:bg-black/[0.03] light:text-slate-700"
+          }`}
+        >
+          <Music2 size={18} />
+          <span>Music Panel</span>
+        </button>
       </div>
 
       <div className="mt-4">
@@ -500,6 +548,8 @@ export default function UploadPage() {
             <div className="flex h-16 w-16 items-center justify-center rounded-full bg-orange-500/10">
               {contentType === "short" ? (
                 <PlaySquare size={30} className="text-orange-400" />
+              ) : contentType === "music" ? (
+                <Music2 size={30} className="text-orange-400" />
               ) : (
                 <UploadCloud size={30} className="text-orange-400" />
               )}
@@ -508,7 +558,9 @@ export default function UploadPage() {
               <p className="font-semibold text-white light:text-slate-900 sm:text-lg">
                 {contentType === "short"
                   ? "Drag and drop a short video file (9:16 vertical)"
-                  : "Drag and drop a video file (16:9 recommended)"}
+                  : contentType === "music"
+                    ? "Drag and drop an audio file (MP3, M4A, WAV, FLAC)"
+                    : "Drag and drop a video file (16:9 recommended)"}
               </p>
               <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
                 or click to browse from your device
@@ -517,7 +569,7 @@ export default function UploadPage() {
             <input
               ref={fileInputRef}
               type="file"
-              accept="video/*"
+              accept={UPLOAD_ACCEPT[contentType]}
               className="hidden"
               onChange={(e) => handleFile(e.target.files?.[0] || null)}
             />
@@ -529,6 +581,8 @@ export default function UploadPage() {
             <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.03] p-4 light:border-black/10 light:bg-black/[0.02]">
               {contentType === "short" ? (
                 <PlaySquare size={22} className="flex-shrink-0 text-orange-400" />
+              ) : contentType === "music" ? (
+                <Music2 size={22} className="flex-shrink-0 text-orange-400" />
               ) : (
                 <Film size={22} className="flex-shrink-0 text-orange-400" />
               )}
@@ -537,7 +591,7 @@ export default function UploadPage() {
                   {file.name}
                 </p>
                 <p className="text-xs text-slate-400 light:text-slate-600">
-                  {(file.size / (1024 * 1024)).toFixed(1)} MB • {contentType === "short" ? "Short" : "Video"}
+                  {(file.size / (1024 * 1024)).toFixed(1)} MB • {CONTENT_TYPE_LABEL[contentType]}
                 </p>
               </div>
               <button
@@ -562,7 +616,8 @@ export default function UploadPage() {
                 onFileSelected: handleThumbnailSelected,
                 busy: thumbnailBusy,
                 error: thumbnailError,
-                muxFrames: localVideoFrames,
+                // No frames to choose from on an audio upload.
+                muxFrames: contentType === "music" ? [] : localVideoFrames,
                 onMuxThumbnailSelected: (url) => setThumbnailPreview(url),
                 onGenerateAIThumbnail: handleGenerateAIThumbnail,
                 aiThumbnailBusy: aiThumbnailBusy,
@@ -588,7 +643,7 @@ export default function UploadPage() {
               disabled={publishing}
               className="w-full rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] py-3.5 font-bold text-white shadow-[0_15px_35px_rgba(255,153,0,.3)] transition-all hover:-translate-y-0.5 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
             >
-              {publishing ? "Publishing..." : `Publish ${contentType === "short" ? "Short" : "Video"}`}
+              {publishing ? "Publishing..." : `Publish ${CONTENT_TYPE_LABEL[contentType]}`}
             </button>
           </div>
         )}

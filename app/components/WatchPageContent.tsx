@@ -14,6 +14,7 @@ import WatchActions from "@/app/components/watch/WatchActions";
 import WatchMeta from "@/app/components/watch/WatchMeta";
 import AdThumbnailCard from "@/app/components/AdThumbnailCard";
 import type { VideoLookFilter } from "@/app/lib/videoFilters";
+import { isMusicType } from "@/app/lib/contentTypes";
 
 interface VideoData {
   videoId: string;
@@ -96,6 +97,11 @@ export default function WatchPageContent({ video, relatedVideos: initialRelatedV
     return () => { cancelled = true; };
   }, [video.videoId, video.category, signedIn]);
 
+  // Audio-only upload — plays in this same player with the cover art
+  // showing instead of a black rectangle. Everything else on this page
+  // (title, actions, comments, Up Next) is unchanged: a track is a video
+  // that happens to have no picture.
+  const isMusic = isMusicType(video.contentType);
   const isShort = video.contentType === "short" || video.category?.toLowerCase().includes("raftaar") || video.category?.toLowerCase().includes("short");
 
   return (
@@ -114,6 +120,8 @@ export default function WatchPageContent({ video, relatedVideos: initialRelatedV
                     soundtrack={video.soundtrack}
                     filterLook={video.filterLook}
                     vertical={isShort}
+                    music={isMusic}
+                    coverUrl={video.thumbnailUrl}
                   />
                 ) : (
                   <VideoPlayer
@@ -129,6 +137,8 @@ export default function WatchPageContent({ video, relatedVideos: initialRelatedV
                     // letterboxed to a sliver inside — the bug someone hit
                     // by opening a Short's shared link.
                     vertical={isShort}
+                    music={isMusic}
+                    coverUrl={video.thumbnailUrl}
                   />
                 )
               ) : (

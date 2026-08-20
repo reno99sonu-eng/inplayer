@@ -8,7 +8,7 @@ export interface AIPromptContext {
   title: string;
   description: string;
   category: string;
-  contentType: "video" | "short";
+  contentType: "video" | "short" | "music";
   /** Free-text context the creator typed specifically to help the AI (see
       AITitleAssistModal) — the AI can't watch the actual video, so when
       this is present it's by far the strongest signal available, and is
@@ -38,7 +38,11 @@ export function buildAIGeneratePrompt(
   const format =
     ctx.contentType === "short"
       ? "vertical short-form video (like a Reel/Short)"
-      : "video";
+      : ctx.contentType === "music"
+        // Naming the format matters: without it the model writes video
+        // copy ("watch", "in this video") for something nobody watches.
+        ? "music track / song (audio only — the listener sees cover art, not footage)"
+        : "video";
   const titleLine = looksLikeAutoFilename(ctx.title)
     ? "No real title yet — the current value is just an auto-generated filename, ignore it as content signal."
     : `Working title: ${ctx.title.trim()}`;

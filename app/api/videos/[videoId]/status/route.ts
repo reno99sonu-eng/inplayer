@@ -3,6 +3,7 @@ import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import mux from "@/app/lib/mux";
 import { getMuxThumbnailUrl } from "@/app/lib/muxThumbnail";
+import { isMusicType } from "@/app/lib/contentTypes";
 
 interface Params {
   params: Promise<{ videoId: string }>;
@@ -36,7 +37,15 @@ export async function GET(request: NextRequest, { params }: Params) {
 
           if (playbackId) {
             const isShort = item.contentType === "short";
-            const thumbnailUrl = getMuxThumbnailUrl(playbackId, isShort);
+            // Music has no video frame for Mux to render, so the cover the
+            // creator supplied is the only image there is. Same reasoning as
+            // the equivalent line in app/api/webhooks/mux — the
+            // if_not_exists() below already prefers customThumbnailUrl, but
+            // leaving a known-404 URL as the fallback invites a later edit
+            // to start using it.
+            const thumbnailUrl = isMusicType(item.contentType)
+              ? ((item.customThumbnailUrl as string | undefined) ?? "")
+              : getMuxThumbnailUrl(playbackId, isShort);
 
             const updateResult = await docClient.send(
               new UpdateCommand({

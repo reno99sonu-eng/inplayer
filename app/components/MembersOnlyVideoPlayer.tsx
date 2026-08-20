@@ -21,6 +21,10 @@ interface MembersOnlyVideoPlayerProps {
    *  the loading/paywall panels below so they fill the same 9:16 frame
    *  rather than forcing a 16:9 strip inside it. */
   vertical?: boolean;
+  /** Audio-only upload — see VideoPlayer's own `music` prop. A track can be
+   *  members-only just like a video, so this has to be forwarded too. */
+  music?: boolean;
+  coverUrl?: string;
 }
 
 // Real gating, not a UI-only lock: this never receives a playable Mux
@@ -39,6 +43,8 @@ export default function MembersOnlyVideoPlayer({
   soundtrack,
   filterLook,
   vertical = false,
+  music = false,
+  coverUrl,
 }: MembersOnlyVideoPlayerProps) {
   const { signedIn, openSignIn } = useAuthModal();
   const [state, setState] = useState<
@@ -94,6 +100,8 @@ export default function MembersOnlyVideoPlayer({
         soundtrack={soundtrack}
         filterLook={filterLook}
         vertical={vertical}
+        music={music}
+        coverUrl={coverUrl}
       />
     );
   }

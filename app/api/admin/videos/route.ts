@@ -3,6 +3,7 @@ import { ScanCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { requireAdmin } from "@/app/lib/isAdmin";
 import { getMuxThumbnailUrl } from "@/app/lib/muxThumbnail";
+import { normalizeContentType } from "@/app/lib/contentTypes";
 
 const PAGE_SIZE = 25;
 // How many raw table items a title search is willing to walk through before
@@ -26,7 +27,7 @@ const MAX_SCAN_PAGES = 20;
 export interface AdminVideoRow {
   videoId: string;
   title: string;
-  contentType: "video" | "short";
+  contentType: "video" | "short" | "music";
   status: string | null;
   visibility: string | null;
   views: number;
@@ -50,7 +51,7 @@ function toRow(item: Record<string, unknown>): AdminVideoRow {
   return {
     videoId: item.videoId as string,
     title: (item.title as string) || "Untitled",
-    contentType: item.contentType === "short" ? "short" : "video",
+    contentType: normalizeContentType(item.contentType),
     status: (item.status as string) || null,
     visibility: (item.visibility as string) || null,
     views: (item.views as number) || 0,

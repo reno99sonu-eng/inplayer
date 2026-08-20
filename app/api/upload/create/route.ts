@@ -7,6 +7,7 @@ import { THUMBNAIL_DATA_URL_MAX_LENGTH } from "@/app/lib/imageCompress";
 import { ensureUsername } from "@/app/lib/ensureUsername";
 import { moderateText, UNCHECKED } from "@/app/lib/moderation";
 import { getPlatformSettings } from "@/app/lib/platformSettings";
+import { isMusicType, normalizeContentType } from "@/app/lib/contentTypes";
 import { applyModerationStrike } from "@/app/lib/moderationStrikes";
 import { CUSTOM_AUDIO_MAX_SECONDS } from "@/app/data/soundtracks";
 import {
@@ -121,6 +122,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Music is an audio-only upload. It is longform (NOT a short, so it
+    // lands in the main feed alongside videos), but it has no video track —
+    // which changes exactly three things: the cover image is mandatory, Mux
+    // is asked for an audio rendition instead of MP4s, and captions are
+    // skipped. See app/lib/contentTypes.ts.
+    //
+    // Declared HERE rather than beside isShort further down, because the
+    // cover check below needs it and a const is in its temporal dead zone
+    // until its own line — declaring it later throws on every upload.
+    const isMusic = isMusicType(contentType);
+
     // Optional creator-supplied thumbnail. Validated defensively even
     // though the client always sends output from compressImageToThumbnail
     // — a request could bypass the browser entirely.
@@ -137,6 +149,18 @@ export async function POST(request: NextRequest) {
         );
       }
       customThumbnailUrl = thumbnailDataUrl;
+    }
+
+    // A cover image is REQUIRED for music, with no fallback: Mux renders
+    // thumbnails from video frames and an audio-only asset has none, so
+    // without this the track publishes with a broken image everywhere it is
+    // listed. Enforced server-side because a hand-made request skips the
+    // upload form entirely.
+    if (isMusic && !customThumbnailUrl) {
+      return NextResponse.json(
+        { error: "Music uploads need a cover image — audio has no video frame to make one from." },
+        { status: 400 }
+      );
     }
 
     // Snapshot the uploader's current avatar so video/short cards can show
@@ -216,7 +240,15 @@ export async function POST(request: NextRequest) {
         // video still gets a public ID too, since most videos aren't
         // members-only and should keep working exactly as before.
         playback_policy: isShort ? ["public"] : ["public", "signed"],
-        ...(!isShort && {
+        // Music: one audio-only downloadable rendition instead of the MP4
+        // ladder. Asking Mux for "1080p" on an asset with no video track is
+        // simply skipped and max_resolution_tier is meaningless here, but an
+        // audio-only M4A is the real equivalent — and it is what makes the
+        // existing Download button work for a track.
+        ...(isMusic && {
+          static_renditions: [{ resolution: "audio-only" }],
+        }),
+        ...(!isShort && !isMusic && {
           static_renditions: [
             { resolution: "1080p" },
             { resolution: "720p" },
@@ -246,7 +278,7 @@ export async function POST(request: NextRequest) {
           title: title.trim(),
           description: description?.trim() || "",
           category: category.trim(),
-          contentType: isShort ? "short" : "video",
+          contentType: normalizeContentType(contentType),
           spokenLanguage: spokenLang,
           uploaderId: user.userId,
           uploaderName: user.name || "Unknown",

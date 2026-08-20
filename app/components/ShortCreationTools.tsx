@@ -36,7 +36,7 @@ export default function ShortCreationTools({
   // cut short of the track's natural end) — a Video instead loops the
   // track for its whole runtime (see VideoPlayer.tsx), so that control is
   // hidden when this is "video".
-  contentType: "video" | "short";
+  contentType: "video" | "short" | "music";
 }) {
   const [query, setQuery] = useState("");
   const [previewingId, setPreviewingId] = useState<string | null>(null);

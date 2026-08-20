@@ -402,28 +402,45 @@ export default function UploadPage() {
       const { uploadUrl, videoId: createdVideoId } = createData;
       setUploadedVideoId(createdVideoId);
 
-      await new Promise<void>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open("PUT", uploadUrl);
+      // Upload the media file directly to Mux with retry logic to handle
+      // flaky mobile connections gracefully.
+      const uploadWithRetry = async (retries = 2): Promise<void> => {
+        for (let attempt = 0; attempt <= retries; attempt++) {
+          try {
+            await new Promise<void>((resolve, reject) => {
+              const xhr = new XMLHttpRequest();
+              xhr.open("PUT", uploadUrl);
 
-        xhr.upload.onprogress = (event) => {
-          if (event.lengthComputable) {
-            setProgress(Math.round((event.loaded / event.total) * 100));
+              xhr.upload.onprogress = (event) => {
+                if (event.lengthComputable) {
+                  setProgress(Math.round((event.loaded / event.total) * 100));
+                }
+              };
+
+              xhr.onload = () => {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                  resolve();
+                } else {
+                  reject(new Error(`Upload failed with status ${xhr.status}`));
+                }
+              };
+
+              xhr.onerror = () => reject(new Error("Network error during upload"));
+              xhr.ontimeout = () => reject(new Error("Upload timed out"));
+              xhr.timeout = 180000; // 3 minute timeout
+
+              xhr.send(file);
+            });
+            return; // Success
+          } catch (err) {
+            if (attempt === retries) throw err;
+            console.warn(`Upload attempt ${attempt + 1} failed, retrying...`, err);
+            await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
           }
-        };
+        }
+      };
 
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            resolve();
-          } else {
-            reject(new Error(`Upload failed with status ${xhr.status}`));
-          }
-        };
-
-        xhr.onerror = () => reject(new Error("Network error during upload"));
-
-        xhr.send(file);
-      });
+      await uploadWithRetry();
 
       setStage("processing");
       setPublishing(false);

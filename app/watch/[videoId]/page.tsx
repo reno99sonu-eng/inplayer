@@ -312,6 +312,11 @@ export default async function WatchPage({ params }: WatchPageProps) {
           membersOnly: !!video.membersOnly,
           thumbnailUrl: video.thumbnailUrl,
           contentType: video.contentType,
+          // Music-only extras. Undefined on a video, and MusicStage is
+          // never rendered for one, so this costs nothing there.
+          covers: (video.covers as string[] | undefined) || undefined,
+          coverIntervalSeconds: (video.coverIntervalSeconds as number | undefined) || undefined,
+          lyrics: (video.lyrics as { time: number; text: string }[] | undefined) || undefined,
           downloadStatus: video.downloadStatus || "unavailable",
           downloadRenditions: video.downloadRenditions || {},
           tags: video.tags || [],

@@ -13,6 +13,7 @@ import {
   ShieldCheck,
   ShieldAlert,
   Search,
+  Bot,
 } from "lucide-react";
 
 interface CopyrightItem {
@@ -25,6 +26,10 @@ interface CopyrightItem {
   details: string;
   createdAt: string;
   currentStrikes: number;
+  /** Raised by the upload screening, not by a person — see the badge and
+   *  the caution note below. Optional so a response from before this
+   *  shipped simply reads as "reported by a person", which it was. */
+  autoFlagged?: boolean;
 }
 
 
@@ -185,6 +190,11 @@ export default function CopyrightCenterPage() {
                 <span className="flex items-center gap-1 rounded-full bg-red-500/15 light:bg-red-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-red-300 light:text-red-700">
                   <Copyright size={10} /> Copyright
                 </span>
+                {item.autoFlagged && (
+                  <span className="flex items-center gap-1 rounded-full bg-amber-500/15 light:bg-amber-100 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-amber-300 light:text-amber-800">
+                    <Bot size={10} /> Auto-flagged
+                  </span>
+                )}
                 <span
                   className={`flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${
                     item.currentStrikes >= threshold - 1
@@ -211,6 +221,21 @@ export default function CopyrightCenterPage() {
               </p>
               {item.details && (
                 <p className="mt-1 text-xs text-slate-500">&ldquo;{item.details}&rdquo;</p>
+              )}
+
+              {/* The distinction that keeps this queue fair. A rights
+                  holder's complaint is a claim; this is a pattern match on
+                  what the creator typed. Same queue, very different weight
+                  — and the reviewer should know which one they're looking
+                  at before they take away someone's channel. */}
+              {item.autoFlagged && (
+                <p className="mt-1.5 flex items-start gap-1.5 rounded-lg bg-amber-500/[0.07] px-2 py-1.5 text-[11px] leading-relaxed text-amber-200/90 light:bg-amber-50 light:text-amber-900">
+                  <AlertTriangle size={11} className="mt-0.5 flex-shrink-0" />
+                  <span>
+                    Nobody has claimed this recording — the upload screening raised it. Listen
+                    before striking: the wording can be wrong about a creator&apos;s own song.
+                  </span>
+                </p>
               )}
 
               <div className="mt-3 flex items-center gap-2">

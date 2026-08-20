@@ -21,6 +21,7 @@ import {
   Globe,
   Sparkles,
   User,
+  Music2,
 } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { formatViews, formatTimeAgo } from "@/app/lib/formatters";
@@ -35,6 +36,7 @@ import {
   normalizeVideoAudience,
 } from "@/app/lib/contentAccess";
 import { buildAIGeneratePrompt, parseAITitleSuggestions } from "@/app/lib/aiPrompts";
+import { normalizeContentType } from "@/app/lib/contentTypes";
 import VideoMetadataFields, {
   VideoMetadataValue,
   SpokenLanguage,
@@ -75,8 +77,12 @@ interface MyVideo {
 interface AnalyticsResponse {
   videos: ContentStats;
   shorts: ContentStats;
+  // Optional on purpose: a browser holding a response from before music
+  // shipped has no `music` key, and every read below falls back to
+  // emptyContentStats rather than throwing on `.views` of undefined.
+  music?: ContentStats;
   subscriberCount: number;
-  trend: { videos: TrendPoint[]; shorts: TrendPoint[] };
+  trend: { videos: TrendPoint[]; shorts: TrendPoint[]; music?: TrendPoint[] };
   trendAvailable: boolean;
 }
 
@@ -97,7 +103,13 @@ export default function MyVideosPage() {
   const [loading, setLoading] = useState(true);
 
   const [activeTab, setActiveTab] = useState<ActivePanel>("dashboard");
-  const [libraryFilter, setLibraryFilter] = useState<"all" | "video" | "short">("all");
+  const [libraryFilter, setLibraryFilter] = useState<"all" | "video" | "short" | "music">("all");
+  // Which content kind the analytics cards and the trend chart describe.
+  // Before this existed the panel always rendered `analytics.videos` and
+  // there was no way to see Shorts numbers at all — so this both answers
+  // "show music individually" and surfaces Shorts, which were already
+  // being computed by the API and thrown away here.
+  const [analyticsScope, setAnalyticsScope] = useState<"video" | "short" | "music">("video");
 
   // Channel Description / Bio State
   const [channelBio, setChannelBio] = useState("");
@@ -221,7 +233,11 @@ export default function MyVideosPage() {
       title: video.title,
       description: video.description || "",
       category: video.category,
-      contentType: video.contentType === "short" ? "short" : "video",
+      // Was `=== "short" ? "short" : "video"`, which silently relabelled a
+      // track as a video — and the edit form branches on this to decide
+      // what to show, so a music upload would have been offered Mux frame
+      // thumbnails that don't exist for audio.
+      contentType: normalizeContentType(video.contentType),
       spokenLanguage: (SPOKEN_LANGUAGE_VALUES.includes(video.spokenLanguage || "")
         ? video.spokenLanguage
         : "auto") as SpokenLanguage,
@@ -358,7 +374,10 @@ export default function MyVideosPage() {
           audience: editValue.audience,
           commentsEnabled: editValue.commentsEnabled,
           spokenLanguage: editValue.spokenLanguage,
-          membersOnly: editValue.contentType === "video" ? editValue.membersOnly : undefined,
+          // Longform, not literally "video" — a members-only track is a
+          // perfectly ordinary thing to publish, and the watch page's
+          // MembersOnlyVideoPlayer already handles audio.
+          membersOnly: editValue.contentType !== "short" ? editValue.membersOnly : undefined,
           thumbnailDataUrl: editThumbnailPreview || undefined,
           thumbnailUrl: selectedMuxThumbnail || undefined,
         }),
@@ -385,7 +404,7 @@ export default function MyVideosPage() {
                 ageRestricted: editValue.ageRestricted,
                 commentsEnabled: editValue.commentsEnabled,
                 spokenLanguage: editValue.spokenLanguage,
-                membersOnly: editValue.contentType === "video" ? editValue.membersOnly : v.membersOnly,
+                membersOnly: editValue.contentType !== "short" ? editValue.membersOnly : v.membersOnly,
                 thumbnailUrl:
                   editThumbnailPreview ||
                   selectedMuxThumbnail ||
@@ -455,11 +474,29 @@ export default function MyVideosPage() {
     );
   }
 
-  const isVideoShort = (v: any) => v.contentType === "short" || v.category?.toLowerCase().includes("raftaar") || v.category?.toLowerCase().includes("short");
-  const videoItems = videos.filter((v) => !isVideoShort(v));
+  const isVideoShort = (v: MyVideo) => v.contentType === "short" || v.category?.toLowerCase().includes("raftaar") || v.category?.toLowerCase().includes("short");
+  const isMusicItem = (v: MyVideo) => v.contentType === "music";
   const shortItems = videos.filter((v) => isVideoShort(v));
+  const musicItems = videos.filter((v) => isMusicItem(v) && !isVideoShort(v));
+  const videoItems = videos.filter((v) => !isVideoShort(v) && !isMusicItem(v));
 
-  const totalViews = analytics ? analytics.videos.views + analytics.shorts.views : 0;
+  const musicStats = analytics?.music ?? emptyContentStats;
+  const analyticsForScope =
+    analyticsScope === "short"
+      ? analytics?.shorts ?? emptyContentStats
+      : analyticsScope === "music"
+        ? musicStats
+        : analytics?.videos ?? emptyContentStats;
+  const trendForScope =
+    analyticsScope === "short"
+      ? analytics?.trend.shorts ?? []
+      : analyticsScope === "music"
+        ? analytics?.trend.music ?? []
+        : analytics?.trend.videos ?? [];
+
+  const totalViews = analytics
+    ? analytics.videos.views + analytics.shorts.views + musicStats.views
+    : 0;
   const subscriberCount = analytics?.subscriberCount ?? 0;
   const activeEditingVideo = editingId ? videos.find((v) => v.videoId === editingId) : null;
 
@@ -631,13 +668,41 @@ export default function MyVideosPage() {
                 </div>
               </div>
 
-              {/* Analytics Summary Overview */}
-              <ChannelAnalytics
-                stats={analytics ? analytics.videos : emptyContentStats}
-                trend={analytics ? analytics.trend.videos : []}
-                trendAvailable={analytics?.trendAvailable ?? true}
-                loading={analyticsLoading}
-              />
+              {/* Analytics Summary Overview — one set of cards, switched
+                  between the three content kinds. Keeping it as ONE panel
+                  rather than three stacked ones matters: the numbers are
+                  directly comparable only when they sit in the same place. */}
+              <div className="space-y-3">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="mr-1 text-base font-black text-white light:text-slate-900 sm:text-lg">
+                    Analytics
+                  </h2>
+                  {([
+                    { id: "video", label: "Videos", count: videoItems.length },
+                    { id: "short", label: "Shorts", count: shortItems.length },
+                    { id: "music", label: "Music", count: musicItems.length },
+                  ] as const).map((scope) => (
+                    <button
+                      key={scope.id}
+                      type="button"
+                      onClick={() => setAnalyticsScope(scope.id)}
+                      className={`rounded-xl px-3 py-1.5 text-xs font-bold transition ${
+                        analyticsScope === scope.id
+                          ? "bg-gradient-to-r from-[#FF7A18] to-[#FF9A00] text-white shadow"
+                          : "bg-black/20 text-slate-400 hover:text-white light:bg-black/5 light:text-slate-600 light:hover:text-slate-900"
+                      }`}
+                    >
+                      {scope.label} ({scope.count})
+                    </button>
+                  ))}
+                </div>
+                <ChannelAnalytics
+                  stats={analyticsForScope}
+                  trend={trendForScope}
+                  trendAvailable={analytics?.trendAvailable ?? true}
+                  loading={analyticsLoading}
+                />
+              </div>
 
               {/* Your Uploads (Videos + Raftaar, combined) */}
                 {(() => {
@@ -646,6 +711,8 @@ export default function MyVideosPage() {
                   ? videoItems
                   : libraryFilter === "short"
                   ? shortItems
+                  : libraryFilter === "music"
+                  ? musicItems
                   : videos;
 
               return (
@@ -691,6 +758,16 @@ export default function MyVideosPage() {
                           }`}
                         >
                           Shorts ({shortItems.length})
+                        </button>
+                        <button
+                          onClick={() => setLibraryFilter("music")}
+                          className={`rounded-lg px-3 py-1 text-xs font-bold transition ${
+                            libraryFilter === "music"
+                              ? "bg-gradient-to-r from-[#FF7A18] to-[#FF9A00] text-white shadow"
+                              : "text-slate-400 hover:text-white light:text-slate-600"
+                          }`}
+                        >
+                          Music ({musicItems.length})
                         </button>
                       </div>
 
@@ -751,6 +828,11 @@ export default function MyVideosPage() {
                           {video.visibility && (
                             <span className="absolute top-2 right-2 rounded-full bg-black/60 backdrop-blur-md px-2 py-0.5 text-[9px] font-bold text-white capitalize">
                               {video.visibility}
+                            </span>
+                          )}
+                          {isMusicItem(video) && (
+                            <span className="absolute bottom-2 left-2 flex items-center gap-1 rounded-full bg-violet-500/90 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-white shadow">
+                              <Music2 size={9} /> Music
                             </span>
                           )}
                         </div>
@@ -863,7 +945,12 @@ export default function MyVideosPage() {
                       </div>
                       <div>
                         <h2 className="text-base font-black text-white light:text-slate-900 sm:text-lg">
-                          Edit {editValue.contentType === "short" ? "Short" : "Video"}
+                          Edit{" "}
+                          {editValue.contentType === "short"
+                            ? "Short"
+                            : editValue.contentType === "music"
+                              ? "Track"
+                              : "Video"}
                         </h2>
                         <p className="truncate text-xs font-medium text-slate-400 light:text-slate-600 max-w-[300px] sm:max-w-md">
                           {activeEditingVideo.title}
@@ -893,14 +980,19 @@ export default function MyVideosPage() {
                       onFileSelected: handleEditThumbnailSelected,
                       busy: editThumbnailBusy,
                       error: editThumbnailError,
-                      muxFrames: activeEditingVideo.muxPlaybackId
-                        ? [
-                            `https://image.mux.com/${activeEditingVideo.muxPlaybackId}/thumbnail.jpg?time=2`,
-                            `https://image.mux.com/${activeEditingVideo.muxPlaybackId}/thumbnail.jpg?time=5`,
-                            `https://image.mux.com/${activeEditingVideo.muxPlaybackId}/thumbnail.jpg?time=10`,
-                            `https://image.mux.com/${activeEditingVideo.muxPlaybackId}/thumbnail.jpg?time=15`,
-                          ]
-                        : [],
+                      // No frame-grabs for a track. Mux renders these from
+                      // video frames, and an audio-only asset has none —
+                      // every one of these URLs would 404 into a row of
+                      // broken images. The creator picks a cover instead.
+                      muxFrames:
+                        activeEditingVideo.muxPlaybackId && editValue.contentType !== "music"
+                          ? [
+                              `https://image.mux.com/${activeEditingVideo.muxPlaybackId}/thumbnail.jpg?time=2`,
+                              `https://image.mux.com/${activeEditingVideo.muxPlaybackId}/thumbnail.jpg?time=5`,
+                              `https://image.mux.com/${activeEditingVideo.muxPlaybackId}/thumbnail.jpg?time=10`,
+                              `https://image.mux.com/${activeEditingVideo.muxPlaybackId}/thumbnail.jpg?time=15`,
+                            ]
+                          : [],
                       selectedMuxThumbnail,
                       onMuxThumbnailSelected: (url) => {
                         setSelectedMuxThumbnail(url);

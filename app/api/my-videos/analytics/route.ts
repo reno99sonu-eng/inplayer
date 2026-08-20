@@ -3,8 +3,8 @@ import { ScanCommand, QueryCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
 
-// Studio-style channel analytics, split by content type (regular videos vs
-// Shorts). Every number here is real, sourced from the same tables the rest
+// Studio-style channel analytics, split by content type (regular videos,
+// Shorts, and audio-only Music). Every number here is real, sourced from the same tables the rest
 // of the app already writes to — nothing on this page is fabricated:
 //   - views / shareCount live directly on each InPlayer-Videos item
 //   - likes come from InPlayer-Likes (reaction === "like")
@@ -76,16 +76,34 @@ export async function GET(request: NextRequest) {
         | undefined;
     } while (exclusiveStartKey);
   }
-  const videoItems = allVideos.filter((v) => v.contentType !== "short");
+  // Three disjoint buckets. Music used to fall into `videoItems` (the
+  // filter was simply `!== "short"`), which is right for the monetization
+  // threshold in app/lib/monetization.ts but wrong here — the creator
+  // asked to see how their music is doing, and a number that has their
+  // videos mixed into it cannot answer that. A row with no contentType at
+  // all is a pre-music upload and is a video, as everywhere else.
   const shortItems = allVideos.filter((v) => v.contentType === "short");
+  const musicItems = allVideos.filter((v) => v.contentType === "music");
+  const videoItems = allVideos.filter(
+    (v) => v.contentType !== "short" && v.contentType !== "music"
+  );
   const videoIds = new Set(allVideos.map((v) => v.videoId));
 
-  const stats: { videos: EmptyStats; shorts: EmptyStats } = {
+  // Built once and reused by both the likes aggregation and the comment
+  // tally below. (The likes loop previously did a linear `.some()` over
+  // every short for every single like — fine at ten videos, quadratic at a
+  // thousand.)
+  const shortIdSet = new Set(shortItems.map((v) => v.videoId));
+  const musicIdSet = new Set(musicItems.map((v) => v.videoId));
+
+  const stats: { videos: EmptyStats; shorts: EmptyStats; music: EmptyStats } = {
     videos: emptyStats(),
     shorts: emptyStats(),
+    music: emptyStats(),
   };
   stats.videos.count = videoItems.length;
   stats.shorts.count = shortItems.length;
+  stats.music.count = musicItems.length;
   for (const v of videoItems) {
     stats.videos.views += v.views || 0;
     stats.videos.shares += v.shareCount || 0;
@@ -94,8 +112,13 @@ export async function GET(request: NextRequest) {
     stats.shorts.views += s.views || 0;
     stats.shorts.shares += s.shareCount || 0;
   }
+  for (const m of musicItems) {
+    stats.music.views += m.views || 0;
+    stats.music.shares += m.shareCount || 0;
+  }
   stats.videos.reach = stats.videos.views;
   stats.shorts.reach = stats.shorts.views;
+  stats.music.reach = stats.music.views;
 
   // 2) Likes — one scan of the reactions that are actually "like"s, grouped
   // back onto this creator's own videos in memory. Fine at InPlayer's
@@ -115,8 +138,8 @@ export async function GET(request: NextRequest) {
         );
         for (const item of likesResult.Items || []) {
           if (!videoIds.has(item.videoId)) continue;
-          const isShort = shortItems.some((s) => s.videoId === item.videoId);
-          if (isShort) stats.shorts.likes += 1;
+          if (shortIdSet.has(item.videoId)) stats.shorts.likes += 1;
+          else if (musicIdSet.has(item.videoId)) stats.music.likes += 1;
           else stats.videos.likes += 1;
         }
         exclusiveStartKey = likesResult.LastEvaluatedKey as
@@ -155,9 +178,9 @@ export async function GET(request: NextRequest) {
       }
     })
   );
-  const shortIdSet = new Set(shortItems.map((s) => s.videoId));
   for (const c of commentCounts) {
     if (shortIdSet.has(c.videoId)) stats.shorts.comments += c.count;
+    else if (musicIdSet.has(c.videoId)) stats.music.comments += c.count;
     else stats.videos.comments += c.count;
   }
 
@@ -185,9 +208,10 @@ export async function GET(request: NextRequest) {
   // Needs the InPlayer-Channel-Daily-Stats table to exist (userId partition
   // key, date sort key) — if it doesn't yet, the rest of this response is
   // still fully real; only the trend arrays come back empty.
-  let trend: { videos: TrendPoint[]; shorts: TrendPoint[] } = {
+  let trend: { videos: TrendPoint[]; shorts: TrendPoint[]; music: TrendPoint[] } = {
     videos: [],
     shorts: [],
+    music: [],
   };
   let trendAvailable = true;
 
@@ -207,6 +231,13 @@ export async function GET(request: NextRequest) {
           shortLikes: stats.shorts.likes,
           shortComments: stats.shorts.comments,
           shortShares: stats.shorts.shares,
+          // New attributes on an existing item — DynamoDB is schemaless,
+          // so days recorded before music shipped simply won't have them
+          // and read back as 0 below. Nothing needs migrating.
+          musicViews: stats.music.views,
+          musicLikes: stats.music.likes,
+          musicComments: stats.music.comments,
+          musicShares: stats.music.shares,
           subscriberCount,
           recordedAt: new Date().toISOString(),
         },
@@ -244,6 +275,13 @@ export async function GET(request: NextRequest) {
         comments: (p.shortComments as number) || 0,
         shares: (p.shortShares as number) || 0,
       })),
+      music: points.map((p) => ({
+        date: p.date as string,
+        views: (p.musicViews as number) || 0,
+        likes: (p.musicLikes as number) || 0,
+        comments: (p.musicComments as number) || 0,
+        shares: (p.musicShares as number) || 0,
+      })),
     };
   } catch (err) {
     console.error(
@@ -256,6 +294,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     videos: stats.videos,
     shorts: stats.shorts,
+    music: stats.music,
     subscriberCount,
     trend,
     trendAvailable,

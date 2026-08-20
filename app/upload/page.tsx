@@ -9,7 +9,12 @@ import ProcessingStatus from "@/app/components/ProcessingStatus";
 import UploadThumbnailStep from "@/app/components/UploadThumbnailStep";
 import BackButton from "@/app/components/BackButton";
 import { CONTENT_CATEGORIES } from "@/app/data/categories";
-import { CONTENT_TYPE_LABEL, UPLOAD_ACCEPT, type ContentType } from "@/app/lib/contentTypes";
+import {
+  CONTENT_TYPE_LABEL,
+  CONTENT_TYPE_WORD,
+  UPLOAD_ACCEPT,
+  type ContentType,
+} from "@/app/lib/contentTypes";
 import { compressImageToThumbnail } from "@/app/lib/imageCompress";
 import { buildAIGeneratePrompt, parseAITitleSuggestions } from "@/app/lib/aiPrompts";
 import VideoMetadataFields, {
@@ -19,6 +24,11 @@ import VideoMetadataFields, {
 } from "@/app/components/VideoMetadataFields";
 import AITitleAssistModal from "@/app/components/AITitleAssistModal";
 import ShortCreationTools, { ShortSettings } from "@/app/components/ShortCreationTools";
+import MusicUploadTools, {
+  emptyMusicSettings,
+  type MusicSettings,
+} from "@/app/components/MusicUploadTools";
+import { sha256HexOfFile } from "@/app/lib/audioHash";
 import { extractLocalVideoThumbnails } from "@/app/lib/videoThumbnailExtractor";
 import { audienceFlags, type VideoAudience } from "@/app/lib/contentAccess";
 
@@ -44,6 +54,7 @@ export default function UploadPage() {
     musicClipSeconds: 30,
     filter: "original",
   });
+  const [musicSettings, setMusicSettings] = useState<MusicSettings>(emptyMusicSettings);
   const [spokenLanguage, setSpokenLanguage] = useState<SpokenLanguage>("auto");
 
   // YouTube-style upload options.
@@ -209,7 +220,17 @@ export default function UploadPage() {
     // file, so the extractor would spin up a <video> element that never
     // produces anything. The cover image is supplied by the creator
     // instead, and is mandatory — see handlePublish.
-    if (isMusicUpload) return;
+    if (isMusicUpload) {
+      // Byte-for-byte fingerprint, computed here in the browser because
+      // the audio goes straight from here to Mux and never passes through
+      // our server. It lets /api/upload/create spot a re-upload of
+      // something already on InPlayer. A null result (no secure context,
+      // no Web Crypto) simply means that one check doesn't run — see
+      // app/lib/audioHash.ts.
+      const hash = await sha256HexOfFile(selected);
+      setMusicSettings((prev) => ({ ...prev, audioSha256: hash }));
+      return;
+    }
 
     try {
       const frames = await extractLocalVideoThumbnails(selected, 4);
@@ -314,8 +335,8 @@ export default function UploadPage() {
     // in search, in playlists and behind the player. The server enforces
     // this too (app/api/upload/create); this is just the friendlier place
     // to find out.
-    if (contentType === "music" && !thumbnailPreview) {
-      setError("Please add cover art — a music upload needs an image.");
+    if (contentType === "music" && musicSettings.covers.length === 0) {
+      setError("Please add cover art — a music upload needs at least one image.");
       return;
     }
 
@@ -351,11 +372,22 @@ export default function UploadPage() {
           ...audienceFlags(audience),
           commentsEnabled,
           tags,
-          membersOnly: contentType === "video" ? membersOnly : undefined,
+          // Longform, not literally "video" — a members-only track is an
+          // ordinary thing to publish, and the watch page already handles
+          // gated audio.
+          membersOnly: contentType !== "short" ? membersOnly : undefined,
           // Sent for both content types now — Videos can pick a background
           // soundtrack/Look too (see ShortCreationTools below).
           shortSettings,
           thumbnailDataUrl: thumbnailPreview,
+          // Music-only. Ignored by the server for any other content type.
+          ...(contentType === "music" && {
+            covers: musicSettings.covers,
+            coverIntervalSeconds: musicSettings.coverIntervalSeconds,
+            lyrics: musicSettings.lyrics,
+            audioSha256: musicSettings.audioSha256,
+            declaredOwnership: musicSettings.declaredOwnership,
+          }),
         }),
       });
 
@@ -417,6 +449,7 @@ export default function UploadPage() {
     setDescription("");
     setCategory(CATEGORIES[0]);
     setShortSettings({ soundtrack: null, musicClipSeconds: 30, filter: "original" });
+    setMusicSettings(emptyMusicSettings());
     setSpokenLanguage("auto");
     setVisibility("public");
     setAudience("everyone");
@@ -611,13 +644,17 @@ export default function UploadPage() {
               onOpenAITitleAssist={() => setAiTitleAssistOpen(true)}
               aiError={aiType === "title" ? aiError : null}
               aiSuggestions={aiType === "title" ? aiSuggestions : []}
-              thumbnail={contentType === "short" ? undefined : {
+              // Music gets no thumbnail picker here: its artwork is the
+              // cover art in MusicUploadTools below, and cover 1 becomes
+              // the thumbnail automatically. Two separate image pickers
+              // for one track is how a creator ends up with a card that
+              // doesn't match the sleeve behind the player.
+              thumbnail={contentType === "short" || contentType === "music" ? undefined : {
                 previewUrl: thumbnailPreview,
                 onFileSelected: handleThumbnailSelected,
                 busy: thumbnailBusy,
                 error: thumbnailError,
-                // No frames to choose from on an audio upload.
-                muxFrames: contentType === "music" ? [] : localVideoFrames,
+                muxFrames: localVideoFrames,
                 onMuxThumbnailSelected: (url) => setThumbnailPreview(url),
                 onGenerateAIThumbnail: handleGenerateAIThumbnail,
                 aiThumbnailBusy: aiThumbnailBusy,
@@ -625,6 +662,18 @@ export default function UploadPage() {
               tagInput={tagInput}
               onTagInputChange={setTagInput}
             />
+
+            {contentType === "music" && (
+              <MusicUploadTools
+                value={musicSettings}
+                onChange={setMusicSettings}
+                audioFile={file}
+                onPosterChange={setThumbnailPreview}
+                title={title}
+                description={description}
+                tags={tags}
+              />
+            )}
 
             <ShortCreationTools
               value={shortSettings}
@@ -686,7 +735,7 @@ export default function UploadPage() {
             </div>
             <div>
               <p className="font-semibold text-white light:text-slate-900">
-                Uploading your {contentType === "short" ? "short" : "video"}...
+                Uploading your {CONTENT_TYPE_WORD[contentType]}...
               </p>
               <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
                 Please keep this tab open.

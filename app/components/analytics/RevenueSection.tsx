@@ -13,6 +13,7 @@ import {
   Check,
   AlertTriangle,
   PlaySquare,
+  Music2,
 } from "lucide-react";
 import {
   PAYOUT_FREQUENCIES,
@@ -448,6 +449,8 @@ export default function RevenueSection({
           <p className="text-xs text-slate-500 light:text-slate-600">
             Monetization unlocks automatically when you reach {monetizeData?.eligibility?.thresholds?.subscribers?.toLocaleString() || 500} In-Family members
             AND either {monetizeData?.eligibility?.thresholds?.videoViews?.toLocaleString() || 50000} video views or {(monetizeData?.eligibility?.thresholds?.shortViews || 1000000).toLocaleString()} Raftaar reels views!
+            {" "}Plays of your music count toward the video-views target — same
+            milestone, whichever way you publish.
           </p>
 
           <div>
@@ -472,6 +475,23 @@ export default function RevenueSection({
               </span>
             </div>
             <ProgressBar value={monetizeData?.eligibility?.metrics?.videoViews || 0} max={monetizeData?.eligibility?.thresholds?.videoViews || 50000} />
+            {/* The music line is a BREAKDOWN of the bar above, not a fourth
+                milestone — see the comment on musicViews in
+                app/lib/monetization.ts. Rendered only when there are
+                actually music plays, so a creator who has never uploaded a
+                track never sees a row of zeros. */}
+            {(monetizeData?.eligibility?.metrics?.musicViews || 0) > 0 && (
+              <p className="mt-1 flex items-center gap-1.5 text-[11px] text-slate-500 light:text-slate-600">
+                <Music2 size={11} />
+                <span>
+                  including{" "}
+                  <span className="font-semibold text-violet-300 light:text-violet-700">
+                    {(monetizeData?.eligibility?.metrics?.musicViews || 0).toLocaleString()}
+                  </span>{" "}
+                  music plays
+                </span>
+              </p>
+            )}
           </div>
 
           <div>

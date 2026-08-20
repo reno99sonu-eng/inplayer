@@ -30,7 +30,7 @@ interface AdminVideoRow {
   uploadedAt: string | null;
 }
 
-type TypeFilter = "all" | "video" | "short";
+type TypeFilter = "all" | "video" | "short" | "music";
 // Mirrors STATUS_VALUES in app/api/admin/videos/route.ts — every real value
 // ever written to a video's `status` field. "ready" here also covers
 // videos with no status attribute at all (pre-dates the field), same as
@@ -45,8 +45,10 @@ const STATUS_TABS: { key: StatusFilter; label: string }[] = [
   { key: "error", label: "Failed" },
 ];
 
+// One shared rule for where a piece of content is watched, so this page
+// can never drift from the rest of the site as content types are added.
 function watchHref(v: AdminVideoRow): string {
-  return v.contentType === "short" ? `/shorts?v=${v.videoId}` : `/watch/${v.videoId}`;
+  return watchHrefFor(v.contentType, v.videoId);
 }
 
 // Status pill shown on each row — "ready" (the normal, working state) is
@@ -77,7 +79,12 @@ export default function AdminVideosPage() {
   const initialType = searchParams.get("type");
   const initialStatus = searchParams.get("status");
   const [type, setType] = useState<TypeFilter>(
-    initialType === "short" || initialType === "video" ? initialType : "all"
+    // Kept in sync with TYPE_VALUES in the API route — the Dashboard's
+    // cards deep-link here as ?type=video / ?type=short / ?type=music, and
+    // an unrecognised value has to fall back to "all" rather than 404.
+    initialType === "short" || initialType === "video" || initialType === "music"
+      ? initialType
+      : "all"
   );
   const [status, setStatus] = useState<StatusFilter>(
     STATUS_TABS.some((t) => t.key === initialStatus) ? (initialStatus as StatusFilter) : "all"
@@ -188,6 +195,7 @@ export default function AdminVideosPage() {
           { id: "all", label: "All" },
           { id: "video", label: "Videos" },
           { id: "short", label: "Shorts" },
+          { id: "music", label: "Music" },
         ] as const).map((t) => (
           <button
             key={t.id}

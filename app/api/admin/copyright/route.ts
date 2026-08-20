@@ -4,6 +4,10 @@ import { docClient } from "@/app/lib/dynamodb";
 import { requireAdmin } from "@/app/lib/isAdmin";
 import { logAdminAction } from "@/app/lib/auditLog";
 import { deleteVideoCascade } from "@/app/lib/cascadeDelete";
+import {
+  COPYRIGHT_SCREEN_REPORTER,
+  externalCheckingEnabled,
+} from "@/app/lib/musicCopyright";
 
 // Real copyright strikes system, layered on top of the existing
 // InPlayer-Reports queue (reason: "copyright") rather than a separate
@@ -114,11 +118,26 @@ export async function GET(request: NextRequest) {
           details: (r.details as string) || "",
           createdAt: r.createdAt as string,
           currentStrikes,
+          // Raised by the upload screening rather than by a person. A
+          // reviewer has to be able to see the difference before issuing a
+          // strike: nobody has actually claimed this recording yet, the
+          // wording just looked like a re-upload. See
+          // COPYRIGHT_SCREEN_REPORTER.
+          autoFlagged: r.reporterId === COPYRIGHT_SCREEN_REPORTER,
         };
       })
     );
 
-    return NextResponse.json({ items, strikeThreshold: STRIKE_THRESHOLD });
+    return NextResponse.json({
+      items,
+      strikeThreshold: STRIKE_THRESHOLD,
+      // Whether audio fingerprinting against commercial catalogues is
+      // actually switched on. Surfaced so a reviewer knows whether "no
+      // external match" means "checked and clean" or "never checked" —
+      // conflating those is how someone ends up trusting a check that
+      // never ran. See app/lib/musicCopyright.ts.
+      externalFingerprinting: externalCheckingEnabled(),
+    });
   } catch (err) {
     console.error("Copyright queue scan failed (table may not exist yet):", err);
     return NextResponse.json({ items: [], strikeThreshold: STRIKE_THRESHOLD, tableMissing: true });

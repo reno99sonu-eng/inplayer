@@ -73,7 +73,11 @@ export async function GET(request: NextRequest) {
   // same tradeoff app/lib/videoStore.ts already makes).
   let totalVideos = 0;
   let totalShorts = 0;
+  // Audio-only uploads, broken out on their own — same split, and for the
+  // same reason, as app/api/admin/dashboard-stats/route.ts.
+  let totalMusic = 0;
   let lifetimeViews = 0;
+  let lifetimeMusicViews = 0;
   let lifetimeShares = 0;
   try {
     let exclusiveStartKey: Record<string, unknown> | undefined;
@@ -87,9 +91,16 @@ export async function GET(request: NextRequest) {
         })
       );
       for (const item of result.Items || []) {
-        if (item.contentType === "short") totalShorts += 1;
-        else totalVideos += 1;
-        lifetimeViews += (item.views as number) || 0;
+        const itemViews = (item.views as number) || 0;
+        if (item.contentType === "short") {
+          totalShorts += 1;
+        } else if (item.contentType === "music") {
+          totalMusic += 1;
+          lifetimeMusicViews += itemViews;
+        } else {
+          totalVideos += 1;
+        }
+        lifetimeViews += itemViews;
         lifetimeShares += (item.shareCount as number) || 0;
       }
       exclusiveStartKey = result.LastEvaluatedKey;
@@ -124,7 +135,9 @@ export async function GET(request: NextRequest) {
       totalUsers,
       totalVideos,
       totalShorts,
+      totalMusic,
       lifetimeViews,
+      lifetimeMusicViews,
       lifetimeShares,
       totalLikes,
       totalComments,

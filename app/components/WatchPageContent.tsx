@@ -36,6 +36,11 @@ interface VideoData {
   membersOnly?: boolean;
   thumbnailUrl?: string;
   contentType?: string;
+  // Music-only. covers/lyrics/coverIntervalSeconds drive MusicStage; all
+  // three are undefined on a video and cost it nothing.
+  covers?: string[];
+  coverIntervalSeconds?: number;
+  lyrics?: { time: number; text: string }[];
   downloadStatus?: "unavailable" | "preparing" | "ready" | "errored";
   downloadRenditions?: Record<string, string>;
   tags?: string[];
@@ -122,6 +127,10 @@ export default function WatchPageContent({ video, relatedVideos: initialRelatedV
                     vertical={isShort}
                     music={isMusic}
                     coverUrl={video.thumbnailUrl}
+                    covers={video.covers}
+                    coverIntervalSeconds={video.coverIntervalSeconds}
+                    lyrics={video.lyrics}
+                    artist={video.uploaderName}
                   />
                 ) : (
                   <VideoPlayer
@@ -139,6 +148,10 @@ export default function WatchPageContent({ video, relatedVideos: initialRelatedV
                     vertical={isShort}
                     music={isMusic}
                     coverUrl={video.thumbnailUrl}
+                    covers={video.covers}
+                    coverIntervalSeconds={video.coverIntervalSeconds}
+                    lyrics={video.lyrics}
+                    artist={video.uploaderName}
                   />
                 )
               ) : (

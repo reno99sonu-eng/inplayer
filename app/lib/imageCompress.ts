@@ -355,3 +355,60 @@ export function extractVideoFramePoster(file: File): Promise<string> {
     };
   });
 }
+// ── Music cover art ───────────────────────────────────────────────────
+//
+// Returns a Blob rather than a data URL, because a cover is POSTed as
+// multipart form data to /api/music/cover and stored in S3 — base64 would
+// inflate it by a third for no reason (see app/lib/musicTrack.ts for why
+// covers can't live in DynamoDB the way a video thumbnail does).
+//
+// Center-cropped to a square on purpose. Album art is square everywhere it
+// is shown on InPlayer (the Music shelf, the player's sleeve), so the crop
+// happens either way — doing it here means what the creator approves in the
+// upload form is exactly what ships, instead of a surprise crop later.
+export function compressCoverImage(
+  file: File,
+  maxEdge = 1600,
+  quality = 0.85
+): Promise<Blob> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = (e) => {
+      const img = new Image();
+
+      img.onload = () => {
+        const edge = Math.min(img.width, img.height);
+        const cropX = (img.width - edge) / 2;
+        const cropY = (img.height - edge) / 2;
+        const out = Math.min(maxEdge, edge);
+
+        const canvas = document.createElement("canvas");
+        canvas.width = out;
+        canvas.height = out;
+
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          reject(new Error("Canvas is not supported in this browser."));
+          return;
+        }
+
+        ctx.drawImage(img, cropX, cropY, edge, edge, 0, 0, out, out);
+        canvas.toBlob(
+          (blob) => {
+            if (blob) resolve(blob);
+            else reject(new Error("Couldn't process that image."));
+          },
+          "image/jpeg",
+          quality
+        );
+      };
+
+      img.onerror = () => reject(new Error("Couldn't read that image file."));
+      img.src = e.target?.result as string;
+    };
+
+    reader.onerror = () => reject(new Error("Couldn't read that file."));
+    reader.readAsDataURL(file);
+  });
+}

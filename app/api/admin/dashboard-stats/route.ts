@@ -49,7 +49,18 @@ export async function GET(request: NextRequest) {
 
   let totalVideos = 0;
   let totalShorts = 0;
+  // Music is counted SEPARATELY from totalVideos, not inside it. These two
+  // cards link to /admin/videos?type=video and ?type=music, which are now
+  // genuinely disjoint lists, and the rule this file already documents is
+  // that a card's number must match the list it opens.
+  //
+  // Note this differs on purpose from app/lib/monetization.ts, where music
+  // plays DO count inside videoViews: there the number decides whether a
+  // creator crosses the 50k threshold, and a musician's work must count
+  // toward it. Here the number is a row count next to a filtered list.
+  let totalMusic = 0;
   let totalViews = 0;
+  let musicViews = 0;
   let processingCount = 0;
   try {
     const items = await scanAll(
@@ -87,12 +98,18 @@ export async function GET(request: NextRequest) {
 
       // "ready" and "live" are both real, watchable content; a live stream
       // accrues views like anything else.
+      const itemViews = (item.views as number) || 0;
       if (item.contentType === "short") {
         totalShorts++;
+      } else if (item.contentType === "music") {
+        totalMusic++;
+        musicViews += itemViews;
       } else {
+        // Includes rows with no contentType at all — pre-dating the field,
+        // and matched by the Videos tab's attribute_not_exists clause.
         totalVideos++;
       }
-      totalViews += (item.views as number) || 0;
+      totalViews += itemViews;
     }
   } catch (err) {
     console.error("Dashboard stats: videos scan failed:", err);
@@ -120,7 +137,9 @@ export async function GET(request: NextRequest) {
     totalUsers,
     totalVideos,
     totalShorts,
+    totalMusic,
     totalViews,
+    musicViews,
     processingCount,
     pendingReports,
     reportsTableMissing,

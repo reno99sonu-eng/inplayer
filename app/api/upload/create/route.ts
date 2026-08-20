@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { GetCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, PutCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { randomUUID } from "crypto";
 import mux, { muxErrorMessages } from "@/app/lib/mux";
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
@@ -8,6 +9,17 @@ import { ensureUsername } from "@/app/lib/ensureUsername";
 import { moderateText, UNCHECKED } from "@/app/lib/moderation";
 import { getPlatformSettings } from "@/app/lib/platformSettings";
 import { isMusicType, normalizeContentType } from "@/app/lib/contentTypes";
+import {
+  normalizeCoverInterval,
+  sanitizeCovers,
+  sanitizeLyrics,
+} from "@/app/lib/musicTrack";
+import {
+  COPYRIGHT_SCREEN_REPORTER,
+  combineCopyrightSignals,
+  screenMusicMetadata,
+} from "@/app/lib/musicCopyright";
+import { getRequestIp } from "@/app/lib/requestInfo";
 import { applyModerationStrike } from "@/app/lib/moderationStrikes";
 import { CUSTOM_AUDIO_MAX_SECONDS } from "@/app/data/soundtracks";
 import {
@@ -113,6 +125,15 @@ export async function POST(request: NextRequest) {
       shortSettings,
       thumbnailDataUrl,
       membersOnly,
+      // Music-only. covers are S3 URLs already uploaded via
+      // /api/music/cover; lyrics are creator-stamped lines; audioSha256 is
+      // a browser-computed hash of the audio bytes used for duplicate
+      // detection; declaredOwnership is the creator's attestation.
+      covers,
+      coverIntervalSeconds,
+      lyrics,
+      audioSha256,
+      declaredOwnership,
     } = body;
 
     if (!title?.trim() || !category?.trim()) {
@@ -161,6 +182,65 @@ export async function POST(request: NextRequest) {
         { error: "Music uploads need a cover image — audio has no video frame to make one from." },
         { status: 400 }
       );
+    }
+
+    // ── Music extras, all re-derived server-side ─────────────────────
+    // Nothing the client sent is trusted: sanitizeCovers accepts only https
+    // URLs (so a request can't point the player at javascript: or stuff a
+    // megabyte data: blob into the item), sanitizeLyrics caps the line
+    // count and length, and the interval is clamped to a sane range.
+    const musicCovers = isMusic ? sanitizeCovers(covers) : [];
+    const musicLyrics = isMusic ? sanitizeLyrics(lyrics) : [];
+    const musicCoverInterval = isMusic ? normalizeCoverInterval(coverIntervalSeconds) : undefined;
+    const musicHash =
+      isMusic && typeof audioSha256 === "string" && /^[a-f0-9]{64}$/i.test(audioSha256)
+        ? audioSha256.toLowerCase()
+        : null;
+
+    // ── Copyright screening (music only) ─────────────────────────────
+    // Three checks, none of which can hear the audio — see the long note at
+    // the top of app/lib/musicCopyright.ts for exactly why, and for the
+    // seam where real fingerprinting plugs in later.
+    //
+    // A hit FLAGS FOR ADMIN REVIEW and nothing more: the track publishes
+    // normally and appears in the Copyright Center. That is deliberate.
+    // Metadata screening will sometimes suspect a genuine musician whose
+    // own song is called "Cover", and a false positive must never stop a
+    // real creator publishing their own work.
+    let copyrightScreening = null;
+    let duplicateOfVideoId: string | null = null;
+
+    if (isMusic) {
+      if (musicHash) {
+        try {
+          const dupe = await docClient.send(
+            new ScanCommand({
+              TableName: "InPlayer-Videos",
+              FilterExpression: "audioSha256 = :h",
+              ExpressionAttributeValues: { ":h": musicHash },
+              ProjectionExpression: "videoId",
+              Limit: 1,
+            })
+          );
+          duplicateOfVideoId = (dupe.Items?.[0]?.videoId as string | undefined) || null;
+        } catch (err) {
+          // Fails open on purpose: a DynamoDB hiccup must not block a
+          // legitimate upload. The worst case is a duplicate that nobody
+          // caught automatically, which is where the Copyright Center and
+          // rights-holder reports take over.
+          console.error("Music duplicate check failed (non-fatal):", err);
+        }
+      }
+
+      copyrightScreening = combineCopyrightSignals({
+        metadata: screenMusicMetadata({
+          title,
+          description,
+          tags,
+          declaredOwnership,
+        }),
+        duplicateOfVideoId,
+      });
     }
 
     // Snapshot the uploader's current avatar so video/short cards can show
@@ -317,6 +397,27 @@ export async function POST(request: NextRequest) {
           // processing. thumbnailUrl is set to the same value up front so
           // the video shows the right image immediately, even while still
           // "processing".
+          // ── Music-only attributes ──────────────────────────────
+          // Written only for a track, so a video's row is byte-identical
+          // to what it was before this feature existed.
+          ...(isMusic && {
+            covers: musicCovers,
+            coverIntervalSeconds: musicCoverInterval,
+            lyrics: musicLyrics,
+            ...(musicHash && { audioSha256: musicHash }),
+            // The ownership attestation, with evidence. This is what gives
+            // InPlayer its safe harbour if a rights holder ever complains,
+            // so it records WHO said it, WHEN, and FROM WHERE — a bare
+            // boolean would be worth nothing in that conversation.
+            ownershipDeclared: declaredOwnership === true,
+            ownershipDeclaredAt: new Date().toISOString(),
+            ownershipDeclaredIp: getRequestIp(request) || "unknown",
+            ...(copyrightScreening && copyrightScreening.risk === "review" && {
+              copyrightRisk: "review",
+              copyrightSignals: copyrightScreening.signals,
+              ...(duplicateOfVideoId && { duplicateOfVideoId }),
+            }),
+          }),
           ...(customThumbnailUrl && {
             customThumbnailUrl,
             thumbnailUrl: customThumbnailUrl,
@@ -409,6 +510,52 @@ export async function POST(request: NextRequest) {
         isShort ? "Short" : "video upload",
         uploadModeration.categories
       ).catch((err) => console.error("upload/create: applyModerationStrike failed:", err));
+    }
+
+    // ── A flagged track goes into the Copyright Center ────────────────
+    //
+    // Not a new queue: the Copyright Center (app/admin/copyright) reads
+    // InPlayer-Reports rows with reason "copyright" and status "open", and
+    // already gives an admin Strike / Dismiss / Remove for each one, with
+    // the uploader's running strike count and the auto-suspend at three.
+    // Writing the screening result as a report means every one of those
+    // behaviours applies to an auto-flagged track for free, and there is
+    // exactly one place a human decides copyright on InPlayer.
+    //
+    // reporterId marks it as machine-raised so it is never confused with a
+    // rights holder's own complaint. The track stays live and visible
+    // throughout — see the screening note above for why a metadata hit
+    // must never be an automatic takedown.
+    if (isMusic && copyrightScreening?.risk === "review") {
+      await docClient
+        .send(
+          new PutCommand({
+            TableName: "InPlayer-Reports",
+            Item: {
+              reportId: randomUUID(),
+              targetType: "video",
+              videoId: upload.id,
+              reporterId: COPYRIGHT_SCREEN_REPORTER,
+              reason: "copyright",
+              // Every signal, spelled out — this is the whole of what the
+              // reviewer gets to judge on, so it says exactly what the
+              // screen objected to rather than a count.
+              details: ["Automatic screening:", ...copyrightScreening.signals.map((sig) => sig.detail)]
+                .join(" ")
+                .slice(0, 1000),
+              status: "open",
+              createdAt: new Date().toISOString(),
+            },
+          })
+        )
+        // Non-fatal by design. The upload has already succeeded at this
+        // point; failing it because a review row couldn't be written would
+        // punish the creator for our own outage. The flags are still on
+        // the video item itself (copyrightRisk/copyrightSignals), so
+        // nothing is lost permanently.
+        .catch((err) =>
+          console.error("upload/create: couldn't queue the copyright review:", err)
+        );
     }
 
     return NextResponse.json({

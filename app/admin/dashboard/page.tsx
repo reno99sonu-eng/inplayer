@@ -7,6 +7,7 @@ import {
   Users,
   Video,
   Film,
+  Music2,
   Eye,
   Flag,
   Loader2,
@@ -19,7 +20,9 @@ interface DashboardStats {
   totalUsers: number;
   totalVideos: number;
   totalShorts: number;
+  totalMusic: number;
   totalViews: number;
+  musicViews: number;
   processingCount: number;
   pendingReports: number;
   reportsTableMissing: boolean;
@@ -139,6 +142,16 @@ export default function AdminDashboardPage() {
       icon: Film,
       href: "/admin/videos?type=short",
       accent: "from-fuchsia-500/20 to-pink-400/10 border-fuchsia-400/20 text-fuchsia-300 light:text-fuchsia-700",
+    },
+    {
+      label: "Total Music",
+      // `?? 0` rather than a bare read: a browser tab left open across the
+      // deploy that added this field will still be holding a response that
+      // predates it, and formatNumber(undefined) throws.
+      value: formatNumber(stats.totalMusic ?? 0),
+      icon: Music2,
+      href: "/admin/videos?type=music",
+      accent: "from-violet-500/20 to-purple-400/10 border-violet-400/20 text-violet-300 light:text-violet-700",
     },
     {
       label: "Total Views",

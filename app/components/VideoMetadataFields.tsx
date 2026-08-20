@@ -510,7 +510,9 @@ export default function VideoMetadataFields({
               on={value.commentsEnabled}
               onChange={() => onChange("commentsEnabled", !value.commentsEnabled)}
             />
-            {value.contentType === "video" && (
+            {/* Longform only — Shorts are never gated. Music is longform,
+                and a members-only track is an ordinary thing to publish. */}
+            {value.contentType !== "short" && (
               <ToggleRow
                 label="Members only"
                 desc="Gated to paid members"

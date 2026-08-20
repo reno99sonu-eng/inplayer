@@ -63,6 +63,10 @@ export interface EligibilityResult {
   subscribers: number;
   videoViews: number;
   shortViews: number;
+  /** Plays of audio-only uploads. A BREAKDOWN of videoViews, not a fourth
+   *  milestone — see the counter below for why music has to stay inside
+   *  the longform total. */
+  musicViews: number;
   hasGoodStanding: boolean;
   meetsSubscriberRequirement: boolean;
   meetsViewRequirement: boolean;
@@ -91,6 +95,7 @@ export interface EligibilityResult {
     subscribers: number;
     videoViews: number;
     shortViews: number;
+    musicViews: number;
   };
   thresholds: {
     subscribers: number;
@@ -127,6 +132,12 @@ export async function checkMonetizationEligibility(userId: string): Promise<Elig
   // 2. Fetch Views (Split by video and short)
   let videoViews = 0;
   let shortViews = 0;
+  // Music plays ALSO stay inside videoViews below — deliberately. The 50k
+  // threshold is meant to be met by longform work of any kind, and
+  // splitting music out of the total would mean a creator who publishes
+  // only music could never qualify no matter how many plays they had. So:
+  // same threshold, extra breakdown.
+  let musicViews = 0;
   try {
     let exclusiveStartKey: Record<string, unknown> | undefined;
     do {
@@ -140,10 +151,12 @@ export async function checkMonetizationEligibility(userId: string): Promise<Elig
       );
       
       for (const item of videosResult.Items || []) {
+        const views = (item.views as number) || 0;
         if (item.contentType === "short") {
-          shortViews += (item.views || 0);
+          shortViews += views;
         } else {
-          videoViews += (item.views || 0);
+          videoViews += views;
+          if (item.contentType === "music") musicViews += views;
         }
       }
       exclusiveStartKey = videosResult.LastEvaluatedKey as Record<string, unknown> | undefined;
@@ -204,6 +217,7 @@ export async function checkMonetizationEligibility(userId: string): Promise<Elig
     subscribers,
     videoViews,
     shortViews,
+    musicViews,
     hasGoodStanding,
     meetsSubscriberRequirement,
     meetsViewRequirement,
@@ -215,6 +229,7 @@ export async function checkMonetizationEligibility(userId: string): Promise<Elig
       subscribers,
       videoViews,
       shortViews,
+      musicViews,
     },
     thresholds: {
       subscribers: settings.monetizationRequiredSubscribers,

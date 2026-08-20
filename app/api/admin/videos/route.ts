@@ -79,7 +79,32 @@ function isStatusFilter(value: string | null): value is VideoStatusFilter {
   return !!value && (STATUS_VALUES as readonly string[]).includes(value);
 }
 
-// Combines the optional contentType (type=video|short) and status filters
+// The three content kinds the Type tabs can filter by. Music is audio-only
+// (app/lib/contentTypes.ts) and gets its own tab rather than being folded
+// into Videos, because the Dashboard's cards LINK to these filters and a
+// card whose number doesn't match the list it opens is worse than no card.
+const TYPE_VALUES = ["video", "short", "music"] as const;
+
+function isTypeFilter(value: string | null): value is (typeof TYPE_VALUES)[number] {
+  return !!value && (TYPE_VALUES as readonly string[]).includes(value);
+}
+
+// The contentType clause for a given tab. "video" also has to match rows
+// with NO contentType attribute at all — everything uploaded before the
+// field existed — for the same reason "ready" matches a missing status
+// below: otherwise the Videos tab silently hides the platform's oldest
+// uploads, and its count disagrees with the Dashboard's Total Videos card.
+function typeClause(type: (typeof TYPE_VALUES)[number]): { clause: string; values: Record<string, unknown> } {
+  if (type === "video") {
+    return {
+      clause: "(contentType = :type OR attribute_not_exists(contentType))",
+      values: { ":type": "video" },
+    };
+  }
+  return { clause: "contentType = :type", values: { ":type": type } };
+}
+
+// Combines the optional contentType (type=video|short|music) and status filters
 // into one FilterExpression — DynamoDB only allows one per Scan/Query, so
 // both dimensions have to be ANDed together here rather than applied
 // separately. "ready" is the one status that also has to match items with
@@ -93,9 +118,10 @@ function buildFilter(type: string | null, status: string | null) {
   const clauses: string[] = [];
   const values: Record<string, unknown> = {};
 
-  if (type === "video" || type === "short") {
-    clauses.push("contentType = :type");
-    values[":type"] = type;
+  if (isTypeFilter(type)) {
+    const tc = typeClause(type);
+    clauses.push(tc.clause);
+    Object.assign(values, tc.values);
   }
 
   if (isStatusFilter(status)) {
@@ -122,8 +148,11 @@ function buildFilter(type: string | null, status: string | null) {
 // a 2-attribute projection so it stays cheap even as the table grows.
 async function computeStatusCounts(type: string | null): Promise<Record<string, number>> {
   const counts: Record<string, number> = { live: 0, processing: 0, ready: 0, error: 0 };
-  const tf = type === "video" || type === "short"
-    ? { FilterExpression: "contentType = :type", ExpressionAttributeValues: { ":type": type } }
+  const tf = isTypeFilter(type)
+    ? (() => {
+        const tc = typeClause(type);
+        return { FilterExpression: tc.clause, ExpressionAttributeValues: tc.values };
+      })()
     : null;
 
   let exclusiveStartKey: Record<string, unknown> | undefined;
@@ -218,7 +247,10 @@ async function searchVideos(query: string, type: string | null, status: string |
   const byIdStatus = byId?.status || "ready";
   const idMatchApplies =
     byId &&
-    (!type || byId.contentType === type) &&
+    // toRow() runs contentType through normalizeContentType, so byId's is
+    // always one of the three literals — a legacy row with no contentType
+    // reads as "video" here, matching typeClause's OR above.
+    (!isTypeFilter(type) || byId.contentType === type) &&
     (!isStatusFilter(status) || byIdStatus === status) &&
     !matches.some((m) => m.videoId === byId.videoId);
 

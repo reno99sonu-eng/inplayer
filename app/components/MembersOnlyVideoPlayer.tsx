@@ -25,6 +25,10 @@ interface MembersOnlyVideoPlayerProps {
    *  members-only just like a video, so this has to be forwarded too. */
   music?: boolean;
   coverUrl?: string;
+  covers?: string[];
+  coverIntervalSeconds?: number;
+  lyrics?: { time: number; text: string }[];
+  artist?: string;
 }
 
 // Real gating, not a UI-only lock: this never receives a playable Mux
@@ -45,6 +49,10 @@ export default function MembersOnlyVideoPlayer({
   vertical = false,
   music = false,
   coverUrl,
+  covers,
+  coverIntervalSeconds,
+  lyrics,
+  artist,
 }: MembersOnlyVideoPlayerProps) {
   const { signedIn, openSignIn } = useAuthModal();
   const [state, setState] = useState<
@@ -102,6 +110,10 @@ export default function MembersOnlyVideoPlayer({
         vertical={vertical}
         music={music}
         coverUrl={coverUrl}
+        covers={covers}
+        coverIntervalSeconds={coverIntervalSeconds}
+        lyrics={lyrics}
+        artist={artist}
       />
     );
   }

@@ -675,11 +675,13 @@ export default function UploadPage() {
               />
             )}
 
-            <ShortCreationTools
-              value={shortSettings}
-              onChange={setShortSettings}
-              contentType={contentType}
-            />
+            {contentType !== "music" && (
+              <ShortCreationTools
+                value={shortSettings}
+                onChange={setShortSettings}
+                contentType={contentType}
+              />
+            )}
 
             {error && (
               <p className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-300 light:text-red-700">

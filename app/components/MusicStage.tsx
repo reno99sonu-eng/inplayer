@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef } from "react";
+import { Music2 } from "lucide-react";
 import {
   activeLyricIndex,
   coverIndexAt,
@@ -99,11 +100,11 @@ export default function MusicStage({
   const primaryCover = safeCovers[0];
 
   return (
-    <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
+    <div className="pointer-events-none absolute inset-0 z-10 overflow-hidden">
       {/* Ambient wash: the current cover blown up and heavily blurred, so a
           square image never leaves dead black bars in a 16:9 frame and the
           whole stage takes on the artwork's colour. */}
-      {primaryCover && (
+      {primaryCover ? (
         <>
           {safeCovers.map((url, i) => (
             // eslint-disable-next-line @next/next/no-img-element -- remote S3 URL, no next/image loader needed for a decorative layer.
@@ -121,17 +122,19 @@ export default function MusicStage({
           ))}
           <div className="absolute inset-0 bg-gradient-to-b from-black/50 via-black/30 to-black/70" />
         </>
+      ) : (
+        <div className="absolute inset-0 bg-gradient-to-br from-[#1a0f05] via-[#090b10] to-[#040609]" />
       )}
 
       <div className={`absolute inset-0 flex items-center gap-4 p-4 pb-14 sm:gap-6 sm:p-8 sm:pb-20 ${hasLyrics ? "justify-start" : "justify-center"}`}>
         {/* ── The sleeve ── */}
-        {primaryCover && (
-          <div
-            className={`relative aspect-square flex-shrink-0 ${
-              hasLyrics ? "h-full max-h-[min(100%,180px)] sm:max-h-[min(100%,320px)]" : "h-full max-h-[min(100%,340px)]"
-            }`}
-          >
-            {safeCovers.map((url, i) => (
+        <div
+          className={`relative aspect-square flex-shrink-0 ${
+            hasLyrics ? "h-full max-h-[min(100%,180px)] sm:max-h-[min(100%,320px)]" : "h-full max-h-[min(100%,340px)]"
+          }`}
+        >
+          {primaryCover ? (
+            safeCovers.map((url, i) => (
               // eslint-disable-next-line @next/next/no-img-element -- as above.
               <img
                 key={url}
@@ -147,25 +150,29 @@ export default function MusicStage({
                   transition: `opacity ${CROSSFADE_MS}ms cubic-bezier(0.4, 0, 0.2, 1)`,
                 }}
               />
-            ))}
+            ))
+          ) : (
+            <div className="absolute inset-0 flex flex-col items-center justify-center rounded-2xl border border-white/10 bg-gradient-to-br from-orange-500/20 via-black to-amber-500/20 shadow-[0_25px_70px_rgba(0,0,0,.65)]">
+              <Music2 size={48} className="text-orange-400/80 animate-pulse" />
+            </div>
+          )}
 
-            {/* Which cover of how many — only worth showing when there is
-                more than one, and it doubles as reassurance that the
-                rotation is deliberate rather than a glitch. */}
-            {safeCovers.length > 1 && (
-              <div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1.5">
-                {safeCovers.map((_, i) => (
-                  <span
-                    key={i}
-                    className={`h-1 rounded-full transition-all duration-700 ${
-                      i === targetIndex ? "w-4 bg-white/90" : "w-1 bg-white/40"
-                    }`}
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+          {/* Which cover of how many — only worth showing when there is
+              more than one, and it doubles as reassurance that the
+              rotation is deliberate rather than a glitch. */}
+          {safeCovers.length > 1 && (
+            <div className="absolute bottom-2 left-1/2 flex -translate-x-1/2 gap-1.5">
+              {safeCovers.map((_, i) => (
+                <span
+                  key={i}
+                  className={`h-1 rounded-full transition-all duration-700 ${
+                    i === targetIndex ? "w-4 bg-white/90" : "w-1 bg-white/40"
+                  }`}
+                />
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* ── The lyrics ── */}
         {hasLyrics && (

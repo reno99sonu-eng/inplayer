@@ -1167,18 +1167,6 @@ export default function VideoPlayer({
           The stage itself — cover art crossfading on the creator's timer,
           with their time-synced lyrics beside it — lives in
           app/components/MusicStage.tsx. */}
-      {music && (
-        <MusicStage
-          covers={covers?.length ? covers : coverUrl ? [coverUrl] : []}
-          coverIntervalSeconds={coverIntervalSeconds ?? 12}
-          lyrics={lyrics ?? []}
-          currentTime={musicTime}
-          durationSeconds={musicDuration}
-          title={title}
-          artist={artist}
-        />
-      )}
-
       <MuxPlayer
         ref={playerRef}
         playbackId={playbackId}
@@ -1246,10 +1234,6 @@ export default function VideoPlayer({
         style={
           {
             width: "100%",
-            // Music only: let the artwork behind show through. Mux Player's
-            // default background is opaque black, which would hide the
-            // cover entirely. z-10 keeps the controls above the art layer.
-            ...(music ? { background: "transparent", position: "relative", zIndex: 10 } : {}),
             // A fixed 16:9 frame for ordinary videos; a vertical one instead
             // stretches to whatever height its 9:16 parent gives it. Setting
             // BOTH would let aspect-ratio win and re-create the bug.
@@ -1273,6 +1257,22 @@ export default function VideoPlayer({
           } as MuxCSSProperties
         }
       />
+
+      {/* Music artwork stage — rendered on top of the black Mux video canvas
+          with pointer-events-none, so cover rotation and time-synced lyrics
+          are crisply visible while all playback/seek/control clicks pass
+          smoothly into MuxPlayer. */}
+      {music && (
+        <MusicStage
+          covers={covers?.length ? covers : coverUrl ? [coverUrl] : []}
+          coverIntervalSeconds={coverIntervalSeconds ?? 12}
+          lyrics={lyrics ?? []}
+          currentTime={musicTime}
+          durationSeconds={musicDuration}
+          title={title}
+          artist={artist}
+        />
+      )}
 
       {/* Background soundtrack — see the effect above and
           syncBackgroundAudioToPlayer/syncBackgroundAudioMute. Hidden,

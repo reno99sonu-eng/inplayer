@@ -10,10 +10,19 @@ import { READY_VIDEOS_TAG } from "@/app/lib/videoStore";
 import { MIDROLL_ADS_TAG } from "@/app/lib/videoAds";
 import { deleteS3Prefix } from "@/app/lib/s3";
 import {
+  registerFingerprintProvider,
+  externalCheckingEnabled,
+  combineCopyrightSignals,
+  getFingerprintProvider,
+} from "@/app/lib/musicCopyright";
+import { acrCloudProvider } from "@/app/lib/acrCloud";
+import {
   CAPTION_TARGETS,
   resolveSourceLang,
   buildCaptionSet,
 } from "@/app/lib/captions";
+
+registerFingerprintProvider(acrCloudProvider);
 
 // Caption translation (below) runs after the webhook response via after(),
 // but still needs the function alive long enough to finish the Groq

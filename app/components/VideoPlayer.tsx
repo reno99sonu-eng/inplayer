@@ -647,16 +647,35 @@ export default function VideoPlayer({
     })();
   }, [isFullscreen]);
 
-  // Theme the quality/captions/audio-track/playback-rate submenus — see the
-  // big comment above PLAYER_ACCENT_COLOR for why this can't be done with a
-  // component prop or a plain globals.css rule.
+  // Theme the quality/captions/audio-track/playback-rate submenus. For music tracks,
+  // the video quality/rendition button is disabled/hidden since audio has no video resolutions.
   useEffect(() => {
     const injectStyleIntoRoot = (root: ShadowRoot | Document | null | undefined) => {
       if (!root) return;
-      if (root.querySelector("style[data-inplayer-menu]")) return;
+      const existing = root.querySelector("style[data-inplayer-menu]");
+      if (existing) {
+        existing.remove(); // allow refreshing with updated state
+      }
       const styleEl = document.createElement("style");
       styleEl.setAttribute("data-inplayer-menu", "true");
       styleEl.textContent = `
+        ${
+          music
+            ? `
+          media-rendition-menu-button,
+          media-rendition-menu,
+          [part*="rendition"] {
+            display: none !important;
+            visibility: hidden !important;
+            opacity: 0 !important;
+            pointer-events: none !important;
+            width: 0 !important;
+            height: 0 !important;
+          }
+        `
+            : ""
+        }
+
         media-menu,
         media-settings-menu,
         media-rendition-menu,
@@ -678,6 +697,7 @@ export default function VideoPlayer({
           box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8) !important;
           overflow: hidden !important;
         }
+
         media-menu-item,
         media-chrome-menu-item,
         [part~="menu-item"],
@@ -690,6 +710,7 @@ export default function VideoPlayer({
           font-size: 13px !important;
           font-weight: 600 !important;
         }
+
         media-menu-item:hover,
         media-chrome-menu-item:hover,
         [part~="menu-item"]:hover,
@@ -698,6 +719,7 @@ export default function VideoPlayer({
           background-color: rgba(255, 154, 0, 0.22) !important;
           color: #ff9a00 !important;
         }
+
         media-menu-item[aria-checked="true"],
         media-chrome-menu-item[aria-checked="true"],
         [role="option"][aria-selected="true"] {
@@ -720,23 +742,27 @@ export default function VideoPlayer({
       const controller = (themeEl?.shadowRoot || muxEl.shadowRoot)?.querySelector("media-controller") as HTMLElement | null;
       if (controller) injectStyleIntoRoot(controller.shadowRoot);
 
+      // Check rendition menus and buttons directly
+      const renditionMenu = (controller?.shadowRoot || themeEl?.shadowRoot || muxEl.shadowRoot)?.querySelector("media-rendition-menu") as HTMLElement | null;
+      if (renditionMenu) injectStyleIntoRoot(renditionMenu.shadowRoot);
+
       return Boolean(controller);
     };
 
-    if (applyMenuTheme()) return;
+    applyMenuTheme();
 
     const muxEl = playerRef.current as unknown as HTMLElement | null;
     const target = muxEl?.shadowRoot;
     if (!target) return;
 
     const mo = new MutationObserver(() => {
-      if (applyMenuTheme()) mo.disconnect();
+      applyMenuTheme();
     });
     mo.observe(target, { childList: true, subtree: true });
 
-    const timeout = window.setTimeout(() => mo.disconnect(), 5000);
+    const timeout = window.setTimeout(() => mo.disconnect(), 6000);
     return () => { mo.disconnect(); window.clearTimeout(timeout); };
-  }, []);
+  }, [music]);
 
   // While CSS-fullscreen: freeze page scroll behind the player, and let
   // Esc exit (parity with real fullscreen).

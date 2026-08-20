@@ -649,51 +649,82 @@ export default function VideoPlayer({
 
   // Theme the quality/captions/audio-track/playback-rate submenus — see the
   // big comment above PLAYER_ACCENT_COLOR for why this can't be done with a
-  // component prop or a plain globals.css rule. These menu elements exist
-  // in the DOM from first mount (just hidden until opened), so one pass
-  // right after mount is enough; a short retry loop only covers the rare
-  // case where the custom element's shadow tree hasn't upgraded yet on the
-  // very first tick.
+  // component prop or a plain globals.css rule.
   useEffect(() => {
+    const injectStyleIntoRoot = (root: ShadowRoot | Document | null | undefined) => {
+      if (!root) return;
+      if (root.querySelector("style[data-inplayer-menu]")) return;
+      const styleEl = document.createElement("style");
+      styleEl.setAttribute("data-inplayer-menu", "true");
+      styleEl.textContent = `
+        media-menu,
+        media-settings-menu,
+        media-rendition-menu,
+        media-captions-menu,
+        media-audio-track-menu,
+        media-playback-rate-menu,
+        media-chrome-listbox,
+        media-chrome-dialog,
+        [part~="menu"],
+        [part~="dialog"],
+        [part~="listbox"],
+        [role="menu"],
+        [role="listbox"] {
+          background-color: #0c1524 !important;
+          background: #0c1524 !important;
+          color: #ffffff !important;
+          border: 1px solid rgba(255, 255, 255, 0.18) !important;
+          border-radius: 16px !important;
+          box-shadow: 0 20px 40px rgba(0, 0, 0, 0.8) !important;
+          overflow: hidden !important;
+        }
+        media-menu-item,
+        media-chrome-menu-item,
+        [part~="menu-item"],
+        [role="menuitem"],
+        [role="menuitemradio"],
+        [role="menuitemcheckbox"],
+        [role="option"] {
+          color: #ffffff !important;
+          background-color: transparent !important;
+          font-size: 13px !important;
+          font-weight: 600 !important;
+        }
+        media-menu-item:hover,
+        media-chrome-menu-item:hover,
+        [part~="menu-item"]:hover,
+        [role="menuitem"]:hover,
+        [role="option"]:hover {
+          background-color: rgba(255, 154, 0, 0.22) !important;
+          color: #ff9a00 !important;
+        }
+        media-menu-item[aria-checked="true"],
+        media-chrome-menu-item[aria-checked="true"],
+        [role="option"][aria-selected="true"] {
+          background-color: rgba(255, 154, 0, 0.3) !important;
+          color: #ff9a00 !important;
+        }
+      `;
+      root.appendChild(styleEl);
+    };
+
     const applyMenuTheme = () => {
       const muxEl = playerRef.current as unknown as HTMLElement | null;
-      const themeEl = muxEl?.shadowRoot?.querySelector(
-        "media-theme"
-      ) as HTMLElement | null;
-      const controller = themeEl?.shadowRoot?.querySelector(
-        "media-controller"
-      ) as HTMLElement | null;
-      if (!controller) return false;
+      if (!muxEl) return false;
 
-      const menus = controller.querySelectorAll(
-        "media-rendition-menu, media-captions-menu, media-audio-track-menu, media-playback-rate-menu"
-      );
-      if (menus.length === 0) return false;
+      injectStyleIntoRoot(muxEl.shadowRoot);
 
-      menus.forEach((node) => {
-        const style = (node as HTMLElement).style;
-        style.setProperty("--media-menu-background", PLAYER_DARK_SURFACE);
-        style.setProperty("--media-text-color", PLAYER_MENU_TEXT_COLOR);
-        style.setProperty(
-          "--media-menu-item-hover-background",
-          PLAYER_MENU_HOVER_BACKGROUND
-        );
-        style.setProperty(
-          "--media-menu-item-checked-background",
-          PLAYER_MENU_CHECKED_BACKGROUND
-        );
-        style.setProperty(
-          "--media-menu-item-hover-outline",
-          PLAYER_MENU_HOVER_OUTLINE
-        );
-      });
-      return true;
+      const themeEl = muxEl.shadowRoot?.querySelector("media-theme") as HTMLElement | null;
+      if (themeEl) injectStyleIntoRoot(themeEl.shadowRoot);
+
+      const controller = (themeEl?.shadowRoot || muxEl.shadowRoot)?.querySelector("media-controller") as HTMLElement | null;
+      if (controller) injectStyleIntoRoot(controller.shadowRoot);
+
+      return Boolean(controller);
     };
 
     if (applyMenuTheme()) return;
 
-    // Instead of polling every 150ms up to 20 times, observe the shadow
-    // DOM for changes and apply theme once menus appear.
     const muxEl = playerRef.current as unknown as HTMLElement | null;
     const target = muxEl?.shadowRoot;
     if (!target) return;
@@ -703,8 +734,6 @@ export default function VideoPlayer({
     });
     mo.observe(target, { childList: true, subtree: true });
 
-    // Safety: disconnect after 5s regardless (same spirit as the old
-    // 20-attempt cap, but doesn't burn CPU cycles polling).
     const timeout = window.setTimeout(() => mo.disconnect(), 5000);
     return () => { mo.disconnect(); window.clearTimeout(timeout); };
   }, []);
@@ -1239,6 +1268,16 @@ export default function VideoPlayer({
             // BOTH would let aspect-ratio win and re-create the bug.
             ...(vertical ? { height: "100%" } : { aspectRatio: "16 / 9" }),
             "--controls-backdrop-color": "rgba(0, 0, 0, 0.7)",
+            "--media-menu-background": "#0c1524",
+            "--media-control-background": "#0c1524",
+            "--media-popover-background": "#0c1524",
+            "--media-text-color": "#ffffff",
+            "--media-icon-color": "#ffffff",
+            "--media-menu-item-color": "#ffffff",
+            "--media-menu-border": "1px solid rgba(255, 255, 255, 0.18)",
+            "--media-menu-border-radius": "16px",
+            "--media-menu-item-hover-background": "rgba(255, 154, 0, 0.22)",
+            "--media-menu-item-checked-background": "rgba(255, 154, 0, 0.3)",
             // Netflix/YouTube-style left-half brightness swipe (see
             // handlePlayerPointerMove) combined with the creator's chosen
             // "Look" filter (see app/lib/videoFilters) into one CSS filter

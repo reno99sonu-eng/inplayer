@@ -1167,7 +1167,7 @@ export default function VideoPlayer({
           The stage itself — cover art crossfading on the creator's timer,
           with their time-synced lyrics beside it — lives in
           app/components/MusicStage.tsx. */}
-      {music && (covers?.length || coverUrl) && (
+      {music && (
         <MusicStage
           covers={covers?.length ? covers : coverUrl ? [coverUrl] : []}
           coverIntervalSeconds={coverIntervalSeconds ?? 12}

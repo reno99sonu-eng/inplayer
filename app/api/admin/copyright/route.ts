@@ -171,6 +171,39 @@ export async function POST(request: NextRequest) {
   }
 
   if (action === "dismiss") {
+    const videoId = report.videoId as string | undefined;
+    if (videoId) {
+      try {
+        const video = await docClient.send(
+          new GetCommand({
+            TableName: "InPlayer-Videos",
+            Key: { videoId },
+            ProjectionExpression: "uploaderId, moderationHidden, copyrightRisk",
+          })
+        );
+        if (video.Item?.copyrightRisk === "review" || video.Item?.moderationHidden) {
+          await docClient.send(
+            new UpdateCommand({
+              TableName: "InPlayer-Videos",
+              Key: { videoId },
+              UpdateExpression: "SET moderationHidden = :f, copyrightRisk = :c",
+              ExpressionAttributeValues: { ":f": false, ":c": "clear" },
+            })
+          );
+          if (video.Item.uploaderId) {
+            await createNotification({
+              userId: video.Item.uploaderId,
+              type: "admin_announcement",
+              message: "Good news! Your upload has been reviewed by an admin and cleared of copyright issues. It is now publicly live.",
+              videoId,
+            });
+          }
+        }
+      } catch (err) {
+        console.error("Failed to unhide video upon dismiss:", err);
+      }
+    }
+
     await docClient.send(
       new UpdateCommand({
         TableName: REPORTS_TABLE,

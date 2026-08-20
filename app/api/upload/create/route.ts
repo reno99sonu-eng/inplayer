@@ -382,6 +382,7 @@ export async function POST(request: NextRequest) {
             flaggedCategories: [
               ...uploadModeration.categories,
               ...(audienceDecision.audienceMismatch ? ["audience-mismatch"] : []),
+              ...(isMusic && copyrightScreening?.risk === "review" ? ["copyright"] : []),
             ],
             moderationHidden: true,
             moderatedAt: new Date().toISOString(),
@@ -569,7 +570,7 @@ export async function POST(request: NextRequest) {
 
         // Notify user
         await createNotification({
-          userId: user.sub,
+          userId: user.userId,
           type: "admin_announcement",
           message: "Your music upload has been flagged for a potential copyright match. It is hidden from the public until an admin reviews it.",
           videoId: upload.id

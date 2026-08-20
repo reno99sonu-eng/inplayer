@@ -78,12 +78,22 @@ export default function MusicStage({
   // whole line switching colour at once.
   const sweep = lyricLineProgress(lyrics, activeIndex, currentTime, durationSeconds);
 
-  // Keep the active line centred. `block: "center"` on the element itself
-  // rather than scrolling a computed offset, so it stays correct at any
-  // font size or line-wrap.
+  // Keep the active line centred in the lyrics scroll container.
+  const lyricsContainerRef = useRef<HTMLDivElement | null>(null);
   const activeLineRef = useRef<HTMLParagraphElement | null>(null);
+
   useEffect(() => {
-    activeLineRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    if (activeLineRef.current && lyricsContainerRef.current) {
+      const container = lyricsContainerRef.current;
+      const el = activeLineRef.current;
+      const elTop = el.offsetTop;
+      const elHeight = el.offsetHeight;
+      const containerHeight = container.offsetHeight;
+      container.scrollTo({
+        top: Math.max(0, elTop - containerHeight / 2 + elHeight / 2),
+        behavior: "smooth",
+      });
+    }
   }, [activeIndex]);
 
   const primaryCover = safeCovers[0];
@@ -113,12 +123,12 @@ export default function MusicStage({
         </>
       )}
 
-      <div className={`absolute inset-0 flex items-center gap-6 p-5 pb-16 sm:p-8 sm:pb-20 ${hasLyrics ? "justify-start" : "justify-center"}`}>
+      <div className={`absolute inset-0 flex items-center gap-4 p-4 pb-14 sm:gap-6 sm:p-8 sm:pb-20 ${hasLyrics ? "justify-start" : "justify-center"}`}>
         {/* ── The sleeve ── */}
         {primaryCover && (
           <div
             className={`relative aspect-square flex-shrink-0 ${
-              hasLyrics ? "h-full max-h-[min(100%,320px)]" : "h-full"
+              hasLyrics ? "h-full max-h-[min(100%,180px)] sm:max-h-[min(100%,320px)]" : "h-full max-h-[min(100%,340px)]"
             }`}
           >
             {safeCovers.map((url, i) => (
@@ -159,13 +169,16 @@ export default function MusicStage({
 
         {/* ── The lyrics ── */}
         {hasLyrics && (
-          <div className="relative hidden h-full min-w-0 flex-1 sm:block">
+          <div className="relative flex h-full min-w-0 flex-1">
             {/* Feathered top and bottom, so lines enter and leave rather
                 than being chopped off at a hard edge. */}
-            <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-16 bg-gradient-to-b from-black/60 to-transparent" />
-            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-16 bg-gradient-to-t from-black/60 to-transparent" />
+            <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-12 bg-gradient-to-b from-black/60 to-transparent sm:h-16" />
+            <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-12 bg-gradient-to-t from-black/60 to-transparent sm:h-16" />
 
-            <div className="h-full overflow-y-auto py-12 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div
+              ref={lyricsContainerRef}
+              className="h-full w-full overflow-y-auto py-10 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:py-12"
+            >
               {lyrics.map((line, i) => {
                 const isActive = i === activeIndex;
                 const distance = Math.abs(i - activeIndex);
@@ -174,12 +187,12 @@ export default function MusicStage({
                   <p
                     key={`${i}-${line.time}`}
                     ref={isActive ? activeLineRef : undefined}
-                    className={`origin-left py-1.5 font-black leading-tight tracking-[-0.01em] transition-all duration-500 ${
+                    className={`origin-left py-1 font-black leading-tight tracking-[-0.01em] transition-all duration-500 sm:py-1.5 ${
                       isActive
-                        ? "text-2xl text-white sm:text-3xl"
+                        ? "text-xl text-white sm:text-3xl"
                         : distance === 1
-                          ? "text-lg text-white/45 sm:text-xl"
-                          : "text-base text-white/20 sm:text-lg"
+                          ? "text-sm text-white/45 sm:text-xl"
+                          : "text-xs text-white/20 sm:text-lg"
                     }`}
                     style={
                       isActive

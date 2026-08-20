@@ -357,6 +357,7 @@ export async function POST(request: NextRequest) {
                   }
                 })
               );
+              revalidateTag(READY_VIDEOS_TAG, "max");
               console.log(`Copyright external match found for ${uploadId}:`, match.title);
 
               // Notify the user

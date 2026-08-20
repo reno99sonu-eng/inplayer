@@ -271,21 +271,13 @@ export default function VideoMetadataFields({
                 <label className="block text-xs font-bold text-slate-300 light:text-slate-700">
                   Thumbnail
                 </label>
-                {thumbnail.onGenerateAIThumbnail && (
-                  <button
-                    type="button"
-                    onClick={thumbnail.onGenerateAIThumbnail}
-                    disabled={thumbnail.aiThumbnailBusy}
-                    className="inline-flex items-center gap-1.5 rounded-lg bg-orange-500/15 px-2.5 py-1 text-[11px] font-bold text-orange-400 transition hover:bg-orange-500 hover:text-white disabled:opacity-50"
-                  >
-                    {thumbnail.aiThumbnailBusy ? (
-                      <Loader2 size={12} className="animate-spin" />
-                    ) : (
-                      <Sparkles size={12} />
-                    )}
-                    <span>{thumbnail.aiThumbnailBusy ? "Generating AI Image..." : "✨ Generate AI Thumbnail"}</span>
-                  </button>
-                )}
+              </div>
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <p className="mb-2 text-[11px] leading-relaxed text-slate-400 light:text-slate-600">
+                    Pick a frame from your video, or upload a custom image (max 5MB).
+                  </p>
+                </div>
               </div>
 
               {muxFrames && muxFrames.length > 0 && (

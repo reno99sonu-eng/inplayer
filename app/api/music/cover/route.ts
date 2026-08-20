@@ -22,7 +22,7 @@ import { verifyAuth } from "@/app/lib/verifyAuth";
 //     "Resource": "arn:aws:s3:::<bucket>/music-covers/*" }
 // The existing policy for `custom-audio/*` can simply gain a second
 // resource line. Optionally set S3_MEDIA_PUBLIC_BASE_URL for CloudFront.
-const COVER_PREFIX = "music-covers";
+const COVER_PREFIX = "custom-audio/covers";
 
 // The browser re-encodes every cover before it gets here (see
 // compressCoverImage in the upload tools) — a 1600px JPEG at q0.85 lands a
@@ -107,8 +107,9 @@ export async function POST(request: NextRequest) {
     );
   } catch (err) {
     console.error("Music cover upload: S3 put failed:", err);
+    const msg = err instanceof Error ? err.message : "Unknown S3 error";
     return NextResponse.json(
-      { error: "Couldn't save that image right now. Please try again." },
+      { error: `Couldn't save that image right now. S3 Error: ${msg}` },
       { status: 502 }
     );
   }

@@ -270,22 +270,27 @@ export default function VideoPlayer({
   const [musicTime, setMusicTime] = useState(0);
   const [musicDuration, setMusicDuration] = useState<number | undefined>(undefined);
 
+  useEffect(() => {
+    if (!music) return;
+    let rafId: number;
+    const pollTime = () => {
+      const player = playerRef.current;
+      if (player) {
+        setMusicTime(player.currentTime || 0);
+        const dur = player.duration;
+        if (typeof dur === "number" && Number.isFinite(dur) && dur > 0) {
+          setMusicDuration(dur);
+        }
+      }
+      rafId = requestAnimationFrame(pollTime);
+    };
+    rafId = requestAnimationFrame(pollTime);
+    return () => cancelAnimationFrame(rafId);
+  }, [music]);
+
   // Playhead mirror for the music stage — see handleTimeUpdate.
   const handleTimeUpdate = () => {
     const player = playerRef.current;
-
-    // Drives the cover crossfade and the lyric highlight. Read from the
-    // real playhead rather than a timer of our own, so a pause or a scrub
-    // is reflected instantly with no resync logic. Only tracked for music
-    // — on a video this state would re-render the tree ~4x a second for
-    // nothing.
-    if (music && player) {
-      setMusicTime(player.currentTime || 0);
-      const dur = player.duration;
-      if (typeof dur === "number" && Number.isFinite(dur) && dur > 0) {
-        setMusicDuration((prev) => (prev === dur ? prev : dur));
-      }
-    }
 
     if (player && playback.rememberPosition) {
       const now = Date.now();
@@ -1462,3 +1467,4 @@ export default function VideoPlayer({
     </div>
   );
 }
+

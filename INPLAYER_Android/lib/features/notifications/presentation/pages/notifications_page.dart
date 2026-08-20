@@ -129,7 +129,7 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
                               : () => _handleTap(n),
                           tileColor: n.read
                               ? Colors.transparent
-                              : AppColors.brandOrange.withOpacity(0.06),
+                              : AppColors.brandOrange.withValues(alpha: 0.06),
                           leading: CircleAvatar(
                             radius: 18,
                             backgroundColor: AppColors.surfaceDark,

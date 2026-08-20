@@ -165,7 +165,7 @@ export default function MusicStage({
             <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-16 bg-gradient-to-b from-black/60 to-transparent" />
             <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-16 bg-gradient-to-t from-black/60 to-transparent" />
 
-            <div className="h-full overflow-hidden py-12 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <div className="h-full overflow-y-auto py-12 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
               {lyrics.map((line, i) => {
                 const isActive = i === activeIndex;
                 const distance = Math.abs(i - activeIndex);

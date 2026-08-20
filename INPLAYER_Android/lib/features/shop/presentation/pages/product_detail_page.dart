@@ -192,7 +192,7 @@ class _ProductDetailPageState extends ConsumerState<ProductDetailPage> {
                                   height: 6,
                                   decoration: BoxDecoration(
                                     shape: BoxShape.circle,
-                                    color: i == _imageIndex ? AppColors.brandOrange : Colors.white.withOpacity(0.4),
+                                    color: i == _imageIndex ? AppColors.brandOrange : Colors.white.withValues(alpha: 0.4),
                                   ),
                                 ),
                               ),

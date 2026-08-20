@@ -80,7 +80,7 @@ class _FeaturedHeroCarouselState extends State<FeaturedHeroCarousel> {
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
               child: Container(
-                color: Colors.black.withOpacity(0.4),
+                color: Colors.black.withValues(alpha: 0.4),
               ),
             ),
           ),
@@ -94,7 +94,7 @@ class _FeaturedHeroCarouselState extends State<FeaturedHeroCarousel> {
                   end: Alignment.topCenter,
                   colors: [
                     AppColors.backgroundDark,
-                    AppColors.backgroundDark.withOpacity(0.7),
+                    AppColors.backgroundDark.withValues(alpha: 0.7),
                     Colors.transparent,
                   ],
                   stops: const [0.0, 0.4, 1.0],
@@ -247,7 +247,7 @@ class _FeaturedHeroCarouselState extends State<FeaturedHeroCarousel> {
                   icon: const Icon(Icons.info_outline),
                   label: const Text('More Info', style: TextStyle(fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white.withOpacity(0.2),
+                    backgroundColor: Colors.white.withValues(alpha: 0.2),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(

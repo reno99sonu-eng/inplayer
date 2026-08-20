@@ -81,6 +81,7 @@ dependencies:
   # (app/upload/page.tsx). Uses the system photo/video picker, so no
   # storage permission handling is needed on our end.
   image_picker: ^1.1.2
+  just_audio: ^0.10.6
 
 dev_dependencies:
   flutter_test:

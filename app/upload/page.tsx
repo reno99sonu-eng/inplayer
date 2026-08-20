@@ -775,6 +775,7 @@ export default function UploadPage() {
                     muxPlaybackId={info.muxPlaybackId}
                     duration={info.duration}
                     defaultThumbnailUrl={info.thumbnailUrl}
+                    contentType={contentType}
                     onDone={() => router.push(`/watch/${uploadedVideoId}`)}
                   />
                 )

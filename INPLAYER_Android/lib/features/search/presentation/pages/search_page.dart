@@ -101,9 +101,9 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     return Container(
       height: 44,
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.06),
+        color: Colors.white.withValues(alpha: 0.06),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
       ),
       child: Row(
         children: [
@@ -125,7 +125,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                 hintText: 'Search InPlayer',
                 border: InputBorder.none,
                 hintStyle: TextStyle(
-                  color: AppColors.textSecondaryDark.withOpacity(0.7),
+                  color: AppColors.textSecondaryDark.withValues(alpha: 0.7),
                 ),
               ),
               style: const TextStyle(
@@ -203,7 +203,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
             Icon(
               icon,
               size: 56,
-              color: AppColors.textSecondaryDark.withOpacity(0.5),
+              color: AppColors.textSecondaryDark.withValues(alpha: 0.5),
             ),
             const SizedBox(height: 16),
             Text(
@@ -220,7 +220,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
               subtitle,
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: AppColors.textSecondaryDark.withOpacity(0.8),
+                color: AppColors.textSecondaryDark.withValues(alpha: 0.8),
                 fontSize: 13,
               ),
             ),

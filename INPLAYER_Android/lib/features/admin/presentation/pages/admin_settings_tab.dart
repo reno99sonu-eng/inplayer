@@ -146,7 +146,7 @@ class _AdminSettingsTabState extends ConsumerState<AdminSettingsTab> {
             const SizedBox(height: 12),
             _sectionTitle('AI moderation'),
             _switchTile('Scan comments', current.moderationEnabledComments, (v) => setState(() => _current = current.copyWith(moderationEnabledComments: v))),
-            _switchTile('Scan messages', current.moderationEnabledMessages, (v) => setState(() => _current = current.copyWith(moderationEnabledMessages: v))),
+            _switchTile('Scan MilonBook', current.moderationEnabledMessages, (v) => setState(() => _current = current.copyWith(moderationEnabledMessages: v))),
             _switchTile('Scan uploads', current.moderationEnabledUploads, (v) => setState(() => _current = current.copyWith(moderationEnabledUploads: v))),
             const SizedBox(height: 12),
             _sectionTitle('Advertising'),

@@ -161,9 +161,9 @@ class _ShopPageState extends ConsumerState<ShopPage> {
                     Container(
                       height: 44,
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.04),
+                        color: Colors.white.withValues(alpha: 0.04),
                         borderRadius: BorderRadius.circular(16),
-                        border: Border.all(color: Colors.white.withOpacity(0.15)),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
                       ),
                       child: TextField(
                         controller: _searchController,
@@ -171,8 +171,8 @@ class _ShopPageState extends ConsumerState<ShopPage> {
                         style: const TextStyle(color: Colors.white, fontSize: 14),
                         decoration: InputDecoration(
                           hintText: 'Search products or sellers...',
-                          hintStyle: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 14),
-                          prefixIcon: Icon(Icons.search, color: Colors.white.withOpacity(0.4), size: 20),
+                          hintStyle: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 14),
+                          prefixIcon: Icon(Icons.search, color: Colors.white.withValues(alpha: 0.4), size: 20),
                           border: InputBorder.none,
                           contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         ),
@@ -193,9 +193,9 @@ class _ShopPageState extends ConsumerState<ShopPage> {
                               margin: const EdgeInsets.only(right: 8),
                               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                               decoration: BoxDecoration(
-                                color: isSelected ? AppColors.brandOrange : Colors.white.withOpacity(0.03),
+                                color: isSelected ? AppColors.brandOrange : Colors.white.withValues(alpha: 0.03),
                                 borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: isSelected ? AppColors.brandOrange : Colors.white.withOpacity(0.1)),
+                                border: Border.all(color: isSelected ? AppColors.brandOrange : Colors.white.withValues(alpha: 0.1)),
                               ),
                               child: Center(
                                 child: Text(
@@ -242,7 +242,7 @@ class _ShopPageState extends ConsumerState<ShopPage> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.shopping_bag_outlined, size: 48, color: Colors.white.withOpacity(0.3)),
+                      Icon(Icons.shopping_bag_outlined, size: 48, color: Colors.white.withValues(alpha: 0.3)),
                       const SizedBox(height: 16),
                       const Text(
                         'No products found',

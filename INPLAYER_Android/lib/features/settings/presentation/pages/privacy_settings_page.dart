@@ -101,13 +101,13 @@ class _PrivacySettingsPageState extends ConsumerState<PrivacySettingsPage> {
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
                     color: selected
-                        ? AppColors.brandOrange.withOpacity(0.1)
+                        ? AppColors.brandOrange.withValues(alpha: 0.1)
                         : AppColors.cardDark,
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(
                       color: selected
                           ? AppColors.brandOrange
-                          : Colors.white.withOpacity(0.08),
+                          : Colors.white.withValues(alpha: 0.08),
                     ),
                   ),
                   child: Row(

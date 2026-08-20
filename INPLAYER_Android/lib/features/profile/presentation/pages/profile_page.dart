@@ -148,7 +148,7 @@ class ProfilePage extends ConsumerWidget {
             ),
             _buildMenuItem(
               icon: Icons.message,
-              title: 'Messages',
+              title: 'MilonBook',
               onTap: () => context.push('/messages'),
             ),
             _buildMenuItem(

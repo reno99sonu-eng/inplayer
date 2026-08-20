@@ -104,7 +104,7 @@ class _AIStudioModalState extends State<AIStudioModal>
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(24),
                 border: Border.all(
-                  color: AppColors.brandOrange.withOpacity(0.15),
+                  color: AppColors.brandOrange.withValues(alpha: 0.15),
                 ),
                 gradient: const LinearGradient(
                   begin: Alignment.topLeft,
@@ -117,7 +117,7 @@ class _AIStudioModalState extends State<AIStudioModal>
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.55),
+                    color: Colors.black.withValues(alpha: 0.55),
                     blurRadius: 90,
                     offset: const Offset(0, 25),
                   ),
@@ -144,7 +144,7 @@ class _AIStudioModalState extends State<AIStudioModal>
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
                               color: const Color(0xFF131C2D),
-                              border: Border.all(color: Colors.white.withOpacity(0.1)),
+                              border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
                             ),
                             child: const Icon(
                               Icons.close,
@@ -184,7 +184,7 @@ class _AIStudioModalState extends State<AIStudioModal>
             height: 200,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: AppColors.brandOrange.withOpacity(0.1),
+              color: AppColors.brandOrange.withValues(alpha: 0.1),
             ),
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 90, sigmaY: 90),
@@ -200,7 +200,7 @@ class _AIStudioModalState extends State<AIStudioModal>
             height: 180,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.cyan.withOpacity(0.1),
+              color: Colors.cyan.withValues(alpha: 0.1),
             ),
             child: BackdropFilter(
               filter: ImageFilter.blur(sigmaX: 90, sigmaY: 90),
@@ -219,15 +219,15 @@ class _AIStudioModalState extends State<AIStudioModal>
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: showIndicator 
-              ? const Color(0xFF10B981).withOpacity(0.4) 
-              : AppColors.brandOrange.withOpacity(0.6),
+              ? const Color(0xFF10B981).withValues(alpha: 0.4) 
+              : AppColors.brandOrange.withValues(alpha: 0.6),
         ),
         gradient: LinearGradient(
           colors: showIndicator 
-              ? [const Color(0xFF10B981).withOpacity(0.1), const Color(0xFF10B981).withOpacity(0.1)]
+              ? [const Color(0xFF10B981).withValues(alpha: 0.1), const Color(0xFF10B981).withValues(alpha: 0.1)]
               : [
-                  AppColors.brandOrange.withOpacity(0.15),
-                  AppColors.brandGold.withOpacity(0.1)
+                  AppColors.brandOrange.withValues(alpha: 0.15),
+                  AppColors.brandGold.withValues(alpha: 0.1)
                 ],
         ),
       ),
@@ -283,7 +283,7 @@ class _AIStudioModalState extends State<AIStudioModal>
           'Generate premium scripts, thumbnails, voiceovers and translations instantly.',
           style: TextStyle(
             fontSize: 12,
-            color: Colors.white.withOpacity(0.6),
+            color: Colors.white.withValues(alpha: 0.6),
             height: 1.5,
           ),
         ),
@@ -296,8 +296,8 @@ class _AIStudioModalState extends State<AIStudioModal>
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            color: Colors.white.withOpacity(0.05),
-            border: Border.all(color: Colors.white.withOpacity(0.1)),
+            color: Colors.white.withValues(alpha: 0.05),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -308,7 +308,7 @@ class _AIStudioModalState extends State<AIStudioModal>
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 2,
-                  color: Colors.white.withOpacity(0.5),
+                  color: Colors.white.withValues(alpha: 0.5),
                 ),
               ),
               const SizedBox(height: 12),
@@ -316,7 +316,7 @@ class _AIStudioModalState extends State<AIStudioModal>
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
                   color: const Color(0xFF07111F),
-                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
                 ),
                 child: TextField(
                   controller: _promptController,
@@ -329,7 +329,7 @@ class _AIStudioModalState extends State<AIStudioModal>
                   decoration: InputDecoration(
                     hintText: 'Create a cinematic travel documentary...',
                     hintStyle: TextStyle(
-                      color: Colors.white.withOpacity(0.3),
+                      color: Colors.white.withValues(alpha: 0.3),
                     ),
                     border: InputBorder.none,
                     contentPadding: const EdgeInsets.all(16),
@@ -349,7 +349,7 @@ class _AIStudioModalState extends State<AIStudioModal>
                       borderRadius: BorderRadius.circular(16),
                     ),
                     elevation: 10,
-                    shadowColor: AppColors.brandOrange.withOpacity(0.5),
+                    shadowColor: AppColors.brandOrange.withValues(alpha: 0.5),
                   ),
                   child: _isLoading 
                       ? const SizedBox(
@@ -375,9 +375,9 @@ class _AIStudioModalState extends State<AIStudioModal>
                   child: Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.red.withOpacity(0.1),
+                      color: Colors.red.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.red.withOpacity(0.2)),
+                      border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
                     ),
                     child: Text(
                       _error!,
@@ -399,7 +399,7 @@ class _AIStudioModalState extends State<AIStudioModal>
             fontSize: 10,
             fontWeight: FontWeight.bold,
             letterSpacing: 2,
-            color: Colors.white.withOpacity(0.5),
+            color: Colors.white.withValues(alpha: 0.5),
           ),
         ),
         const SizedBox(height: 12),
@@ -415,13 +415,13 @@ class _AIStudioModalState extends State<AIStudioModal>
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
-                  color: Colors.white.withOpacity(0.04),
-                  border: Border.all(color: Colors.white.withOpacity(0.05)),
+                  color: Colors.white.withValues(alpha: 0.04),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
                 ),
                 child: Text(
                   entry.key,
                   style: TextStyle(
-                    color: Colors.white.withOpacity(0.8),
+                    color: Colors.white.withValues(alpha: 0.8),
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
                   ),
@@ -447,8 +447,8 @@ class _AIStudioModalState extends State<AIStudioModal>
                 height: 36,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.white.withOpacity(0.05),
-                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                  color: Colors.white.withValues(alpha: 0.05),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
                 ),
                 child: const Icon(
                   Icons.arrow_back,
@@ -476,7 +476,7 @@ class _AIStudioModalState extends State<AIStudioModal>
           'Here\'s what InPlayer AI generated from your prompt.',
           style: TextStyle(
             fontSize: 12,
-            color: Colors.white.withOpacity(0.6),
+            color: Colors.white.withValues(alpha: 0.6),
             height: 1.5,
           ),
         ),
@@ -486,8 +486,8 @@ class _AIStudioModalState extends State<AIStudioModal>
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(20),
-            color: Colors.white.withOpacity(0.05),
-            border: Border.all(color: Colors.white.withOpacity(0.1)),
+            color: Colors.white.withValues(alpha: 0.05),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -498,7 +498,7 @@ class _AIStudioModalState extends State<AIStudioModal>
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 2,
-                  color: Colors.white.withOpacity(0.5),
+                  color: Colors.white.withValues(alpha: 0.5),
                 ),
               ),
               const SizedBox(height: 12),
@@ -508,7 +508,7 @@ class _AIStudioModalState extends State<AIStudioModal>
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(16),
                   color: const Color(0xFF07111F),
-                  border: Border.all(color: Colors.white.withOpacity(0.1)),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
                 ),
                 child: Text(
                   _result ?? '',

@@ -77,7 +77,7 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
           backgroundColor: AppColors.backgroundDark,
           elevation: 0,
           title: const Text(
-            'Messages',
+            'MilonBook',
             style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimaryDark),
           ),
           actions: [
@@ -94,7 +94,7 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
             labelColor: AppColors.brandOrange,
             unselectedLabelColor: AppColors.textSecondaryDark,
             tabs: [
-              const Tab(text: 'Messages'),
+              const Tab(text: 'MilonBook'),
               Tab(text: _requests.isEmpty ? 'Requests' : 'Requests (${_requests.length})'),
             ],
           ),

@@ -65,10 +65,10 @@ class _HomePageState extends ConsumerState<HomePage> {
         filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
         child: Container(
           decoration: BoxDecoration(
-            color: AppColors.cardDark.withOpacity(0.95),
+            color: AppColors.cardDark.withValues(alpha: 0.95),
             border: Border(
               top: BorderSide(
-                color: Colors.white.withOpacity(0.1),
+                color: Colors.white.withValues(alpha: 0.1),
                 width: 1,
               ),
             ),
@@ -146,7 +146,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               shadows: isActive
                   ? [
                       Shadow(
-                        color: AppColors.brandOrange.withOpacity(0.85),
+                        color: AppColors.brandOrange.withValues(alpha: 0.85),
                         blurRadius: 12,
                       )
                     ]
@@ -166,7 +166,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                 shadows: isActive
                     ? [
                         Shadow(
-                          color: AppColors.brandOrange.withOpacity(0.7),
+                          color: AppColors.brandOrange.withValues(alpha: 0.7),
                           blurRadius: 8,
                         )
                       ]
@@ -202,7 +202,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           borderRadius: BorderRadius.circular(17),
           boxShadow: [
             BoxShadow(
-              color: AppColors.brandOrange.withOpacity(0.4),
+              color: AppColors.brandOrange.withValues(alpha: 0.4),
               blurRadius: 12,
               offset: const Offset(0, 4),
             ),
@@ -265,28 +265,58 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage> {
           SliverAppBar(
             floating: true,
             snap: true,
-            backgroundColor: AppColors.backgroundDark,
+            backgroundColor: const Color(0xFF06101D).withValues(alpha: 0.9),
             surfaceTintColor: Colors.transparent,
             elevation: 0,
             toolbarHeight: 72,
             titleSpacing: 16,
+            flexibleSpace: ClipRect(
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 28, sigmaY: 28),
+                child: Container(
+                  color: Colors.transparent,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      // INPLAYER Background Watermark
+                      Text(
+                        'INPLAYER',
+                        style: TextStyle(
+                          fontSize: 54,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 18.9, // 0.35em
+                          color: Colors.white.withValues(alpha: 0.03),
+                        ),
+                      ),
+                      Positioned.fill(
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 1.5, sigmaY: 1.5),
+                          child: const SizedBox(),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
             title: Row(
               children: [
                 Builder(
                   builder: (context) => GestureDetector(
                     onTap: () => Scaffold.of(context).openDrawer(),
                     child: Container(
-                      padding: const EdgeInsets.all(8),
+                      width: 44,
+                      height: 44,
                       margin: const EdgeInsets.only(right: 12),
                       decoration: BoxDecoration(
-                        color: Colors.white.withOpacity(0.05),
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white.withOpacity(0.1)),
+                        color: Colors.white.withValues(alpha: 0.05),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
                       ),
                       child: const Icon(
                         Icons.menu,
                         color: Colors.white,
-                        size: 20,
+                        size: 22,
                       ),
                     ),
                   ),
@@ -296,6 +326,12 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage> {
                 _buildHeaderIcon(
                   Icons.search,
                   () => context.push('/search'),
+                ),
+                _buildHeaderIcon(
+                  Icons.shopping_bag_outlined,
+                  () {
+                    context.push('/marketplace');
+                  },
                 ),
                 _buildHeaderIcon(
                   Icons.notifications_outlined,
@@ -536,7 +572,7 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage> {
           Icon(
             Icons.video_library_outlined,
             size: 60,
-            color: AppColors.textSecondaryDark.withOpacity(0.5),
+            color: AppColors.textSecondaryDark.withValues(alpha: 0.5),
           ),
           const SizedBox(height: 16),
           const Text(
@@ -552,7 +588,7 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage> {
             'New videos will appear here when they are published.',
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: AppColors.textSecondaryDark.withOpacity(0.8),
+              color: AppColors.textSecondaryDark.withValues(alpha: 0.8),
               fontSize: 13,
             ),
           ),

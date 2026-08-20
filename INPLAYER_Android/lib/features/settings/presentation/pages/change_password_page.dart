@@ -125,7 +125,7 @@ class _ChangePasswordPageState extends ConsumerState<ChangePasswordPage> {
         hintText: hint,
         hintStyle: const TextStyle(color: AppColors.textSecondaryDark),
         filled: true,
-        fillColor: Colors.white.withOpacity(0.05),
+        fillColor: Colors.white.withValues(alpha: 0.05),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide.none,

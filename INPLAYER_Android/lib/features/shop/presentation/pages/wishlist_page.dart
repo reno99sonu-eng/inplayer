@@ -92,7 +92,7 @@ class _WishlistPageState extends ConsumerState<WishlistPage> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.favorite_border, size: 56, color: Colors.white.withOpacity(0.3)),
+                          Icon(Icons.favorite_border, size: 56, color: Colors.white.withValues(alpha: 0.3)),
                           const SizedBox(height: 16),
                           const Text(
                             'Nothing saved yet',
@@ -172,7 +172,7 @@ class _WishlistCard extends StatelessWidget {
                       onTap: busy ? null : onRemove,
                       child: Container(
                         padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(color: Colors.black.withOpacity(0.55), shape: BoxShape.circle),
+                        decoration: BoxDecoration(color: Colors.black.withValues(alpha: 0.55), shape: BoxShape.circle),
                         child: busy
                             ? const SizedBox(
                                 width: 14,

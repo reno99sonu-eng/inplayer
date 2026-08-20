@@ -3,6 +3,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:logger/logger.dart';
 import 'package:amplify_flutter/amplify_flutter.dart';
 import 'package:amplify_auth_cognito/amplify_auth_cognito.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../config/app_config.dart';
 
 class DioClient {
@@ -62,6 +63,18 @@ class DioClient {
             // if the endpoint actually requires auth, same as a
             // signed-out browser hitting it.
             _logger.d('No auth session available for request: $e');
+          }
+
+          try {
+            final prefs = await SharedPreferences.getInstance();
+            final audience = prefs.getString('audience');
+            if (audience != null && audience.isNotEmpty) {
+              final existingCookie = options.headers['Cookie'] as String? ?? '';
+              final newCookie = existingCookie.isEmpty ? 'audience=$audience' : '$existingCookie; audience=$audience';
+              options.headers['Cookie'] = newCookie;
+            }
+          } catch (e) {
+            _logger.d('Could not read audience preference: $e');
           }
 
           _logger.d('Request: ${options.method} ${options.uri}');

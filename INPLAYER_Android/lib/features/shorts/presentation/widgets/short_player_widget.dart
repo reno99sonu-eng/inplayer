@@ -4,7 +4,9 @@ import 'package:video_player/video_player.dart';
 import '../../../../models/short.dart';
 import '../../../../models/video.dart';
 import '../../../../services/video_service.dart';
+import '../../../../services/premium_service.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:just_audio/just_audio.dart';
 
 class ShortPlayerWidget extends ConsumerStatefulWidget {
   final Short short;
@@ -17,6 +19,7 @@ class ShortPlayerWidget extends ConsumerStatefulWidget {
 
 class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget> {
   VideoPlayerController? _videoController;
+  AudioPlayer? _audioPlayer;
   bool _isInitialized = false;
   bool _isPlaying = true;
 
@@ -28,25 +31,42 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget> {
 
   Future<void> _initPlayer() async {
     try {
-      final videoService = ref.read(videoServiceProvider);
-      Video? video;
-      if (widget.short.videoId.isNotEmpty) {
-        video = await videoService.getVideoById(widget.short.videoId);
-      }
-      
       String? videoUrl;
-      if (video != null && video.muxPlaybackId != null) {
-         videoUrl = 'https://stream.mux.com/${video.muxPlaybackId}.m3u8';
+      final premiumService = ref.read(premiumServiceProvider);
+      final maxRes = await premiumService.getMaxResolution();
+
+      if (widget.short.muxPlaybackId != null && widget.short.muxPlaybackId!.isNotEmpty) {
+        videoUrl = 'https://stream.mux.com/${widget.short.muxPlaybackId}.m3u8?max_resolution=$maxRes';
+      } else {
+        // Fallback to fetching full video if short doesn't have muxPlaybackId
+        final videoService = ref.read(videoServiceProvider);
+        if (widget.short.videoId.isNotEmpty) {
+          final video = await videoService.getVideoById(widget.short.videoId);
+          if (video != null && video.muxPlaybackId != null) {
+            videoUrl = 'https://stream.mux.com/${video.muxPlaybackId}.m3u8?max_resolution=$maxRes';
+          }
+        }
       }
 
       if (videoUrl != null) {
         _videoController = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
         await _videoController!.initialize();
         _videoController!.setLooping(true);
+        
+        if (widget.short.soundtrack != null) {
+          _audioPlayer = AudioPlayer();
+          await _audioPlayer!.setUrl(widget.short.soundtrack!.url);
+          await _audioPlayer!.setLoopMode(LoopMode.one);
+          _videoController!.setVolume(0); // Mute video if we have a soundtrack
+          _audioPlayer!.play();
+        }
+        
         _videoController!.play();
-        setState(() {
-          _isInitialized = true;
-        });
+        if (mounted) {
+          setState(() {
+            _isInitialized = true;
+          });
+        }
       }
     } catch (e) {
       print('Error initializing short player: $e');
@@ -56,6 +76,7 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget> {
   @override
   void dispose() {
     _videoController?.dispose();
+    _audioPlayer?.dispose();
     super.dispose();
   }
 
@@ -64,9 +85,11 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget> {
     setState(() {
       if (_videoController!.value.isPlaying) {
         _videoController!.pause();
+        _audioPlayer?.pause();
         _isPlaying = false;
       } else {
         _videoController!.play();
+        _audioPlayer?.play();
         _isPlaying = true;
       }
     });
@@ -103,7 +126,7 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget> {
             child: Icon(
               Icons.play_arrow,
               size: 80,
-              color: Colors.white.withOpacity(0.5),
+              color: Colors.white.withValues(alpha: 0.5),
             ),
           ),
 

@@ -129,7 +129,7 @@ class _SubscriptionsPageState extends ConsumerState<SubscriptionsPage> {
                                 Icon(
                                   Icons.subscriptions_outlined,
                                   size: 56,
-                                  color: AppColors.textSecondaryDark.withOpacity(0.5),
+                                  color: AppColors.textSecondaryDark.withValues(alpha: 0.5),
                                 ),
                                 const SizedBox(height: 16),
                                 const Text(
@@ -144,7 +144,7 @@ class _SubscriptionsPageState extends ConsumerState<SubscriptionsPage> {
                                 Text(
                                   'Subscribe to channels to see them here',
                                   style: TextStyle(
-                                    color: AppColors.textSecondaryDark.withOpacity(0.7),
+                                    color: AppColors.textSecondaryDark.withValues(alpha: 0.7),
                                     fontSize: 13,
                                   ),
                                 ),

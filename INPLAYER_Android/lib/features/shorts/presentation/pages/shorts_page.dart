@@ -28,18 +28,6 @@ class _ShortsPageState extends ConsumerState<ShortsPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(
-        backgroundColor: AppColors.backgroundDark,
-        elevation: 0,
-        title: const Text(
-          'Raftaar',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimaryDark,
-            fontSize: 22,
-          ),
-        ),
-      ),
       body: FutureBuilder<List<Short>>(
         future: ref.read(videoServiceProvider).getShorts(),
         builder: (context, snapshot) {
@@ -84,7 +72,7 @@ class _ShortsPageState extends ConsumerState<ShortsPage> {
                   Icon(
                     Icons.play_circle_outline,
                     size: 64,
-                    color: AppColors.textSecondaryDark.withOpacity(0.5),
+                    color: AppColors.textSecondaryDark.withValues(alpha: 0.5),
                   ),
                   const SizedBox(height: 16),
                   Text(
@@ -98,7 +86,7 @@ class _ShortsPageState extends ConsumerState<ShortsPage> {
                   Text(
                     'Check back later for new content',
                     style: TextStyle(
-                      color: AppColors.textSecondaryDark.withOpacity(0.7),
+                      color: AppColors.textSecondaryDark.withValues(alpha: 0.7),
                       fontSize: 14,
                     ),
                   ),

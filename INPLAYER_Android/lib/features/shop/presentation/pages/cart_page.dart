@@ -128,7 +128,7 @@ class _CartPageState extends ConsumerState<CartPage> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.shopping_cart_outlined, size: 56, color: Colors.white.withOpacity(0.3)),
+                          Icon(Icons.shopping_cart_outlined, size: 56, color: Colors.white.withValues(alpha: 0.3)),
                           const SizedBox(height: 16),
                           const Text(
                             'Your cart is empty',
@@ -165,7 +165,7 @@ class _CartPageState extends ConsumerState<CartPage> {
                 padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
                 decoration: BoxDecoration(
                   color: AppColors.surfaceDark,
-                  border: Border(top: BorderSide(color: Colors.white.withOpacity(0.08))),
+                  border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.08))),
                 ),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -190,7 +190,7 @@ class _CartPageState extends ConsumerState<CartPage> {
                           );
                         },
                         style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white.withOpacity(0.08),
+                          backgroundColor: Colors.white.withValues(alpha: 0.08),
                           foregroundColor: Colors.white,
                           padding: const EdgeInsets.symmetric(vertical: 14),
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -318,10 +318,10 @@ class _QtyButton extends StatelessWidget {
         width: 26,
         height: 26,
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(onTap == null ? 0.02 : 0.06),
+          color: Colors.white.withValues(alpha: onTap == null ? 0.02 : 0.06),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Icon(icon, size: 14, color: onTap == null ? Colors.white.withOpacity(0.2) : Colors.white),
+        child: Icon(icon, size: 14, color: onTap == null ? Colors.white.withValues(alpha: 0.2) : Colors.white),
       ),
     );
   }

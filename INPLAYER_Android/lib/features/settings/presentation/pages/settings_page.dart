@@ -20,6 +20,7 @@ class SettingsPage extends ConsumerStatefulWidget {
 
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   bool _pushNotifications = true;
+  bool _audience18Plus = true;
   bool _prefsLoaded = false;
   bool _deletingAccount = false;
 
@@ -34,6 +35,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     if (!mounted) return;
     setState(() {
       _pushNotifications = prefs.getBool(_pushNotificationsPrefKey) ?? true;
+      _audience18Plus = prefs.getString('audience') != 'kids';
       _prefsLoaded = true;
     });
   }
@@ -42,6 +44,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     setState(() => _pushNotifications = value);
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_pushNotificationsPrefKey, value);
+  }
+
+  Future<void> _setAudience18Plus(bool value) async {
+    setState(() => _audience18Plus = value);
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('audience', value ? '18+' : 'kids');
   }
 
   void _showSnack(String message) {
@@ -226,6 +234,13 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
           const Divider(height: 1, color: AppColors.cardDark),
           _buildSectionHeader('Privacy'),
+          _buildSwitchItem(
+            icon: Icons.family_restroom,
+            title: '18+ Content',
+            subtitle: 'Turn off for Kids mode.',
+            value: _audience18Plus,
+            onChanged: _prefsLoaded ? _setAudience18Plus : null,
+          ),
           _buildMenuItem(
             icon: Icons.visibility,
             title: 'Privacy Settings',

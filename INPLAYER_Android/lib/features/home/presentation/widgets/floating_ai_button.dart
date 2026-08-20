@@ -64,7 +64,7 @@ class _FloatingAIButtonState extends State<FloatingAIButton>
       context: context,
       barrierDismissible: true,
       barrierLabel: 'AI Studio Modal',
-      barrierColor: Colors.black.withOpacity(0.5),
+      barrierColor: Colors.black.withValues(alpha: 0.5),
       transitionDuration: const Duration(milliseconds: 300),
       pageBuilder: (context, animation, secondaryAnimation) {
         return const AIStudioModal();
@@ -113,12 +113,12 @@ class _FloatingAIButtonState extends State<FloatingAIButton>
                 ],
               ),
               border: Border.all(
-                color: AppColors.brandOrange.withOpacity(0.2),
+                color: AppColors.brandOrange.withValues(alpha: 0.2),
                 width: 1,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: AppColors.brandOrange.withOpacity(0.35),
+                  color: AppColors.brandOrange.withValues(alpha: 0.35),
                   blurRadius: 40,
                   spreadRadius: 0,
                 ),

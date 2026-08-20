@@ -68,9 +68,9 @@ class _TrendingNowRowState extends ConsumerState<TrendingNowRow> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                 decoration: BoxDecoration(
-                  color: Colors.red.withOpacity(0.1),
+                  color: Colors.red.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.red.withOpacity(0.2)),
+                  border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
                 ),
                 child: const Text(
                   'TRENDING NOW',
@@ -127,7 +127,7 @@ class _TrendingNowRowState extends ConsumerState<TrendingNowRow> {
                 width: 64,
                 height: 64,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.06),
+                  color: Colors.white.withValues(alpha: 0.06),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -136,7 +136,7 @@ class _TrendingNowRowState extends ConsumerState<TrendingNowRow> {
                 width: 48,
                 height: 8,
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.06),
+                  color: Colors.white.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),

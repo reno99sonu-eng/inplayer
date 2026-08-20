@@ -358,7 +358,7 @@ class _ChannelPageState extends ConsumerState<ChannelPage> {
                     child: Text(
                       'No videos yet',
                       style: TextStyle(
-                          color: AppColors.textSecondaryDark.withOpacity(0.8)),
+                          color: AppColors.textSecondaryDark.withValues(alpha: 0.8)),
                     ),
                   ),
                 ),
@@ -401,7 +401,7 @@ class _ChannelPageState extends ConsumerState<ChannelPage> {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            AppColors.brandOrange.withOpacity(0.35),
+            AppColors.brandOrange.withValues(alpha: 0.35),
             AppColors.backgroundDark,
           ],
         ),
@@ -410,7 +410,7 @@ class _ChannelPageState extends ConsumerState<ChannelPage> {
                 image: provider,
                 fit: BoxFit.cover,
                 colorFilter: ColorFilter.mode(
-                  Colors.black.withOpacity(0.25),
+                  Colors.black.withValues(alpha: 0.25),
                   BlendMode.darken,
                 ),
                 onError: (_, __) {},
@@ -451,7 +451,7 @@ class _ChannelPageState extends ConsumerState<ChannelPage> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: AppColors.surfaceDark,
-                  border: Border.all(color: Colors.white.withOpacity(0.08)),
+                  border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
                 ),
                 child: Icon(
                   channel.notifyEnabled
@@ -479,7 +479,7 @@ class _ChannelPageState extends ConsumerState<ChannelPage> {
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
                 side: subscribed
-                    ? BorderSide(color: Colors.white.withOpacity(0.08))
+                    ? BorderSide(color: Colors.white.withValues(alpha: 0.08))
                     : BorderSide.none,
               ),
             ),

@@ -216,9 +216,9 @@ class _GoLivePageState extends ConsumerState<GoLivePage> {
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
-            color: AppColors.brandOrange.withOpacity(0.08),
+            color: AppColors.brandOrange.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: AppColors.brandOrange.withOpacity(0.25)),
+            border: Border.all(color: AppColors.brandOrange.withValues(alpha: 0.25)),
           ),
           child: Row(
             children: [
@@ -227,7 +227,7 @@ class _GoLivePageState extends ConsumerState<GoLivePage> {
               Expanded(
                 child: Text(
                   "You'll broadcast from a streaming app (like OBS or Streamlabs) using a server URL and key we generate for you — not directly from this screen.",
-                  style: TextStyle(color: Colors.white.withOpacity(0.85), fontSize: 12.5, height: 1.4),
+                  style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 12.5, height: 1.4),
                 ),
               ),
             ],
@@ -321,14 +321,14 @@ class _GoLivePageState extends ConsumerState<GoLivePage> {
           _showStreamKey ? (creds.streamKey ?? '—') : List.filled(24, '•').join(),
           onCopy: () => _copy('Stream key', creds.streamKey),
           trailing: IconButton(
-            icon: Icon(_showStreamKey ? Icons.visibility_off : Icons.visibility, color: Colors.white.withOpacity(0.6), size: 18),
+            icon: Icon(_showStreamKey ? Icons.visibility_off : Icons.visibility, color: Colors.white.withValues(alpha: 0.6), size: 18),
             onPressed: () => setState(() => _showStreamKey = !_showStreamKey),
           ),
         ),
         const SizedBox(height: 8),
         Text(
           "Don't share your stream key — anyone with it can broadcast to your channel.",
-          style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 11),
+          style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
         ),
         const SizedBox(height: 24),
         _sectionTitle('2. Press "Start Streaming" there'),
@@ -352,12 +352,12 @@ class _GoLivePageState extends ConsumerState<GoLivePage> {
                         : Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.videocam_off_outlined, color: Colors.white.withOpacity(0.3), size: 32),
+                              Icon(Icons.videocam_off_outlined, color: Colors.white.withValues(alpha: 0.3), size: 32),
                               const SizedBox(height: 8),
                               Text(
                                 _previewFailed ? 'Not receiving video yet — start broadcasting first.' : 'Preview not started',
                                 textAlign: TextAlign.center,
-                                style: TextStyle(color: Colors.white.withOpacity(0.4), fontSize: 12),
+                                style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 12),
                               ),
                             ],
                           ),
@@ -457,7 +457,7 @@ class _GoLivePageState extends ConsumerState<GoLivePage> {
   InputDecoration _inputDecoration(String? hint) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: TextStyle(color: AppColors.textSecondaryDark.withOpacity(0.6)),
+      hintStyle: TextStyle(color: AppColors.textSecondaryDark.withValues(alpha: 0.6)),
       filled: true,
       fillColor: AppColors.cardDark,
       border: OutlineInputBorder(

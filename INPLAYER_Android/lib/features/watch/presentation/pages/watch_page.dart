@@ -14,6 +14,7 @@ import '../../../../services/comment_service.dart';
 import '../../../../services/channel_service.dart';
 import '../../../../models/video.dart';
 import '../../../../models/comment.dart';
+import '../../../../services/premium_service.dart';
 
 class WatchPage extends ConsumerStatefulWidget {
   final String videoId;
@@ -80,7 +81,9 @@ class _WatchPageState extends ConsumerState<WatchPage> {
       }
 
       if (video.muxPlaybackId != null && video.muxPlaybackId!.isNotEmpty) {
-        final videoUrl = 'https://stream.mux.com/${video.muxPlaybackId}.m3u8';
+        final premiumService = ref.read(premiumServiceProvider);
+        final maxRes = await premiumService.getMaxResolution();
+        final videoUrl = 'https://stream.mux.com/${video.muxPlaybackId}.m3u8?max_resolution=$maxRes';
         _videoController = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
 
         try {
@@ -477,7 +480,7 @@ class _WatchPageState extends ConsumerState<WatchPage> {
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                     side: _isSubscribed
-                        ? BorderSide(color: Colors.white.withOpacity(0.08))
+                        ? BorderSide(color: Colors.white.withValues(alpha: 0.08))
                         : BorderSide.none,
                   ),
                 ),
@@ -511,7 +514,7 @@ class _WatchPageState extends ConsumerState<WatchPage> {
       decoration: BoxDecoration(
         color: AppColors.cardDark,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
@@ -590,9 +593,9 @@ class _WatchPageState extends ConsumerState<WatchPage> {
         width: double.infinity,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.05),
+          color: Colors.white.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withOpacity(0.08)),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -632,7 +635,7 @@ class _WatchPageState extends ConsumerState<WatchPage> {
       decoration: BoxDecoration(
         color: AppColors.cardDark,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -693,7 +696,7 @@ class _WatchPageState extends ConsumerState<WatchPage> {
                       fontSize: 13,
                     ),
                     filled: true,
-                    fillColor: Colors.white.withOpacity(0.05),
+                    fillColor: Colors.white.withValues(alpha: 0.05),
                     contentPadding:
                         const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                     border: OutlineInputBorder(
@@ -787,7 +790,7 @@ class _WatchPageState extends ConsumerState<WatchPage> {
                         padding:
                             const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
                         decoration: BoxDecoration(
-                          color: AppColors.brandOrange.withOpacity(0.15),
+                          color: AppColors.brandOrange.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(6),
                         ),
                         child: const Text(

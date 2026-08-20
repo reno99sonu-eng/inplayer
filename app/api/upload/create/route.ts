@@ -20,6 +20,7 @@ import {
   screenMusicMetadata,
 } from "@/app/lib/musicCopyright";
 import { getRequestIp } from "@/app/lib/requestInfo";
+import { createNotification } from "@/app/lib/notifications";
 import { applyModerationStrike } from "@/app/lib/moderationStrikes";
 import { CUSTOM_AUDIO_MAX_SECONDS } from "@/app/data/soundtracks";
 import {
@@ -282,10 +283,10 @@ export async function POST(request: NextRequest) {
     );
 
     // Hidden from every public listing if EITHER the general moderation
-    // check flagged it, or the audience classifier decided this must not be
-    // publicly visible pending review.
+    // check flagged it, the audience classifier decided this must not be
+    // publicly visible pending review, OR the copyright screener flagged it.
     const moderationHidden =
-      (uploadModeration.checked && uploadModeration.flagged) || audienceDecision.hide;
+      (uploadModeration.checked && uploadModeration.flagged) || audienceDecision.hide || (isMusic && copyrightScreening?.risk === "review");
     // Ground truth for which language the video is spoken in — trusted
     // over Mux's own "auto" detection by the caption pipeline (see
     // app/api/webhooks/mux), since Mux has no ASR model for Hindi/Bengali
@@ -415,6 +416,7 @@ export async function POST(request: NextRequest) {
             ...(copyrightScreening && copyrightScreening.risk === "review" && {
               copyrightRisk: "review",
               copyrightSignals: copyrightScreening.signals,
+              moderationHidden: true, // Immediately hide from public until reviewed
               ...(duplicateOfVideoId && { duplicateOfVideoId }),
             }),
           }),
@@ -504,12 +506,20 @@ export async function POST(request: NextRequest) {
     );
 
     if (moderationHidden) {
-      await applyModerationStrike(
-        request,
-        user.userId,
-        isShort ? "Short" : "video upload",
-        uploadModeration.categories
-      ).catch((err) => console.error("upload/create: applyModerationStrike failed:", err));
+      const isOnlyCopyright =
+        isMusic &&
+        copyrightScreening?.risk === "review" &&
+        !(uploadModeration.checked && uploadModeration.flagged) &&
+        !audienceDecision.hide;
+
+      if (!isOnlyCopyright) {
+        await applyModerationStrike(
+          request,
+          user.userId,
+          isShort ? "Short" : "video upload",
+          uploadModeration.categories
+        ).catch((err) => console.error("upload/create: applyModerationStrike failed:", err));
+      }
     }
 
     // ── A flagged track goes into the Copyright Center ────────────────
@@ -556,6 +566,14 @@ export async function POST(request: NextRequest) {
         .catch((err) =>
           console.error("upload/create: couldn't queue the copyright review:", err)
         );
+
+        // Notify user
+        await createNotification({
+          userId: user.sub,
+          type: "admin_announcement",
+          message: "Your music upload has been flagged for a potential copyright match. It is hidden from the public until an admin reviews it.",
+          videoId: upload.id
+        }).catch(err => console.error("Failed to notify user", err));
     }
 
     return NextResponse.json({

@@ -126,7 +126,7 @@ class VideoCard extends StatelessWidget {
                   children: [
                     _buildThumbnail(),
 
-                    // Duration badge.
+                // Duration badge.
                     if (video.duration.isNotEmpty)
                       Positioned(
                         right: 8,
@@ -137,7 +137,7 @@ class VideoCard extends StatelessWidget {
                             vertical: 3,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.85),
+                            color: Colors.black.withValues(alpha: 0.85),
                             borderRadius: BorderRadius.circular(4),
                           ),
                           child: Text(
@@ -146,6 +146,31 @@ class VideoCard extends StatelessWidget {
                               color: Colors.white,
                               fontSize: 11,
                               fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ),
+                      ),
+                    
+                    if (video.videoId.isNotEmpty)
+                      Positioned(
+                        top: 8,
+                        left: 8,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
+                          decoration: BoxDecoration(
+                            color: AppColors.brandOrange.withValues(alpha: 0.9),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            'NEW',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
                             ),
                           ),
                         ),
@@ -161,7 +186,13 @@ class VideoCard extends StatelessWidget {
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _buildAvatar(),
+                Container(
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.1), width: 1),
+                  ),
+                  child: _buildAvatar(),
+                ),
 
                 const SizedBox(width: 9),
 
@@ -177,7 +208,7 @@ class VideoCard extends StatelessWidget {
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: AppColors.textPrimaryDark,
-                          fontSize: 14,
+                          fontSize: 13,
                           fontWeight: FontWeight.w600,
                           height: 1.25,
                         ),
@@ -194,7 +225,7 @@ class VideoCard extends StatelessWidget {
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 color: AppColors.textSecondaryDark,
-                                fontSize: 12,
+                                fontSize: 11,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -203,9 +234,9 @@ class VideoCard extends StatelessWidget {
                           if (video.verified) ...[
                             const SizedBox(width: 4),
                             const Icon(
-                              Icons.verified,
-                              size: 13,
-                              color: AppColors.brandGold,
+                              Icons.check_circle,
+                              size: 11,
+                              color: Color(0xFFCBD5E1),
                             ),
                           ],
                         ],
@@ -225,6 +256,17 @@ class VideoCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                
+                // More options icon
+                if (video.videoId.isNotEmpty)
+                  IconButton(
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(),
+                    icon: const Icon(Icons.more_vert, size: 18, color: AppColors.textSecondaryDark),
+                    onPressed: () {
+                      // TODO: show options menu
+                    },
+                  ),
               ],
             ),
           ],

@@ -151,7 +151,7 @@ class _PlaylistDetailPageState
                           top: 0,
                           right: 0,
                           child: Material(
-                            color: Colors.black.withOpacity(0.6),
+                            color: Colors.black.withValues(alpha: 0.6),
                             shape: const CircleBorder(),
                             child: IconButton(
                               icon: const Icon(

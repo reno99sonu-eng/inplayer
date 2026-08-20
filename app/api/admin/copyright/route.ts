@@ -3,6 +3,7 @@ import { ScanCommand, GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { requireAdmin } from "@/app/lib/isAdmin";
 import { logAdminAction } from "@/app/lib/auditLog";
+import { createNotification } from "@/app/lib/notifications";
 import { deleteVideoCascade } from "@/app/lib/cascadeDelete";
 import {
   COPYRIGHT_SCREEN_REPORTER,
@@ -227,6 +228,13 @@ export async function POST(request: NextRequest) {
     })
   );
   const newStrikeCount = (updated.Attributes?.copyrightStrikes as number) || 1;
+
+  await createNotification({
+    userId: uploaderId,
+    type: "admin_announcement",
+    message: `Your video has received a copyright strike. You now have ${newStrikeCount}/${STRIKE_THRESHOLD} strikes.`,
+    ...(videoId && { videoId }),
+  });
 
   await logAdminAction({
     request,

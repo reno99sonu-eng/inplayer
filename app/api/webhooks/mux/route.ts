@@ -8,6 +8,10 @@ import { getMuxThumbnailUrl } from "@/app/lib/muxThumbnail";
 import { isMusicType, normalizeContentType } from "@/app/lib/contentTypes";
 import { READY_VIDEOS_TAG } from "@/app/lib/videoStore";
 import { MIDROLL_ADS_TAG } from "@/app/lib/videoAds";
+import { createNotification } from "@/app/lib/notifications";
+import { randomUUID } from "crypto";
+import { COPYRIGHT_SCREEN_REPORTER } from "@/app/lib/musicCopyright";
+import { PutCommand } from "@aws-sdk/lib-dynamodb";
 import { deleteS3Prefix } from "@/app/lib/s3";
 import {
   registerFingerprintProvider,
@@ -325,6 +329,68 @@ export async function POST(request: NextRequest) {
       }).catch((err) => console.error("Failed to broadcast new video email to subscribers:", err));
     }
 
+
+    const contentType = updateResult.Attributes?.contentType;
+    if (updateResult.Attributes && normalizeContentType(contentType) === "music" && externalCheckingEnabled()) {
+      const attrs = updateResult.Attributes;
+      after(async () => {
+        try {
+          const provider = getFingerprintProvider();
+          if (!provider) return;
+          const match = await provider.identify(`https://stream.mux.com/${playbackId}/audio.m4a`);
+          if (match) {
+            const existingScreening = { risk: attrs.copyrightRisk || "clear", signals: attrs.copyrightSignals || [] };
+            const updatedScreening = combineCopyrightSignals({
+              metadata: existingScreening,
+              externalMatch: match
+            });
+            if (updatedScreening.signals.length > existingScreening.signals.length) {
+              await docClient.send(
+                new UpdateCommand({
+                  TableName: "InPlayer-Videos",
+                  Key: { videoId: uploadId },
+                  UpdateExpression: "SET copyrightRisk = :risk, copyrightSignals = :signals, moderationHidden = :hidden",
+                  ExpressionAttributeValues: { 
+                    ":risk": updatedScreening.risk, 
+                    ":signals": updatedScreening.signals,
+                    ":hidden": true
+                  }
+                })
+              );
+              console.log(`Copyright external match found for ${uploadId}:`, match.title);
+
+              // Notify the user
+              await createNotification({
+                userId: attrs.uploaderId,
+                type: "admin_announcement",
+                message: "Your music upload has been flagged for a potential copyright match by ACRCloud. It is hidden from the public until an admin reviews it.",
+                videoId: uploadId
+              }).catch(err => console.error("Failed to notify user for ACRCloud match", err));
+
+              // Insert into InPlayer-Reports so admin sees it
+              await docClient.send(
+                new PutCommand({
+                  TableName: "InPlayer-Reports",
+                  Item: {
+                    reportId: randomUUID(),
+                    targetType: "video",
+                    videoId: uploadId,
+                    reporterId: COPYRIGHT_SCREEN_REPORTER,
+                    reason: "copyright",
+                    details: ["Automatic ACRCloud screening:", ...updatedScreening.signals.map(s => s.detail)].join(" ").slice(0, 1000),
+                    status: "open",
+                    createdAt: new Date().toISOString(),
+                  }
+                })
+              ).catch(err => console.error("Failed to insert report for ACRCloud match", err));
+            }
+          }
+        } catch (err) {
+          console.error("Failed to run fingerprint on uploaded music:", err);
+        }
+      });
+    }
+
     // Kick off automatic caption generation on the asset's primary audio
     // track — Shorts are explicitly excluded, they should never get
     // captions. Mux runs speech recognition against the track and, once
@@ -333,7 +399,6 @@ export async function POST(request: NextRequest) {
     // the full translated set (and replaces it with properly-labeled
     // English/Hindi/Bengali tracks). Silent videos (no audio track) simply
     // have nothing to caption — that's an expected case, not an error.
-    const contentType = updateResult.Attributes?.contentType;
     const spokenLanguage = updateResult.Attributes?.spokenLanguage;
 
     const audioTrack = asset.tracks?.find(

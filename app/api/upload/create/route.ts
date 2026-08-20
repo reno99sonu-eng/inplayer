@@ -20,7 +20,7 @@ import {
   screenMusicMetadata,
 } from "@/app/lib/musicCopyright";
 import { getRequestIp } from "@/app/lib/requestInfo";
-import { createNotification } from "@/app/lib/notifications";
+import { createNotification, notifyAdmins } from "@/app/lib/notifications";
 import { applyModerationStrike } from "@/app/lib/moderationStrikes";
 import { CUSTOM_AUDIO_MAX_SECONDS } from "@/app/data/soundtracks";
 import {
@@ -572,9 +572,15 @@ export async function POST(request: NextRequest) {
         await createNotification({
           userId: user.userId,
           type: "admin_announcement",
-          message: "Your music upload has been flagged for a potential copyright match. It is hidden from the public until an admin reviews it.",
+          message: `Your music upload "${title}" has been flagged for a potential copyright match. It is hidden from the public until an admin reviews it in the Copyright Center.`,
           videoId: upload.id
         }).catch(err => console.error("Failed to notify user", err));
+
+        // Notify admins
+        await notifyAdmins({
+          message: `New copyright review: "${title}" has been flagged by AI screening and hidden pending your review in Copyright Center.`,
+          videoId: upload.id
+        }).catch(err => console.error("Failed to notify admins for metadata copyright match", err));
     }
 
     return NextResponse.json({

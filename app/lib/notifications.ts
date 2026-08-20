@@ -1,6 +1,7 @@
-import { PutCommand } from "@aws-sdk/lib-dynamodb";
+import { PutCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { randomUUID } from "crypto";
 import { docClient } from "@/app/lib/dynamodb";
+import { isAdminEmail } from "@/app/lib/isAdmin";
 
 // The "like"/"comment"/"subscribe" writers each hand-roll this same
 // PutCommand inline (see app/api/likes, app/api/comments,
@@ -49,5 +50,32 @@ export async function createNotification(input: CreateNotificationInput): Promis
     );
   } catch (err) {
     console.error(`Failed to write "${input.type}" notification:`, err);
+  }
+}
+
+/**
+ * Notifies all platform admins when an action requires review (e.g. copyright flag).
+ */
+export async function notifyAdmins(input: { message: string; videoId?: string }): Promise<void> {
+  try {
+    const result = await docClient.send(
+      new ScanCommand({
+        TableName: "InPlayer-Users",
+        ProjectionExpression: "userId, email",
+      })
+    );
+    const adminUsers = (result.Items || []).filter((u) => isAdminEmail(u.email as string));
+    await Promise.all(
+      adminUsers.map((admin) =>
+        createNotification({
+          userId: admin.userId as string,
+          type: "admin_announcement",
+          message: input.message,
+          ...(input.videoId && { videoId: input.videoId }),
+        })
+      )
+    );
+  } catch (err) {
+    console.error("Failed to notify admins:", err);
   }
 }

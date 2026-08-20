@@ -8,7 +8,7 @@ import { getMuxThumbnailUrl } from "@/app/lib/muxThumbnail";
 import { isMusicType, normalizeContentType } from "@/app/lib/contentTypes";
 import { READY_VIDEOS_TAG } from "@/app/lib/videoStore";
 import { MIDROLL_ADS_TAG } from "@/app/lib/videoAds";
-import { createNotification } from "@/app/lib/notifications";
+import { createNotification, notifyAdmins } from "@/app/lib/notifications";
 import { randomUUID } from "crypto";
 import { COPYRIGHT_SCREEN_REPORTER } from "@/app/lib/musicCopyright";
 import { PutCommand } from "@aws-sdk/lib-dynamodb";
@@ -363,9 +363,15 @@ export async function POST(request: NextRequest) {
               await createNotification({
                 userId: attrs.uploaderId,
                 type: "admin_announcement",
-                message: "Your music upload has been flagged for a potential copyright match by ACRCloud. It is hidden from the public until an admin reviews it.",
+                message: `Your track "${attrs.title || "Music"}" has been flagged for a potential copyright match (${match.title} by ${match.artist}). It is hidden from the public until an admin reviews it.`,
                 videoId: uploadId
               }).catch(err => console.error("Failed to notify user for ACRCloud match", err));
+
+              // Notify all admins for review
+              await notifyAdmins({
+                message: `New copyright review: "${attrs.title || "Track"}" has been flagged by ACRCloud for "${match.title}" by ${match.artist} and hidden pending review in Copyright Center.`,
+                videoId: uploadId
+              }).catch(err => console.error("Failed to notify admins for ACRCloud match", err));
 
               // Insert into InPlayer-Reports so admin sees it
               await docClient.send(

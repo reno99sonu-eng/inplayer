@@ -1,4 +1,4 @@
-﻿import crypto from "crypto";
+import crypto from "crypto";
 import { ExternalFingerprintProvider, ExternalFingerprintMatch } from "./musicCopyright";
 
 function buildStringToSign(
@@ -24,16 +24,40 @@ export const acrCloudProvider: ExternalFingerprintProvider = {
     const accessSecret = process.env.ACRCLOUD_SECRET_KEY;
     if (!host || !accessKey || !accessSecret) return null;
 
-    // Fetch the first 2MB of the audio URL
-    const res = await fetch(audioUrl, {
-      headers: { Range: "bytes=0-2097152" }
-    });
-    if (!res.ok) {
-      if (res.status !== 206 && res.status !== 200) {
-        throw new Error("Failed to fetch audio for fingerprinting: " + res.status);
+    // Fetch the first 2MB of audio with fallback URLs and retry
+    const urlsToTry = [
+      audioUrl,
+      audioUrl.replace("/audio.m4a", "/low.mp4"),
+      audioUrl.replace("/audio.m4a", "/medium.mp4"),
+      audioUrl.replace("/audio.m4a", "/high.mp4"),
+    ];
+
+    let audioBuffer: ArrayBuffer | null = null;
+    for (let attempt = 0; attempt < 3; attempt++) {
+      for (const url of urlsToTry) {
+        try {
+          const res = await fetch(url, {
+            headers: { Range: "bytes=0-2097152" }
+          });
+          if (res.ok || res.status === 206 || res.status === 200) {
+            const buf = await res.arrayBuffer();
+            if (buf.byteLength > 1000) {
+              audioBuffer = buf;
+              break;
+            }
+          }
+        } catch {
+          // try next URL
+        }
       }
+      if (audioBuffer) break;
+      await new Promise((r) => setTimeout(r, 2000));
     }
-    const audioBuffer = await res.arrayBuffer();
+
+    if (!audioBuffer) {
+      console.warn("ACRCloud identify: could not fetch audio stream from Mux for:", audioUrl);
+      return null;
+    }
 
     const timestamp = Math.floor(Date.now() / 1000).toString();
     const signatureVersion = "1";

@@ -20,53 +20,56 @@ const jakarta = Plus_Jakarta_Sans({
 
 export const metadata: Metadata = {
   // Base URL every relative/og/canonical link in the app resolves against.
-  // Without this, Next.js falls back to guessing from the request, which
-  // is exactly how the same page can end up looking like it lives at more
-  // than one address (inplayer.in vs the Vercel alias domains) with no
-  // single source of truth — part of the fix for Search Console's
-  // "Duplicate without user-selected canonical" report (see middleware.ts
-  // for the other half: redirecting the known alias domains to this one).
   metadataBase: new URL("https://inplayer.in"),
-  // `template` lets every other page just set its own short title (e.g.
-  // generateMetadata on a watch page returning the real video title) and
-  // automatically get "<that title> | INPLAYER" — consistent branding on
-  // every single result Google shows for this site, without repeating
-  // "INPLAYER" by hand on every page. `default` is only used by pages that
-  // don't set their own title at all.
+  alternates: {
+    canonical: "https://inplayer.in",
+  },
   title: {
-    default: "INPLAYER — Stream Videos, Live TV, Shorts & Shop Online",
+    default: "InPlayer — Stream Videos, Music, Live TV, Shorts & Shop Online | India",
     template: "%s | INPLAYER",
   },
   description:
-    "INPLAYER is an all-in-one entertainment platform — stream original videos and live shows, watch Raftaar shorts, discover creators, and shop, all in one place.",
+    "InPlayer (inplayer.in) is India's all-in-one entertainment platform — stream original videos, audio & music tracks with synced lyrics, watch Raftaar shorts, discover top creators, and shop online.",
   applicationName: "INPLAYER",
-  // Google Search Console ownership proof. Next renders this as
-  //   <meta name="google-site-verification" content="..." />
-  // in every page's <head>, which is what Google's verifier looks for.
-  //
-  // Not a secret — it proves control of the domain, it doesn't grant
-  // access to anything. It has to STAY here permanently: Google re-checks
-  // it periodically and silently unverifies the property if it disappears,
-  // taking the sitemap and indexing reports with it.
-  //
-  // Google's verifier fetches this from outside India, so it depends on
-  // the "google-site-verification" entry in app/lib/searchCrawlers.ts to
-  // get past the geo-block. Before that exemption existed, verifying this
-  // domain by HTML tag was impossible — the verifier only ever saw the
-  // "Region Not Available" page, which has no such tag in it.
+  keywords: [
+    "InPlayer",
+    "inplayer",
+    "inplayer.in",
+    "In Player",
+    "InPlayer India",
+    "inplayer app",
+    "inplayer streaming",
+    "inplayer video",
+    "inplayer music",
+    "inplayer live",
+    "inplayer shorts",
+    "inplayer raftaar",
+    "Indian streaming platform",
+    "watch videos online India",
+    "stream music India",
+  ],
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
+  // Google Search Console ownership proof.
   verification: {
     google: "mZqMR3AMeJ64HxrdTP96XmrzRCCTtJ5L-ojAuUbWtuc",
   },
-  // Also referenced by the JSON-LD Organization/WebSite block below, which
-  // is what actually helps Google tell this INPLAYER apart from unrelated
-  // companies/products that happen to share the name.
   openGraph: {
     type: "website",
-    url: "/",
+    url: "https://inplayer.in",
     siteName: "INPLAYER",
-    title: "INPLAYER — Stream Videos, Live TV, Shorts & Shop Online",
+    title: "InPlayer — Stream Videos, Music, Live TV, Shorts & Shop Online | India",
     description:
-      "Stream original videos and live shows, watch Raftaar shorts, discover creators, and shop — all in one place.",
+      "Stream original videos, audio & music tracks with synced lyrics, watch Raftaar shorts, discover creators, and shop — all in one place on InPlayer.",
     images: [
       {
         url: "/logos/inplayer-full.png",
@@ -78,38 +81,45 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "INPLAYER — Stream Videos, Live TV, Shorts & Shop Online",
+    title: "InPlayer — Stream Videos, Music, Live TV, Shorts & Shop Online | India",
     description:
-      "Stream original videos and live shows, watch Raftaar shorts, discover creators, and shop — all in one place.",
+      "Stream original videos, audio & music tracks with synced lyrics, watch Raftaar shorts, discover creators, and shop — all in one place on InPlayer.",
     images: ["/logos/inplayer-full.png"],
   },
 };
 
-// Tells Google (and any other engine that reads schema.org data) that
-// "INPLAYER" the word and "inplayer.in" the URL refer to the same one real
-// entity — the actual mechanism behind a Knowledge Panel / correct entity
-// match for a brand-name search, not something a title tag alone can do.
-// Deliberately omits `sameAs` (links to official social profiles) — the
-// Instagram/X icons in Footer.tsx aren't wired to real URLs yet (plain
-// decorative buttons, no href), and a wrong/guessed profile link in
-// structured data would actively mislead Google rather than help. Add
-// `sameAs: [...]` here the moment those real profile URLs exist.
+// Tells Google and search engines that "InPlayer", "inplayer", and "inplayer.in"
+// refer to the same one real entity and platform.
 const ORGANIZATION_JSON_LD = {
   "@context": "https://schema.org",
   "@graph": [
     {
       "@type": "Organization",
       name: "INPLAYER",
+      alternateName: ["InPlayer", "inplayer", "inplayer.in", "In Player", "InPlayer India"],
       legalName: "Homox Prime Pvt Ltd",
       url: "https://inplayer.in",
       logo: "https://inplayer.in/logos/inplayer-full.png",
       description:
-        "INPLAYER is an all-in-one entertainment platform — stream original videos and live shows, watch shorts, discover creators, and shop, all in one place.",
+        "INPLAYER is an all-in-one Indian entertainment platform — stream original videos and live shows, listen to music with synced lyrics, watch shorts, discover creators, and shop, all in one place.",
+      address: {
+        "@type": "PostalAddress",
+        addressCountry: "IN",
+      },
     },
     {
       "@type": "WebSite",
       name: "INPLAYER",
+      alternateName: ["InPlayer", "inplayer", "inplayer.in", "In Player"],
       url: "https://inplayer.in",
+      potentialAction: {
+        "@type": "SearchAction",
+        target: {
+          "@type": "EntryPoint",
+          urlTemplate: "https://inplayer.in/search?q={search_term_string}",
+        },
+        "query-input": "required name=search_term_string",
+      },
     },
   ],
 };

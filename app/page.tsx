@@ -287,6 +287,10 @@ export default async function Home({ searchParams }: HomeProps) {
         <div className="absolute -right-64 bottom-0 h-[600px] w-[600px] rounded-full bg-cyan-500/10 blur-[180px] light:bg-amber-300/10" />
       </div>
 
+      <h1 className="sr-only">
+        InPlayer — India&apos;s Video Streaming, Music, Live TV &amp; Creator Platform
+      </h1>
+
       <div className="relative z-10">
         <Suspense fallback={<div className="h-screen w-full flex items-center justify-center"><div className="animate-spin h-8 w-8 rounded-full border-b-2 border-orange-500"></div></div>}>
           <HomeContent activeView={activeView} isVertical={isVertical} />

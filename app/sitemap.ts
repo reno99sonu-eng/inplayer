@@ -67,13 +67,13 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     const videos = filterByAudience(await getReadyVideos(), DEFAULT_AUDIENCE_MODE);
     const videoEntries: MetadataRoute.Sitemap = videos
       .filter((video) => Boolean(video.videoId))
-      .slice(0, 5000) // sitemap protocol's own per-file entry cap
+      .slice(0, 500)
       .map((video) => {
         const uploadedAt = video.uploadedAt as string | undefined;
         return {
           url: `${SITE_URL}/watch/${video.videoId as string}`,
           lastModified: uploadedAt ? new Date(uploadedAt) : undefined,
-          changeFrequency: "monthly" as const,
+          changeFrequency: "weekly" as const,
           priority: 0.65,
         };
       });

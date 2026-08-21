@@ -275,8 +275,9 @@ export default function VideoPlayer({
     let rafId: number;
     const pollTime = () => {
       const player = playerRef.current;
-      if (player) {
-        setMusicTime(player.currentTime || 0);
+      if (player && !player.paused) {
+        const curr = player.currentTime || 0;
+        setMusicTime(curr);
         const dur = player.duration;
         if (typeof dur === "number" && Number.isFinite(dur) && dur > 0) {
           setMusicDuration(dur);
@@ -647,15 +648,14 @@ export default function VideoPlayer({
     })();
   }, [isFullscreen]);
 
-  // Theme the quality/captions/audio-track/playback-rate submenus. For music tracks,
-  // the video quality/rendition button is disabled/hidden since audio has no video resolutions.
+  // Theme the quality/captions/audio-track/playback-rate submenus safely.
   useEffect(() => {
-    const injectStyleIntoRoot = (root: ShadowRoot | Document | null | undefined) => {
-      if (!root) return;
-      const existing = root.querySelector("style[data-inplayer-menu]");
-      if (existing) {
-        existing.remove(); // allow refreshing with updated state
-      }
+    let isMounted = true;
+
+    const injectStyleIntoRoot = (root: ShadowRoot | Document | null | undefined): boolean => {
+      if (!root) return false;
+      if (root.querySelector("style[data-inplayer-menu]")) return true; // Already styled, do not re-inject
+
       const styleEl = document.createElement("style");
       styleEl.setAttribute("data-inplayer-menu", "true");
       styleEl.textContent = `
@@ -728,40 +728,61 @@ export default function VideoPlayer({
         }
       `;
       root.appendChild(styleEl);
+      return true;
     };
 
-    const applyMenuTheme = () => {
+    const applyMenuTheme = (): boolean => {
       const muxEl = playerRef.current as unknown as HTMLElement | null;
-      if (!muxEl) return false;
+      if (!muxEl || !muxEl.shadowRoot) return false;
 
       injectStyleIntoRoot(muxEl.shadowRoot);
 
-      const themeEl = muxEl.shadowRoot?.querySelector("media-theme") as HTMLElement | null;
-      if (themeEl) injectStyleIntoRoot(themeEl.shadowRoot);
+      const themeEl = muxEl.shadowRoot.querySelector("media-theme") as HTMLElement | null;
+      if (themeEl?.shadowRoot) injectStyleIntoRoot(themeEl.shadowRoot);
 
-      const controller = (themeEl?.shadowRoot || muxEl.shadowRoot)?.querySelector("media-controller") as HTMLElement | null;
-      if (controller) injectStyleIntoRoot(controller.shadowRoot);
-
-      // Check rendition menus and buttons directly
-      const renditionMenu = (controller?.shadowRoot || themeEl?.shadowRoot || muxEl.shadowRoot)?.querySelector("media-rendition-menu") as HTMLElement | null;
-      if (renditionMenu) injectStyleIntoRoot(renditionMenu.shadowRoot);
+      const controller = (themeEl?.shadowRoot || muxEl.shadowRoot).querySelector("media-controller") as HTMLElement | null;
+      if (controller?.shadowRoot) injectStyleIntoRoot(controller.shadowRoot);
 
       return Boolean(controller);
     };
 
-    applyMenuTheme();
+    // Try immediate injection
+    if (applyMenuTheme()) return;
 
+    // Observe until shadow root is ready, then disconnect immediately
     const muxEl = playerRef.current as unknown as HTMLElement | null;
     const target = muxEl?.shadowRoot;
     if (!target) return;
 
-    const mo = new MutationObserver(() => {
-      applyMenuTheme();
+    let mo: MutationObserver | null = new MutationObserver(() => {
+      if (!isMounted) return;
+      if (applyMenuTheme() && mo) {
+        mo.disconnect();
+        mo = null;
+      }
     });
-    mo.observe(target, { childList: true, subtree: true });
 
-    const timeout = window.setTimeout(() => mo.disconnect(), 6000);
-    return () => { mo.disconnect(); window.clearTimeout(timeout); };
+    try {
+      mo.observe(target, { childList: true, subtree: true });
+    } catch {
+      // Fallback
+    }
+
+    const timeout = window.setTimeout(() => {
+      if (mo) {
+        mo.disconnect();
+        mo = null;
+      }
+    }, 2000);
+
+    return () => {
+      isMounted = false;
+      if (mo) {
+        mo.disconnect();
+        mo = null;
+      }
+      window.clearTimeout(timeout);
+    };
   }, [music]);
 
   // While CSS-fullscreen: freeze page scroll behind the player, and let

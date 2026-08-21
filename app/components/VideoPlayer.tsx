@@ -270,34 +270,24 @@ export default function VideoPlayer({
   const [musicTime, setMusicTime] = useState(0);
   const [musicDuration, setMusicDuration] = useState<number | undefined>(undefined);
 
-  useEffect(() => {
-    if (!music) return;
-    let rafId: number;
-    const pollTime = () => {
-      const player = playerRef.current;
-      if (player && !player.paused) {
-        const curr = player.currentTime || 0;
-        setMusicTime(curr);
+  // Playhead mirror for the music stage and saved playback positions.
+  const handleTimeUpdate = () => {
+    const player = playerRef.current;
+    if (player) {
+      if (music) {
+        setMusicTime(player.currentTime || 0);
         const dur = player.duration;
         if (typeof dur === "number" && Number.isFinite(dur) && dur > 0) {
           setMusicDuration(dur);
         }
       }
-      rafId = requestAnimationFrame(pollTime);
-    };
-    rafId = requestAnimationFrame(pollTime);
-    return () => cancelAnimationFrame(rafId);
-  }, [music]);
 
-  // Playhead mirror for the music stage — see handleTimeUpdate.
-  const handleTimeUpdate = () => {
-    const player = playerRef.current;
-
-    if (player && playback.rememberPosition) {
-      const now = Date.now();
-      if (now - lastPositionSaveRef.current > 4000) {
-        lastPositionSaveRef.current = now;
-        savePlaybackPosition(videoId, player.currentTime || 0, player.duration || 0);
+      if (playback.rememberPosition) {
+        const now = Date.now();
+        if (now - lastPositionSaveRef.current > 4000) {
+          lastPositionSaveRef.current = now;
+          savePlaybackPosition(videoId, player.currentTime || 0, player.duration || 0);
+        }
       }
     }
 
@@ -746,42 +736,14 @@ export default function VideoPlayer({
       return Boolean(controller);
     };
 
-    // Try immediate injection
-    if (applyMenuTheme()) return;
-
-    // Observe until shadow root is ready, then disconnect immediately
-    const muxEl = playerRef.current as unknown as HTMLElement | null;
-    const target = muxEl?.shadowRoot;
-    if (!target) return;
-
-    let mo: MutationObserver | null = new MutationObserver(() => {
-      if (!isMounted) return;
-      if (applyMenuTheme() && mo) {
-        mo.disconnect();
-        mo = null;
-      }
-    });
-
-    try {
-      mo.observe(target, { childList: true, subtree: true });
-    } catch {
-      // Fallback
-    }
-
-    const timeout = window.setTimeout(() => {
-      if (mo) {
-        mo.disconnect();
-        mo = null;
-      }
-    }, 2000);
+    // Apply theme on mount and when ready
+    applyMenuTheme();
+    const t1 = window.setTimeout(applyMenuTheme, 150);
+    const t2 = window.setTimeout(applyMenuTheme, 600);
 
     return () => {
-      isMounted = false;
-      if (mo) {
-        mo.disconnect();
-        mo = null;
-      }
-      window.clearTimeout(timeout);
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
     };
   }, [music]);
 

@@ -289,19 +289,18 @@ export default function AuthProvider({
   useEffect(() => {
     if (!user?.userId) return;
 
-    let cancelled = false;
     async function ping() {
+      if (typeof document !== "undefined" && document.hidden) return;
       try {
         await authedFetch("/api/presence", { method: "POST" });
-      } catch (err) {
-        console.error("Presence heartbeat failed:", err);
+      } catch {
+        // Presence is best-effort background heartbeat
       }
     }
 
     ping();
     const interval = setInterval(ping, 45000);
     return () => {
-      cancelled = true;
       clearInterval(interval);
     };
   }, [user?.userId]);

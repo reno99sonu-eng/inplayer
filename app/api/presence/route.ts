@@ -18,6 +18,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Please sign in." }, { status: 401 });
   }
 
+  if (!user || !user.userId) {
+    return NextResponse.json({ error: "Please sign in." }, { status: 401 });
+  }
+
   try {
     await docClient.send(
       new UpdateCommand({

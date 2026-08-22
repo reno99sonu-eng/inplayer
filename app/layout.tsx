@@ -171,7 +171,16 @@ export default async function RootLayout({
   // for it anyway. See app/lib/searchCrawlers.ts.
   const hdrs = await headers();
   const ipCountry = hdrs.get("x-vercel-ip-country") || "IN";
-  const geoAllowed = ipCountry === "IN" || isSearchCrawler(hdrs.get("user-agent"));
+  const referer = (hdrs.get("referer") || "").toLowerCase();
+  const isAdsensePreview =
+    referer.includes("adsense.google.com") ||
+    referer.includes("google.com/adsense") ||
+    referer.includes("pagead2.googlesyndication.com");
+
+  const geoAllowed =
+    ipCountry === "IN" ||
+    isAdsensePreview ||
+    isSearchCrawler(hdrs.get("user-agent"));
 
   return (
     <html lang="en">

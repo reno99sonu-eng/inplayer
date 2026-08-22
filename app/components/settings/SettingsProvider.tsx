@@ -126,7 +126,11 @@ export function SettingsProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!ready) return;
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    } catch {
+      // Storage access restricted in sandboxed iframes
+    }
   }, [state, ready]);
 
   const updateGeneral = (patch: Partial<GeneralSettings>) =>

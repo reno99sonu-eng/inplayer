@@ -29,6 +29,15 @@ function looksLikeStaleChunkError(message: unknown): boolean {
 }
 
 export function recoverFromStaleChunkOnce(message?: string) {
+  // If running inside a cross-origin sandbox iframe (e.g. AdSense preview), never attempt to reload
+  if (typeof window !== "undefined") {
+    try {
+      if (window.self !== window.top) return;
+    } catch {
+      return;
+    }
+  }
+
   try {
     const lastReload = Number(sessionStorage.getItem(CHUNK_RELOAD_STORAGE_KEY) || 0);
     if (Date.now() - lastReload < CHUNK_RELOAD_COOLDOWN_MS) return;
@@ -57,7 +66,11 @@ export function recoverFromStaleChunkOnce(message?: string) {
     /* ignore */
   }
 
-  window.location.reload();
+  try {
+    window.location.reload();
+  } catch {
+    /* ignore */
+  }
 }
 
 export default function ChunkErrorRecovery() {

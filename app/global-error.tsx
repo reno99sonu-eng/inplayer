@@ -49,14 +49,20 @@ export default function GlobalError({
     }
 
     try {
+      if (typeof window !== "undefined") {
+        try {
+          if (window.self !== window.top) return;
+        } catch {
+          return;
+        }
+      }
       const lastReload = Number(sessionStorage.getItem(CHUNK_RELOAD_STORAGE_KEY) || 0);
       if (Date.now() - lastReload >= CHUNK_RELOAD_COOLDOWN_MS) {
         sessionStorage.setItem(CHUNK_RELOAD_STORAGE_KEY, String(Date.now()));
         window.location.reload();
       }
     } catch {
-      // No storage access — fall through to the manual button below rather
-      // than risk an un-throttled reload loop.
+      // No storage access
     }
   }, [error]);
 

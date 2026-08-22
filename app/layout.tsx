@@ -175,6 +175,13 @@ export default async function RootLayout({
 
   return (
     <html lang="en">
+      <head>
+        <script
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-8705156751415945"
+          crossOrigin="anonymous"
+        />
+      </head>
       <body
   className={`
     ${jakarta.className}

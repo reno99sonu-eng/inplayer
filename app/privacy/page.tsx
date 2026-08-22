@@ -148,7 +148,46 @@ export default function PrivacyPage() {
         </p>
       </Section>
 
-      <Section title="5. Your choices">
+      <Section title="5. Cookies &amp; Third-Party Advertising (Google AdSense)">
+        <p>
+          We and our third-party advertising partners (such as Google and Google AdSense) use
+          cookies, web beacons, and similar technologies to serve advertisements on InPlayer.
+        </p>
+        <ul className="list-disc space-y-1.5 pl-5">
+          <li>
+            Third-party vendors, including Google, use cookies to serve ads based on a user&apos;s
+            prior visits to our website or other websites on the Internet.
+          </li>
+          <li>
+            Google&apos;s use of advertising cookies enables it and its partners to serve ads to our
+            users based on their visits to InPlayer and/or other sites across the web.
+          </li>
+          <li>
+            Users may opt out of personalized advertising by visiting{" "}
+            <a
+              href="https://www.google.com/settings/ads"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-orange-400 hover:underline"
+            >
+              Google Ads Settings
+            </a>
+            . Alternatively, you can opt out of third-party vendor use of cookies for personalized
+            advertising by visiting{" "}
+            <a
+              href="https://www.aboutads.info/choices/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-orange-400 hover:underline"
+            >
+              aboutads.info
+            </a>
+            .
+          </li>
+        </ul>
+      </Section>
+
+      <Section title="6. Your choices">
         <ul className="list-disc space-y-1.5 pl-5">
           <li>
             <strong className="text-white light:text-slate-900">Edit or remove content:</strong>{" "}
@@ -166,7 +205,7 @@ export default function PrivacyPage() {
         </ul>
       </Section>
 
-      <Section title="6. Children's privacy">
+      <Section title="7. Children's privacy">
         <p>
           InPlayer requires all accounts to be 13 or older, and if you&apos;re under 18 we ask
           you to confirm you have your parent or guardian&apos;s permission at signup. India&apos;s
@@ -185,7 +224,7 @@ export default function PrivacyPage() {
         </p>
       </Section>
 
-      <Section title="7. Your rights &amp; grievance officer">
+      <Section title="8. Your rights &amp; grievance officer">
         <p>
           Under India&apos;s Digital Personal Data Protection Act, 2023, you can ask us to: tell
           you what personal data we hold about you, correct it if it&apos;s wrong or incomplete,
@@ -211,14 +250,14 @@ export default function PrivacyPage() {
         </p>
       </Section>
 
-      <Section title="8. Changes to this policy">
+      <Section title="9. Changes to this policy">
         <p>
           If we make a material change to how we handle your data, we&apos;ll update the
           &quot;Last updated&quot; date above.
         </p>
       </Section>
 
-      <Section title="9. Contact">
+      <Section title="10. Contact">
         <p>
           Questions about your data? Email{" "}
           <a href="mailto:contact@inplayer.in" className="text-orange-400 hover:underline">

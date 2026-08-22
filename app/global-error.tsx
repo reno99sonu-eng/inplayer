@@ -19,9 +19,10 @@ import {
 // hiccup — a visible "Reload" button instead of silently retrying forever.
 export default function GlobalError({
   error,
+  reset,
 }: {
   error: Error & { digest?: string };
-  reset: () => void;
+  reset?: () => void;
 }) {
   useEffect(() => {
     console.error("Root layout error:", error);
@@ -96,7 +97,11 @@ export default function GlobalError({
         <button
           onClick={() => {
             try {
-              reset();
+              if (typeof reset === "function") {
+                reset();
+              } else {
+                window.location.reload();
+              }
             } catch {
               window.location.reload();
             }

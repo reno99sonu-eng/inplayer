@@ -100,15 +100,39 @@ export default function AdThumbnailCard({
   // "was this shown to a visitor" signal, same spirit as the click POST
   // below.
   useEffect(() => {
-    if (!creative || imageBroken) return;
-    if (impressedRef.current.has(creative.adId)) return;
-    impressedRef.current.add(creative.adId);
-    fetch("/api/ads", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ adId: creative.adId, event: "impression" }),
-    }).catch(() => {});
-  }, [creative, imageBroken]);
+    if (data && data.source === "adsense") {
+      try {
+        // @ts-expect-error window.adsbygoogle global
+        (window.adsbygoogle = window.adsbygoogle || []).push({});
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [data]);
+
+  if (data && data.source === "adsense") {
+    const publisherId = data.adsensePublisherId || "pub-8705156751415945";
+    const client = publisherId.startsWith("ca-") ? publisherId : `ca-${publisherId}`;
+    return (
+      <article className="group flex flex-col justify-between overflow-hidden rounded-2xl bg-[#0e1626] border border-white/10 p-2">
+        <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black/40">
+          <ins
+            className="adsbygoogle block h-full w-full"
+            style={{ display: "block" }}
+            data-ad-client={client}
+            data-ad-format="auto"
+            data-full-width-responsive="true"
+          />
+        </div>
+        <div className="mt-2 flex items-center gap-2 px-1 text-[11px] text-slate-400">
+          <span className="rounded bg-orange-500/20 px-1.5 py-0.5 font-bold uppercase text-orange-400 text-[9px]">
+            Google Ad
+          </span>
+          <span>Sponsored</span>
+        </div>
+      </article>
+    );
+  }
 
   if (!creative || !creative.imageUrl || imageBroken) return null;
 

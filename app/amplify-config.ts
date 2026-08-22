@@ -54,16 +54,47 @@ Amplify.configure({
   },
 });
 
+// In-memory fallback for sandboxed / third-party iframes (e.g. AdSense preview) where localStorage is blocked
+class SafeMemoryStorage {
+  private data: Record<string, string> = {};
+  async setItem(key: string, value: string): Promise<void> {
+    this.data[key] = value;
+  }
+  async getItem(key: string): Promise<string | null> {
+    return this.data[key] ?? null;
+  }
+  async removeItem(key: string): Promise<void> {
+    delete this.data[key];
+  }
+  async clear(): Promise<void> {
+    this.data = {};
+  }
+}
+
 // Honor "Remember me": sessions default to persistent localStorage (survives tab closes & app switches).
 // Only when explicitly unchecked does storage switch to sessionStorage.
 if (typeof window !== "undefined") {
+  let isStorageAvailable = false;
   try {
-    if (window.localStorage.getItem("inplayer-remember-me") === "0") {
-      cognitoUserPoolsTokenProvider.setKeyValueStorage(amplifySessionStorage);
-    } else {
-      cognitoUserPoolsTokenProvider.setKeyValueStorage(defaultStorage);
-    }
+    const testKey = "__inplayer_test__";
+    window.localStorage.setItem(testKey, testKey);
+    window.localStorage.removeItem(testKey);
+    isStorageAvailable = true;
   } catch {
-    // Storage unavailable (private mode etc.) — default behavior is fine.
+    isStorageAvailable = false;
+  }
+
+  if (!isStorageAvailable) {
+    cognitoUserPoolsTokenProvider.setKeyValueStorage(new SafeMemoryStorage());
+  } else {
+    try {
+      if (window.localStorage.getItem("inplayer-remember-me") === "0") {
+        cognitoUserPoolsTokenProvider.setKeyValueStorage(amplifySessionStorage);
+      } else {
+        cognitoUserPoolsTokenProvider.setKeyValueStorage(defaultStorage);
+      }
+    } catch {
+      cognitoUserPoolsTokenProvider.setKeyValueStorage(new SafeMemoryStorage());
+    }
   }
 }

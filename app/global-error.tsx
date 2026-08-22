@@ -88,8 +88,19 @@ export default function GlobalError({
           We&apos;re trying to recover automatically. If this page doesn&apos;t come back on its
           own, tap reload.
         </p>
+        {error?.message ? (
+          <p style={{ fontSize: 11, color: "#ff6b6b", maxWidth: 420, wordBreak: "break-word", margin: 0 }}>
+            {error.message}
+          </p>
+        ) : null}
         <button
-          onClick={() => window.location.reload()}
+          onClick={() => {
+            try {
+              reset();
+            } catch {
+              window.location.reload();
+            }
+          }}
           style={{
             background: "linear-gradient(90deg,#FF7A18,#FFD54A)",
             color: "#000",

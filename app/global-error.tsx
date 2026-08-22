@@ -27,6 +27,21 @@ export default function GlobalError({
   useEffect(() => {
     console.error("Root layout error:", error);
 
+    // If it's a connection closed or aborted stream (common in preview iframes), auto-reset
+    if (
+      error?.message?.toLowerCase().includes("connection closed") ||
+      error?.message?.toLowerCase().includes("aborted")
+    ) {
+      if (typeof reset === "function") {
+        try {
+          reset();
+          return;
+        } catch {
+          /* ignore */
+        }
+      }
+    }
+
     // Best-effort report to our own server logs (see
     // app/api/client-error-log/route.ts) — this is the ONLY way a crash
     // that only ever happened in one visitor's browser becomes something

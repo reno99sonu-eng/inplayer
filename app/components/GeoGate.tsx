@@ -111,11 +111,19 @@ export default function GeoGate({
     // crawler ranges (developers.google.com/search/apis/ipranges/googlebot.json)
     // or do a reverse-DNS lookup on it. Keep this token list narrow until
     // then — every entry added is another word someone can put in a header.
-    const isAdsenseIframe =
-      typeof window !== "undefined" &&
-      (document.referrer.includes("adsense") ||
-        document.referrer.includes("google.com") ||
-        (window.self !== window.top && document.referrer.includes("google")));
+    let isAdsenseIframe = false;
+    try {
+      if (typeof window !== "undefined") {
+        const ref = (document.referrer || "").toLowerCase();
+        isAdsenseIframe =
+          ref.includes("adsense") ||
+          ref.includes("google.com") ||
+          ref.includes("doubleclick") ||
+          window.self !== window.top;
+      }
+    } catch {
+      isAdsenseIframe = true;
+    }
 
     if (isAdsenseIframe || isSearchCrawler(navigator.userAgent)) {
       setAllowed(true);

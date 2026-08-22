@@ -54,8 +54,13 @@ export function ThemeProvider({
 
   useEffect(() => {
     (() => {
-      const saved =
-        (localStorage.getItem(STORAGE_KEY) as ThemeChoice | null) ?? "system";
+      let saved: ThemeChoice = "system";
+      try {
+        saved =
+          (localStorage.getItem(STORAGE_KEY) as ThemeChoice | null) ?? "system";
+      } catch {
+        // Storage access restricted in third-party / sandbox iframes
+      }
 
       setThemeState(saved);
       applyTheme(saved);
@@ -65,8 +70,13 @@ export function ThemeProvider({
     // own when the local time crosses the day/night boundary — even if the
     // tab has been open for hours.
     const interval = setInterval(() => {
-      const current =
-        (localStorage.getItem(STORAGE_KEY) as ThemeChoice | null) ?? "system";
+      let current: ThemeChoice = "system";
+      try {
+        current =
+          (localStorage.getItem(STORAGE_KEY) as ThemeChoice | null) ?? "system";
+      } catch {
+        // Storage access restricted
+      }
 
       if (current === "system") {
         applyTheme("system");
@@ -78,7 +88,11 @@ export function ThemeProvider({
 
   const setTheme = (newTheme: ThemeChoice) => {
     setThemeState(newTheme);
-    localStorage.setItem(STORAGE_KEY, newTheme);
+    try {
+      localStorage.setItem(STORAGE_KEY, newTheme);
+    } catch {
+      // Storage access restricted
+    }
     applyTheme(newTheme);
   };
 

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { notFound } from "next/navigation";
 import { playables } from "@/app/data/playables";
 import GamePlayerClient from "./GamePlayerClient";
 
@@ -38,6 +39,11 @@ export async function generateMetadata({
   };
 }
 
-export default function PlayPage() {
+export default async function PlayPage({ params }: PlayPageProps) {
+  const { gameId } = await params;
+  const game = playables.find((p) => p.id === gameId);
+  if (!game) {
+    notFound();
+  }
   return <GamePlayerClient />;
 }

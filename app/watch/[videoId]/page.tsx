@@ -12,6 +12,7 @@ import WatchHistoryRecorder from "@/app/components/WatchHistoryRecorder";
 import ProcessingStatus from "@/app/components/ProcessingStatus";
 import WatchPageContent from "@/app/components/WatchPageContent";
 import Link from "next/link";
+import { notFound } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 
@@ -111,22 +112,7 @@ export default async function WatchPage({ params }: WatchPageProps) {
   // it already is everywhere this video would otherwise be listed (see
   // app/lib/videoStore.ts).
   if (!video || video.moderationHidden === true) {
-    return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 text-center lg:px-6">
-        <h2 className="text-2xl font-black text-white light:text-slate-900">
-          Video not found
-        </h2>
-        <p className="mt-1.5 text-sm text-slate-400 light:text-slate-600 lg:mt-2">
-          This video doesn&apos;t exist or may have been removed.
-        </p>
-        <Link
-          href="/videos"
-          className="mt-4 rounded-2xl border border-white/10 light:border-black/10 px-5 py-2 text-sm font-semibold text-slate-200 light:text-slate-700 transition hover:border-orange-400/30 hover:bg-white/5 light:hover:bg-black/5 lg:mt-6 lg:px-6 lg:py-2.5"
-        >
-          Back to Videos
-        </Link>
-      </div>
-    );
+    notFound();
   }
 
   // The hard gate. Filtering the listings keeps 18+ content out of every

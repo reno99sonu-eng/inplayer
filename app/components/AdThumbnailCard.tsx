@@ -143,7 +143,7 @@ export default function AdThumbnailCard({
   }, [data]);
 
   if (data && data.source === "adsense") {
-    const publisherId = data.adsensePublisherId || "pub-8705156751415945";
+    const publisherId = data.adsensePublisherId || "pub-9015405021941451";
     const client = publisherId.startsWith("ca-") ? publisherId : `ca-${publisherId}`;
     return (
       <article

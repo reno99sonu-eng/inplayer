@@ -5,7 +5,7 @@ import Link from "next/link";
 import { fetchAuthSession } from "aws-amplify/auth";
 import NavbarLogo from "./NavbarLogo";
 import NavbarLinks from "./NavbarLinks";
-import { Menu, X, Search, Home, PlaySquare, ChevronRight, ChevronDown, LogOut, Mail, Copy, Check, Gamepad2, Megaphone, Headset } from "lucide-react";
+import { Menu, X, Search, Home, PlaySquare, ChevronRight, ChevronDown, LogOut, Mail, Copy, Check, Gamepad2, Megaphone, Headset, Music2 } from "lucide-react";
 import { useAuthModal } from "./auth/AuthProvider";
 import NavbarSearch from "./NavbarSearch";
 import NavbarActions from "./NavbarActions";
@@ -663,6 +663,32 @@ lg:right-auto
               </button>
 
               <button
+                onClick={() => goTo("/music")}
+                className="
+                  hidden lg:flex
+                  w-full
+                  items-center
+                  gap-4
+                  rounded-xl
+                  px-3
+                  py-2
+                  text-left
+                  text-slate-200
+                  light:text-slate-700
+                  transition-all
+                  duration-300
+                  hover:bg-white/5
+                  light:hover:bg-black/5
+                  hover:translate-x-1
+                  hover:text-orange-300
+                  light:hover:text-orange-600
+                "
+              >
+                <Music2 size={19} className="text-orange-400" />
+                <span className="text-sm font-semibold">Music</span>
+              </button>
+
+              <button
                 onClick={() => goTo("/injoy")}
                 className="
                   flex
@@ -1106,9 +1132,7 @@ lg:right-auto
               </div>
             </div>
 
-            {/* Contact — where the Instagram/X icons used to sit. Toggles a
-                panel of every @inplayer.in address inline, right here in
-                the drawer (not a separate modal). */}
+            {/* Contact & Support — toggles email addresses and direct Support launcher */}
             <div className="mt-4 border-t border-white/10 light:border-black/10 px-3 pt-3">
               <button
                 onClick={() => setContactOpen((v) => !v)}
@@ -1121,7 +1145,7 @@ lg:right-auto
               >
                 <span className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-[0.2em] text-orange-300 light:text-orange-600">
                   <Mail size={12} />
-                  Contact us
+                  Contact us & Support
                 </span>
                 <ChevronDown
                   size={14}
@@ -1136,7 +1160,25 @@ lg:right-auto
                   contactOpen ? "grid-rows-[1fr] opacity-100 mt-2" : "grid-rows-[0fr] opacity-0"
                 }`}
               >
-                <div className="min-h-0 space-y-1">
+                <div className="min-h-0 space-y-1.5">
+                  {/* Live Support Desk launcher */}
+                  {siteDomain !== "hammart" && (
+                    <button
+                      onClick={() => {
+                        setMenuOpen(false);
+                        window.dispatchEvent(new CustomEvent("openSupportChat"));
+                      }}
+                      className="
+                        flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2
+                        bg-orange-500/10 border border-orange-500/20 text-orange-400 font-semibold text-xs transition
+                        hover:bg-orange-500/20 hover:text-orange-300
+                      "
+                    >
+                      <Headset size={15} />
+                      <span>Live Support Chat</span>
+                    </button>
+                  )}
+
                   {CONTACT_EMAILS.map(({ address }) => (
                     <div
                       key={address}
@@ -1172,47 +1214,6 @@ lg:right-auto
                 </div>
               </div>
             </div>
-
-            {/* Support — deliberately the LAST entry in the drawer, just
-                above the copyright line. It's a "when something's wrong"
-                action, not a browsing destination, so it sits at the end
-                rather than among the navigation links at the top.
-
-                Shown on every panel EXCEPT Hammart: SupportChatWidget.tsx
-                keeps its own floating launcher there, and this entry would
-                duplicate it. Everywhere else that floating launcher is
-                suppressed and this is the only way in, so it dispatches
-                "openSupportChat" to open the same panel. */}
-            {siteDomain !== "hammart" && (
-              <div className="mt-4 border-t border-white/10 light:border-black/10 px-3 pt-3">
-                <button
-                  onClick={() => {
-                    setMenuOpen(false);
-                    window.dispatchEvent(new CustomEvent("openSupportChat"));
-                  }}
-                  className="
-                    flex
-                    w-full
-                    items-center
-                    gap-3
-                    rounded-xl
-                    px-0
-                    py-1
-                    text-left
-                    text-slate-200
-                    light:text-slate-700
-                    transition-all
-                    duration-300
-                    hover:translate-x-1
-                    hover:text-orange-300
-                    light:hover:text-orange-600
-                  "
-                >
-                  <Headset size={16} />
-                  <span className="text-sm font-semibold">Support</span>
-                </button>
-              </div>
-            )}
 
             <div className="mt-4 border-t border-white/10 light:border-black/10 px-3 pt-3">
               <p className="text-[10px] text-slate-500">© 2026 Homox Prime Pvt Ltd</p>

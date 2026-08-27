@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Home, PlaySquare, Rss } from "lucide-react";
+import { Home, PlaySquare, Music2 } from "lucide-react";
 
 import MobileCreateButton from "./MobileCreateButton";
 import MobileProfileMenu from "./MobileProfileMenu";
@@ -12,7 +12,7 @@ export default function MobileBottomNav() {
 
   const isHomeActive = pathname === "/";
   const isRaftaarActive = pathname.startsWith("/shorts");
-  const isSubscriptionsActive = pathname.startsWith("/subscriptions") || pathname.startsWith("/in-family");
+  const isMusicActive = pathname.startsWith("/music");
   const isProfileActive =
     pathname.startsWith("/profile") ||
     pathname.startsWith("/my-videos") ||
@@ -103,9 +103,9 @@ export default function MobileBottomNav() {
         <MobileCreateButton />
       </div>
 
-      {/* In-Family */}
+      {/* Music */}
       <Link
-        href="/subscriptions"
+        href="/music"
         className={`
           flex
           flex-col
@@ -117,15 +117,15 @@ export default function MobileBottomNav() {
           transition-all
           duration-200
           ${
-            isSubscriptionsActive
+            isMusicActive
               ? "text-orange-400 font-black scale-105"
               : "text-slate-300 light:text-slate-600 hover:text-orange-300 light:hover:text-orange-600"
           }
         `}
       >
-        <Rss size={21} className={isSubscriptionsActive ? "text-orange-400 drop-shadow-[0_0_12px_rgba(249,115,22,0.85)] filter" : ""} />
-        <span className={`text-[10px] ${isSubscriptionsActive ? "font-black text-orange-400 drop-shadow-[0_0_8px_rgba(249,115,22,0.7)]" : "font-medium"}`}>
-          In-Family
+        <Music2 size={21} className={isMusicActive ? "text-orange-400 drop-shadow-[0_0_12px_rgba(249,115,22,0.85)] filter" : ""} />
+        <span className={`text-[10px] ${isMusicActive ? "font-black text-orange-400 drop-shadow-[0_0_8px_rgba(249,115,22,0.7)]" : "font-medium"}`}>
+          Music
         </span>
       </Link>
 

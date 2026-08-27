@@ -16,12 +16,14 @@ import {
   Bookmark,
   X,
   Clapperboard,
+  PictureInPicture2,
 } from "lucide-react";
 
 import type { Short } from "../data/shorts";
 import { getSoundtrackById, soundtrackClipSeconds } from "../data/soundtracks";
 import { usePremium } from "@/app/hooks/usePremium";
 import { effectiveMaxResolution, preferredResolution } from "@/app/lib/premium";
+import { useMiniPlayer } from "@/app/context/MiniPlayerContext";
 
 // A Short with a chosen soundtrack is meant to have that track REPLACE the
 // camera's own recorded audio entirely — see the identical comment in
@@ -84,6 +86,7 @@ export default function ShortsPageContent({
   // Viewer's tier — caps the rendition ladder below, same rule as the
   // main watch player (see VideoPlayer.tsx).
   const premium = usePremium();
+  const { minimizeVideo } = useMiniPlayer();
 
   const shorts = initialShorts;
   const [activeIndex, setActiveIndex] = useState(0);
@@ -598,7 +601,7 @@ export default function ShortsPageContent({
 
   const handleShare = async (short: Short) => {
     if (!short.videoId) return;
-    const url = `${window.location.origin}/watch/${short.videoId}`;
+    const url = `${window.location.origin}/shorts?v=${short.videoId}`;
 
     if (navigator.share) {
       try {
@@ -731,34 +734,75 @@ export default function ShortsPageContent({
           <ArrowLeft size={17} />
         </button>
 
-        <button
-          onClick={toggleMuted}
-          aria-label={muted ? "Unmute" : "Mute"}
-          className="
-            ml-auto
-            flex
-            h-8
-            w-8
-            shrink-0
-            items-center
-            justify-center
-            rounded-full
-            border
-            border-white/10
-            bg-white/10
-            text-white
-            backdrop-blur-md
-            transition-all
-            duration-200
-            hover:border-white/30
-            hover:bg-white/20
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={() => {
+              const activeShort = shorts[activeIndex];
+              if (activeShort) {
+                minimizeVideo({
+                  videoId: String(activeShort.videoId || activeShort.id),
+                  title: activeShort.title,
+                  creator: activeShort.creator,
+                  thumbnailUrl: activeShort.poster || "/shorts/1.jpg",
+                  muxPlaybackId: activeShort.muxPlaybackId,
+                  isShort: true,
+                });
+                router.push("/");
+              }
+            }}
+            aria-label="Minimize to Mini-Player"
+            title="Minimize to Mini-Player"
+            className="
+              flex
+              h-8
+              w-8
+              shrink-0
+              items-center
+              justify-center
+              rounded-full
+              border
+              border-white/10
+              bg-white/10
+              text-white
+              backdrop-blur-md
+              transition-all
+              duration-200
+              hover:border-white/30
+              hover:bg-white/20
+              lg:h-9
+              lg:w-9
+            "
+          >
+            <PictureInPicture2 size={15} />
+          </button>
 
-            lg:h-9
-            lg:w-9
-          "
-        >
-          {muted ? <VolumeX size={15} /> : <Volume2 size={15} />}
-        </button>
+          <button
+            onClick={toggleMuted}
+            aria-label={muted ? "Unmute" : "Mute"}
+            className="
+              flex
+              h-8
+              w-8
+              shrink-0
+              items-center
+              justify-center
+              rounded-full
+              border
+              border-white/10
+              bg-white/10
+              text-white
+              backdrop-blur-md
+              transition-all
+              duration-200
+              hover:border-white/30
+              hover:bg-white/20
+              lg:h-9
+              lg:w-9
+            "
+          >
+            {muted ? <VolumeX size={15} /> : <Volume2 size={15} />}
+          </button>
+        </div>
       </div>
 
       {/* Progress dots — neutral white, not brand orange */}

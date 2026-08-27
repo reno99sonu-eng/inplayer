@@ -12,7 +12,8 @@ import WatchHistoryRecorder from "@/app/components/WatchHistoryRecorder";
 import ProcessingStatus from "@/app/components/ProcessingStatus";
 import WatchPageContent from "@/app/components/WatchPageContent";
 import Link from "next/link";
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { isMusicType } from "@/app/lib/contentTypes";
 
 export const dynamic = "force-dynamic";
 
@@ -113,6 +114,16 @@ export default async function WatchPage({ params }: WatchPageProps) {
   // app/lib/videoStore.ts).
   if (!video || video.moderationHidden === true) {
     notFound();
+  }
+
+  // Raftaar reels redirect straight into the vertical Raftaar reel player
+  if (video.contentType === "short") {
+    redirect(`/shorts?v=${videoId}`);
+  }
+
+  // Music tracks redirect straight into the ultra-premium Music screen & player
+  if (isMusicType(video.contentType)) {
+    redirect(`/music?v=${videoId}`);
   }
 
   // The hard gate. Filtering the listings keeps 18+ content out of every

@@ -26,6 +26,7 @@ import {
   AlertTriangle,
   Receipt,
   LifeBuoy,
+  Music2,
 } from "lucide-react";
 import { useAdminMode } from "@/app/components/admin/AdminModeContext";
 
@@ -47,6 +48,7 @@ const inplayerItems = [
   { id: "error-logs", label: "Error Logs", icon: AlertTriangle, href: "/admin/error-logs" },
   { id: "videos", label: "Videos", icon: Video, href: "/admin/videos" },
   { id: "shorts", label: "Shorts", icon: Film, href: "/admin/videos?type=short" },
+  { id: "music", label: "Music Studio", icon: Music2, href: "/admin/music" },
   { id: "reports", label: "Reports & Moderation", icon: Flag, href: "/admin/moderation" },
   { id: "copyright", label: "Copyright Center", icon: Copyright, href: "/admin/copyright" },
   { id: "revenue", label: "Revenue", icon: DollarSign, href: "/admin/revenue" },

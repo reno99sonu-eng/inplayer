@@ -22,6 +22,10 @@ const IdleViewerPrompt = dynamic(() => import("./IdleViewerPrompt"), { ssr: fals
 // picks its own product playbook (InPlayer vs Hammart) off the pathname
 // internally, so mounting it once here covers both storefronts.
 const SupportChatWidget = dynamic(() => import("./support/SupportChatWidget"), { ssr: false });
+const GlobalMusicPlayer = dynamic(() => import("./music/GlobalMusicPlayer"), { ssr: false });
+const MiniPlayer = dynamic(() => import("./MiniPlayer"), { ssr: false });
+import { MusicPlayerProvider } from "@/app/context/MusicPlayerContext";
+import { MiniPlayerProvider } from "@/app/context/MiniPlayerContext";
 import MaintenanceGate from "./MaintenanceGate";
 import GeoGate from "./GeoGate";
 import SplashScreen from "./SplashScreen";
@@ -68,22 +72,26 @@ export default function SiteChrome({
   }
 
   return (
-    <>
-      {/* Overlay only — the real chrome/content below still mounts and
-          loads normally underneath it, so the splash never delays the
-          actual page. */}
-      <SplashScreen />
-      <MaintenanceGate initialMaintenance={initialMaintenance}>
-        <GeoGate initialGeoAllowed={initialGeoAllowed}>
-          <Navbar />
-          <AnnouncementBanner />
-          <div className="pb-20 lg:pb-0">{children}</div>
-          <MobileBottomNav />
-          <IdleViewerPrompt />
-          <SupportChatWidget />
-          <FloatingAIButton />
-        </GeoGate>
-      </MaintenanceGate>
-    </>
+    <MusicPlayerProvider>
+      <MiniPlayerProvider>
+        {/* Overlay only — the real chrome/content below still mounts and
+            loads normally underneath it, so the splash never delays the
+            actual page. */}
+        <SplashScreen />
+        <MaintenanceGate initialMaintenance={initialMaintenance}>
+          <GeoGate initialGeoAllowed={initialGeoAllowed}>
+            <Navbar />
+            <AnnouncementBanner />
+            <div className="pb-20 lg:pb-0">{children}</div>
+            <MobileBottomNav />
+            <IdleViewerPrompt />
+            <SupportChatWidget />
+            <FloatingAIButton />
+            <GlobalMusicPlayer />
+            <MiniPlayer />
+          </GeoGate>
+        </MaintenanceGate>
+      </MiniPlayerProvider>
+    </MusicPlayerProvider>
   );
 }

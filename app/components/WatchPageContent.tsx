@@ -4,11 +4,13 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { fetchAuthSession } from "aws-amplify/auth";
-import { Maximize2, MessageSquareOff, Minimize2, ShieldAlert } from "lucide-react";
+import { Maximize2, MessageSquareOff, Minimize2, ShieldAlert, ArrowDownRight, PictureInPicture2 } from "lucide-react";
 import VideoPlayer from "@/app/components/VideoPlayer";
 import MembersOnlyVideoPlayer from "@/app/components/MembersOnlyVideoPlayer";
 import CommentSection from "@/app/components/CommentSection";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
+import { useMiniPlayer } from "@/app/context/MiniPlayerContext";
+import { useRouter } from "next/navigation";
 import { formatTimeAgo, formatViews } from "@/app/lib/formatters";
 import WatchActions from "@/app/components/watch/WatchActions";
 import WatchMeta from "@/app/components/watch/WatchMeta";
@@ -71,6 +73,8 @@ interface WatchPageContentProps {
 
 export default function WatchPageContent({ video, relatedVideos: initialRelatedVideos }: WatchPageContentProps) {
   const { signedIn } = useAuthModal();
+  const { minimizeVideo } = useMiniPlayer();
+  const router = useRouter();
   const [theaterMode, setTheaterMode] = useState(false);
   const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [relatedVideos, setRelatedVideos] = useState(initialRelatedVideos);
@@ -165,7 +169,35 @@ export default function WatchPageContent({ video, relatedVideos: initialRelatedV
             {/* Theater mode is for widescreen video only. On a 9:16 Short the
                 same max-w-[1300px] would stretch the frame to ~2300px tall,
                 so the control simply isn't offered. */}
-            {!isShort && <button onClick={() => setTheaterMode((active) => !active)} title={theaterMode ? "Exit theater mode" : "Theater mode"} className="absolute right-3 top-3 z-10 hidden h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/65 text-white opacity-0 backdrop-blur transition hover:scale-110 hover:border-orange-400/50 group-hover:opacity-100 lg:flex">{theaterMode ? <Minimize2 size={17} /> : <Maximize2 size={17} />}</button>}
+            <div className="absolute right-3 top-3 z-10 flex items-center gap-2 opacity-0 transition group-hover:opacity-100">
+              <button
+                onClick={() => {
+                  minimizeVideo({
+                    videoId: video.videoId,
+                    title: video.title,
+                    creator: video.uploaderName,
+                    thumbnailUrl: video.thumbnailUrl || "/recommendations/thumbnails/1.jpg",
+                    muxPlaybackId: video.muxPlaybackId,
+                    isShort: isShort,
+                  });
+                  router.push("/");
+                }}
+                title="Minimize to Mini-Player"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/65 text-white backdrop-blur transition hover:scale-110 hover:border-orange-400/50"
+              >
+                <PictureInPicture2 size={17} />
+              </button>
+
+              {!isShort && (
+                <button
+                  onClick={() => setTheaterMode((active) => !active)}
+                  title={theaterMode ? "Exit theater mode" : "Theater mode"}
+                  className="hidden h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-black/65 text-white backdrop-blur transition hover:scale-110 hover:border-orange-400/50 lg:flex"
+                >
+                  {theaterMode ? <Minimize2 size={17} /> : <Maximize2 size={17} />}
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Title + views/date/category, directly under the player — the

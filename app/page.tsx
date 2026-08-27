@@ -5,7 +5,6 @@ import RecommendationFeed from "./components/RecommendationFeed";
 import { getVisibleVideos, getAudienceMode } from "./lib/contentAccessServer";
 import { videoAudience } from "./lib/contentAccess";
 import KidsRow, { type KidsRowItem } from "./components/KidsRow";
-import MusicRow, { type MusicRowItem } from "./components/MusicRow";
 import { isMusicType } from "./lib/contentTypes";
 import { getFeaturedThisWeek } from "./lib/trendingStore";
 import { getPlatformSettings } from "./lib/platformSettings";
@@ -44,7 +43,6 @@ interface RealContent {
   // Videos a creator tagged as Kids in the upload Audience picker. These
   // ALSO appear in realVideos — this is an extra shelf, not a partition.
   kidsVideos: KidsRowItem[];
-  musicTracks: MusicRowItem[];
 }
 
 async function getRealContent(): Promise<RealContent> {
@@ -64,7 +62,7 @@ async function getRealContent(): Promise<RealContent> {
     );
 
     const realVideos: Recommendation[] = items
-      .filter((video) => video.contentType !== "short")
+      .filter((video) => video.contentType !== "short" && !isMusicType(video.contentType))
       .map((video) => {
         const videoId = video.videoId as string;
         const uploaderId = video.uploaderId as string | undefined;
@@ -125,7 +123,7 @@ async function getRealContent(): Promise<RealContent> {
     // audience-filtered and public-only) so it can never surface something
     // the rest of the page is hiding.
     const kidsVideos: KidsRowItem[] = items
-      .filter((video) => video.contentType !== "short" && videoAudience(video) === "kids")
+      .filter((video) => video.contentType !== "short" && !isMusicType(video.contentType) && videoAudience(video) === "kids")
       .slice(0, 20)
       .map((video) => ({
         videoId: video.videoId as string,
@@ -136,32 +134,12 @@ async function getRealContent(): Promise<RealContent> {
         views: `${(video.views as number) || 0} views`,
       }));
 
-    // Music shelf — same source list, narrowed to audio-only uploads.
-    // Music is longform, so it is ALREADY in realVideos above (every
-    // `contentType !== "short"` filter includes it) and shows inline in the
-    // main feed. This row is additional, not instead of — the same
-    // both-places treatment Kids content gets.
-    const musicTracks: MusicRowItem[] = items
-      .filter((video) => isMusicType(video.contentType))
-      .slice(0, 20)
-      .map((video) => ({
-        videoId: video.videoId as string,
-        title: video.title as string,
-        creator: (video.uploaderName as string) || "Unknown",
-        // Non-null in practice: a cover image is mandatory for music
-        // (app/api/upload/create). The fallback is here only so a row
-        // written before that rule can never render a broken <Image>.
-        thumbnail:
-          (video.thumbnailUrl as string) || "/recommendations/thumbnails/1.jpg",
-        views: `${(video.views as number) || 0} views`,
-      }));
-
-    return { realVideos, realShorts, kidsVideos, musicTracks };
+    return { realVideos, realShorts, kidsVideos };
   } catch (err) {
     // If DynamoDB is briefly unreachable, fail gracefully rather than
     // breaking the whole homepage — just show the example data instead.
     console.error("Failed to fetch real content for homepage:", err);
-    return { realVideos: [], realShorts: [], kidsVideos: [], musicTracks: [] };
+    return { realVideos: [], realShorts: [], kidsVideos: [] };
   }
 }
 
@@ -304,7 +282,7 @@ async function HomeContent({ activeView, isVertical }: { activeView: "horizontal
   // The hero only renders in horizontal view, so only fetch its data then —
   // no point paying for the extra query on the Shorts feed. Both fetches
   // run in parallel rather than sequentially.
-  const [{ realVideos, realShorts, kidsVideos, musicTracks }, heroContent, audienceMode] =
+  const [{ realVideos, realShorts, kidsVideos }, heroContent, audienceMode] =
     await Promise.all([
       getRealContent(),
       isVertical
@@ -317,12 +295,6 @@ async function HomeContent({ activeView, isVertical }: { activeView: "horizontal
   // feed), and it's pointless in Kids-only mode where the entire page is
   // already this content and the row would just duplicate the grid below.
   const showKidsRow = !isVertical && audienceMode !== "kids" && kidsVideos.length > 0;
-  // Hidden in the vertical (Raftaar) view for the same reason the Kids row
-  // is — that view is a shorts feed and a horizontal shelf doesn't belong.
-  // Unlike Kids it is NOT hidden in kids-only mode: a track tagged Kids is
-  // still music, and getVisibleVideos has already removed anything the
-  // current audience mode shouldn't see.
-  const showMusicRow = !isVertical && musicTracks.length > 0;
 
   return (
         <div className="space-y-1 lg:space-y-2">
@@ -347,7 +319,6 @@ async function HomeContent({ activeView, isVertical }: { activeView: "horizontal
           )}
 
           {showKidsRow && <KidsRow items={kidsVideos} />}
-          {showMusicRow && <MusicRow items={musicTracks} />}
 
           <RecommendationFeed
             realVideos={realVideos}

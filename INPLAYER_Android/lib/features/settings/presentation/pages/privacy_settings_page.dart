@@ -4,6 +4,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/pattern_background.dart';
 import '../../../../providers/auth_provider.dart';
+import '../../../../services/auth_service.dart';
 import '../../../../services/biometric_lock_service.dart';
 import '../../../../services/settings_service.dart';
 
@@ -222,10 +223,11 @@ class _PrivacySettingsPageState extends ConsumerState<PrivacySettingsPage> {
                       ),
                       Switch.adaptive(
                         value: lockState.isEnabled,
-                        activeColor: AppColors.brandOrange,
+                        activeTrackColor: AppColors.brandOrange,
                         onChanged: (val) async {
                           final success = await lockNotifier.setEnabled(val);
-                          if (!success && mounted && val) {
+                          if (!context.mounted) return;
+                          if (!success && val) {
                             ScaffoldMessenger.of(context).showSnackBar(
                               const SnackBar(
                                 content: Text('Biometric verification cancelled or unavailable'),

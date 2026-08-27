@@ -446,7 +446,7 @@ class _ChannelPageState extends ConsumerState<ChannelPage> {
                           child: ListView.separated(
                             scrollDirection: Axis.horizontal,
                             itemCount: shorts.length,
-                            separatorBuilder: (_, __) => const SizedBox(width: 10),
+                            separatorBuilder: (context, index) => const SizedBox(width: 10),
                             itemBuilder: (context, index) {
                               final s = shorts[index];
                               final image = (s.thumbnailUrl ?? '').isNotEmpty ? smartImageProvider(s.thumbnailUrl!) : null;

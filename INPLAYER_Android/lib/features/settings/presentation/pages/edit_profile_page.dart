@@ -129,7 +129,8 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                       );
                       if (dataUrl != null) {
                         final ok = await ref.read(settingsServiceProvider).updateAvatar(dataUrl);
-                        if (ok && mounted) {
+                        if (!context.mounted) return;
+                        if (ok) {
                           ref.read(authStateProvider.notifier).updateLocalUser((u) => u.copyWith(avatarUrl: dataUrl));
                           ScaffoldMessenger.of(context).showSnackBar(
                             const SnackBar(content: Text('Avatar updated!'), backgroundColor: Color(0xFF10B981)),

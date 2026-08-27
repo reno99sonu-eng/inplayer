@@ -5,12 +5,13 @@ import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/theme/pattern_background.dart';
+import '../../../../core/utils/image_utils.dart';
 import '../../../../core/widgets/user_avatar.dart';
 import '../../../../models/video.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../services/video_service.dart';
 import '../../../../services/channel_service.dart';
+import '../../../../services/settings_service.dart';
 import '../../../home/presentation/widgets/mobile_menu_drawer.dart';
 
 enum StudioTab {

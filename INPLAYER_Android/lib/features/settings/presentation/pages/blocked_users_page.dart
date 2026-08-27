@@ -73,7 +73,7 @@ class _BlockedUsersPageState extends ConsumerState<BlockedUsersPage> {
                 : ListView.separated(
                     padding: const EdgeInsets.all(16),
                     itemCount: _blockedUsers.length,
-                    separatorBuilder: (_, __) => Divider(color: context.borderSubtle),
+                    separatorBuilder: (_, index) => Divider(color: context.borderSubtle),
                     itemBuilder: (context, index) {
                       final u = _blockedUsers[index];
                       return ListTile(

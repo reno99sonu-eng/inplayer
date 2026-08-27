@@ -486,7 +486,7 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                 ],
               ),
               actions: [
-                if (user?.handle != null && user!.handle!.isNotEmpty)
+                if (user.handle != null && user.handle!.isNotEmpty)
                   TextButton.icon(
                     style: TextButton.styleFrom(
                       backgroundColor: context.isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05),
@@ -524,7 +524,7 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                     )
                   : Padding(
                       padding: const EdgeInsets.all(16.0),
-                      child: _buildActiveTabContent(user!),
+                      child: _buildActiveTabContent(user),
                     ),
             ),
             const SliverToBoxAdapter(

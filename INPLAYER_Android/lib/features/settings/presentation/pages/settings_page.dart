@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/about_app_dialog.dart';
@@ -53,14 +52,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         backgroundColor: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
       ),
     );
-  }
-
-  Future<void> _openUrl(String url) async {
-    final uri = Uri.parse(url);
-    final launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!launched && mounted) {
-      _showSnack("Couldn't open that page.");
-    }
   }
 
   Future<void> _showThemePicker() async {

@@ -73,7 +73,7 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
     _bioController.text = user.bio;
     _handleController.text = user.handle ?? user.username;
 
-    setState(() => _loading = true);
+    if (mounted) setState(() => _loading = true);
 
     try {
       final results = await Future.wait([
@@ -359,10 +359,26 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<AuthState>(authStateProvider, (prev, next) {
+      if (next is AuthStateAuthenticated) {
+        _loadData();
+      }
+    });
+
     final authState = ref.watch(authStateProvider);
     final user = authState is AuthStateAuthenticated ? authState.user : null;
 
-    if (user == null && !_loading) {
+    if (user == null) {
+      if (_loading) {
+        return Scaffold(
+          drawer: const MobileMenuDrawer(),
+          body: PatternBackground(
+            child: const Center(
+              child: CircularProgressIndicator(color: AppColors.brandOrange),
+            ),
+          ),
+        );
+      }
       return Scaffold(
         drawer: const MobileMenuDrawer(),
         body: PatternBackground(

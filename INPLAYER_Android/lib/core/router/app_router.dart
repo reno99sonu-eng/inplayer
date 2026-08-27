@@ -47,6 +47,8 @@ import '../../features/music/presentation/pages/genre_page.dart';
 import '../../features/music/presentation/pages/liked_music_page.dart';
 import '../../features/settings/presentation/pages/contact_us_page.dart';
 import '../../features/settings/presentation/pages/report_problem_page.dart';
+import '../../features/settings/presentation/pages/blocked_users_page.dart';
+import '../../features/settings/presentation/pages/app_legal_page.dart';
 import '../../services/video_service.dart';
 
 // Bridges authStateProvider's changes into a plain Listenable go_router can
@@ -266,6 +268,43 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/settings/report-problem',
         name: 'report-problem',
         builder: (context, state) => const ReportProblemPage(),
+      ),
+      GoRoute(
+        path: '/settings/blocked-users',
+        name: 'blocked-users',
+        builder: (context, state) => const BlockedUsersPage(),
+      ),
+      GoRoute(
+        path: '/settings/terms',
+        name: 'terms-of-service',
+        builder: (context, state) => const AppLegalPage(
+          title: 'Terms of Service',
+          content: 'Welcome to InPlayer. By accessing or using our website, services, and mobile applications, you agree to be bound by these Terms of Service.\n\n1. Acceptance of Terms: By registering for, accessing, or using the InPlayer platform, you confirm that you are at least 13 years of age and agree to comply with these terms.\n\n2. User Accounts: You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account.\n\n3. Content Guidelines: You retain ownership of content you upload, but grant InPlayer a worldwide license to host, display, and distribute it.\n\n4. Monetization & Payouts: Eligible creators may receive revenue share subject to community guidelines and KYC verification.',
+        ),
+      ),
+      GoRoute(
+        path: '/settings/privacy-policy',
+        name: 'privacy-policy',
+        builder: (context, state) => const AppLegalPage(
+          title: 'Privacy Policy',
+          content: 'At InPlayer, your privacy and data security are our top priorities.\n\n1. Information We Collect: We collect information you provide directly (such as name, email, profile photo) and data generated when you interact with content (watch history, likes, subscriptions).\n\n2. How We Use Information: We use your data to personalize recommendations, process creator payouts, enforce safety features (such as on-device age classification and biometric lock), and prevent abuse.\n\n3. Data Protection: All data is encrypted in transit and at rest. We never sell your personal information to third parties.\n\n4. Your Rights: You can update your profile, export your watch history, or delete your account at any time from the Settings menu.',
+        ),
+      ),
+      GoRoute(
+        path: '/settings/vendor-terms',
+        name: 'vendor-terms',
+        builder: (context, state) => const AppLegalPage(
+          title: 'HamMart Vendor Terms',
+          content: 'HamMart is InPlayer\'s integrated creator and merchandise marketplace.\n\n1. Eligibility: Verified creators and authorized vendors can list merchandise and digital products for purchase by the community.\n\n2. Fulfillment & Quality: Vendors are solely responsible for product fulfillment, accurate item descriptions, and handling customer inquiries.\n\n3. Revenue & Fees: Transactions are processed securely, with platform commissions and vendor payouts calculated and disbursed according to the vendor agreement.',
+        ),
+      ),
+      GoRoute(
+        path: '/settings/help',
+        name: 'help-center',
+        builder: (context, state) => const AppLegalPage(
+          title: 'Help Center & FAQ',
+          content: 'Frequently Asked Questions & Support:\n\nQ: How do I upload a video or Raftaar short?\nA: Tap the "+" button in the top bar or navigation drawer to open the Upload screen.\n\nQ: How do I enable Fingerprint / Passkey lock?\nA: Go to Settings -> Account & Privacy -> Privacy, Passkeys & Active Sessions, and switch on Passkey & Biometric App Lock.\n\nQ: How do I turn on Kids Mode?\nA: Go to Settings -> General -> Content Access, and set the audience mode with your secure 6-digit passkey.\n\nQ: How do I contact the InPlayer team?\nA: Tap "Contact Support" in Settings or email support@inplayer.in.',
+        ),
       ),
       GoRoute(
         path: '/creators',

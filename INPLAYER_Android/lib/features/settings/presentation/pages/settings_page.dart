@@ -329,7 +329,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           _buildMenuItem(
             icon: Icons.block_outlined,
             title: 'Blocked Users',
-            onTap: () => _showSnack('Coming soon.'),
+            onTap: () => context.push('/settings/blocked-users'),
           ),
           Divider(height: 1, color: context.borderSubtle),
 
@@ -375,7 +375,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           _buildMenuItem(
             icon: Icons.help_outline,
             title: 'Help Center',
-            onTap: () => _openUrl('https://inplayer.in/help'),
+            onTap: () => context.push('/settings/help'),
           ),
           _buildMenuItem(
             icon: Icons.email_outlined,
@@ -385,17 +385,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           _buildMenuItem(
             icon: Icons.description_outlined,
             title: 'Terms of Service',
-            onTap: () => _openUrl('https://inplayer.in/terms'),
+            onTap: () => context.push('/settings/terms'),
           ),
           _buildMenuItem(
             icon: Icons.storefront_outlined,
             title: 'HamMart Vendor Terms',
-            onTap: () => _openUrl('https://inplayer.in/hammart-vendor-terms'),
+            onTap: () => context.push('/settings/vendor-terms'),
           ),
           _buildMenuItem(
             icon: Icons.privacy_tip_outlined,
             title: 'Privacy Policy',
-            onTap: () => _openUrl('https://inplayer.in/privacy'),
+            onTap: () => context.push('/settings/privacy-policy'),
           ),
           Divider(height: 1, color: context.borderSubtle),
 

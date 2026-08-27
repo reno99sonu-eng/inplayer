@@ -12,6 +12,7 @@ import { isMusicType, normalizeContentType } from "@/app/lib/contentTypes";
 import {
   normalizeCoverInterval,
   sanitizeCovers,
+  sanitizeGenre,
   sanitizeLyrics,
 } from "@/app/lib/musicTrack";
 import {
@@ -133,6 +134,7 @@ export async function POST(request: NextRequest) {
       covers,
       coverIntervalSeconds,
       lyrics,
+      genre,
       audioSha256,
       declaredOwnership,
     } = body;
@@ -193,6 +195,10 @@ export async function POST(request: NextRequest) {
     const musicCovers = isMusic ? sanitizeCovers(covers) : [];
     const musicLyrics = isMusic ? sanitizeLyrics(lyrics) : [];
     const musicCoverInterval = isMusic ? normalizeCoverInterval(coverIntervalSeconds) : undefined;
+    // Closed-list genre, e.g. "Pop"/"Hip-Hop"/"Devotional" — powers the
+    // Genres browse grid. Falls back to "Other" rather than being rejected,
+    // same posture as the rest of this block.
+    const musicGenre = isMusic ? sanitizeGenre(genre) : undefined;
     const musicHash =
       isMusic && typeof audioSha256 === "string" && /^[a-f0-9]{64}$/i.test(audioSha256)
         ? audioSha256.toLowerCase()
@@ -406,6 +412,7 @@ export async function POST(request: NextRequest) {
             covers: musicCovers,
             coverIntervalSeconds: musicCoverInterval,
             lyrics: musicLyrics,
+            genre: musicGenre,
             ...(musicHash && { audioSha256: musicHash }),
             // The ownership attestation, with evidence. This is what gives
             // InPlayer its safe harbour if a rights holder ever complains,

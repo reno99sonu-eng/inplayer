@@ -62,6 +62,41 @@ export function coverIndexAt(
   return Math.floor(seconds / interval) % count;
 }
 
+// ── Genre ─────────────────────────────────────────────────────────────
+
+/** The fixed set of genres a creator can tag a track with. Deliberately a
+ *  closed list rather than free text — "Pop" typed three different ways
+ *  across three uploads would make genre browsing useless. "Other" is the
+ *  honest catch-all for anything that doesn't fit one of the rest. */
+export const MUSIC_GENRES = [
+  "Pop",
+  "Hip-Hop",
+  "R&B",
+  "Rock",
+  "Electronic",
+  "Classical",
+  "Folk",
+  "Indie",
+  "Devotional",
+  "Bollywood",
+  "Instrumental",
+  "Other",
+] as const;
+
+export type MusicGenre = (typeof MUSIC_GENRES)[number];
+
+/** Server-side sanitising of the creator-picked genre. Anything outside the
+ *  fixed list (a stale client, a hand-made request) falls back to "Other"
+ *  rather than being rejected outright or stored as uncontrolled free text —
+ *  the same "never trust the client" posture as sanitizeLyrics/sanitizeCovers
+ *  below. */
+export function sanitizeGenre(raw: unknown): MusicGenre {
+  if (typeof raw === "string" && (MUSIC_GENRES as readonly string[]).includes(raw)) {
+    return raw as MusicGenre;
+  }
+  return "Other";
+}
+
 // ── Lyrics ────────────────────────────────────────────────────────────
 
 /** One line, and the second of the track at which it becomes the active

@@ -27,10 +27,12 @@ import {
   MAX_COVERS,
   MAX_COVER_BYTES,
   MAX_LYRIC_LINES,
+  MUSIC_GENRES,
   activeLyricIndex,
   parseLyrics,
   toLrc,
   type LyricLine,
+  type MusicGenre,
 } from "@/app/lib/musicTrack";
 import { screenMusicMetadata } from "@/app/lib/musicCopyright";
 import { compressCoverImage, compressImageToThumbnail } from "@/app/lib/imageCompress";
@@ -50,6 +52,8 @@ export interface MusicSettings {
   coverIntervalSeconds: number;
   /** Publishable form: every line has a real number, cascaded (see below). */
   lyrics: LyricLine[];
+  /** Powers the Genres browse grid. Closed list — see MUSIC_GENRES. */
+  genre: MusicGenre;
   audioSha256: string | null;
   declaredOwnership: boolean;
 }
@@ -59,6 +63,7 @@ export function emptyMusicSettings(): MusicSettings {
     covers: [],
     coverIntervalSeconds: COVER_INTERVAL_DEFAULT,
     lyrics: [],
+    genre: "Other",
     audioSha256: null,
     declaredOwnership: false,
   };
@@ -391,6 +396,30 @@ export default function MusicUploadTools({
             </span>
           </span>
         </label>
+      </div>
+
+      {/* ── Genre ───────────────────────────────────────────────────── */}
+      <div className={card}>
+        <p className={label}>
+          <span className="inline-flex items-center gap-1.5">
+            <Music2 size={13} className="text-violet-400" /> Genre
+          </span>
+        </p>
+        <select
+          value={value.genre}
+          onChange={(e) => emit({ genre: e.target.value as MusicGenre })}
+          className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm font-semibold text-white outline-none focus:border-violet-400/60 light:border-black/10 light:bg-white light:text-slate-900"
+        >
+          {MUSIC_GENRES.map((g) => (
+            <option key={g} value={g}>
+              {g}
+            </option>
+          ))}
+        </select>
+        <p className="mt-2 text-[11px] leading-relaxed text-slate-400 light:text-slate-600">
+          Lets listeners find this track by browsing a genre. Pick the closest fit — &quot;Other&quot;
+          if none really apply.
+        </p>
       </div>
 
       {/* ── Cover art ───────────────────────────────────────────────── */}

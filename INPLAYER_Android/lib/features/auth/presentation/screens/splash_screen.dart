@@ -5,6 +5,7 @@ import 'package:audioplayers/audioplayers.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../providers/auth_provider.dart';
+import '../../../../services/geo_service.dart';
 
 class SplashScreenOverlay extends ConsumerStatefulWidget {
   final VoidCallback? onDismiss;
@@ -128,6 +129,16 @@ class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
     );
 
     _initAudioAndPlay();
+    _triggerGeoCheck();
+  }
+
+  void _triggerGeoCheck() {
+    // Non-blocking geo-verification matching the website's fail-open strategy
+    ref.read(geoServiceProvider).verifyGeo().then((result) {
+      if (!result.allowed) {
+        debugPrint('[InPlayer] Geo verification restriction flagged: ${result.country}');
+      }
+    }).catchError((_) {});
   }
 
   void _dismissSplash() {

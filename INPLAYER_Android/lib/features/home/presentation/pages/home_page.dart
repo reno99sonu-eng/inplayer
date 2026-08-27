@@ -31,6 +31,7 @@ import '../widgets/mobile_menu_drawer.dart';
 import '../widgets/profile_menu_modal.dart';
 import '../widgets/create_menu_popup.dart';
 import '../../../auth/presentation/widgets/auth_modals.dart';
+import '../../../../core/widgets/notification_permission_helper.dart';
 import '../../../../core/widgets/pattern_background.dart';
 import '../../../../core/widgets/user_avatar.dart';
 import '../../../../models/user.dart';
@@ -44,6 +45,14 @@ class HomePage extends ConsumerStatefulWidget {
 
 class _HomePageState extends ConsumerState<HomePage> {
   int _currentIndex = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      NotificationPermissionHelper.maybePrompt(context);
+    });
+  }
 
   /// Index of the Raftaar tab. Named because three separate things below
   /// key off it — the bottom bar goes transparent, its labels switch to

@@ -1,3 +1,4 @@
+﻿import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -5,9 +6,12 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:video_player/video_player.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/playback_settings_store.dart';
+import '../../../../core/utils/video_preview_gate.dart';
 import '../../../../core/widgets/user_avatar.dart';
 import '../../../../models/video.dart';
 import '../../../../services/video_interaction_service.dart';
@@ -16,7 +20,7 @@ import '../../../watch/presentation/widgets/video_options_sheet.dart';
 class VideoCard extends ConsumerStatefulWidget {
   final Video video;
   /// This viewer's existing Interested/Not Interested feedback for this
-  /// video, if any — matches RecommendationFeed.tsx's `feedbackMap`,
+  /// video, if any — matches RecommendationFeed.tsx's eedbackMap,
   /// loaded once by the feed and passed down so 20+ cards on one screen
   /// don't each fire their own status request.
   final String? initialFeedback;
@@ -35,10 +39,35 @@ class _VideoCardState extends ConsumerState<VideoCard> {
   String? _feedback;
   bool _feedbackBusy = false;
 
+  // Video preview player
+  VideoPlayerController? _previewController;
+  Timer? _hoverTimer;
+  bool _isPlayingPreview = false;
+  bool _dataSaver = false;
+
   @override
   void initState() {
     super.initState();
     _feedback = widget.initialFeedback;
+    VideoPreviewGate.instance.activeCardId.addListener(_onActivePreviewChanged);
+    _checkDataSaver();
+  }
+
+  Future<void> _checkDataSaver() async {
+    final settings = await PlaybackSettingsStore.get();
+    if (mounted) {
+      setState(() => _dataSaver = settings.dataSaver);
+    }
+  }
+
+  void _onActivePreviewChanged() {
+    final activeId = VideoPreviewGate.instance.activeCardId.value;
+    final isMe = activeId == widget.video.videoId && widget.video.videoId.isNotEmpty;
+    if (isMe && !_isPlayingPreview) {
+      _startStreamingPreview();
+    } else if (!isMe && _isPlayingPreview) {
+      _stopStreamingPreview();
+    }
   }
 
   @override
@@ -46,6 +75,81 @@ class _VideoCardState extends ConsumerState<VideoCard> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.video.videoId != widget.video.videoId) {
       _feedback = widget.initialFeedback;
+      _stopStreamingPreview();
+    }
+  }
+
+  @override
+  void dispose() {
+    VideoPreviewGate.instance.activeCardId.removeListener(_onActivePreviewChanged);
+    VideoPreviewGate.instance.releaseActivePreview(widget.video.videoId);
+    _hoverTimer?.cancel();
+    _previewController?.dispose();
+    super.dispose();
+  }
+
+  void _onCardHover(bool isHovered) {
+    if (_dataSaver || widget.video.muxPlaybackId == null || widget.video.videoId.isEmpty) return;
+    _hoverTimer?.cancel();
+    if (isHovered) {
+      // 200ms debounce matching HOVER_PREVIEW_DELAY in RecommendationFeed.tsx
+      _hoverTimer = Timer(const Duration(milliseconds: 200), () {
+        if (mounted) {
+          VideoPreviewGate.instance.requestActivePreview(widget.video.videoId);
+        }
+      });
+    } else {
+      VideoPreviewGate.instance.releaseActivePreview(widget.video.videoId);
+    }
+  }
+
+  Future<void> _startStreamingPreview() async {
+    final muxId = widget.video.muxPlaybackId;
+    if (muxId == null || muxId.isEmpty || _dataSaver) return;
+
+    _previewController?.dispose();
+    // Low resolution (360p or 480p) muted HLS stream matching Mux preview
+    final url = 'https://stream.mux.com/.m3u8?max_resolution=360p';
+    final controller = VideoPlayerController.networkUrl(
+      Uri.parse(url),
+      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+    );
+
+    try {
+      await controller.initialize();
+      await controller.setVolume(0.0); // Always muted on feed cards
+      await controller.setLooping(true);
+      if (!mounted || VideoPreviewGate.instance.activeCardId.value != widget.video.videoId) {
+        await controller.dispose();
+        return;
+      }
+      await controller.play();
+      setState(() {
+        _previewController = controller;
+        _isPlayingPreview = true;
+      });
+    } catch (_) {
+      // Network error or unsupported video - thumbnail remains smoothly visible
+      await controller.dispose();
+      if (mounted) {
+        setState(() {
+          _previewController = null;
+          _isPlayingPreview = false;
+        });
+      }
+    }
+  }
+
+  void _stopStreamingPreview() {
+    _hoverTimer?.cancel();
+    if (_previewController != null) {
+      final controller = _previewController;
+      _previewController = null;
+      controller?.pause();
+      controller?.dispose();
+    }
+    if (mounted) {
+      setState(() => _isPlayingPreview = false);
     }
   }
 
@@ -154,154 +258,207 @@ class _VideoCardState extends ConsumerState<VideoCard> {
   Widget build(BuildContext context) {
     return Material(
       color: Colors.transparent,
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: video.videoId.isEmpty
-            ? null
-            : () {
-                context.push('/watch/${video.videoId}');
-              },
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 16:9 thumbnail
-            ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: AspectRatio(
-                aspectRatio: 16 / 9,
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    _buildThumbnail(context),
-
-                    // Duration badge
-                    if (video.duration.isNotEmpty)
-                      Positioned(
-                        right: 8,
-                        bottom: 8,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 3,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.85),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            video.duration,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ),
-                      ),
-
-                    if (video.videoId.isNotEmpty)
-                      Positioned(
-                        top: 8,
-                        left: 8,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppColors.brandOrange.withValues(alpha: 0.9),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Text(
-                            'NEW',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 9,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-
-            const SizedBox(height: 10),
-
-            // Video information
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: context.borderSubtle, width: 1),
-                  ),
-                  child: _buildAvatar(context),
-                ),
-
-                const SizedBox(width: 10),
-
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+      child: MouseRegion(
+        onEnter: (_) => _onCardHover(true),
+        onExit: (_) => _onCardHover(false),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: video.videoId.isEmpty
+              ? null
+              : () {
+                  _stopStreamingPreview();
+                  context.push('/watch/');
+                },
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 16:9 thumbnail / Live Video Preview
+              ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: AspectRatio(
+                  aspectRatio: 16 / 9,
+                  child: Stack(
+                    fit: StackFit.expand,
                     children: [
-                      Text(
-                        video.title.isEmpty ? 'Untitled video' : video.title,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: context.textPrimary,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                          height: 1.25,
-                        ),
-                      ),
+                      _buildThumbnail(context),
 
-                      const SizedBox(height: 3),
-
-                      Text(
-                        '${video.creator} • ${video.views} • ${video.uploaded}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: context.textSecondary,
-                          fontSize: 12,
+                      // Autoplaying Muted Preview layer
+                      if (_isPlayingPreview &&
+                          _previewController != null &&
+                          _previewController!.value.isInitialized)
+                        Positioned.fill(
+                          child: FittedBox(
+                            fit: BoxFit.cover,
+                            clipBehavior: Clip.hardEdge,
+                            child: SizedBox(
+                              width: _previewController!.value.size.width,
+                              height: _previewController!.value.size.height,
+                              child: VideoPlayer(_previewController!),
+                            ),
+                          ),
                         ),
-                      ),
+
+                      // Duration badge (hidden during active video preview)
+                      if (video.duration.isNotEmpty && !_isPlayingPreview)
+                        Positioned(
+                          right: 8,
+                          bottom: 8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 3,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.85),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              video.duration,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
+                          ),
+                        ),
+
+                      if (video.videoId.isNotEmpty && !_isPlayingPreview)
+                        Positioned(
+                          top: 8,
+                          left: 8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: AppColors.brandOrange.withValues(alpha: 0.9),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'NEW',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                          ),
+                        ),
+
+                      // Live preview indicator badge
+                      if (_isPlayingPreview)
+                        Positioned(
+                          top: 8,
+                          right: 8,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withValues(alpha: 0.7),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.volume_off, size: 11, color: Colors.white70),
+                                SizedBox(width: 3),
+                                Text(
+                                  'PREVIEW',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                     ],
                   ),
                 ),
+              ),
 
-                // More options icon
-                if (video.videoId.isNotEmpty)
+              const SizedBox(height: 10),
+
+              // Video information
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
                   Container(
-                    margin: const EdgeInsets.only(left: 6),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: context.borderSubtle),
+                      border: Border.all(color: context.borderSubtle, width: 1),
                     ),
-                    child: IconButton(
-                      padding: const EdgeInsets.all(6),
-                      constraints: const BoxConstraints(),
-                      icon: Icon(Icons.more_vert, size: 18, color: context.textSecondary),
-                      onPressed: () => showVideoOptionsSheet(context, video),
+                    child: _buildAvatar(context),
+                  ),
+
+                  const SizedBox(width: 10),
+
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          video.title.isEmpty ? 'Untitled video' : video.title,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: context.textPrimary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            height: 1.25,
+                          ),
+                        ),
+
+                        const SizedBox(height: 3),
+
+                        Text(
+                          ' •  • ',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            color: context.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                const SizedBox(width: 46),
-                _buildFeedbackButton(context, Icons.thumb_up_outlined, Icons.thumb_up_alt, 'Interested', 'interested'),
-                const SizedBox(width: 8),
-                _buildFeedbackButton(context, Icons.thumb_down_outlined, Icons.thumb_down_alt, 'Not Interested', 'not_interested'),
-              ],
-            ),
-          ],
+
+                  // More options icon
+                  if (video.videoId.isNotEmpty)
+                    Container(
+                      margin: const EdgeInsets.only(left: 6),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(color: context.borderSubtle),
+                      ),
+                      child: IconButton(
+                        padding: const EdgeInsets.all(6),
+                        constraints: const BoxConstraints(),
+                        icon: Icon(Icons.more_vert, size: 18, color: context.textSecondary),
+                        onPressed: () => showVideoOptionsSheet(context, video),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const SizedBox(width: 46),
+                  _buildFeedbackButton(context, Icons.thumb_up_outlined, Icons.thumb_up_alt, 'Interested', 'interested'),
+                  const SizedBox(width: 8),
+                  _buildFeedbackButton(context, Icons.thumb_down_outlined, Icons.thumb_down_alt, 'Not Interested', 'not_interested'),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -343,7 +500,7 @@ class _VideoCardState extends ConsumerState<VideoCard> {
       size: 38,
       isVerified: video.verified,
       onTap: video.uploaderUsername != null && video.uploaderUsername!.isNotEmpty
-          ? () => context.push('/channel/${Uri.encodeComponent(video.uploaderUsername!)}')
+          ? () => context.push('/channel/')
           : null,
     );
   }

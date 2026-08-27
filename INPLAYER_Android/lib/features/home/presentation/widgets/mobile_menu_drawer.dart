@@ -186,14 +186,6 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                       },
                     ),
                     _buildMenuItem(
-                      icon: Icons.play_arrow_rounded,
-                      title: 'Raftaar',
-                      onTap: () {
-                        Navigator.pop(context);
-                        context.go('/shorts');
-                      },
-                    ),
-                    _buildMenuItem(
                       icon: Icons.sports_esports_outlined,
                       title: 'InJoy',
                       onTap: () {
@@ -269,14 +261,6 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                     if (user != null) ...[
                       _buildDivider(),
                       _buildSectionHeader('YOU'),
-                      _buildMenuItem(
-                        icon: Icons.account_circle_outlined,
-                        title: 'Your Channel',
-                        onTap: () {
-                          Navigator.pop(context);
-                          context.push('/my-videos');
-                        },
-                      ),
                       _buildMenuItem(
                         icon: Icons.playlist_play_rounded,
                         title: 'Playlists',
@@ -538,7 +522,19 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                       },
                     ),
 
-                    const SizedBox(height: 24),
+                    const SizedBox(height: 18),
+                    Center(
+                      child: Text(
+                        '© 2026 Homox Prime Pvt Ltd',
+                        style: TextStyle(
+                          color: context.textDim,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
                   ],
                 ),
               ),

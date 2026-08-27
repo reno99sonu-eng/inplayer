@@ -1,4 +1,4 @@
-﻿import 'dart:ui';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -105,15 +105,6 @@ class ProfileMenuModal extends ConsumerWidget {
                       onTap: () {
                         Navigator.pop(context);
                         context.push('/my-videos');
-                      },
-                    ),
-                    _buildItem(
-                      context: context,
-                      icon: Icons.person_outline_rounded,
-                      label: 'My Profile',
-                      onTap: () {
-                        Navigator.pop(context);
-                        context.push('/profile');
                       },
                     ),
                     _buildItem(

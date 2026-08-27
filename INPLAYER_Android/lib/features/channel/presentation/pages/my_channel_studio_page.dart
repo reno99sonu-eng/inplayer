@@ -416,6 +416,26 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                 toolbarHeight: 64,
                 title: Row(
                   children: [
+                    GestureDetector(
+                      onTap: () {
+                        if (context.canPop()) {
+                          context.pop();
+                        } else {
+                          context.go('/');
+                        }
+                      },
+                      child: Container(
+                        width: 38,
+                        height: 38,
+                        margin: const EdgeInsets.only(right: 8),
+                        decoration: BoxDecoration(
+                          color: context.isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04),
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(color: context.borderSubtle),
+                        ),
+                        child: Icon(Icons.arrow_back_rounded, color: context.textPrimary, size: 20),
+                      ),
+                    ),
                     Builder(
                       builder: (ctx) => GestureDetector(
                         onTap: () => Scaffold.of(ctx).openDrawer(),
@@ -432,12 +452,16 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                         ),
                       ),
                     ),
-                    Text(
-                      'Your Channel Studio',
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.w900,
-                        color: context.textPrimary,
+                    Expanded(
+                      child: Text(
+                        'Your Channel Studio',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w900,
+                          color: context.textPrimary,
+                        ),
                       ),
                     ),
                   ],

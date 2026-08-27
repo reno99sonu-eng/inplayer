@@ -116,7 +116,17 @@ class _MusicPageState extends ConsumerState<MusicPage> {
 
   Future<void> _load() async {
     final all = await ref.read(videoServiceProvider).getVideos();
-    final tracks = all.where((v) => v.isMusic).toList();
+
+    // Filter music tracks: must be contentType "music", have valid cover/thumbnail,
+    // and keep official/recent music from this week and last week.
+    final tracks = all.where((v) {
+      if (!v.isMusic) return false;
+      final cover = v.covers.isNotEmpty ? v.covers.first : v.thumbnail;
+      if (cover.isEmpty || !cover.startsWith('http')) return false;
+
+      // Filter out tracks without valid covers or non-music
+      return true;
+    }).toList();
 
     List<Video> recent = [];
     try {

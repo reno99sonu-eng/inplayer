@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
 
@@ -10,6 +11,7 @@ final authStateProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthService _authService;
   final _logger = Logger();
+  static const _cachedNameKey = 'inplayer:cached_user_name';
 
   AuthNotifier(this._authService) : super(const AuthState.initial()) {
     _init();
@@ -23,6 +25,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (isSignedIn) {
         final user = await _authService.getCurrentUser();
         if (user != null) {
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.setString(_cachedNameKey, user.name);
           state = AuthState.authenticated(user);
         } else {
           state = const AuthState.unauthenticated();
@@ -42,6 +46,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final result = await _authService.signIn(email: email, password: password);
 
     if (result.success && result.user != null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_cachedNameKey, result.user!.name);
       state = AuthState.authenticated(result.user!);
       return true;
     } else {
@@ -56,6 +62,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final result = await _authService.signInWithGoogle();
 
     if (result.success && result.user != null) {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_cachedNameKey, result.user!.name);
       state = AuthState.authenticated(result.user!);
       return true;
     } else {

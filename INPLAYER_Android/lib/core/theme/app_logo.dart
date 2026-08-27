@@ -106,8 +106,8 @@ class _AppNavbarLogoState extends State<AppNavbarLogo> {
       onTap: _handleTap,
       behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
-        duration: const Duration(milliseconds: 900),
-        curve: Curves.easeInOutCubic,
+        duration: const Duration(milliseconds: 1600),
+        curve: Curves.easeInOutCubicEmphasized,
         width: _isRolledOut ? fullWidth : compactWidth,
         height: widget.height,
         clipBehavior: Clip.hardEdge,

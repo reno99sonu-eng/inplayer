@@ -331,22 +331,46 @@ class _SearchPageState extends ConsumerState<SearchPage> {
   }
 
   Widget _buildSearchField() {
-    return Container(
+    final isDark = context.isDark;
+    final isFocused = _focusNode.hasFocus;
+
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
       height: 44,
       decoration: BoxDecoration(
-        color: context.bgCard,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: context.borderSubtle),
+        color: (isDark ? const Color(0xFF0F172A) : Colors.white).withValues(alpha: 0.90),
+        borderRadius: BorderRadius.circular(22),
+        border: Border.all(
+          color: isFocused
+              ? AppColors.brandOrange
+              : (isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.08)),
+          width: isFocused ? 1.4 : 1.0,
+        ),
+        boxShadow: isFocused
+            ? [
+                BoxShadow(
+                  color: AppColors.brandOrange.withValues(alpha: isDark ? 0.25 : 0.15),
+                  blurRadius: 16,
+                  spreadRadius: 1,
+                ),
+              ]
+            : [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.05),
+                  blurRadius: 10,
+                  offset: const Offset(0, 2),
+                ),
+              ],
       ),
       child: Row(
         children: [
-          const SizedBox(width: 12),
+          const SizedBox(width: 14),
           Icon(
-            Icons.search,
+            Icons.search_rounded,
             size: 20,
-            color: context.textDim,
+            color: isFocused ? AppColors.brandOrange : context.textDim,
           ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 10),
           Expanded(
             child: TextField(
               controller: _searchController,
@@ -359,35 +383,44 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                 border: InputBorder.none,
                 hintStyle: TextStyle(
                   color: context.textDim,
+                  fontSize: 13.5,
                 ),
               ),
               style: TextStyle(
                 color: context.textPrimary,
-                fontWeight: FontWeight.w500,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
               ),
               onSubmitted: _performSearch,
               onChanged: _onQueryChanged,
             ),
           ),
-          IconButton(
-            icon: Icon(
-              _isListening ? Icons.mic : Icons.mic_none,
-              size: 20,
-              color: _isListening ? AppColors.brandOrange : context.textDim,
-            ),
-            onPressed: _toggleVoiceSearch,
-          ),
           if (_searchController.text.isNotEmpty)
             IconButton(
               icon: Icon(
-                Icons.close,
+                Icons.close_rounded,
                 size: 18,
-                color: context.textDim,
+                color: context.textSecondary,
               ),
               onPressed: _clearSearch,
-            )
-          else
-            const SizedBox(width: 12),
+            ),
+          Container(
+            margin: const EdgeInsets.only(right: 6),
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: _isListening
+                  ? AppColors.brandOrange.withValues(alpha: 0.2)
+                  : Colors.transparent,
+            ),
+            child: IconButton(
+              icon: Icon(
+                _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
+                size: 20,
+                color: _isListening ? AppColors.brandOrange : context.textSecondary,
+              ),
+              onPressed: _toggleVoiceSearch,
+            ),
+          ),
         ],
       ),
     );

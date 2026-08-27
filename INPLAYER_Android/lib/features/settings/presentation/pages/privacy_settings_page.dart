@@ -1,9 +1,10 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/pattern_background.dart';
 import '../../../../providers/auth_provider.dart';
+import '../../../../services/biometric_lock_service.dart';
 import '../../../../services/settings_service.dart';
 
 class PrivacySettingsPage extends ConsumerStatefulWidget {
@@ -144,6 +145,100 @@ class _PrivacySettingsPageState extends ConsumerState<PrivacySettingsPage> {
                 ),
               );
             }),
+
+            const SizedBox(height: 16),
+            Divider(color: context.borderSubtle),
+            const SizedBox(height: 16),
+
+            Text(
+              'App Security & Passkeys',
+              style: TextStyle(
+                color: AppColors.brandOrange,
+                fontSize: 11.5,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 1.2,
+              ),
+            ),
+            const SizedBox(height: 10),
+
+            Consumer(
+              builder: (context, ref, _) {
+                final lockState = ref.watch(biometricLockProvider);
+                final lockNotifier = ref.read(biometricLockProvider.notifier);
+
+                return Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: context.bgCard,
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: lockState.isEnabled
+                          ? AppColors.brandOrange.withValues(alpha: 0.5)
+                          : context.borderSubtle,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 44,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: lockState.isEnabled
+                              ? AppColors.brandOrange.withValues(alpha: 0.15)
+                              : context.textPrimary.withValues(alpha: 0.05),
+                        ),
+                        child: Icon(
+                          Icons.fingerprint_rounded,
+                          color: lockState.isEnabled ? AppColors.brandOrange : context.textDim,
+                          size: 24,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Passkey & Fingerprint Lock',
+                              style: TextStyle(
+                                color: context.textPrimary,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              lockState.isEnabled
+                                  ? 'Biometric lock is ACTIVE upon launch'
+                                  : 'Require biometric or device passkey to open app',
+                              style: TextStyle(
+                                color: context.textSecondary,
+                                fontSize: 11.5,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Switch.adaptive(
+                        value: lockState.isEnabled,
+                        activeColor: AppColors.brandOrange,
+                        onChanged: (val) async {
+                          final success = await lockNotifier.setEnabled(val);
+                          if (!success && mounted && val) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text('Biometric verification cancelled or unavailable'),
+                              ),
+                            );
+                          }
+                        },
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
           ],
         ),
       ),

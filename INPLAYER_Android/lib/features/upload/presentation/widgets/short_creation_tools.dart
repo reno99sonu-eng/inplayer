@@ -1,6 +1,8 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:audioplayers/audioplayers.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -139,6 +141,7 @@ class _ShortCreationToolsState extends ConsumerState<ShortCreationTools> {
         if (_tab == 0) _buildLocalCatalogue(context),
         if (_tab == 1) _buildSearch(context),
         if (_tab == 2) _buildCustomLink(context),
+        if (_tab == 3) _buildLocalAudioPicker(context),
 
         // Clip length is meaningless for a Video (it loops the track for the
         // whole runtime) and for music, so it only appears for a Short —
@@ -235,7 +238,7 @@ class _ShortCreationToolsState extends ConsumerState<ShortCreationTools> {
   }
 
   Widget _buildTabs(BuildContext context) {
-    const labels = ['InPlayer', 'Search music', 'Your link'];
+    const labels = ['InPlayer', 'Search music', 'Your link', 'Upload (29s)'];
     return Row(
       children: List.generate(labels.length, (i) {
         final active = _tab == i;
@@ -243,14 +246,14 @@ class _ShortCreationToolsState extends ConsumerState<ShortCreationTools> {
           child: GestureDetector(
             onTap: () => setState(() => _tab = i),
             child: Container(
-              margin: EdgeInsets.only(right: i < labels.length - 1 ? 6 : 0),
-              padding: const EdgeInsets.symmetric(vertical: 8),
+              margin: EdgeInsets.only(right: i < labels.length - 1 ? 4 : 0),
+              padding: const EdgeInsets.symmetric(vertical: 7),
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 color: active
                     ? AppColors.brandOrange.withValues(alpha: 0.15)
                     : context.textPrimary.withValues(alpha: 0.03),
-                borderRadius: BorderRadius.circular(10),
+                borderRadius: BorderRadius.circular(8),
                 border: Border.all(
                   color: active
                       ? AppColors.brandOrange.withValues(alpha: 0.4)
@@ -259,11 +262,13 @@ class _ShortCreationToolsState extends ConsumerState<ShortCreationTools> {
               ),
               child: Text(
                 labels[i],
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   color: active
                       ? AppColors.brandOrangeLight
                       : context.textSecondary,
-                  fontSize: 11.5,
+                  fontSize: 10.5,
                   fontWeight: FontWeight.w800,
                 ),
               ),
@@ -424,6 +429,76 @@ class _ShortCreationToolsState extends ConsumerState<ShortCreationTools> {
           'InPlayer has no licence for audio you supply, so playback is '
           'capped at ${customAudioMaxSeconds}s and wraps back to the start. '
           'Only use audio you have the right to use.',
+          style: TextStyle(color: context.textDim, fontSize: 10.5, height: 1.4),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLocalAudioPicker(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () async {
+            try {
+              final result = await FilePicker.platform.pickFiles(
+                type: FileType.custom,
+                allowedExtensions: ['mp3', 'wav', 'm4a', 'aac', 'ogg', 'flac'],
+              );
+              if (result != null && result.files.single.path != null) {
+                final file = File(result.files.single.path!);
+                final name = result.files.single.name;
+                final track = ResolvedSoundtrack(
+                  id: 'local_${DateTime.now().millisecondsSinceEpoch}',
+                  title: name.replaceAll(RegExp(r'\.[a-zA-Z0-9]+$'), ''),
+                  artist: 'Your device audio',
+                  url: file.uri.toString(),
+                  durationSeconds: customAudioMaxSeconds.toDouble(),
+                  source: SoundtrackSource.custom,
+                );
+                _pick(track);
+              }
+            } catch (e) {
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('Failed to pick audio: $e')),
+                );
+              }
+            }
+          },
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+            decoration: BoxDecoration(
+              color: context.bgCard,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: AppColors.brandOrange.withValues(alpha: 0.4),
+                style: BorderStyle.solid,
+                width: 1.5,
+              ),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(Icons.audio_file_rounded, color: AppColors.brandOrange, size: 24),
+                const SizedBox(width: 12),
+                Text(
+                  'Choose Audio file from device (29s max)',
+                  style: TextStyle(
+                    color: context.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 6),
+        Text(
+          'Upload your own voiceover or sound (capped at 29s per InPlayer terms).',
           style: TextStyle(color: context.textDim, fontSize: 10.5, height: 1.4),
         ),
       ],

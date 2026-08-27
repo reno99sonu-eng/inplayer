@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import 'ai_studio_modal.dart';
@@ -108,54 +108,51 @@ class _FloatingAIButtonState extends State<FloatingAIButton>
             onTapCancel: () => _tapController.reverse(),
             child: ScaleTransition(
               scale: _scaleAnimation,
-              child: Container(
-                width: 56,
-                height: 56,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: isDark
-                        ? const [Color(0xFF1B2435), Color(0xFF0B1020)]
-                        : const [Color(0xFFFDF8EC), Color(0xFFF0E3C6)],
-                  ),
-                  border: Border.all(
-                    color: isDark
-                        ? AppColors.brandOrange.withValues(alpha: _pulseAnimation.value)
-                        : AppColors.brandOrange.withValues(alpha: _pulseAnimation.value * 0.9),
-                    width: 1.5,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(22),
+                child: Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: (isDark ? const Color(0xFF0F172A) : Colors.white).withValues(alpha: 0.75),
+                    border: Border.all(
                       color: isDark
-                          ? const Color(0xFFFFAA00).withValues(alpha: 0.35)
-                          : const Color(0xFFEA580C).withValues(alpha: 0.28),
-                      blurRadius: 32,
-                      spreadRadius: 2,
+                          ? AppColors.brandOrange.withValues(alpha: _pulseAnimation.value * 0.8)
+                          : AppColors.brandOrange.withValues(alpha: _pulseAnimation.value * 0.7),
+                      width: 1.2,
                     ),
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: isDark ? 0.4 : 0.15),
-                      blurRadius: 10,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Center(
-                  child: Text(
-                    '✦',
-                    style: TextStyle(
-                      color: isDark ? const Color(0xFFFCD34D) : const Color(0xFFF97316),
-                      fontSize: 26,
-                      fontWeight: FontWeight.w900,
-                      shadows: [
-                        Shadow(
-                          color: isDark
-                              ? const Color(0xFFFFAA00).withValues(alpha: 0.6)
-                              : const Color(0xFFEA580C).withValues(alpha: 0.4),
-                          blurRadius: 10,
-                        ),
-                      ],
+                    boxShadow: [
+                      BoxShadow(
+                        color: isDark
+                            ? const Color(0xFFFFAA00).withValues(alpha: 0.22)
+                            : const Color(0xFFEA580C).withValues(alpha: 0.18),
+                        blurRadius: 18,
+                        spreadRadius: 1,
+                      ),
+                      BoxShadow(
+                        color: Colors.black.withValues(alpha: isDark ? 0.3 : 0.08),
+                        blurRadius: 8,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
+                  ),
+                  child: Center(
+                    child: Text(
+                      '✦',
+                      style: TextStyle(
+                        color: isDark ? const Color(0xFFFCD34D) : const Color(0xFFF97316),
+                        fontSize: 20,
+                        fontWeight: FontWeight.w900,
+                        shadows: [
+                          Shadow(
+                            color: isDark
+                                ? const Color(0xFFFFAA00).withValues(alpha: 0.5)
+                                : const Color(0xFFEA580C).withValues(alpha: 0.3),
+                            blurRadius: 8,
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),

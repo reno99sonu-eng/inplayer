@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:audioplayers/audioplayers.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../providers/auth_provider.dart';
@@ -32,10 +33,12 @@ class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
   AudioPlayer? _audioPlayer;
   Timer? _fallbackTimer;
   bool _isVisible = true;
+  String? _cachedUserName;
 
   @override
   void initState() {
     super.initState();
+    _loadCachedName();
 
     // Single unified master controller for rock-solid 60/120fps sync.
     // All the Interval() curves below are expressed as fractions of this
@@ -168,6 +171,16 @@ class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
     });
   }
 
+  Future<void> _loadCachedName() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final name = prefs.getString('inplayer:cached_user_name');
+      if (name != null && name.isNotEmpty && mounted) {
+        setState(() => _cachedUserName = name);
+      }
+    } catch (_) {}
+  }
+
   @override
   void dispose() {
     _fallbackTimer?.cancel();
@@ -190,7 +203,11 @@ class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
     final isDark = context.isDark;
     final authState = ref.watch(authStateProvider);
     final user = authState is AuthStateAuthenticated ? authState.user : null;
-    final greeting = 'Good ${_getGreeting()}${user != null && user.name.isNotEmpty ? ', ${user.name}' : ''}';
+    final effectiveName = (user != null && user.name.isNotEmpty)
+        ? user.name
+        : (_cachedUserName ?? '');
+
+    final greeting = 'Good ${_getGreeting()}${effectiveName.isNotEmpty ? ', $effectiveName' : ''}';
 
     return AnimatedBuilder(
       animation: _masterController,

@@ -4,6 +4,7 @@ import 'package:just_audio_background/just_audio_background.dart';
 import 'core/theme/app_theme.dart';
 import 'core/router/app_router.dart';
 import 'features/auth/presentation/screens/splash_screen.dart';
+import 'features/auth/presentation/screens/biometric_lock_screen.dart';
 import 'providers/theme_provider.dart';
 import 'services/video_service.dart';
 import 'models/video.dart';
@@ -71,6 +72,7 @@ class InplayerApp extends ConsumerWidget {
           children: [
             ?child,
             const SplashScreenOverlay(),
+            const BiometricLockScreen(),
           ],
         );
       },

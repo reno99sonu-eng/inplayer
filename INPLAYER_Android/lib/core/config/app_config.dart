@@ -17,6 +17,6 @@ class AppConfig {
   static const String cognitoUserPoolClientId = '1ckejhd5mp3oohgsfuqseeda5t';
   static const String cognitoRegion = 'ap-south-1';
 
-  // Optional: OAuth domain for Google sign-in
-  static const String? cognitoDomain = null; // Set to your domain if configured
+  // OAuth domain for Google sign-in / Hosted UI
+  static const String? cognitoDomain = 'ap-south-1orihwadfn.auth.ap-south-1.amazoncognito.com';
 }

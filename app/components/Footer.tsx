@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Mail, ChevronDown, Copy, Check } from "lucide-react";
 import NavbarLogo from "./NavbarLogo";
@@ -16,11 +17,11 @@ const browse = [
 ];
 
 const company = [
-  "About",
-  "Careers",
-  "Support",
-  "Privacy",
-  "Terms",
+  { label: "About", href: "/settings?tab=about" },
+  { label: "Privacy Policy", href: "/privacy" },
+  { label: "Terms of Service", href: "/terms" },
+  { label: "HamMart Vendor Terms", href: "/hammart-vendor-terms" },
+  { label: "Help & Support", href: "/help" },
 ];
 
 export default function Footer() {
@@ -108,10 +109,13 @@ export default function Footer() {
 
             <ul className="mt-1.5 space-y-1 lg:mt-3 lg:space-y-2">
               {company.map((item) => (
-                <li key={item}>
-                  <button className="text-xs text-slate-400 transition hover:text-orange-300 hover:translate-x-1 lg:text-base light:text-slate-600 light:hover:text-orange-600">
-                    {item}
-                  </button>
+                <li key={item.label}>
+                  <Link
+                    href={item.href}
+                    className="block text-xs text-slate-400 transition hover:text-orange-300 hover:translate-x-1 lg:text-base light:text-slate-600 light:hover:text-orange-600"
+                  >
+                    {item.label}
+                  </Link>
                 </li>
               ))}
             </ul>

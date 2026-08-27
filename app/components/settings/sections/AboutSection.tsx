@@ -61,6 +61,13 @@ export default function AboutSection() {
           />
 
           <SettingsRow
+            icon={<FileText size={20} />}
+            title="HamMart Vendor Terms"
+            description="Terms & Conditions for HamMart sellers and vendors."
+            onClick={() => router.push("/hammart-vendor-terms")}
+          />
+
+          <SettingsRow
             icon={<Lock size={20} />}
             title="Privacy Policy"
             description="What data we collect and your rights over it."

@@ -346,12 +346,18 @@ export default function UploadPage() {
     setProgress(0);
 
     try {
-      const session = await fetchAuthSession();
-      const idToken = session.tokens?.idToken?.toString();
+      let session = await fetchAuthSession().catch(() => null);
+      let idToken = session?.tokens?.idToken?.toString();
+
+      if (!idToken) {
+        session = await fetchAuthSession({ forceRefresh: true }).catch(() => null);
+        idToken = session?.tokens?.idToken?.toString();
+      }
 
       if (!idToken) {
         setError("Your session has expired. Please sign in again.");
         setStage("error");
+        setPublishing(false);
         return;
       }
 
@@ -385,17 +391,19 @@ export default function UploadPage() {
             covers: musicSettings.covers,
             coverIntervalSeconds: musicSettings.coverIntervalSeconds,
             lyrics: musicSettings.lyrics,
+            genre: musicSettings.genre,
             audioSha256: musicSettings.audioSha256,
             declaredOwnership: musicSettings.declaredOwnership,
           }),
         }),
       });
 
-      const createData = await createRes.json();
+      const createData = await createRes.json().catch(() => null);
 
       if (!createRes.ok) {
-        setError(createData.error || "Couldn't start the upload. Please try again.");
+        setError(createData?.error || "Couldn't start the upload. Please check your connection and try again.");
         setStage("error");
+        setPublishing(false);
         return;
       }
 
@@ -404,7 +412,7 @@ export default function UploadPage() {
 
       // Upload the media file directly to Mux with retry logic to handle
       // flaky mobile connections gracefully.
-      const uploadWithRetry = async (retries = 2): Promise<void> => {
+      const uploadWithRetry = async (retries = 3): Promise<void> => {
         for (let attempt = 0; attempt <= retries; attempt++) {
           try {
             await new Promise<void>((resolve, reject) => {
@@ -421,13 +429,13 @@ export default function UploadPage() {
                 if (xhr.status >= 200 && xhr.status < 300) {
                   resolve();
                 } else {
-                  reject(new Error(`Upload failed with status ${xhr.status}`));
+                  reject(new Error(`Upload failed with status ${xhr.status}: ${xhr.statusText || 'Server rejected'}`));
                 }
               };
 
-              xhr.onerror = () => reject(new Error("Network error during upload"));
-              xhr.ontimeout = () => reject(new Error("Upload timed out"));
-              xhr.timeout = 180000; // 3 minute timeout
+              xhr.onerror = () => reject(new Error("Network connection dropped during upload. Please check your internet connection."));
+              xhr.ontimeout = () => reject(new Error("Upload timed out. Try uploading on a faster connection or Wi-Fi."));
+              xhr.timeout = 300000; // 5 minute timeout for larger files
 
               xhr.send(file);
             });
@@ -446,7 +454,7 @@ export default function UploadPage() {
       setPublishing(false);
     } catch (err) {
       console.error("Upload error:", err);
-      setError(`Something went wrong uploading your video: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setError(`Upload issue: ${err instanceof Error ? err.message : 'Unknown error'}. Please try again.`);
       setStage("error");
       setPublishing(false);
     }

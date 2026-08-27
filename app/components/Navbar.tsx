@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, Suspense } from "react";
+import Link from "next/link";
 import { fetchAuthSession } from "aws-amplify/auth";
 import NavbarLogo from "./NavbarLogo";
 import NavbarLinks from "./NavbarLinks";
@@ -1065,15 +1066,42 @@ lg:right-auto
                   Company
                 </h4>
                 <ul className="mt-2 space-y-1.5">
-                {["About", "Privacy", "Terms"].map(
-                    (item) => (
-                      <li key={item}>
-                        <button className="text-xs text-slate-400 light:text-slate-600 transition hover:text-orange-300 light:hover:text-orange-600">
-                          {item}
-                        </button>
-                      </li>
-                    )
-                  )}
+                  <li>
+                    <Link
+                      href="/settings?tab=about"
+                      onClick={() => setMenuOpen(false)}
+                      className="block text-xs text-slate-400 light:text-slate-600 transition hover:text-orange-300 light:hover:text-orange-600"
+                    >
+                      About
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      href="/privacy"
+                      onClick={() => setMenuOpen(false)}
+                      className="block text-xs text-slate-400 light:text-slate-600 transition hover:text-orange-300 light:hover:text-orange-600"
+                    >
+                      Privacy Policy
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      href="/terms"
+                      onClick={() => setMenuOpen(false)}
+                      className="block text-xs text-slate-400 light:text-slate-600 transition hover:text-orange-300 light:hover:text-orange-600"
+                    >
+                      Terms of Service
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      href="/hammart-vendor-terms"
+                      onClick={() => setMenuOpen(false)}
+                      className="block text-xs text-slate-400 light:text-slate-600 transition hover:text-orange-300 light:hover:text-orange-600"
+                    >
+                      HamMart Vendor Terms
+                    </Link>
+                  </li>
                 </ul>
               </div>
             </div>

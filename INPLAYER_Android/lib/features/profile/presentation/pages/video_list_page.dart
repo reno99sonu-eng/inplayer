@@ -1,12 +1,11 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/pattern_background.dart';
 import '../../../../models/video.dart';
 import '../../../home/presentation/widgets/video_card.dart';
 
-/// Generic "list of full Video objects" profile screen — backs My Videos
-/// and Liked Videos, which both return real `Video` records (just from
-/// different endpoints) and only differ in title/empty-state copy/loader.
 class VideoListPage extends ConsumerStatefulWidget {
   final String title;
   final IconData emptyIcon;
@@ -47,57 +46,61 @@ class _VideoListPageState extends ConsumerState<VideoListPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(
-        backgroundColor: AppColors.backgroundDark,
-        elevation: 0,
-        title: Text(
-          widget.title,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimaryDark,
+    return PatternBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: context.bgCanvas.withValues(alpha: 0.95),
+          elevation: 0,
+          iconTheme: IconThemeData(color: context.textPrimary),
+          title: Text(
+            widget.title,
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              color: context.textPrimary,
+              letterSpacing: -0.5,
+            ),
           ),
         ),
-      ),
-      body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppColors.brandOrange),
-            )
-          : RefreshIndicator(
-              color: AppColors.brandOrange,
-              backgroundColor: AppColors.surfaceDark,
-              onRefresh: _load,
-              child: _videos.isEmpty
-                  ? ListView(
-                      children: [
-                        SizedBox(
-                          height: MediaQuery.of(context).size.height * 0.6,
-                          child: Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(widget.emptyIcon,
-                                    size: 48, color: AppColors.textSecondaryDark),
-                                const SizedBox(height: 16),
-                                Text(
-                                  widget.emptyMessage,
-                                  style: const TextStyle(
-                                      color: AppColors.textSecondaryDark),
-                                ),
-                              ],
+        body: _loading
+            ? const Center(
+                child: CircularProgressIndicator(color: AppColors.brandOrange),
+              )
+            : RefreshIndicator(
+                color: AppColors.brandOrange,
+                backgroundColor: context.bgCard,
+                onRefresh: _load,
+                child: _videos.isEmpty
+                    ? ListView(
+                        children: [
+                          SizedBox(
+                            height: MediaQuery.of(context).size.height * 0.6,
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(widget.emptyIcon,
+                                      size: 48, color: context.textDim),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    widget.emptyMessage,
+                                    style: TextStyle(
+                                        color: context.textSecondary),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
-                        ),
-                      ],
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.all(16),
-                      itemCount: _videos.length,
-                      separatorBuilder: (context, index) => const SizedBox(height: 24),
-                      itemBuilder: (context, index) => VideoCard(video: _videos[index]),
-                    ),
-            ),
+                        ],
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.all(16),
+                        itemCount: _videos.length,
+                        separatorBuilder: (context, index) => const SizedBox(height: 24),
+                        itemBuilder: (context, index) => VideoCard(video: _videos[index]),
+                      ),
+              ),
+      ),
     );
   }
 }

@@ -50,6 +50,12 @@ class Short {
         ? shortSettings['soundtrack']
         : json['soundtrack'];
 
+    final playbackId = json['muxPlaybackId']?.toString();
+    String rawPoster = json['poster']?.toString() ?? json['thumbnailUrl']?.toString() ?? json['thumbnail']?.toString() ?? '';
+    if (rawPoster.trim().isEmpty && playbackId != null && playbackId.isNotEmpty) {
+      rawPoster = 'https://image.mux.com/$playbackId/thumbnail.webp?width=640&height=1138&fit_mode=smartcrop&time=1';
+    }
+
     return Short(
       id: json['id']?.toString() ?? json['videoId']?.toString() ?? '',
       videoId: json['videoId']?.toString() ?? '',
@@ -60,7 +66,7 @@ class Short {
       uploaderAvatarUrl: json['uploaderAvatarUrl'] != null
           ? _resolveUrl(json['uploaderAvatarUrl'])
           : null,
-      poster: _resolveUrl(json['poster'] ?? json['thumbnailUrl'] ?? ''),
+      poster: _resolveUrl(rawPoster),
       views: _formatViews(json['views'] ?? 0),
       // `likeCount`/`commentCount` are the real raw field names on a video
       // item; `likes`/`comments` are kept as a fallback in case a future

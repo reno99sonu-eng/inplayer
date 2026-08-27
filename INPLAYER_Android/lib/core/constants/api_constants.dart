@@ -27,6 +27,13 @@ class ApiConstants {
   // Search
   static const String search = '/api/search';
 
+  // Live search-as-you-type suggestions (lightweight autocomplete —
+  // videoId/title/thumbnail/contentType only, not full Video objects; see
+  // video_service.dart's getSuggestions()). searchVideos() below still uses
+  // '/api/videos' + a client-side filter for the full results grid — this
+  // is a separate, additive endpoint just for the typeahead dropdown.
+  static const String videoSuggest = '/api/videos/suggest';
+
   // Channels
   //
   // `/api/creators` is the paginated "browse everyone" list (cursor-only,
@@ -39,6 +46,20 @@ class ApiConstants {
   static const String creators = '/api/creators';
   static const String users = '/api/users';
   static const String subscriptionsList = '/api/subscriptions/list';
+
+  // Content access — the platform-wide 18+ / Kids-only audience control
+  // (Settings > Content Access on the website, app/api/content-access/
+  // route.ts). GET returns {mode, hasPasskey} and works signed-out too
+  // (mode defaults to "family" — 18+ hidden — until a passkey unlocks
+  // something else). POST branches on an `action` field:
+  //   set_mode      { mode, passkey }              -> unlock a mode
+  //   set_passkey   { passkey, currentPasskey? }    -> create/change the passkey
+  //   reset_mode    {}                              -> back to "family", no passkey needed
+  // The mode itself is carried by the server in an HttpOnly `inplayer-
+  // audience` cookie set only after the passkey verifies — see
+  // dio_client.dart, which sends that exact cookie name back on every
+  // request from the value ContentAccessService caches locally.
+  static const String contentAccess = '/api/content-access';
 
   // Subscribing/unsubscribing is NOT a separate REST path — there is no
   // `/api/subscriptions/subscribe` or `/api/subscriptions/unsubscribe` on
@@ -126,4 +147,38 @@ class ApiConstants {
   // own app/api/upload/create/route.ts and app/upload/page.tsx — there is
   // no `/api/upload/complete` route on the backend.
   static const String uploadCreate = '/api/upload/create';
+
+  // Premium / memberships
+  //
+  // GET premiumMe -> { premium, premiumUntil, maxResolution } — the signed-
+  // in viewer's own real subscription status (app/hooks/usePremium.ts).
+  // GET membershipStatus?creatorId= -> { isActive, status } — whether the
+  // viewer has an active channel membership with one specific creator.
+  // Neither endpoint moves money — the actual purchase/checkout still only
+  // exists on the website (Razorpay), so both are read-only status calls;
+  // see websiteOrigin below for the honest link-out to the real flow.
+  static const String premiumMe = '/api/premium/me';
+  static const String membershipStatus = '/api/memberships/status';
+
+  // Recommendation feedback (Interested / Not Interested) and content
+  // reports — the watch-page and video-card "⋮ More options" menu.
+  static const String videoFeedback = '/api/video-feedback';
+  static const String reports = '/api/reports';
+
+  // Ads
+  //
+  // GET ads?placement= -> { source: 'off'|'house'|'adsense', creative,
+  // creatives }. 'house' creatives (Reno's own promos) render and track
+  // natively; 'adsense' is deliberately not built here — it needs a native
+  // Google Mobile Ads SDK this Android-folder-only pass can't add — so an
+  // 'adsense' response is treated the same as 'off'.
+  // POST ads { adId, event: 'impression'|'click' } — fire-and-forget.
+  static const String ads = '/api/ads';
+
+  // The real website — used only for the small set of actions this app
+  // honestly can't complete natively yet (Razorpay checkout for Premium/
+  // memberships, InJoy games, Sponsorships): the app shows real, live
+  // status fetched from the API above, and only the actual money-moving or
+  // unbuildable step opens this URL instead of faking it.
+  static const String websiteOrigin = 'https://inplayer.in';
 }

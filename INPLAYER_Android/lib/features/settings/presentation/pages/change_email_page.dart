@@ -1,6 +1,8 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/pattern_background.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../services/auth_service.dart';
 
@@ -82,9 +84,9 @@ class _ChangeEmailPageState extends ConsumerState<ChangeEmailPage> {
     final newEmail = _emailController.text.trim();
     ref.read(authStateProvider.notifier).updateLocalUser((u) => u.copyWith(email: newEmail));
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Email updated.'),
-        backgroundColor: AppColors.surfaceDark,
+      SnackBar(
+        content: const Text('Email updated.'),
+        backgroundColor: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
       ),
     );
     Navigator.of(context).pop();
@@ -92,74 +94,79 @@ class _ChangeEmailPageState extends ConsumerState<ChangeEmailPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(
-        backgroundColor: AppColors.backgroundDark,
-        elevation: 0,
-        title: const Text('Email Settings',
-            style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimaryDark)),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          if (!_awaitingCode) ...[
-            const Text('New email address',
-                style: TextStyle(
-                    color: AppColors.textSecondaryDark,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700)),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _emailController,
-              keyboardType: TextInputType.emailAddress,
-              style: const TextStyle(color: AppColors.textPrimaryDark),
-              decoration: _fieldDecoration('you@example.com'),
-            ),
-          ] else ...[
-            Text(
-              'We sent a verification code to ${_emailController.text.trim()}. Enter it below to confirm the change.',
-              style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 13),
-            ),
-            const SizedBox(height: 16),
-            const Text('Verification code',
-                style: TextStyle(
-                    color: AppColors.textSecondaryDark,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700)),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _codeController,
-              keyboardType: TextInputType.number,
-              style: const TextStyle(color: AppColors.textPrimaryDark),
-              decoration: _fieldDecoration('123456'),
-            ),
-          ],
-          if (_error != null) ...[
-            const SizedBox(height: 12),
-            Text(_error!, style: const TextStyle(color: AppColors.error, fontSize: 13)),
-          ],
-          const SizedBox(height: 24),
-          SizedBox(
-            width: double.infinity,
-            height: 48,
-            child: ElevatedButton(
-              onPressed: _saving ? null : (_awaitingCode ? _confirmCode : _requestChange),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.brandOrange,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-              ),
-              child: _saving
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                          strokeWidth: 2, valueColor: AlwaysStoppedAnimation(Colors.white)))
-                  : Text(_awaitingCode ? 'Confirm' : 'Send Verification Code',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
-            ),
+    return PatternBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: context.bgCanvas.withValues(alpha: 0.95),
+          elevation: 0,
+          iconTheme: IconThemeData(color: context.textPrimary),
+          title: Text(
+            'Email Settings',
+            style: TextStyle(fontWeight: FontWeight.w800, color: context.textPrimary, letterSpacing: -0.5),
           ),
-        ],
+        ),
+        body: ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
+            if (!_awaitingCode) ...[
+              Text('New email address',
+                  style: TextStyle(
+                      color: context.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _emailController,
+                keyboardType: TextInputType.emailAddress,
+                style: TextStyle(color: context.textPrimary),
+                decoration: _fieldDecoration('you@example.com'),
+              ),
+            ] else ...[
+              Text(
+                'We sent a verification code to ${_emailController.text.trim()}. Enter it below to confirm the change.',
+                style: TextStyle(color: context.textSecondary, fontSize: 13),
+              ),
+              const SizedBox(height: 16),
+              Text('Verification code',
+                  style: TextStyle(
+                      color: context.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700)),
+              const SizedBox(height: 8),
+              TextField(
+                controller: _codeController,
+                keyboardType: TextInputType.number,
+                style: TextStyle(color: context.textPrimary),
+                decoration: _fieldDecoration('123456'),
+              ),
+            ],
+            if (_error != null) ...[
+              const SizedBox(height: 12),
+              Text(_error!, style: const TextStyle(color: AppColors.error, fontSize: 13)),
+            ],
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              height: 48,
+              child: ElevatedButton(
+                onPressed: _saving ? null : (_awaitingCode ? _confirmCode : _requestChange),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.brandOrange,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                child: _saving
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                            strokeWidth: 2, valueColor: AlwaysStoppedAnimation(Colors.white)))
+                    : Text(_awaitingCode ? 'Confirm' : 'Send Verification Code',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700)),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -167,12 +174,20 @@ class _ChangeEmailPageState extends ConsumerState<ChangeEmailPage> {
   InputDecoration _fieldDecoration(String hint) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: const TextStyle(color: AppColors.textSecondaryDark),
+      hintStyle: TextStyle(color: context.textDim),
       filled: true,
-      fillColor: Colors.white.withValues(alpha: 0.05),
+      fillColor: context.bgCard,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
+        borderSide: BorderSide(color: context.borderSubtle),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: context.borderSubtle),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.brandOrange, width: 1.5),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
     );

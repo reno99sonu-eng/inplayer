@@ -75,7 +75,7 @@ class PlaylistService {
           'playlistId': playlistId,
           'videoId': videoId,
           'member': member,
-          if (name != null) 'name': name,
+          'name': ?name,
         },
       );
       return response.statusCode == 200;

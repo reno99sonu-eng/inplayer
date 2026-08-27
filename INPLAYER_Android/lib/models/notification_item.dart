@@ -1,15 +1,20 @@
 /// One row from GET /api/notifications (app/api/notifications/route.ts).
-/// `type` is one of 'subscribe' | 'like' | 'comment' | 'comment_reply' —
-/// see app/api/subscriptions, app/api/likes, app/api/comments for who
-/// writes each kind. `message` is already a complete, ready-to-render
-/// sentence written server-side (e.g. "Jane subscribed to your channel"),
-/// so this model doesn't need to reconstruct copy client-side.
+/// `type` is one of 'subscribe' | 'like' | 'comment' | 'comment_reply' |
+/// 'message' | 'message_request' | 'admin_announcement' | 'live_stream' —
+/// see app/api/subscriptions, app/api/likes, app/api/comments, and
+/// app/lib/notifications.ts for who writes each kind. `message` is already
+/// a complete, ready-to-render sentence written server-side (e.g. "Jane
+/// subscribed to your channel"), so this model doesn't need to reconstruct
+/// copy client-side. `conversationId` is only present on 'message' /
+/// 'message_request' rows — it's what the bell uses to route a tap to the
+/// right conversation (matches the website's NavbarActions.tsx exactly).
 class NotificationItem {
   final String userId;
   final String notificationId;
   final String type;
   final String message;
   final String? videoId;
+  final String? conversationId;
   final bool read;
   final String createdAt;
 
@@ -19,6 +24,7 @@ class NotificationItem {
     required this.type,
     required this.message,
     this.videoId,
+    this.conversationId,
     this.read = false,
     required this.createdAt,
   });
@@ -30,6 +36,7 @@ class NotificationItem {
       type: json['type']?.toString() ?? '',
       message: json['message']?.toString() ?? '',
       videoId: json['videoId'] as String?,
+      conversationId: json['conversationId'] as String?,
       read: json['read'] == true,
       createdAt: json['createdAt']?.toString() ?? '',
     );

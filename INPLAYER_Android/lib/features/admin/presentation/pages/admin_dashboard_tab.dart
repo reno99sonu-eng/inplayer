@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../services/admin_service.dart';
 import '../../../../models/admin_dashboard_stats.dart';
 
@@ -51,7 +52,7 @@ class _AdminDashboardTabState extends ConsumerState<AdminDashboardTab> {
           children: [
             const Icon(Icons.error_outline, color: AppColors.error, size: 48),
             const SizedBox(height: 12),
-            const Text('Failed to load dashboard stats', style: TextStyle(color: AppColors.textSecondaryDark)),
+            Text('Failed to load dashboard stats', style: TextStyle(color: context.textSecondary)),
             const SizedBox(height: 12),
             ElevatedButton(onPressed: _load, child: const Text('Retry')),
           ],
@@ -63,13 +64,14 @@ class _AdminDashboardTabState extends ConsumerState<AdminDashboardTab> {
       (icon: Icons.people, label: 'Total Users', value: _formatCount(stats.totalUsers)),
       (icon: Icons.movie_outlined, label: 'Videos', value: _formatCount(stats.totalVideos)),
       (icon: Icons.play_circle_outline, label: 'Shorts', value: _formatCount(stats.totalShorts)),
+      (icon: Icons.library_music_outlined, label: 'Music Tracks', value: _formatCount(stats.totalMusic)),
       (icon: Icons.visibility_outlined, label: 'Total Views', value: _formatCount(stats.totalViews)),
       (icon: Icons.hourglass_top, label: 'Processing', value: _formatCount(stats.processingCount)),
     ];
 
     return RefreshIndicator(
       color: AppColors.brandOrange,
-      backgroundColor: AppColors.surfaceDark,
+      backgroundColor: context.bgCard,
       onRefresh: _load,
       child: ListView(
         padding: const EdgeInsets.all(16),
@@ -84,29 +86,33 @@ class _AdminDashboardTabState extends ConsumerState<AdminDashboardTab> {
             children: cards.map((c) => _StatCard(icon: c.icon, label: c.label, value: c.value)).toList(),
           ),
           const SizedBox(height: 12),
-          Card(
-            color: AppColors.cardDark,
+          Container(
+            decoration: BoxDecoration(
+              color: context.bgCard,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: context.borderSubtle),
+            ),
             child: ListTile(
               leading: Icon(
                 Icons.flag_outlined,
-                color: stats.reportsTableMissing ? AppColors.textSecondaryDark : AppColors.brandOrange,
+                color: stats.reportsTableMissing ? context.textDim : AppColors.brandOrange,
               ),
               title: Text(
                 stats.reportsTableMissing ? 'Reports not set up yet' : 'Pending Reports',
-                style: const TextStyle(color: AppColors.textPrimaryDark),
+                style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.w600),
               ),
               subtitle: stats.reportsTableMissing
-                  ? const Text(
+                  ? Text(
                       "The reports table hasn't been created in AWS yet.",
-                      style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 12),
+                      style: TextStyle(color: context.textSecondary, fontSize: 12),
                     )
                   : null,
               trailing: stats.reportsTableMissing
                   ? null
                   : Text(
                       '${stats.pendingReports}',
-                      style: const TextStyle(
-                        color: AppColors.textPrimaryDark,
+                      style: TextStyle(
+                        color: context.textPrimary,
                         fontWeight: FontWeight.bold,
                         fontSize: 18,
                       ),
@@ -131,8 +137,9 @@ class _StatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.cardDark,
+        color: context.bgCard,
         borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: context.borderSubtle),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -141,11 +148,11 @@ class _StatCard extends StatelessWidget {
           Icon(icon, color: AppColors.brandOrange, size: 22),
           Text(
             value,
-            style: const TextStyle(color: AppColors.textPrimaryDark, fontWeight: FontWeight.bold, fontSize: 20),
+            style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.bold, fontSize: 20),
           ),
           Text(
             label,
-            style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 12),
+            style: TextStyle(color: context.textSecondary, fontSize: 12),
           ),
         ],
       ),

@@ -3,6 +3,7 @@ import { docClient } from "./dynamodb";
 import { getMuxThumbnailUrl } from "./muxThumbnail";
 import { getVisibleVideos } from "./contentAccessServer";
 import { ensureUsername } from "./ensureUsername";
+import { isMusicType } from "./contentTypes";
 
 const DAILY_VIEWS_TABLE = "InPlayer-Video-Daily-Views";
 
@@ -91,6 +92,7 @@ async function rankByWindow(
       if (
         !video ||
         video.contentType === "short" ||
+        isMusicType(video.contentType) ||
         (video.visibility && video.visibility !== "public")
       ) {
         return null;
@@ -101,9 +103,6 @@ async function rankByWindow(
         title: video.title as string,
         uploaderName: (video.uploaderName as string) || "Unknown",
         uploaderAvatarUrl: (video.uploaderAvatarUrl as string) || null,
-        // Current uploads persist this field at video.asset.ready. Derive it
-        // from the playback ID too, so ready videos created before that field
-        // existed do not fall back to the avatar.
         thumbnailUrl: resolveThumbnailUrl(video),
         windowViews,
       };
@@ -185,6 +184,35 @@ export async function getTrendingCreators(
     });
   }
 
+  // Fallback / supplement: If active daily views have fewer than 10 creators,
+  // supplement from visible public longform videos (strictly excluding music/shorts)
+  // so the homefeed strip is always populated with real active creators.
+  if (creators.size < limit) {
+    try {
+      const allVideos = await getVisibleVideos();
+      for (const v of allVideos) {
+        if (
+          v.contentType === "short" ||
+          isMusicType(v.contentType) ||
+          (v.visibility && v.visibility !== "public") ||
+          !v.uploaderId
+        ) {
+          continue;
+        }
+        const uId = v.uploaderId as string;
+        const existing = creators.get(uId);
+        const views = (v.views as number) || 0;
+        creators.set(uId, {
+          name: existing?.name || (v.uploaderName as string) || "Unknown Creator",
+          avatarUrl: existing?.avatarUrl || (v.uploaderAvatarUrl as string) || null,
+          windowViews: (existing?.windowViews || 0) + views,
+        });
+      }
+    } catch (err) {
+      console.error("Failed to supplement trending creators:", err);
+    }
+  }
+
   const creatorIds = Array.from(creators.keys());
   if (creatorIds.length === 0) return [];
 
@@ -207,12 +235,6 @@ export async function getTrendingCreators(
     ])
   );
 
-  // A trending creator needs a real channel destination too. Without this,
-  // any profile that predates usernames (or never got a username reserved)
-  // silently vanished from the whole Trending Creators list below — the
-  // same failure mode getFeaturedThisWeek already guards against. Self-heal
-  // via the shared ensureUsername() so every creator with real views gets a
-  // working /u/[username] link, not just the ones that happened to have one.
   const missingUsernameIds = creatorIds.filter(
     (userId) => !(profiles.get(userId)?.username as string | undefined)
   );
@@ -251,24 +273,53 @@ export async function getTrendingCreators(
 }
 
 // "Featured Weekly" — a rolling trailing 7-day window (today + the 6
-// before it), not a fixed Mon-Sun bucket. That means the lineup can shift
-// a little every day rather than only flipping once a week, and it needs
-// no timezone-aware "start of week" math. DynamoDB can't Query across
-// multiple partition-key values in one call (date is the partition key),
-// so this is 7 parallel single-day Queries merged in memory — the same
-// fan-out idiom app/api/my-videos/analytics already uses for per-video
-// comment counts.
+// before it), not a fixed Mon-Sun bucket. Strictly non-music and non-short videos.
 export async function getFeaturedThisWeek(limit = 6): Promise<RankedVideo[]> {
   const days = Array.from({ length: 7 }, (_, i) => {
     const d = new Date();
     d.setUTCDate(d.getUTCDate() - i);
     return dateKey(d);
   });
-  // A weekly feature is creator-led and must have a channel destination.
-  // Video rows without an uploader cannot provide that experience.
-  const videos = (await rankByWindow(days, limit)).filter(
+  let videos = (await rankByWindow(days, limit)).filter(
     (video) => Boolean(video.uploaderId)
   );
+
+  // Fallback: If weekly views are empty, supplement with top public non-music videos
+  if (videos.length < limit) {
+    try {
+      const allVideos = await getVisibleVideos();
+      const nonMusic = allVideos
+        .filter(
+          (v) =>
+            v.contentType !== "short" &&
+            !isMusicType(v.contentType) &&
+            (!v.visibility || v.visibility === "public") &&
+            Boolean(v.uploaderId)
+        )
+        .sort((a, b) => ((b.views as number) || 0) - ((a.views as number) || 0));
+
+      const existingIds = new Set(videos.map((v) => v.videoId));
+      for (const v of nonMusic) {
+        const vid = v.videoId as string;
+        if (!existingIds.has(vid)) {
+          videos.push({
+            videoId: vid,
+            uploaderId: (v.uploaderId as string) || null,
+            title: v.title as string,
+            uploaderName: (v.uploaderName as string) || "Unknown",
+            uploaderAvatarUrl: (v.uploaderAvatarUrl as string) || null,
+            thumbnailUrl: resolveThumbnailUrl(v),
+            windowViews: (v.views as number) || 0,
+          });
+          existingIds.add(vid);
+          if (videos.length >= limit) break;
+        }
+      }
+    } catch (err) {
+      console.error("Failed to supplement featured weekly videos:", err);
+    }
+  }
+
   const userIds = Array.from(
     new Set(videos.map((video) => video.uploaderId).filter((id): id is string => Boolean(id)))
   );
@@ -290,10 +341,7 @@ export async function getFeaturedThisWeek(limit = 6): Promise<RankedVideo[]> {
       profile.username as string | undefined,
     ])
   );
-  // A channel is addressed by a reservation in InPlayer-Usernames, not just
-  // the username field on a profile. Reconcile every featured creator here:
-  // this repairs legacy rows with a display handle but no lookup entry before
-  // the Details button is rendered.
+
   const ensuredUsernames = await Promise.all(
     userIds.map(async (userId) => [userId, await ensureUsername(userId)] as const)
   );

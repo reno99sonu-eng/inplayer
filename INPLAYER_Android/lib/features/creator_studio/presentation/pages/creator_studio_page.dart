@@ -1,7 +1,9 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/pattern_background.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../services/video_service.dart';
 import '../../../../services/channel_service.dart';
@@ -54,8 +56,6 @@ class _CreatorStudioPageState extends ConsumerState<CreatorStudioPage> {
     });
   }
 
-  /// Video.views is already formatted (e.g. "1,204 views") rather than a
-  /// raw int, so the dashboard total is summed by stripping non-digits.
   int _parseViews(String formatted) {
     final digits = formatted.replaceAll(RegExp(r'[^0-9]'), '');
     return int.tryParse(digits) ?? 0;
@@ -69,102 +69,110 @@ class _CreatorStudioPageState extends ConsumerState<CreatorStudioPage> {
 
   void _showSnack(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: AppColors.surfaceDark),
+      SnackBar(
+        content: Text(message),
+        backgroundColor: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+      ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(
-        backgroundColor: AppColors.backgroundDark,
-        title: const Text(
-          'Creator Studio',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimaryDark,
+    return PatternBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: context.bgCanvas.withValues(alpha: 0.95),
+          elevation: 0,
+          iconTheme: IconThemeData(color: context.textPrimary),
+          title: Text(
+            'Creator Studio',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              color: context.textPrimary,
+              letterSpacing: -0.5,
+            ),
           ),
         ),
-      ),
-      body: RefreshIndicator(
-        color: AppColors.brandOrange,
-        backgroundColor: AppColors.surfaceDark,
-        onRefresh: _load,
-        child: ListView(
-          children: [
-            _buildSectionHeader('Dashboard'),
-            _buildStatCard(
-              icon: Icons.play_circle,
-              title: 'Total Views',
-              value: _loading ? '—' : _formatCount(_totalViews),
-              onTap: () => context.push('/my-videos'),
-            ),
-            _buildStatCard(
-              icon: Icons.subscriptions,
-              title: 'Subscribers',
-              value: _loading ? '—' : _formatCount(_subscriberCount),
-              onTap: null,
-            ),
-            _buildStatCard(
-              icon: Icons.video_library,
-              title: 'Videos',
-              value: _loading ? '—' : '$_videoCount',
-              onTap: () => context.push('/my-videos'),
-            ),
-            const Divider(height: 1, color: AppColors.cardDark),
-            _buildSectionHeader('Content'),
-            _buildMenuItem(
-              icon: Icons.upload,
-              title: 'Upload Video',
-              onTap: () => context.push('/upload'),
-            ),
-            _buildMenuItem(
-              icon: Icons.podcasts,
-              title: 'Go Live',
-              onTap: () => context.push('/live'),
-            ),
-            _buildMenuItem(
-              icon: Icons.edit,
-              title: 'Manage Videos',
-              onTap: () => context.push('/my-videos'),
-            ),
-            _buildMenuItem(
-              icon: Icons.comment,
-              title: 'Comments',
-              onTap: () => _showSnack('Coming soon.'),
-              trailing: const Text('Coming soon',
-                  style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 12)),
-            ),
-            const Divider(height: 1, color: AppColors.cardDark),
-            _buildSectionHeader('Analytics'),
-            _buildMenuItem(
-              icon: Icons.bar_chart,
-              title: 'View Analytics',
-              onTap: () => _showSnack('Coming soon.'),
-              trailing: const Text('Coming soon',
-                  style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 12)),
-            ),
-            _buildMenuItem(
-              icon: Icons.trending_up,
-              title: 'Revenue',
-              onTap: () => _showSnack('Coming soon.'),
-              trailing: const Text('Coming soon',
-                  style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 12)),
-            ),
-            const Divider(height: 1, color: AppColors.cardDark),
-            _buildSectionHeader('Settings'),
-            _buildMenuItem(
-              icon: Icons.settings,
-              title: 'Channel Settings',
-              onTap: () => context.push('/settings/edit-profile'),
-            ),
-            _buildMenuItem(
-              icon: Icons.admin_panel_settings,
-              title: 'Admin Panel',
-              onTap: () => context.push('/admin'),
-            ),
-          ],
+        body: RefreshIndicator(
+          color: AppColors.brandOrange,
+          backgroundColor: context.bgCard,
+          onRefresh: _load,
+          child: ListView(
+            children: [
+              _buildSectionHeader('Dashboard'),
+              _buildStatCard(
+                icon: Icons.play_circle,
+                title: 'Total Views',
+                value: _loading ? '—' : _formatCount(_totalViews),
+                onTap: () => context.push('/my-videos'),
+              ),
+              _buildStatCard(
+                icon: Icons.subscriptions,
+                title: 'Subscribers',
+                value: _loading ? '—' : _formatCount(_subscriberCount),
+                onTap: null,
+              ),
+              _buildStatCard(
+                icon: Icons.video_library,
+                title: 'Videos',
+                value: _loading ? '—' : '$_videoCount',
+                onTap: () => context.push('/my-videos'),
+              ),
+              Divider(height: 1, color: context.borderSubtle),
+              _buildSectionHeader('Content'),
+              _buildMenuItem(
+                icon: Icons.upload,
+                title: 'Upload Video',
+                onTap: () => context.push('/upload'),
+              ),
+              _buildMenuItem(
+                icon: Icons.podcasts,
+                title: 'Go Live',
+                onTap: () => context.push('/live'),
+              ),
+              _buildMenuItem(
+                icon: Icons.edit,
+                title: 'Manage Videos',
+                onTap: () => context.push('/my-videos'),
+              ),
+              _buildMenuItem(
+                icon: Icons.comment,
+                title: 'Comments',
+                onTap: () => _showSnack('Coming soon.'),
+                trailing: Text('Coming soon',
+                    style: TextStyle(color: context.textDim, fontSize: 12)),
+              ),
+              Divider(height: 1, color: context.borderSubtle),
+              _buildSectionHeader('Analytics'),
+              _buildMenuItem(
+                icon: Icons.bar_chart,
+                title: 'View Analytics',
+                onTap: () => _showSnack('Coming soon.'),
+                trailing: Text('Coming soon',
+                    style: TextStyle(color: context.textDim, fontSize: 12)),
+              ),
+              _buildMenuItem(
+                icon: Icons.trending_up,
+                title: 'Revenue',
+                onTap: () => _showSnack('Coming soon.'),
+                trailing: Text('Coming soon',
+                    style: TextStyle(color: context.textDim, fontSize: 12)),
+              ),
+              Divider(height: 1, color: context.borderSubtle),
+              _buildSectionHeader('Settings'),
+              _buildMenuItem(
+                icon: Icons.settings,
+                title: 'Channel Settings',
+                onTap: () => context.push('/settings/edit-profile'),
+              ),
+              _buildMenuItem(
+                icon: Icons.admin_panel_settings,
+                title: 'Admin Panel',
+                onTap: () => context.push('/admin'),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -190,19 +198,23 @@ class _CreatorStudioPageState extends ConsumerState<CreatorStudioPage> {
     required String value,
     required VoidCallback? onTap,
   }) {
-    return Card(
-      color: AppColors.cardDark,
+    return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      decoration: BoxDecoration(
+        color: context.bgCard,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: context.borderSubtle),
+      ),
       child: ListTile(
         leading: Icon(icon, color: AppColors.brandOrange),
         title: Text(
           title,
-          style: const TextStyle(color: AppColors.textPrimaryDark),
+          style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.w600),
         ),
         trailing: Text(
           value,
-          style: const TextStyle(
-            color: AppColors.textPrimaryDark,
+          style: TextStyle(
+            color: context.textPrimary,
             fontWeight: FontWeight.bold,
             fontSize: 18,
           ),
@@ -219,13 +231,13 @@ class _CreatorStudioPageState extends ConsumerState<CreatorStudioPage> {
     Widget? trailing,
   }) {
     return ListTile(
-      leading: Icon(icon, color: AppColors.textPrimaryDark),
+      leading: Icon(icon, color: context.textPrimary),
       title: Text(
         title,
-        style: const TextStyle(color: AppColors.textPrimaryDark),
+        style: TextStyle(color: context.textPrimary),
       ),
       trailing: trailing ??
-          const Icon(Icons.chevron_right, color: AppColors.textSecondaryDark),
+          Icon(Icons.chevron_right, color: context.textDim),
       onTap: onTap,
     );
   }

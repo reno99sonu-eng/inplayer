@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/time_utils.dart';
 import '../../../../services/admin_service.dart';
 import '../../../../models/moderation_item.dart';
@@ -15,12 +16,12 @@ class AdminModerationTab extends StatelessWidget {
       child: Column(
         children: [
           Container(
-            color: AppColors.backgroundDark,
-            child: const TabBar(
+            color: context.bgCanvas,
+            child: TabBar(
               indicatorColor: AppColors.brandOrange,
               labelColor: AppColors.brandOrange,
-              unselectedLabelColor: AppColors.textSecondaryDark,
-              tabs: [
+              unselectedLabelColor: context.textSecondary,
+              tabs: const [
                 Tab(text: 'Reports'),
                 Tab(text: 'Auto-flagged'),
                 Tab(text: 'Strikes'),

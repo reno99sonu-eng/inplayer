@@ -1,15 +1,13 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/pattern_background.dart';
 import '../../../../core/utils/image_utils.dart';
 import '../../../../services/hammart_service.dart';
 import '../../../../models/hammart_cart_item.dart';
 
-/// HamMart cart — real items against GET/PATCH/DELETE
-/// /api/hammart/cart[/{productId}]. Checkout (payment) isn't wired up
-/// yet, so this page says so honestly instead of pretending a "Pay now"
-/// button works.
 class CartPage extends ConsumerStatefulWidget {
   const CartPage({super.key});
 
@@ -95,114 +93,116 @@ class _CartPageState extends ConsumerState<CartPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(
-        backgroundColor: AppColors.backgroundDark,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () => context.pop(),
+    return PatternBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: context.bgCanvas.withValues(alpha: 0.95),
+          elevation: 0,
+          surfaceTintColor: Colors.transparent,
+          leading: IconButton(
+            icon: Icon(Icons.arrow_back, color: context.textPrimary),
+            onPressed: () => context.pop(),
+          ),
+          title: Text(
+            'Your Cart',
+            style: TextStyle(color: context.textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
+          ),
         ),
-        title: const Text(
-          'Your Cart',
-          style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-        ),
-      ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator(color: AppColors.brandOrange))
-          : _tableMissing
-              ? const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Text(
-                      "HamMart isn't fully set up yet. Please check back shortly.",
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 13),
+        body: _loading
+            ? const Center(child: CircularProgressIndicator(color: AppColors.brandOrange))
+            : _tableMissing
+                ? Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        "HamMart isn't fully set up yet. Please check back shortly.",
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: context.textSecondary, fontSize: 13),
+                      ),
                     ),
-                  ),
-                )
-              : _items.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.shopping_cart_outlined, size: 56, color: Colors.white.withValues(alpha: 0.3)),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Your cart is empty',
-                            style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 14, fontWeight: FontWeight.w600),
+                  )
+                : _items.isEmpty
+                    ? Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.shopping_cart_outlined, size: 56, color: context.textDim),
+                            const SizedBox(height: 16),
+                            Text(
+                              'Your cart is empty',
+                              style: TextStyle(color: context.textSecondary, fontSize: 14, fontWeight: FontWeight.w600),
+                            ),
+                            const SizedBox(height: 16),
+                            TextButton(
+                              onPressed: () => context.pop(),
+                              child: const Text('Browse HamMart', style: TextStyle(color: AppColors.brandOrange)),
+                            ),
+                          ],
+                        ),
+                      )
+                    : RefreshIndicator(
+                        color: AppColors.brandOrange,
+                        backgroundColor: context.bgCard,
+                        onRefresh: _load,
+                        child: ListView.separated(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: _items.length,
+                          separatorBuilder: (context, index) => const SizedBox(height: 12),
+                          itemBuilder: (context, index) => _CartTile(
+                            item: _items[index],
+                            busy: _busyIds.contains(_items[index].productId),
+                            onQuantityChanged: (q) => _updateQuantity(_items[index], q),
+                            onRemove: () => _remove(_items[index]),
                           ),
-                          const SizedBox(height: 16),
-                          TextButton(
-                            onPressed: () => context.pop(),
-                            child: const Text('Browse HamMart', style: TextStyle(color: AppColors.brandOrange)),
+                        ),
+                      ),
+        bottomNavigationBar: (_loading || _tableMissing || _items.isEmpty)
+            ? null
+            : SafeArea(
+                child: Container(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+                  decoration: BoxDecoration(
+                    color: context.bgNavbar,
+                    border: Border(top: BorderSide(color: context.borderSubtle)),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text('Total', style: TextStyle(color: context.textSecondary, fontSize: 13)),
+                          Text(
+                            '₹$_total',
+                            style: TextStyle(color: context.textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
                           ),
                         ],
                       ),
-                    )
-                  : RefreshIndicator(
-                      color: AppColors.brandOrange,
-                      backgroundColor: AppColors.surfaceDark,
-                      onRefresh: _load,
-                      child: ListView.separated(
-                        padding: const EdgeInsets.all(16),
-                        itemCount: _items.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 12),
-                        itemBuilder: (context, index) => _CartTile(
-                          item: _items[index],
-                          busy: _busyIds.contains(_items[index].productId),
-                          onQuantityChanged: (q) => _updateQuantity(_items[index], q),
-                          onRemove: () => _remove(_items[index]),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton(
+                          onPressed: () {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text("Checkout isn't available yet — we're still wiring up payments.")),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.brandOrange,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            elevation: 0,
+                          ),
+                          child: const Text('Checkout — coming soon', style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
                       ),
-                    ),
-      bottomNavigationBar: (_loading || _tableMissing || _items.isEmpty)
-          ? null
-          : SafeArea(
-              child: Container(
-                padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
-                decoration: BoxDecoration(
-                  color: AppColors.surfaceDark,
-                  border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.08))),
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text('Total', style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 13)),
-                        Text(
-                          '₹$_total',
-                          style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 10),
-                    SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text("Checkout isn't available yet — we're still wiring up payments.")),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white.withValues(alpha: 0.08),
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                          elevation: 0,
-                        ),
-                        child: const Text('Checkout — coming soon', style: TextStyle(fontWeight: FontWeight.bold)),
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
-            ),
+      ),
     );
   }
 }
@@ -228,7 +228,11 @@ class _CartTile extends StatelessWidget {
       opacity: item.unavailable ? 0.5 : 1.0,
       child: Container(
         padding: const EdgeInsets.all(10),
-        decoration: BoxDecoration(color: AppColors.cardDark, borderRadius: BorderRadius.circular(14)),
+        decoration: BoxDecoration(
+          color: context.bgCard,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: context.borderSubtle),
+        ),
         child: Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -237,10 +241,10 @@ class _CartTile extends StatelessWidget {
               child: Container(
                 width: 72,
                 height: 72,
-                color: AppColors.surfaceDark,
+                color: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
                 child: image != null
                     ? Image(image: image, fit: BoxFit.cover)
-                    : const Icon(Icons.shopping_bag_outlined, color: AppColors.textSecondaryDark),
+                    : Icon(Icons.shopping_bag_outlined, color: context.textDim),
               ),
             ),
             const SizedBox(width: 12),
@@ -252,7 +256,7 @@ class _CartTile extends StatelessWidget {
                     product?.title ?? 'Product no longer available',
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w600),
+                    style: TextStyle(color: context.textPrimary, fontSize: 14, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 4),
                   if (item.unavailable)
@@ -281,7 +285,7 @@ class _CartTile extends StatelessWidget {
                                     height: 12,
                                     child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.brandOrange),
                                   )
-                                : Text('${item.quantity}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                : Text('${item.quantity}', style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.bold)),
                           ),
                         ),
                         _QtyButton(
@@ -295,7 +299,7 @@ class _CartTile extends StatelessWidget {
               ),
             ),
             IconButton(
-              icon: const Icon(Icons.delete_outline, color: AppColors.textSecondaryDark, size: 20),
+              icon: Icon(Icons.delete_outline, color: context.textDim, size: 20),
               onPressed: busy ? null : onRemove,
             ),
           ],
@@ -318,10 +322,10 @@ class _QtyButton extends StatelessWidget {
         width: 26,
         height: 26,
         decoration: BoxDecoration(
-          color: Colors.white.withValues(alpha: onTap == null ? 0.02 : 0.06),
+          color: context.isDark ? Colors.white.withValues(alpha: onTap == null ? 0.02 : 0.06) : Colors.black.withValues(alpha: onTap == null ? 0.02 : 0.05),
           borderRadius: BorderRadius.circular(8),
         ),
-        child: Icon(icon, size: 14, color: onTap == null ? Colors.white.withValues(alpha: 0.2) : Colors.white),
+        child: Icon(icon, size: 14, color: onTap == null ? context.textDim.withValues(alpha: 0.3) : context.textPrimary),
       ),
     );
   }

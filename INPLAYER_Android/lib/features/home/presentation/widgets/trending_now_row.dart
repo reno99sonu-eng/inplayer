@@ -1,14 +1,26 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/user_avatar.dart';
 import '../../../../models/trending_creator.dart';
 import '../../../../services/video_service.dart';
-import 'package:intl/intl.dart';
 
 class TrendingNowRow extends ConsumerStatefulWidget {
-  const TrendingNowRow({super.key});
+  /// Bumped by the home feed on every pull-to-refresh.
+  ///
+  /// Without this the row fetched exactly once, in initState, and never
+  /// again — and because it lives inside HomePage's IndexedStack it is built
+  /// once and then kept alive for the whole session, so pull-to-refresh
+  /// reloaded the video feed around it while this row went on showing
+  /// whatever ranking happened to be current when the app was first opened.
+  /// The website's /api/trending is `force-dynamic` and recomputes today's
+  /// ranking on every single request, so a long-lived session could sit on a
+  /// ranking hours or days stale. That is the "trending creators not syncing
+  /// properly" report — the fetch and the parsing were both already correct.
+  final int refreshToken;
+
+  const TrendingNowRow({super.key, this.refreshToken = 0});
 
   @override
   ConsumerState<TrendingNowRow> createState() => _TrendingNowRowState();
@@ -22,6 +34,18 @@ class _TrendingNowRowState extends ConsumerState<TrendingNowRow> {
   void initState() {
     super.initState();
     _loadCreators();
+  }
+
+  @override
+  void didUpdateWidget(covariant TrendingNowRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.refreshToken != widget.refreshToken) {
+      // Deliberately does not flip _isLoading back to true: swapping a
+      // populated row out for shimmer placeholders on every pull-to-refresh
+      // reads as the content vanishing. The current creators stay on screen
+      // until the new ones land.
+      _loadCreators();
+    }
   }
 
   Future<void> _loadCreators() async {
@@ -66,29 +90,29 @@ class _TrendingNowRowState extends ConsumerState<TrendingNowRow> {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                 decoration: BoxDecoration(
-                  color: Colors.red.withValues(alpha: 0.1),
+                  color: Colors.red.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
+                  border: Border.all(color: Colors.red.withValues(alpha: 0.25)),
                 ),
                 child: const Text(
-                  'TRENDING NOW',
+                  '🔥 TRENDING NOW',
                   style: TextStyle(
                     color: Colors.redAccent,
                     fontSize: 9,
-                    fontWeight: FontWeight.bold,
+                    fontWeight: FontWeight.w800,
                     letterSpacing: 1.2,
                   ),
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 4),
-          const Text(
+          const SizedBox(height: 6),
+          Text(
             'Trending Creators',
             style: TextStyle(
-              color: Colors.white,
+              color: context.textPrimary,
               fontSize: 18,
               fontWeight: FontWeight.w900,
               letterSpacing: -0.5,
@@ -96,9 +120,9 @@ class _TrendingNowRowState extends ConsumerState<TrendingNowRow> {
           ),
           const SizedBox(height: 12),
           SizedBox(
-            height: 110,
+            height: 115,
             child: _isLoading
-                ? _buildLoading()
+                ? _buildLoading(context)
                 : ListView.builder(
                     scrollDirection: Axis.horizontal,
                     itemCount: _creators.length,
@@ -113,7 +137,7 @@ class _TrendingNowRowState extends ConsumerState<TrendingNowRow> {
     );
   }
 
-  Widget _buildLoading() {
+  Widget _buildLoading(BuildContext context) {
     return ListView.builder(
       scrollDirection: Axis.horizontal,
       itemCount: 5,
@@ -127,7 +151,7 @@ class _TrendingNowRowState extends ConsumerState<TrendingNowRow> {
                 width: 64,
                 height: 64,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.06),
+                  color: context.isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.06),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -136,7 +160,7 @@ class _TrendingNowRowState extends ConsumerState<TrendingNowRow> {
                 width: 48,
                 height: 8,
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.06),
+                  color: context.isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
@@ -150,8 +174,9 @@ class _TrendingNowRowState extends ConsumerState<TrendingNowRow> {
   Widget _buildCreatorCard(BuildContext context, TrendingCreator creator) {
     return GestureDetector(
       onTap: () {
-        // TODO: Navigate to creator channel
-        // context.push('/u/${Uri.encodeComponent(creator.username)}');
+        if (creator.username.isNotEmpty) {
+          context.push('/channel/${Uri.encodeComponent(creator.username)}');
+        }
       },
       child: Container(
         width: 80,
@@ -159,38 +184,11 @@ class _TrendingNowRowState extends ConsumerState<TrendingNowRow> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
-            Stack(
-              clipBehavior: Clip.none,
-              children: [
-                Container(
-                  width: 64,
-                  height: 64,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    image: DecorationImage(
-                      image: CachedNetworkImageProvider(creator.avatarUrl),
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                ),
-                if (creator.isVerified)
-                  Positioned(
-                    bottom: -2,
-                    right: -2,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: AppColors.backgroundDark,
-                        shape: BoxShape.circle,
-                      ),
-                      padding: const EdgeInsets.all(2),
-                      child: const Icon(
-                        Icons.verified,
-                        size: 16,
-                        color: AppColors.brandGold,
-                      ),
-                    ),
-                  ),
-              ],
+            UserAvatar(
+              avatarUrl: creator.avatarUrl,
+              name: creator.name,
+              size: 64,
+              isVerified: creator.isVerified,
             ),
             const SizedBox(height: 6),
             Text(
@@ -198,10 +196,10 @@ class _TrendingNowRowState extends ConsumerState<TrendingNowRow> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 11,
-                fontWeight: FontWeight.bold,
+              style: TextStyle(
+                color: context.textPrimary,
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(height: 2),
@@ -210,9 +208,9 @@ class _TrendingNowRowState extends ConsumerState<TrendingNowRow> {
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
               textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: AppColors.textSecondaryDark,
-                fontSize: 9.5,
+              style: TextStyle(
+                color: context.textSecondary,
+                fontSize: 9,
                 fontWeight: FontWeight.w500,
               ),
             ),

@@ -63,8 +63,25 @@ dependencies:
   # Video Player
   video_player: ^2.9.1
 
-  # Native share sheet — used by the Share action on the watch page.
-  share_plus: ^12.0.2
+  # Native share sheet — used by the Share action on the watch page and
+  # Raftaar/Shorts' share button. Bumped from ^7.2.2 (real "flutter pub get"
+  # dependency-solver failure this round: amplify_flutter's own transitive
+  # aws_common requirement moved to a version whose `mime` constraint
+  # conflicts with share_plus <10.0.3's older `mime` requirement — not
+  # caused by anything added this round, just the first time pub get was
+  # run since amplify_flutter/aws_common published newer patch releases).
+  # Deliberately pinned to 11.1.0 rather than the newest available (12.x/
+  # 13.x, which is what `flutter pub add share_plus` would suggest) —
+  # 12.0.0 is share_plus's own documented breaking bump to a much newer
+  # required Android toolchain (AGP >=8.12.1, Gradle wrapper >=8.13, Kotlin
+  # 2.2.0, Java 17), which risks breaking the build in a different way this
+  # environment has no way to verify against your actual local toolchain.
+  # 11.1.0 is the latest release before that bump, already satisfies the
+  # resolver (only needs share_plus >=10.0.3), and its `SharePlus.instance
+  # .share(ShareParams(...))` API — confirmed against the real 11.1.0 API
+  # docs — is byte-for-byte the same call shape already used in
+  # watch_page.dart's _share(), so no Dart code changes were needed here.
+  share_plus: ^11.1.0
 
   # Opens Help/Terms/Privacy Policy links (the real inplayer.in pages) from
   # Settings in an external browser / custom tab.
@@ -81,7 +98,80 @@ dependencies:
   # (app/upload/page.tsx). Uses the system photo/video picker, so no
   # storage permission handling is needed on our end.
   image_picker: ^1.1.2
+
+  # Voice search — mic button on the search screen. Handles the
+  # RECORD_AUDIO runtime permission prompt itself inside initialize()
+  # (Android + iOS), so no separate permission_handler dependency is
+  # needed. See android/app/src/main/AndroidManifest.xml for the
+  # accompanying permissions/<queries> entry this package requires.
+  speech_to_text: ^7.4.0
+
+  # Raw physical-device-orientation sensor stream — used only by
+  # FullscreenPlayerPage to auto-exit fullscreen when the phone is rotated
+  # back to portrait. Flutter's own WidgetsBindingObserver/MediaQuery size
+  # (used for the rotate-*in* half, see watch_page.dart) stops reflecting
+  # real device orientation once SystemChrome.setPreferredOrientations locks
+  # the rendered orientation to landscape, which is exactly the situation
+  # this package's sensor-backed stream is needed for. No special Android
+  # permission or manifest entry is required — it reads the same
+  # accelerometer/rotation-vector sensors any orientation-aware app already
+  # has access to.
+  native_device_orientation: ^2.1.1
+
+  # Raftaar/Shorts soundtrack playback (muted video + looping creator-chosen
+  # track) and the splash screen's short logo "sting" sound. Real, working
+  # `AudioPlayer`/`LoopMode` code using this package has existed in
+  # short_player_widget.dart and splash_screen.dart since Round 11 — but
+  # `just_audio` itself was never actually declared here, a gap this
+  # environment had no compiler to catch until `flutter analyze` surfaced it
+  # for the first time this round. Every call site (AudioPlayer(),
+  # setAsset(), setUrl(), setVolume(), setLoopMode(LoopMode.one), play(),
+  # dispose()) is a long-stable core API, unchanged across just_audio's
+  # version history, so no Dart code changes were needed — only this
+  # declaration.
   just_audio: ^0.10.6
+
+  # Lock-screen / notification media controls + real background playback for
+  # the new dedicated Music section (MusicPlayerService). Wraps just_audio
+  # with a MediaSession-backed AudioService so the OS keeps the player alive
+  # and shows transport controls outside the app. Requires
+  # JustAudioBackground.init(...) once in main.dart before runApp(), plus the
+  # foreground-service/media-button manifest entries added alongside this.
+  just_audio_background: ^0.0.1-beta.17
+
+  # Private on-device storage location for downloaded videos
+  # (download_manager.dart, Round 15). Same gap as just_audio above — real
+  # code using `getApplicationDocumentsDirectory()` has existed since Round
+  # 15, but the package was never declared directly (it was only resolving
+  # via some other package's transitive dependency, which `flutter analyze`
+  # flags as fragile even though it isn't broken today).
+  path_provider: ^2.1.6
+
+  # Separate, non-background audio engine used ONLY for the splash screen's
+  # one-shot logo "sting" and Raftaar/Shorts' muted-video soundtrack loop
+  # (splash_screen.dart, short_player_widget.dart). just_audio_background
+  # enforces a hard app-wide single-AudioPlayer-instance rule once
+  # JustAudioBackground.init() has run in main.dart — with MiniPlayerBar
+  # permanently mounted in home_page.dart's bottom nav since Round 22,
+  # MusicPlayerService now constructs its just_audio AudioPlayer on
+  # essentially the first frame, so any OTHER just_audio AudioPlayer
+  # instantiated anywhere else in the app (splash sting, Shorts soundtrack)
+  # throws `PlatformException(error, just_audio_background supports only a
+  # single player instance)` and crashes the app. audioplayers is a
+  # completely separate plugin/platform-channel with no such restriction, so
+  # moving those two non-background use cases onto it removes the collision
+  # entirely while leaving MusicPlayerService as the sole just_audio-based
+  # singleton. Version confirmed via pub.dev.
+  audioplayers: ^6.8.1
+
+  # SHA-256 fingerprint of a music upload's audio bytes, sent to the backend
+  # as `audioSha256` (upload_service.dart) for server-side duplicate-track
+  # detection — matches the website's own client-side hash in
+  # MusicUploadTools.tsx (a real gap found during the Round 24 upload-page
+  # parity audit: Android was uploading music with no fingerprint at all).
+  # Dart-team maintained, pure-Dart, no native deps — lowest-risk possible
+  # addition. Version confirmed via pub.dev.
+  crypto: ^3.0.7
 
 dev_dependencies:
   flutter_test:
@@ -95,6 +185,7 @@ flutter:
 
   assets:
     - assets/images/
+    - assets/sounds/
 
   # Uncomment and add font files to enable custom fonts
   # fonts:

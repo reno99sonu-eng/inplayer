@@ -1,6 +1,8 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/pattern_background.dart';
 import '../../../../services/playlist_service.dart';
 import '../../../../services/video_service.dart';
 import '../../../../models/video.dart';
@@ -38,9 +40,6 @@ class _PlaylistDetailPageState
   Future<void> _load() async {
     setState(() => _loading = true);
 
-    // /api/playlists only returns metadata + a videoIds set, not full
-    // video objects, so fetch the playlist's own row first, then hydrate
-    // each id via the same per-video lookup the watch page uses.
     final playlists =
         await ref.read(playlistServiceProvider).getPlaylists();
 
@@ -60,8 +59,6 @@ class _PlaylistDetailPageState
       return;
     }
 
-    // Keep a non-null reference so Dart's null-safety analysis
-    // remains valid across the asynchronous operation below.
     final playlist = match;
 
     final videoService = ref.read(videoServiceProvider);
@@ -98,9 +95,9 @@ class _PlaylistDetailPageState
       _load();
 
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Couldn't remove that video."),
-          backgroundColor: AppColors.surfaceDark,
+        SnackBar(
+          content: const Text("Couldn't remove that video."),
+          backgroundColor: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
         ),
       );
     }
@@ -108,65 +105,69 @@ class _PlaylistDetailPageState
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(
-        backgroundColor: AppColors.backgroundDark,
-        elevation: 0,
-        title: Text(
-          _name ?? 'Playlist',
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-            color: AppColors.textPrimaryDark,
+    return PatternBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: context.bgCanvas.withValues(alpha: 0.95),
+          elevation: 0,
+          iconTheme: IconThemeData(color: context.textPrimary),
+          title: Text(
+            _name ?? 'Playlist',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              color: context.textPrimary,
+              letterSpacing: -0.5,
+            ),
           ),
         ),
-      ),
-      body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(
-                color: AppColors.brandOrange,
-              ),
-            )
-          : _videos.isEmpty
-              ? const Center(
-                  child: Text(
-                    'No videos in this playlist yet',
-                    style: TextStyle(
-                      color: AppColors.textSecondaryDark,
+        body: _loading
+            ? const Center(
+                child: CircularProgressIndicator(
+                  color: AppColors.brandOrange,
+                ),
+              )
+            : _videos.isEmpty
+                ? Center(
+                    child: Text(
+                      'No videos in this playlist yet',
+                      style: TextStyle(
+                        color: context.textSecondary,
+                      ),
                     ),
-                  ),
-                )
-              : ListView.separated(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _videos.length,
-                  separatorBuilder: (context, index) =>
-                      const SizedBox(height: 24),
-                  itemBuilder: (context, index) {
-                    final video = _videos[index];
+                  )
+                : ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _videos.length,
+                    separatorBuilder: (context, index) =>
+                        const SizedBox(height: 24),
+                    itemBuilder: (context, index) {
+                      final video = _videos[index];
 
-                    return Stack(
-                      children: [
-                        VideoCard(video: video),
-                        Positioned(
-                          top: 0,
-                          right: 0,
-                          child: Material(
-                            color: Colors.black.withValues(alpha: 0.6),
-                            shape: const CircleBorder(),
-                            child: IconButton(
-                              icon: const Icon(
-                                Icons.close,
-                                size: 16,
-                                color: Colors.white,
+                      return Stack(
+                        children: [
+                          VideoCard(video: video),
+                          Positioned(
+                            top: 0,
+                            right: 0,
+                            child: Material(
+                              color: Colors.black.withValues(alpha: 0.6),
+                              shape: const CircleBorder(),
+                              child: IconButton(
+                                icon: const Icon(
+                                  Icons.close,
+                                  size: 16,
+                                  color: Colors.white,
+                                ),
+                                onPressed: () => _removeVideo(video),
                               ),
-                              onPressed: () => _removeVideo(video),
                             ),
                           ),
-                        ),
-                      ],
-                    );
-                  },
-                ),
+                        ],
+                      );
+                    },
+                  ),
+      ),
     );
   }
 }

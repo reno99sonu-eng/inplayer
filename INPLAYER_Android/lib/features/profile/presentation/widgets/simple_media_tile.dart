@@ -1,13 +1,9 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/image_utils.dart';
 
-/// A lightweight video row for screens backed by denormalized API rows
-/// (Watch History, Watchlist) rather than full `Video` objects — those
-/// endpoints only return {videoId, title, thumbnailUrl, ...a timestamp},
-/// not creator/views/duration, so this intentionally doesn't try to look
-/// like `VideoCard`.
 class SimpleMediaTile extends StatelessWidget {
   final String videoId;
   final String title;
@@ -44,11 +40,11 @@ class SimpleMediaTile extends StatelessWidget {
                 child: Container(
                   width: 120,
                   height: 68,
-                  color: AppColors.surfaceDark,
+                  color: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
                   child: provider != null
                       ? Image(image: provider, fit: BoxFit.cover)
-                      : const Icon(Icons.play_circle_outline,
-                          color: AppColors.textSecondaryDark, size: 28),
+                      : Icon(Icons.play_circle_outline,
+                          color: context.textDim, size: 28),
                 ),
               ),
               const SizedBox(width: 12),
@@ -60,8 +56,8 @@ class SimpleMediaTile extends StatelessWidget {
                       title.isEmpty ? 'Untitled video' : title,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: AppColors.textPrimaryDark,
+                      style: TextStyle(
+                        color: context.textPrimary,
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         height: 1.25,
@@ -70,8 +66,8 @@ class SimpleMediaTile extends StatelessWidget {
                     const SizedBox(height: 6),
                     Text(
                       timeLabel,
-                      style: const TextStyle(
-                        color: AppColors.textSecondaryDark,
+                      style: TextStyle(
+                        color: context.textSecondary,
                         fontSize: 12,
                       ),
                     ),
@@ -80,8 +76,8 @@ class SimpleMediaTile extends StatelessWidget {
               ),
               if (onRemove != null)
                 IconButton(
-                  icon: const Icon(Icons.close,
-                      size: 18, color: AppColors.textSecondaryDark),
+                  icon: Icon(Icons.close,
+                      size: 18, color: context.textDim),
                   onPressed: onRemove,
                 ),
             ],

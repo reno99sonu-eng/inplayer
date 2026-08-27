@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:video_player/video_player.dart';
 import '../../providers/auth_provider.dart';
 import '../../features/auth/presentation/pages/sign_in_page.dart';
 import '../../features/auth/presentation/pages/sign_up_page.dart';
@@ -17,7 +18,7 @@ import '../../features/settings/presentation/pages/settings_page.dart';
 import '../../features/messages/presentation/pages/messages_page.dart';
 import '../../features/messages/presentation/pages/new_message_page.dart';
 import '../../features/messages/presentation/pages/conversation_page.dart';
-import '../../features/creator_studio/presentation/pages/creator_studio_page.dart';
+import '../../features/channel/presentation/pages/my_channel_studio_page.dart';
 import '../../features/shop/presentation/pages/shop_page.dart';
 import '../../features/shop/presentation/pages/product_detail_page.dart';
 import '../../features/shop/presentation/pages/cart_page.dart';
@@ -32,16 +33,62 @@ import '../../features/settings/presentation/pages/edit_profile_page.dart';
 import '../../features/settings/presentation/pages/privacy_settings_page.dart';
 import '../../features/settings/presentation/pages/change_password_page.dart';
 import '../../features/settings/presentation/pages/change_email_page.dart';
+import '../../features/settings/presentation/pages/playback_settings_page.dart';
 import '../../features/admin/presentation/pages/admin_page.dart';
 import '../../features/live/presentation/pages/go_live_page.dart';
+import '../../features/downloads/presentation/pages/downloads_page.dart';
+import '../../features/settings/presentation/pages/content_access_page.dart';
+import '../../features/settings/presentation/pages/plans_purchases_page.dart';
+import '../../features/settings/presentation/pages/analytics_page.dart';
+import '../../features/settings/presentation/pages/storage_page.dart';
+import '../../features/discover/presentation/pages/discover_creators_page.dart';
+import '../../features/home/presentation/pages/category_videos_page.dart';
+import '../../features/music/presentation/pages/genre_page.dart';
+import '../../features/music/presentation/pages/liked_music_page.dart';
+import '../../features/settings/presentation/pages/contact_us_page.dart';
 import '../../services/video_service.dart';
 
+// Bridges authStateProvider's changes into a plain Listenable go_router can
+// react to via `refreshListenable`, WITHOUT the whole GoRouter being torn
+// down and rebuilt on every auth transition. Before this, routerProvider
+// used `ref.watch(authStateProvider)` directly inside its own builder —
+// since a Riverpod Provider re-runs its entire builder whenever a watched
+// value changes, that meant a brand-new GoRouter() (new Navigator, new
+// route/back-stack, the works) was constructed from scratch every single
+// time auth state changed — which happens at least once on every cold
+// start (AuthStateInitial -> AuthStateAuthenticated/Unauthenticated, once
+// AuthNotifier._init() resolves), and again on every sign-in/out. That's
+// exactly the kind of full widget-subtree churn that can make an app feel
+// slow/janky and can visibly disrupt whatever's on screen at the moment it
+// happens — including the splash overlay, which sits as a sibling of the
+// Router's own child in main.dart's MaterialApp.router builder.
+class _AuthRefreshNotifier extends ChangeNotifier {
+  _AuthRefreshNotifier(Ref ref) {
+    ref.listen<AuthState>(authStateProvider, (previous, next) => notifyListeners());
+  }
+}
+
+final _authRefreshNotifierProvider = Provider<_AuthRefreshNotifier>((ref) {
+  final notifier = _AuthRefreshNotifier(ref);
+  ref.onDispose(notifier.dispose);
+  return notifier;
+});
+
 final routerProvider = Provider<GoRouter>((ref) {
-  final authState = ref.watch(authStateProvider);
+  // Watching this (not authStateProvider itself) is what keeps GoRouter
+  // stable: _authRefreshNotifierProvider's own body has no watched
+  // dependencies, so it's built exactly once and never invalidates —
+  // routerProvider's builder only ever runs once per app lifetime now.
+  final refreshNotifier = ref.watch(_authRefreshNotifierProvider);
 
   return GoRouter(
     initialLocation: '/',
+    refreshListenable: refreshNotifier,
     redirect: (context, state) {
+      // Read (not watch) — this closure re-runs on every navigation AND
+      // every time refreshListenable fires, so it always sees the current
+      // auth state without needing routerProvider itself to rebuild.
+      final authState = ref.read(authStateProvider);
       final isAuthenticated = authState is AuthStateAuthenticated;
       final isVerificationPage = state.matchedLocation == '/verify';
       final isAuthPage =
@@ -53,14 +100,26 @@ final routerProvider = Provider<GoRouter>((ref) {
         return '/verify?email=${authState.email}';
       }
 
-      // If not authenticated and trying to access protected routes
-      if (!isAuthenticated && !isAuthPage && !isVerificationPage) {
-        return '/signin';
-      }
-
-      // If authenticated and trying to access auth pages
+      // If authenticated and trying to access auth pages, go to home
       if (isAuthenticated && isAuthPage) {
         return '/';
+      }
+
+      // Explicit protected routes that strictly require authentication
+      const protectedPrefixes = [
+        '/upload',
+        '/creator-studio',
+        '/settings',
+        '/messages',
+        '/cart',
+        '/admin',
+        '/live',
+      ];
+      final isProtected = protectedPrefixes.any((prefix) => state.matchedLocation.startsWith(prefix));
+
+      // If unauthenticated and accessing a protected action, redirect to signin
+      if (!isAuthenticated && isProtected) {
+        return '/signin';
       }
 
       return null;
@@ -97,12 +156,31 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'shorts',
         builder: (context, state) => const ShortsPage(),
       ),
+      // Deep-link target for shared Raftaar (Shorts) videos — lands on the
+      // scrolling Shorts feed positioned at this video, instead of the raw
+      // watch page. Share links now point here (see short_player_widget's
+      // _shareShort); the plain /watch/:videoId route is left untouched so
+      // the player's existing "Full page" button keeps opening shorts there.
+      GoRoute(
+        path: '/shorts/:videoId',
+        name: 'shorts-video',
+        builder: (context, state) {
+          final videoId = state.pathParameters['videoId'] ?? '';
+          return ShortsPage(startVideoId: videoId);
+        },
+      ),
       GoRoute(
         path: '/watch/:videoId',
         name: 'watch',
         builder: (context, state) {
           final videoId = state.pathParameters['videoId'] ?? '';
-          return WatchPage(videoId: videoId);
+          // Set only when re-expanding the draggable mini player (see
+          // VideoMiniPlayerOverlay._restore) — every other existing caller
+          // of this route never passes `extra`, so this is null for them
+          // exactly as before and WatchPage falls back to its normal
+          // fresh-controller path unchanged.
+          final adoptController = state.extra is VideoPlayerController ? state.extra as VideoPlayerController : null;
+          return WatchPage(videoId: videoId, adoptController: adoptController);
         },
       ),
       GoRoute(
@@ -159,6 +237,44 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const ChangeEmailPage(),
       ),
       GoRoute(
+        path: '/settings/playback',
+        name: 'playback-settings',
+        builder: (context, state) => const PlaybackSettingsPage(),
+      ),
+      GoRoute(
+        path: '/settings/content-access',
+        name: 'content-access',
+        builder: (context, state) => const ContentAccessPage(),
+      ),
+      GoRoute(
+        path: '/settings/plans',
+        name: 'plans-purchases',
+        builder: (context, state) => const PlansPurchasesPage(),
+      ),
+      GoRoute(
+        path: '/settings/analytics',
+        name: 'settings-analytics',
+        builder: (context, state) => const AnalyticsPage(),
+      ),
+      GoRoute(
+        path: '/settings/storage',
+        name: 'settings-storage',
+        builder: (context, state) => const StoragePage(),
+      ),
+      GoRoute(
+        path: '/creators',
+        name: 'creators',
+        builder: (context, state) => const DiscoverCreatorsPage(),
+      ),
+      GoRoute(
+        path: '/category/:category',
+        name: 'category-videos',
+        builder: (context, state) {
+          final category = Uri.decodeComponent(state.pathParameters['category'] ?? '');
+          return CategoryVideosPage(category: category);
+        },
+      ),
+      GoRoute(
         path: '/messages',
         name: 'messages',
         builder: (context, state) => const MessagesPage(),
@@ -200,7 +316,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/creator-studio',
         name: 'creator-studio',
-        builder: (context, state) => const CreatorStudioPage(),
+        builder: (context, state) => const MyChannelStudioPage(),
       ),
       GoRoute(
         path: '/admin',
@@ -246,12 +362,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/my-videos',
         name: 'my-videos',
-        builder: (context, state) => VideoListPage(
-          title: 'My Videos',
-          emptyIcon: Icons.video_library_outlined,
-          emptyMessage: "You haven't uploaded any videos yet",
-          loader: (ref) => ref.read(videoServiceProvider).getMyVideos(),
-        ),
+        builder: (context, state) => const MyChannelStudioPage(),
       ),
       GoRoute(
         path: '/liked-videos',
@@ -269,9 +380,19 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const WatchHistoryPage(),
       ),
       GoRoute(
+        path: '/history',
+        name: 'history',
+        builder: (context, state) => const WatchHistoryPage(),
+      ),
+      GoRoute(
         path: '/watchlist',
         name: 'watchlist',
         builder: (context, state) => const WatchlistPage(),
+      ),
+      GoRoute(
+        path: '/downloads',
+        name: 'downloads',
+        builder: (context, state) => const DownloadsPage(),
       ),
       GoRoute(
         path: '/playlists',
@@ -286,6 +407,24 @@ final routerProvider = Provider<GoRouter>((ref) {
           final name = state.extra is String ? state.extra as String : null;
           return PlaylistDetailPage(playlistId: playlistId, name: name);
         },
+      ),
+      GoRoute(
+        path: '/music/genre/:genre',
+        name: 'music-genre',
+        builder: (context, state) {
+          final genre = Uri.decodeComponent(state.pathParameters['genre'] ?? 'Other');
+          return GenrePage(genre: genre);
+        },
+      ),
+      GoRoute(
+        path: '/music/liked',
+        name: 'music-liked',
+        builder: (context, state) => const LikedMusicPage(),
+      ),
+      GoRoute(
+        path: '/contact',
+        name: 'contact-us',
+        builder: (context, state) => const ContactUsPage(),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

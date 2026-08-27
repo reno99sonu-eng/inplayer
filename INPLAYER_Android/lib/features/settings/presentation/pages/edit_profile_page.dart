@@ -1,6 +1,8 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/pattern_background.dart';
 import '../../../../core/utils/image_utils.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../services/settings_service.dart';
@@ -37,9 +39,9 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     final name = _nameController.text.trim();
     if (name.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Name can't be empty."),
-          backgroundColor: AppColors.surfaceDark,
+        SnackBar(
+          content: const Text("Name can't be empty."),
+          backgroundColor: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
         ),
       );
       return;
@@ -65,9 +67,9 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
       Navigator.of(context).pop();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Couldn't save your profile. Please try again."),
-          backgroundColor: AppColors.surfaceDark,
+        SnackBar(
+          content: const Text("Couldn't save your profile. Please try again."),
+          backgroundColor: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
         ),
       );
     }
@@ -78,78 +80,81 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     final authState = ref.watch(authStateProvider);
     final user = authState is AuthStateAuthenticated ? authState.user : null;
 
-    return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(
-        backgroundColor: AppColors.backgroundDark,
-        elevation: 0,
-        title: const Text('Edit Profile',
-            style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimaryDark)),
-        actions: [
-          TextButton(
-            onPressed: _saving ? null : _save,
-            child: _saving
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation(AppColors.brandOrange)),
-                  )
-                : const Text('Save', style: TextStyle(color: AppColors.brandOrange)),
-          ),
-        ],
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          Center(
-            child: CircleAvatar(
-              radius: 44,
-              backgroundColor: AppColors.surfaceDark,
-              backgroundImage:
-                  user?.avatarUrl != null ? smartImageProvider(user!.avatarUrl!) : null,
-              child: user?.avatarUrl == null
-                  ? const Icon(Icons.person, size: 44, color: AppColors.textSecondaryDark)
-                  : null,
+    return PatternBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: context.bgCanvas.withValues(alpha: 0.95),
+          elevation: 0,
+          iconTheme: IconThemeData(color: context.textPrimary),
+          title: Text('Edit Profile',
+              style: TextStyle(fontWeight: FontWeight.w800, color: context.textPrimary, letterSpacing: -0.5)),
+          actions: [
+            TextButton(
+              onPressed: _saving ? null : _save,
+              child: _saving
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation(AppColors.brandOrange)),
+                    )
+                  : const Text('Save', style: TextStyle(color: AppColors.brandOrange, fontWeight: FontWeight.bold)),
             ),
-          ),
-          const SizedBox(height: 8),
-          const Center(
-            child: Text(
-              'Changing your photo isn\'t supported here yet — use the website for now.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 11.5),
+          ],
+        ),
+        body: ListView(
+          padding: const EdgeInsets.all(20),
+          children: [
+            Center(
+              child: CircleAvatar(
+                radius: 44,
+                backgroundColor: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+                backgroundImage:
+                    user?.avatarUrl != null ? smartImageProvider(user!.avatarUrl!) : null,
+                child: user?.avatarUrl == null
+                    ? Icon(Icons.person, size: 44, color: context.textDim)
+                    : null,
+              ),
             ),
-          ),
-          const SizedBox(height: 28),
-          const Text('Name',
-              style: TextStyle(
-                  color: AppColors.textSecondaryDark,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700)),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _nameController,
-            maxLength: 100,
-            style: const TextStyle(color: AppColors.textPrimaryDark),
-            decoration: _fieldDecoration('Your display name'),
-          ),
-          const SizedBox(height: 12),
-          const Text('Bio',
-              style: TextStyle(
-                  color: AppColors.textSecondaryDark,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700)),
-          const SizedBox(height: 8),
-          TextField(
-            controller: _bioController,
-            maxLength: 500,
-            maxLines: 4,
-            style: const TextStyle(color: AppColors.textPrimaryDark),
-            decoration: _fieldDecoration('Tell viewers about your channel'),
-          ),
-        ],
+            const SizedBox(height: 8),
+            Center(
+              child: Text(
+                'Changing your photo isn\'t supported here yet — use the website for now.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: context.textDim, fontSize: 11.5),
+              ),
+            ),
+            const SizedBox(height: 28),
+            Text('Name',
+                style: TextStyle(
+                    color: context.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _nameController,
+              maxLength: 100,
+              style: TextStyle(color: context.textPrimary),
+              decoration: _fieldDecoration('Your display name'),
+            ),
+            const SizedBox(height: 12),
+            Text('Bio',
+                style: TextStyle(
+                    color: context.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _bioController,
+              maxLength: 500,
+              maxLines: 4,
+              style: TextStyle(color: context.textPrimary),
+              decoration: _fieldDecoration('Tell viewers about your channel'),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -157,12 +162,20 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
   InputDecoration _fieldDecoration(String hint) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: const TextStyle(color: AppColors.textSecondaryDark),
+      hintStyle: TextStyle(color: context.textDim),
       filled: true,
-      fillColor: Colors.white.withValues(alpha: 0.05),
+      fillColor: context.bgCard,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
+        borderSide: BorderSide(color: context.borderSubtle),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: context.borderSubtle),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.brandOrange, width: 1.5),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
     );

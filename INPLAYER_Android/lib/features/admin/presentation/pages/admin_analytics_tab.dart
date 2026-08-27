@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../services/admin_service.dart';
 import '../../../../models/admin_analytics.dart';
 import '../../../../models/admin_revenue.dart';
@@ -15,16 +16,16 @@ class AdminAnalyticsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Column(
         children: [
           Container(
-            color: AppColors.backgroundDark,
-            child: const TabBar(
+            color: context.bgCanvas,
+            child: TabBar(
               indicatorColor: AppColors.brandOrange,
               labelColor: AppColors.brandOrange,
-              unselectedLabelColor: AppColors.textSecondaryDark,
-              tabs: [Tab(text: 'Analytics'), Tab(text: 'Revenue')],
+              unselectedLabelColor: context.textSecondary,
+              tabs: const [Tab(text: 'Analytics'), Tab(text: 'Revenue'), Tab(text: 'Payouts')],
             ),
           ),
           const Expanded(
@@ -232,7 +233,7 @@ class _RevenueViewState extends ConsumerState<_RevenueView> {
                   _row('Charges', '${summary.totalCharges}'),
                   _row('Active memberships', '${summary.activeMemberships}'),
                   _row('Verified creators', '${summary.verifiedCreatorCount}'),
-                  const Divider(color: AppColors.backgroundDark, height: 20),
+                  Divider(color: context.borderSubtle, height: 20),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [

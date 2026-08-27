@@ -1,12 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Modify this file to customize your launch splash screen -->
+<!-- The OS-drawn window background shown for the brief moment between
+     process start and Flutter's first frame — automatically removed the
+     instant Flutter paints (see LaunchTheme in values/styles.xml). This is
+     deliberately just the brand background color, with no logo bitmap: a
+     `splash_logo` bitmap was added here at one point (the old glossy
+     tricolor "IN" icon-pack asset already identified and removed from the
+     app launcher icon back in an earlier round — see the audit doc) and
+     caused two separate splash experiences to show back-to-back, which
+     both looked wrong (stale asset) and made the app's real, custom
+     InPlayer intro animation (SplashScreenOverlay in main.dart) feel like
+     it was missing — it was still running, just after and upstaged by this
+     native flash. Only the color shows now, so the Flutter animation is
+     the first and only thing anyone actually sees animate in. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@android:color/white" />
-
-    <!-- You can insert your own image assets here -->
-    <!-- <item>
-        <bitmap
-            android:gravity="center"
-            android:src="@mipmap/launch_image" />
-    </item> -->
+    <item android:drawable="@color/ic_launcher_background" />
 </layer-list>

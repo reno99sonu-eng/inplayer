@@ -106,6 +106,11 @@ class Channel {
   final bool isVerified;
   final bool isOwner;
   final bool gated;
+  /// 'public' | 'private' | 'connections' — mirrors getPublicProfile.ts's
+  /// `base.usernamePrivacy`. Lets the gated view distinguish a fully
+  /// private account from one that's only visible to mutual In-Family
+  /// connections, instead of collapsing both into one generic message.
+  final String usernamePrivacy;
   final String? joinedAt;
   final List<ChannelVideo> videos;
 
@@ -124,6 +129,7 @@ class Channel {
     this.isVerified = false,
     this.isOwner = false,
     this.gated = false,
+    this.usernamePrivacy = 'public',
     this.joinedAt,
     this.videos = const [],
   });
@@ -181,6 +187,7 @@ class Channel {
       isVerified: json['isVerified'] == true,
       isOwner: json['isOwner'] == true,
       gated: json['gated'] == true,
+      usernamePrivacy: (json['usernamePrivacy'] as String?) ?? 'public',
       joinedAt: json['joinedAt'] as String?,
       videos: videos,
     );
@@ -202,6 +209,7 @@ class Channel {
       'isVerified': isVerified,
       'isOwner': isOwner,
       'gated': gated,
+      'usernamePrivacy': usernamePrivacy,
       'joinedAt': joinedAt,
     };
   }
@@ -221,6 +229,7 @@ class Channel {
     bool? isVerified,
     bool? isOwner,
     bool? gated,
+    String? usernamePrivacy,
     String? joinedAt,
     List<ChannelVideo>? videos,
   }) {
@@ -239,6 +248,7 @@ class Channel {
       isVerified: isVerified ?? this.isVerified,
       isOwner: isOwner ?? this.isOwner,
       gated: gated ?? this.gated,
+      usernamePrivacy: usernamePrivacy ?? this.usernamePrivacy,
       joinedAt: joinedAt ?? this.joinedAt,
       videos: videos ?? this.videos,
     );

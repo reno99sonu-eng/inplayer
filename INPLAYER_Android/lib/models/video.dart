@@ -1,4 +1,5 @@
 import 'package:inplayer_android/core/config/app_config.dart';
+import 'lyric_line.dart';
 
 class Video {
   final String id;
@@ -16,6 +17,28 @@ class Video {
   final String? description;
   final bool? membersOnly;
   final String? uploaderId;
+  final String category;
+  final String contentType;
+  final bool isMusic;
+  final List<String> covers;
+  final int coverIntervalSeconds;
+  final List<LyricLine> lyrics;
+  final bool moderationHidden;
+  final String? visibility;
+  final String? copyrightRisk;
+  final String? artist;
+  /// 'everyone' | 'kids' | 'adult' — mirrors the website's videoAudience()
+  /// fallback: the real `audience` field when present, else derived from
+  /// `ageRestricted`. Lets the Android home feed build a real Kids row for
+  /// the first time instead of just filtering nothing.
+  final String audience;
+  /// Music-only. One of MUSIC_GENRES on the website (app/lib/musicTrack.ts)
+  /// — e.g. 'Pop', 'Hip-Hop', 'Devotional' — or null for a track uploaded
+  /// before this field existed / a non-music row. Powers the Music hub's
+  /// Genres grid. Deliberately separate from [category] ('Music' the
+  /// topical content category vs. 'Pop' the actual genre — two different
+  /// taxonomies that happen to both live on a music row).
+  final String? genre;
 
   Video({
     required this.id,
@@ -33,6 +56,18 @@ class Video {
     this.description,
     this.membersOnly,
     this.uploaderId,
+    this.category = 'Entertainment',
+    this.contentType = 'video',
+    this.isMusic = false,
+    this.covers = const [],
+    this.coverIntervalSeconds = 12,
+    this.lyrics = const [],
+    this.moderationHidden = false,
+    this.visibility,
+    this.copyrightRisk,
+    this.artist,
+    this.audience = 'everyone',
+    this.genre,
   });
 
   static String _resolveUrl(String url) {
@@ -43,6 +78,46 @@ class Video {
   }
 
   factory Video.fromJson(Map<String, dynamic> json) {
+    final rawCategory = json['category']?.toString() ?? json['genre']?.toString() ?? 'Entertainment';
+    final rawContentType = json['contentType']?.toString() ?? 'video';
+    final isMusicTrack = rawContentType == 'music' || rawCategory.toLowerCase() == 'music' || json['isMusic'] == true;
+
+    final rawCovers = json['covers'];
+    List<String> parsedCovers = [];
+    if (rawCovers is List) {
+      parsedCovers = rawCovers.whereType<String>().map((u) => _resolveUrl(u)).toList();
+    }
+    if (parsedCovers.isEmpty && json['thumbnail'] != null) {
+      parsedCovers = [_resolveUrl(json['thumbnail'].toString())];
+    } else if (parsedCovers.isEmpty && json['thumbnailUrl'] != null) {
+      parsedCovers = [_resolveUrl(json['thumbnailUrl'].toString())];
+    }
+
+    final rawLyrics = json['lyrics'];
+    List<LyricLine> parsedLyrics = [];
+    if (rawLyrics is List) {
+      parsedLyrics = rawLyrics
+          .whereType<Map>()
+          .map((m) => LyricLine.fromJson(Map<String, dynamic>.from(m)))
+          .toList();
+    }
+
+    // Mirrors the website's videoAudience(): a real 'everyone'/'kids'/'adult'
+    // field takes precedence; otherwise fall back to ageRestricted.
+    final rawAudience = json['audience']?.toString();
+    final resolvedAudience = (rawAudience == 'everyone' || rawAudience == 'kids' || rawAudience == 'adult')
+        ? rawAudience!
+        : (json['ageRestricted'] == true ? 'adult' : 'everyone');
+
+    final playbackId = json['muxPlaybackId']?.toString();
+    final isShort = rawContentType == 'short';
+    String rawThumb = json['thumbnail']?.toString() ?? json['thumbnailUrl']?.toString() ?? '';
+    if (rawThumb.trim().isEmpty && playbackId != null && playbackId.isNotEmpty) {
+      rawThumb = isShort
+          ? 'https://image.mux.com/$playbackId/thumbnail.webp?width=640&height=1138&fit_mode=smartcrop&time=1'
+          : 'https://image.mux.com/$playbackId/thumbnail.webp?width=640&height=360&fit_mode=smartcrop&time=1';
+    }
+
     return Video(
       id: json['id']?.toString() ?? json['videoId']?.toString() ?? '',
       videoId: json['videoId']?.toString() ?? '',
@@ -51,7 +126,7 @@ class Video {
       uploaderUsername: json['uploaderUsername'],
       avatar: _resolveUrl(
           json['avatar'] ?? json['uploaderAvatarUrl'] ?? '/avatars/avatar.png'),
-      thumbnail: _resolveUrl(json['thumbnail'] ?? json['thumbnailUrl'] ?? ''),
+      thumbnail: _resolveUrl(rawThumb),
       views: _formatViews(json['views'] ?? 0),
       uploaded: _formatTimeAgo(json['uploadedAt'] ?? json['uploaded']),
       duration: _formatDuration(json['duration'] ?? 0),
@@ -60,6 +135,18 @@ class Video {
       description: json['description'],
       membersOnly: json['membersOnly'],
       uploaderId: json['uploaderId']?.toString(),
+      category: rawCategory,
+      contentType: rawContentType,
+      isMusic: isMusicTrack,
+      covers: parsedCovers,
+      coverIntervalSeconds: (json['coverIntervalSeconds'] as num?)?.toInt() ?? 12,
+      lyrics: parsedLyrics,
+      moderationHidden: json['moderationHidden'] == true,
+      visibility: json['visibility']?.toString(),
+      copyrightRisk: json['copyrightRisk']?.toString(),
+      artist: json['artist']?.toString() ?? json['creator']?.toString(),
+      audience: resolvedAudience,
+      genre: json['genre']?.toString().trim().isNotEmpty == true ? json['genre'].toString().trim() : null,
     );
   }
 
@@ -134,6 +221,17 @@ class Video {
       'description': description,
       'membersOnly': membersOnly,
       'uploaderId': uploaderId,
+      'category': category,
+      'contentType': contentType,
+      'isMusic': isMusic,
+      'covers': covers,
+      'coverIntervalSeconds': coverIntervalSeconds,
+      'lyrics': lyrics.map((l) => l.toJson()).toList(),
+      'moderationHidden': moderationHidden,
+      'copyrightRisk': copyrightRisk,
+      'artist': artist,
+      'audience': audience,
+      'genre': genre,
     };
   }
 }

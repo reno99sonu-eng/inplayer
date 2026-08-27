@@ -1,15 +1,14 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
-
-/// Small shared helpers reused across every admin section screen added in
-/// the "finish whole admin panel" round, so each new tab file doesn't need
-/// to redefine its own snackbar/dialog/empty-state boilerplate (the
-/// earlier Dashboard/Users/Moderation tabs each rolled their own — this
-/// centralizes the pattern now that the panel has grown to 15+ sections).
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/pattern_background.dart';
 
 void showAdminSnack(BuildContext context, String message) {
   ScaffoldMessenger.of(context).showSnackBar(
-    SnackBar(content: Text(message), backgroundColor: AppColors.surfaceDark),
+    SnackBar(
+      content: Text(message),
+      backgroundColor: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+    ),
   );
 }
 
@@ -23,9 +22,9 @@ Future<bool> confirmAdminDialog(
   final confirmed = await showDialog<bool>(
     context: context,
     builder: (context) => AlertDialog(
-      backgroundColor: AppColors.cardDark,
-      title: Text(title, style: const TextStyle(color: AppColors.textPrimaryDark)),
-      content: Text(content, style: const TextStyle(color: AppColors.textSecondaryDark)),
+      backgroundColor: context.bgModal,
+      title: Text(title, style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.bold)),
+      content: Text(content, style: TextStyle(color: context.textSecondary)),
       actions: [
         TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
         TextButton(
@@ -39,11 +38,6 @@ Future<bool> confirmAdminDialog(
   return confirmed == true;
 }
 
-/// Honest "this table doesn't exist in AWS yet" empty state — the backend
-/// pattern (see e.g. app/api/admin/revenue/route.ts) is to fail soft and
-/// report `tableMissing: true` rather than fabricate a zero. Mirrored here
-/// so the app never implies a section is simply "empty" when it's actually
-/// not provisioned yet.
 class AdminTableMissingNotice extends StatelessWidget {
   final String message;
   const AdminTableMissingNotice({super.key, this.message = "This isn't set up in AWS yet, so there's nothing to show here."});
@@ -56,9 +50,9 @@ class AdminTableMissingNotice extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.storage_outlined, color: AppColors.textSecondaryDark, size: 40),
+            Icon(Icons.storage_outlined, color: context.textDim, size: 40),
             const SizedBox(height: 12),
-            Text(message, textAlign: TextAlign.center, style: const TextStyle(color: AppColors.textSecondaryDark)),
+            Text(message, textAlign: TextAlign.center, style: TextStyle(color: context.textSecondary)),
           ],
         ),
       ),
@@ -77,9 +71,9 @@ class AdminEmptyState extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(icon, color: AppColors.textSecondaryDark, size: 40),
+          Icon(icon, color: context.textDim, size: 40),
           const SizedBox(height: 12),
-          Text(message, style: const TextStyle(color: AppColors.textSecondaryDark)),
+          Text(message, style: TextStyle(color: context.textSecondary)),
         ],
       ),
     );
@@ -88,8 +82,6 @@ class AdminEmptyState extends StatelessWidget {
 
 const adminLoadingCenter = Center(child: CircularProgressIndicator(color: AppColors.brandOrange));
 
-/// A muted status pill, e.g. for kycStatus / vendor status / bug report
-/// status values — consistent coloring across every section that shows one.
 class AdminStatusPill extends StatelessWidget {
   final String label;
   final Color color;
@@ -111,9 +103,6 @@ class AdminStatusPill extends StatelessWidget {
   }
 }
 
-/// Reusable "push a full section as its own page" wrapper for admin_page.dart's
-/// menu, so every section gets a consistent AppBar/back button instead of
-/// each tab file managing its own Scaffold.
 class AdminSectionPage extends StatelessWidget {
   final String title;
   final Widget child;
@@ -121,14 +110,20 @@ class AdminSectionPage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(
-        backgroundColor: AppColors.backgroundDark,
-        elevation: 0,
-        title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimaryDark)),
+    return PatternBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: context.bgCanvas.withValues(alpha: 0.95),
+          elevation: 0,
+          iconTheme: IconThemeData(color: context.textPrimary),
+          title: Text(
+            title,
+            style: TextStyle(fontWeight: FontWeight.w800, color: context.textPrimary, letterSpacing: -0.5),
+          ),
+        ),
+        body: child,
       ),
-      body: child,
     );
   }
 }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/image_utils.dart';
 import '../../../../core/utils/time_utils.dart';
 import '../../../../services/admin_service.dart';
@@ -20,12 +21,12 @@ class AdminCreatorsTab extends StatelessWidget {
       child: Column(
         children: [
           Container(
-            color: AppColors.backgroundDark,
-            child: const TabBar(
+            color: context.bgCanvas,
+            child: TabBar(
               indicatorColor: AppColors.brandOrange,
               labelColor: AppColors.brandOrange,
-              unselectedLabelColor: AppColors.textSecondaryDark,
-              tabs: [Tab(text: 'Pending'), Tab(text: 'Verified'), Tab(text: 'Rejected')],
+              unselectedLabelColor: context.textSecondary,
+              tabs: const [Tab(text: 'Pending'), Tab(text: 'Verified'), Tab(text: 'Rejected')],
             ),
           ),
           const Expanded(
@@ -184,8 +185,8 @@ class _CreatorKycViewState extends ConsumerState<_CreatorKycView> {
                         .map((e) => ActionChip(
                               label: Text(e.key.replaceAll('_', ' ')),
                               onPressed: () => _viewDocument(e.key.replaceAll('_', ' '), e.value),
-                              backgroundColor: AppColors.backgroundDark,
-                              labelStyle: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 11),
+                              backgroundColor: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+                              labelStyle: TextStyle(color: context.textSecondary, fontSize: 11),
                             ))
                         .toList(),
                   ),

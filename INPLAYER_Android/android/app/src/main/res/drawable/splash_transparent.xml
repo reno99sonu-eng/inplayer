@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A deliberately empty, fully transparent drawable, used ONLY as
+     android:windowSplashScreenAnimatedIcon in values-v31/styles.xml and
+     values-night-v31/styles.xml.
+
+     Why this exists: since Android 12 (API 31) the OS draws its OWN splash
+     screen on every cold start, centred on the app's launcher icon, and it
+     does so regardless of what drawable/launch_background.xml says — that
+     older mechanism is simply ignored from 12 onwards. That system splash
+     was showing the tricolor "IN" triangle for a beat before InPlayer's real
+     animated intro (SplashScreenOverlay, wired in main.dart) had a chance to
+     run, so users saw two different splashes back to back. Note that
+     launch_background.xml had already been stripped of its logo bitmap in an
+     earlier round — that fix was correct, it just does nothing on 12+, which
+     is why the triangle appeared to come back.
+
+     The Android 12+ splash cannot be switched off; the OS will always draw
+     something. But pointing its icon slot at a fully transparent drawable
+     means it renders nothing but the background colour, which is set to the
+     same near-black the Flutter intro opens on. The result reads as one
+     seamless startup: brand-coloured screen, then the real animation with
+     its sound sting, and nothing else. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@android:color/transparent" />
+</shape>

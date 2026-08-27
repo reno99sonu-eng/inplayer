@@ -3,6 +3,7 @@ import 'package:logger/logger.dart';
 import '../core/network/dio_client.dart';
 import '../core/constants/api_constants.dart';
 import '../models/channel.dart';
+import '../models/public_creator.dart';
 
 final channelServiceProvider = Provider<ChannelService>((ref) {
   return ChannelService();
@@ -124,6 +125,36 @@ class ChannelService {
     }
   }
 
+  /// The public, paginated "browse everyone" list (GET /api/creators) —
+  /// only accounts with a claimed, public @handle. Cursor-based: pass the
+  /// previous page's nextCursor to continue. Powers DiscoverCreatorsPage,
+  /// the real equivalent of the website's app/creators.
+  Future<CreatorsPage> getCreators({String? cursor}) async {
+    try {
+      final response = await _dio.get(
+        ApiConstants.creators,
+        queryParameters: cursor != null ? {'cursor': cursor} : null,
+      );
+
+      if (response.statusCode == 200 && response.data is Map) {
+        final data = response.data as Map;
+        final creatorsJson = data['creators'] as List<dynamic>? ?? [];
+        return CreatorsPage(
+          creators: creatorsJson
+              .whereType<Map>()
+              .map((json) => PublicCreator.fromJson(Map<String, dynamic>.from(json)))
+              .toList(),
+          nextCursor: data['nextCursor'] as String?,
+        );
+      }
+
+      return const CreatorsPage(creators: []);
+    } catch (e) {
+      _logger.e('Error fetching creators list: $e');
+      return const CreatorsPage(creators: []);
+    }
+  }
+
   /// Search-as-you-type by handle. /api/creators doesn't support a `q`
   /// filter — the real search endpoint is /api/users/search.
   Future<List<Channel>> searchChannels(String query) async {
@@ -149,5 +180,23 @@ class ChannelService {
       _logger.e('Error searching channels: $e');
       return [];
     }
+  }
+
+  /// Whether the signed-in viewer has an active paid membership with this
+  /// one creator — GET /api/memberships/status?creatorId=. Read-only: the
+  /// actual purchase still only happens on the real website (Razorpay).
+  Future<bool> getMembershipStatus(String creatorId) async {
+    try {
+      final response = await _dio.get(
+        ApiConstants.membershipStatus,
+        queryParameters: {'creatorId': creatorId},
+      );
+      if (response.statusCode == 200 && response.data is Map) {
+        return (response.data as Map)['isActive'] == true;
+      }
+    } catch (e) {
+      _logger.e('Error fetching membership status for $creatorId: $e');
+    }
+    return false;
   }
 }

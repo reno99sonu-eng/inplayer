@@ -4,7 +4,9 @@ class AdminDashboardStats {
   final int totalUsers;
   final int totalVideos;
   final int totalShorts;
+  final int totalMusic;
   final int totalViews;
+  final int musicViews;
   final int processingCount;
   final int pendingReports;
   final bool reportsTableMissing;
@@ -13,7 +15,9 @@ class AdminDashboardStats {
     this.totalUsers = 0,
     this.totalVideos = 0,
     this.totalShorts = 0,
+    this.totalMusic = 0,
     this.totalViews = 0,
+    this.musicViews = 0,
     this.processingCount = 0,
     this.pendingReports = 0,
     this.reportsTableMissing = false,
@@ -25,7 +29,9 @@ class AdminDashboardStats {
       totalUsers: toInt(json['totalUsers']),
       totalVideos: toInt(json['totalVideos']),
       totalShorts: toInt(json['totalShorts']),
+      totalMusic: toInt(json['totalMusic']),
       totalViews: toInt(json['totalViews']),
+      musicViews: toInt(json['musicViews']),
       processingCount: toInt(json['processingCount']),
       pendingReports: toInt(json['pendingReports']),
       reportsTableMissing: json['reportsTableMissing'] == true,

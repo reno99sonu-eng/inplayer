@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
 
 import '../core/config/app_config.dart';
+import '../core/network/dio_client.dart';
 import '../models/user.dart' show User;
 
 final authServiceProvider = Provider<AuthService>((ref) {
@@ -71,18 +72,69 @@ class AuthService {
       }
 
       final userId = attributes['sub'] ?? '';
-      final username = attributes['email'] ?? '';
+      String username = attributes['email'] ?? '';
       final email = attributes['email'] ?? '';
-      final name =
+      String name =
           attributes['name'] ??
           attributes['given_name'] ??
           '';
+      String? avatarUrl = attributes['picture'] ?? attributes['custom:avatarUrl'];
+      String? coverPhotoUrl;
+      String? handle;
+      String bio = '';
+      Map<String, String> socialLinks = {};
+      List<Map<String, String>> otherLinks = [];
+      int? age;
+      bool termsAccepted = false;
+
+      // Fetch the full rich profile from DynamoDB via /api/profile/avatar
+      try {
+        final response = await DioClient().dio.get('/api/profile/avatar');
+        if (response.statusCode == 200 && response.data != null) {
+          final data = response.data is Map<String, dynamic>
+              ? response.data as Map<String, dynamic>
+              : jsonDecode(response.data.toString()) as Map<String, dynamic>;
+
+          if (data['name'] != null && (data['name'] as String).isNotEmpty) {
+            name = data['name'];
+          }
+          if (data['avatarUrl'] != null && (data['avatarUrl'] as String).isNotEmpty) {
+            avatarUrl = data['avatarUrl'];
+          }
+          if (data['coverPhotoUrl'] != null && (data['coverPhotoUrl'] as String).isNotEmpty) {
+            coverPhotoUrl = data['coverPhotoUrl'];
+          }
+          if (data['username'] != null && (data['username'] as String).isNotEmpty) {
+            username = data['username'];
+            handle = data['username'];
+          }
+          if (data['description'] != null) {
+            bio = data['description'];
+          }
+          if (data['age'] != null && data['age'] is int) {
+            age = data['age'];
+          }
+          if (data['termsAccepted'] != null) {
+            termsAccepted = data['termsAccepted'] == true;
+          }
+        }
+      } catch (err) {
+        _logger.w('Failed to fetch /api/profile/avatar: $err');
+      }
 
       return User(
         userId: userId,
         username: username,
         name: name,
         email: email,
+        avatarUrl: avatarUrl,
+        coverPhotoUrl: coverPhotoUrl,
+        handle: handle,
+        bio: bio,
+        socialLinks: socialLinks,
+        otherLinks: otherLinks,
+        age: age,
+        termsAccepted: termsAccepted,
       );
     } catch (e) {
       _logger.e('Error fetching current user: $e');
@@ -94,15 +146,16 @@ class AuthService {
     required String email,
     required String password,
   }) async {
-    try {
+    final cleanEmail = email.trim();
+
+    Future<SignInResult> attempt() async {
       final result = await Amplify.Auth.signIn(
-        username: email,
+        username: cleanEmail,
         password: password,
       );
 
       if (result.isSignedIn) {
         final user = await getCurrentUser();
-
         return SignInResult(
           success: true,
           user: user,
@@ -113,19 +166,91 @@ class AuthService {
         success: false,
         error: 'Sign in failed',
       );
-    } on AuthException catch (e) {
-      _logger.e('Sign in error: ${e.message}');
+    }
 
+    try {
+      return await attempt();
+    } on AuthException catch (e) {
+      final msg = e.message.toLowerCase();
+      if (msg.contains('already') ||
+          msg.contains('signed in') ||
+          e.runtimeType.toString().contains('UserAlreadyAuthenticatedException')) {
+        _logger.w('Stale session detected during sign in. Clearing and retrying...');
+        try {
+          await Amplify.Auth.signOut();
+          return await attempt();
+        } on AuthException catch (retryE) {
+          _logger.e('Retry sign in failed: ${retryE.message}');
+          return SignInResult(
+            success: false,
+            error: retryE.message,
+          );
+        }
+      }
+
+      _logger.e('Sign in error: ${e.message}');
       return SignInResult(
         success: false,
         error: e.message,
       );
     } catch (e) {
       _logger.e('Unexpected sign in error: $e');
-
       return SignInResult(
         success: false,
         error: 'An unexpected error occurred',
+      );
+    }
+  }
+
+  Future<SignInResult> signInWithGoogle() async {
+    Future<SignInResult> attempt() async {
+      final result = await Amplify.Auth.signInWithWebUI(
+        provider: AuthProvider.google,
+      );
+
+      if (result.isSignedIn) {
+        final user = await getCurrentUser();
+        return SignInResult(
+          success: true,
+          user: user,
+        );
+      }
+
+      return SignInResult(
+        success: false,
+        error: 'Google sign in did not complete',
+      );
+    }
+
+    try {
+      return await attempt();
+    } on AuthException catch (e) {
+      final msg = e.message.toLowerCase();
+      if (msg.contains('already') ||
+          msg.contains('signed in') ||
+          e.runtimeType.toString().contains('UserAlreadyAuthenticatedException')) {
+        _logger.w('Stale session detected during Google sign in. Clearing and retrying...');
+        try {
+          await Amplify.Auth.signOut();
+          return await attempt();
+        } on AuthException catch (retryE) {
+          return SignInResult(success: false, error: retryE.message);
+        }
+      }
+
+      _logger.e('Google sign in error: ${e.message}');
+      if (msg.contains('cancel') || msg.contains('user cancelled')) {
+        return SignInResult(success: false, error: 'Sign in was cancelled');
+      }
+      return SignInResult(
+        success: false,
+        error: "Google sign-in isn't set up for this site yet. Please sign in with your email and password.",
+      );
+    } catch (e) {
+      _logger.e('Unexpected Google sign in error: $e');
+      return SignInResult(
+        success: false,
+        error: "Google sign-in isn't set up for this site yet. Please sign in with your email and password.",
       );
     }
   }

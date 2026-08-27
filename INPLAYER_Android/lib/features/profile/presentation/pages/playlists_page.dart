@@ -1,7 +1,9 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/pattern_background.dart';
 import '../../../../services/playlist_service.dart';
 import '../../../../models/playlist.dart';
 
@@ -38,13 +40,16 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
     final name = await showDialog<String>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.cardDark,
-        title: const Text('New playlist', style: TextStyle(color: AppColors.textPrimaryDark)),
+        backgroundColor: context.bgModal,
+        title: Text('New playlist', style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.bold)),
         content: TextField(
           controller: controller,
           autofocus: true,
-          style: const TextStyle(color: AppColors.textPrimaryDark),
-          decoration: const InputDecoration(hintText: 'Playlist name'),
+          style: TextStyle(color: context.textPrimary),
+          decoration: InputDecoration(
+            hintText: 'Playlist name',
+            hintStyle: TextStyle(color: context.textDim),
+          ),
         ),
         actions: [
           TextButton(
@@ -70,9 +75,9 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
       await _load();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Couldn't create that playlist."),
-          backgroundColor: AppColors.surfaceDark,
+        SnackBar(
+          content: const Text("Couldn't create that playlist."),
+          backgroundColor: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
         ),
       );
     }
@@ -80,96 +85,103 @@ class _PlaylistsPageState extends ConsumerState<PlaylistsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(
-        backgroundColor: AppColors.backgroundDark,
-        elevation: 0,
-        title: const Text(
-          'Playlists',
-          style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimaryDark),
-        ),
-      ),
-      floatingActionButton: FloatingActionButton(
-        backgroundColor: AppColors.brandOrange,
-        onPressed: _creating ? null : _createPlaylist,
-        child: _creating
-            ? const SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  valueColor: AlwaysStoppedAnimation(Colors.white),
-                ),
-              )
-            : const Icon(Icons.add, color: Colors.white),
-      ),
-      body: _loading
-          ? const Center(
-              child: CircularProgressIndicator(color: AppColors.brandOrange))
-          : RefreshIndicator(
-              color: AppColors.brandOrange,
-              backgroundColor: AppColors.surfaceDark,
-              onRefresh: _load,
-              child: _playlists.isEmpty
-                  ? ListView(
-                      children: [
-                        SizedBox(
-                          height: MediaQuery.of(context).size.height * 0.6,
-                          child: const Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(Icons.playlist_play,
-                                    size: 48, color: AppColors.textSecondaryDark),
-                                SizedBox(height: 16),
-                                Text('No playlists yet',
-                                    style:
-                                        TextStyle(color: AppColors.textSecondaryDark)),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      itemCount: _playlists.length,
-                      separatorBuilder: (context, index) =>
-                          const Divider(height: 1, color: AppColors.cardDark),
-                      itemBuilder: (context, index) {
-                        final p = _playlists[index];
-                        return ListTile(
-                          leading: CircleAvatar(
-                            radius: 20,
-                            backgroundColor: AppColors.surfaceDark,
-                            child: Icon(
-                              p.reserved ? Icons.bookmark : Icons.playlist_play,
-                              color: AppColors.brandOrange,
-                            ),
-                          ),
-                          title: Text(
-                            p.reserved ? 'Saved' : p.name,
-                            style: const TextStyle(
-                              color: AppColors.textPrimaryDark,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                          subtitle: Text(
-                            '${p.videoIds.length} video${p.videoIds.length == 1 ? '' : 's'}',
-                            style:
-                                const TextStyle(color: AppColors.textSecondaryDark, fontSize: 12),
-                          ),
-                          trailing: const Icon(Icons.chevron_right,
-                              color: AppColors.textSecondaryDark),
-                          onTap: () => context.push(
-                            '/playlists/${p.playlistId}',
-                            extra: p.reserved ? 'Saved' : p.name,
-                          ),
-                        );
-                      },
-                    ),
+    return PatternBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: context.bgCanvas.withValues(alpha: 0.95),
+          elevation: 0,
+          iconTheme: IconThemeData(color: context.textPrimary),
+          title: Text(
+            'Playlists',
+            style: TextStyle(
+              fontWeight: FontWeight.w800,
+              color: context.textPrimary,
+              letterSpacing: -0.5,
             ),
+          ),
+        ),
+        floatingActionButton: FloatingActionButton(
+          backgroundColor: AppColors.brandOrange,
+          onPressed: _creating ? null : _createPlaylist,
+          child: _creating
+              ? const SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    valueColor: AlwaysStoppedAnimation(Colors.white),
+                  ),
+                )
+              : const Icon(Icons.add, color: Colors.white),
+        ),
+        body: _loading
+            ? const Center(
+                child: CircularProgressIndicator(color: AppColors.brandOrange))
+            : RefreshIndicator(
+                color: AppColors.brandOrange,
+                backgroundColor: context.bgCard,
+                onRefresh: _load,
+                child: _playlists.isEmpty
+                    ? ListView(
+                        children: [
+                          SizedBox(
+                            height: MediaQuery.of(context).size.height * 0.6,
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.playlist_play,
+                                      size: 48, color: context.textDim),
+                                  const SizedBox(height: 16),
+                                  Text('No playlists yet',
+                                      style:
+                                          TextStyle(color: context.textSecondary)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    : ListView.separated(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        itemCount: _playlists.length,
+                        separatorBuilder: (context, index) =>
+                            Divider(height: 1, color: context.borderSubtle),
+                        itemBuilder: (context, index) {
+                          final p = _playlists[index];
+                          return ListTile(
+                            leading: CircleAvatar(
+                              radius: 20,
+                              backgroundColor: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+                              child: Icon(
+                                p.reserved ? Icons.bookmark : Icons.playlist_play,
+                                color: AppColors.brandOrange,
+                              ),
+                            ),
+                            title: Text(
+                              p.reserved ? 'Saved' : p.name,
+                              style: TextStyle(
+                                color: context.textPrimary,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Text(
+                              '${p.videoIds.length} video${p.videoIds.length == 1 ? '' : 's'}',
+                              style:
+                                  TextStyle(color: context.textSecondary, fontSize: 12),
+                            ),
+                            trailing: Icon(Icons.chevron_right,
+                                color: context.textDim),
+                            onTap: () => context.push(
+                              '/playlists/${p.playlistId}',
+                              extra: p.reserved ? 'Saved' : p.name,
+                            ),
+                          );
+                        },
+                      ),
+              ),
+      ),
     );
   }
 }

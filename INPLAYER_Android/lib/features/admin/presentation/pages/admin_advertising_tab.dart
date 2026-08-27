@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/image_utils.dart';
 import '../../../../services/admin_service.dart';
 import '../../../../models/admin_ad_creative.dart';
@@ -24,12 +25,12 @@ class AdminAdvertisingTab extends StatelessWidget {
       child: Column(
         children: [
           Container(
-            color: AppColors.backgroundDark,
-            child: const TabBar(
+            color: context.bgCanvas,
+            child: TabBar(
               indicatorColor: AppColors.brandOrange,
               labelColor: AppColors.brandOrange,
-              unselectedLabelColor: AppColors.textSecondaryDark,
-              tabs: [Tab(text: 'Ads'), Tab(text: 'Mid-roll'), Tab(text: 'Navbar Theme')],
+              unselectedLabelColor: context.textSecondary,
+              tabs: const [Tab(text: 'Ads'), Tab(text: 'Mid-roll'), Tab(text: 'Navbar Theme')],
             ),
           ),
           const Expanded(
@@ -248,9 +249,9 @@ class _CreateAdSheetState extends ConsumerState<_CreateAdSheet> {
                       label: Text(p.replaceAll('_', ' ')),
                       selected: _placement == p,
                       onSelected: (_) => setState(() => _placement = p),
-                      backgroundColor: AppColors.backgroundDark,
+                      backgroundColor: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
                       selectedColor: AppColors.brandOrange.withValues(alpha: 0.25),
-                      labelStyle: TextStyle(color: _placement == p ? AppColors.brandOrange : AppColors.textSecondaryDark, fontSize: 12),
+                      labelStyle: TextStyle(color: _placement == p ? AppColors.brandOrange : context.textSecondary, fontSize: 12),
                       side: BorderSide.none,
                     ))
                 .toList(),
@@ -261,8 +262,9 @@ class _CreateAdSheetState extends ConsumerState<_CreateAdSheet> {
             child: Container(
               height: 90,
               decoration: BoxDecoration(
-                color: AppColors.backgroundDark,
+                color: context.bgCard,
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: context.borderSubtle),
                 image: _imageDataUrl != null
                     ? DecorationImage(image: smartImageProvider(_imageDataUrl!)!, fit: BoxFit.cover)
                     : null,
@@ -514,8 +516,9 @@ class _CreateMidrollSheetState extends ConsumerState<_CreateMidrollSheet> {
             child: Container(
               height: 90,
               decoration: BoxDecoration(
-                color: AppColors.backgroundDark,
+                color: context.bgCard,
                 borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: context.borderSubtle),
                 image: _imageDataUrl != null ? DecorationImage(image: smartImageProvider(_imageDataUrl!)!, fit: BoxFit.cover) : null,
               ),
               child: _imageDataUrl == null

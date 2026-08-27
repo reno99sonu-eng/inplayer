@@ -36,15 +36,31 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<void> signIn({required String email, required String password}) async {
+  Future<bool> signIn({required String email, required String password}) async {
     state = const AuthState.loading();
 
     final result = await _authService.signIn(email: email, password: password);
 
     if (result.success && result.user != null) {
       state = AuthState.authenticated(result.user!);
+      return true;
     } else {
       state = AuthState.error(result.error ?? 'Sign in failed');
+      return false;
+    }
+  }
+
+  Future<bool> signInWithGoogle() async {
+    state = const AuthState.loading();
+
+    final result = await _authService.signInWithGoogle();
+
+    if (result.success && result.user != null) {
+      state = AuthState.authenticated(result.user!);
+      return true;
+    } else {
+      state = AuthState.error(result.error ?? 'Google sign in failed');
+      return false;
     }
   }
 

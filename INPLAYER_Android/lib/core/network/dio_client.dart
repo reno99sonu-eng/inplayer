@@ -66,11 +66,25 @@ class DioClient {
           }
 
           try {
+            // The real cookie the backend reads is named "inplayer-audience"
+            // (see app/lib/contentAccess.ts's AUDIENCE_COOKIE on the
+            // website) — this used to send a cookie literally named
+            // "audience" instead, which the server's cookies().get(
+            // "inplayer-audience") call would never match, so every request
+            // silently landed on the safe "family" default no matter what
+            // was stored locally. ContentAccessService is the only writer
+            // of this 'audience' pref key, and it only ever stores the real
+            // AudienceMode values ("all" | "family" | "kids") returned by a
+            // verified /api/content-access call — never a value the app
+            // invented locally, since the server is the source of truth for
+            // whether a mode is actually unlocked.
             final prefs = await SharedPreferences.getInstance();
             final audience = prefs.getString('audience');
             if (audience != null && audience.isNotEmpty) {
               final existingCookie = options.headers['Cookie'] as String? ?? '';
-              final newCookie = existingCookie.isEmpty ? 'audience=$audience' : '$existingCookie; audience=$audience';
+              final newCookie = existingCookie.isEmpty
+                  ? 'inplayer-audience=$audience'
+                  : '$existingCookie; inplayer-audience=$audience';
               options.headers['Cookie'] = newCookie;
             }
           } catch (e) {

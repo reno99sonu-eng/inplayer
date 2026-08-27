@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+ (API 31) overrides of values/styles.xml, light-mode variant.
+
+     Everything here is identical to the base light theme except the three
+     windowSplashScreen* attributes, which only exist from API 31 onwards —
+     see drawable/splash_transparent.xml for the full explanation of why
+     they're needed (short version: on 12+ the OS draws its own splash using
+     the launcher icon, ignoring launch_background.xml entirely, which is
+     what was putting a stray tricolor triangle in front of the real
+     animated intro).
+
+     Kept in a separate version-qualified folder rather than merged into the
+     base values/styles.xml so that pre-12 devices, whose resource compiler
+     doesn't know these attribute names, are left completely untouched. -->
+<resources>
+    <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+
+        <!-- The OS splash's backdrop. Deliberately the same #05070D the
+             launcher-icon background and launch_background.xml already use,
+             so the pre-Flutter frame and the Flutter intro's own dark
+             backdrop are the same shade and the handover is invisible. -->
+        <item name="android:windowSplashScreenBackground">@color/ic_launcher_background</item>
+
+        <!-- The actual fix: a transparent icon means the OS splash paints
+             colour only, never the launcher triangle. -->
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_transparent</item>
+
+        <!-- Suppresses the circular plate the OS would otherwise draw behind
+             the icon slot. Without this a faint disc can still show on some
+             OEM skins even when the icon itself is transparent. -->
+        <item name="android:windowSplashScreenIconBackgroundColor">@android:color/transparent</item>
+    </style>
+
+    <!-- Unchanged from the base file — repeated here only because a
+         version-qualified values folder replaces same-named styles wholesale
+         rather than merging with them. -->
+    <style name="NormalTheme" parent="@android:style/Theme.Light.NoTitleBar">
+        <item name="android:windowBackground">?android:colorBackground</item>
+    </style>
+</resources>

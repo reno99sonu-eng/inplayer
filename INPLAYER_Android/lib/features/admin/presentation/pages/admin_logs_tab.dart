@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/time_utils.dart';
 import '../../../../services/admin_service.dart';
 import '../../../../models/admin_audit_log.dart';
@@ -23,12 +24,12 @@ class AdminLogsTab extends StatelessWidget {
       child: Column(
         children: [
           Container(
-            color: AppColors.backgroundDark,
-            child: const TabBar(
+            color: context.bgCanvas,
+            child: TabBar(
               indicatorColor: AppColors.brandOrange,
               labelColor: AppColors.brandOrange,
-              unselectedLabelColor: AppColors.textSecondaryDark,
-              tabs: [Tab(text: 'Audit'), Tab(text: 'Errors'), Tab(text: 'Bug reports')],
+              unselectedLabelColor: context.textSecondary,
+              tabs: const [Tab(text: 'Audit'), Tab(text: 'Errors'), Tab(text: 'Bug reports')],
             ),
           ),
           const Expanded(
@@ -292,9 +293,9 @@ class _BugReportsViewState extends ConsumerState<_BugReportsView> {
                             label: Text(s.replaceAll('_', ' ')),
                             selected: status == s,
                             onSelected: (_) => setDialogState(() => status = s),
-                            backgroundColor: AppColors.backgroundDark,
+                            backgroundColor: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
                             selectedColor: AppColors.brandOrange.withValues(alpha: 0.25),
-                            labelStyle: TextStyle(color: status == s ? AppColors.brandOrange : AppColors.textSecondaryDark, fontSize: 11),
+                            labelStyle: TextStyle(color: status == s ? AppColors.brandOrange : context.textSecondary, fontSize: 11),
                             side: BorderSide.none,
                           ))
                       .toList(),

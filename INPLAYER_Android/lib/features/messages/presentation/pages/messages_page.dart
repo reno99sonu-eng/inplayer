@@ -1,7 +1,9 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/pattern_background.dart';
 import '../../../../core/utils/image_utils.dart';
 import '../../../../core/utils/time_utils.dart';
 import '../../../../services/message_service.dart';
@@ -59,9 +61,9 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
     } else if (!ok) {
       setState(() => _requests = [c, ..._requests]);
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Couldn't do that. Try again."),
-          backgroundColor: AppColors.surfaceDark,
+        SnackBar(
+          content: const Text("Couldn't do that. Try again."),
+          backgroundColor: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
         ),
       );
     }
@@ -71,42 +73,49 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
   Widget build(BuildContext context) {
     return DefaultTabController(
       length: 2,
-      child: Scaffold(
-        backgroundColor: AppColors.backgroundDark,
-        appBar: AppBar(
-          backgroundColor: AppColors.backgroundDark,
-          elevation: 0,
-          title: const Text(
-            'MilonBook',
-            style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimaryDark),
-          ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.edit_outlined, color: AppColors.textPrimaryDark),
-              onPressed: () async {
-                await context.push('/messages/new');
-                if (mounted) _load();
-              },
-            ),
-          ],
-          bottom: TabBar(
-            indicatorColor: AppColors.brandOrange,
-            labelColor: AppColors.brandOrange,
-            unselectedLabelColor: AppColors.textSecondaryDark,
-            tabs: [
-              const Tab(text: 'MilonBook'),
-              Tab(text: _requests.isEmpty ? 'Requests' : 'Requests (${_requests.length})'),
-            ],
-          ),
-        ),
-        body: _loading
-            ? const Center(child: CircularProgressIndicator(color: AppColors.brandOrange))
-            : TabBarView(
-                children: [
-                  _buildList(_conversations, isRequests: false),
-                  _buildList(_requests, isRequests: true),
-                ],
+      child: PatternBackground(
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          appBar: AppBar(
+            backgroundColor: context.bgCanvas.withValues(alpha: 0.95),
+            elevation: 0,
+            iconTheme: IconThemeData(color: context.textPrimary),
+            title: Text(
+              'MilonBook',
+              style: TextStyle(
+                fontWeight: FontWeight.w800,
+                color: context.textPrimary,
+                letterSpacing: -0.5,
               ),
+            ),
+            actions: [
+              IconButton(
+                icon: Icon(Icons.edit_outlined, color: context.textPrimary),
+                onPressed: () async {
+                  await context.push('/messages/new');
+                  if (mounted) _load();
+                },
+              ),
+            ],
+            bottom: TabBar(
+              indicatorColor: AppColors.brandOrange,
+              labelColor: AppColors.brandOrange,
+              unselectedLabelColor: context.textSecondary,
+              tabs: [
+                const Tab(text: 'MilonBook'),
+                Tab(text: _requests.isEmpty ? 'Requests' : 'Requests (${_requests.length})'),
+              ],
+            ),
+          ),
+          body: _loading
+              ? const Center(child: CircularProgressIndicator(color: AppColors.brandOrange))
+              : TabBarView(
+                  children: [
+                    _buildList(_conversations, isRequests: false),
+                    _buildList(_requests, isRequests: true),
+                  ],
+                ),
+        ),
       ),
     );
   }
@@ -114,7 +123,7 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
   Widget _buildList(List<Conversation> items, {required bool isRequests}) {
     return RefreshIndicator(
       color: AppColors.brandOrange,
-      backgroundColor: AppColors.surfaceDark,
+      backgroundColor: context.bgCard,
       onRefresh: _load,
       child: items.isEmpty
           ? ListView(
@@ -128,19 +137,19 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
                         Icon(
                           isRequests ? Icons.mail_outline : Icons.chat_bubble_outline,
                           size: 48,
-                          color: AppColors.textSecondaryDark.withValues(alpha: 0.5),
+                          color: context.textDim,
                         ),
                         const SizedBox(height: 16),
                         Text(
                           isRequests ? 'No message requests' : 'No messages yet',
-                          style: const TextStyle(color: AppColors.textSecondaryDark),
+                          style: TextStyle(color: context.textSecondary),
                         ),
                         if (!isRequests) ...[
                           const SizedBox(height: 8),
                           Text(
                             'Tap the pencil to start a conversation',
                             style: TextStyle(
-                              color: AppColors.textSecondaryDark.withValues(alpha: 0.7),
+                              color: context.textDim,
                               fontSize: 12,
                             ),
                           ),
@@ -153,7 +162,7 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
             )
           : ListView.separated(
               itemCount: items.length,
-              separatorBuilder: (context, index) => const Divider(height: 1, color: AppColors.cardDark),
+              separatorBuilder: (context, index) => Divider(height: 1, color: context.borderSubtle),
               itemBuilder: (context, index) {
                 final c = items[index];
                 final avatar = c.otherAvatarUrl != null ? smartImageProvider(c.otherAvatarUrl!) : null;
@@ -161,19 +170,19 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
 
                 return ListTile(
                   onTap: () => _openConversation(c),
-                  tileColor: unread ? AppColors.brandOrange.withValues(alpha: 0.06) : null,
+                  tileColor: unread ? AppColors.brandOrange.withValues(alpha: 0.08) : null,
                   leading: CircleAvatar(
                     radius: 22,
-                    backgroundColor: AppColors.surfaceDark,
+                    backgroundColor: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
                     backgroundImage: avatar,
                     child: avatar == null
-                        ? const Icon(Icons.person, color: AppColors.textSecondaryDark)
+                        ? Icon(Icons.person, color: context.textSecondary)
                         : null,
                   ),
                   title: Text(
                     c.otherUsername ?? 'Unknown',
                     style: TextStyle(
-                      color: AppColors.textPrimaryDark,
+                      color: context.textPrimary,
                       fontWeight: unread ? FontWeight.bold : FontWeight.w600,
                     ),
                   ),
@@ -182,7 +191,7 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: TextStyle(
-                      color: unread ? AppColors.textPrimaryDark : AppColors.textSecondaryDark,
+                      color: unread ? context.textPrimary : context.textSecondary,
                       fontWeight: unread ? FontWeight.w600 : FontWeight.normal,
                     ),
                   ),
@@ -191,7 +200,7 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
                           mainAxisSize: MainAxisSize.min,
                           children: [
                             IconButton(
-                              icon: const Icon(Icons.close, color: AppColors.textSecondaryDark),
+                              icon: Icon(Icons.close, color: context.textSecondary),
                               onPressed: () => _respondToRequest(c, false),
                             ),
                             IconButton(
@@ -206,7 +215,7 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
                           children: [
                             Text(
                               formatTimeAgo(c.lastMessageAt),
-                              style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 11),
+                              style: TextStyle(color: context.textDim, fontSize: 11),
                             ),
                             if (unread) ...[
                               const SizedBox(height: 6),

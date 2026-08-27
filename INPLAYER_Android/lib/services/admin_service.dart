@@ -19,6 +19,9 @@ import '../models/admin_platform_settings.dart';
 import '../models/admin_audit_log.dart';
 import '../models/admin_error_log.dart';
 import '../models/admin_bug_report.dart';
+import '../models/admin_support_ticket.dart';
+import '../models/admin_hammart_order.dart';
+import '../models/admin_sponsorship.dart';
 
 final adminServiceProvider = Provider<AdminService>((ref) {
   return AdminService();
@@ -75,7 +78,7 @@ class AdminService {
         '${ApiConstants.admin}/users',
         queryParameters: {
           if (query != null && query.isNotEmpty) 'query': query,
-          if (cursor != null) 'cursor': cursor,
+          'cursor': ?cursor,
         },
       );
       if (response.statusCode == 200 && response.data is Map) {
@@ -279,14 +282,37 @@ class AdminService {
 
   // ── Content browser (Videos) ─────────────────────────────────────────
 
-  Future<AdminVideosResult> getAdminVideos({String? type, String? query, String? cursor}) async {
+  /// The admin content browser.
+  ///
+  /// [type] is 'video' | 'short' | 'music' (null = all three). Music is its
+  /// own content kind server-side, not a flavour of video — see the
+  /// TYPE_VALUES comment in app/api/admin/videos/route.ts — so it gets its
+  /// own tab here exactly as it does on the website.
+  ///
+  /// [status] is 'live' | 'processing' | 'ready' | 'error'. Note 'ready'
+  /// also matches rows with no status attribute at all, i.e. everything
+  /// uploaded before that field existed.
+  ///
+  /// [includeCounts] asks for the per-status totals behind the filter
+  /// badges. The route computes those with a second full-table scan and
+  /// skips it whenever a search query is active, so only ask on a first,
+  /// unsearched page — which is exactly when the numbers mean anything.
+  Future<AdminVideosResult> getAdminVideos({
+    String? type,
+    String? status,
+    String? query,
+    String? cursor,
+    bool includeCounts = false,
+  }) async {
     try {
       final response = await _dio.get(
         '${ApiConstants.admin}/videos',
         queryParameters: {
-          if (type != null) 'type': type,
+          'type': ?type,
+          'status': ?status,
           if (query != null && query.isNotEmpty) 'query': query,
-          if (cursor != null) 'cursor': cursor,
+          'cursor': ?cursor,
+          if (includeCounts) 'counts': '1',
         },
       );
       if (response.statusCode == 200 && response.data is Map) {
@@ -295,7 +321,19 @@ class AdminService {
             .whereType<Map>()
             .map((j) => AdminVideoRow.fromJson(Map<String, dynamic>.from(j)))
             .toList();
-        return AdminVideosResult(videos: videos, nextCursor: data['nextCursor'] as String?);
+        final rawCounts = data['counts'];
+        final counts = <String, int>{};
+        if (rawCounts is Map) {
+          rawCounts.forEach((k, v) {
+            final n = v is num ? v.toInt() : int.tryParse(v.toString());
+            if (n != null) counts[k.toString()] = n;
+          });
+        }
+        return AdminVideosResult(
+          videos: videos,
+          nextCursor: data['nextCursor'] as String?,
+          counts: counts,
+        );
       }
       return AdminVideosResult();
     } catch (e) {
@@ -328,7 +366,7 @@ class AdminService {
     try {
       final response = await _dio.post(
         '${ApiConstants.admin}/creators',
-        data: {'userId': userId, 'action': action, if (reason != null) 'reason': reason},
+        data: {'userId': userId, 'action': action, 'reason': ?reason},
       );
       if (response.statusCode == 200) return AdminActionResult(success: true);
       final error = (response.data is Map ? response.data['error'] : null) as String?;
@@ -420,7 +458,7 @@ class AdminService {
     try {
       final response = await _dio.post(
         '${ApiConstants.admin}/notifications',
-        data: {'target': target, 'message': message, if (username != null) 'username': username},
+        data: {'target': target, 'message': message, 'username': ?username},
       );
       if (response.statusCode == 200 && response.data is Map) {
         final data = response.data as Map;
@@ -462,9 +500,9 @@ class AdminService {
         '${ApiConstants.admin}/navbar-theme',
         data: {
           'imageUrl': imageUrl,
-          if (occasionId != null) 'occasionId': occasionId,
-          if (occasionName != null) 'occasionName': occasionName,
-          if (title != null) 'title': title,
+          'occasionId': ?occasionId,
+          'occasionName': ?occasionName,
+          'title': ?title,
           'active': active,
         },
       );
@@ -539,7 +577,7 @@ class AdminService {
     try {
       final response = await _dio.post(
         '${ApiConstants.admin}/hammart-vendors',
-        data: {'userId': userId, 'action': action, if (reason != null) 'reason': reason},
+        data: {'userId': userId, 'action': action, 'reason': ?reason},
       );
       if (response.statusCode == 200) return AdminActionResult(success: true);
       final error = (response.data is Map ? response.data['error'] : null) as String?;
@@ -583,7 +621,7 @@ class AdminService {
         data: {
           'placement': placement,
           'imageUrl': imageUrl,
-          if (imageUrlDesktop != null) 'imageUrlDesktop': imageUrlDesktop,
+          'imageUrlDesktop': ?imageUrlDesktop,
           'linkUrl': linkUrl,
           'title': title,
         },
@@ -737,7 +775,7 @@ class AdminService {
     try {
       final response = await _dio.get(
         '${ApiConstants.admin}/bug-reports',
-        queryParameters: {if (status != null) 'status': status},
+        queryParameters: {'status': ?status},
       );
       if (response.statusCode == 200 && response.data is Map) {
         final data = response.data as Map;
@@ -758,7 +796,7 @@ class AdminService {
     try {
       final response = await _dio.post(
         '${ApiConstants.admin}/bug-reports',
-        data: {'reportId': reportId, 'status': status, if (adminNotes != null) 'adminNotes': adminNotes},
+        data: {'reportId': reportId, 'status': status, 'adminNotes': ?adminNotes},
       );
       return response.statusCode == 200;
     } catch (e) {
@@ -808,6 +846,113 @@ class AdminService {
     } catch (e) {
       _logger.e('Error running Shorts thumbnail backfill: $e');
       return null;
+    }
+  }
+
+  // ── Support Desk ───────────────────────────────────────────────────────
+
+  Future<AdminSupportResult> getSupportTickets({String domain = 'inplayer', String? status}) async {
+    try {
+      final response = await _dio.get(
+        '${ApiConstants.admin}/support',
+        queryParameters: {
+          'domain': domain,
+          if (status != null && status.isNotEmpty && status != 'all') 'status': status,
+        },
+      );
+      if (response.statusCode == 200 && response.data is Map) {
+        final data = response.data as Map;
+        final tickets = (data['tickets'] as List? ?? [])
+            .whereType<Map>()
+            .map((j) => AdminSupportTicket.fromJson(Map<String, dynamic>.from(j)))
+            .toList();
+        final rawCounts = data['counts'] as Map? ?? {};
+        final counts = <String, int>{};
+        for (final entry in rawCounts.entries) {
+          counts[entry.key.toString()] = (entry.value as num?)?.toInt() ?? 0;
+        }
+        return AdminSupportResult(
+          tickets: tickets,
+          counts: counts,
+          tableMissing: data['tableMissing'] == true,
+        );
+      }
+      return AdminSupportResult(tickets: []);
+    } catch (e) {
+      _logger.e('Error fetching admin support tickets: $e');
+      return AdminSupportResult(tickets: []);
+    }
+  }
+
+  Future<bool> updateSupportTicketStatus(String ticketId, String status, {String? adminNotes}) async {
+    try {
+      final response = await _dio.patch(
+        '${ApiConstants.admin}/support',
+        data: {
+          'ticketId': ticketId,
+          'status': status,
+          if (adminNotes != null) 'adminNotes': adminNotes,
+        },
+      );
+      return response.statusCode == 200 && response.data is Map && response.data['success'] == true;
+    } catch (e) {
+      _logger.e('Error updating support ticket status: $e');
+      return false;
+    }
+  }
+
+  // ── Hammart Orders ─────────────────────────────────────────────────────
+
+  Future<AdminHammartOrdersResult> getHammartOrders({String tab = 'all'}) async {
+    try {
+      final response = await _dio.get(
+        '${ApiConstants.admin}/hammart-orders',
+        queryParameters: {'tab': tab},
+      );
+      if (response.statusCode == 200 && response.data is Map) {
+        final data = response.data as Map;
+        final items = (data['items'] as List? ?? [])
+            .whereType<Map>()
+            .map((j) => AdminHammartOrder.fromJson(Map<String, dynamic>.from(j)))
+            .toList();
+        final rawCounts = data['counts'] as Map? ?? {};
+        final counts = <String, int>{};
+        for (final entry in rawCounts.entries) {
+          counts[entry.key.toString()] = (entry.value as num?)?.toInt() ?? 0;
+        }
+        return AdminHammartOrdersResult(
+          items: items,
+          counts: counts,
+          tableMissing: data['tableMissing'] == true,
+        );
+      }
+      return AdminHammartOrdersResult(items: []);
+    } catch (e) {
+      _logger.e('Error fetching admin hammart orders: $e');
+      return AdminHammartOrdersResult(items: []);
+    }
+  }
+
+  // ── Sponsorships ───────────────────────────────────────────────────────
+
+  Future<AdminSponsorshipsResult> getSponsorships() async {
+    try {
+      final response = await _dio.get('${ApiConstants.admin}/sponsorships');
+      if (response.statusCode == 200 && response.data is Map) {
+        final data = response.data as Map;
+        final items = (data['items'] as List? ?? [])
+            .whereType<Map>()
+            .map((j) => AdminSponsorship.fromJson(Map<String, dynamic>.from(j)))
+            .toList();
+        return AdminSponsorshipsResult(
+          items: items,
+          tableMissing: data['tableMissing'] == true,
+        );
+      }
+      return AdminSponsorshipsResult(items: []);
+    } catch (e) {
+      _logger.e('Error fetching admin sponsorships: $e');
+      return AdminSponsorshipsResult(items: []);
     }
   }
 }

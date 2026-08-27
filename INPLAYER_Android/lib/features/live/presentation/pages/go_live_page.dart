@@ -1,10 +1,12 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:logger/logger.dart';
 import 'package:video_player/video_player.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/pattern_background.dart';
 import '../../../../services/live_service.dart';
 import '../../../../models/live_stream.dart';
 
@@ -16,16 +18,6 @@ const _visibilityOptions = [
 
 enum _Stage { setup, starting, live, ended }
 
-/// "Go Live" — the real broadcaster flow against POST /api/live/ivs-create
-/// and POST /api/live/end. The website captures your camera directly in
-/// the browser via the AWS IVS Web Broadcast SDK (WebRTC); there's no
-/// equivalent native camera-broadcast SDK wired into this Flutter app yet,
-/// so instead of faking an in-app "Start Camera" button that doesn't
-/// actually push video, this screen creates the real IVS channel and hands
-/// you the real RTMPS ingest URL + stream key to paste into any RTMP
-/// broadcaster app (OBS Studio, Streamlabs, Larix, etc.) — a genuine,
-/// working way to go live from a phone today, just via an external app for
-/// the camera capture step rather than in-app.
 class GoLivePage extends ConsumerStatefulWidget {
   const GoLivePage({super.key});
 
@@ -60,7 +52,10 @@ class _GoLivePageState extends ConsumerState<GoLivePage> {
   void _showSnack(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: AppColors.surfaceDark),
+      SnackBar(
+        content: Text(message),
+        backgroundColor: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+      ),
     );
   }
 
@@ -152,11 +147,11 @@ class _GoLivePageState extends ConsumerState<GoLivePage> {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: AppColors.cardDark,
-        title: const Text('End live stream?', style: TextStyle(color: AppColors.textPrimaryDark)),
-        content: const Text(
+        backgroundColor: context.bgModal,
+        title: Text('End live stream?', style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.bold)),
+        content: Text(
           "This stops your stream from showing as live. Also stop broadcasting from your streaming app.",
-          style: TextStyle(color: AppColors.textSecondaryDark),
+          style: TextStyle(color: context.textSecondary),
         ),
         actions: [
           TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
@@ -185,14 +180,24 @@ class _GoLivePageState extends ConsumerState<GoLivePage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
-      appBar: AppBar(
-        backgroundColor: AppColors.backgroundDark,
-        elevation: 0,
-        title: const Text('Go Live', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+    return PatternBackground(
+      child: Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: context.bgCanvas.withValues(alpha: 0.95),
+          elevation: 0,
+          iconTheme: IconThemeData(color: context.textPrimary),
+          title: Text(
+            'Go Live',
+            style: TextStyle(
+              color: context.textPrimary,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.5,
+            ),
+          ),
+        ),
+        body: SafeArea(child: _buildStage()),
       ),
-      body: SafeArea(child: _buildStage()),
     );
   }
 
@@ -227,7 +232,7 @@ class _GoLivePageState extends ConsumerState<GoLivePage> {
               Expanded(
                 child: Text(
                   "You'll broadcast from a streaming app (like OBS or Streamlabs) using a server URL and key we generate for you — not directly from this screen.",
-                  style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 12.5, height: 1.4),
+                  style: TextStyle(color: context.textPrimary, fontSize: 12.5, height: 1.4),
                 ),
               ),
             ],
@@ -238,7 +243,7 @@ class _GoLivePageState extends ConsumerState<GoLivePage> {
         TextField(
           controller: _titleController,
           maxLength: 100,
-          style: const TextStyle(color: AppColors.textPrimaryDark),
+          style: TextStyle(color: context.textPrimary),
           decoration: _inputDecoration('Give your stream a title'),
         ),
         _label('Description'),
@@ -246,14 +251,14 @@ class _GoLivePageState extends ConsumerState<GoLivePage> {
           controller: _descriptionController,
           maxLength: 500,
           maxLines: 3,
-          style: const TextStyle(color: AppColors.textPrimaryDark),
+          style: TextStyle(color: context.textPrimary),
           decoration: _inputDecoration('Tell viewers what this stream is about'),
         ),
         _label('Visibility'),
         DropdownButtonFormField<String>(
-          value: _visibility,
-          dropdownColor: AppColors.cardDark,
-          style: const TextStyle(color: AppColors.textPrimaryDark),
+          initialValue: _visibility,
+          dropdownColor: context.bgCard,
+          style: TextStyle(color: context.textPrimary),
           decoration: _inputDecoration(null),
           items: _visibilityOptions
               .map((o) => DropdownMenuItem(value: o.value, child: Text(o.label, overflow: TextOverflow.ellipsis)))
@@ -263,8 +268,8 @@ class _GoLivePageState extends ConsumerState<GoLivePage> {
         const SizedBox(height: 8),
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
-          activeColor: AppColors.brandOrange,
-          title: const Text('Comments enabled', style: TextStyle(color: AppColors.textPrimaryDark)),
+          activeThumbColor: AppColors.brandOrange,
+          title: Text('Comments enabled', style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.w600)),
           value: _commentsEnabled,
           onChanged: (v) => setState(() => _commentsEnabled = v),
         ),
@@ -273,14 +278,32 @@ class _GoLivePageState extends ConsumerState<GoLivePage> {
           Text(_error!, style: const TextStyle(color: AppColors.error, fontSize: 13)),
         ],
         const SizedBox(height: 20),
-        ElevatedButton.icon(
-          onPressed: _goLive,
-          icon: const Icon(Icons.podcasts),
-          label: const Text('Create Live Stream'),
-          style: ElevatedButton.styleFrom(
-            minimumSize: const Size(double.infinity, 52),
-            backgroundColor: AppColors.brandOrange,
-            foregroundColor: Colors.white,
+        Container(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            gradient: AppColors.flameGradient,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.brandOrange.withValues(alpha: 0.3),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: ElevatedButton.icon(
+            onPressed: _goLive,
+            icon: const Icon(Icons.podcasts, color: Colors.black),
+            label: const Text(
+              'Create Live Stream',
+              style: TextStyle(color: Colors.black, fontWeight: FontWeight.w800, fontSize: 15),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.transparent,
+              shadowColor: Colors.transparent,
+              minimumSize: const Size(double.infinity, 52),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            ),
           ),
         ),
         const SizedBox(height: 24),
@@ -306,12 +329,13 @@ class _GoLivePageState extends ConsumerState<GoLivePage> {
           ),
         ),
         const SizedBox(height: 16),
-        Text(_titleController.text.trim(), style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+        Text(_titleController.text.trim(), style: TextStyle(color: context.textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
         const SizedBox(height: 20),
         _sectionTitle('1. Open your streaming app'),
-        const Text(
+        const SizedBox(height: 4),
+        Text(
           'Use OBS Studio, Streamlabs, Larix Broadcaster, or any app that streams to a custom RTMP server. Enter these two values there:',
-          style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 13, height: 1.4),
+          style: TextStyle(color: context.textSecondary, fontSize: 13, height: 1.4),
         ),
         const SizedBox(height: 12),
         _credRow('Server URL', creds.rtmpsServerUrl ?? '—', onCopy: () => _copy('Server URL', creds.rtmpsServerUrl)),
@@ -321,20 +345,21 @@ class _GoLivePageState extends ConsumerState<GoLivePage> {
           _showStreamKey ? (creds.streamKey ?? '—') : List.filled(24, '•').join(),
           onCopy: () => _copy('Stream key', creds.streamKey),
           trailing: IconButton(
-            icon: Icon(_showStreamKey ? Icons.visibility_off : Icons.visibility, color: Colors.white.withValues(alpha: 0.6), size: 18),
+            icon: Icon(_showStreamKey ? Icons.visibility_off : Icons.visibility, color: context.textDim, size: 18),
             onPressed: () => setState(() => _showStreamKey = !_showStreamKey),
           ),
         ),
         const SizedBox(height: 8),
         Text(
           "Don't share your stream key — anyone with it can broadcast to your channel.",
-          style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
+          style: TextStyle(color: context.textDim, fontSize: 11),
         ),
         const SizedBox(height: 24),
         _sectionTitle('2. Press "Start Streaming" there'),
-        const Text(
+        const SizedBox(height: 4),
+        Text(
           'Your stream goes live on InPlayer as soon as your app connects and starts sending video.',
-          style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 13, height: 1.4),
+          style: TextStyle(color: context.textSecondary, fontSize: 13, height: 1.4),
         ),
         const SizedBox(height: 20),
         _sectionTitle('Preview'),
@@ -369,6 +394,10 @@ class _GoLivePageState extends ConsumerState<GoLivePage> {
           onPressed: _togglePreview,
           icon: Icon(_previewController != null ? Icons.stop : Icons.play_arrow),
           label: Text(_previewController != null ? 'Stop Preview' : 'Load Preview'),
+          style: OutlinedButton.styleFrom(
+            side: BorderSide(color: context.borderSubtle),
+            foregroundColor: context.textPrimary,
+          ),
         ),
         const SizedBox(height: 28),
         ElevatedButton.icon(
@@ -379,6 +408,7 @@ class _GoLivePageState extends ConsumerState<GoLivePage> {
             minimumSize: const Size(double.infinity, 52),
             backgroundColor: AppColors.error,
             foregroundColor: Colors.white,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
           ),
         ),
         const SizedBox(height: 24),
@@ -395,13 +425,18 @@ class _GoLivePageState extends ConsumerState<GoLivePage> {
           children: [
             const Icon(Icons.check_circle, color: AppColors.brandOrange, size: 56),
             const SizedBox(height: 16),
-            const Text(
+            Text(
               'Stream ended',
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(color: context.textPrimary, fontSize: 18, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 24),
             ElevatedButton(
               onPressed: () => context.pop(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.brandOrange,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              ),
               child: const Text('Done'),
             ),
           ],
@@ -412,31 +447,35 @@ class _GoLivePageState extends ConsumerState<GoLivePage> {
 
   Widget _sectionTitle(String text) => Text(
         text,
-        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
+        style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.bold, fontSize: 14),
       );
 
   Widget _credRow(String label, String value, {required VoidCallback onCopy, Widget? trailing}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(color: AppColors.cardDark, borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(
+        color: context.bgCard,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: context.borderSubtle),
+      ),
       child: Row(
         children: [
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label, style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 11)),
+                Text(label, style: TextStyle(color: context.textDim, fontSize: 11)),
                 const SizedBox(height: 2),
                 Text(
                   value,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(color: Colors.white, fontSize: 13, fontFamily: 'monospace'),
+                  style: TextStyle(color: context.textPrimary, fontSize: 13, fontFamily: 'monospace'),
                 ),
               ],
             ),
           ),
-          if (trailing != null) trailing,
+          ?trailing,
           IconButton(
             icon: const Icon(Icons.copy, color: AppColors.brandOrange, size: 18),
             onPressed: onCopy,
@@ -450,19 +489,27 @@ class _GoLivePageState extends ConsumerState<GoLivePage> {
         padding: const EdgeInsets.only(top: 16, bottom: 6),
         child: Text(
           text,
-          style: const TextStyle(color: AppColors.textSecondaryDark, fontWeight: FontWeight.w600, fontSize: 13),
+          style: TextStyle(color: context.textSecondary, fontWeight: FontWeight.w600, fontSize: 13),
         ),
       );
 
   InputDecoration _inputDecoration(String? hint) {
     return InputDecoration(
       hintText: hint,
-      hintStyle: TextStyle(color: AppColors.textSecondaryDark.withValues(alpha: 0.6)),
+      hintStyle: TextStyle(color: context.textDim, fontSize: 13),
       filled: true,
-      fillColor: AppColors.cardDark,
+      fillColor: context.bgCard,
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
-        borderSide: BorderSide.none,
+        borderSide: BorderSide(color: context.borderSubtle),
+      ),
+      enabledBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: BorderSide(color: context.borderSubtle),
+      ),
+      focusedBorder: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(12),
+        borderSide: const BorderSide(color: AppColors.brandOrange, width: 1.5),
       ),
       contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
     );

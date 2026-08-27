@@ -6,6 +6,7 @@ import '../core/constants/api_constants.dart';
 import '../models/video.dart';
 import '../models/short.dart';
 import '../models/trending_creator.dart';
+import '../models/video_suggestion.dart';
 
 final videoServiceProvider = Provider<VideoService>((ref) {
   return VideoService();
@@ -15,37 +16,41 @@ class VideoService {
   final _dio = DioClient().dio;
   final _logger = Logger();
 
-  /// Loads the real video feed from the InPlayer website backend.
-  ///
-  /// This is the same `/api/videos` endpoint the website's homepage,
-  /// /videos, and channel pages all read from (see app/api/videos/route.ts)
-  /// — it returns every public, ready video, newest first.
-  Future<List<Video>> getVideos() async {
+  static List<Video>? _cachedVideos;
+  static DateTime? _videosCacheTime;
+
+  static List<Video>? _cachedFeatured;
+  static DateTime? _featuredCacheTime;
+
+  /// Loads the real video feed from the InPlayer website backend with instant in-memory caching.
+  Future<List<Video>> getVideos({bool forceRefresh = false}) async {
+    if (!forceRefresh &&
+        _cachedVideos != null &&
+        _cachedVideos!.isNotEmpty &&
+        _videosCacheTime != null &&
+        DateTime.now().difference(_videosCacheTime!).inSeconds < 45) {
+      return _cachedVideos!;
+    }
+
     try {
       final response = await _dio.get(ApiConstants.videos);
 
       if (response.statusCode != 200) {
-        _logger.w(
-          'getVideos returned HTTP ${response.statusCode}',
-        );
-        return [];
+        _logger.w('getVideos returned HTTP ${response.statusCode}');
+        return _cachedVideos ?? [];
       }
 
       final data = response.data;
-
       if (data is! Map) {
-        _logger.w('Unexpected /api/videos response format');
-        return [];
+        return _cachedVideos ?? [];
       }
 
       final videosJson = data['videos'];
-
       if (videosJson is! List) {
-        _logger.w('No videos array found in /api/videos response');
-        return [];
+        return _cachedVideos ?? [];
       }
 
-      return videosJson
+      final result = videosJson
           .whereType<Map>()
           .map(
             (json) => Video.fromJson(
@@ -53,57 +58,69 @@ class VideoService {
             ),
           )
           .toList();
+
+      _cachedVideos = result;
+      _videosCacheTime = DateTime.now();
+      return result;
     } catch (e, stackTrace) {
       _logger.e(
         'Error fetching real InPlayer videos',
         error: e,
         stackTrace: stackTrace,
       );
-      return [];
+      return _cachedVideos ?? [];
     }
   }
 
-  /// Loads the real Featured Weekly videos.
-  Future<List<Video>> getFeaturedWeekly() async {
+  /// Loads the real Featured Weekly videos with instant in-memory caching.
+  Future<List<Video>> getFeaturedWeekly({bool forceRefresh = false}) async {
+    if (!forceRefresh &&
+        _cachedFeatured != null &&
+        _cachedFeatured!.isNotEmpty &&
+        _featuredCacheTime != null &&
+        DateTime.now().difference(_featuredCacheTime!).inSeconds < 45) {
+      return _cachedFeatured!;
+    }
+
     try {
       final response = await _dio.get(
         ApiConstants.featuredWeekly,
       );
 
       if (response.statusCode != 200) {
-        _logger.w(
-          'getFeaturedWeekly returned HTTP ${response.statusCode}',
-        );
-        return [];
+        return _cachedFeatured ?? [];
       }
 
       final data = response.data;
-
       if (data is! Map) {
-        return [];
+        return _cachedFeatured ?? [];
       }
 
       final videosJson = data['videos'];
-
       if (videosJson is! List) {
-        return [];
+        return _cachedFeatured ?? [];
       }
 
-      return videosJson
+      final result = videosJson
           .whereType<Map>()
           .map(
             (json) => Video.fromJson(
               Map<String, dynamic>.from(json),
             ),
           )
+          .where((v) => !v.isMusic)
           .toList();
+
+      _cachedFeatured = result;
+      _featuredCacheTime = DateTime.now();
+      return result;
     } catch (e, stackTrace) {
       _logger.e(
         'Error fetching featured weekly videos',
         error: e,
         stackTrace: stackTrace,
       );
-      return [];
+      return _cachedFeatured ?? [];
     }
   }
 
@@ -352,6 +369,45 @@ class VideoService {
     }
   }
 
+  /// Live search-as-you-type suggestions — GET /api/videos/suggest?q=
+  /// (app/api/videos/suggest/route.ts), a real, separate, lightweight
+  /// endpoint already audience-filtered server-side. Returns up to 8
+  /// title-matched results carrying only videoId/title/thumbnail/
+  /// contentType — the typeahead dropdown in search_page.dart, not the
+  /// full results grid (which stays on searchVideos() above, unchanged).
+  Future<List<VideoSuggestion>> getSuggestions(String query) async {
+    final trimmed = query.trim();
+    if (trimmed.isEmpty) return [];
+
+    try {
+      final response = await _dio.get(
+        ApiConstants.videoSuggest,
+        queryParameters: {'q': trimmed},
+      );
+
+      if (response.statusCode != 200) {
+        return [];
+      }
+
+      final data = response.data;
+      if (data is! Map || data['suggestions'] is! List) {
+        return [];
+      }
+
+      return (data['suggestions'] as List)
+          .whereType<Map>()
+          .map((json) => VideoSuggestion.fromJson(Map<String, dynamic>.from(json)))
+          .toList();
+    } catch (e, stackTrace) {
+      _logger.e(
+        'Error fetching search suggestions for "$trimmed"',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      return [];
+    }
+  }
+
   /// The signed-in user's own uploads (Creator Studio / "My Videos").
   /// GET /api/my-videos (app/api/my-videos/route.ts) — every video where
   /// uploaderId matches the caller, any status/visibility (unlike the
@@ -442,6 +498,87 @@ class VideoService {
         error: e,
         stackTrace: stackTrace,
       );
+      return [];
+    }
+  }
+
+  /// Updates a video owned by the signed-in user (PATCH /api/my-videos/:videoId).
+  Future<bool> updateMyVideo(String videoId, Map<String, dynamic> data) async {
+    try {
+      final response = await _dio.patch(
+        '${ApiConstants.myVideos}/$videoId',
+        data: data,
+      );
+      return response.statusCode == 200;
+    } catch (e, stackTrace) {
+      _logger.e('Error updating video $videoId', error: e, stackTrace: stackTrace);
+      return false;
+    }
+  }
+
+  /// Deletes a video owned by the signed-in user (DELETE /api/my-videos/:videoId).
+  Future<bool> deleteMyVideo(String videoId) async {
+    try {
+      final response = await _dio.delete(
+        '${ApiConstants.myVideos}/$videoId',
+      );
+      return response.statusCode == 200;
+    } catch (e, stackTrace) {
+      _logger.e('Error deleting video $videoId', error: e, stackTrace: stackTrace);
+      return false;
+    }
+  }
+
+  /// Updates the user's channel bio (POST /api/profile/settings with action: 'update_bio').
+  Future<bool> updateBio(String bio) async {
+    try {
+      final response = await _dio.post(
+        ApiConstants.profileSettings,
+        data: {
+          'action': 'update_bio',
+          'bio': bio,
+        },
+      );
+      return response.statusCode == 200;
+    } catch (e, stackTrace) {
+      _logger.e('Error updating channel bio', error: e, stackTrace: stackTrace);
+      return false;
+    }
+  }
+
+  /// Fetches channel analytics from GET /api/analytics/channel or /api/my-videos/analytics.
+  Future<Map<String, dynamic>?> getChannelAnalytics() async {
+    try {
+      final response = await _dio.get('/api/my-videos/analytics');
+      if (response.statusCode == 200 && response.data is Map) {
+        return Map<String, dynamic>.from(response.data as Map);
+      }
+      return null;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// GET /api/my-videos — the signed-in creator's own uploads, any status
+  /// (processing/ready/etc). Returned raw rather than through Video.fromJson:
+  /// that model pre-formats `views` as a display string ("12 views") and has
+  /// no `status` field, both of which the Analytics and Storage settings
+  /// pages need untouched. Backs those two real, previously-static pages.
+  Future<List<Map<String, dynamic>>> getMyVideoStatsRaw() async {
+    try {
+      final response = await _dio.get(ApiConstants.myVideos);
+      final data = response.data;
+      List<dynamic> raw;
+      if (data is List) {
+        raw = data;
+      } else if (data is Map && data['videos'] is List) {
+        raw = data['videos'] as List;
+      } else {
+        return [];
+      }
+      return raw.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+    } catch (e, stackTrace) {
+      _logger.e('Error fetching my-videos stats', error: e, stackTrace: stackTrace);
       return [];
     }
   }

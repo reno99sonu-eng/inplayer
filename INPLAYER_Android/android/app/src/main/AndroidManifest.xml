@@ -1,7 +1,30 @@
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
     <uses-permission android:name="android.permission.INTERNET"/>
+    <!-- Required by the speech_to_text package (voice search on the Search
+         screen). RECORD_AUDIO is the actual mic permission and triggers the
+         runtime prompt on Android 6+ (handled by the plugin's own
+         initialize() call, not requested manually here); the three
+         BLUETOOTH permissions let it use a connected Bluetooth headset's
+         mic when one is active, same as the plugin's own setup docs. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <uses-permission android:name="android.permission.BLUETOOTH"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_ADMIN"/>
+    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT"/>
+
+    <!-- Required for the new dedicated Music section's real background
+         playback with lock-screen/notification controls (just_audio_background,
+         MusicPlayerService). FOREGROUND_SERVICE_MEDIA_PLAYBACK is the
+         Android 14+ (API 34) typed foreground-service permission required
+         alongside the general one; POST_NOTIFICATIONS is required on
+         Android 13+ (API 33) to show the media control notification and is
+         a runtime-prompted permission the user will need to grant. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK"/>
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
     <application
-        android:label="inplayer_android"
+        android:label="INPLAYER"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity
@@ -12,7 +35,9 @@
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"
-            android:windowSoftInputMode="adjustResize">
+            android:windowSoftInputMode="adjustResize"
+            android:resizeableActivity="true"
+            android:supportsPictureInPicture="true">
             <!-- Specifies an Android theme to apply to this Activity as soon as
                  the Android process has started. This theme is visible to the user
                  while the Flutter UI initializes. After that, this theme continues
@@ -25,12 +50,53 @@
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
+
+            <!-- App Links — lets Android offer this app as a handler for real
+                 inplayer.in links (e.g. shared /shorts/{id} and /watch/{id}
+                 URLs from WhatsApp) instead of always opening a browser.
+                 android:autoVerify requires a server-hosted
+                 https://inplayer.in/.well-known/assetlinks.json (outside this
+                 app's codebase) to skip the OS chooser dialog entirely — until
+                 that file exists, Android still offers this app as a choice
+                 rather than opening it silently, but the app becomes a valid
+                 candidate handler either way. -->
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https" android:host="inplayer.in"/>
+            </intent-filter>
         </activity>
         <!-- Don't delete the meta-data below.
              This is used by the Flutter tool to generate GeneratedPluginRegistrant.java -->
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- just_audio_background — powers MusicPlayerService's real
+             background playback + lock-screen/notification media controls
+             for the new dedicated Music section. Standard manifest entries
+             from the package's own setup docs; foregroundServiceType
+             "mediaPlayback" pairs with the FOREGROUND_SERVICE_MEDIA_PLAYBACK
+             permission declared above. -->
+        <service
+            android:name="com.ryanheise.audioservice.AudioService"
+            android:foregroundServiceType="mediaPlayback"
+            android:exported="true"
+            tools:ignore="Instantiatable">
+            <intent-filter>
+                <action android:name="android.media.browse.MediaBrowserService" />
+            </intent-filter>
+        </service>
+
+        <receiver
+            android:name="com.ryanheise.audioservice.MediaButtonReceiver"
+            android:exported="true"
+            tools:ignore="Instantiatable">
+            <intent-filter>
+                <action android:name="android.intent.action.MEDIA_BUTTON" />
+            </intent-filter>
+        </receiver>
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
@@ -41,6 +107,23 @@
         <intent>
             <action android:name="android.intent.action.PROCESS_TEXT"/>
             <data android:mimeType="text/plain"/>
+        </intent>
+        <!-- Required on Android 11+ (API 30+) for url_launcher's
+             canLaunchUrl()/launchUrl() to reliably resolve a browser for
+             https links. Without this, package-visibility rules can make the
+             OS report no app can handle the link even when one can — the
+             likely cause of "unclickable" Help/Terms/Privacy/About links
+             across Settings and the hamburger drawer. -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
+        <!-- Required by speech_to_text on Android 11+ (API 30+) so it can
+             find the on-device speech recognition service; without this the
+             mic button would report "unavailable" on those OS versions
+             even with the RECORD_AUDIO permission granted. -->
+        <intent>
+            <action android:name="android.speech.RecognitionService"/>
         </intent>
     </queries>
 </manifest>

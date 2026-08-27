@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+ (API 31) overrides of values-night/styles.xml, dark-mode
+     variant. Same three windowSplashScreen* attributes as values-v31, on the
+     dark parent theme.
+
+     This folder is NOT redundant with values-v31. Android resolves resource
+     qualifiers in a fixed precedence order in which night mode ranks ABOVE
+     platform version, so on an Android 12 device with dark mode on,
+     values-night/styles.xml would win over values-v31/styles.xml and the
+     splash fix would silently not apply — which is the majority case for
+     this app, since most people run it dark. The combined -night-v31
+     qualifier is the only variant that matches both conditions at once.
+
+     See drawable/splash_transparent.xml for why any of this is needed. -->
+<resources>
+    <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <item name="android:windowBackground">@drawable/launch_background</item>
+
+        <!-- Same #05070D as the light variant — the Flutter intro opens on
+             near-black in dark mode too, so this is already the matching
+             shade and needs no separate night colour. -->
+        <item name="android:windowSplashScreenBackground">@color/ic_launcher_background</item>
+
+        <!-- The actual fix: a transparent icon means the OS splash paints
+             colour only, never the launcher triangle. -->
+        <item name="android:windowSplashScreenAnimatedIcon">@drawable/splash_transparent</item>
+
+        <!-- Suppresses the circular plate the OS would otherwise draw behind
+             the icon slot. -->
+        <item name="android:windowSplashScreenIconBackgroundColor">@android:color/transparent</item>
+    </style>
+
+    <!-- Unchanged from values-night/styles.xml — repeated here only because a
+         qualified values folder replaces same-named styles wholesale rather
+         than merging with them. -->
+    <style name="NormalTheme" parent="@android:style/Theme.Black.NoTitleBar">
+        <item name="android:windowBackground">?android:colorBackground</item>
+    </style>
+</resources>

@@ -22,7 +22,7 @@ class LiveCreateResult {
     this.channelArn,
   });
 
-  /// rtmps://<ingestEndpoint>:443/app/ — the standard IVS RTMPS ingest URL
+  /// `rtmps://<ingestEndpoint>:443/app/` — the standard IVS RTMPS ingest URL
   /// format. Any RTMP-capable broadcaster app (OBS Studio, Streamlabs,
   /// Larix, etc.) accepts this as its "Server" field, with [streamKey] as
   /// the separate "Stream Key" field.

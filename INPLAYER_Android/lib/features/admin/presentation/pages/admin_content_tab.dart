@@ -14,7 +14,14 @@ import '../widgets/admin_common.dart';
 /// auto-flagged queue. This is "find any video/short by title or id and
 /// act on it," not a moderation inbox.
 class AdminContentTab extends ConsumerStatefulWidget {
-  const AdminContentTab({super.key});
+  /// Which kind this browser opens on: null (all), 'video', 'short' or
+  /// 'music'. Mirrors the website's sidebar, where Videos and Shorts are
+  /// two separate entries pointing at the same page with a different
+  /// `?type=` — the filter chips are still there either way, this just
+  /// decides the starting one.
+  final String? initialType;
+
+  const AdminContentTab({super.key, this.initialType});
 
   @override
   ConsumerState<AdminContentTab> createState() => _AdminContentTabState();
@@ -29,11 +36,27 @@ class _AdminContentTabState extends ConsumerState<AdminContentTab> {
   List<AdminVideoRow> _videos = [];
   String? _nextCursor;
   String _query = '';
-  String? _type; // null = all, 'video', 'short'
+
+  /// null = all kinds. Music is a first-class kind here, not a flavour of
+  /// video — the API filters on it separately (TYPE_VALUES in
+  /// app/api/admin/videos/route.ts) and the Dashboard's cards link straight
+  /// to these filters, so a Music tab whose count didn't match its list
+  /// would be worse than no tab.
+  String? _type; // null | 'video' | 'short' | 'music'
+
+  /// null = every status. 'ready' additionally matches rows with no status
+  /// attribute at all — everything uploaded before that field existed.
+  String? _status; // null | 'live' | 'processing' | 'ready' | 'error'
+
+  /// Per-status totals for the active type. Empty means "not counted this
+  /// request", never "zero" — the route skips the count scan while a search
+  /// query is active.
+  Map<String, int> _counts = const {};
 
   @override
   void initState() {
     super.initState();
+    _type = widget.initialType;
     _load();
   }
 
@@ -46,11 +69,22 @@ class _AdminContentTabState extends ConsumerState<AdminContentTab> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    final result = await ref.read(adminServiceProvider).getAdminVideos(type: _type, query: _query);
+    final result = await ref.read(adminServiceProvider).getAdminVideos(
+          type: _type,
+          status: _status,
+          query: _query,
+          // Only worth asking on an unsearched first page: the route runs a
+          // second full-table scan for these and skips it entirely once a
+          // query is set, so asking anyway would just return nothing.
+          includeCounts: _query.isEmpty,
+        );
     if (!mounted) return;
     setState(() {
       _videos = result.videos;
       _nextCursor = result.nextCursor;
+      // Keep the previous numbers when this response carried none, rather
+      // than blanking the badges mid-search.
+      if (result.counts.isNotEmpty) _counts = result.counts;
       _loading = false;
     });
   }
@@ -58,7 +92,12 @@ class _AdminContentTabState extends ConsumerState<AdminContentTab> {
   Future<void> _loadMore() async {
     if (_loadingMore || _nextCursor == null) return;
     setState(() => _loadingMore = true);
-    final result = await ref.read(adminServiceProvider).getAdminVideos(type: _type, query: _query, cursor: _nextCursor);
+    final result = await ref.read(adminServiceProvider).getAdminVideos(
+          type: _type,
+          status: _status,
+          query: _query,
+          cursor: _nextCursor,
+        );
     if (!mounted) return;
     setState(() {
       _videos = [..._videos, ...result.videos];
@@ -76,7 +115,17 @@ class _AdminContentTabState extends ConsumerState<AdminContentTab> {
   }
 
   void _setType(String? type) {
-    setState(() => _type = type);
+    setState(() {
+      _type = type;
+      // Status counts are computed per type, so the old numbers are stale
+      // the instant the type changes — clear rather than show wrong ones.
+      _counts = const {};
+    });
+    _load();
+  }
+
+  void _setStatus(String? status) {
+    setState(() => _status = status);
     _load();
   }
 
@@ -150,23 +199,62 @@ class _AdminContentTabState extends ConsumerState<AdminContentTab> {
             ),
           ),
         ),
+        // Kind. Music sits alongside Videos and Raftaar as a peer, matching
+        // both the API's own three-way split and the website's sidebar.
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          child: Row(
-            children: [
-              _filterChip('All', _type == null, () => _setType(null)),
-              const SizedBox(width: 8),
-              _filterChip('Videos', _type == 'video', () => _setType('video')),
-              const SizedBox(width: 8),
-              _filterChip('Shorts', _type == 'short', () => _setType('short')),
-            ],
+          padding: const EdgeInsets.fromLTRB(12, 10, 12, 4),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _filterChip('All', _type == null, () => _setType(null)),
+                const SizedBox(width: 8),
+                _filterChip('Videos', _type == 'video', () => _setType('video')),
+                const SizedBox(width: 8),
+                _filterChip('Raftaar', _type == 'short', () => _setType('short')),
+                const SizedBox(width: 8),
+                _filterChip('Music', _type == 'music', () => _setType('music')),
+              ],
+            ),
+          ),
+        ),
+        // Status, with live totals. Deliberately a second row rather than
+        // folded into the one above: they are independent filters and the
+        // API applies them together, so showing them stacked is the only
+        // honest picture of what is currently being listed.
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: [
+                _statusChip('Any status', null),
+                const SizedBox(width: 8),
+                _statusChip('Live', 'live'),
+                const SizedBox(width: 8),
+                _statusChip('Ready', 'ready'),
+                const SizedBox(width: 8),
+                _statusChip('Processing', 'processing'),
+                const SizedBox(width: 8),
+                _statusChip('Error', 'error'),
+              ],
+            ),
           ),
         ),
         Expanded(
           child: _loading
               ? adminLoadingCenter
               : _videos.isEmpty
-                  ? const AdminEmptyState(message: 'No videos found', icon: Icons.movie_outlined)
+                  ? AdminEmptyState(
+                      message: _type == 'music'
+                          ? 'No music tracks found'
+                          : _type == 'short'
+                              ? 'No Raftaar videos found'
+                              : 'No videos found',
+                      icon: _type == 'music'
+                          ? Icons.library_music_outlined
+                          : Icons.movie_outlined,
+                    )
                   : NotificationListener<ScrollNotification>(
                       onNotification: (notification) {
                         if (notification.metrics.pixels > notification.metrics.maxScrollExtent - 200) {
@@ -199,7 +287,13 @@ class _AdminContentTabState extends ConsumerState<AdminContentTab> {
                                 image: thumb != null ? DecorationImage(image: thumb, fit: BoxFit.cover) : null,
                               ),
                               child: thumb == null
-                                  ? const Icon(Icons.movie_outlined, color: AppColors.textSecondaryDark, size: 18)
+                                  ? Icon(
+                                      v.contentType == 'music'
+                                          ? Icons.music_note_rounded
+                                          : Icons.movie_outlined,
+                                      color: AppColors.textSecondaryDark,
+                                      size: 18,
+                                    )
                                   : null,
                             ),
                             title: Text(
@@ -217,7 +311,7 @@ class _AdminContentTabState extends ConsumerState<AdminContentTab> {
                                 children: [
                                   AdminStatusPill(label: v.status, color: _statusColor(v.status)),
                                   Text(
-                                    '${v.contentType == 'short' ? 'Short' : 'Video'} • ${v.views} views'
+                                    '${_kindLabel(v.contentType)} • ${v.views} views'
                                     '${v.uploaderName != null ? ' • @${v.uploaderName}' : ''} • ${formatTimeAgo(v.uploadedAt)}',
                                     style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 11),
                                   ),
@@ -252,6 +346,25 @@ class _AdminContentTabState extends ConsumerState<AdminContentTab> {
         ),
       ],
     );
+  }
+
+  /// Row label for a content kind. 'Raftaar' rather than 'Short' because
+  /// that is what this platform calls them everywhere a person can see —
+  /// the wire value stays 'short'.
+  String _kindLabel(String contentType) => switch (contentType) {
+        'short' => 'Raftaar',
+        'music' => 'Music',
+        _ => 'Video',
+      };
+
+  /// A status chip, badged with its real total when the route supplied
+  /// counts. No number is shown rather than a zero when it didn't — "0
+  /// processing" and "we didn't count" are very different facts to an admin
+  /// deciding whether something is stuck.
+  Widget _statusChip(String label, String? status) {
+    final count = status == null ? null : _counts[status];
+    final text = count == null ? label : '$label ($count)';
+    return _filterChip(text, _status == status, () => _setStatus(status));
   }
 
   Widget _filterChip(String label, bool selected, VoidCallback onTap) {

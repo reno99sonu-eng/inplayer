@@ -696,7 +696,7 @@ class _ShopPageState extends ConsumerState<ShopPage> {
             AspectRatio(
               aspectRatio: 1,
               child: image != null
-                  ? Image(image: image, fit: BoxFit.cover, errorBuilder: (_, __, ___) => _productImageFallback())
+                  ? Image(image: image, fit: BoxFit.cover, errorBuilder: (context, error, stackTrace) => _productImageFallback())
                   : _productImageFallback(),
             ),
             Padding(

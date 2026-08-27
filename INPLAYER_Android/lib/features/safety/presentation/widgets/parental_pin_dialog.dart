@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_colors.dart';
@@ -112,7 +112,7 @@ class _ParentalPinDialogState extends ConsumerState<ParentalPinDialog> {
               height: 56,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: AppColors.brandOrange.withOpacity(0.15),
+                color: AppColors.brandOrange.withValues(alpha: 0.15),
               ),
               child: const Icon(
                 Icons.lock_person_rounded,

@@ -1,12 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-// Narrow `show` rather than a bare `import 'dart:ui'`: this file uses
-// material's TextStyle, and dart:ui declares one of its own. Dart would
-// resolve that in material's favour anyway (a non-dart: import outranks a
-// dart: one), but naming the single symbol needed makes it unambiguous to
-// read as well as to compile.
-import 'dart:ui' show FontFeature;
-
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 

@@ -461,7 +461,7 @@ class _ShortCreationToolsState extends ConsumerState<ShortCreationTools> {
                 _pick(track);
               }
             } catch (e) {
-              if (mounted) {
+              if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   SnackBar(content: Text('Failed to pick audio: $e')),
                 );

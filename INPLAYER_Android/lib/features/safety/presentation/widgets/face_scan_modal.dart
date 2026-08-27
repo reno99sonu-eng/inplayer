@@ -203,7 +203,7 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal> with SingleTicker
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: context.textDim.withOpacity(0.4),
+              color: context.textDim.withValues(alpha: 0.4),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -269,7 +269,7 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal> with SingleTicker
         height: 220,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: Colors.red.withOpacity(0.1),
+          color: Colors.red.withValues(alpha: 0.1),
           border: Border.all(color: Colors.redAccent, width: 2),
         ),
         child: const Center(
@@ -317,7 +317,7 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal> with SingleTicker
             border: Border.all(color: ringColor, width: 3),
             boxShadow: [
               BoxShadow(
-                color: ringColor.withOpacity(0.25),
+                color: ringColor.withValues(alpha: 0.25),
                 blurRadius: 20,
                 spreadRadius: 4,
               ),
@@ -351,7 +351,7 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal> with SingleTicker
                     color: AppColors.brandOrange,
                     boxShadow: [
                       BoxShadow(
-                        color: AppColors.brandOrange.withOpacity(0.9),
+                        color: AppColors.brandOrange.withValues(alpha: 0.9),
                         blurRadius: 8,
                         spreadRadius: 2,
                       ),

@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/theme/pattern_background.dart';
 import '../../../../core/utils/image_utils.dart';
 import '../../../../core/widgets/user_avatar.dart';
 import '../../../../models/video.dart';

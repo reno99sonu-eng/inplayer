@@ -146,7 +146,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                           border: Border.all(color: const Color(0xFF10B981), width: 1.2),
                           boxShadow: [
                             BoxShadow(
-                              color: const Color(0xFF10B981).withOpacity(0.3),
+                              color: const Color(0xFF10B981).withValues(alpha: 0.3),
                               blurRadius: 10,
                               offset: const Offset(0, 3),
                             ),
@@ -169,7 +169,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
+                                color: Colors.white.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(8),
                               ),
                               child: const Text(

@@ -58,17 +58,11 @@ class UserAvatar extends StatelessWidget {
         width: size,
         height: size,
         fit: BoxFit.cover,
-        fadeInDuration: const Duration(milliseconds: 150),
-        placeholder: (context, url) => Container(
-          color: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-          child: Center(
-            child: SizedBox(
-              width: size * 0.4,
-              height: size * 0.4,
-              child: const CircularProgressIndicator(strokeWidth: 1.5, color: AppColors.brandOrange),
-            ),
-          ),
-        ),
+        memCacheWidth: (size * 2.5).round(),
+        memCacheHeight: (size * 2.5).round(),
+        fadeInDuration: Duration.zero,
+        fadeOutDuration: Duration.zero,
+        placeholder: (context, url) => _buildInitialFallback(context),
         errorWidget: (context, url, error) => _buildInitialFallback(context),
       );
     } else {

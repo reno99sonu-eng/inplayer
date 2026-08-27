@@ -46,6 +46,7 @@ import '../../features/home/presentation/pages/category_videos_page.dart';
 import '../../features/music/presentation/pages/genre_page.dart';
 import '../../features/music/presentation/pages/liked_music_page.dart';
 import '../../features/settings/presentation/pages/contact_us_page.dart';
+import '../../features/settings/presentation/pages/report_problem_page.dart';
 import '../../services/video_service.dart';
 
 // Bridges authStateProvider's changes into a plain Listenable go_router can
@@ -260,6 +261,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/settings/storage',
         name: 'settings-storage',
         builder: (context, state) => const StoragePage(),
+      ),
+      GoRoute(
+        path: '/settings/report-problem',
+        name: 'report-problem',
+        builder: (context, state) => const ReportProblemPage(),
       ),
       GoRoute(
         path: '/creators',

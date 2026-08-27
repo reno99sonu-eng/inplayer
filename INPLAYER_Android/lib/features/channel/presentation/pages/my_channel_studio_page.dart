@@ -999,9 +999,104 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
 
   // --- PANEL 3: PROFILE & SETTINGS ---
   Widget _buildProfileSettingsTab(dynamic user) {
+    final coverUrl = user.coverPhotoUrl as String?;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Channel Cover / Banner Photo Card
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: context.bgCard,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: context.borderSubtle),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Channel Cover Photo', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: context.textPrimary)),
+              const SizedBox(height: 4),
+              Text('Banner displayed at the top of your public channel page.', style: TextStyle(color: context.textSecondary, fontSize: 12)),
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  height: 120,
+                  width: double.infinity,
+                  color: context.isDark ? const Color(0xFF0F172A) : const Color(0xFFE2E8F0),
+                  child: coverUrl != null && coverUrl.isNotEmpty
+                      ? Image(
+                          image: smartImageProvider(coverUrl)!,
+                          fit: BoxFit.cover,
+                        )
+                      : Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.image_outlined, size: 36, color: context.textDim),
+                              const SizedBox(height: 6),
+                              Text('No cover photo set', style: TextStyle(color: context.textDim, fontSize: 12)),
+                            ],
+                          ),
+                        ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      style: OutlinedButton.styleFrom(
+                        side: const BorderSide(color: AppColors.brandOrange),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        padding: const EdgeInsets.symmetric(vertical: 10),
+                      ),
+                      onPressed: () async {
+                        final dataUrl = await pickImageAsDataUrl(
+                          maxDimension: 1200,
+                          quality: 75,
+                          maxChars: 150000,
+                        );
+                        if (dataUrl != null) {
+                          final ok = await ref.read(settingsServiceProvider).updateCoverPhoto(dataUrl);
+                          if (ok && mounted) {
+                            ref.read(authStateProvider.notifier).updateLocalUser((u) => u.copyWith(coverPhotoUrl: dataUrl));
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(content: Text('Cover photo updated!'), backgroundColor: Color(0xFF10B981)),
+                            );
+                            setState(() {});
+                          }
+                        }
+                      },
+                      icon: const Icon(Icons.upload, size: 16, color: AppColors.brandOrange),
+                      label: Text(coverUrl != null ? 'Change Cover' : 'Upload Cover', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.brandOrange)),
+                    ),
+                  ),
+                  if (coverUrl != null && coverUrl.isNotEmpty) ...[
+                    const SizedBox(width: 8),
+                    IconButton(
+                      icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444)),
+                      tooltip: 'Remove cover photo',
+                      onPressed: () async {
+                        final ok = await ref.read(settingsServiceProvider).updateCoverPhoto(null);
+                        if (ok && mounted) {
+                          ref.read(authStateProvider.notifier).updateLocalUser((u) => u.copyWith(coverPhotoUrl: ''));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Cover photo removed.')),
+                          );
+                          setState(() {});
+                        }
+                      },
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+
         Container(
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
@@ -1060,10 +1155,15 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                     padding: const EdgeInsets.symmetric(vertical: 12),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Settings saved successfully!'), backgroundColor: Color(0xFF10B981)),
-                    );
+                  onPressed: () async {
+                    final ok = await ref.read(settingsServiceProvider).updatePrivacy(_privacyLevel);
+                    if (!mounted) return;
+                    if (ok) {
+                      ref.read(authStateProvider.notifier).updateLocalUser((u) => u.copyWith(usernamePrivacy: _privacyLevel));
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Settings saved successfully!'), backgroundColor: Color(0xFF10B981)),
+                      );
+                    }
                   },
                   child: const Text('Save Profile Settings', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
                 ),

@@ -255,9 +255,12 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
           final duration = _videoController!.value.duration;
           final position = _videoController!.value.position;
           if (duration.inMilliseconds > 0) {
-            setState(() {
-              _progress = position.inMilliseconds / duration.inMilliseconds;
-            });
+            final p = position.inMilliseconds / duration.inMilliseconds;
+            if ((p - _progress).abs() > 0.01) {
+              setState(() {
+                _progress = p;
+              });
+            }
           }
         });
 

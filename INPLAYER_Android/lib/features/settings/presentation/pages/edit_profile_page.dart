@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -108,22 +108,55 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           padding: const EdgeInsets.all(20),
           children: [
             Center(
-              child: CircleAvatar(
-                radius: 44,
-                backgroundColor: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-                backgroundImage:
-                    user?.avatarUrl != null ? smartImageProvider(user!.avatarUrl!) : null,
-                child: user?.avatarUrl == null
-                    ? Icon(Icons.person, size: 44, color: context.textDim)
-                    : null,
+              child: Stack(
+                alignment: Alignment.bottomRight,
+                children: [
+                  CircleAvatar(
+                    radius: 48,
+                    backgroundColor: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+                    backgroundImage:
+                        user?.avatarUrl != null ? smartImageProvider(user!.avatarUrl!) : null,
+                    child: user?.avatarUrl == null
+                        ? Icon(Icons.person, size: 48, color: context.textDim)
+                        : null,
+                  ),
+                  GestureDetector(
+                    onTap: () async {
+                      final dataUrl = await pickImageAsDataUrl(
+                        maxDimension: 800,
+                        quality: 75,
+                        maxChars: 150000,
+                      );
+                      if (dataUrl != null) {
+                        final ok = await ref.read(settingsServiceProvider).updateAvatar(dataUrl);
+                        if (ok && mounted) {
+                          ref.read(authStateProvider.notifier).updateLocalUser((u) => u.copyWith(avatarUrl: dataUrl));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Avatar updated!'), backgroundColor: Color(0xFF10B981)),
+                          );
+                          setState(() {});
+                        }
+                      }
+                    },
+                    child: Container(
+                      padding: const EdgeInsets.all(6),
+                      decoration: BoxDecoration(
+                        color: AppColors.brandOrange,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: context.bgCanvas, width: 2),
+                      ),
+                      child: const Icon(Icons.camera_alt, color: Colors.white, size: 16),
+                    ),
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 10),
             Center(
               child: Text(
-                'Changing your photo isn\'t supported here yet — use the website for now.',
+                'Tap the camera icon to change your profile photo',
                 textAlign: TextAlign.center,
-                style: TextStyle(color: context.textDim, fontSize: 11.5),
+                style: TextStyle(color: context.textDim, fontSize: 12),
               ),
             ),
             const SizedBox(height: 28),

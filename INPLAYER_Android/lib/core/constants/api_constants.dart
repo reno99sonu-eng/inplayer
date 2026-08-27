@@ -8,8 +8,11 @@ class ApiConstants {
 
   // Authentication
   static const String profileAvatar = '/api/profile/avatar';
+  static const String profileCover = '/api/profile/cover';
   static const String profileSettings = '/api/profile/settings';
   static const String username = '/api/username';
+  static const String bugReports = '/api/bug-reports';
+  static const String sessions = '/api/sessions';
 
   // Home
   static const String trending = '/api/trending';

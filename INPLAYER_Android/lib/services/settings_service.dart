@@ -23,6 +23,90 @@ class SettingsService {
   Future<bool> updatePrivacy(String value) =>
       _post({'action': 'update_privacy', 'usernamePrivacy': value});
 
+  /// Save or remove user avatar (base64 data URL).
+  Future<bool> updateAvatar(String? avatarUrl) async {
+    try {
+      final response = await _dio.post(ApiConstants.profileAvatar, data: {
+        'avatarUrl': avatarUrl,
+      });
+      return response.statusCode == 200;
+    } catch (e) {
+      _logger.e('Error updating avatar: $e');
+      return false;
+    }
+  }
+
+  /// Save or remove the channel cover photo (data URL or null to remove).
+  Future<bool> updateCoverPhoto(String? coverPhotoUrl) async {
+    try {
+      final response = await _dio.post(ApiConstants.profileCover, data: {
+        'coverPhotoUrl': coverPhotoUrl,
+      });
+      return response.statusCode == 200;
+    } catch (e) {
+      _logger.e('Error updating cover photo: $e');
+      return false;
+    }
+  }
+
+  /// Submit a bug / error report to /api/bug-reports
+  Future<bool> submitBugReport({
+    required String description,
+    String? screenshotDataUrl,
+  }) async {
+    try {
+      final response = await _dio.post(ApiConstants.bugReports, data: {
+        'description': description,
+        'pageUrl': 'INPLAYER_Android_App',
+        'userAgent': 'InPlayer-Android-Native',
+        if (screenshotDataUrl != null) 'screenshotDataUrl': screenshotDataUrl,
+      });
+      return response.statusCode == 200;
+    } catch (e) {
+      _logger.e('Error submitting bug report: $e');
+      return false;
+    }
+  }
+
+  /// Fetch active user sessions from /api/sessions
+  Future<List<Map<String, dynamic>>> getSessions() async {
+    try {
+      final response = await _dio.get(ApiConstants.sessions);
+      if (response.statusCode == 200 && response.data is Map) {
+        final list = response.data['sessions'];
+        if (list is List) {
+          return list.whereType<Map<String, dynamic>>().toList();
+        }
+      }
+      return [];
+    } catch (e) {
+      _logger.e('Error fetching sessions: $e');
+      return [];
+    }
+  }
+
+  /// Revoke a single active session
+  Future<bool> revokeSession(String sessionId) async {
+    try {
+      final response = await _dio.delete('${ApiConstants.sessions}/$sessionId');
+      return response.statusCode == 200;
+    } catch (e) {
+      _logger.e('Error revoking session: $e');
+      return false;
+    }
+  }
+
+  /// Logout everywhere
+  Future<bool> logoutAllSessions() async {
+    try {
+      final response = await _dio.post('${ApiConstants.sessions}/logout-all');
+      return response.statusCode == 200;
+    } catch (e) {
+      _logger.e('Error logging out all sessions: $e');
+      return false;
+    }
+  }
+
   Future<bool> _post(Map<String, dynamic> data) async {
     try {
       final response = await _dio.post(ApiConstants.profileSettings, data: data);

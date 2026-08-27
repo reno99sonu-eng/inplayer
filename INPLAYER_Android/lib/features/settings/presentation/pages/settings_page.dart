@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -248,6 +248,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ),
       body: ListView(
         children: [
+          // 1. APPEARANCE
           _buildSectionHeader('Appearance'),
           _buildMenuItem(
             icon: currentTheme == ThemeChoice.system
@@ -255,7 +256,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 : currentTheme == ThemeChoice.light
                     ? Icons.light_mode
                     : Icons.dark_mode,
-            title: 'Theme',
+            title: 'Theme & Appearance',
             trailing: Text(
               currentTheme.label,
               style: const TextStyle(
@@ -268,10 +269,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
           Divider(height: 1, color: context.borderSubtle),
 
-          _buildSectionHeader('Account'),
+          // 2. GENERAL
+          _buildSectionHeader('General'),
           _buildMenuItem(
             icon: Icons.person_outline,
-            title: 'Edit Profile',
+            title: 'Edit Profile & Avatar',
             onTap: () => context.push('/settings/edit-profile'),
           ),
           _buildMenuItem(
@@ -281,30 +283,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
           _buildMenuItem(
             icon: Icons.mail_outline,
-            title: 'Email Settings',
+            title: 'Email Address',
             onTap: () => context.push('/settings/change-email'),
           ),
-          _buildMenuItem(
-            icon: Icons.workspace_premium_outlined,
-            title: 'Plans & Purchases',
-            onTap: () => context.push('/settings/plans'),
-          ),
-          Divider(height: 1, color: context.borderSubtle),
-
-          _buildSectionHeader('Creator'),
-          _buildMenuItem(
-            icon: Icons.insights_outlined,
-            title: 'Analytics',
-            onTap: () => context.push('/settings/analytics'),
-          ),
-          _buildMenuItem(
-            icon: Icons.storage_outlined,
-            title: 'Storage',
-            onTap: () => context.push('/settings/storage'),
-          ),
-          Divider(height: 1, color: context.borderSubtle),
-
-          _buildSectionHeader('Preferences'),
           _buildSwitchItem(
             icon: Icons.notifications_outlined,
             title: 'Push Notifications',
@@ -312,26 +293,37 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             onChanged: _prefsLoaded ? _setPushNotifications : null,
           ),
           _buildMenuItem(
+            icon: Icons.shield_outlined,
+            title: 'Content Access (18+ / Kids Mode)',
+            onTap: () => context.push('/settings/content-access'),
+          ),
+          _buildMenuItem(
+            icon: Icons.language_outlined,
+            title: 'Language',
+            trailing: Text('English', style: TextStyle(color: context.textDim, fontSize: 13)),
+            onTap: () => _showSnack('InPlayer is currently available in English only.'),
+          ),
+          Divider(height: 1, color: context.borderSubtle),
+
+          // 3. PLAYBACK
+          _buildSectionHeader('Playback'),
+          _buildMenuItem(
             icon: Icons.play_circle_outline,
-            title: 'Playback',
+            title: 'Streaming & Quality Preferences',
             onTap: () => context.push('/settings/playback'),
           ),
           _buildMenuItem(
             icon: Icons.download_for_offline_outlined,
-            title: 'Downloads',
+            title: 'Downloads & Offline Videos',
             onTap: () => context.push('/downloads'),
           ),
           Divider(height: 1, color: context.borderSubtle),
 
-          _buildSectionHeader('Privacy & Safety'),
-          _buildMenuItem(
-            icon: Icons.shield_outlined,
-            title: 'Content Access',
-            onTap: () => context.push('/settings/content-access'),
-          ),
+          // 4. PRIVACY
+          _buildSectionHeader('Account & Privacy'),
           _buildMenuItem(
             icon: Icons.visibility_outlined,
-            title: 'Privacy Settings',
+            title: 'Privacy, Passkeys & Active Sessions',
             onTap: () => context.push('/settings/privacy'),
           ),
           _buildMenuItem(
@@ -341,21 +333,64 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
           Divider(height: 1, color: context.borderSubtle),
 
-          _buildSectionHeader('Support'),
+          // 5. PLANS & PURCHASES
+          _buildSectionHeader('Plans & Purchases'),
+          _buildMenuItem(
+            icon: Icons.workspace_premium_outlined,
+            title: 'Premium Plans & Subscriptions',
+            onTap: () => context.push('/settings/plans'),
+          ),
+          Divider(height: 1, color: context.borderSubtle),
+
+          // 6. ANALYTICS
+          _buildSectionHeader('User Analytics'),
+          _buildMenuItem(
+            icon: Icons.insights_outlined,
+            title: 'Creator & Upload Analytics',
+            onTap: () => context.push('/settings/analytics'),
+          ),
+          Divider(height: 1, color: context.borderSubtle),
+
+          // 7. STORAGE
+          _buildSectionHeader('Storage'),
+          _buildMenuItem(
+            icon: Icons.storage_outlined,
+            title: 'Cloud Storage & Uploads Overview',
+            onTap: () => context.push('/settings/storage'),
+          ),
+          Divider(height: 1, color: context.borderSubtle),
+
+          // 8. ABOUT & LEGAL
+          _buildSectionHeader('About & Legal'),
+          _buildMenuItem(
+            icon: Icons.info_outline,
+            title: 'About InPlayer',
+            onTap: _showAbout,
+          ),
+          _buildMenuItem(
+            icon: Icons.bug_report_outlined,
+            title: 'Report a Problem',
+            onTap: () => context.push('/settings/report-problem'),
+          ),
           _buildMenuItem(
             icon: Icons.help_outline,
-            title: 'Help & Support',
+            title: 'Help Center',
             onTap: () => _openUrl('https://inplayer.in/help'),
           ),
           _buildMenuItem(
-            icon: Icons.info_outline,
-            title: 'About',
-            onTap: _showAbout,
+            icon: Icons.email_outlined,
+            title: 'Contact Support',
+            onTap: () => context.push('/contact'),
           ),
           _buildMenuItem(
             icon: Icons.description_outlined,
             title: 'Terms of Service',
             onTap: () => _openUrl('https://inplayer.in/terms'),
+          ),
+          _buildMenuItem(
+            icon: Icons.storefront_outlined,
+            title: 'HamMart Vendor Terms',
+            onTap: () => _openUrl('https://inplayer.in/hammart-vendor-terms'),
           ),
           _buildMenuItem(
             icon: Icons.privacy_tip_outlined,
@@ -364,6 +399,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
           Divider(height: 1, color: context.borderSubtle),
 
+          // DANGER ZONE
           _buildSectionHeader('Danger Zone'),
           _buildMenuItem(
             icon: Icons.delete_forever_outlined,

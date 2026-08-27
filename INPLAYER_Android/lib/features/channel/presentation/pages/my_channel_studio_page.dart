@@ -405,115 +405,116 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
     return Scaffold(
       drawer: const MobileMenuDrawer(),
       body: PatternBackground(
-        child: NestedScrollView(
-          headerSliverBuilder: (context, innerBoxIsScrolled) {
-            return [
-              SliverAppBar(
-                automaticallyImplyLeading: false,
-                floating: true,
-                snap: true,
-                backgroundColor: context.bgCanvas.withValues(alpha: 0.95),
-                surfaceTintColor: Colors.transparent,
-                elevation: 0,
-                toolbarHeight: 64,
-                title: Row(
-                  children: [
-                    GestureDetector(
-                      onTap: () {
-                        if (context.canPop()) {
-                          context.pop();
-                        } else {
-                          context.go('/');
-                        }
-                      },
+        child: CustomScrollView(
+          physics: const AlwaysScrollableScrollPhysics(),
+          slivers: [
+            SliverAppBar(
+              automaticallyImplyLeading: false,
+              floating: true,
+              snap: true,
+              pinned: true,
+              backgroundColor: context.bgCanvas.withValues(alpha: 0.95),
+              surfaceTintColor: Colors.transparent,
+              elevation: 0,
+              toolbarHeight: 64,
+              title: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      if (context.canPop()) {
+                        context.pop();
+                      } else {
+                        context.go('/');
+                      }
+                    },
+                    child: Container(
+                      width: 38,
+                      height: 38,
+                      margin: const EdgeInsets.only(right: 8),
+                      decoration: BoxDecoration(
+                        color: context.isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(color: context.borderSubtle),
+                      ),
+                      child: Icon(Icons.arrow_back_rounded, color: context.textPrimary, size: 20),
+                    ),
+                  ),
+                  Builder(
+                    builder: (ctx) => GestureDetector(
+                      onTap: () => Scaffold.of(ctx).openDrawer(),
                       child: Container(
                         width: 38,
                         height: 38,
-                        margin: const EdgeInsets.only(right: 8),
+                        margin: const EdgeInsets.only(right: 10),
                         decoration: BoxDecoration(
                           color: context.isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(color: context.borderSubtle),
                         ),
-                        child: Icon(Icons.arrow_back_rounded, color: context.textPrimary, size: 20),
+                        child: Icon(Icons.menu, color: context.textPrimary, size: 20),
                       ),
                     ),
-                    Builder(
-                      builder: (ctx) => GestureDetector(
-                        onTap: () => Scaffold.of(ctx).openDrawer(),
-                        child: Container(
-                          width: 38,
-                          height: 38,
-                          margin: const EdgeInsets.only(right: 10),
-                          decoration: BoxDecoration(
-                            color: context.isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04),
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: context.borderSubtle),
-                          ),
-                          child: Icon(Icons.menu, color: context.textPrimary, size: 20),
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Text(
-                        'Your Channel Studio',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w900,
-                          color: context.textPrimary,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                actions: [
-                  if (user?.handle != null && user!.handle!.isNotEmpty)
-                    TextButton.icon(
-                      style: TextButton.styleFrom(
-                        backgroundColor: context.isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      ),
-                      onPressed: () => context.push('/channel/${user.handle}'),
-                      icon: const Icon(Icons.public, size: 14, color: AppColors.brandOrange),
-                      label: Text(
-                        'Public View',
-                        style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: context.textPrimary),
-                      ),
-                    ),
-                  const SizedBox(width: 8),
-                  IconButton(
-                    style: IconButton.styleFrom(
-                      backgroundColor: AppColors.brandOrange,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      padding: const EdgeInsets.all(8),
-                    ),
-                    icon: const Icon(Icons.add, color: Colors.white, size: 18),
-                    onPressed: () => context.push('/upload'),
                   ),
-                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      'Your Channel Studio',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w900,
+                        color: context.textPrimary,
+                      ),
+                    ),
+                  ),
                 ],
               ),
-              SliverToBoxAdapter(
-                child: _buildTopTabBar(),
-              ),
-            ];
-          },
-          body: _loading
-              ? const Center(
-                  child: CircularProgressIndicator(color: AppColors.brandOrange),
-                )
-              : RefreshIndicator(
-                  color: AppColors.brandOrange,
-                  onRefresh: _loadData,
-                  child: SingleChildScrollView(
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(16.0),
-                    child: _buildActiveTabContent(user!),
+              actions: [
+                if (user?.handle != null && user!.handle!.isNotEmpty)
+                  TextButton.icon(
+                    style: TextButton.styleFrom(
+                      backgroundColor: context.isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    ),
+                    onPressed: () => context.push('/channel/${user.handle}'),
+                    icon: const Icon(Icons.public, size: 14, color: AppColors.brandOrange),
+                    label: Text(
+                      'Public View',
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: context.textPrimary),
+                    ),
                   ),
+                const SizedBox(width: 8),
+                IconButton(
+                  style: IconButton.styleFrom(
+                    backgroundColor: AppColors.brandOrange,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    padding: const EdgeInsets.all(8),
+                  ),
+                  icon: const Icon(Icons.add, color: Colors.white, size: 18),
+                  onPressed: () => context.push('/upload'),
                 ),
+                const SizedBox(width: 12),
+              ],
+            ),
+            SliverToBoxAdapter(
+              child: _buildTopTabBar(),
+            ),
+            SliverToBoxAdapter(
+              child: _loading
+                  ? const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 80),
+                      child: Center(child: CircularProgressIndicator(color: AppColors.brandOrange)),
+                    )
+                  : Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: _buildActiveTabContent(user!),
+                    ),
+            ),
+            const SliverToBoxAdapter(
+              child: SizedBox(height: 60),
+            ),
+          ],
         ),
       ),
     );

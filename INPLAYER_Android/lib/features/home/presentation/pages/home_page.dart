@@ -32,6 +32,8 @@ import '../widgets/profile_menu_modal.dart';
 import '../widgets/create_menu_popup.dart';
 import '../../../auth/presentation/widgets/auth_modals.dart';
 import '../../../../core/widgets/notification_permission_helper.dart';
+import '../../../../providers/kid_mode_provider.dart';
+import '../../../safety/presentation/widgets/parental_pin_dialog.dart';
 import '../../../../core/widgets/pattern_background.dart';
 import '../../../../core/widgets/user_avatar.dart';
 import '../../../../models/user.dart';
@@ -120,12 +122,73 @@ class _HomePageState extends ConsumerState<HomePage> {
               children: _buildPages(shortsBottomInset: shortsBottomInset),
             ),
             if (_currentIndex == 0) const FloatingAIButton(),
-            // Draggable corner video window (video_mini_player_overlay.dart)
-            // — unconditional, unlike FloatingAIButton just above: the whole
-            // point of minimizing a video is that it keeps floating no
-            // matter which of these tabs is open. Renders nothing when no
-            // video is currently minimized.
             const VideoMiniPlayerOverlay(),
+            // Kids Mode Safety Banner Indicator
+            Consumer(
+              builder: (context, ref, _) {
+                final isKid = ref.watch(kidModeProvider.select((s) => s.isEnabled));
+                if (!isKid) return const SizedBox.shrink();
+
+                return Positioned(
+                  top: MediaQuery.of(context).padding.top + 6,
+                  left: 16,
+                  right: 16,
+                  child: Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: () => ParentalPinDialog.show(context),
+                      borderRadius: BorderRadius.circular(16),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(
+                          color: const Color(0xE6065F46),
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: const Color(0xFF10B981), width: 1.2),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF10B981).withOpacity(0.3),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          children: [
+                            const Icon(Icons.child_care_rounded, color: Colors.white, size: 18),
+                            const SizedBox(width: 8),
+                            const Expanded(
+                              child: Text(
+                                'Kids Safe Mode Active • Content Filtered',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Text(
+                                'EXIT (PIN)',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
           ],
         ),
       ),

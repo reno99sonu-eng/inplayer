@@ -303,7 +303,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'help-center',
         builder: (context, state) => const AppLegalPage(
           title: 'Help Center & FAQ',
-          content: 'Frequently Asked Questions & Support:\n\nQ: How do I upload a video or Raftaar short?\nA: Tap the "+" button in the top bar or navigation drawer to open the Upload screen.\n\nQ: How do I enable Fingerprint / Passkey lock?\nA: Go to Settings -> Account & Privacy -> Privacy, Passkeys & Active Sessions, and switch on Passkey & Biometric App Lock.\n\nQ: How do I turn on Kids Mode?\nA: Go to Settings -> General -> Content Access, and set the audience mode with your secure 6-digit passkey.\n\nQ: How do I contact the InPlayer team?\nA: Tap "Contact Support" in Settings or email support@inplayer.in.',
+          content: 'Frequently Asked Questions & Support:\n\nQ: How do I upload a video or Raftaar short?\nA: Tap the "+" button in the top bar or navigation drawer to open the Upload screen.\n\nQ: How do I enable Fingerprint / Passkey lock?\nA: Go to Settings -> Account & Privacy -> Privacy, Passkeys & Active Sessions, and switch on Passkey & Biometric App Lock.\n\nQ: How do I turn on Kids Mode?\nA: Open the hamburger menu and switch on Kids only. A passkey is needed only when turning 18+ content on.\n\nQ: How do I contact the InPlayer team?\nA: Tap "Contact Support" in Settings or email support@inplayer.in.',
         ),
       ),
       GoRoute(

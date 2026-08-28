@@ -64,6 +64,10 @@ final contentAccessServiceProvider = Provider<ContentAccessService>((ref) {
   return ContentAccessService();
 });
 
+/// Bumped after the server accepts a mode change. Feed surfaces listen to
+/// this so their pre-change HTTP cache is never shown after a content switch.
+final contentAccessRevisionProvider = StateProvider<int>((ref) => 0);
+
 class ContentAccessResult {
   final bool success;
   final String? error;
@@ -105,15 +109,26 @@ class ContentAccessService {
   /// Unlock a mode. Requires an existing passkey — the server returns
   /// needsPasskey: true (409) if the account has never created one yet, in
   /// which case the UI should fall through to setPasskey() first.
-  Future<ContentAccessResult> setMode(AudienceMode mode, String passkey) async {
+  Future<ContentAccessResult> setMode(
+    AudienceMode mode, {
+    String? passkey,
+  }) async {
     try {
       final response = await _dio.post(
         ApiConstants.contentAccess,
-        data: {'action': 'set_mode', 'mode': audienceModeToString(mode), 'passkey': passkey},
+        data: {
+          'action': 'set_mode',
+          'mode': audienceModeToString(mode),
+          if (passkey != null && passkey.isNotEmpty) 'passkey': passkey,
+        },
       );
 
       if (response.statusCode == 200) {
-        await _cacheMode(mode);
+        final data = response.data;
+        final serverMode = data is Map
+            ? audienceModeFromString(data['mode']?.toString())
+            : mode;
+        await _cacheMode(serverMode);
         return const ContentAccessResult(success: true);
       }
 

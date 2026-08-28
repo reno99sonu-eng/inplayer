@@ -24,6 +24,7 @@ import '../widgets/home_ad_card.dart';
 import '../widgets/floating_ai_button.dart';
 import '../../../music/presentation/widgets/mini_player_bar.dart';
 import '../../../../services/music_player_service.dart';
+import '../../../../services/content_access_service.dart';
 import '../../../watch/presentation/widgets/video_mini_player_overlay.dart';
 import '../../../../models/short.dart';
 import '../../../../services/video_interaction_service.dart';
@@ -81,10 +82,14 @@ class _HomePageState extends ConsumerState<HomePage> {
   /// underneath the music bar while music happens to be playing.
   static const double _miniPlayerInset = 64.0;
 
-  List<Widget> _buildPages({required double shortsBottomInset}) {
+  List<Widget> _buildPages({
+    required double shortsBottomInset,
+    required int contentAccessRevision,
+  }) {
     return [
-      const HomeFeedPage(),
+      HomeFeedPage(key: ValueKey('home-feed-$contentAccessRevision')),
       ShortsPage(
+        key: ValueKey('shorts-$contentAccessRevision'),
         isActive: _currentIndex == _raftaarTab,
         bottomInset: shortsBottomInset,
         // Nothing to pop here — Raftaar is a tab, not a pushed route — so
@@ -92,7 +97,7 @@ class _HomePageState extends ConsumerState<HomePage> {
         onExit: () => setState(() => _currentIndex = 0),
       ),
       const UploadPage(),
-      const MusicPage(),
+      MusicPage(key: ValueKey('music-$contentAccessRevision')),
       const ProfilePage(),
     ];
   }
@@ -100,6 +105,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   @override
   Widget build(BuildContext context) {
     ref.watch(authStateProvider);
+    final contentAccessRevision = ref.watch(contentAccessRevisionProvider);
 
     // MiniPlayerBar only occupies space while a track is loaded, so the
     // clearance Raftaar needs is not a constant — watching the player here
@@ -119,7 +125,10 @@ class _HomePageState extends ConsumerState<HomePage> {
           children: [
             IndexedStack(
               index: _currentIndex,
-              children: _buildPages(shortsBottomInset: shortsBottomInset),
+              children: _buildPages(
+                shortsBottomInset: shortsBottomInset,
+                contentAccessRevision: contentAccessRevision,
+              ),
             ),
             if (_currentIndex == 0) const FloatingAIButton(),
             const VideoMiniPlayerOverlay(),

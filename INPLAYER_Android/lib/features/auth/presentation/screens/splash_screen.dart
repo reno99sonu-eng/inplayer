@@ -1,612 +1,613 @@
 import 'dart:async';
 import 'dart:math' as math;
+
+import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:audioplayers/audioplayers.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
 import '../../../../core/theme/app_colors.dart';
-import '../../../../core/theme/app_theme.dart';
+import '../../../../models/user.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../services/geo_service.dart';
 
+/// The short branded overlay shown above the router on each cold start.
+///
+/// The display name comes from a local cache immediately, then is refreshed by
+/// the auth provider while the animation is still on screen. That keeps the
+/// greeting dependable without delaying the first frame for Cognito/network
+/// work.
 class SplashScreenOverlay extends ConsumerStatefulWidget {
   final VoidCallback? onDismiss;
 
   const SplashScreenOverlay({super.key, this.onDismiss});
 
   @override
-  ConsumerState<SplashScreenOverlay> createState() => _SplashScreenOverlayState();
+  ConsumerState<SplashScreenOverlay> createState() =>
+      _SplashScreenOverlayState();
 }
 
 class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
     with SingleTickerProviderStateMixin {
-  late AnimationController _masterController;
+  static const _cachedNameKey = 'inplayer:cached_user_name';
 
-  late Animation<double> _logoScale;
-  late Animation<double> _logoOpacity;
-  late Animation<double> _logoTilt;
-  late Animation<double> _flashOpacity;
-  late Animation<double> _shinePosition;
-  late Animation<double> _taglineOpacity;
-  late Animation<double> _greetingOpacity;
-  late Animation<double> _curtainOpacity;
+  late final AnimationController _controller;
+  late final Animation<double> _logoScale;
+  late final Animation<double> _logoOpacity;
+  late final Animation<double> _logoTilt;
+  late final Animation<double> _flashOpacity;
+  late final Animation<double> _shinePosition;
+  late final Animation<double> _taglineOpacity;
+  late final Animation<double> _greetingOpacity;
+  late final Animation<double> _curtainOpacity;
+  late final ProviderSubscription<AuthState> _authSubscription;
 
   AudioPlayer? _audioPlayer;
   Timer? _fallbackTimer;
   bool _isVisible = true;
-  String? _cachedUserName;
+  String _displayName = '';
 
   @override
   void initState() {
     super.initState();
-    _loadCachedName();
-
-    _masterController = AnimationController(
+    _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 3000),
+      duration: const Duration(milliseconds: 3400),
     );
 
-    // 1. Logo Zoom & Tilt (0% -> 45%)
-    _logoScale = TweenSequence<double>([
-      TweenSequenceItem(
-        tween: Tween(begin: 0.70, end: 1.06).chain(CurveTween(curve: Curves.easeOutCubic)),
-        weight: 75,
-      ),
-      TweenSequenceItem(
-        tween: Tween(begin: 1.06, end: 1.00).chain(CurveTween(curve: Curves.easeInOut)),
-        weight: 25,
-      ),
-    ]).animate(
+    _logoScale =
+        TweenSequence<double>([
+          TweenSequenceItem(
+            tween: Tween<double>(
+              begin: .78,
+              end: 1.04,
+            ).chain(CurveTween(curve: Curves.easeOutCubic)),
+            weight: 76,
+          ),
+          TweenSequenceItem(
+            tween: Tween<double>(
+              begin: 1.04,
+              end: 1,
+            ).chain(CurveTween(curve: Curves.easeInOut)),
+            weight: 24,
+          ),
+        ]).animate(
+          CurvedAnimation(parent: _controller, curve: const Interval(0, .44)),
+        );
+    _logoOpacity = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0, .22, curve: Curves.easeIn),
+    );
+    _logoTilt = Tween<double>(begin: .075, end: 0).animate(
       CurvedAnimation(
-        parent: _masterController,
-        curve: const Interval(0.00, 0.45, curve: Curves.linear),
+        parent: _controller,
+        curve: const Interval(0, .38, curve: Curves.easeOutCubic),
       ),
     );
-
-    _logoOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
+    _flashOpacity =
+        TweenSequence<double>([
+          TweenSequenceItem(
+            tween: Tween<double>(
+              begin: 0,
+              end: .42,
+            ).chain(CurveTween(curve: Curves.easeInQuad)),
+            weight: 35,
+          ),
+          TweenSequenceItem(
+            tween: Tween<double>(
+              begin: .42,
+              end: 0,
+            ).chain(CurveTween(curve: Curves.easeOutQuad)),
+            weight: 65,
+          ),
+        ]).animate(
+          CurvedAnimation(parent: _controller, curve: const Interval(.10, .35)),
+        );
+    _shinePosition = Tween<double>(begin: -1.15, end: 1.4).animate(
       CurvedAnimation(
-        parent: _masterController,
-        curve: const Interval(0.00, 0.25, curve: Curves.easeIn),
+        parent: _controller,
+        curve: const Interval(.28, .62, curve: Curves.easeInOutCubic),
       ),
     );
-
-    _logoTilt = Tween<double>(begin: 0.12, end: 0.0).animate(
+    _taglineOpacity = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(.43, .65, curve: Curves.easeOut),
+    );
+    _greetingOpacity = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(.54, .78, curve: Curves.easeOut),
+    );
+    _curtainOpacity = Tween<double>(begin: 1, end: 0).animate(
       CurvedAnimation(
-        parent: _masterController,
-        curve: const Interval(0.00, 0.40, curve: Curves.easeOutCubic),
+        parent: _controller,
+        curve: const Interval(.88, 1, curve: Curves.easeInOutCubic),
       ),
     );
 
-    // 2. Flash Burst (12% -> 35%)
-    _flashOpacity = TweenSequence<double>([
-      TweenSequenceItem(
-        tween: Tween(begin: 0.0, end: 0.90).chain(CurveTween(curve: Curves.easeInQuad)),
-        weight: 35,
-      ),
-      TweenSequenceItem(
-        tween: Tween(begin: 0.90, end: 0.0).chain(CurveTween(curve: Curves.easeOutQuad)),
-        weight: 65,
-      ),
-    ]).animate(
-      CurvedAnimation(
-        parent: _masterController,
-        curve: const Interval(0.10, 0.38, curve: Curves.linear),
-      ),
-    );
-
-    // 3. Diagonal Light Shine Sweep (32% -> 66%)
-    _shinePosition = Tween<double>(begin: -1.2, end: 1.5).animate(
-      CurvedAnimation(
-        parent: _masterController,
-        curve: const Interval(0.30, 0.66, curve: Curves.easeInOutCubic),
-      ),
-    );
-
-    // 4. Tagline & Greeting Fade In (45% -> 80%)
-    _taglineOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _masterController,
-        curve: const Interval(0.42, 0.68, curve: Curves.easeOut),
-      ),
-    );
-
-    _greetingOpacity = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _masterController,
-        curve: const Interval(0.55, 0.80, curve: Curves.easeOut),
-      ),
-    );
-
-    // 5. Smooth Exit Curtain (86% -> 100%)
-    _curtainOpacity = Tween<double>(begin: 1.0, end: 0.0).animate(
-      CurvedAnimation(
-        parent: _masterController,
-        curve: const Interval(0.86, 1.00, curve: Curves.easeInOutCubic),
-      ),
-    );
-
-    _initAudioAndPlay();
+    _authSubscription = ref.listenManual<AuthState>(authStateProvider, (
+      _,
+      next,
+    ) {
+      if (next is AuthStateAuthenticated) {
+        _setDisplayName(_preferredName(next.user), persist: true);
+      }
+    }, fireImmediately: true);
+    unawaited(_loadCachedName());
+    _startAnimation();
     _triggerGeoCheck();
   }
 
-  void _triggerGeoCheck() {
-    ref.read(geoServiceProvider).verifyGeo().then((result) {
-      if (!result.allowed) {
-        debugPrint('[InPlayer] Geo verification restriction flagged: ${result.country}');
-      }
-    }).catchError((_) {});
-  }
-
-  void _dismissSplash() {
-    if (_isVisible && mounted) {
-      _fallbackTimer?.cancel();
-      setState(() => _isVisible = false);
-      widget.onDismiss?.call();
-    }
-  }
-
-  void _initAudioAndPlay() {
-    _fallbackTimer = Timer(const Duration(milliseconds: 3800), _dismissSplash);
+  void _startAnimation() {
+    // This only safeguards an interrupted animation; normal completion wins.
+    _fallbackTimer = Timer(const Duration(milliseconds: 4300), _dismissSplash);
 
     try {
-      _audioPlayer = AudioPlayer();
-      _audioPlayer!.setVolume(1.0);
-      _audioPlayer!.play(AssetSource('sounds/splash-logo-sting.mp3')).catchError((_) {});
-    } catch (_) {}
+      _audioPlayer = AudioPlayer()..setVolume(1);
+      unawaited(
+        _audioPlayer!
+            .play(AssetSource('sounds/splash-logo-sting.mp3'))
+            .catchError((_) {}),
+      );
+    } catch (_) {
+      // The branding animation remains usable if audio hardware is occupied.
+    }
 
-    _masterController.forward().then((_) {
-      _dismissSplash();
-    });
+    _controller.forward().whenComplete(_dismissSplash);
+  }
+
+  void _triggerGeoCheck() {
+    unawaited(
+      ref
+          .read(geoServiceProvider)
+          .verifyGeo()
+          .then((result) {
+            if (!result.allowed) {
+              debugPrint(
+                '[InPlayer] Geo verification restriction flagged: ${result.country}',
+              );
+            }
+          })
+          .catchError((_) {}),
+    );
+  }
+
+  static String _preferredName(User user) {
+    final name = user.name.toString().trim();
+    if (name.isNotEmpty) return name;
+    return user.username.toString().trim();
   }
 
   Future<void> _loadCachedName() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      var name = prefs.getString('inplayer:cached_user_name');
-      if (name == null || name.isEmpty) name = prefs.getString('inplayer:user_name');
-      if (name == null || name.isEmpty) name = prefs.getString('user_name');
-      if (name == null || name.isEmpty) name = prefs.getString('username');
-      if (name != null && name.isNotEmpty && mounted) {
-        setState(() => _cachedUserName = name);
-      }
-    } catch (_) {}
+      final name =
+          [
+            prefs.getString(_cachedNameKey),
+            prefs.getString('inplayer:user_name'),
+            prefs.getString('user_name'),
+            prefs.getString('username'),
+          ].firstWhere(
+            (candidate) => candidate != null && candidate.trim().isNotEmpty,
+            orElse: () => null,
+          );
+      if (name != null) _setDisplayName(name);
+    } catch (_) {
+      // No cache is fine for a first-time/signed-out launch.
+    }
+  }
+
+  void _setDisplayName(String rawName, {bool persist = false}) {
+    final name = rawName.trim();
+    if (name.isEmpty || name == _displayName) return;
+
+    if (mounted) {
+      setState(() => _displayName = name);
+    } else {
+      _displayName = name;
+    }
+
+    if (persist) {
+      unawaited(
+        SharedPreferences.getInstance().then(
+          (prefs) => prefs.setString(_cachedNameKey, name),
+        ),
+      );
+    }
+  }
+
+  void _dismissSplash() {
+    if (!_isVisible || !mounted) return;
+    _fallbackTimer?.cancel();
+    setState(() => _isVisible = false);
+    widget.onDismiss?.call();
+  }
+
+  String _greetingForCurrentTime() {
+    final hour = DateTime.now().hour;
+    if (hour >= 5 && hour < 12) return 'Good morning';
+    if (hour >= 12 && hour < 17) return 'Good afternoon';
+    return 'Good evening';
   }
 
   @override
   void dispose() {
     _fallbackTimer?.cancel();
-    _masterController.dispose();
-    _audioPlayer?.dispose();
+    _authSubscription.close();
+    _controller.dispose();
+    unawaited(_audioPlayer?.dispose() ?? Future<void>.value());
     super.dispose();
-  }
-
-  String _getGreeting() {
-    final hour = DateTime.now().hour;
-    if (hour >= 5 && hour < 12) return 'Good Morning';
-    if (hour >= 12 && hour < 17) return 'Good Afternoon';
-    return 'Good Evening';
   }
 
   @override
   Widget build(BuildContext context) {
     if (!_isVisible) {
-      return const IgnorePointer(
-        ignoring: true,
-        child: SizedBox.shrink(),
-      );
+      return const IgnorePointer(ignoring: true, child: SizedBox.expand());
     }
 
-    final isDark = context.isDark;
     final authState = ref.watch(authStateProvider);
-    final user = authState is AuthStateAuthenticated ? authState.user : null;
+    final signedInName = authState is AuthStateAuthenticated
+        ? _preferredName(authState.user)
+        : '';
+    final name = signedInName.isNotEmpty ? signedInName : _displayName;
+    final greeting = name.isEmpty
+        ? _greetingForCurrentTime()
+        : '${_greetingForCurrentTime()}, $name';
 
-    if (user != null && user.name.isNotEmpty && _cachedUserName != user.name) {
-      _cachedUserName = user.name;
-      SharedPreferences.getInstance().then((p) => p.setString('inplayer:cached_user_name', user.name));
-    }
-
-    final effectiveName = (user != null && user.name.isNotEmpty)
-        ? user.name
-        : (user != null && user.username.isNotEmpty)
-            ? user.username
-            : (_cachedUserName ?? '');
-
-    final timeGreeting = _getGreeting();
-    final greeting = effectiveName.isNotEmpty
-        ? '$timeGreeting, $effectiveName'
-        : timeGreeting;
-
-    return Positioned.fill(
+    return SizedBox.expand(
       child: IgnorePointer(
         ignoring: !_isVisible,
         child: AnimatedBuilder(
-          animation: _masterController,
+          animation: _controller,
           builder: (context, child) {
-            final curtainVal = _curtainOpacity.value;
-            if (curtainVal <= 0.0) return const SizedBox.shrink();
-
             return Opacity(
-              opacity: curtainVal.clamp(0.0, 1.0),
+              opacity: _curtainOpacity.value.clamp(0, 1).toDouble(),
               child: child,
             );
           },
           child: Material(
-            color: isDark ? const Color(0xFF030712) : const Color(0xFFFAF6EE),
+            // The splash is intentionally black in both app themes. It keeps
+            // the light wordmark and the peacock accents coherent on startup.
+            color: const Color(0xFF02050A),
             child: Stack(
-              alignment: Alignment.center,
+              fit: StackFit.expand,
               children: [
-                // 1. Peacock Feather Background
-                Positioned.fill(
-                  child: RepaintBoundary(
-                    child: AnimatedBuilder(
-                      animation: _masterController,
-                      builder: (context, _) {
-                        return CustomPaint(
-                          painter: PeacockFeatherPainter(
-                            animationProgress: _masterController.value,
-                            isDark: isDark,
-                          ),
-                        );
-                      },
+                RepaintBoundary(
+                  child: AnimatedBuilder(
+                    animation: _controller,
+                    builder: (context, _) => CustomPaint(
+                      painter: PeacockFeatherPainter(
+                        animationProgress: _controller.value,
+                      ),
                     ),
                   ),
                 ),
-
-            // 2. Flash Burst Wash
-            AnimatedBuilder(
-              animation: _flashOpacity,
-              builder: (context, child) {
-                final flashVal = _flashOpacity.value;
-                if (flashVal <= 0.01) return const SizedBox.shrink();
-                return Opacity(
-                  opacity: flashVal.clamp(0.0, 1.0),
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: RadialGradient(
-                        center: Alignment.center,
-                        radius: 0.75,
-                        colors: [
-                          Colors.white.withValues(alpha: 0.92),
-                          const Color(0xFFFFA600).withValues(alpha: 0.60),
-                          const Color(0xFFFFA600).withValues(alpha: 0.0),
-                        ],
-                        stops: const [0.0, 0.35, 0.70],
+                AnimatedBuilder(
+                  animation: _flashOpacity,
+                  builder: (context, _) => IgnorePointer(
+                    child: Opacity(
+                      opacity: _flashOpacity.value.clamp(0, 1).toDouble(),
+                      child: const DecoratedBox(
+                        decoration: BoxDecoration(
+                          gradient: RadialGradient(
+                            center: Alignment(0, -.08),
+                            radius: .68,
+                            colors: [
+                              Color(0x1AFFFFFF),
+                              Color(0x1490D7FF),
+                              Colors.transparent,
+                            ],
+                            stops: [0, .45, 1],
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                );
-              },
-            ),
-
-            // 3. Centered Logo & Content
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    // 3D Logo with Diagonal Shine Sweep
-                    AnimatedBuilder(
-                      animation: _masterController,
-                      builder: (context, child) {
-                        final scale = _logoScale.value;
-                        final tilt = _logoTilt.value;
-                        final opacity = _logoOpacity.value.clamp(0.0, 1.0);
-
-                        return Transform.scale(
-                          scale: scale,
-                          child: Transform(
-                            alignment: Alignment.center,
-                            transform: Matrix4.identity()
-                              ..setEntry(3, 2, 0.001)
-                              ..rotateX(tilt),
-                            child: Opacity(
-                              opacity: opacity,
-                              child: child,
+                ),
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        AnimatedBuilder(
+                          animation: _controller,
+                          builder: (context, child) => Transform.scale(
+                            scale: _logoScale.value,
+                            child: Transform(
+                              alignment: Alignment.center,
+                              transform: Matrix4.identity()
+                                ..setEntry(3, 2, .001)
+                                ..rotateX(_logoTilt.value),
+                              child: Opacity(
+                                opacity: _logoOpacity.value
+                                    .clamp(0, 1)
+                                    .toDouble(),
+                                child: child,
+                              ),
                             ),
                           ),
-                        );
-                      },
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(16),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.brandOrange.withValues(alpha: isDark ? 0.40 : 0.20),
-                              blurRadius: 36,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
+                          child: _AnimatedWordmark(
+                            shinePosition: _shinePosition,
+                          ),
                         ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: Stack(
-                            alignment: Alignment.center,
-                            children: [
-                              // InPlayer Wordmark Image
-                              Image.asset(
-                                isDark
-                                    ? 'assets/images/inplayer-mark-dark.png'
-                                    : 'assets/images/inplayer-mark-light.png',
-                                height: 76,
-                                fit: BoxFit.contain,
-                              ),
-
-                              // Diagonal Light-Shine Sweep
-                              Positioned.fill(
-                                child: AnimatedBuilder(
-                                  animation: _shinePosition,
-                                  builder: (context, child) {
-                                    return FractionallySizedBox(
-                                      alignment: Alignment(_shinePosition.value, 0.0),
-                                      widthFactor: 0.5,
-                                      child: Transform(
-                                        alignment: Alignment.center,
-                                        transform: Matrix4.skewX(-0.35),
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            gradient: LinearGradient(
-                                              colors: [
-                                                Colors.transparent,
-                                                Colors.white.withValues(alpha: 0.75),
-                                                Colors.transparent,
-                                              ],
-                                            ),
-                                          ),
+                        const SizedBox(height: 22),
+                        FadeTransition(
+                          opacity: _taglineOpacity,
+                          child: const Text(
+                            'THE FUTURE OF ENTERTAINMENT',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Color(0xFFFDBA74),
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 3.2,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 13),
+                        FadeTransition(
+                          opacity: _greetingOpacity,
+                          child: SizedBox(
+                            width: 300,
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 180),
+                              switchInCurve: Curves.easeOut,
+                              switchOutCurve: Curves.easeIn,
+                              child: FittedBox(
+                                key: ValueKey(greeting),
+                                fit: BoxFit.scaleDown,
+                                child: ShaderMask(
+                                  shaderCallback: (bounds) =>
+                                      const LinearGradient(
+                                        colors: [
+                                          Color(0xFFFED7AA),
+                                          Colors.white,
+                                          Color(0xFFBCEFFF),
+                                        ],
+                                      ).createShader(bounds),
+                                  child: Text(
+                                    greeting,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w700,
+                                      letterSpacing: .35,
+                                      shadows: [
+                                        Shadow(
+                                          color: Color(0x4D4CD7D0),
+                                          blurRadius: 14,
+                                          offset: Offset(0, 2),
                                         ),
-                                      ),
-                                    );
-                                  },
+                                      ],
+                                    ),
+                                  ),
                                 ),
                               ),
-                            ],
+                            ),
                           ),
                         ),
-                      ),
+                      ],
                     ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
 
-                    const SizedBox(height: 22),
+class _AnimatedWordmark extends StatelessWidget {
+  final Animation<double> shinePosition;
 
-                    // Tagline: "THE FUTURE OF ENTERTAINMENT"
-                    AnimatedBuilder(
-                      animation: _taglineOpacity,
-                      builder: (context, child) {
-                        return Opacity(
-                          opacity: _taglineOpacity.value.clamp(0.0, 1.0),
-                          child: child,
-                        );
-                      },
-                      child: const Text(
-                        'THE FUTURE OF ENTERTAINMENT',
-                        style: TextStyle(
-                          color: Color(0xFFFDBA74),
-                          fontSize: 12,
-                          fontWeight: FontWeight.w800,
-                          letterSpacing: 4.5,
-                        ),
-                      ),
-                    ),
+  const _AnimatedWordmark({required this.shinePosition});
 
-                    const SizedBox(height: 12),
-
-                    // Time-of-day Greeting
-                    AnimatedBuilder(
-                      animation: _greetingOpacity,
-                      builder: (context, child) {
-                        return Opacity(
-                          opacity: _greetingOpacity.value.clamp(0.0, 1.0),
-                          child: child,
-                        );
-                      },
-                      child: ShaderMask(
-                        shaderCallback: (bounds) => const LinearGradient(
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.brandOrange.withValues(alpha: .28),
+            blurRadius: 34,
+            offset: const Offset(0, 4),
+          ),
+          BoxShadow(
+            color: const Color(0xFF22D3EE).withValues(alpha: .12),
+            blurRadius: 50,
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(16),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Image.asset(
+              'assets/images/inplayer-mark-dark.png',
+              height: 76,
+              fit: BoxFit.contain,
+            ),
+            Positioned.fill(
+              child: AnimatedBuilder(
+                animation: shinePosition,
+                builder: (context, _) => FractionallySizedBox(
+                  alignment: Alignment(shinePosition.value, 0),
+                  widthFactor: .45,
+                  child: Transform(
+                    alignment: Alignment.center,
+                    transform: Matrix4.skewX(-.35),
+                    child: DecoratedBox(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
                           colors: [
-                            Color(0xFFFED7AA),
-                            Colors.white,
-                            Color(0xFFFED7AA),
+                            Colors.transparent,
+                            Colors.white.withValues(alpha: .54),
+                            Colors.transparent,
                           ],
-                        ).createShader(bounds),
-                        child: Text(
-                          greeting,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.5,
-                            shadows: [
-                              Shadow(
-                                color: Color(0x60F97316),
-                                blurRadius: 14,
-                                offset: Offset(0, 2),
-                              ),
-                            ],
-                          ),
                         ),
                       ),
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
           ],
         ),
       ),
-    ),
-  ),
-);
-}
+    );
+  }
 }
 
+/// Low-contrast feather silhouettes, deliberately offset away from the
+/// wordmark. This is ornamental background texture, not a second logo.
 class PeacockFeatherPainter extends CustomPainter {
   final double animationProgress;
-  final bool isDark;
 
-  PeacockFeatherPainter({required this.animationProgress, required this.isDark});
+  const PeacockFeatherPainter({required this.animationProgress});
 
   @override
   void paint(Canvas canvas, Size size) {
-    final cx = size.width / 2;
-    final cy = size.height * 0.44;
-
-    // 1. Ambient Iridescent Radiance
-    final glowPaint = Paint()
+    final shimmer = .75 + (.25 * math.sin(animationProgress * math.pi));
+    final ambient = Paint()
       ..shader = RadialGradient(
-        center: const Alignment(0.0, -0.12),
-        radius: 0.85,
-        colors: isDark
-            ? [
-                const Color(0xFF0D9488).withValues(alpha: 0.18 + 0.08 * math.sin(animationProgress * math.pi)),
-                const Color(0xFF1E3A8A).withValues(alpha: 0.14),
-                const Color(0xFF042F2E).withValues(alpha: 0.08),
-                Colors.transparent,
-              ]
-            : [
-                const Color(0xFF0D9488).withValues(alpha: 0.08),
-                const Color(0xFFFDE68A).withValues(alpha: 0.06),
-                Colors.transparent,
-              ],
-        stops: const [0.0, 0.40, 0.70, 1.0],
-      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
-    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), glowPaint);
-
-    // 2. Peacock Feather Stem (Rachis)
-    final stemPath = Path();
-    stemPath.moveTo(cx, size.height * 0.85);
-    stemPath.quadraticBezierTo(cx - 15, size.height * 0.60, cx, cy);
-
-    final stemPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 2.2
-      ..shader = LinearGradient(
-        begin: Alignment.bottomCenter,
-        end: Alignment.topCenter,
+        center: const Alignment(.72, -.52),
+        radius: 1.05,
         colors: [
-          const Color(0xFF047857).withValues(alpha: 0.0),
-          const Color(0xFF10B981).withValues(alpha: 0.35),
-          const Color(0xFFF59E0B).withValues(alpha: 0.45),
-        ],
-      ).createShader(Rect.fromLTWH(cx - 30, cy, 60, size.height * 0.85 - cy));
-    canvas.drawPath(stemPath, stemPaint);
-
-    // 3. Peacock Feather Barbs (Plumules) radiating outwards
-    final barbPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    const barbCount = 28;
-    for (int i = 0; i < barbCount; i++) {
-      final t = i / barbCount;
-      final yStem = cy + (size.height * 0.82 - cy) * (t * 0.85 + 0.15);
-      final spread = math.sin(t * math.pi) * (size.width * 0.42);
-      final curveFactor = (1.0 - t) * 35;
-      final alpha = (math.sin(t * math.pi) * 0.22 * (0.6 + 0.4 * math.sin(animationProgress * math.pi + i * 0.2))).clamp(0.04, 0.35);
-
-      // Left Barb
-      barbPaint.strokeWidth = 1.0 + (1.0 - t) * 0.8;
-      barbPaint.color = Color.lerp(
-        const Color(0xFF059669),
-        const Color(0xFF3B82F6),
-        t,
-      )!.withValues(alpha: alpha);
-
-      final leftPath = Path();
-      leftPath.moveTo(cx - 2, yStem);
-      leftPath.quadraticBezierTo(
-        cx - spread * 0.55,
-        yStem - curveFactor,
-        cx - spread,
-        yStem - curveFactor * 0.6,
-      );
-      canvas.drawPath(leftPath, barbPaint);
-
-      // Right Barb
-      barbPaint.color = Color.lerp(
-        const Color(0xFF10B981),
-        const Color(0xFF6366F1),
-        t,
-      )!.withValues(alpha: alpha);
-
-      final rightPath = Path();
-      rightPath.moveTo(cx + 2, yStem);
-      rightPath.quadraticBezierTo(
-        cx + spread * 0.55,
-        yStem - curveFactor,
-        cx + spread,
-        yStem - curveFactor * 0.6,
-      );
-      canvas.drawPath(rightPath, barbPaint);
-    }
-
-    // 4. Peacock Feather Eye (Ocellus)
-    final eyeCenter = Offset(cx, cy);
-    final eyeScale = (0.85 + 0.15 * math.sin(animationProgress * math.pi)).clamp(0.8, 1.1);
-
-    // Layer A: Outer Sapphire Halo
-    final outerHaloPaint = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          const Color(0xFF1E3A8A).withValues(alpha: isDark ? 0.32 : 0.15),
-          const Color(0xFF0F172A).withValues(alpha: 0.0),
-        ],
-      ).createShader(Rect.fromCircle(center: eyeCenter, radius: 100 * eyeScale));
-    canvas.drawOval(
-      Rect.fromCenter(center: eyeCenter, width: 170 * eyeScale, height: 210 * eyeScale),
-      outerHaloPaint,
-    );
-
-    // Layer B: Teal & Turquoise Ring
-    final tealRingPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 14 * eyeScale
-      ..shader = SweepGradient(
-        center: const Alignment(0, 0),
-        colors: [
-          const Color(0xFF0D9488).withValues(alpha: 0.30),
-          const Color(0xFF06B6D4).withValues(alpha: 0.40),
-          const Color(0xFF10B981).withValues(alpha: 0.35),
-          const Color(0xFF0D9488).withValues(alpha: 0.30),
-        ],
-      ).createShader(Rect.fromCircle(center: eyeCenter, radius: 55 * eyeScale));
-    canvas.drawOval(
-      Rect.fromCenter(center: eyeCenter, width: 110 * eyeScale, height: 135 * eyeScale),
-      tealRingPaint,
-    );
-
-    // Layer C: Golden Bronze Inner Core
-    final goldCorePaint = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          const Color(0xFFF59E0B).withValues(alpha: 0.45),
-          const Color(0xFFD97706).withValues(alpha: 0.25),
+          const Color(0xFF0F766E).withValues(alpha: .12 * shimmer),
+          const Color(0xFF172554).withValues(alpha: .10 * shimmer),
           Colors.transparent,
         ],
-        stops: const [0.0, 0.65, 1.0],
-      ).createShader(Rect.fromCircle(center: eyeCenter, radius: 45 * eyeScale));
-    canvas.drawOval(
-      Rect.fromCenter(center: eyeCenter, width: 75 * eyeScale, height: 95 * eyeScale),
-      goldCorePaint,
+        stops: const [0, .48, 1],
+      ).createShader(Offset.zero & size);
+    canvas.drawRect(Offset.zero & size, ambient);
+
+    final unit = math.min(size.width / 430, size.height / 820);
+    final scale = unit.clamp(.68, 1.18).toDouble();
+    _drawFeather(
+      canvas,
+      eye: Offset(size.width * .83, size.height * .26),
+      scale: scale,
+      opacity: .46 * shimmer,
+      mirrored: false,
+    );
+    _drawFeather(
+      canvas,
+      eye: Offset(size.width * .15, size.height * .79),
+      scale: scale * .82,
+      opacity: .24 * shimmer,
+      mirrored: true,
+    );
+  }
+
+  void _drawFeather(
+    Canvas canvas, {
+    required Offset eye,
+    required double scale,
+    required double opacity,
+    required bool mirrored,
+  }) {
+    canvas.save();
+    canvas.translate(eye.dx, eye.dy);
+    canvas.scale(mirrored ? -scale : scale, scale);
+
+    final stem = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.4
+      ..strokeCap = StrokeCap.round
+      ..shader = const LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [Color(0xFFEAB308), Color(0xFF14B8A6), Color(0xFF0F172A)],
+      ).createShader(const Rect.fromLTWH(-8, 0, 18, 220));
+    canvas.drawPath(
+      Path()
+        ..moveTo(0, 18)
+        ..quadraticBezierTo(-8, 92, 10, 220),
+      stem..color = stem.color.withValues(alpha: opacity),
     );
 
-    // Layer D: Midnight Indigo Heart Pupil
-    final pupilPaint = Paint()
-      ..shader = RadialGradient(
-        colors: [
-          const Color(0xFF312E81).withValues(alpha: 0.60),
-          const Color(0xFF1E1B4B).withValues(alpha: 0.80),
-        ],
-      ).createShader(Rect.fromCircle(center: eyeCenter, radius: 24 * eyeScale));
+    final barb = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    for (var index = 0; index < 18; index++) {
+      final t = index / 17;
+      final y = 28 + (t * 162);
+      final length = 22 + (math.sin(t * math.pi) * 96);
+      final curve = 12 + (1 - t) * 24;
+      barb
+        ..strokeWidth = 0.7 + ((1 - t) * .6)
+        ..color = Color.lerp(
+          const Color(0xFF22C55E),
+          const Color(0xFF38BDF8),
+          t,
+        )!.withValues(alpha: opacity * (.17 + (math.sin(t * math.pi) * .20)));
+      canvas.drawPath(
+        Path()
+          ..moveTo(-2 + (t * 4), y)
+          ..quadraticBezierTo(
+            -length * .52,
+            y - curve,
+            -length,
+            y - curve * .42,
+          ),
+        barb,
+      );
+      canvas.drawPath(
+        Path()
+          ..moveTo(2 + (t * 4), y)
+          ..quadraticBezierTo(length * .52, y - curve, length, y - curve * .42),
+        barb,
+      );
+    }
+
+    final halo = Paint()
+      ..shader =
+          RadialGradient(
+            colors: [
+              const Color(0xFF1D4ED8).withValues(alpha: opacity * .28),
+              Colors.transparent,
+            ],
+          ).createShader(
+            Rect.fromCenter(center: Offset.zero, width: 116, height: 138),
+          );
     canvas.drawOval(
-      Rect.fromCenter(center: Offset(cx, cy + 4), width: 42 * eyeScale, height: 50 * eyeScale),
-      pupilPaint,
+      Rect.fromCenter(center: Offset.zero, width: 116, height: 138),
+      halo,
     );
 
-    // Specular glimmer dot
-    final sparkPaint = Paint()..color = Colors.white.withValues(alpha: 0.55);
-    canvas.drawCircle(Offset(cx - 6 * eyeScale, cy - 4 * eyeScale), 2.5 * eyeScale, sparkPaint);
+    final ring = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 7
+      ..shader =
+          SweepGradient(
+            colors: [
+              const Color(0xFF0D9488).withValues(alpha: opacity * .48),
+              const Color(0xFF06B6D4).withValues(alpha: opacity * .52),
+              const Color(0xFFF59E0B).withValues(alpha: opacity * .36),
+              const Color(0xFF0D9488).withValues(alpha: opacity * .48),
+            ],
+          ).createShader(
+            Rect.fromCenter(center: Offset.zero, width: 58, height: 76),
+          );
+    canvas.drawOval(
+      Rect.fromCenter(center: Offset.zero, width: 58, height: 76),
+      ring,
+    );
+    final pupil = Paint()
+      ..color = const Color(0xFF312E81).withValues(alpha: opacity * .48);
+    canvas.drawOval(
+      Rect.fromCenter(center: Offset.zero, width: 23, height: 34),
+      pupil,
+    );
+    canvas.restore();
   }
 
   @override
   bool shouldRepaint(covariant PeacockFeatherPainter oldDelegate) {
-    return oldDelegate.animationProgress != animationProgress || oldDelegate.isDark != isDark;
+    return oldDelegate.animationProgress != animationProgress;
   }
 }

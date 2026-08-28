@@ -6,19 +6,12 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../services/content_access_service.dart';
+import '../../../../services/video_service.dart';
 import '../../../auth/presentation/widgets/auth_modals.dart';
 
-/// The real version of what used to be two disconnected, non-functional
-/// stand-ins elsewhere in the app: a local-only "18+ Content" switch on
-/// this same Settings page that wrote the wrong value strings to the wrong
-/// place, and a pair of Switches inside the hamburger drawer that never
-/// persisted or sent anything anywhere. Ported row-for-row from the
-/// website's own Settings > General > Content Access
-/// (app/components/settings/sections/ContentAccessSection.tsx) — the mode
-/// itself lives in a server-set HttpOnly cookie no client script can
-/// forge, and every change is authorised by a 6-digit passkey hashed
-/// against the account, so this screen can only ever ASK the server to
-/// change something, same as the website.
+/// Kept as a deep-link destination for older installs. The live controls are
+/// now in the hamburger drawer, matching the website. Its behavior is kept
+/// identical so an old bookmarked route cannot reintroduce a second policy.
 class ContentAccessPage extends ConsumerStatefulWidget {
   const ContentAccessPage({super.key});
 
@@ -26,32 +19,26 @@ class ContentAccessPage extends ConsumerStatefulWidget {
   ConsumerState<ContentAccessPage> createState() => _ContentAccessPageState();
 }
 
-enum _PendingKind { mode, newPasskey, changePasskey }
-
-class _Pending {
-  final _PendingKind kind;
-  final AudienceMode? mode;
-  const _Pending(this.kind, {this.mode});
-}
-
 class _ContentAccessPageState extends ConsumerState<ContentAccessPage> {
   AudienceMode _mode = AudienceMode.family;
   bool _hasPasskey = false;
   bool _loading = true;
+  bool _busy = false;
+  String? _error;
 
   @override
   void initState() {
     super.initState();
-    _refresh();
+    _load();
   }
 
-  Future<void> _refresh() async {
-    final state = await ref.read(contentAccessServiceProvider).getState();
+  Future<void> _load() async {
+    final access = await ref.read(contentAccessServiceProvider).getState();
     if (!mounted) return;
     setState(() {
-      if (state != null) {
-        _mode = state.mode;
-        _hasPasskey = state.hasPasskey;
+      if (access != null) {
+        _mode = access.mode;
+        _hasPasskey = access.hasPasskey;
       }
       _loading = false;
     });
@@ -59,115 +46,136 @@ class _ContentAccessPageState extends ConsumerState<ContentAccessPage> {
 
   bool get _signedIn => ref.read(authStateProvider) is AuthStateAuthenticated;
 
-  void _requestMode(AudienceMode next) {
+  void _announceChange() {
+    VideoService.clearAudienceCaches();
+    ref.read(contentAccessRevisionProvider.notifier).state++;
+  }
+
+  Future<void> _applyNarrowMode(AudienceMode mode) async {
+    if (_busy) return;
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final result = await ref.read(contentAccessServiceProvider).setMode(mode);
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      if (result.success) {
+        _mode = mode;
+      } else {
+        _error = result.error ?? 'Could not update content access.';
+      }
+    });
+    if (result.success) _announceChange();
+  }
+
+  Future<void> _requestAdultMode() async {
     if (!_signedIn) {
       showSignInModal(context);
       return;
     }
-    _openPasskeyDialog(
-      _hasPasskey ? _Pending(_PendingKind.mode, mode: next) : _Pending(_PendingKind.newPasskey, mode: next),
-    );
+    await _showPasskeyDialog(switchToAdult: true);
   }
 
-  Future<void> _openPasskeyDialog(_Pending pending) async {
-    final passkeyController = TextEditingController();
-    final confirmController = TextEditingController();
-    final currentController = TextEditingController();
-    bool busy = false;
+  Future<void> _showPasskeyDialog({bool switchToAdult = false}) async {
+    final passkey = TextEditingController();
+    final confirm = TextEditingController();
+    final current = TextEditingController();
+    final needsNew = !_hasPasskey;
+    final changingOnly = !switchToAdult;
+    var busy = false;
     String? error;
 
-    await showDialog<void>(
-      context: context,
-      builder: (dialogCtx) {
-        return StatefulBuilder(
-          builder: (dialogCtx, setDialogState) {
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (dialogContext) => StatefulBuilder(
+          builder: (dialogContext, setDialogState) {
             Future<void> submit() async {
-              if (busy) return;
+              if (busy || passkey.text.length != 6) return;
+              if (needsNew && passkey.text != confirm.text) {
+                setDialogState(() => error = 'The two passkeys do not match.');
+                return;
+              }
+              if (changingOnly && !needsNew && current.text.length != 6) {
+                setDialogState(() => error = 'Enter your current passkey.');
+                return;
+              }
+
               setDialogState(() {
                 busy = true;
                 error = null;
               });
-
-              try {
-                if (pending.kind == _PendingKind.mode) {
-                  final result = await ref
-                      .read(contentAccessServiceProvider)
-                      .setMode(pending.mode!, passkeyController.text);
-                  if (!result.success) throw Exception(result.error ?? 'Something went wrong.');
-                  setState(() => _mode = pending.mode!);
-                } else {
-                  if (passkeyController.text != confirmController.text) {
-                    throw Exception("Those two passkeys don't match.");
-                  }
-                  final result = await ref.read(contentAccessServiceProvider).setPasskey(
-                        passkeyController.text,
-                        currentPasskey: pending.kind == _PendingKind.changePasskey ? currentController.text : null,
-                      );
-                  if (!result.success) throw Exception(result.error ?? "Couldn't save that passkey.");
-                  setState(() => _hasPasskey = true);
-
-                  if (pending.kind == _PendingKind.newPasskey && pending.mode != null) {
-                    final modeResult = await ref
-                        .read(contentAccessServiceProvider)
-                        .setMode(pending.mode!, passkeyController.text);
-                    if (modeResult.success) {
-                      setState(() => _mode = pending.mode!);
-                    }
-                  }
+              final service = ref.read(contentAccessServiceProvider);
+              if (needsNew || changingOnly) {
+                final save = await service.setPasskey(
+                  passkey.text,
+                  currentPasskey: needsNew ? null : current.text,
+                );
+                if (!save.success) {
+                  setDialogState(() {
+                    busy = false;
+                    error = save.error ?? 'Could not save the passkey.';
+                  });
+                  return;
                 }
-
-                if (dialogCtx.mounted) Navigator.of(dialogCtx).pop();
-              } catch (e) {
-                setDialogState(() {
-                  busy = false;
-                  error = e.toString().replaceFirst('Exception: ', '');
-                });
               }
+
+              if (switchToAdult) {
+                final unlock = await service.setMode(
+                  AudienceMode.all,
+                  passkey: passkey.text,
+                );
+                if (!unlock.success) {
+                  setDialogState(() {
+                    busy = false;
+                    error = unlock.error ?? 'Could not unlock 18+ content.';
+                  });
+                  return;
+                }
+                if (mounted) {
+                  setState(() {
+                    _mode = AudienceMode.all;
+                    _hasPasskey = true;
+                  });
+                  _announceChange();
+                }
+              } else if (mounted) {
+                setState(() => _hasPasskey = true);
+              }
+
+              if (dialogContext.mounted) Navigator.of(dialogContext).pop();
             }
 
-            final title = pending.kind == _PendingKind.mode
-                ? 'Enter your passkey'
-                : pending.kind == _PendingKind.changePasskey
-                    ? 'Change your passkey'
-                    : 'Create a passkey';
-            final subtitle = pending.kind == _PendingKind.mode
-                ? 'Enter your 6-digit passkey to change what content is shown.'
-                : "Pick 6 digits. You'll need them any time this setting is changed, on any device.";
-
+            final title = changingOnly
+                ? (needsNew ? 'Create a passkey' : 'Change passkey')
+                : (needsNew ? 'Create a passkey' : 'Enter your passkey');
             return AlertDialog(
-              backgroundColor: dialogCtx.bgModal,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
-                side: BorderSide(color: dialogCtx.borderSubtle),
-              ),
-              title: Text(title, style: TextStyle(color: dialogCtx.textPrimary, fontWeight: FontWeight.bold)),
+              backgroundColor: dialogContext.bgModal,
+              title: Text(title, style: TextStyle(color: dialogContext.textPrimary)),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(subtitle, style: TextStyle(color: dialogCtx.textSecondary, fontSize: 12.5)),
-                  const SizedBox(height: 16),
-                  if (pending.kind == _PendingKind.changePasskey) ...[
-                    _PasskeyField(
-                      controller: currentController,
-                      hint: 'Current passkey',
-                      onChanged: (_) => setDialogState(() {}),
-                    ),
+                  Text(
+                    switchToAdult
+                        ? 'A 6-digit passkey is required only to show 18+ content.'
+                        : 'Use a 6-digit passkey to protect 18+ content on this account.',
+                    style: TextStyle(color: dialogContext.textSecondary, fontSize: 12.5),
+                  ),
+                  const SizedBox(height: 14),
+                  if (changingOnly && !needsNew) ...[
+                    _PasskeyField(controller: current, hint: 'Current passkey'),
                     const SizedBox(height: 10),
                   ],
                   _PasskeyField(
-                    controller: passkeyController,
-                    hint: pending.kind == _PendingKind.mode ? 'Passkey' : 'New passkey',
-                    onChanged: (_) => setDialogState(() {}),
+                    controller: passkey,
+                    hint: needsNew ? 'New passkey' : 'Passkey',
                     autofocus: true,
                   ),
-                  if (pending.kind != _PendingKind.mode) ...[
+                  if (needsNew) ...[
                     const SizedBox(height: 10),
-                    _PasskeyField(
-                      controller: confirmController,
-                      hint: 'Confirm passkey',
-                      onChanged: (_) => setDialogState(() {}),
-                    ),
+                    _PasskeyField(controller: confirm, hint: 'Confirm passkey'),
                   ],
                   if (error != null) ...[
                     const SizedBox(height: 10),
@@ -177,111 +185,85 @@ class _ContentAccessPageState extends ConsumerState<ContentAccessPage> {
               ),
               actions: [
                 TextButton(
-                  onPressed: busy ? null : () => Navigator.of(dialogCtx).pop(),
-                  child: Text('Cancel', style: TextStyle(color: dialogCtx.textSecondary)),
+                  onPressed: busy ? null : () => Navigator.of(dialogContext).pop(),
+                  child: const Text('Cancel'),
                 ),
                 ElevatedButton(
-                  onPressed: busy || passkeyController.text.length != 6 ? null : submit,
-                  style: ElevatedButton.styleFrom(backgroundColor: AppColors.brandOrange),
+                  onPressed: busy ? null : submit,
                   child: busy
                       ? const SizedBox(
                           width: 16,
                           height: 16,
                           child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
                         )
-                      : Text(
-                          pending.kind == _PendingKind.mode ? 'Unlock' : 'Save passkey',
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                        ),
+                      : Text(switchToAdult ? 'Unlock' : 'Save'),
                 ),
               ],
             );
           },
-        );
-      },
-    );
+        ),
+      );
+    } finally {
+      passkey.dispose();
+      confirm.dispose();
+      current.dispose();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final adultVisible = _mode == AudienceMode.all;
+    final kidsOnly = _mode == AudienceMode.kids;
     return Scaffold(
       backgroundColor: context.bgCanvas,
-      appBar: AppBar(
-        backgroundColor: context.bgCanvas,
-        elevation: 0,
-        title: Text(
-          'Content Access',
-          style: TextStyle(fontWeight: FontWeight.w800, color: context.textPrimary, fontSize: 20),
-        ),
-      ),
+      appBar: AppBar(title: const Text('Content Access')),
       body: ListView(
-        padding: const EdgeInsets.symmetric(vertical: 8),
+        padding: const EdgeInsets.symmetric(vertical: 10),
         children: [
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 16),
             child: Text(
-              'Control which content is shown across InPlayer, locked with a 6-digit passkey.',
+              'These controls are also available in the hamburger menu.',
               style: TextStyle(color: context.textSecondary, fontSize: 13),
             ),
           ),
           SwitchListTile(
-            secondary: Icon(Icons.shield_outlined, color: context.textPrimary, size: 22),
-            title: Text('Show 18+ content', style: TextStyle(color: context.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+            secondary: const Icon(Icons.eighteen_up_rating_rounded),
+            title: const Text('18+ content'),
             subtitle: Text(
-              _loading
-                  ? 'Checking…'
-                  : _mode == AudienceMode.all
-                      ? '18+ videos are visible everywhere on InPlayer.'
-                      : '18+ videos are hidden from every feed, search result and direct link.',
-              style: TextStyle(color: context.textSecondary, fontSize: 12),
+              adultVisible ? 'Showing all content, including 18+.' : '18+ content is hidden.',
             ),
-            activeThumbColor: AppColors.brandOrange,
-            value: _mode == AudienceMode.all,
-            onChanged: _loading ? null : (checked) => _requestMode(checked ? AudienceMode.all : AudienceMode.family),
+            value: adultVisible,
+            onChanged: _loading || _busy
+                ? null
+                : (enabled) => enabled
+                    ? _requestAdultMode()
+                    : _applyNarrowMode(AudienceMode.family),
           ),
           SwitchListTile(
-            secondary: Icon(Icons.face_outlined, color: context.textPrimary, size: 22),
-            title: Text('Kids content only', style: TextStyle(color: context.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+            secondary: const Icon(Icons.child_care_rounded),
+            title: const Text('Kids only'),
             subtitle: Text(
-              _loading
-                  ? 'Checking…'
-                  : _mode == AudienceMode.kids
-                      ? 'Only videos a creator marked as Kids can be seen or played.'
-                      : 'Turn on to limit InPlayer to Kids content and nothing else.',
-              style: TextStyle(color: context.textSecondary, fontSize: 12),
+              kidsOnly ? 'Only Kids videos are visible.' : 'Limit InPlayer to Kids videos.',
             ),
-            activeThumbColor: AppColors.brandOrange,
-            value: _mode == AudienceMode.kids,
-            onChanged: _loading ? null : (checked) => _requestMode(checked ? AudienceMode.kids : AudienceMode.family),
-          ),
-          ListTile(
-            leading: Icon(Icons.key_outlined, color: context.textPrimary, size: 22),
-            title: Text(
-              _hasPasskey ? 'Change passkey' : 'Create passkey',
-              style: TextStyle(color: context.textPrimary, fontSize: 14, fontWeight: FontWeight.w600),
-            ),
-            subtitle: Text(
-              _hasPasskey ? 'Required to change either setting above.' : "You'll be asked to set one the first time you change a setting above.",
-              style: TextStyle(color: context.textSecondary, fontSize: 12),
-            ),
-            trailing: _loading
+            value: kidsOnly,
+            onChanged: _loading || _busy
                 ? null
-                : Text(audienceModeLabel(_mode), style: const TextStyle(color: AppColors.brandOrange, fontSize: 11.5, fontWeight: FontWeight.w600)),
-            onTap: () {
-              if (!_signedIn) {
-                showSignInModal(context);
-                return;
-              }
-              _openPasskeyDialog(_Pending(_hasPasskey ? _PendingKind.changePasskey : _PendingKind.newPasskey));
-            },
+                : (enabled) => _applyNarrowMode(
+                    enabled ? AudienceMode.kids : AudienceMode.family,
+                  ),
           ),
-          if (!_signedIn && !_loading)
+          if (_signedIn)
+            ListTile(
+              leading: const Icon(Icons.key_outlined),
+              title: Text(_hasPasskey ? 'Change 18+ passkey' : 'Create 18+ passkey'),
+              subtitle: const Text('Only required when showing 18+ content.'),
+              onTap: _loading || _busy ? null : _showPasskeyDialog,
+            ),
+          if (_error != null)
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 4, 20, 4),
-              child: Text(
-                'Sign in to change these — signed-out viewing always hides 18+ content.',
-                style: TextStyle(color: context.textDim, fontSize: 11.5),
-              ),
+              padding: const EdgeInsets.all(16),
+              child: Text(_error!, style: const TextStyle(color: AppColors.error)),
             ),
         ],
       ),
@@ -292,13 +274,11 @@ class _ContentAccessPageState extends ConsumerState<ContentAccessPage> {
 class _PasskeyField extends StatelessWidget {
   final TextEditingController controller;
   final String hint;
-  final ValueChanged<String> onChanged;
   final bool autofocus;
 
   const _PasskeyField({
     required this.controller,
     required this.hint,
-    required this.onChanged,
     this.autofocus = false,
   });
 
@@ -309,21 +289,12 @@ class _PasskeyField extends StatelessWidget {
       autofocus: autofocus,
       obscureText: true,
       keyboardType: TextInputType.number,
-      inputFormatters: [FilteringTextInputFormatter.digitsOnly, LengthLimitingTextInputFormatter(6)],
+      inputFormatters: [
+        FilteringTextInputFormatter.digitsOnly,
+        LengthLimitingTextInputFormatter(6),
+      ],
       textAlign: TextAlign.center,
-      style: TextStyle(color: context.textPrimary, fontSize: 18, letterSpacing: 8),
-      decoration: InputDecoration(
-        hintText: hint,
-        hintStyle: TextStyle(color: context.textDim, letterSpacing: 0, fontSize: 13),
-        filled: true,
-        fillColor: context.bgCard,
-        contentPadding: const EdgeInsets.symmetric(vertical: 12),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide(color: context.borderSubtle),
-        ),
-      ),
-      onChanged: onChanged,
+      decoration: InputDecoration(hintText: hint),
     );
   }
 }

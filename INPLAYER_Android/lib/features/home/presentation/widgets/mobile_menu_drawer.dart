@@ -10,11 +10,9 @@ import '../../../../core/theme/app_logo.dart';
 import '../../../../core/widgets/about_app_dialog.dart';
 import '../../../../models/channel.dart';
 import '../../../../providers/auth_provider.dart';
-import '../../../../providers/kid_mode_provider.dart';
 import '../../../../services/channel_service.dart';
 import '../../../auth/presentation/widgets/auth_modals.dart';
-import '../../../safety/presentation/widgets/face_scan_modal.dart';
-import '../../../safety/presentation/widgets/parental_pin_dialog.dart';
+import 'content_access_drawer_section.dart';
 
 class MobileMenuDrawer extends ConsumerStatefulWidget {
   const MobileMenuDrawer({super.key});
@@ -217,62 +215,7 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                       },
                     ),
                     _buildDivider(),
-                    _buildSectionHeader('CONTENT ACCESS & SAFETY'),
-                    _buildMenuItem(
-                      icon: Icons.eighteen_up_rating_rounded,
-                      title: '18+ Adult Content & Passcode',
-                      trailing: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                        decoration: BoxDecoration(
-                          color: AppColors.brandOrange.withValues(alpha: 0.12),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Text(
-                          'PASSKEY',
-                          style: TextStyle(
-                            color: AppColors.brandOrange,
-                            fontSize: 10,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                      onTap: () {
-                        Navigator.pop(context);
-                        context.push('/settings/content-access');
-                      },
-                    ),
-                    Consumer(
-                      builder: (context, ref, _) {
-                        final isKid = ref.watch(kidModeProvider.select((s) => s.isEnabled));
-                        return _buildMenuItem(
-                          icon: isKid ? Icons.child_care_rounded : Icons.face_retouching_natural_rounded,
-                          title: isKid ? 'Kids Mode: Active (Exit)' : 'Kids Mode & Face ID Safety',
-                          trailing: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: isKid ? const Color(0x2210B981) : const Color(0x22F97316),
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Text(
-                              isKid ? 'ACTIVE' : 'SCAN / PIN',
-                              style: TextStyle(
-                                color: isKid ? const Color(0xFF10B981) : AppColors.brandOrange,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ),
-                          onTap: () {
-                            Navigator.pop(context);
-                            if (isKid) {
-                              ParentalPinDialog.show(context);
-                            } else {
-                              FaceScanModal.show(context);
-                            }
-                          },
-                        );
-                      },
-                    ),
+                    const ContentAccessDrawerSection(),
 
                     // YOU Section (when signed in)
                     if (user != null) ...[

@@ -22,6 +22,16 @@ class VideoService {
   static List<Video>? _cachedFeatured;
   static DateTime? _featuredCacheTime;
 
+  /// The audience cookie is part of the server response contract. Clear both
+  /// in-memory shelves whenever a viewer changes 18+/Kids mode so existing
+  /// cached cards cannot briefly bypass the newly selected filter.
+  static void clearAudienceCaches() {
+    _cachedVideos = null;
+    _videosCacheTime = null;
+    _cachedFeatured = null;
+    _featuredCacheTime = null;
+  }
+
   /// Loads the real video feed from the InPlayer website backend with instant in-memory caching.
   Future<List<Video>> getVideos({bool forceRefresh = false}) async {
     if (!forceRefresh &&

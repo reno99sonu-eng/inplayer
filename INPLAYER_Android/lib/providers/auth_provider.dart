@@ -17,6 +17,19 @@ class AuthNotifier extends StateNotifier<AuthState> {
     _init();
   }
 
+  /// Keeps the startup greeting available before Cognito/profile hydration has
+  /// finished on the next cold launch. Some accounts only have a handle, so
+  /// never overwrite a useful cached value with an empty display name.
+  Future<void> _cacheDisplayName(User user) async {
+    final name = user.name.trim().isNotEmpty
+        ? user.name.trim()
+        : user.username.trim();
+    if (name.isEmpty) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_cachedNameKey, name);
+  }
+
   Future<void> _init() async {
     try {
       await _authService.configureAmplify();
@@ -25,8 +38,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (isSignedIn) {
         final user = await _authService.getCurrentUser();
         if (user != null) {
-          final prefs = await SharedPreferences.getInstance();
-          await prefs.setString(_cachedNameKey, user.name);
+          await _cacheDisplayName(user);
           state = AuthState.authenticated(user);
         } else {
           state = const AuthState.unauthenticated();
@@ -46,8 +58,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final result = await _authService.signIn(email: email, password: password);
 
     if (result.success && result.user != null) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_cachedNameKey, result.user!.name);
+      await _cacheDisplayName(result.user!);
       state = AuthState.authenticated(result.user!);
       return true;
     } else {
@@ -62,8 +73,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final result = await _authService.signInWithGoogle();
 
     if (result.success && result.user != null) {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.setString(_cachedNameKey, result.user!.name);
+      await _cacheDisplayName(result.user!);
       state = AuthState.authenticated(result.user!);
       return true;
     } else {
@@ -163,6 +173,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       try {
         final user = await _authService.getCurrentUser();
         if (user != null) {
+          await _cacheDisplayName(user);
           state = AuthState.authenticated(user);
         }
       } catch (e) {

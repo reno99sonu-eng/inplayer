@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import '../config/app_config.dart';
@@ -5,7 +7,14 @@ import '../theme/app_colors.dart';
 import '../theme/app_theme.dart';
 import '../utils/image_utils.dart';
 
-class UserAvatar extends StatelessWidget {
+/// A stable avatar renderer for both URL and base64 profile images.
+///
+/// Raftaar's player rebuilds its chrome many times per second.  Decoding a
+/// data URI in [build] creates a new [MemoryImage] on each rebuild, which
+/// changes the image-cache key and makes the avatar flash between the image
+/// and its fallback.  Keeping the decoded bytes in State gives the image a
+/// stable provider for the lifetime of the mounted avatar.
+class UserAvatar extends StatefulWidget {
   final String? avatarUrl;
   final String name;
   final double size;
@@ -21,15 +30,45 @@ class UserAvatar extends StatelessWidget {
     this.onTap,
   });
 
+  @override
+  State<UserAvatar> createState() => _UserAvatarState();
+}
+
+class _UserAvatarState extends State<UserAvatar> {
+  String _dataUrl = '';
+  Uint8List? _dataBytes;
+
+  @override
+  void initState() {
+    super.initState();
+    _syncDataImage();
+  }
+
+  @override
+  void didUpdateWidget(covariant UserAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.avatarUrl != widget.avatarUrl) {
+      _syncDataImage();
+    }
+  }
+
+  void _syncDataImage() {
+    final candidate = (widget.avatarUrl ?? '').trim();
+    _dataUrl = candidate;
+    _dataBytes = isDataImageUrl(candidate)
+        ? decodeDataImageUrl(candidate)
+        : null;
+  }
+
   String get _initial {
-    final clean = name.trim();
+    final clean = widget.name.trim();
     if (clean.isEmpty) return 'I';
     return clean[0].toUpperCase();
   }
 
   @override
   Widget build(BuildContext context) {
-    var url = (avatarUrl ?? '').trim();
+    var url = (widget.avatarUrl ?? '').trim();
     if (url.startsWith('/')) {
       url = '${AppConfig.apiBaseUrl}$url';
     }
@@ -40,14 +79,18 @@ class UserAvatar extends StatelessWidget {
     Widget avatarContent;
 
     if (isData) {
-      final bytes = decodeDataImageUrl(url);
+      // The URL can only differ from [_dataUrl] during the one build before
+      // didUpdateWidget runs.  Fall back to a one-off decode in that rare
+      // case; normal playback rebuilds reuse the exact same byte list.
+      final bytes = url == _dataUrl ? _dataBytes : decodeDataImageUrl(url);
       if (bytes != null) {
         avatarContent = Image.memory(
           bytes,
-          width: size,
-          height: size,
+          width: widget.size,
+          height: widget.size,
           fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => _buildInitialFallback(context),
+          errorBuilder: (context, error, stackTrace) =>
+              _buildInitialFallback(context),
         );
       } else {
         avatarContent = _buildInitialFallback(context);
@@ -55,13 +98,15 @@ class UserAvatar extends StatelessWidget {
     } else if (isHttp) {
       avatarContent = CachedNetworkImage(
         imageUrl: url,
-        width: size,
-        height: size,
+        cacheKey: url,
+        width: widget.size,
+        height: widget.size,
         fit: BoxFit.cover,
-        memCacheWidth: (size * 2.5).round(),
-        memCacheHeight: (size * 2.5).round(),
+        memCacheWidth: (widget.size * 2.5).round(),
+        memCacheHeight: (widget.size * 2.5).round(),
         fadeInDuration: Duration.zero,
         fadeOutDuration: Duration.zero,
+        useOldImageOnUrlChange: true,
         placeholder: (context, url) => _buildInitialFallback(context),
         errorWidget: (context, url, error) => _buildInitialFallback(context),
       );
@@ -73,13 +118,13 @@ class UserAvatar extends StatelessWidget {
       clipBehavior: Clip.none,
       children: [
         Container(
-          width: size,
-          height: size,
+          width: widget.size,
+          height: widget.size,
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             border: Border.all(
               color: AppColors.brandOrange.withValues(alpha: 0.35),
-              width: size > 40 ? 2.0 : 1.5,
+              width: widget.size > 40 ? 2.0 : 1.5,
             ),
             boxShadow: [
               BoxShadow(
@@ -91,19 +136,19 @@ class UserAvatar extends StatelessWidget {
           ),
           child: ClipOval(child: avatarContent),
         ),
-        if (isVerified)
+        if (widget.isVerified)
           Positioned(
             bottom: -1,
             right: -1,
             child: Container(
-              padding: EdgeInsets.all(size * 0.04),
+              padding: EdgeInsets.all(widget.size * 0.04),
               decoration: BoxDecoration(
                 color: context.bgCanvas,
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 Icons.verified_rounded,
-                size: (size * 0.36).clamp(12.0, 22.0),
+                size: (widget.size * 0.36).clamp(12.0, 22.0),
                 color: AppColors.brandOrange,
               ),
             ),
@@ -111,25 +156,21 @@ class UserAvatar extends StatelessWidget {
       ],
     );
 
-    if (onTap != null) {
-      return GestureDetector(onTap: onTap, child: avatar);
+    if (widget.onTap != null) {
+      return GestureDetector(onTap: widget.onTap, child: avatar);
     }
     return avatar;
   }
 
   Widget _buildInitialFallback(BuildContext context) {
     return Container(
-      width: size,
-      height: size,
+      width: widget.size,
+      height: widget.size,
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            Color(0xFFF97316),
-            Color(0xFFEA580C),
-            Color(0xFFC2410C),
-          ],
+          colors: [Color(0xFFF97316), Color(0xFFEA580C), Color(0xFFC2410C)],
         ),
       ),
       child: Center(
@@ -137,7 +178,7 @@ class UserAvatar extends StatelessWidget {
           _initial,
           style: TextStyle(
             color: Colors.white,
-            fontSize: size * 0.44,
+            fontSize: widget.size * 0.44,
             fontWeight: FontWeight.w900,
             shadows: [
               Shadow(

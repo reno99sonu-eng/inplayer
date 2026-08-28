@@ -1,30 +1,21 @@
 package com.inplayer.app
 
+import android.Manifest
 import android.app.PictureInPictureParams
+import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Build
 import android.util.Rational
+import androidx.core.app.ActivityCompat
+import androidx.core.content.ContextCompat
 import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
-// Real Android system Picture-in-Picture, wired up as a small platform
-// channel to lib/services/pip_service.dart. Flutter has no core API for
-// this — it is genuinely native-only, same as every real PiP-capable
-// Flutter video app on the Play Store. Everything here is defensive and
-// version-gated: on anything below Android 7.0 (API 24, the first OS
-// version PiP exists at all) every method is a safe no-op, matching
-// PipService's own "never throw, just return false/do nothing" contract on
-// the Dart side.
 class MainActivity : AudioServiceActivity() {
     private val pipChannelName = "inplayer.app/pip"
+    private val permissionChannelName = "inplayer.app/permissions"
     private var pipChannel: MethodChannel? = null
-
-    // Set from Dart (see PipService.setPlaybackActive) whenever the watch
-    // page's video is actually playing AND the viewer has "Picture in
-    // Picture" turned on in Settings > Playback — onUserLeaveHint() below
-    // only auto-enters PiP when this is true, so pressing Home while just
-    // browsing (not watching) or with the preference off never triggers it.
     private var isPlaybackActive = false
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -48,6 +39,32 @@ class MainActivity : AudioServiceActivity() {
             }
         }
         pipChannel = channel
+
+        val permChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, permissionChannelName)
+        permChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "requestNotificationPermission" -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                        if (!granted) {
+                            ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.POST_NOTIFICATIONS), 101)
+                        }
+                        result.success(granted)
+                    } else {
+                        result.success(true)
+                    }
+                }
+                "hasNotificationPermission" -> {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                        val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) == PackageManager.PERMISSION_GRANTED
+                        result.success(granted)
+                    } else {
+                        result.success(true)
+                    }
+                }
+                else -> result.notImplemented()
+            }
+        }
     }
 
     // Builds a PictureInPictureParams with the video's real aspect ratio

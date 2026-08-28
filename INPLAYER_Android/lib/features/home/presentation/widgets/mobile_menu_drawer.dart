@@ -216,9 +216,26 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                         _openUrl('https://inplayer.in/sponsorships');
                       },
                     ),
+                    _buildDivider(),
+                    _buildSectionHeader('CONTENT ACCESS & SAFETY'),
                     _buildMenuItem(
-                      icon: Icons.shield_outlined,
-                      title: 'Content Access',
+                      icon: Icons.eighteen_up_rating_rounded,
+                      title: '18+ Adult Content & Passcode',
+                      trailing: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.brandOrange.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Text(
+                          'PASSKEY',
+                          style: TextStyle(
+                            color: AppColors.brandOrange,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
                       onTap: () {
                         Navigator.pop(context);
                         context.push('/settings/content-access');
@@ -229,7 +246,7 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                         final isKid = ref.watch(kidModeProvider.select((s) => s.isEnabled));
                         return _buildMenuItem(
                           icon: isKid ? Icons.child_care_rounded : Icons.face_retouching_natural_rounded,
-                          title: isKid ? 'Kids Mode: Active (Exit)' : 'Face ID: Family Safety',
+                          title: isKid ? 'Kids Mode: Active (Exit)' : 'Kids Mode & Face ID Safety',
                           trailing: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                             decoration: BoxDecoration(
@@ -237,7 +254,7 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Text(
-                              isKid ? 'KIDS ON' : 'SCAN',
+                              isKid ? 'ACTIVE' : 'SCAN / PIN',
                               style: TextStyle(
                                 color: isKid ? const Color(0xFF10B981) : AppColors.brandOrange,
                                 fontSize: 10,

@@ -93,6 +93,11 @@ dependencies:
   # Settings in an external browser / custom tab.
   url_launcher: ^6.3.1
 
+  # Native Android/iOS checkout for the same server-created Razorpay Premium
+  # orders used by the website. Premium is still granted only by the signed
+  # Razorpay webhook; a client-side success callback never changes a tier.
+  razorpay_flutter: ^1.4.5
+
   # Typography — matches the website's own font. The website loads
   # Plus_Jakarta_Sans via next/font/google (see app/layout.tsx); this
   # package fetches/caches the same Google Font at runtime instead of the
@@ -136,6 +141,7 @@ dependencies:
   # version history, so no Dart code changes were needed — only this
   # declaration.
   just_audio: ^0.10.6
+  audio_session: ^0.1.25
 
   # Lock-screen / notification media controls + real background playback for
   # the new dedicated Music section (MusicPlayerService). Wraps just_audio

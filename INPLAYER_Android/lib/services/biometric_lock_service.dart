@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:local_auth/local_auth.dart';
@@ -32,12 +32,39 @@ class BiometricLockState {
   }
 }
 
-class BiometricLockNotifier extends StateNotifier<BiometricLockState> {
+class BiometricLockNotifier extends StateNotifier<BiometricLockState> with WidgetsBindingObserver {
   static const _prefKey = 'inplayer:biometric_lock_enabled';
   final LocalAuthentication _auth = LocalAuthentication();
+  DateTime? _backgroundedTime;
+  bool _isAuthenticating = false;
 
   BiometricLockNotifier() : super(const BiometricLockState()) {
+    WidgetsBinding.instance.addObserver(this);
     _init();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (!this.state.isEnabled) return;
+
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden) {
+      _backgroundedTime = DateTime.now();
+    } else if (state == AppLifecycleState.resumed) {
+      if (_isAuthenticating) return;
+      if (_backgroundedTime != null) {
+        final elapsed = DateTime.now().difference(_backgroundedTime!).inSeconds;
+        if (elapsed >= 1) {
+          lock();
+        }
+      }
+      _backgroundedTime = null;
+    }
   }
 
   Future<void> _init() async {
@@ -66,7 +93,7 @@ class BiometricLockNotifier extends StateNotifier<BiometricLockState> {
     if (enabled) {
       // Require an immediate successful authentication before enabling
       final authenticated = await authenticate(
-        reason: 'Scan your Fingerprint or Face to enable Passkey Lock',
+        reason: 'Scan your Fingerprint, Face, or enter Device PIN to enable App Lock',
       );
       if (!authenticated) return false;
     }
@@ -82,6 +109,8 @@ class BiometricLockNotifier extends StateNotifier<BiometricLockState> {
 
   /// Prompts native Passkey / Fingerprint / Device PIN dialog.
   Future<bool> authenticate({String? reason}) async {
+    if (_isAuthenticating) return false;
+    _isAuthenticating = true;
     try {
       final authenticated = await _auth.authenticate(
         localizedReason: reason ?? 'Unlock INPLAYER to continue',
@@ -89,16 +118,19 @@ class BiometricLockNotifier extends StateNotifier<BiometricLockState> {
           stickyAuth: true,
           biometricOnly: false, // allows fallback to device Passcode/PIN
           useErrorDialogs: true,
+          sensitiveTransaction: true,
         ),
       );
 
+      _isAuthenticating = false;
       if (authenticated) {
         HapticFeedback.mediumImpact();
         state = state.copyWith(isLocked: false);
       }
       return authenticated;
     } catch (e) {
-      debugPrint('[BiometricLock] Auth error: ');
+      _isAuthenticating = false;
+      debugPrint('[BiometricLock] Auth error: $e');
       return false;
     }
   }

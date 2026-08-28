@@ -284,11 +284,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             onChanged: _prefsLoaded ? _setPushNotifications : null,
           ),
           _buildMenuItem(
-            icon: Icons.shield_outlined,
-            title: 'Content Access (18+ / Kids Mode)',
-            onTap: () => context.push('/settings/content-access'),
-          ),
-          _buildMenuItem(
             icon: Icons.language_outlined,
             title: 'Language',
             trailing: Text('English', style: TextStyle(color: context.textDim, fontSize: 13)),

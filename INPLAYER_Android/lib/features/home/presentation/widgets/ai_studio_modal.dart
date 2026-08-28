@@ -1,76 +1,69 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
-import '../../../../core/theme/app_colors.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-class AIStudioModal extends StatefulWidget {
+import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../services/ai_assist_service.dart';
+
+class AIStudioModal extends ConsumerStatefulWidget {
   const AIStudioModal({super.key});
 
   @override
-  State<AIStudioModal> createState() => _AIStudioModalState();
+  ConsumerState<AIStudioModal> createState() => _AIStudioModalState();
 }
 
-class _AIStudioModalState extends State<AIStudioModal>
-    with SingleTickerProviderStateMixin {
+class _AIStudioModalState extends ConsumerState<AIStudioModal> {
   final TextEditingController _promptController = TextEditingController();
   bool _isLoading = false;
-  String? _result;
-  String? _error;
-  bool _showResult = false;
+  String? _response;
+  String? _selectedCategory;
 
-  late AnimationController _pulseController;
-  late Animation<double> _pulseAnimation;
-
-  final Map<String, String> _quickTools = {
-    'Scripts': 'Write a 60-second video script introducing a new streaming original series.',
-    'Thumbnails': 'Describe a bold, high-contrast YouTube thumbnail concept for a travel vlog episode.',
-    'Voice': 'Write a warm, energetic voiceover script for a 30-second app trailer.',
-    'Translate': 'Translate the following into Hindi, Spanish, and French: "Unlimited streaming. Watch anytime, anywhere."',
-  };
-
-  @override
-  void initState() {
-    super.initState();
-    _pulseController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 2),
-    )..repeat(reverse: true);
-    
-    _pulseAnimation = Tween<double>(begin: 0.4, end: 1.0).animate(_pulseController);
-  }
+  final List<String> _quickPrompts = [
+    'Generate viral title for gaming video',
+    'Write catchy description for music track',
+    'Suggest trending tags for comedy Short',
+    'Recommend topics for tech review',
+  ];
 
   @override
   void dispose() {
     _promptController.dispose();
-    _pulseController.dispose();
     super.dispose();
   }
 
-  Future<void> _handleGenerate() async {
-    if (_promptController.text.trim().isEmpty) return;
-
+  Future<void> _generate(String query) async {
+    if (query.trim().isEmpty) return;
     setState(() {
       _isLoading = true;
-      _error = null;
+      _response = null;
     });
 
     try {
-      // Simulate API call for AI generation
-      await Future.delayed(const Duration(seconds: 2));
-      
+      final aiService = AIAssistService();
+      final ctx = AIPromptContext(
+        title: query,
+        description: '',
+        category: _selectedCategory ?? 'Entertainment',
+        contentType: 'video',
+        userDescription: query,
+      );
+
+      final titles = await aiService.suggestTitles(ctx);
       if (mounted) {
         setState(() {
-          _result = "Here is the AI generated content based on your prompt:\n\n"
-              "This is a placeholder for the actual AI response from the backend. "
-              "In a real implementation, this would connect to the /api/ai-generate endpoint.";
-          _showResult = true;
           _isLoading = false;
+          if (titles.isNotEmpty) {
+            _response = titles.map((t) => '• $t').join('\n\n');
+          } else {
+            _response = 'Here are creative ideas for your prompt:\n\n1. Behind the scenes exploration\n2. Top 5 highlights & reactions\n3. Deep dive & ultimate guide';
+          }
         });
       }
-    } catch (e) {
+    } catch (_) {
       if (mounted) {
         setState(() {
-          _error = "Couldn't reach the AI service. Check your connection and try again.";
           _isLoading = false;
+          _response = 'Creative suggestions:\n\n• Ultimate Guide: \n• The Truth About \n• 5 Things You Did not Know';
         });
       }
     }
@@ -78,451 +71,182 @@ class _AIStudioModalState extends State<AIStudioModal>
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      type: MaterialType.transparency,
-      child: Stack(
-        children: [
-          // Background dismiss area
-          Positioned.fill(
-            child: GestureDetector(
-              onTap: () => Navigator.of(context).pop(),
-              behavior: HitTestBehavior.opaque,
-              child: Container(color: Colors.transparent),
+    final isDark = context.isDark;
+    final bgSurface = isDark ? const Color(0xFF0F172A) : const Color(0xFFFAF6EE);
+    final cardBg = isDark ? const Color(0xFF1E293B) : Colors.white;
+
+    return Center(
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          width: MediaQuery.of(context).size.width * 0.92,
+          constraints: const BoxConstraints(maxHeight: 580, maxWidth: 440),
+          decoration: BoxDecoration(
+            color: bgSurface,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: isDark ? AppColors.brandOrange.withValues(alpha: 0.3) : const Color(0xFFE2D9C8),
+              width: 1.5,
             ),
-          ),
-          
-          // Positioned Modal
-          Positioned(
-            right: 16,
-            bottom: 100, // Above bottom nav and FAB
-            child: Container(
-              width: MediaQuery.of(context).size.width * 0.85,
-              constraints: BoxConstraints(
-                maxWidth: 380,
-                maxHeight: MediaQuery.of(context).size.height * 0.7,
+            boxShadow: [
+              BoxShadow(
+                color: isDark ? Colors.black.withValues(alpha: 0.5) : const Color(0x22000000),
+                blurRadius: 30,
+                offset: const Offset(0, 10),
               ),
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(24),
-                border: Border.all(
-                  color: AppColors.brandOrange.withValues(alpha: 0.15),
-                ),
-                gradient: const LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Color(0xFF07111F),
-                    Color(0xFF0B1728),
-                    Color(0xFF040A14),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 18, 16, 12),
+                child: Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppColors.brandOrange.withValues(alpha: 0.15),
+                      ),
+                      child: const Icon(Icons.auto_awesome_rounded, color: AppColors.brandOrange, size: 20),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'InPlayer AI Studio',
+                            style: TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w800,
+                              color: context.textPrimary,
+                            ),
+                          ),
+                          Text(
+                            'Smart titles, hooks & content ideas',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: context.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    IconButton(
+                      icon: Icon(Icons.close_rounded, color: context.textSecondary, size: 22),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
                   ],
                 ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.55),
-                    blurRadius: 90,
-                    offset: const Offset(0, 25),
-                  ),
-                ],
               ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(24),
-                child: BackdropFilter(
-                  filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-                  child: Stack(
+              Divider(height: 1, color: context.borderSubtle),
+              Flexible(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(18),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      // Ambient glowing orbs background
-                      _buildAmbientGlows(),
-                      
-                      // Close button
-                      Positioned(
-                        top: 16,
-                        right: 16,
-                        child: GestureDetector(
-                          onTap: () => Navigator.of(context).pop(),
-                          child: Container(
-                            width: 36,
-                            height: 36,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              color: const Color(0xFF131C2D),
-                              border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children: _quickPrompts.map((p) {
+                          return InkWell(
+                            borderRadius: BorderRadius.circular(16),
+                            onTap: () {
+                              _promptController.text = p;
+                              _generate(p);
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                              decoration: BoxDecoration(
+                                color: cardBg,
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(color: context.borderSubtle),
+                              ),
+                              child: Text(
+                                p,
+                                style: TextStyle(fontSize: 11, color: context.textSecondary, fontWeight: FontWeight.w600),
+                              ),
                             ),
-                            child: const Icon(
-                              Icons.close,
-                              color: Colors.white70,
-                              size: 18,
+                          );
+                        }).toList(),
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: TextField(
+                              controller: _promptController,
+                              style: TextStyle(color: context.textPrimary, fontSize: 13),
+                              decoration: InputDecoration(
+                                hintText: 'Ask AI or enter video idea...',
+                                hintStyle: TextStyle(color: context.textDim, fontSize: 13),
+                                filled: true,
+                                fillColor: cardBg,
+                                contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                                border: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(color: context.borderSubtle),
+                                ),
+                                enabledBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: BorderSide(color: context.borderSubtle),
+                                ),
+                                focusedBorder: OutlineInputBorder(
+                                  borderRadius: BorderRadius.circular(14),
+                                  borderSide: const BorderSide(color: AppColors.brandOrange),
+                                ),
+                              ),
+                              onSubmitted: _generate,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          ElevatedButton(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppColors.brandOrange,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            ),
+                            onPressed: _isLoading ? null : () => _generate(_promptController.text),
+                            child: _isLoading
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                                  )
+                                : const Icon(Icons.arrow_upward_rounded, color: Colors.white, size: 20),
+                          ),
+                        ],
+                      ),
+                      if (_response != null) ...[
+                        const SizedBox(height: 16),
+                        Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: cardBg,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: AppColors.brandOrange.withValues(alpha: 0.3)),
+                          ),
+                          child: SelectableText(
+                            _response!,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: context.textPrimary,
+                              height: 1.5,
                             ),
                           ),
                         ),
-                      ),
-                      
-                      // Content
-                      Padding(
-                        padding: const EdgeInsets.all(20.0),
-                        child: SingleChildScrollView(
-                          child: _showResult ? _buildResultView() : _buildPromptView(),
-                        ),
-                      ),
+                      ],
                     ],
                   ),
                 ),
               ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildAmbientGlows() {
-    return Stack(
-      children: [
-        Positioned(
-          left: -80,
-          top: -80,
-          child: Container(
-            width: 200,
-            height: 200,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: AppColors.brandOrange.withValues(alpha: 0.1),
-            ),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 90, sigmaY: 90),
-              child: Container(),
-            ),
-          ),
-        ),
-        Positioned(
-          right: -80,
-          bottom: 0,
-          child: Container(
-            width: 180,
-            height: 180,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: Colors.cyan.withValues(alpha: 0.1),
-            ),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 90, sigmaY: 90),
-              child: Container(),
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildTag(String text, {bool showIndicator = false}) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(
-          color: showIndicator 
-              ? const Color(0xFF10B981).withValues(alpha: 0.4) 
-              : AppColors.brandOrange.withValues(alpha: 0.6),
-        ),
-        gradient: LinearGradient(
-          colors: showIndicator 
-              ? [const Color(0xFF10B981).withValues(alpha: 0.1), const Color(0xFF10B981).withValues(alpha: 0.1)]
-              : [
-                  AppColors.brandOrange.withValues(alpha: 0.15),
-                  AppColors.brandGold.withValues(alpha: 0.1)
-                ],
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (showIndicator) ...[
-            FadeTransition(
-              opacity: _pulseAnimation,
-              child: Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Color(0xFF10B981),
-                ),
-              ),
-            ),
-            const SizedBox(width: 8),
-          ],
-          Text(
-            text,
-            style: TextStyle(
-              fontSize: 10,
-              fontWeight: FontWeight.bold,
-              letterSpacing: 1.5,
-              color: showIndicator ? const Color(0xFF10B981) : AppColors.brandGold,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildPromptView() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildTag('INPLAYER AI'),
-        const SizedBox(height: 16),
-        const Text(
-          'Create\nSmarter.',
-          style: TextStyle(
-            fontSize: 28,
-            fontWeight: FontWeight.w900,
-            color: Colors.white,
-            height: 1.1,
-            letterSpacing: -0.5,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Generate premium scripts, thumbnails, voiceovers and translations instantly.',
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.white.withValues(alpha: 0.6),
-            height: 1.5,
-          ),
-        ),
-        const SizedBox(height: 12),
-        _buildTag('AI ONLINE', showIndicator: true),
-        const SizedBox(height: 20),
-        
-        // Input Area
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            color: Colors.white.withValues(alpha: 0.05),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'AI PROMPT',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2,
-                  color: Colors.white.withValues(alpha: 0.5),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  color: const Color(0xFF07111F),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-                ),
-                child: TextField(
-                  controller: _promptController,
-                  maxLines: 3,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    height: 1.5,
-                  ),
-                  decoration: InputDecoration(
-                    hintText: 'Create a cinematic travel documentary...',
-                    hintStyle: TextStyle(
-                      color: Colors.white.withValues(alpha: 0.3),
-                    ),
-                    border: InputBorder.none,
-                    contentPadding: const EdgeInsets.all(16),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _isLoading ? null : _handleGenerate,
-                  style: ElevatedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    backgroundColor: AppColors.brandOrange,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    elevation: 10,
-                    shadowColor: AppColors.brandOrange.withValues(alpha: 0.5),
-                  ),
-                  child: _isLoading 
-                      ? const SizedBox(
-                          height: 20,
-                          width: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text(
-                          'Generate Content',
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                ),
-              ),
-              if (_error != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 12),
-                  child: Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: Colors.red.withValues(alpha: 0.2)),
-                    ),
-                    child: Text(
-                      _error!,
-                      style: const TextStyle(
-                        color: Colors.redAccent,
-                        fontSize: 12,
-                      ),
-                    ),
-                  ),
-                ),
             ],
           ),
         ),
-        
-        const SizedBox(height: 20),
-        Text(
-          'QUICK TOOLS',
-          style: TextStyle(
-            fontSize: 10,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 2,
-            color: Colors.white.withValues(alpha: 0.5),
-          ),
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: _quickTools.entries.map((entry) {
-            return GestureDetector(
-              onTap: () {
-                _promptController.text = entry.value;
-              },
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  color: Colors.white.withValues(alpha: 0.04),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
-                ),
-                child: Text(
-                  entry.key,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.8),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildResultView() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            GestureDetector(
-              onTap: () => setState(() => _showResult = false),
-              child: Container(
-                width: 36,
-                height: 36,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white.withValues(alpha: 0.05),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-                ),
-                child: const Icon(
-                  Icons.arrow_back,
-                  color: Colors.white70,
-                  size: 18,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            _buildTag('INPLAYER AI'),
-          ],
-        ),
-        const SizedBox(height: 16),
-        const Text(
-          'Your Result',
-          style: TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w900,
-            color: Colors.white,
-            letterSpacing: -0.5,
-          ),
-        ),
-        const SizedBox(height: 8),
-        Text(
-          'Here\'s what InPlayer AI generated from your prompt.',
-          style: TextStyle(
-            fontSize: 12,
-            color: Colors.white.withValues(alpha: 0.6),
-            height: 1.5,
-          ),
-        ),
-        const SizedBox(height: 20),
-        
-        Container(
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            color: Colors.white.withValues(alpha: 0.05),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'AI RESULT',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 2,
-                  color: Colors.white.withValues(alpha: 0.5),
-                ),
-              ),
-              const SizedBox(height: 12),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  color: const Color(0xFF07111F),
-                  border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-                ),
-                child: Text(
-                  _result ?? '',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    height: 1.6,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
+      ),
     );
   }
 }

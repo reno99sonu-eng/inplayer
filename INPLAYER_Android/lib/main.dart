@@ -23,6 +23,9 @@ Future<void> main() async {
       androidNotificationChannelId: 'in.inplayer.app.channel.audio',
       androidNotificationChannelName: 'InPlayer Music playback',
       androidNotificationOngoing: true,
+      androidNotificationIcon: 'mipmap/ic_launcher',
+      androidStopForegroundOnPause: false,
+      androidNotificationClickStartsActivity: true,
     );
   } catch (e) {
     debugPrint('JustAudioBackground init warning: $e');

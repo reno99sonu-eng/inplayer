@@ -27,7 +27,8 @@ class MyChannelStudioPage extends ConsumerStatefulWidget {
   const MyChannelStudioPage({super.key});
 
   @override
-  ConsumerState<MyChannelStudioPage> createState() => _MyChannelStudioPageState();
+  ConsumerState<MyChannelStudioPage> createState() =>
+      _MyChannelStudioPageState();
 }
 
 class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
@@ -39,6 +40,8 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
   List<Video> _videos = [];
   int _subscriberCount = 0;
   int _totalViews = 0;
+  Map<String, dynamic>? _analytics;
+  bool _analyticsUnavailable = false;
 
   // Bio state
   final _bioController = TextEditingController();
@@ -48,6 +51,7 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
   // Profile settings state
   final _handleController = TextEditingController();
   String _privacyLevel = 'public';
+  bool _savingProfileSettings = false;
 
   @override
   void initState() {
@@ -72,6 +76,14 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
     final user = authState.user;
     _bioController.text = user.bio;
     _handleController.text = user.handle ?? user.username;
+    _privacyLevel =
+        const {
+          'public',
+          'connections',
+          'private',
+        }.contains(user.usernamePrivacy)
+        ? user.usernamePrivacy
+        : 'public';
 
     if (mounted) setState(() => _loading = true);
 
@@ -79,12 +91,14 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
       final results = await Future.wait([
         ref.read(videoServiceProvider).getMyVideos(),
         ref.read(channelServiceProvider).getSubscriptionStatus(user.userId),
+        ref.read(videoServiceProvider).getChannelAnalytics(),
       ]);
 
       if (!mounted) return;
 
       final videos = (results[0] as List<Video>?) ?? [];
       final subStatus = results[1] as Map<String, dynamic>?;
+      final analytics = results[2] as Map<String, dynamic>?;
 
       int totalViews = 0;
       for (final v in videos) {
@@ -92,15 +106,50 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
         totalViews += int.tryParse(digits) ?? 0;
       }
 
+      final analyticsViews = analytics == null
+          ? null
+          : _analyticsTotalViews(analytics);
+      final analyticsSubscribers = analytics?['subscriberCount'];
+
       setState(() {
         _videos = videos;
-        _subscriberCount = (subStatus?['subscriberCount'] as num?)?.toInt() ?? 0;
-        _totalViews = totalViews;
+        _subscriberCount = analyticsSubscribers is num
+            ? analyticsSubscribers.toInt()
+            : (subStatus?['subscriberCount'] as num?)?.toInt() ?? 0;
+        _totalViews = analyticsViews ?? totalViews;
+        _analytics = analytics;
+        _analyticsUnavailable = analytics == null;
         _loading = false;
       });
     } catch (_) {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  int _analyticsTotalViews(Map<String, dynamic> analytics) {
+    var total = 0;
+    for (final key in const ['videos', 'shorts', 'music']) {
+      final stats = analytics[key];
+      if (stats is Map && stats['views'] is num) {
+        total += (stats['views'] as num).toInt();
+      }
+    }
+    return total;
+  }
+
+  Map<String, dynamic>? _analyticsForScope() {
+    final key = switch (_analyticsScope) {
+      'short' => 'shorts',
+      'music' => 'music',
+      _ => 'videos',
+    };
+    final stats = _analytics?[key];
+    return stats is Map ? Map<String, dynamic>.from(stats) : null;
+  }
+
+  String _analyticsValue(Map<String, dynamic>? stats, String key) {
+    final value = stats?[key];
+    return value is num ? _formatCount(value.toInt()) : '—';
   }
 
   Future<void> _handleSaveBio() async {
@@ -109,7 +158,9 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
       _bioSaved = false;
     });
 
-    final success = await ref.read(videoServiceProvider).updateBio(_bioController.text.trim());
+    final success = await ref
+        .read(videoServiceProvider)
+        .updateBio(_bioController.text.trim());
 
     if (!mounted) return;
     setState(() {
@@ -185,12 +236,17 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                     const SizedBox(height: 6),
                     TextField(
                       controller: titleController,
-                      style: TextStyle(color: context.textPrimary, fontSize: 14),
+                      style: TextStyle(
+                        color: context.textPrimary,
+                        fontSize: 14,
+                      ),
                       decoration: InputDecoration(
                         hintText: 'Video title...',
                         hintStyle: TextStyle(color: context.textDim),
                         filled: true,
-                        fillColor: context.isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.03),
+                        fillColor: context.isDark
+                            ? Colors.white.withValues(alpha: 0.04)
+                            : Colors.black.withValues(alpha: 0.03),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide(color: context.borderSubtle),
@@ -211,12 +267,17 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                     TextField(
                       controller: descController,
                       maxLines: 3,
-                      style: TextStyle(color: context.textPrimary, fontSize: 13),
+                      style: TextStyle(
+                        color: context.textPrimary,
+                        fontSize: 13,
+                      ),
                       decoration: InputDecoration(
                         hintText: 'Tell viewers about your video...',
                         hintStyle: TextStyle(color: context.textDim),
                         filled: true,
-                        fillColor: context.isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.03),
+                        fillColor: context.isDark
+                            ? Colors.white.withValues(alpha: 0.04)
+                            : Colors.black.withValues(alpha: 0.03),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(12),
                           borderSide: BorderSide(color: context.borderSubtle),
@@ -237,7 +298,9 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 14),
                       decoration: BoxDecoration(
-                        color: context.isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.03),
+                        color: context.isDark
+                            ? Colors.white.withValues(alpha: 0.04)
+                            : Colors.black.withValues(alpha: 0.03),
                         borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: context.borderSubtle),
                       ),
@@ -247,12 +310,22 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                           isExpanded: true,
                           dropdownColor: context.bgCard,
                           items: const [
-                            DropdownMenuItem(value: 'public', child: Text('Public (Anyone can see)')),
-                            DropdownMenuItem(value: 'unlisted', child: Text('Unlisted (Anyone with link)')),
-                            DropdownMenuItem(value: 'private', child: Text('Private (Only you)')),
+                            DropdownMenuItem(
+                              value: 'public',
+                              child: Text('Public (Anyone can see)'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'unlisted',
+                              child: Text('Unlisted (Anyone with link)'),
+                            ),
+                            DropdownMenuItem(
+                              value: 'private',
+                              child: Text('Private (Only you)'),
+                            ),
                           ],
                           onChanged: (val) {
-                            if (val != null) setModalState(() => selectedVisibility = val);
+                            if (val != null)
+                              setModalState(() => selectedVisibility = val);
                           },
                         ),
                       ),
@@ -264,20 +337,21 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                       child: ElevatedButton(
                         style: ElevatedButton.styleFrom(
                           backgroundColor: AppColors.brandOrange,
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
                         ),
                         onPressed: saving
                             ? null
                             : () async {
                                 setModalState(() => saving = true);
-                                final ok = await ref.read(videoServiceProvider).updateMyVideo(
-                                  video.videoId,
-                                  {
-                                    'title': titleController.text.trim(),
-                                    'description': descController.text.trim(),
-                                    'visibility': selectedVisibility,
-                                  },
-                                );
+                                final ok = await ref
+                                    .read(videoServiceProvider)
+                                    .updateMyVideo(video.videoId, {
+                                      'title': titleController.text.trim(),
+                                      'description': descController.text.trim(),
+                                      'visibility': selectedVisibility,
+                                    });
                                 if (!ctx.mounted) return;
                                 Navigator.pop(ctx);
                                 if (!mounted) return;
@@ -285,15 +359,30 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                                   _loadData();
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
-                                      content: Text('Video updated successfully!'),
+                                      content: Text(
+                                        'Video updated successfully!',
+                                      ),
                                       backgroundColor: Color(0xFF10B981),
                                     ),
                                   );
                                 }
                               },
                         child: saving
-                            ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                            : const Text('Save Changes', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                            ? const SizedBox(
+                                width: 20,
+                                height: 20,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text(
+                                'Save Changes',
+                                style: TextStyle(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
                       ),
                     ),
                   ],
@@ -312,8 +401,16 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
       builder: (ctx) {
         return AlertDialog(
           backgroundColor: context.bgCard,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-          title: Text('Delete Video?', style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.bold)),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Text(
+            'Delete Video?',
+            style: TextStyle(
+              color: context.textPrimary,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
           content: Text(
             'Are you sure you want to delete "${video.title}"? This action cannot be undone.',
             style: TextStyle(color: context.textSecondary, fontSize: 13),
@@ -321,16 +418,23 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx),
-              child: Text('Cancel', style: TextStyle(color: context.textSecondary)),
+              child: Text(
+                'Cancel',
+                style: TextStyle(color: context.textSecondary),
+              ),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFEF4444),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
               onPressed: () async {
                 Navigator.pop(ctx);
-                final ok = await ref.read(videoServiceProvider).deleteMyVideo(video.videoId);
+                final ok = await ref
+                    .read(videoServiceProvider)
+                    .deleteMyVideo(video.videoId);
                 if (ok && mounted) {
                   setState(() {
                     _videos.removeWhere((v) => v.videoId == video.videoId);
@@ -343,7 +447,13 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                   );
                 }
               },
-              child: const Text('Delete', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              child: const Text(
+                'Delete',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ],
         );
@@ -388,27 +498,49 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.lock_outline, size: 48, color: AppColors.brandOrange),
+                  const Icon(
+                    Icons.lock_outline,
+                    size: 48,
+                    color: AppColors.brandOrange,
+                  ),
                   const SizedBox(height: 16),
                   Text(
                     'Sign in to access Your Channel',
-                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: context.textPrimary),
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                      color: context.textPrimary,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   Text(
                     'Manage your videos, shorts, analytics, and payouts.',
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: context.textSecondary, fontSize: 13),
+                    style: TextStyle(
+                      color: context.textSecondary,
+                      fontSize: 13,
+                    ),
                   ),
                   const SizedBox(height: 20),
                   ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.brandOrange,
-                      padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 28,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
                     ),
                     onPressed: () => context.push('/signin'),
-                    child: const Text('Sign In', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    child: const Text(
+                      'Sign In',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -448,11 +580,17 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                       height: 38,
                       margin: const EdgeInsets.only(right: 8),
                       decoration: BoxDecoration(
-                        color: context.isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04),
+                        color: context.isDark
+                            ? Colors.white.withValues(alpha: 0.06)
+                            : Colors.black.withValues(alpha: 0.04),
                         borderRadius: BorderRadius.circular(10),
                         border: Border.all(color: context.borderSubtle),
                       ),
-                      child: Icon(Icons.arrow_back_rounded, color: context.textPrimary, size: 20),
+                      child: Icon(
+                        Icons.arrow_back_rounded,
+                        color: context.textPrimary,
+                        size: 20,
+                      ),
                     ),
                   ),
                   Builder(
@@ -463,11 +601,17 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                         height: 38,
                         margin: const EdgeInsets.only(right: 10),
                         decoration: BoxDecoration(
-                          color: context.isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04),
+                          color: context.isDark
+                              ? Colors.white.withValues(alpha: 0.06)
+                              : Colors.black.withValues(alpha: 0.04),
                           borderRadius: BorderRadius.circular(10),
                           border: Border.all(color: context.borderSubtle),
                         ),
-                        child: Icon(Icons.menu, color: context.textPrimary, size: 20),
+                        child: Icon(
+                          Icons.menu,
+                          color: context.textPrimary,
+                          size: 20,
+                        ),
                       ),
                     ),
                   ),
@@ -489,22 +633,39 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                 if (user.handle != null && user.handle!.isNotEmpty)
                   TextButton.icon(
                     style: TextButton.styleFrom(
-                      backgroundColor: context.isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.05),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      backgroundColor: context.isDark
+                          ? Colors.white.withValues(alpha: 0.08)
+                          : Colors.black.withValues(alpha: 0.05),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                     ),
                     onPressed: () => context.push('/channel/${user.handle}'),
-                    icon: const Icon(Icons.public, size: 14, color: AppColors.brandOrange),
+                    icon: const Icon(
+                      Icons.public,
+                      size: 14,
+                      color: AppColors.brandOrange,
+                    ),
                     label: Text(
                       'Public View',
-                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: context.textPrimary),
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                        color: context.textPrimary,
+                      ),
                     ),
                   ),
                 const SizedBox(width: 8),
                 IconButton(
                   style: IconButton.styleFrom(
                     backgroundColor: AppColors.brandOrange,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                     padding: const EdgeInsets.all(8),
                   ),
                   icon: const Icon(Icons.add, color: Colors.white, size: 18),
@@ -513,23 +674,23 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                 const SizedBox(width: 12),
               ],
             ),
-            SliverToBoxAdapter(
-              child: _buildTopTabBar(),
-            ),
+            SliverToBoxAdapter(child: _buildTopTabBar()),
             SliverToBoxAdapter(
               child: _loading
                   ? const Padding(
                       padding: EdgeInsets.symmetric(vertical: 80),
-                      child: Center(child: CircularProgressIndicator(color: AppColors.brandOrange)),
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          color: AppColors.brandOrange,
+                        ),
+                      ),
                     )
                   : Padding(
                       padding: const EdgeInsets.all(16.0),
                       child: _buildActiveTabContent(user),
                     ),
             ),
-            const SliverToBoxAdapter(
-              child: SizedBox(height: 60),
-            ),
+            const SliverToBoxAdapter(child: SizedBox(height: 60)),
           ],
         ),
       ),
@@ -538,11 +699,31 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
 
   Widget _buildTopTabBar() {
     final tabs = [
-      {'id': StudioTab.dashboard, 'label': 'Dashboard', 'icon': Icons.dashboard_outlined},
-      {'id': StudioTab.editContent, 'label': 'Edit Content', 'icon': Icons.edit_outlined},
-      {'id': StudioTab.profileSettings, 'label': 'Profile & Settings', 'icon': Icons.person_outline_rounded},
-      {'id': StudioTab.revenueKYC, 'label': 'Revenue & KYC', 'icon': Icons.attach_money_rounded},
-      {'id': StudioTab.howItWorks, 'label': 'How It Works?', 'icon': Icons.help_outline_rounded},
+      {
+        'id': StudioTab.dashboard,
+        'label': 'Dashboard',
+        'icon': Icons.dashboard_outlined,
+      },
+      {
+        'id': StudioTab.editContent,
+        'label': 'Edit Content',
+        'icon': Icons.edit_outlined,
+      },
+      {
+        'id': StudioTab.profileSettings,
+        'label': 'Profile & Settings',
+        'icon': Icons.person_outline_rounded,
+      },
+      {
+        'id': StudioTab.revenueKYC,
+        'label': 'Revenue & KYC',
+        'icon': Icons.attach_money_rounded,
+      },
+      {
+        'id': StudioTab.howItWorks,
+        'label': 'How It Works?',
+        'icon': Icons.help_outline_rounded,
+      },
     ];
 
     return Container(
@@ -566,10 +747,16 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
               decoration: BoxDecoration(
                 gradient: isActive
                     ? const LinearGradient(
-                        colors: [Color(0xFFFF7A18), Color(0xFFFF9A00), Color(0xFFFFD54A)],
+                        colors: [
+                          Color(0xFFFF7A18),
+                          Color(0xFFFF9A00),
+                          Color(0xFFFFD54A),
+                        ],
                       )
                     : null,
-                color: isActive ? null : (context.isDark ? const Color(0xFF071120) : Colors.white),
+                color: isActive
+                    ? null
+                    : (context.isDark ? const Color(0xFF071120) : Colors.white),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
                   color: isActive ? Colors.transparent : context.borderSubtle,
@@ -590,7 +777,9 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                   Icon(
                     item['icon'] as IconData,
                     size: 15,
-                    color: isActive ? Colors.white : (context.isDark ? Colors.white70 : Colors.black87),
+                    color: isActive
+                        ? Colors.white
+                        : (context.isDark ? Colors.white70 : Colors.black87),
                   ),
                   const SizedBox(width: 6),
                   Text(
@@ -598,7 +787,9 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.w800,
-                      color: isActive ? Colors.white : (context.isDark ? Colors.white70 : Colors.black87),
+                      color: isActive
+                          ? Colors.white
+                          : (context.isDark ? Colors.white70 : Colors.black87),
                     ),
                   ),
                 ],
@@ -627,9 +818,12 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
 
   // --- PANEL 1: DASHBOARD ---
   Widget _buildDashboardTab(dynamic user) {
-    final videoCount = _videos.where((v) => v.contentType != 'short' && v.contentType != 'music').length;
+    final videoCount = _videos
+        .where((v) => v.contentType != 'short' && v.contentType != 'music')
+        .length;
     final shortCount = _videos.where((v) => v.contentType == 'short').length;
     final musicCount = _videos.where((v) => v.contentType == 'music').length;
+    final stats = _analyticsForScope();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -650,7 +844,10 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                   Container(
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.brandOrange, width: 2),
+                      border: Border.all(
+                        color: AppColors.brandOrange,
+                        width: 2,
+                      ),
                     ),
                     child: UserAvatar(
                       avatarUrl: user.avatarUrl,
@@ -704,10 +901,13 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                 maxLines: 3,
                 style: TextStyle(color: context.textPrimary, fontSize: 13),
                 decoration: InputDecoration(
-                  hintText: 'Tell viewers about your channel, content topics, and upload schedule...',
+                  hintText:
+                      'Tell viewers about your channel, content topics, and upload schedule...',
                   hintStyle: TextStyle(color: context.textDim, fontSize: 12),
                   filled: true,
-                  fillColor: context.isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.03),
+                  fillColor: context.isDark
+                      ? Colors.white.withValues(alpha: 0.04)
+                      : Colors.black.withValues(alpha: 0.03),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
                     borderSide: BorderSide(color: context.borderSubtle),
@@ -725,16 +925,38 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                   ElevatedButton.icon(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: AppColors.brandOrange,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
                     ),
                     onPressed: _savingBio ? null : _handleSaveBio,
                     icon: _savingBio
-                        ? const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
-                        : Icon(_bioSaved ? Icons.check : Icons.save, size: 14, color: Colors.white),
+                        ? const SizedBox(
+                            width: 14,
+                            height: 14,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: Colors.white,
+                            ),
+                          )
+                        : Icon(
+                            _bioSaved ? Icons.check : Icons.save,
+                            size: 14,
+                            color: Colors.white,
+                          ),
                     label: Text(
-                      _savingBio ? 'Saving...' : (_bioSaved ? 'Saved!' : 'Save Bio'),
-                      style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.white),
+                      _savingBio
+                          ? 'Saving...'
+                          : (_bioSaved ? 'Saved!' : 'Save Bio'),
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
                     ),
                   ),
                 ],
@@ -766,7 +988,43 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
         ),
         const SizedBox(height: 14),
 
-        // 4 Stat Cards
+        if (_analyticsUnavailable)
+          Container(
+            width: double.infinity,
+            margin: const EdgeInsets.only(bottom: 14),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: AppColors.brandOrange.withValues(alpha: 0.10),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: AppColors.brandOrange.withValues(alpha: 0.25),
+              ),
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.analytics_outlined,
+                  color: AppColors.brandOrange,
+                  size: 18,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Creator analytics could not be loaded. Showing only totals available from your uploads.',
+                    style: TextStyle(
+                      color: context.textSecondary,
+                      fontSize: 11,
+                    ),
+                  ),
+                ),
+                TextButton(onPressed: _loadData, child: const Text('Retry')),
+              ],
+            ),
+          ),
+
+        // All figures come from GET /api/my-videos/analytics.  Do not infer
+        // engagement from views: the website deliberately reports only the
+        // reactions/comments/shares actually stored by the backend.
         GridView.count(
           crossAxisCount: 2,
           shrinkWrap: true,
@@ -775,10 +1033,36 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
           mainAxisSpacing: 10,
           childAspectRatio: 1.5,
           children: [
-            _buildAnalyticsMetricCard('Total Reach', _formatCount(_totalViews * 2 + 120), Icons.remove_red_eye_outlined, const Color(0xFF3B82F6)),
-            _buildAnalyticsMetricCard('Views', _formatCount(_totalViews), Icons.play_circle_outline, AppColors.brandOrange),
-            _buildAnalyticsMetricCard('Likes', _formatCount((_totalViews * 0.08).round()), Icons.thumb_up_alt_outlined, const Color(0xFF10B981)),
-            _buildAnalyticsMetricCard('Comments', _formatCount((_totalViews * 0.02).round()), Icons.chat_bubble_outline, const Color(0xFF8B5CF6)),
+            _buildAnalyticsMetricCard(
+              'Reach',
+              _analyticsValue(stats, 'reach'),
+              Icons.remove_red_eye_outlined,
+              const Color(0xFF3B82F6),
+            ),
+            _buildAnalyticsMetricCard(
+              'Views',
+              _analyticsValue(stats, 'views'),
+              Icons.play_circle_outline,
+              AppColors.brandOrange,
+            ),
+            _buildAnalyticsMetricCard(
+              'Likes',
+              _analyticsValue(stats, 'likes'),
+              Icons.thumb_up_alt_outlined,
+              const Color(0xFF10B981),
+            ),
+            _buildAnalyticsMetricCard(
+              'Comments',
+              _analyticsValue(stats, 'comments'),
+              Icons.chat_bubble_outline,
+              const Color(0xFF8B5CF6),
+            ),
+            _buildAnalyticsMetricCard(
+              'Shares',
+              _analyticsValue(stats, 'shares'),
+              Icons.share_outlined,
+              const Color(0xFFEC4899),
+            ),
           ],
         ),
         const SizedBox(height: 40),
@@ -793,7 +1077,11 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isActive ? AppColors.brandOrange : (context.isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.05)),
+          color: isActive
+              ? AppColors.brandOrange
+              : (context.isDark
+                    ? Colors.white.withValues(alpha: 0.06)
+                    : Colors.black.withValues(alpha: 0.05)),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Text(
@@ -808,7 +1096,12 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
     );
   }
 
-  Widget _buildAnalyticsMetricCard(String title, String value, IconData icon, Color iconColor) {
+  Widget _buildAnalyticsMetricCard(
+    String title,
+    String value,
+    IconData icon,
+    Color iconColor,
+  ) {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -825,14 +1118,22 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
             children: [
               Text(
                 title,
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: context.textSecondary),
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: context.textSecondary,
+                ),
               ),
               Icon(icon, size: 18, color: iconColor),
             ],
           ),
           Text(
             value,
-            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w900, color: context.textPrimary),
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w900,
+              color: context.textPrimary,
+            ),
           ),
         ],
       ),
@@ -842,7 +1143,8 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
   // --- PANEL 2: EDIT CONTENT ---
   Widget _buildEditContentTab() {
     final filtered = _videos.where((v) {
-      if (_contentFilter == 'video') return v.contentType != 'short' && v.contentType != 'music';
+      if (_contentFilter == 'video')
+        return v.contentType != 'short' && v.contentType != 'music';
       if (_contentFilter == 'short') return v.contentType == 'short';
       if (_contentFilter == 'music') return v.contentType == 'music';
       return true;
@@ -870,9 +1172,19 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
             alignment: Alignment.center,
             child: Column(
               children: [
-                Icon(Icons.video_library_outlined, size: 48, color: context.textDim),
+                Icon(
+                  Icons.video_library_outlined,
+                  size: 48,
+                  color: context.textDim,
+                ),
                 const SizedBox(height: 12),
-                Text('No content uploaded in this category', style: TextStyle(color: context.textSecondary, fontWeight: FontWeight.bold)),
+                Text(
+                  'No content uploaded in this category',
+                  style: TextStyle(
+                    color: context.textSecondary,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ],
             ),
           )
@@ -906,10 +1218,29 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                                 ? CachedNetworkImage(
                                     imageUrl: v.thumbnail,
                                     fit: BoxFit.cover,
-                                    placeholder: (context, url) => Container(color: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight),
-                                    errorWidget: (context, url, error) => Container(color: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight, child: const Icon(Icons.play_circle_outline)),
+                                    placeholder: (context, url) => Container(
+                                      color: context.isDark
+                                          ? AppColors.surfaceDark
+                                          : AppColors.surfaceLight,
+                                    ),
+                                    errorWidget: (context, url, error) =>
+                                        Container(
+                                          color: context.isDark
+                                              ? AppColors.surfaceDark
+                                              : AppColors.surfaceLight,
+                                          child: const Icon(
+                                            Icons.play_circle_outline,
+                                          ),
+                                        ),
                                   )
-                                : Container(color: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight, child: const Icon(Icons.play_circle_outline)),
+                                : Container(
+                                    color: context.isDark
+                                        ? AppColors.surfaceDark
+                                        : AppColors.surfaceLight,
+                                    child: const Icon(
+                                      Icons.play_circle_outline,
+                                    ),
+                                  ),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -932,13 +1263,23 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                                 children: [
                                   Text(
                                     '${v.views} • ${v.uploaded}',
-                                    style: TextStyle(fontSize: 11, color: context.textSecondary),
+                                    style: TextStyle(
+                                      fontSize: 11,
+                                      color: context.textSecondary,
+                                    ),
                                   ),
                                   const SizedBox(width: 8),
                                   Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
                                     decoration: BoxDecoration(
-                                      color: (v.visibility == 'private' ? const Color(0xFFEF4444) : const Color(0xFF10B981)).withValues(alpha: 0.15),
+                                      color:
+                                          (v.visibility == 'private'
+                                                  ? const Color(0xFFEF4444)
+                                                  : const Color(0xFF10B981))
+                                              .withValues(alpha: 0.15),
                                       borderRadius: BorderRadius.circular(6),
                                     ),
                                     child: Text(
@@ -946,7 +1287,9 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                                       style: TextStyle(
                                         fontSize: 9,
                                         fontWeight: FontWeight.bold,
-                                        color: v.visibility == 'private' ? const Color(0xFFEF4444) : const Color(0xFF10B981),
+                                        color: v.visibility == 'private'
+                                            ? const Color(0xFFEF4444)
+                                            : const Color(0xFF10B981),
                                       ),
                                     ),
                                   ),
@@ -964,23 +1307,59 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                         OutlinedButton.icon(
                           style: OutlinedButton.styleFrom(
                             side: BorderSide(color: context.borderSubtle),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
                           ),
                           onPressed: () => _showEditVideoModal(v),
-                          icon: const Icon(Icons.edit, size: 13, color: AppColors.brandOrange),
-                          label: Text('Edit', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: context.textPrimary)),
+                          icon: const Icon(
+                            Icons.edit,
+                            size: 13,
+                            color: AppColors.brandOrange,
+                          ),
+                          label: Text(
+                            'Edit',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: context.textPrimary,
+                            ),
+                          ),
                         ),
                         const SizedBox(width: 8),
                         OutlinedButton.icon(
                           style: OutlinedButton.styleFrom(
-                            side: BorderSide(color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                            side: BorderSide(
+                              color: const Color(
+                                0xFFEF4444,
+                              ).withValues(alpha: 0.3),
+                            ),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 10,
+                              vertical: 4,
+                            ),
                           ),
                           onPressed: () => _confirmDeleteVideo(v),
-                          icon: const Icon(Icons.delete_outline, size: 13, color: Color(0xFFEF4444)),
-                          label: const Text('Delete', style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Color(0xFFEF4444))),
+                          icon: const Icon(
+                            Icons.delete_outline,
+                            size: 13,
+                            color: Color(0xFFEF4444),
+                          ),
+                          label: const Text(
+                            'Delete',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFFEF4444),
+                            ),
+                          ),
                         ),
                       ],
                     ),
@@ -1001,7 +1380,11 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
-          color: isActive ? AppColors.brandOrange : (context.isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.05)),
+          color: isActive
+              ? AppColors.brandOrange
+              : (context.isDark
+                    ? Colors.white.withValues(alpha: 0.06)
+                    : Colors.black.withValues(alpha: 0.05)),
           borderRadius: BorderRadius.circular(10),
         ),
         child: Text(
@@ -1034,16 +1417,28 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Channel Cover Photo', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: context.textPrimary)),
+              Text(
+                'Channel Cover Photo',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: context.textPrimary,
+                ),
+              ),
               const SizedBox(height: 4),
-              Text('Banner displayed at the top of your public channel page.', style: TextStyle(color: context.textSecondary, fontSize: 12)),
+              Text(
+                'Banner displayed at the top of your public channel page.',
+                style: TextStyle(color: context.textSecondary, fontSize: 12),
+              ),
               const SizedBox(height: 12),
               ClipRRect(
                 borderRadius: BorderRadius.circular(14),
                 child: Container(
                   height: 120,
                   width: double.infinity,
-                  color: context.isDark ? const Color(0xFF0F172A) : const Color(0xFFE2E8F0),
+                  color: context.isDark
+                      ? const Color(0xFF0F172A)
+                      : const Color(0xFFE2E8F0),
                   child: coverUrl != null && coverUrl.isNotEmpty
                       ? Image(
                           image: smartImageProvider(coverUrl)!,
@@ -1053,9 +1448,19 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              Icon(Icons.image_outlined, size: 36, color: context.textDim),
+                              Icon(
+                                Icons.image_outlined,
+                                size: 36,
+                                color: context.textDim,
+                              ),
                               const SizedBox(height: 6),
-                              Text('No cover photo set', style: TextStyle(color: context.textDim, fontSize: 12)),
+                              Text(
+                                'No cover photo set',
+                                style: TextStyle(
+                                  color: context.textDim,
+                                  fontSize: 12,
+                                ),
+                              ),
                             ],
                           ),
                         ),
@@ -1068,7 +1473,9 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                     child: OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
                         side: const BorderSide(color: AppColors.brandOrange),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         padding: const EdgeInsets.symmetric(vertical: 10),
                       ),
                       onPressed: () async {
@@ -1078,31 +1485,61 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                           maxChars: 150000,
                         );
                         if (dataUrl != null) {
-                          final ok = await ref.read(settingsServiceProvider).updateCoverPhoto(dataUrl);
+                          final ok = await ref
+                              .read(settingsServiceProvider)
+                              .updateCoverPhoto(dataUrl);
                           if (ok && mounted) {
-                            ref.read(authStateProvider.notifier).updateLocalUser((u) => u.copyWith(coverPhotoUrl: dataUrl));
+                            ref
+                                .read(authStateProvider.notifier)
+                                .updateLocalUser(
+                                  (u) => u.copyWith(coverPhotoUrl: dataUrl),
+                                );
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text('Cover photo updated!'), backgroundColor: Color(0xFF10B981)),
+                              const SnackBar(
+                                content: Text('Cover photo updated!'),
+                                backgroundColor: Color(0xFF10B981),
+                              ),
                             );
                             setState(() {});
                           }
                         }
                       },
-                      icon: const Icon(Icons.upload, size: 16, color: AppColors.brandOrange),
-                      label: Text(coverUrl != null ? 'Change Cover' : 'Upload Cover', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.brandOrange)),
+                      icon: const Icon(
+                        Icons.upload,
+                        size: 16,
+                        color: AppColors.brandOrange,
+                      ),
+                      label: Text(
+                        coverUrl != null ? 'Change Cover' : 'Upload Cover',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.brandOrange,
+                        ),
+                      ),
                     ),
                   ),
                   if (coverUrl != null && coverUrl.isNotEmpty) ...[
                     const SizedBox(width: 8),
                     IconButton(
-                      icon: const Icon(Icons.delete_outline, color: Color(0xFFEF4444)),
+                      icon: const Icon(
+                        Icons.delete_outline,
+                        color: Color(0xFFEF4444),
+                      ),
                       tooltip: 'Remove cover photo',
                       onPressed: () async {
-                        final ok = await ref.read(settingsServiceProvider).updateCoverPhoto(null);
+                        final ok = await ref
+                            .read(settingsServiceProvider)
+                            .updateCoverPhoto(null);
                         if (ok && mounted) {
-                          ref.read(authStateProvider.notifier).updateLocalUser((u) => u.copyWith(coverPhotoUrl: ''));
+                          ref
+                              .read(authStateProvider.notifier)
+                              .updateLocalUser(
+                                (u) => u.copyWith(coverPhotoUrl: ''),
+                              );
                           ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('Cover photo removed.')),
+                            const SnackBar(
+                              content: Text('Cover photo removed.'),
+                            ),
                           );
                           setState(() {});
                         }
@@ -1126,26 +1563,50 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Channel Handle & Username', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: context.textPrimary)),
+              Text(
+                'Channel Handle & Username',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: context.textPrimary,
+                ),
+              ),
               const SizedBox(height: 6),
               TextField(
                 controller: _handleController,
                 style: TextStyle(color: context.textPrimary, fontSize: 13),
                 decoration: InputDecoration(
                   prefixText: '@ ',
-                  prefixStyle: const TextStyle(color: AppColors.brandOrange, fontWeight: FontWeight.bold),
+                  prefixStyle: const TextStyle(
+                    color: AppColors.brandOrange,
+                    fontWeight: FontWeight.bold,
+                  ),
                   filled: true,
-                  fillColor: context.isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.03),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: context.borderSubtle)),
+                  fillColor: context.isDark
+                      ? Colors.white.withValues(alpha: 0.04)
+                      : Colors.black.withValues(alpha: 0.03),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: context.borderSubtle),
+                  ),
                 ),
               ),
               const SizedBox(height: 16),
-              Text('Username Privacy', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: context.textPrimary)),
+              Text(
+                'Username Privacy',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: context.textPrimary,
+                ),
+              ),
               const SizedBox(height: 6),
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12),
                 decoration: BoxDecoration(
-                  color: context.isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.03),
+                  color: context.isDark
+                      ? Colors.white.withValues(alpha: 0.04)
+                      : Colors.black.withValues(alpha: 0.03),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: context.borderSubtle),
                 ),
@@ -1155,9 +1616,18 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                     isExpanded: true,
                     dropdownColor: context.bgCard,
                     items: const [
-                      DropdownMenuItem(value: 'public', child: Text('Public (Anyone can find and tag you)')),
-                      DropdownMenuItem(value: 'connections', child: Text('Connections Only')),
-                      DropdownMenuItem(value: 'private', child: Text('Private')),
+                      DropdownMenuItem(
+                        value: 'public',
+                        child: Text('Public (Anyone can find and tag you)'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'connections',
+                        child: Text('Connections Only'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'private',
+                        child: Text('Private'),
+                      ),
                     ],
                     onChanged: (val) {
                       if (val != null) setState(() => _privacyLevel = val);
@@ -1172,19 +1642,114 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.brandOrange,
                     padding: const EdgeInsets.symmetric(vertical: 12),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
-                  onPressed: () async {
-                    final ok = await ref.read(settingsServiceProvider).updatePrivacy(_privacyLevel);
-                    if (!mounted) return;
-                    if (ok) {
-                      ref.read(authStateProvider.notifier).updateLocalUser((u) => u.copyWith(usernamePrivacy: _privacyLevel));
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Settings saved successfully!'), backgroundColor: Color(0xFF10B981)),
-                      );
-                    }
-                  },
-                  child: const Text('Save Profile Settings', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white)),
+                  onPressed: _savingProfileSettings
+                      ? null
+                      : () async {
+                          final requestedHandle = _handleController.text.trim();
+                          if (requestedHandle.isEmpty) {
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              const SnackBar(
+                                content: Text(
+                                  'Your channel handle cannot be empty.',
+                                ),
+                              ),
+                            );
+                            return;
+                          }
+
+                          final currentHandle = user.handle ?? user.username;
+                          setState(() => _savingProfileSettings = true);
+                          final settings = ref.read(settingsServiceProvider);
+
+                          var resolvedHandle = currentHandle;
+                          String? error;
+                          if (requestedHandle != currentHandle) {
+                            final result = await settings.updateUsername(
+                              requestedHandle,
+                            );
+                            if (result.success) {
+                              resolvedHandle =
+                                  result.username ?? requestedHandle;
+                            } else {
+                              error = result.error;
+                            }
+                          }
+
+                          var privacySaved = true;
+                          if (error == null &&
+                              _privacyLevel != user.usernamePrivacy) {
+                            privacySaved = await settings.updatePrivacy(
+                              _privacyLevel,
+                            );
+                            if (!privacySaved) {
+                              error =
+                                  'Your username was saved, but privacy could not be updated.';
+                            }
+                          }
+
+                          if (!mounted) return;
+                          setState(() => _savingProfileSettings = false);
+
+                          if (error != null) {
+                            // Keep the local state aligned with any successful
+                            // username change even when the second request
+                            // failed, then tell the user exactly what remains.
+                            if (resolvedHandle != currentHandle) {
+                              ref
+                                  .read(authStateProvider.notifier)
+                                  .updateLocalUser(
+                                    (u) => u.copyWith(
+                                      username: resolvedHandle,
+                                      handle: resolvedHandle,
+                                    ),
+                                  );
+                            }
+                            ScaffoldMessenger.of(
+                              context,
+                            ).showSnackBar(SnackBar(content: Text(error)));
+                            return;
+                          }
+
+                          ref
+                              .read(authStateProvider.notifier)
+                              .updateLocalUser(
+                                (u) => u.copyWith(
+                                  username: resolvedHandle,
+                                  handle: resolvedHandle,
+                                  usernamePrivacy: privacySaved
+                                      ? _privacyLevel
+                                      : u.usernamePrivacy,
+                                ),
+                              );
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(
+                              content: Text(
+                                'Profile settings saved successfully!',
+                              ),
+                              backgroundColor: Color(0xFF10B981),
+                            ),
+                          );
+                        },
+                  child: _savingProfileSettings
+                      ? const SizedBox(
+                          height: 18,
+                          width: 18,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Text(
+                          'Save Profile Settings',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                          ),
+                        ),
                 ),
               ),
             ],
@@ -1208,7 +1773,9 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
               end: Alignment.bottomRight,
             ),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.brandOrange.withValues(alpha: 0.3)),
+            border: Border.all(
+              color: AppColors.brandOrange.withValues(alpha: 0.3),
+            ),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -1216,21 +1783,49 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text('ESTIMATED REVENUE', style: TextStyle(color: Color(0xFFFDBA74), fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 1.5)),
+                  const Text(
+                    'ESTIMATED REVENUE',
+                    style: TextStyle(
+                      color: Color(0xFFFDBA74),
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 1.5,
+                    ),
+                  ),
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
                     decoration: BoxDecoration(
                       color: const Color(0xFF10B981).withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Text('ACTIVE', style: TextStyle(color: Color(0xFF10B981), fontSize: 10, fontWeight: FontWeight.bold)),
+                    child: const Text(
+                      'ACTIVE',
+                      style: TextStyle(
+                        color: Color(0xFF10B981),
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ],
               ),
               const SizedBox(height: 10),
-              const Text('₹0.00', style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.w900)),
+              const Text(
+                '₹0.00',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 32,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
               const SizedBox(height: 6),
-              const Text('Earnings from ad impressions, memberships, and super chats.', style: TextStyle(color: Colors.white70, fontSize: 12)),
+              const Text(
+                'Earnings from ad impressions, memberships, and super chats.',
+                style: TextStyle(color: Colors.white70, fontSize: 12),
+              ),
             ],
           ),
         ),
@@ -1245,13 +1840,33 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Monetization Progress', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: context.textPrimary)),
+              Text(
+                'Monetization Progress',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                  color: context.textPrimary,
+                ),
+              ),
               const SizedBox(height: 12),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Subscribers Target (1,000)', style: TextStyle(fontSize: 12, color: context.textSecondary)),
-                  Text('$_subscriberCount / 1,000', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: context.textPrimary)),
+                  Text(
+                    'Subscribers Target (1,000)',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: context.textSecondary,
+                    ),
+                  ),
+                  Text(
+                    '$_subscriberCount / 1,000',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: context.textPrimary,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 6),
@@ -1259,7 +1874,9 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                 borderRadius: BorderRadius.circular(6),
                 child: LinearProgressIndicator(
                   value: (_subscriberCount / 1000).clamp(0.0, 1.0),
-                  backgroundColor: context.isDark ? Colors.white10 : Colors.black12,
+                  backgroundColor: context.isDark
+                      ? Colors.white10
+                      : Colors.black12,
                   color: AppColors.brandOrange,
                   minHeight: 8,
                 ),
@@ -1268,8 +1885,21 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text('Watch Hours (4,000 hrs)', style: TextStyle(fontSize: 12, color: context.textSecondary)),
-                  Text('0 / 4,000', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: context.textPrimary)),
+                  Text(
+                    'Watch Hours (4,000 hrs)',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: context.textSecondary,
+                    ),
+                  ),
+                  Text(
+                    '0 / 4,000',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: context.textPrimary,
+                    ),
+                  ),
                 ],
               ),
               const SizedBox(height: 6),
@@ -1277,7 +1907,9 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                 borderRadius: BorderRadius.circular(6),
                 child: LinearProgressIndicator(
                   value: 0.02,
-                  backgroundColor: context.isDark ? Colors.white10 : Colors.black12,
+                  backgroundColor: context.isDark
+                      ? Colors.white10
+                      : Colors.black12,
                   color: AppColors.brandOrange,
                   minHeight: 8,
                 ),
@@ -1292,15 +1924,34 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
   // --- PANEL 5: HOW IT WORKS? ---
   Widget _buildHowItWorksTab() {
     final faqs = [
-      {'q': 'How do creator payouts work on InPlayer?', 'a': 'InPlayer creators receive revenue share from ad views, direct creator tips, and channel memberships directly into their linked UPI / Bank account on the 1st of every month.'},
-      {'q': 'What are the content guidelines?', 'a': 'All content must adhere to InPlayer community standards. Original videos, music tracks, and Raftaar vertical shorts are eligible for the creator fund.'},
-      {'q': 'How do I get verified?', 'a': 'Channels reaching 5,000 subscribers and completing KYC identity verification are eligible for the verified creator badge.'},
+      {
+        'q': 'How do creator payouts work on InPlayer?',
+        'a':
+            'InPlayer creators receive revenue share from ad views, direct creator tips, and channel memberships directly into their linked UPI / Bank account on the 1st of every month.',
+      },
+      {
+        'q': 'What are the content guidelines?',
+        'a':
+            'All content must adhere to InPlayer community standards. Original videos, music tracks, and Raftaar vertical shorts are eligible for the creator fund.',
+      },
+      {
+        'q': 'How do I get verified?',
+        'a':
+            'Channels reaching 5,000 subscribers and completing KYC identity verification are eligible for the verified creator badge.',
+      },
     ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text('InPlayer Creator Guide', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w900, color: context.textPrimary)),
+        Text(
+          'InPlayer Creator Guide',
+          style: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.w900,
+            color: context.textPrimary,
+          ),
+        ),
         const SizedBox(height: 12),
         ...faqs.map(
           (faq) => Container(
@@ -1314,9 +1965,23 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(faq['q']!, style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: context.textPrimary)),
+                Text(
+                  faq['q']!,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: context.textPrimary,
+                  ),
+                ),
                 const SizedBox(height: 6),
-                Text(faq['a']!, style: TextStyle(fontSize: 12, color: context.textSecondary, height: 1.4)),
+                Text(
+                  faq['a']!,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: context.textSecondary,
+                    height: 1.4,
+                  ),
+                ),
               ],
             ),
           ),

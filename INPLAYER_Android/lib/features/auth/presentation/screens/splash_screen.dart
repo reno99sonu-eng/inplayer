@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:audioplayers/audioplayers.dart';
@@ -40,19 +41,12 @@ class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
     super.initState();
     _loadCachedName();
 
-    // Single unified master controller for rock-solid 60/120fps sync.
-    // All the Interval() curves below are expressed as fractions of this
-    // total, so they rescale automatically with it — changing this one
-    // duration re-times the entire choreography (logo zoom, flash, shine
-    // sweep, tagline/greeting fade, exit curtain) proportionally without
-    // touching any of the Interval() calls below. Set to 3000ms (3s) per
-    // explicit request — was 1150ms.
     _masterController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 3000),
     );
 
-    // 1. Logo Zoom & Tilt (0% -> 40%)
+    // 1. Logo Zoom & Tilt (0% -> 45%)
     _logoScale = TweenSequence<double>([
       TweenSequenceItem(
         tween: Tween(begin: 0.70, end: 1.06).chain(CurveTween(curve: Curves.easeOutCubic)),
@@ -136,7 +130,6 @@ class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
   }
 
   void _triggerGeoCheck() {
-    // Non-blocking geo-verification matching the website's fail-open strategy
     ref.read(geoServiceProvider).verifyGeo().then((result) {
       if (!result.allowed) {
         debugPrint('[InPlayer] Geo verification restriction flagged: ${result.country}');
@@ -153,11 +146,6 @@ class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
   }
 
   void _initAudioAndPlay() {
-    // Safety net only — normally _masterController's forward().then()
-    // below fires _dismissSplash() right as the animation completes.
-    // This just guarantees the splash can't get stuck forever if that
-    // somehow doesn't happen, so it's set a comfortable margin (800ms)
-    // beyond the animation's own 3000ms duration rather than racing it.
     _fallbackTimer = Timer(const Duration(milliseconds: 3800), _dismissSplash);
 
     try {
@@ -174,7 +162,10 @@ class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
   Future<void> _loadCachedName() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      final name = prefs.getString('inplayer:cached_user_name');
+      var name = prefs.getString('inplayer:cached_user_name');
+      if (name == null || name.isEmpty) name = prefs.getString('inplayer:user_name');
+      if (name == null || name.isEmpty) name = prefs.getString('user_name');
+      if (name == null || name.isEmpty) name = prefs.getString('username');
       if (name != null && name.isNotEmpty && mounted) {
         setState(() => _cachedUserName = name);
       }
@@ -191,9 +182,9 @@ class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
 
   String _getGreeting() {
     final hour = DateTime.now().hour;
-    if (hour >= 5 && hour < 12) return 'Morning';
-    if (hour >= 12 && hour < 17) return 'Afternoon';
-    return 'Evening';
+    if (hour >= 5 && hour < 12) return 'Good Morning';
+    if (hour >= 12 && hour < 17) return 'Good Afternoon';
+    return 'Good Evening';
   }
 
   @override
@@ -203,11 +194,22 @@ class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
     final isDark = context.isDark;
     final authState = ref.watch(authStateProvider);
     final user = authState is AuthStateAuthenticated ? authState.user : null;
+
+    if (user != null && user.name.isNotEmpty && _cachedUserName != user.name) {
+      _cachedUserName = user.name;
+      SharedPreferences.getInstance().then((p) => p.setString('inplayer:cached_user_name', user.name));
+    }
+
     final effectiveName = (user != null && user.name.isNotEmpty)
         ? user.name
-        : (_cachedUserName ?? '');
+        : (user != null && user.username.isNotEmpty)
+            ? user.username
+            : (_cachedUserName ?? '');
 
-    final greeting = 'Good ${_getGreeting()}${effectiveName.isNotEmpty ? ', $effectiveName' : ''}';
+    final timeGreeting = _getGreeting();
+    final greeting = effectiveName.isNotEmpty
+        ? '$timeGreeting, $effectiveName'
+        : timeGreeting;
 
     return AnimatedBuilder(
       animation: _masterController,
@@ -221,11 +223,26 @@ class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
         );
       },
       child: Material(
-        color: isDark ? const Color(0xFF020203) : const Color(0xFFF4ECDA),
+        color: isDark ? const Color(0xFF030712) : const Color(0xFFFAF6EE),
         child: Stack(
           alignment: Alignment.center,
           children: [
-            // 1. Flash Burst Wash
+            // 1. Peacock Feather Background
+            Positioned.fill(
+              child: AnimatedBuilder(
+                animation: _masterController,
+                builder: (context, _) {
+                  return CustomPaint(
+                    painter: PeacockFeatherPainter(
+                      animationProgress: _masterController.value,
+                      isDark: isDark,
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            // 2. Flash Burst Wash
             AnimatedBuilder(
               animation: _flashOpacity,
               builder: (context, child) {
@@ -251,7 +268,7 @@ class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
               },
             ),
 
-            // 2. Centered Logo & Content
+            // 3. Centered Logo & Content
             Center(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -405,5 +422,179 @@ class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
         ),
       ),
     );
+  }
+}
+
+class PeacockFeatherPainter extends CustomPainter {
+  final double animationProgress;
+  final bool isDark;
+
+  PeacockFeatherPainter({required this.animationProgress, required this.isDark});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cx = size.width / 2;
+    final cy = size.height * 0.44;
+
+    // 1. Ambient Iridescent Radiance
+    final glowPaint = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(0.0, -0.12),
+        radius: 0.85,
+        colors: isDark
+            ? [
+                const Color(0xFF0D9488).withValues(alpha: 0.18 + 0.08 * math.sin(animationProgress * math.pi)),
+                const Color(0xFF1E3A8A).withValues(alpha: 0.14),
+                const Color(0xFF042F2E).withValues(alpha: 0.08),
+                Colors.transparent,
+              ]
+            : [
+                const Color(0xFF0D9488).withValues(alpha: 0.08),
+                const Color(0xFFFDE68A).withValues(alpha: 0.06),
+                Colors.transparent,
+              ],
+        stops: const [0.0, 0.40, 0.70, 1.0],
+      ).createShader(Rect.fromLTWH(0, 0, size.width, size.height));
+    canvas.drawRect(Rect.fromLTWH(0, 0, size.width, size.height), glowPaint);
+
+    // 2. Peacock Feather Stem (Rachis)
+    final stemPath = Path();
+    stemPath.moveTo(cx, size.height * 0.85);
+    stemPath.quadraticBezierTo(cx - 15, size.height * 0.60, cx, cy);
+
+    final stemPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 2.2
+      ..shader = LinearGradient(
+        begin: Alignment.bottomCenter,
+        end: Alignment.topCenter,
+        colors: [
+          const Color(0xFF047857).withValues(alpha: 0.0),
+          const Color(0xFF10B981).withValues(alpha: 0.35),
+          const Color(0xFFF59E0B).withValues(alpha: 0.45),
+        ],
+      ).createShader(Rect.fromLTWH(cx - 30, cy, 60, size.height * 0.85 - cy));
+    canvas.drawPath(stemPath, stemPaint);
+
+    // 3. Peacock Feather Barbs (Plumules) radiating outwards
+    final barbPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+
+    const barbCount = 28;
+    for (int i = 0; i < barbCount; i++) {
+      final t = i / barbCount;
+      final yStem = cy + (size.height * 0.82 - cy) * (t * 0.85 + 0.15);
+      final spread = math.sin(t * math.pi) * (size.width * 0.42);
+      final curveFactor = (1.0 - t) * 35;
+      final alpha = (math.sin(t * math.pi) * 0.22 * (0.6 + 0.4 * math.sin(animationProgress * math.pi + i * 0.2))).clamp(0.04, 0.35);
+
+      // Left Barb
+      barbPaint.strokeWidth = 1.0 + (1.0 - t) * 0.8;
+      barbPaint.color = Color.lerp(
+        const Color(0xFF059669),
+        const Color(0xFF3B82F6),
+        t,
+      )!.withValues(alpha: alpha);
+
+      final leftPath = Path();
+      leftPath.moveTo(cx - 2, yStem);
+      leftPath.quadraticBezierTo(
+        cx - spread * 0.55,
+        yStem - curveFactor,
+        cx - spread,
+        yStem - curveFactor * 0.6,
+      );
+      canvas.drawPath(leftPath, barbPaint);
+
+      // Right Barb
+      barbPaint.color = Color.lerp(
+        const Color(0xFF10B981),
+        const Color(0xFF6366F1),
+        t,
+      )!.withValues(alpha: alpha);
+
+      final rightPath = Path();
+      rightPath.moveTo(cx + 2, yStem);
+      rightPath.quadraticBezierTo(
+        cx + spread * 0.55,
+        yStem - curveFactor,
+        cx + spread,
+        yStem - curveFactor * 0.6,
+      );
+      canvas.drawPath(rightPath, barbPaint);
+    }
+
+    // 4. Peacock Feather Eye (Ocellus)
+    final eyeCenter = Offset(cx, cy);
+    final eyeScale = (0.85 + 0.15 * math.sin(animationProgress * math.pi)).clamp(0.8, 1.1);
+
+    // Layer A: Outer Sapphire Halo
+    final outerHaloPaint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          const Color(0xFF1E3A8A).withValues(alpha: isDark ? 0.32 : 0.15),
+          const Color(0xFF0F172A).withValues(alpha: 0.0),
+        ],
+      ).createShader(Rect.fromCircle(center: eyeCenter, radius: 100 * eyeScale));
+    canvas.drawOval(
+      Rect.fromCenter(center: eyeCenter, width: 170 * eyeScale, height: 210 * eyeScale),
+      outerHaloPaint,
+    );
+
+    // Layer B: Teal & Turquoise Ring
+    final tealRingPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 14 * eyeScale
+      ..shader = SweepGradient(
+        center: const Alignment(0, 0),
+        colors: [
+          const Color(0xFF0D9488).withValues(alpha: 0.30),
+          const Color(0xFF06B6D4).withValues(alpha: 0.40),
+          const Color(0xFF10B981).withValues(alpha: 0.35),
+          const Color(0xFF0D9488).withValues(alpha: 0.30),
+        ],
+      ).createShader(Rect.fromCircle(center: eyeCenter, radius: 55 * eyeScale));
+    canvas.drawOval(
+      Rect.fromCenter(center: eyeCenter, width: 110 * eyeScale, height: 135 * eyeScale),
+      tealRingPaint,
+    );
+
+    // Layer C: Golden Bronze Inner Core
+    final goldCorePaint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          const Color(0xFFF59E0B).withValues(alpha: 0.45),
+          const Color(0xFFD97706).withValues(alpha: 0.25),
+          Colors.transparent,
+        ],
+        stops: const [0.0, 0.65, 1.0],
+      ).createShader(Rect.fromCircle(center: eyeCenter, radius: 45 * eyeScale));
+    canvas.drawOval(
+      Rect.fromCenter(center: eyeCenter, width: 75 * eyeScale, height: 95 * eyeScale),
+      goldCorePaint,
+    );
+
+    // Layer D: Midnight Indigo Heart Pupil
+    final pupilPaint = Paint()
+      ..shader = RadialGradient(
+        colors: [
+          const Color(0xFF312E81).withValues(alpha: 0.60),
+          const Color(0xFF1E1B4B).withValues(alpha: 0.80),
+        ],
+      ).createShader(Rect.fromCircle(center: eyeCenter, radius: 24 * eyeScale));
+    canvas.drawOval(
+      Rect.fromCenter(center: Offset(cx, cy + 4), width: 42 * eyeScale, height: 50 * eyeScale),
+      pupilPaint,
+    );
+
+    // Specular glimmer dot
+    final sparkPaint = Paint()..color = Colors.white.withValues(alpha: 0.55);
+    canvas.drawCircle(Offset(cx - 6 * eyeScale, cy - 4 * eyeScale), 2.5 * eyeScale, sparkPaint);
+  }
+
+  @override
+  bool shouldRepaint(covariant PeacockFeatherPainter oldDelegate) {
+    return oldDelegate.animationProgress != animationProgress || oldDelegate.isDark != isDark;
   }
 }

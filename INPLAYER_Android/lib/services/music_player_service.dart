@@ -1,4 +1,6 @@
+import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
@@ -7,41 +9,69 @@ import 'package:logger/logger.dart';
 import '../models/video.dart';
 import 'history_service.dart';
 
-/// The single, app-wide music playback engine — one AudioPlayer instance
-/// every screen shares, so a track started from the Music hub keeps
-/// playing (with real lock-screen/notification controls, via
-/// just_audio_background — see main.dart's JustAudioBackground.init and
-/// the AndroidManifest service/permission entries this requires) no
-/// matter what else you do in the app: browse Home, open a video,
-/// background the app entirely.
-///
-/// Deliberately separate from watch_page.dart's own VideoPlayerController
-/// — that one is untouched and stays exactly as it was (foreground-only,
-/// tied to one screen) for regular video/Short playback. This service is
-/// only ever used by the new dedicated Music section (the mini player,
-/// Now Playing, genre/liked/artist browsing) — a purpose-built audio
-/// pipeline instead of retrofitting the general video player, which is
-/// also why it plays the plain public Mux HLS URL with no
-/// `max_resolution` param: that cap is a video-quality concept with
-/// nothing to apply to on an audio-only asset.
 class MusicPlayerService extends ChangeNotifier {
-  MusicPlayerService({Future<void> Function(String videoId)? onTrackStarted})
-      : _onTrackStarted = onTrackStarted {
+  static const _permissionChannel = MethodChannel('inplayer.app/permissions');
+
+  final _logger = Logger();
+  final AudioPlayer _player = AudioPlayer();
+  final Future<void> Function(String videoId)? onTrackStarted;
+
+  MusicPlayerService({this.onTrackStarted}) {
+    _initAudioSession();
     _player.currentIndexStream.listen((index) {
       final changed = index != _currentIndex;
       _currentIndex = index;
       notifyListeners();
       final track = currentTrack;
       if (changed && track != null) {
-        _onTrackStarted?.call(track.videoId);
+        onTrackStarted?.call(track.videoId);
       }
     });
     _player.playerStateStream.listen((_) => notifyListeners());
   }
 
-  final _logger = Logger();
-  final AudioPlayer _player = AudioPlayer();
-  final Future<void> Function(String videoId)? _onTrackStarted;
+  Future<void> _initAudioSession() async {
+    try {
+      final session = await AudioSession.instance;
+      await session.configure(const AudioSessionConfiguration.music());
+      session.interruptionEventStream.listen((event) {
+        if (event.begin) {
+          switch (event.type) {
+            case AudioInterruptionType.duck:
+              _player.setVolume(0.5);
+              break;
+            case AudioInterruptionType.pause:
+            case AudioInterruptionType.unknown:
+              _player.pause();
+              break;
+          }
+        } else {
+          switch (event.type) {
+            case AudioInterruptionType.duck:
+              _player.setVolume(1.0);
+              break;
+            case AudioInterruptionType.pause:
+              _player.play();
+              break;
+            case AudioInterruptionType.unknown:
+              break;
+          }
+        }
+      });
+      session.becomingNoisyEventStream.listen((_) {
+        _player.pause();
+      });
+    } catch (e) {
+      _logger.w('AudioSession configuration warning: $e');
+    }
+  }
+
+  Future<void> _requestNotificationPermission() async {
+    try {
+      await _permissionChannel.invokeMethod('requestNotificationPermission');
+    } catch (_) {}
+  }
+
 
   // A live, mutable playlist object the player is actually attached to.
   // Queue edits (playNext/addToQueue/removeFromQueue/reorderQueue) mutate
@@ -110,6 +140,7 @@ class MusicPlayerService extends ChangeNotifier {
     notifyListeners();
 
     try {
+      _requestNotificationPermission();
       await _player.setAudioSource(_playlist, initialIndex: initialIndex);
       await _player.play();
     } catch (e, stackTrace) {

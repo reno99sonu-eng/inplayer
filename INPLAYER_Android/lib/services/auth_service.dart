@@ -42,11 +42,7 @@ class AuthService {
       _isConfigured = true;
       _logger.i('Amplify was already configured');
     } catch (e, stackTrace) {
-      _logger.e(
-        'Error configuring Amplify',
-        error: e,
-        stackTrace: stackTrace,
-      );
+      _logger.e('Error configuring Amplify', error: e, stackTrace: stackTrace);
       rethrow;
     }
   }
@@ -74,14 +70,13 @@ class AuthService {
       final userId = attributes['sub'] ?? '';
       String username = attributes['email'] ?? '';
       final email = attributes['email'] ?? '';
-      String name =
-          attributes['name'] ??
-          attributes['given_name'] ??
-          '';
-      String? avatarUrl = attributes['picture'] ?? attributes['custom:avatarUrl'];
+      String name = attributes['name'] ?? attributes['given_name'] ?? '';
+      String? avatarUrl =
+          attributes['picture'] ?? attributes['custom:avatarUrl'];
       String? coverPhotoUrl;
       String? handle;
       String bio = '';
+      String usernamePrivacy = 'public';
       Map<String, String> socialLinks = {};
       List<Map<String, String>> otherLinks = [];
       int? age;
@@ -98,18 +93,45 @@ class AuthService {
           if (data['name'] != null && (data['name'] as String).isNotEmpty) {
             name = data['name'];
           }
-          if (data['avatarUrl'] != null && (data['avatarUrl'] as String).isNotEmpty) {
+          if (data['avatarUrl'] != null &&
+              (data['avatarUrl'] as String).isNotEmpty) {
             avatarUrl = data['avatarUrl'];
           }
-          if (data['coverPhotoUrl'] != null && (data['coverPhotoUrl'] as String).isNotEmpty) {
+          if (data['coverPhotoUrl'] != null &&
+              (data['coverPhotoUrl'] as String).isNotEmpty) {
             coverPhotoUrl = data['coverPhotoUrl'];
           }
-          if (data['username'] != null && (data['username'] as String).isNotEmpty) {
+          if (data['username'] != null &&
+              (data['username'] as String).isNotEmpty) {
             username = data['username'];
             handle = data['username'];
           }
           if (data['description'] != null) {
             bio = data['description'];
+          }
+          if (data['usernamePrivacy'] is String) {
+            usernamePrivacy = data['usernamePrivacy'] as String;
+          }
+          final rawLinks = data['socialLinks'];
+          if (rawLinks is Map) {
+            final rawSocial = rawLinks['social'];
+            if (rawSocial is Map) {
+              socialLinks = rawSocial.map(
+                (key, value) => MapEntry(key.toString(), value.toString()),
+              );
+            }
+            final rawOther = rawLinks['other'];
+            if (rawOther is List) {
+              otherLinks = rawOther
+                  .whereType<Map>()
+                  .map(
+                    (entry) => entry.map(
+                      (key, value) =>
+                          MapEntry(key.toString(), value.toString()),
+                    ),
+                  )
+                  .toList();
+            }
           }
           if (data['age'] != null && data['age'] is int) {
             age = data['age'];
@@ -130,6 +152,7 @@ class AuthService {
         avatarUrl: avatarUrl,
         coverPhotoUrl: coverPhotoUrl,
         handle: handle,
+        usernamePrivacy: usernamePrivacy,
         bio: bio,
         socialLinks: socialLinks,
         otherLinks: otherLinks,
@@ -156,16 +179,10 @@ class AuthService {
 
       if (result.isSignedIn) {
         final user = await getCurrentUser();
-        return SignInResult(
-          success: true,
-          user: user,
-        );
+        return SignInResult(success: true, user: user);
       }
 
-      return SignInResult(
-        success: false,
-        error: 'Sign in failed',
-      );
+      return SignInResult(success: false, error: 'Sign in failed');
     }
 
     try {
@@ -174,25 +191,23 @@ class AuthService {
       final msg = e.message.toLowerCase();
       if (msg.contains('already') ||
           msg.contains('signed in') ||
-          e.runtimeType.toString().contains('UserAlreadyAuthenticatedException')) {
-        _logger.w('Stale session detected during sign in. Clearing and retrying...');
+          e.runtimeType.toString().contains(
+            'UserAlreadyAuthenticatedException',
+          )) {
+        _logger.w(
+          'Stale session detected during sign in. Clearing and retrying...',
+        );
         try {
           await Amplify.Auth.signOut();
           return await attempt();
         } on AuthException catch (retryE) {
           _logger.e('Retry sign in failed: ${retryE.message}');
-          return SignInResult(
-            success: false,
-            error: retryE.message,
-          );
+          return SignInResult(success: false, error: retryE.message);
         }
       }
 
       _logger.e('Sign in error: ${e.message}');
-      return SignInResult(
-        success: false,
-        error: e.message,
-      );
+      return SignInResult(success: false, error: e.message);
     } catch (e) {
       _logger.e('Unexpected sign in error: $e');
       return SignInResult(
@@ -210,10 +225,7 @@ class AuthService {
 
       if (result.isSignedIn) {
         final user = await getCurrentUser();
-        return SignInResult(
-          success: true,
-          user: user,
-        );
+        return SignInResult(success: true, user: user);
       }
 
       return SignInResult(
@@ -228,8 +240,12 @@ class AuthService {
       final msg = e.message.toLowerCase();
       if (msg.contains('already') ||
           msg.contains('signed in') ||
-          e.runtimeType.toString().contains('UserAlreadyAuthenticatedException')) {
-        _logger.w('Stale session detected during Google sign in. Clearing and retrying...');
+          e.runtimeType.toString().contains(
+            'UserAlreadyAuthenticatedException',
+          )) {
+        _logger.w(
+          'Stale session detected during Google sign in. Clearing and retrying...',
+        );
         try {
           await Amplify.Auth.signOut();
           return await attempt();
@@ -244,13 +260,15 @@ class AuthService {
       }
       return SignInResult(
         success: false,
-        error: "Google sign-in isn't set up for this site yet. Please sign in with your email and password.",
+        error:
+            "Google sign-in isn't set up for this site yet. Please sign in with your email and password.",
       );
     } catch (e) {
       _logger.e('Unexpected Google sign in error: $e');
       return SignInResult(
         success: false,
-        error: "Google sign-in isn't set up for this site yet. Please sign in with your email and password.",
+        error:
+            "Google sign-in isn't set up for this site yet. Please sign in with your email and password.",
       );
     }
   }
@@ -356,7 +374,10 @@ class AuthService {
       return AccountActionResult(success: false, error: e.message);
     } catch (e) {
       _logger.e('Unexpected change password error: $e');
-      return AccountActionResult(success: false, error: 'An unexpected error occurred');
+      return AccountActionResult(
+        success: false,
+        error: 'An unexpected error occurred',
+      );
     }
   }
 
@@ -369,15 +390,22 @@ class AuthService {
         userAttributeKey: AuthUserAttributeKey.email,
         value: newEmail,
       );
-      final needsConfirmation = result.nextStep.updateAttributeStep ==
+      final needsConfirmation =
+          result.nextStep.updateAttributeStep ==
           AuthUpdateAttributeStep.confirmAttributeWithCode;
-      return AccountActionResult(success: true, needsConfirmation: needsConfirmation);
+      return AccountActionResult(
+        success: true,
+        needsConfirmation: needsConfirmation,
+      );
     } on AuthException catch (e) {
       _logger.e('Request email change error: ${e.message}');
       return AccountActionResult(success: false, error: e.message);
     } catch (e) {
       _logger.e('Unexpected request email change error: $e');
-      return AccountActionResult(success: false, error: 'An unexpected error occurred');
+      return AccountActionResult(
+        success: false,
+        error: 'An unexpected error occurred',
+      );
     }
   }
 
@@ -394,7 +422,10 @@ class AuthService {
       return AccountActionResult(success: false, error: e.message);
     } catch (e) {
       _logger.e('Unexpected confirm email change error: $e');
-      return AccountActionResult(success: false, error: 'An unexpected error occurred');
+      return AccountActionResult(
+        success: false,
+        error: 'An unexpected error occurred',
+      );
     }
   }
 
@@ -413,30 +444,23 @@ class AuthService {
       return AccountActionResult(success: false, error: e.message);
     } catch (e) {
       _logger.e('Unexpected delete user error: $e');
-      return AccountActionResult(success: false, error: 'An unexpected error occurred');
+      return AccountActionResult(
+        success: false,
+        error: 'An unexpected error occurred',
+      );
     }
   }
 
-  Future<void> resetPassword({
-    required String email,
-  }) async {
+  Future<void> resetPassword({required String email}) async {
     try {
-      await Amplify.Auth.resetPassword(
-        username: email,
-      );
+      await Amplify.Auth.resetPassword(username: email);
 
-      _logger.i(
-        'Password reset initiated for $email',
-      );
+      _logger.i('Password reset initiated for $email');
     } on AuthException catch (e) {
-      _logger.e(
-        'Reset password error: ${e.message}',
-      );
+      _logger.e('Reset password error: ${e.message}');
       rethrow;
     } catch (e) {
-      _logger.e(
-        'Unexpected reset password error: $e',
-      );
+      _logger.e('Unexpected reset password error: $e');
       rethrow;
     }
   }
@@ -453,18 +477,12 @@ class AuthService {
         newPassword: newPassword,
       );
 
-      _logger.i(
-        'Password reset confirmed for $email',
-      );
+      _logger.i('Password reset confirmed for $email');
     } on AuthException catch (e) {
-      _logger.e(
-        'Confirm reset password error: ${e.message}',
-      );
+      _logger.e('Confirm reset password error: ${e.message}');
       rethrow;
     } catch (e) {
-      _logger.e(
-        'Unexpected confirm reset password error: $e',
-      );
+      _logger.e('Unexpected confirm reset password error: $e');
       rethrow;
     }
   }
@@ -475,11 +493,7 @@ class SignInResult {
   final User? user;
   final String? error;
 
-  SignInResult({
-    required this.success,
-    this.user,
-    this.error,
-  });
+  SignInResult({required this.success, this.user, this.error});
 }
 
 class SignUpResult {

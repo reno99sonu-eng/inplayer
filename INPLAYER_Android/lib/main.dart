@@ -72,6 +72,7 @@ class InplayerApp extends ConsumerWidget {
       routerConfig: router,
       builder: (context, child) {
         return Stack(
+          fit: StackFit.expand,
           children: [
             ?child,
             const SplashScreenOverlay(),

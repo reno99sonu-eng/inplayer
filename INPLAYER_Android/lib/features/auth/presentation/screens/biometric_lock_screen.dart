@@ -43,14 +43,18 @@ class _BiometricLockScreenState extends ConsumerState<BiometricLockScreen> {
   Widget build(BuildContext context) {
     final lockState = ref.watch(biometricLockProvider);
     if (!lockState.isEnabled || !lockState.isLocked) {
-      return const SizedBox.shrink();
+      return const IgnorePointer(
+        ignoring: true,
+        child: SizedBox.shrink(),
+      );
     }
 
     final isDark = context.isDark;
 
-    return Material(
-      color: isDark ? const Color(0xFF030712) : const Color(0xFFFAF5E8),
-      child: PatternBackground(
+    return Positioned.fill(
+      child: Material(
+        color: isDark ? const Color(0xFF030712) : const Color(0xFFFAF5E8),
+        child: PatternBackground(
         child: SafeArea(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 40),
@@ -142,6 +146,7 @@ class _BiometricLockScreenState extends ConsumerState<BiometricLockScreen> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  );
+}
 }

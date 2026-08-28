@@ -115,44 +115,46 @@ class _FloatingAIButtonState extends State<FloatingAIButton>
       curve: Curves.easeInOut,
       bottom: _isHidden ? -100 : 80,
       right: 16,
-      child: AnimatedBuilder(
-        animation: _pulseAnimation,
-        builder: (context, child) {
-          return Semantics(
-            button: true,
-            label: 'Open InPlayer AI',
-            child: GestureDetector(
-              onTapDown: (_) => _tapController.forward(),
-              onTapUp: (_) {
-                _tapController.reverse();
-                _showAIStudioModal();
-              },
-              onTapCancel: _tapController.reverse,
-              child: ScaleTransition(
-                scale: _scaleAnimation,
-                child: SizedBox(
-                  width: 50,
-                  height: 50,
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      // Breathing Outer Glow Ring
-                      Container(
-                        width: 50,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: borderColor.withValues(
-                              alpha: (0.10 + (_pulseAnimation.value * 0.30)).clamp(0.0, 1.0),
+      child: IgnorePointer(
+        ignoring: _isHidden,
+        child: Semantics(
+          button: true,
+          label: 'Open InPlayer AI',
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTapDown: (_) => _tapController.forward(),
+            onTapUp: (_) {
+              _tapController.reverse();
+              _showAIStudioModal();
+            },
+            onTapCancel: _tapController.reverse,
+            child: ScaleTransition(
+              scale: _scaleAnimation,
+              child: AnimatedBuilder(
+                animation: _pulseAnimation,
+                builder: (context, child) {
+                  return SizedBox(
+                    width: 52,
+                    height: 52,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        // Breathing Outer Ring
+                        Container(
+                          width: 52,
+                          height: 52,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: borderColor.withValues(
+                                alpha: (0.10 + (_pulseAnimation.value * 0.30)).clamp(0.0, 1.0),
+                              ),
+                              width: 1.2,
                             ),
-                            width: 1.2,
                           ),
                         ),
-                      ),
-                      // Frosted Glass Floating Action Button
-                      ClipOval(
-                        child: Container(
+                        // Frosted Glass Core Button
+                        Container(
                           width: 42,
                           height: 42,
                           decoration: BoxDecoration(
@@ -175,35 +177,28 @@ class _FloatingAIButtonState extends State<FloatingAIButton>
                               ),
                             ],
                           ),
-                          child: Material(
-                            color: Colors.transparent,
-                            child: InkWell(
-                              customBorder: const CircleBorder(),
-                              onTap: _showAIStudioModal,
-                              child: Center(
-                                child: Icon(
-                                  Icons.auto_awesome_rounded,
-                                  color: iconColor,
-                                  size: 20,
-                                  shadows: [
-                                    Shadow(
-                                      color: glowColor.withValues(alpha: 0.8),
-                                      blurRadius: 6,
-                                    ),
-                                  ],
+                          child: Center(
+                            child: Icon(
+                              Icons.auto_awesome_rounded,
+                              color: iconColor,
+                              size: 20,
+                              shadows: [
+                                Shadow(
+                                  color: glowColor.withValues(alpha: 0.8),
+                                  blurRadius: 6,
                                 ),
-                              ),
+                              ],
                             ),
                           ),
                         ),
-                      ),
-                    ],
-                  ),
-                ),
+                      ],
+                    ),
+                  );
+                },
               ),
             ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }

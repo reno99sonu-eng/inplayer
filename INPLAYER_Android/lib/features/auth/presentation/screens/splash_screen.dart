@@ -189,7 +189,12 @@ class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
 
   @override
   Widget build(BuildContext context) {
-    if (!_isVisible) return const SizedBox.shrink();
+    if (!_isVisible) {
+      return const IgnorePointer(
+        ignoring: true,
+        child: SizedBox.shrink(),
+      );
+    }
 
     final isDark = context.isDark;
     final authState = ref.watch(authStateProvider);
@@ -211,36 +216,41 @@ class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
         ? '$timeGreeting, $effectiveName'
         : timeGreeting;
 
-    return AnimatedBuilder(
-      animation: _masterController,
-      builder: (context, child) {
-        final curtainVal = _curtainOpacity.value;
-        if (curtainVal <= 0.0) return const SizedBox.shrink();
+    return Positioned.fill(
+      child: IgnorePointer(
+        ignoring: !_isVisible,
+        child: AnimatedBuilder(
+          animation: _masterController,
+          builder: (context, child) {
+            final curtainVal = _curtainOpacity.value;
+            if (curtainVal <= 0.0) return const SizedBox.shrink();
 
-        return Opacity(
-          opacity: curtainVal.clamp(0.0, 1.0),
-          child: child,
-        );
-      },
-      child: Material(
-        color: isDark ? const Color(0xFF030712) : const Color(0xFFFAF6EE),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            // 1. Peacock Feather Background
-            Positioned.fill(
-              child: AnimatedBuilder(
-                animation: _masterController,
-                builder: (context, _) {
-                  return CustomPaint(
-                    painter: PeacockFeatherPainter(
-                      animationProgress: _masterController.value,
-                      isDark: isDark,
+            return Opacity(
+              opacity: curtainVal.clamp(0.0, 1.0),
+              child: child,
+            );
+          },
+          child: Material(
+            color: isDark ? const Color(0xFF030712) : const Color(0xFFFAF6EE),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                // 1. Peacock Feather Background
+                Positioned.fill(
+                  child: RepaintBoundary(
+                    child: AnimatedBuilder(
+                      animation: _masterController,
+                      builder: (context, _) {
+                        return CustomPaint(
+                          painter: PeacockFeatherPainter(
+                            animationProgress: _masterController.value,
+                            isDark: isDark,
+                          ),
+                        );
+                      },
                     ),
-                  );
-                },
-              ),
-            ),
+                  ),
+                ),
 
             // 2. Flash Burst Wash
             AnimatedBuilder(
@@ -421,8 +431,10 @@ class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
           ],
         ),
       ),
-    );
-  }
+    ),
+  ),
+);
+}
 }
 
 class PeacockFeatherPainter extends CustomPainter {

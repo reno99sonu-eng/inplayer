@@ -24,6 +24,7 @@ export default function AdminHeader({ email }: { email: string | null }) {
   const { triggerRefresh, isRefreshing, lastUpdated } = useAdminRefresh();
   const router = useRouter();
   const [isDark, setIsDark] = useState(true);
+  const [navbarTheme, setNavbarTheme] = useState<{ active: boolean; imageUrl: string; occasionId?: string; title?: string } | null>(null);
 
   // Switching modes also navigates to that side's home page, so clicking
   // "Hammart" or "Sponsorship" always lands somewhere real (the vendor KYC
@@ -42,6 +43,30 @@ export default function AdminHeader({ email }: { email: string | null }) {
       setIsDark(document.documentElement.classList.contains("dark"));
     };
     readTheme();
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/navbar-theme");
+        if (!res.ok) return;
+        const data = await res.json().catch(() => ({ active: false }));
+        if (!cancelled && data?.active && data?.theme?.imageUrl) {
+          setNavbarTheme({
+            active: true,
+            imageUrl: data.theme.imageUrl,
+            occasionId: data.theme.occasionId,
+            title: data.theme.title,
+          });
+        }
+      } catch (err) {
+        console.error("Navbar theme fetch error:", err);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   // Sets an explicit light/dark choice (bypassing "Auto") — the same
@@ -100,6 +125,44 @@ export default function AdminHeader({ email }: { email: string | null }) {
               className="hidden light:block h-7 w-auto object-contain sm:h-8"
             />
           </Link>
+
+          {/* Festive Occasion Graphic + greeting text, side by side */}
+          {navbarTheme?.active && navbarTheme.imageUrl && (
+            <div className="ml-4 sm:ml-6 lg:ml-8 flex items-center gap-2.5 flex-shrink-0">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={navbarTheme.imageUrl}
+                alt="Occasion Graphic"
+                className="h-10 lg:h-11 xl:h-12 w-auto object-contain drop-shadow-[0_2px_14px_rgba(255,165,0,0.5)]"
+              />
+
+              <div className="flex flex-col items-start justify-center text-left leading-[0.95] py-0.5">
+                {(() => {
+                  const occId = navbarTheme.occasionId;
+                  let lines: string[] = ["OCCASION", "CELEBRATION", "THEME"];
+                  if (occId === "independence_day") lines = ["HAPPY", "INDEPENDENCE", "DAY"];
+                  else if (occId === "diwali") lines = ["HAPPY", "DIWALI", "FESTIVAL"];
+                  else if (occId === "holi") lines = ["HAPPY", "HOLI", "FESTIVAL"];
+                  else if (occId === "republic_day") lines = ["HAPPY", "REPUBLIC", "DAY"];
+                  else if (occId === "new_year") lines = ["HAPPY", "NEW YEAR", "2026"];
+                  else if (occId === "cyberpunk") lines = ["CYBERPUNK", "TECH", "MODE"];
+                  else if (navbarTheme.title) {
+                    const parts = navbarTheme.title.toUpperCase().split(" ");
+                    lines = parts.length >= 3 ? parts.slice(0, 3) : [parts[0] || "OCCASION", parts[1] || "CELEBRATION", parts[2] || "THEME"];
+                  }
+
+                  return lines.map((line, idx) => (
+                    <span
+                      key={idx}
+                      className="whitespace-nowrap text-[9px] sm:text-[10px] lg:text-[11px] xl:text-[12px] font-black uppercase tracking-wide bg-gradient-to-r from-amber-300 via-orange-400 to-pink-400 bg-clip-text text-transparent animate-pulse drop-shadow-[0_1.5px_4px_rgba(0,0,0,0.85)]"
+                    >
+                      {line}
+                    </span>
+                  ));
+                })()}
+              </div>
+            </div>
+          )}
 
           {/* Theme + sign out ride the logo's row on mobile (always fits,
               two small controls), and move to the far right on sm+. */}

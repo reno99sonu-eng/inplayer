@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Keep the mark comfortably inside Android's circular adaptive-icon safe
      zone. The launcher is still free to apply its own circle/squircle mask. -->
+<!-- 18.5% leaves a 63% content area (5% larger than the previous 60%)
+     while preserving the adaptive launcher mask safe zone. -->
 <inset xmlns:android="http://schemas.android.com/apk/res/android"
-    android:inset="20%">
+    android:inset="18.5%">
     <bitmap
         android:src="@mipmap/ic_launcher_foreground"
         android:gravity="fill" />

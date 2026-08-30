@@ -125,7 +125,8 @@ export function togglesFromMode(mode: AudienceMode): { showAdult: boolean; kidsO
 // of its directions ("kids" on, "family" off) are non-loosening. Turning
 // 18+ ON is the one action that stops and asks.
 export function modeRequiresPasskey(mode: AudienceMode): boolean {
-  return mode === "all";
+  void mode;
+  return true;
 }
 
 // ── Backwards compatibility with the two older per-video flags ────────

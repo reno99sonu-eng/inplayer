@@ -66,6 +66,7 @@ const List<Color> _genreColors = [
 class _MusicPageState extends ConsumerState<MusicPage> {
   List<Video>? _tracks;
   List<Video> _recentlyPlayed = [];
+  List<Video> _recommended = [];
 
   Timer? _liveToastTimer;
   Timer? _liveToastDismissTimer;
@@ -104,7 +105,8 @@ class _MusicPageState extends ConsumerState<MusicPage> {
       _toastIdx++;
 
       setState(() {
-        _currentToast = '🎧 ${listener.$1} from ${listener.$2} is playing "${track.title}"';
+        _currentToast =
+            '🎧 ${listener.$1} from ${listener.$2} is playing "${track.title}"';
       });
 
       _liveToastDismissTimer?.cancel();
@@ -147,9 +149,28 @@ class _MusicPageState extends ConsumerState<MusicPage> {
     }
 
     if (!mounted) return;
+    final recentGenres = recent.map((t) => t.genre ?? 'Other').toSet();
+    final recentArtists = recent
+        .map((t) => (t.artist ?? t.creator).toLowerCase())
+        .toSet();
+    final recommended = tracks
+        .where((track) {
+          if (recent.any(
+            (recentTrack) => recentTrack.videoId == track.videoId,
+          )) {
+            return false;
+          }
+          return recentGenres.contains(track.genre ?? 'Other') ||
+              recentArtists.contains(
+                (track.artist ?? track.creator).toLowerCase(),
+              );
+        })
+        .take(12)
+        .toList();
     setState(() {
       _tracks = tracks;
       _recentlyPlayed = recent;
+      _recommended = recommended;
     });
   }
 
@@ -162,13 +183,19 @@ class _MusicPageState extends ConsumerState<MusicPage> {
     return map;
   }
 
-  List<({String username, String name, String avatar})> _uniqueArtists(List<Video> tracks) {
+  List<({String username, String name, String avatar})> _uniqueArtists(
+    List<Video> tracks,
+  ) {
     final seen = <String>{};
     final result = <({String username, String name, String avatar})>[];
     for (final t in tracks) {
       final username = t.uploaderUsername;
       if (username == null || username.isEmpty || !seen.add(username)) continue;
-      result.add((username: username, name: t.artist?.isNotEmpty == true ? t.artist! : t.creator, avatar: t.avatar));
+      result.add((
+        username: username,
+        name: t.artist?.isNotEmpty == true ? t.artist! : t.creator,
+        avatar: t.avatar,
+      ));
       if (result.length >= 15) break;
     }
     return result;
@@ -186,15 +213,24 @@ class _MusicPageState extends ConsumerState<MusicPage> {
         automaticallyImplyLeading: false,
         titleSpacing: 20,
         title: ShaderMask(
-          shaderCallback: (bounds) => AppColors.flameGradient.createShader(bounds),
+          shaderCallback: (bounds) =>
+              AppColors.flameGradient.createShader(bounds),
           child: const Text(
             'Music',
-            style: TextStyle(fontWeight: FontWeight.w900, color: Colors.white, fontSize: 24, letterSpacing: -0.5),
+            style: TextStyle(
+              fontWeight: FontWeight.w900,
+              color: Colors.white,
+              fontSize: 24,
+              letterSpacing: -0.5,
+            ),
           ),
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.download_for_offline_outlined, color: context.textPrimary),
+            icon: Icon(
+              Icons.download_for_offline_outlined,
+              color: context.textPrimary,
+            ),
             onPressed: () => context.push('/downloads'),
             tooltip: 'Downloaded',
           ),
@@ -202,40 +238,52 @@ class _MusicPageState extends ConsumerState<MusicPage> {
         ],
       ),
       body: tracks == null
-          ? const Center(child: CircularProgressIndicator(color: AppColors.brandOrange))
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.brandOrange),
+            )
           : tracks.isEmpty
-              ? _buildEmptyState(context)
-              : Stack(
-                  children: [
-                    RefreshIndicator(
-                      color: AppColors.brandOrange,
-                      onRefresh: _load,
-                      child: ListView(
-                        padding: const EdgeInsets.only(bottom: 120),
-                        children: [
-                          const SizedBox(height: 6),
-                          if (tracks.isNotEmpty) _buildSpotlightHero(context, tracks.first, tracks),
-                          _buildQuickAccessRow(context),
-                          if (_recentlyPlayed.isNotEmpty) ...[
-                            const SizedBox(height: 26),
-                            _sectionHeader(context, 'Recently Played'),
-                            _buildSquareShelf(context, _recentlyPlayed),
-                          ],
-                          const SizedBox(height: 26),
-                          _sectionHeader(context, 'Genres'),
-                          _buildGenreGrid(context, tracks),
-                          if (_uniqueArtists(tracks).isNotEmpty) ...[
-                            const SizedBox(height: 26),
-                            _sectionHeader(context, 'Artists'),
-                            _buildArtistsRow(context, _uniqueArtists(tracks)),
-                          ],
-                          const SizedBox(height: 26),
-                          _sectionHeader(context, 'All Songs'),
+          ? _buildEmptyState(context)
+          : Stack(
+              children: [
+                RefreshIndicator(
+                  color: AppColors.brandOrange,
+                  onRefresh: _load,
+                  child: ListView(
+                    padding: const EdgeInsets.only(bottom: 120),
+                    children: [
+                      const SizedBox(height: 6),
+                      if (tracks.isNotEmpty)
+                        _buildSpotlightHero(context, tracks.first, tracks),
+                      _buildQuickAccessRow(context),
+                      if (_recentlyPlayed.isNotEmpty) ...[
+                        const SizedBox(height: 26),
+                        _sectionHeader(context, 'Recently Played'),
+                        _buildSquareShelf(context, _recentlyPlayed),
+                      ],
+                      if (_recommended.isNotEmpty) ...[
+                        const SizedBox(height: 26),
+                        _sectionHeader(context, 'Recommended for you'),
+                        _buildSquareShelf(context, _recommended),
+                      ],
+                      const SizedBox(height: 26),
+                      _sectionHeader(context, 'Genres'),
+                      _buildGenreGrid(context, tracks),
+                      if (_uniqueArtists(tracks).isNotEmpty) ...[
+                        const SizedBox(height: 26),
+                        _sectionHeader(context, 'Artists'),
+                        _buildArtistsRow(context, _uniqueArtists(tracks)),
+                      ],
+                      const SizedBox(height: 26),
+                      _sectionHeader(context, 'All Songs'),
                       ...List.generate(
                         tracks.length,
                         (i) => Padding(
                           padding: const EdgeInsets.symmetric(horizontal: 20),
-                          child: MusicTrackTile(track: tracks[i], queue: tracks, index: i),
+                          child: MusicTrackTile(
+                            track: tracks[i],
+                            queue: tracks,
+                            index: i,
+                          ),
                         ),
                       ),
                     ],
@@ -260,7 +308,9 @@ class _MusicPageState extends ConsumerState<MusicPage> {
           decoration: BoxDecoration(
             color: Colors.black.withValues(alpha: 0.88),
             borderRadius: BorderRadius.circular(30),
-            border: Border.all(color: AppColors.brandOrange.withValues(alpha: 0.5)),
+            border: Border.all(
+              color: AppColors.brandOrange.withValues(alpha: 0.5),
+            ),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withValues(alpha: 0.4),
@@ -300,8 +350,14 @@ class _MusicPageState extends ConsumerState<MusicPage> {
     );
   }
 
-  Widget _buildSpotlightHero(BuildContext context, Video track, List<Video> queue) {
-    final coverUrl = track.covers.isNotEmpty ? track.covers.first : track.thumbnail;
+  Widget _buildSpotlightHero(
+    BuildContext context,
+    Video track,
+    List<Video> queue,
+  ) {
+    final coverUrl = track.covers.isNotEmpty
+        ? track.covers.first
+        : track.thumbnail;
     return Container(
       margin: const EdgeInsets.fromLTRB(20, 4, 20, 16),
       padding: const EdgeInsets.all(16),
@@ -341,7 +397,9 @@ class _MusicPageState extends ConsumerState<MusicPage> {
                     shape: BoxShape.circle,
                     color: Colors.black,
                     border: Border.all(color: Colors.white24, width: 2),
-                    boxShadow: const [BoxShadow(color: Colors.black45, blurRadius: 8)],
+                    boxShadow: const [
+                      BoxShadow(color: Colors.black45, blurRadius: 8),
+                    ],
                   ),
                   child: Center(
                     child: Container(
@@ -362,7 +420,10 @@ class _MusicPageState extends ConsumerState<MusicPage> {
                   width: 88,
                   height: 88,
                   child: coverUrl.isNotEmpty
-                      ? CachedNetworkImage(imageUrl: coverUrl, fit: BoxFit.cover)
+                      ? CachedNetworkImage(
+                          imageUrl: coverUrl,
+                          fit: BoxFit.cover,
+                        )
                       : Container(color: AppColors.music),
                 ),
               ),
@@ -375,14 +436,22 @@ class _MusicPageState extends ConsumerState<MusicPage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
                   decoration: BoxDecoration(
                     color: AppColors.brandOrange,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Text(
                     'SPOTLIGHT RELEASE',
-                    style: TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.w900, letterSpacing: 0.8),
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.8,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 6),
@@ -390,19 +459,30 @@ class _MusicPageState extends ConsumerState<MusicPage> {
                   track.title,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: context.textPrimary, fontSize: 15, fontWeight: FontWeight.w800),
+                  style: TextStyle(
+                    color: context.textPrimary,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
                 Text(
-                  track.artist?.isNotEmpty == true ? track.artist! : track.creator,
+                  track.artist?.isNotEmpty == true
+                      ? track.artist!
+                      : track.creator,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: context.textSecondary, fontSize: 12),
                 ),
                 const SizedBox(height: 10),
                 GestureDetector(
-                  onTap: () => ref.read(musicPlayerServiceProvider).playQueue(queue, startIndex: 0),
+                  onTap: () => ref
+                      .read(musicPlayerServiceProvider)
+                      .playQueue(queue, startIndex: 0),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 6,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.brandOrange,
                       borderRadius: BorderRadius.circular(20),
@@ -410,9 +490,20 @@ class _MusicPageState extends ConsumerState<MusicPage> {
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.play_arrow_rounded, color: Colors.white, size: 16),
+                        Icon(
+                          Icons.play_arrow_rounded,
+                          color: Colors.white,
+                          size: 16,
+                        ),
                         SizedBox(width: 4),
-                        Text('Play Now', style: TextStyle(color: Colors.white, fontSize: 11.5, fontWeight: FontWeight.bold)),
+                        Text(
+                          'Play Now',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -430,16 +521,36 @@ class _MusicPageState extends ConsumerState<MusicPage> {
       padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
       child: Text(
         title,
-        style: TextStyle(color: context.textPrimary, fontSize: 17, fontWeight: FontWeight.w800, letterSpacing: -0.3),
+        style: TextStyle(
+          color: context.textPrimary,
+          fontSize: 17,
+          fontWeight: FontWeight.w800,
+          letterSpacing: -0.3,
+        ),
       ),
     );
   }
 
   Widget _buildQuickAccessRow(BuildContext context) {
     final items = [
-      (icon: Icons.favorite_rounded, label: 'Liked Songs', color: const Color(0xFFDB2777), onTap: () => context.push('/music/liked')),
-      (icon: Icons.playlist_play_rounded, label: 'Playlists', color: AppColors.brandOrange, onTap: () => context.push('/playlists')),
-      (icon: Icons.download_done_rounded, label: 'Downloaded', color: const Color(0xFF16A34A), onTap: () => context.push('/downloads')),
+      (
+        icon: Icons.favorite_rounded,
+        label: 'Liked Songs',
+        color: const Color(0xFFDB2777),
+        onTap: () => context.push('/music/liked'),
+      ),
+      (
+        icon: Icons.playlist_play_rounded,
+        label: 'Playlists',
+        color: AppColors.brandOrange,
+        onTap: () => context.push('/playlists'),
+      ),
+      (
+        icon: Icons.download_done_rounded,
+        label: 'Downloaded',
+        color: const Color(0xFF16A34A),
+        onTap: () => context.push('/downloads'),
+      ),
     ];
 
     return SizedBox(
@@ -461,7 +572,11 @@ class _MusicPageState extends ConsumerState<MusicPage> {
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(color: context.borderSubtle),
                 boxShadow: [
-                  BoxShadow(color: item.color.withValues(alpha: 0.14), blurRadius: 18, offset: const Offset(0, 8)),
+                  BoxShadow(
+                    color: item.color.withValues(alpha: 0.14),
+                    blurRadius: 18,
+                    offset: const Offset(0, 8),
+                  ),
                 ],
               ),
               child: Row(
@@ -469,7 +584,10 @@ class _MusicPageState extends ConsumerState<MusicPage> {
                   Container(
                     width: 38,
                     height: 38,
-                    decoration: BoxDecoration(color: item.color.withValues(alpha: 0.16), shape: BoxShape.circle),
+                    decoration: BoxDecoration(
+                      color: item.color.withValues(alpha: 0.16),
+                      shape: BoxShape.circle,
+                    ),
                     child: Icon(item.icon, color: item.color, size: 18),
                   ),
                   const SizedBox(width: 10),
@@ -478,7 +596,12 @@ class _MusicPageState extends ConsumerState<MusicPage> {
                       item.label,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: context.textPrimary, fontSize: 12.5, fontWeight: FontWeight.w700, height: 1.2),
+                      style: TextStyle(
+                        color: context.textPrimary,
+                        fontSize: 12.5,
+                        fontWeight: FontWeight.w700,
+                        height: 1.2,
+                      ),
                     ),
                   ),
                 ],
@@ -503,7 +626,12 @@ class _MusicPageState extends ConsumerState<MusicPage> {
           final coverUrl = t.covers.isNotEmpty ? t.covers.first : t.thumbnail;
           return SizedBox(
             width: 130,
-            child: _TrackShelfCard(track: t, queue: tracks, index: i, coverUrl: coverUrl),
+            child: _TrackShelfCard(
+              track: t,
+              queue: tracks,
+              index: i,
+              coverUrl: coverUrl,
+            ),
           );
         },
       ),
@@ -512,7 +640,9 @@ class _MusicPageState extends ConsumerState<MusicPage> {
 
   Widget _buildGenreGrid(BuildContext context, List<Video> tracks) {
     final groups = _groupByGenre(tracks);
-    final present = _genreOrder.where((g) => (groups[g]?.isNotEmpty ?? false)).toList();
+    final present = _genreOrder
+        .where((g) => (groups[g]?.isNotEmpty ?? false))
+        .toList();
     if (present.isEmpty) return const SizedBox.shrink();
 
     return Padding(
@@ -529,17 +659,22 @@ class _MusicPageState extends ConsumerState<MusicPage> {
         itemCount: present.length,
         itemBuilder: (context, i) {
           final genre = present[i];
-          final color = _genreColors[_genreOrder.indexOf(genre) % _genreColors.length];
+          final color =
+              _genreColors[_genreOrder.indexOf(genre) % _genreColors.length];
           final count = groups[genre]!.length;
           return GestureDetector(
-            onTap: () => context.push('/music/genre/${Uri.encodeComponent(genre)}'),
+            onTap: () =>
+                context.push('/music/genre/${Uri.encodeComponent(genre)}'),
             child: Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
-                  colors: [color.withValues(alpha: 0.85), color.withValues(alpha: 0.45)],
+                  colors: [
+                    color.withValues(alpha: 0.85),
+                    color.withValues(alpha: 0.45),
+                  ],
                 ),
                 borderRadius: BorderRadius.circular(16),
               ),
@@ -549,11 +684,19 @@ class _MusicPageState extends ConsumerState<MusicPage> {
                 children: [
                   Text(
                     genre,
-                    style: const TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.w800),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w800,
+                    ),
                   ),
                   Text(
                     '$count track${count == 1 ? '' : 's'}',
-                    style: TextStyle(color: Colors.white.withValues(alpha: 0.85), fontSize: 11, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      color: Colors.white.withValues(alpha: 0.85),
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ],
               ),
@@ -564,7 +707,10 @@ class _MusicPageState extends ConsumerState<MusicPage> {
     );
   }
 
-  Widget _buildArtistsRow(BuildContext context, List<({String username, String name, String avatar})> artists) {
+  Widget _buildArtistsRow(
+    BuildContext context,
+    List<({String username, String name, String avatar})> artists,
+  ) {
     return SizedBox(
       height: 100,
       child: ListView.separated(
@@ -575,7 +721,8 @@ class _MusicPageState extends ConsumerState<MusicPage> {
         itemBuilder: (context, i) {
           final a = artists[i];
           return GestureDetector(
-            onTap: () => context.push('/channel/${Uri.encodeComponent(a.username)}'),
+            onTap: () =>
+                context.push('/channel/${Uri.encodeComponent(a.username)}'),
             child: SizedBox(
               width: 72,
               child: Column(
@@ -589,7 +736,8 @@ class _MusicPageState extends ConsumerState<MusicPage> {
                           ? CachedNetworkImage(
                               imageUrl: a.avatar,
                               fit: BoxFit.cover,
-                              errorWidget: (context, url, error) => _artistFallback(),
+                              errorWidget: (context, url, error) =>
+                                  _artistFallback(),
                             )
                           : _artistFallback(),
                     ),
@@ -599,7 +747,11 @@ class _MusicPageState extends ConsumerState<MusicPage> {
                     a.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
-                    style: TextStyle(color: context.textPrimary, fontSize: 11, fontWeight: FontWeight.w600),
+                    style: TextStyle(
+                      color: context.textPrimary,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ],
               ),
@@ -626,7 +778,14 @@ class _MusicPageState extends ConsumerState<MusicPage> {
           children: [
             Icon(Icons.music_note_outlined, size: 56, color: context.textDim),
             const SizedBox(height: 16),
-            Text('No music yet', style: TextStyle(color: context.textPrimary, fontSize: 16, fontWeight: FontWeight.w700)),
+            Text(
+              'No music yet',
+              style: TextStyle(
+                color: context.textPrimary,
+                fontSize: 16,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
             const SizedBox(height: 6),
             Text(
               'Tracks uploaded by creators will show up here.',
@@ -646,14 +805,21 @@ class _TrackShelfCard extends ConsumerWidget {
   final int index;
   final String coverUrl;
 
-  const _TrackShelfCard({required this.track, required this.queue, required this.index, required this.coverUrl});
+  const _TrackShelfCard({
+    required this.track,
+    required this.queue,
+    required this.index,
+    required this.coverUrl,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return GestureDetector(
       onTap: track.videoId.isEmpty
           ? null
-          : () => ref.read(musicPlayerServiceProvider).playQueue(queue, startIndex: index),
+          : () => ref
+                .read(musicPlayerServiceProvider)
+                .playQueue(queue, startIndex: index),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -665,8 +831,16 @@ class _TrackShelfCard extends ConsumerWidget {
               child: coverUrl.isNotEmpty
                   ? CachedNetworkImage(imageUrl: coverUrl, fit: BoxFit.cover)
                   : Container(
-                      decoration: const BoxDecoration(gradient: LinearGradient(colors: [Color(0xFFE8590C), Color(0xFF1E1E1E)])),
-                      child: const Icon(Icons.music_note_rounded, color: Colors.white70, size: 32),
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xFFE8590C), Color(0xFF1E1E1E)],
+                        ),
+                      ),
+                      child: const Icon(
+                        Icons.music_note_rounded,
+                        color: Colors.white70,
+                        size: 32,
+                      ),
                     ),
             ),
           ),
@@ -675,7 +849,11 @@ class _TrackShelfCard extends ConsumerWidget {
             track.title.isEmpty ? 'Untitled track' : track.title,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: TextStyle(color: context.textPrimary, fontSize: 12.5, fontWeight: FontWeight.w700),
+            style: TextStyle(
+              color: context.textPrimary,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+            ),
           ),
           Text(
             track.artist?.isNotEmpty == true ? track.artist! : track.creator,

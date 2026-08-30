@@ -6,6 +6,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../models/video.dart';
 import '../../../../services/music_player_service.dart';
+import '../../../../services/like_service.dart';
 import '../../../watch/presentation/widgets/video_options_sheet.dart';
 import 'mini_equalizer.dart';
 
@@ -17,6 +18,7 @@ import 'mini_equalizer.dart';
 /// Liked Songs screens.
 class MusicTrackTile extends ConsumerWidget {
   final Video track;
+
   /// The full ordered list this tile belongs to — tapping starts playback
   /// of this whole list from this track, so next/previous inside Now
   /// Playing moves through the same list the person was browsing.
@@ -33,8 +35,12 @@ class MusicTrackTile extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final player = ref.watch(musicPlayerServiceProvider);
-    final isCurrent = player.currentTrack?.videoId == track.videoId && track.videoId.isNotEmpty;
-    final coverUrl = track.covers.isNotEmpty ? track.covers.first : track.thumbnail;
+    final isCurrent =
+        player.currentTrack?.videoId == track.videoId &&
+        track.videoId.isNotEmpty;
+    final coverUrl = track.covers.isNotEmpty
+        ? track.covers.first
+        : track.thumbnail;
 
     return Material(
       color: Colors.transparent,
@@ -42,7 +48,9 @@ class MusicTrackTile extends ConsumerWidget {
         borderRadius: BorderRadius.circular(14),
         onTap: track.videoId.isEmpty
             ? null
-            : () => ref.read(musicPlayerServiceProvider).playQueue(queue, startIndex: index),
+            : () => ref
+                  .read(musicPlayerServiceProvider)
+                  .playQueue(queue, startIndex: index),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
           child: Row(
@@ -59,14 +67,18 @@ class MusicTrackTile extends ConsumerWidget {
                           ? CachedNetworkImage(
                               imageUrl: coverUrl,
                               fit: BoxFit.cover,
-                              errorWidget: (context, url, error) => _fallbackArt(context),
+                              errorWidget: (context, url, error) =>
+                                  _fallbackArt(context),
                             )
                           : _fallbackArt(context),
                       if (isCurrent)
                         Container(
                           color: Colors.black.withValues(alpha: 0.45),
                           child: Center(
-                            child: MiniEqualizer(playing: player.isPlaying, height: 18),
+                            child: MiniEqualizer(
+                              playing: player.isPlaying,
+                              height: 18,
+                            ),
                           ),
                         ),
                     ],
@@ -83,17 +95,24 @@ class MusicTrackTile extends ConsumerWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: isCurrent ? AppColors.brandOrangeLight : context.textPrimary,
+                        color: isCurrent
+                            ? AppColors.brandOrangeLight
+                            : context.textPrimary,
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      (track.artist?.isNotEmpty == true ? track.artist! : track.creator),
+                      (track.artist?.isNotEmpty == true
+                          ? track.artist!
+                          : track.creator),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: context.textSecondary, fontSize: 12),
+                      style: TextStyle(
+                        color: context.textSecondary,
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 ),
@@ -101,13 +120,29 @@ class MusicTrackTile extends ConsumerWidget {
               if (track.duration.isNotEmpty) ...[
                 Text(
                   track.duration,
-                  style: TextStyle(color: context.textDim, fontSize: 11, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    color: context.textDim,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
                 const SizedBox(width: 4),
               ],
+              _MusicReactionButtons(videoId: track.videoId),
               IconButton(
-                icon: Icon(Icons.more_vert, color: context.textSecondary, size: 20),
-                onPressed: track.videoId.isEmpty ? null : () => showMusicTrackQuickActions(context, ref, track: track, queue: queue),
+                icon: Icon(
+                  Icons.more_vert,
+                  color: context.textSecondary,
+                  size: 20,
+                ),
+                onPressed: track.videoId.isEmpty
+                    ? null
+                    : () => showMusicTrackQuickActions(
+                        context,
+                        ref,
+                        track: track,
+                        queue: queue,
+                      ),
               ),
             ],
           ),
@@ -128,6 +163,93 @@ class MusicTrackTile extends ConsumerWidget {
       child: const Center(
         child: Icon(Icons.music_note_rounded, color: Colors.white70, size: 22),
       ),
+    );
+  }
+}
+
+class _MusicReactionButtons extends ConsumerStatefulWidget {
+  final String videoId;
+  const _MusicReactionButtons({required this.videoId});
+
+  @override
+  ConsumerState<_MusicReactionButtons> createState() =>
+      _MusicReactionButtonsState();
+}
+
+class _MusicReactionButtonsState extends ConsumerState<_MusicReactionButtons> {
+  String? _reaction;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    final status = await ref
+        .read(likeServiceProvider)
+        .getStatus(widget.videoId);
+    if (mounted) setState(() => _reaction = status['myReaction']?.toString());
+  }
+
+  Future<void> _react(String value) async {
+    if (_busy) return;
+    final previous = _reaction;
+    final next = previous == value ? null : value;
+    setState(() {
+      _reaction = next;
+      _busy = true;
+    });
+    final ok = await ref
+        .read(likeServiceProvider)
+        .react(widget.videoId, next ?? 'remove');
+    if (mounted) {
+      setState(() {
+        if (!ok) _reaction = previous;
+        _busy = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 28, minHeight: 32),
+          tooltip: 'Like',
+          icon: Icon(
+            _reaction == 'like'
+                ? Icons.thumb_up_rounded
+                : Icons.thumb_up_outlined,
+            size: 17,
+            color: _reaction == 'like'
+                ? AppColors.brandOrange
+                : context.textDim,
+          ),
+          onPressed: () => _react('like'),
+        ),
+        IconButton(
+          visualDensity: VisualDensity.compact,
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(minWidth: 28, minHeight: 32),
+          tooltip: 'Dislike',
+          icon: Icon(
+            _reaction == 'dislike'
+                ? Icons.thumb_down_rounded
+                : Icons.thumb_down_outlined,
+            size: 17,
+            color: _reaction == 'dislike'
+                ? AppColors.brandOrange
+                : context.textDim,
+          ),
+          onPressed: () => _react('dislike'),
+        ),
+      ],
     );
   }
 }
@@ -163,7 +285,10 @@ void showMusicTrackQuickActions(
               width: 40,
               height: 4,
               margin: const EdgeInsets.only(bottom: 14),
-              decoration: BoxDecoration(color: ctx.textDim.withValues(alpha: 0.4), borderRadius: BorderRadius.circular(2)),
+              decoration: BoxDecoration(
+                color: ctx.textDim.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -174,9 +299,20 @@ void showMusicTrackQuickActions(
                     child: SizedBox(
                       width: 40,
                       height: 40,
-                      child: (track.covers.isNotEmpty ? track.covers.first : track.thumbnail).isNotEmpty
-                          ? CachedNetworkImage(imageUrl: track.covers.isNotEmpty ? track.covers.first : track.thumbnail, fit: BoxFit.cover)
-                          : Container(color: AppColors.music.withValues(alpha: 0.25)),
+                      child:
+                          (track.covers.isNotEmpty
+                                  ? track.covers.first
+                                  : track.thumbnail)
+                              .isNotEmpty
+                          ? CachedNetworkImage(
+                              imageUrl: track.covers.isNotEmpty
+                                  ? track.covers.first
+                                  : track.thumbnail,
+                              fit: BoxFit.cover,
+                            )
+                          : Container(
+                              color: AppColors.music.withValues(alpha: 0.25),
+                            ),
                     ),
                   ),
                   const SizedBox(width: 12),
@@ -189,13 +325,22 @@ void showMusicTrackQuickActions(
                           track.title.isEmpty ? 'Untitled track' : track.title,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: ctx.textPrimary, fontSize: 14, fontWeight: FontWeight.w800),
+                          style: TextStyle(
+                            color: ctx.textPrimary,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                         Text(
-                          track.artist?.isNotEmpty == true ? track.artist! : track.creator,
+                          track.artist?.isNotEmpty == true
+                              ? track.artist!
+                              : track.creator,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: TextStyle(color: ctx.textSecondary, fontSize: 12),
+                          style: TextStyle(
+                            color: ctx.textSecondary,
+                            fontSize: 12,
+                          ),
                         ),
                       ],
                     ),
@@ -224,7 +369,12 @@ void showMusicTrackQuickActions(
                 _showQueuedSnack(context, 'Added to queue');
               },
             ),
-            Divider(color: ctx.borderSubtle, height: 20, indent: 16, endIndent: 16),
+            Divider(
+              color: ctx.borderSubtle,
+              height: 20,
+              indent: 16,
+              endIndent: 16,
+            ),
             _quickActionTile(
               context: ctx,
               icon: Icons.more_horiz_rounded,
@@ -258,7 +408,14 @@ Widget _quickActionTile({
           children: [
             Icon(icon, color: AppColors.brandOrangeLight, size: 20),
             const SizedBox(width: 14),
-            Text(label, style: TextStyle(color: context.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+            Text(
+              label,
+              style: TextStyle(
+                color: context.textPrimary,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
         ),
       ),
@@ -271,7 +428,9 @@ void _showQueuedSnack(BuildContext context, String message) {
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
       content: Text(message),
-      backgroundColor: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+      backgroundColor: context.isDark
+          ? AppColors.surfaceDark
+          : AppColors.surfaceLight,
       duration: const Duration(seconds: 2),
     ),
   );

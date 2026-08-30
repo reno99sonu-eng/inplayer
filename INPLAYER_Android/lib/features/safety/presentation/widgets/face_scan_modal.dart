@@ -7,9 +7,7 @@ import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../providers/kid_mode_provider.dart';
 import '../../../../services/face_age_detector_service.dart';
-import 'parental_pin_dialog.dart';
 
 class FaceScanModal extends ConsumerStatefulWidget {
   final bool startupScan;
@@ -71,6 +69,9 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal>
   bool _isProcessing = false;
   bool _hasPermissionError = false;
   FaceScanResult? _scanResult;
+  AgeCategory _candidateCategory = AgeCategory.unknown;
+  int _candidateFrames = 0;
+  double _candidateConfidence = 0;
   Timer? _startupTimeout;
   String _statusText = 'Center your face in the circle';
 
@@ -143,14 +144,37 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal>
       _processCameraImage(image)
           .then((result) {
             if (result != null && mounted) {
-              if (result.category != AgeCategory.unknown) {
+              if (result.category != AgeCategory.unknown &&
+                  result.confidence >= .75) {
+                if (result.category == _candidateCategory) {
+                  _candidateFrames++;
+                  _candidateConfidence += result.confidence;
+                } else {
+                  _candidateCategory = result.category;
+                  _candidateFrames = 1;
+                  _candidateConfidence = result.confidence;
+                }
+                if (_candidateFrames < 4) {
+                  setState(
+                    () => _statusText =
+                        'Hold still… checking $_candidateFrames/4',
+                  );
+                  return;
+                }
+                final stableResult = FaceScanResult(
+                  category: _candidateCategory,
+                  confidence: _candidateConfidence / _candidateFrames,
+                  description: result.description,
+                  boundingBox: result.boundingBox,
+                  headEulerAngleY: result.headEulerAngleY,
+                );
                 setState(() {
-                  _scanResult = result;
-                  _statusText = result.isChild
+                  _scanResult = stableResult;
+                  _statusText = stableResult.isChild
                       ? 'Child Detected (<13)'
                       : 'Adult/Teen Detected (13+)';
                 });
-                _onScanComplete(result);
+                _onScanComplete(stableResult);
               }
             }
           })
@@ -222,13 +246,6 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal>
     HapticFeedback.mediumImpact();
     await Future.delayed(const Duration(milliseconds: 1200));
     if (!mounted) return;
-
-    final notifier = ref.read(kidModeProvider.notifier);
-    if (result.isChild) {
-      await notifier.setKidMode(true);
-    } else {
-      await notifier.setKidMode(false);
-    }
 
     if (mounted) {
       Navigator.of(context, rootNavigator: true).pop(result);
@@ -346,22 +363,13 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal>
           // Status indicator
           _buildStatusBadge(context),
           const SizedBox(height: 16),
-          // Manual Fallback Toggle
+          // A face result is only a suggestion. The caller applies it through
+          // the account's verified six-digit content passkey.
           TextButton.icon(
-            onPressed: () {
-              Navigator.of(context).pop();
-              final currentKid = ref.read(kidModeProvider).isEnabled;
-              if (currentKid) {
-                // Prompt PIN to exit
-                ParentalPinDialog.show(context);
-              } else {
-                // Directly switch to Kids Mode
-                ref.read(kidModeProvider.notifier).setKidMode(true);
-              }
-            },
-            icon: const Icon(Icons.pin_outlined, size: 16),
+            onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
+            icon: const Icon(Icons.close_rounded, size: 16),
             label: const Text(
-              'Switch mode with Parental PIN instead',
+              'Cancel scan',
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
             ),
           ),

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The supplied peacock image is intentionally almost imperceptible on the
+     launcher; the dark base keeps the icon legible on every mask. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/ic_launcher_background" />
+    <item android:alpha="0.10">
+        <bitmap
+            android:src="@drawable/launcher_peacock"
+            android:gravity="fill" />
+    </item>
+</layer-list>

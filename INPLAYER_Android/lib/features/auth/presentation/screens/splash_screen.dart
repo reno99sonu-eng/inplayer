@@ -314,12 +314,21 @@ class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
             child: Stack(
               fit: StackFit.expand,
               children: [
-                RepaintBoundary(
+                Positioned.fill(
                   child: AnimatedBuilder(
                     animation: _controller,
-                    builder: (context, _) => CustomPaint(
-                      painter: PeacockFeatherPainter(
-                        animationProgress: _controller.value,
+                    builder: (context, child) => Transform.scale(
+                      // A restrained, continuous push-in across the same
+                      // timeline as the existing logo and sound sting.
+                      scale: 1.0 + (_controller.value * 0.10),
+                      alignment: Alignment.center,
+                      child: child,
+                    ),
+                    child: Opacity(
+                      opacity: 0.28,
+                      child: Image.asset(
+                        'assets/images/my_peacock_feather.png',
+                        fit: BoxFit.cover,
                       ),
                     ),
                   ),

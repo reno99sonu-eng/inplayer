@@ -9,11 +9,13 @@ import 'core/router/app_router.dart';
 import 'features/auth/presentation/screens/splash_screen.dart';
 import 'features/auth/presentation/screens/biometric_lock_screen.dart';
 import 'features/safety/presentation/widgets/face_scan_modal.dart';
+import 'features/home/presentation/widgets/content_access_drawer_section.dart';
 import 'features/home/presentation/widgets/floating_ai_button.dart';
 import 'services/content_access_service.dart';
 import 'services/geo_service.dart';
 import 'services/video_service.dart';
 import 'providers/kid_mode_provider.dart';
+import 'providers/auth_provider.dart';
 import 'services/platform_update_service.dart';
 import 'services/device_location_service.dart';
 import 'providers/theme_provider.dart';
@@ -136,27 +138,67 @@ class _InplayerAppState extends ConsumerState<InplayerApp> {
     final result = await FaceScanModal.show(context, startupScan: true);
     if (!mounted) return;
     final previousAccess = await previousAccessFuture;
+    if (!mounted) return;
 
-    // A child is restricted to Kids content. Adults and an unavailable/cancelled
-    // scan use the safer family mode (18+ hidden). Both writes are accepted
-    // signed-out by the website API, so this runs for every launch.
-    final mode = result?.isChild == true
+    // A mode transition is always server-authorised with the account's
+    // six-digit content passkey. The face estimate only selects the desired
+    // filter; it never bypasses that authorization or changes local state.
+    var mode = result?.isChild == true
         ? AudienceMode.kids
         : result?.isChild == false && previousAccess?.mode == AudienceMode.all
         ? AudienceMode.all
         : AudienceMode.family;
+    var applied = const ContentAccessResult(success: true);
+    if (previousAccess?.mode != mode) {
+      // Auth hydration runs in parallel with the branded splash. Do not treat
+      // its transient initial/loading state as signed-out and accidentally
+      // skip the passkey gate for an already signed-in account.
+      for (var attempt = 0; attempt < 50; attempt++) {
+        final authState = ref.read(authStateProvider);
+        if (authState is! AuthStateInitial && authState is! AuthStateLoading) {
+          break;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 100));
+        if (!mounted) return;
+      }
+      final signedIn = ref.read(authStateProvider) is AuthStateAuthenticated;
+      if (!signedIn) {
+        // There is no account passkey to verify while signed out. Keep the
+        // server's existing safe state rather than making a local-only claim.
+        mode = previousAccess?.mode ?? AudienceMode.family;
+        applied = const ContentAccessResult(success: false);
+      } else {
+        final request = await showContentAccessPasskeyDialog(
+          context,
+          needsNewPasskey: !(previousAccess?.hasPasskey ?? false),
+        );
+        if (!mounted) return;
+        if (request == null) {
+          mode = previousAccess?.mode ?? AudienceMode.family;
+          applied = const ContentAccessResult(success: false);
+        } else {
+          if (request.createPasskey) {
+            final created = await accessService.setPasskey(request.passkey);
+            if (!created.success) {
+              mode = previousAccess?.mode ?? AudienceMode.family;
+              applied = created;
+            }
+          }
+          if (applied.success) {
+            applied = await accessService.setMode(
+              mode,
+              passkey: request.passkey,
+            );
+            if (!applied.success) {
+              mode = previousAccess?.mode ?? AudienceMode.family;
+            }
+          }
+        }
+      }
+    }
     await ref
         .read(kidModeProvider.notifier)
-        .setKidMode(mode == AudienceMode.kids);
-    final applied = previousAccess?.mode == mode
-        ? const ContentAccessResult(success: true)
-        : await accessService.setMode(mode);
-    if (!applied.success && mode == AudienceMode.kids) {
-      // Never leave an unverified local child result pretending the server was
-      // filtered. Fall back to the server's restrictive default instead.
-      await accessService.resetMode();
-      await ref.read(kidModeProvider.notifier).setKidMode(false);
-    }
+        .setKidMode(applied.success && mode == AudienceMode.kids);
     VideoService.clearAudienceCaches();
     ref.read(contentAccessRevisionProvider.notifier).state++;
     if (mounted) setState(() => _startupScanComplete = true);

@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -5,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../providers/auth_provider.dart';
+import '../../../../providers/kid_mode_provider.dart';
 import '../../../../services/content_access_service.dart';
 import '../../../../services/video_service.dart';
 import '../../../auth/presentation/widgets/auth_modals.dart';
@@ -16,6 +19,7 @@ import '../../../auth/presentation/widgets/auth_modals.dart';
 /// * 18+ off = `family`
 /// * Kids on = `kids`
 /// * Kids off = `family`
+/// Every transition is confirmed with the same account-owned six-digit passkey.
 ///
 /// The passkey sheet is deliberately independent from this drawer state.
 /// It only returns an input after its route is completely popped; network
@@ -44,6 +48,41 @@ class ContentAccessDrawerSection extends ConsumerStatefulWidget {
 final contentAccessSignedInProvider = Provider<bool>((ref) {
   return ref.watch(authStateProvider) is AuthStateAuthenticated;
 });
+
+/// Shared passkey prompt for startup age filtering and the drawer. It returns
+/// only after the dialog's reverse transition has completed, so callers can
+/// safely update providers and server-backed filters.
+Future<({String passkey, bool createPasskey})?> showContentAccessPasskeyDialog(
+  BuildContext context, {
+  required bool needsNewPasskey,
+}) async {
+  final route = RawDialogRoute<_AdultUnlockRequest>(
+    barrierDismissible: false,
+    barrierLabel: 'Content access passkey',
+    barrierColor: Colors.black.withValues(alpha: .68),
+    transitionDuration: const Duration(milliseconds: 180),
+    pageBuilder: (context, animation, secondaryAnimation) =>
+        _AdultPasskeySheet(needsNewPasskey: needsNewPasskey),
+    transitionBuilder: (context, animation, secondaryAnimation, child) {
+      final curve = CurvedAnimation(
+        parent: animation,
+        curve: Curves.easeOutCubic,
+      );
+      return FadeTransition(
+        opacity: curve,
+        child: ScaleTransition(
+          scale: Tween<double>(begin: .97, end: 1).animate(curve),
+          child: child,
+        ),
+      );
+    },
+  );
+  final navigator = Navigator.of(context, rootNavigator: true);
+  final result = await navigator.push(route);
+  await route.completed;
+  if (result == null) return null;
+  return (passkey: result.passkey, createPasskey: result.createPasskey);
+}
 
 class _ContentAccessDrawerSectionState
     extends ConsumerState<ContentAccessDrawerSection> {
@@ -77,28 +116,27 @@ class _ContentAccessDrawerSectionState
     VideoService.clearAudienceCaches();
     ref.read(contentAccessRevisionProvider.notifier).state++;
     setState(() => _mode = mode);
+    unawaited(
+      ref.read(kidModeProvider.notifier).setKidMode(mode == AudienceMode.kids),
+    );
+  }
+
+  Future<void> _exitKidsMode() async {
+    await _setNarrowMode(AudienceMode.family);
+  }
+
+  Future<void> _enableKidsMode() async {
+    await _setNarrowMode(AudienceMode.kids);
   }
 
   Future<void> _setNarrowMode(AudienceMode next) async {
     if (_loading || _busy) return;
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-
-    final result = await ref.read(contentAccessServiceProvider).setMode(next);
-    if (!mounted) return;
-    setState(() => _busy = false);
-    if (result.success) {
-      _applyAudienceChange(next);
-    } else {
-      setState(
-        () => _error = result.error ?? 'Could not update content access.',
-      );
-    }
+    await _requestAdultMode(next);
   }
 
-  Future<void> _requestAdultMode() async {
+  Future<void> _requestAdultMode([
+    AudienceMode target = AudienceMode.all,
+  ]) async {
     if (_loading || _busy) return;
     if (!_signedIn) {
       showSignInModal(context);
@@ -112,7 +150,7 @@ class _ContentAccessDrawerSectionState
     // including when the user presses Cancel.
     final route = RawDialogRoute<_AdultUnlockRequest>(
       barrierDismissible: false,
-      barrierLabel: '18+ content passkey',
+      barrierLabel: 'Content access passkey',
       barrierColor: Colors.black.withValues(alpha: .68),
       transitionDuration: const Duration(milliseconds: 180),
       pageBuilder: (context, animation, secondaryAnimation) =>
@@ -158,21 +196,18 @@ class _ContentAccessDrawerSectionState
       if (mounted) setState(() => _hasPasskey = true);
     }
 
-    final unlocked = await service.setMode(
-      AudienceMode.all,
-      passkey: request.passkey,
-    );
+    final unlocked = await service.setMode(target, passkey: request.passkey);
     if (!mounted) return;
     setState(() => _busy = false);
     if (unlocked.success) {
       setState(() => _hasPasskey = true);
-      _applyAudienceChange(AudienceMode.all);
+      _applyAudienceChange(target);
     } else {
       // A stale cached `hasPasskey` must not trap someone in a broken flow.
       // The server's 409 is authoritative, so offer create-passkey next time.
       setState(() {
         if (unlocked.needsPasskey) _hasPasskey = false;
-        _error = unlocked.error ?? 'Could not unlock 18+ content.';
+        _error = unlocked.error ?? 'Could not update content access.';
       });
     }
   }
@@ -223,8 +258,7 @@ class _ContentAccessDrawerSectionState
               : 'Limit InPlayer to Kids videos',
           value: kidsOn,
           disabled: disabled,
-          onChanged: (enabled) =>
-              _setNarrowMode(enabled ? AudienceMode.kids : AudienceMode.family),
+          onChanged: (enabled) => enabled ? _enableKidsMode() : _exitKidsMode(),
         ),
         if (_error != null)
           Padding(
@@ -354,8 +388,8 @@ class _AdultPasskeySheetState extends State<_AdultPasskeySheet> {
                               const SizedBox(height: 4),
                               Text(
                                 widget.needsNewPasskey
-                                    ? 'Choose 6 digits to protect turning 18+ content on.'
-                                    : 'Enter your 6-digit passkey to show 18+ content.',
+                                    ? 'Choose 6 digits to protect every content-mode change.'
+                                    : 'Enter your 6-digit passkey to change the content filter.',
                                 style: TextStyle(
                                   color: textSecondary,
                                   fontSize: 12.5,

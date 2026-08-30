@@ -74,7 +74,9 @@ class FaceAgeDetectorService {
     return FaceScanResult(
       category: isChild ? AgeCategory.child : AgeCategory.teenOrAdult,
       confidence: confidence,
-      description: isChild ? 'Child profile detected (<13)' : 'Adult/Teen profile detected (13+)',
+      description: isChild
+          ? 'Child profile detected (<13)'
+          : 'Adult/Teen profile detected (13+)',
     );
   }
 
@@ -97,22 +99,19 @@ class FaceAgeDetectorService {
       final leftEye = face.landmarks[FaceLandmarkType.leftEye]?.position;
       final rightEye = face.landmarks[FaceLandmarkType.rightEye]?.position;
       final noseBase = face.landmarks[FaceLandmarkType.noseBase]?.position;
-      final bottomMouth = face.landmarks[FaceLandmarkType.bottomMouth]?.position;
+      final bottomMouth =
+          face.landmarks[FaceLandmarkType.bottomMouth]?.position;
 
-      if (leftEye == null || rightEye == null || noseBase == null || bottomMouth == null) {
-        final aspect = box.width / (box.height > 0 ? box.height : 1.0);
-        final fallback = classifyFaceMetrics(
-          roundnessRatio: aspect,
-          lowerFaceRatio: 0.38,
-          ocularProportion: 0.41,
-          isFacingFront: true,
-        );
-        return FaceScanResult(
-          category: fallback.category,
-          confidence: fallback.confidence,
-          description: fallback.description,
-          boundingBox: box,
-          headEulerAngleY: face.headEulerAngleY,
+      if (leftEye == null ||
+          rightEye == null ||
+          noseBase == null ||
+          bottomMouth == null) {
+        // A bounding box alone is not reliable enough to set a child/adult
+        // content policy. Wait for a frame with the required landmarks.
+        return const FaceScanResult(
+          category: AgeCategory.unknown,
+          confidence: 0,
+          description: 'Face landmarks not clear. Hold still and try again.',
         );
       }
 
@@ -120,7 +119,8 @@ class FaceAgeDetectorService {
       final eyeDistance = (leftEye.x - rightEye.x).abs();
       final lowerFaceHeight = (bottomMouth.y - eyeCenterY).toDouble();
       final totalFaceHeight = box.height.toDouble();
-      final lowerFaceRatio = lowerFaceHeight / (totalFaceHeight > 0 ? totalFaceHeight : 1.0);
+      final lowerFaceRatio =
+          lowerFaceHeight / (totalFaceHeight > 0 ? totalFaceHeight : 1.0);
       final roundnessRatio = box.width / (box.height > 0 ? box.height : 1.0);
       final ocularProportion = eyeDistance / (box.width > 0 ? box.width : 1.0);
       final isFacingFront = (face.headEulerAngleY ?? 0).abs() < 20;

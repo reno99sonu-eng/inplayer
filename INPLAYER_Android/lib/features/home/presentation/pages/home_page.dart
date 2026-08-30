@@ -33,7 +33,6 @@ import '../widgets/create_menu_popup.dart';
 import '../../../auth/presentation/widgets/auth_modals.dart';
 import '../../../../core/widgets/notification_permission_helper.dart';
 import '../../../../providers/kid_mode_provider.dart';
-import '../../../safety/presentation/widgets/parental_pin_dialog.dart';
 import '../../../../core/widgets/pattern_background.dart';
 import '../../../../core/widgets/user_avatar.dart';
 import '../../../../models/user.dart';
@@ -162,7 +161,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                   child: Material(
                     color: Colors.transparent,
                     child: InkWell(
-                      onTap: () => ParentalPinDialog.show(context),
+                      // Audience changes are account-level operations and
+                      // must go through the drawer's six-digit passkey flow.
+                      onTap: () => Scaffold.maybeOf(context)?.openDrawer(),
                       borderRadius: BorderRadius.circular(16),
                       child: Container(
                         padding: const EdgeInsets.symmetric(

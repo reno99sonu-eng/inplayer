@@ -8,7 +8,6 @@ import {
   AUDIENCE_COOKIE_MAX_AGE,
   DEFAULT_AUDIENCE_MODE,
   isValidPasskey,
-  modeRequiresPasskey,
   normalizeAudienceMode,
 } from "@/app/lib/contentAccess";
 
@@ -123,18 +122,6 @@ export async function POST(request: NextRequest) {
   // the hardest one to reach.
   //
   // Unlocking 18+ still falls through to the authenticated branch below.
-  if (action === "set_mode") {
-    const requestedMode = normalizeAudienceMode((body as { mode?: unknown }).mode);
-    if (!modeRequiresPasskey(requestedMode)) {
-      return audienceCookieResponse(requestedMode);
-    }
-  }
-
-  // Same reasoning: dropping back to the safe default only ever restricts.
-  if (action === "reset_mode") {
-    return audienceCookieResponse(DEFAULT_AUDIENCE_MODE);
-  }
-
   let user;
   try {
     user = await verifyAuth(request);
@@ -197,9 +184,11 @@ export async function POST(request: NextRequest) {
   // ── Unlock 18+ ─────────────────────────────────────────────────────
   // Only reached for modes modeRequiresPasskey() says are loosening —
   // every narrowing mode already returned above.
-  if (action === "set_mode") {
+  if (action === "set_mode" || action === "reset_mode") {
     const { passkey } = body as { passkey?: unknown };
-    const mode = normalizeAudienceMode((body as { mode?: unknown }).mode);
+    const mode = action === "reset_mode"
+      ? DEFAULT_AUDIENCE_MODE
+      : normalizeAudienceMode((body as { mode?: unknown }).mode);
 
     if (!existing) {
       return NextResponse.json(

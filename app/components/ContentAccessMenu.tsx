@@ -11,7 +11,6 @@ import {
   DEFAULT_AUDIENCE_MODE,
   PASSKEY_LENGTH,
   modeFromToggles,
-  modeRequiresPasskey,
   togglesFromMode,
   type AudienceMode,
 } from "@/app/lib/contentAccess";
@@ -134,29 +133,15 @@ export default function ContentAccessMenu() {
     if (busy || loading) return;
     setError(null);
 
-    if (modeRequiresPasskey(next)) {
-      if (!signedIn) {
-        openSignIn();
-        return;
-      }
-      setPasskey("");
-      setConfirmPasskey("");
-      setDialogError(null);
-      // Known from the GET, so the dialog opens straight into "create one"
-      // instead of bouncing off a 409 after they have already typed a code.
-      setNeedsNewPasskey(!hasPasskey);
-      setAskingFor(next);
+    if (!signedIn) {
+      openSignIn();
       return;
     }
-
-    setBusy(true);
-    try {
-      await applyMode(next);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Something went wrong.");
-    } finally {
-      setBusy(false);
-    }
+    setPasskey("");
+    setConfirmPasskey("");
+    setDialogError(null);
+    setNeedsNewPasskey(!hasPasskey);
+    setAskingFor(next);
   };
 
   const submitDialog = async () => {
@@ -250,8 +235,8 @@ export default function ContentAccessMenu() {
                   </h3>
                   <p className="mt-1 text-xs leading-5 text-slate-400 light:text-slate-600">
                     {needsNewPasskey
-                      ? "Pick 6 digits. You'll need them any time 18+ content is switched on, on any device."
-                      : "Enter your 6-digit passkey to show 18+ content."}
+                      ? "Pick 6 digits. You'll need them any time an audience mode is changed, on any device."
+                      : "Enter your 6-digit passkey to change the content filter."}
                   </p>
                 </div>
                 <button
@@ -318,7 +303,7 @@ export default function ContentAccessMenu() {
               {/* No "forgot your passkey" link needed any more: switching 18+
                   back OFF is itself unlocked, so nobody can get stranded. */}
               <p className="mt-2 text-center text-[11px] leading-4 text-slate-500">
-                Switching 18+ back off never needs the passkey.
+                The same passkey confirms every content-mode change.
               </p>
             </div>
           </div>,

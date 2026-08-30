@@ -37,7 +37,8 @@ class NowPlayingPage extends ConsumerStatefulWidget {
   ConsumerState<NowPlayingPage> createState() => _NowPlayingPageState();
 }
 
-class _NowPlayingPageState extends ConsumerState<NowPlayingPage> with SingleTickerProviderStateMixin {
+class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
+    with SingleTickerProviderStateMixin {
   late final AnimationController _glowController;
   final ScrollController _lyricsScroll = ScrollController();
   int _lastLyricIndex = -1;
@@ -47,7 +48,10 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> with SingleTick
   @override
   void initState() {
     super.initState();
-    _glowController = AnimationController(vsync: this, duration: const Duration(seconds: 3))..repeat(reverse: true);
+    _glowController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    )..repeat(reverse: true);
   }
 
   @override
@@ -58,7 +62,9 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> with SingleTick
   }
 
   void _scrollLyricsTo(int index) {
-    if (index == _lastLyricIndex || !_lyricsScroll.hasClients || index < 0) return;
+    if (index == _lastLyricIndex || !_lyricsScroll.hasClients || index < 0) {
+      return;
+    }
     _lastLyricIndex = index;
     const itemExtent = 46.0;
     final target = (index * itemExtent) - 120.0;
@@ -77,6 +83,17 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> with SingleTick
     if (mounted) setState(() {});
   }
 
+  Future<void> _toggleDislike(Video track) async {
+    final likeService = ref.read(likeServiceProvider);
+    final status = await likeService.getStatus(track.videoId);
+    final currentlyDisliked = status['myReaction'] == 'dislike';
+    await likeService.react(
+      track.videoId,
+      currentlyDisliked ? 'remove' : 'dislike',
+    );
+    if (mounted) setState(() {});
+  }
+
   Future<void> _handleDownload(Video track) async {
     if (_downloadBusy) return;
     setState(() => _downloadBusy = true);
@@ -92,22 +109,32 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> with SingleTick
       final downloadService = ref.read(downloadServiceProvider);
       final manager = ref.read(downloadManagerProvider);
 
-      if (manager.isDownloaded(track.videoId) || manager.taskFor(track.videoId) != null) {
+      if (manager.isDownloaded(track.videoId) ||
+          manager.taskFor(track.videoId) != null) {
         return;
       }
 
       final prep = await downloadService.prepareDownload(track.videoId);
       if (prep.status == 'unavailable' || prep.status == 'error') {
-        _showSnack(prep.error ?? "Couldn't prepare this track for offline listening right now.");
+        _showSnack(
+          prep.error ??
+              "Couldn't prepare this track for offline listening right now.",
+        );
         return;
       }
 
       final status = await downloadService.checkDownloadStatus(track.videoId);
       final rendition = status.renditions['audio-only'];
       if (status.downloadStatus == 'ready' && rendition != null) {
-        await manager.download(video: track, quality: 'audio-only', fileName: rendition);
+        await manager.download(
+          video: track,
+          quality: 'audio-only',
+          fileName: rendition,
+        );
       } else {
-        _showSnack("Still preparing this track for offline listening — try again in a moment.");
+        _showSnack(
+          "Still preparing this track for offline listening — try again in a moment.",
+        );
       }
     } catch (_) {
       _showSnack("Couldn't start the download. Please try again.");
@@ -119,7 +146,12 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> with SingleTick
   void _showSnack(String message) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight),
+      SnackBar(
+        content: Text(message),
+        backgroundColor: context.isDark
+            ? AppColors.surfaceDark
+            : AppColors.surfaceLight,
+      ),
     );
   }
 
@@ -138,24 +170,46 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> with SingleTick
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.workspace_premium_rounded, color: AppColors.brandGold, size: 30),
+            Icon(
+              Icons.workspace_premium_rounded,
+              color: AppColors.brandGold,
+              size: 30,
+            ),
             const SizedBox(height: 12),
-            Text('Offline listening is a Premium feature',
-                style: TextStyle(color: ctx.textPrimary, fontSize: 17, fontWeight: FontWeight.w800)),
+            Text(
+              'Offline listening is a Premium feature',
+              style: TextStyle(
+                color: ctx.textPrimary,
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
             const SizedBox(height: 8),
             Text(
               'Download tracks to listen without a connection with an InPlayer Premium plan.',
-              style: TextStyle(color: ctx.textSecondary, fontSize: 13, height: 1.4),
+              style: TextStyle(
+                color: ctx.textSecondary,
+                fontSize: 13,
+                height: 1.4,
+              ),
             ),
             const SizedBox(height: 20),
             ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: AppColors.brandOrange),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.brandOrange,
+              ),
               onPressed: () {
                 Navigator.pop(ctx);
                 Navigator.of(context, rootNavigator: true).pop();
                 context.push('/settings/plans');
               },
-              child: const Text('View Plans', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              child: const Text(
+                'View Plans',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ],
         ),
@@ -178,20 +232,42 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> with SingleTick
             return Container(
               decoration: BoxDecoration(
                 color: context.bgModal,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                borderRadius: const BorderRadius.vertical(
+                  top: Radius.circular(24),
+                ),
                 border: Border.all(color: context.borderSubtle),
               ),
               child: Column(
                 children: [
                   const SizedBox(height: 12),
-                  Container(width: 40, height: 4, decoration: BoxDecoration(color: context.textDim.withValues(alpha: 0.4), borderRadius: BorderRadius.circular(2))),
+                  Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: context.textDim.withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
                   Padding(
                     padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
                     child: Row(
                       children: [
-                        Text('Up Next', style: TextStyle(color: context.textPrimary, fontSize: 16, fontWeight: FontWeight.w800)),
+                        Text(
+                          'Up Next',
+                          style: TextStyle(
+                            color: context.textPrimary,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
                         const Spacer(),
-                        Text('${player.queue.length} tracks', style: TextStyle(color: context.textDim, fontSize: 12)),
+                        Text(
+                          '${player.queue.length} tracks',
+                          style: TextStyle(
+                            color: context.textDim,
+                            fontSize: 12,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -206,10 +282,15 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> with SingleTick
                     child: ReorderableListView.builder(
                       scrollController: scrollController,
                       buildDefaultDragHandles: false,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 4,
+                      ),
                       itemCount: player.queue.length,
                       onReorderItem: (oldIndex, newIndex) {
-                        ref.read(musicPlayerServiceProvider).reorderQueue(oldIndex, newIndex);
+                        ref
+                            .read(musicPlayerServiceProvider)
+                            .reorderQueue(oldIndex, newIndex);
                       },
                       itemBuilder: (context, i) {
                         final t = player.queue[i];
@@ -224,9 +305,22 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> with SingleTick
                             child: SizedBox(
                               width: 40,
                               height: 40,
-                              child: (t.covers.isNotEmpty ? t.covers.first : t.thumbnail).isNotEmpty
-                                  ? CachedNetworkImage(imageUrl: t.covers.isNotEmpty ? t.covers.first : t.thumbnail, fit: BoxFit.cover)
-                                  : Container(color: AppColors.music.withValues(alpha: 0.25)),
+                              child:
+                                  (t.covers.isNotEmpty
+                                          ? t.covers.first
+                                          : t.thumbnail)
+                                      .isNotEmpty
+                                  ? CachedNetworkImage(
+                                      imageUrl: t.covers.isNotEmpty
+                                          ? t.covers.first
+                                          : t.thumbnail,
+                                      fit: BoxFit.cover,
+                                    )
+                                  : Container(
+                                      color: AppColors.music.withValues(
+                                        alpha: 0.25,
+                                      ),
+                                    ),
                             ),
                           ),
                           title: Text(
@@ -234,31 +328,56 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> with SingleTick
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: TextStyle(
-                              color: isCurrent ? AppColors.brandOrangeLight : context.textPrimary,
-                              fontWeight: isCurrent ? FontWeight.w800 : FontWeight.w600,
+                              color: isCurrent
+                                  ? AppColors.brandOrangeLight
+                                  : context.textPrimary,
+                              fontWeight: isCurrent
+                                  ? FontWeight.w800
+                                  : FontWeight.w600,
                               fontSize: 13,
                             ),
                           ),
                           subtitle: Text(
-                            t.artist?.isNotEmpty == true ? t.artist! : t.creator,
+                            t.artist?.isNotEmpty == true
+                                ? t.artist!
+                                : t.creator,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: TextStyle(color: context.textSecondary, fontSize: 11),
+                            style: TextStyle(
+                              color: context.textSecondary,
+                              fontSize: 11,
+                            ),
                           ),
                           trailing: isCurrent
-                              ? MiniEqualizer(playing: player.isPlaying, height: 18)
+                              ? MiniEqualizer(
+                                  playing: player.isPlaying,
+                                  height: 18,
+                                )
                               : Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
                                     IconButton(
                                       padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(minWidth: 30, minHeight: 30),
-                                      icon: Icon(Icons.close_rounded, color: context.textDim, size: 18),
-                                      onPressed: () => ref.read(musicPlayerServiceProvider).removeFromQueue(i),
+                                      constraints: const BoxConstraints(
+                                        minWidth: 30,
+                                        minHeight: 30,
+                                      ),
+                                      icon: Icon(
+                                        Icons.close_rounded,
+                                        color: context.textDim,
+                                        size: 18,
+                                      ),
+                                      onPressed: () => ref
+                                          .read(musicPlayerServiceProvider)
+                                          .removeFromQueue(i),
                                     ),
                                     ReorderableDragStartListener(
                                       index: i,
-                                      child: Icon(Icons.drag_handle_rounded, color: context.textDim, size: 20),
+                                      child: Icon(
+                                        Icons.drag_handle_rounded,
+                                        color: context.textDim,
+                                        size: 20,
+                                      ),
                                     ),
                                   ],
                                 ),
@@ -289,7 +408,9 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> with SingleTick
       return const SizedBox.shrink();
     }
 
-    final coverUrl = track.covers.isNotEmpty ? track.covers.first : track.thumbnail;
+    final coverUrl = track.covers.isNotEmpty
+        ? track.covers.first
+        : track.thumbnail;
 
     return Scaffold(
       backgroundColor: context.bgCanvas,
@@ -345,24 +466,24 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> with SingleTick
                 Expanded(
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
-                     padding: const EdgeInsets.symmetric(horizontal: 18),
+                    padding: const EdgeInsets.symmetric(horizontal: 18),
                     child: Column(
                       children: [
                         const SizedBox(height: 8),
                         _buildSleeve(context, coverUrl),
-                         const SizedBox(height: 16),
+                        const SizedBox(height: 16),
                         _buildTitleRow(context, track),
-                         const SizedBox(height: 16),
+                        const SizedBox(height: 16),
                         _buildScrubber(context, player),
                         const SizedBox(height: 6),
                         _buildTransport(context, player),
-                         const SizedBox(height: 16),
+                        const SizedBox(height: 16),
                         _buildSecondaryActions(context, player, track),
                         if (track.lyrics.isNotEmpty) ...[
-                           const SizedBox(height: 20),
+                          const SizedBox(height: 20),
                           _buildLyricsSection(context, player, track),
                         ],
-                         const SizedBox(height: 20),
+                        const SizedBox(height: 20),
                       ],
                     ),
                   ),
@@ -395,29 +516,49 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> with SingleTick
             height: 40,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: (context.isDark ? Colors.black : Colors.white).withValues(alpha: 0.28),
+              color: (context.isDark ? Colors.black : Colors.white).withValues(
+                alpha: 0.28,
+              ),
               border: Border.all(color: context.borderSubtle),
             ),
             child: IconButton(
               padding: EdgeInsets.zero,
-              icon: Icon(Icons.keyboard_arrow_down_rounded, color: context.textPrimary, size: 26),
-              onPressed: () => Navigator.of(context, rootNavigator: true).maybePop(),
+              icon: Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: context.textPrimary,
+                size: 26,
+              ),
+              onPressed: () =>
+                  Navigator.of(context, rootNavigator: true).maybePop(),
             ),
           ),
           Expanded(
             child: Center(
               child: Text(
                 'NOW PLAYING',
-                style: TextStyle(color: context.textDim, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 2),
+                style: TextStyle(
+                  color: context.textDim,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 2,
+                ),
               ),
             ),
           ),
           IconButton(
-            icon: Icon(Icons.queue_music_rounded, color: context.textPrimary, size: 24),
+            icon: Icon(
+              Icons.queue_music_rounded,
+              color: context.textPrimary,
+              size: 24,
+            ),
             onPressed: () => _openQueueSheet(context, player),
           ),
           IconButton(
-            icon: Icon(Icons.tune_rounded, color: context.textPrimary, size: 22),
+            icon: Icon(
+              Icons.tune_rounded,
+              color: context.textPrimary,
+              size: 22,
+            ),
             tooltip: 'Player settings',
             onPressed: () => context.push('/settings/playback'),
           ),
@@ -441,7 +582,9 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> with SingleTick
                 spreadRadius: 2,
               ),
               BoxShadow(
-                color: Colors.black.withValues(alpha: context.isDark ? 0.5 : 0.18),
+                color: Colors.black.withValues(
+                  alpha: context.isDark ? 0.5 : 0.18,
+                ),
                 blurRadius: 30,
                 offset: const Offset(0, 18),
               ),
@@ -458,9 +601,17 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> with SingleTick
               ? CachedNetworkImage(imageUrl: coverUrl, fit: BoxFit.cover)
               : Container(
                   decoration: const BoxDecoration(
-                    gradient: LinearGradient(colors: [Color(0xFFE8590C), Color(0xFF1E1E1E)]),
+                    gradient: LinearGradient(
+                      colors: [Color(0xFFE8590C), Color(0xFF1E1E1E)],
+                    ),
                   ),
-                  child: const Center(child: Icon(Icons.music_note_rounded, color: Colors.white70, size: 64)),
+                  child: const Center(
+                    child: Icon(
+                      Icons.music_note_rounded,
+                      color: Colors.white70,
+                      size: 64,
+                    ),
+                  ),
                 ),
         ),
       ),
@@ -479,28 +630,47 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> with SingleTick
                 track.title.isEmpty ? 'Untitled track' : track.title,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: context.textPrimary, fontSize: 22, fontWeight: FontWeight.w900, letterSpacing: -0.5),
+                style: TextStyle(
+                  color: context.textPrimary,
+                  fontSize: 22,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: -0.5,
+                ),
               ),
               const SizedBox(height: 4),
               GestureDetector(
-                onTap: track.uploaderUsername != null && track.uploaderUsername!.isNotEmpty
+                onTap:
+                    track.uploaderUsername != null &&
+                        track.uploaderUsername!.isNotEmpty
                     ? () {
                         Navigator.of(context, rootNavigator: true).maybePop();
-                        context.push('/channel/${Uri.encodeComponent(track.uploaderUsername!)}');
+                        context.push(
+                          '/channel/${Uri.encodeComponent(track.uploaderUsername!)}',
+                        );
                       }
                     : null,
                 child: Text(
-                  track.artist?.isNotEmpty == true ? track.artist! : track.creator,
+                  track.artist?.isNotEmpty == true
+                      ? track.artist!
+                      : track.creator,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: TextStyle(color: context.textSecondary, fontSize: 14, fontWeight: FontWeight.w600),
+                  style: TextStyle(
+                    color: context.textSecondary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
           ),
         ),
         IconButton(
-          icon: Icon(Icons.more_horiz_rounded, color: context.textSecondary, size: 26),
+          icon: Icon(
+            Icons.more_horiz_rounded,
+            color: context.textSecondary,
+            size: 26,
+          ),
           onPressed: () => showVideoOptionsSheet(context, track),
         ),
       ],
@@ -513,7 +683,9 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> with SingleTick
       builder: (context, snapshot) {
         final pos = snapshot.data ?? Duration.zero;
         final dur = player.duration ?? Duration.zero;
-        final maxMs = dur.inMilliseconds > 0 ? dur.inMilliseconds.toDouble() : 1.0;
+        final maxMs = dur.inMilliseconds > 0
+            ? dur.inMilliseconds.toDouble()
+            : 1.0;
         final value = pos.inMilliseconds.clamp(0, maxMs.toInt()).toDouble();
 
         return Column(
@@ -531,7 +703,8 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> with SingleTick
                 min: 0,
                 max: maxMs,
                 value: value,
-                onChanged: (v) => player.seek(Duration(milliseconds: v.round())),
+                onChanged: (v) =>
+                    player.seek(Duration(milliseconds: v.round())),
               ),
             ),
             Padding(
@@ -539,8 +712,22 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> with SingleTick
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(_fmt(pos), style: TextStyle(color: context.textDim, fontSize: 11, fontWeight: FontWeight.w600)),
-                  Text(_fmt(dur), style: TextStyle(color: context.textDim, fontSize: 11, fontWeight: FontWeight.w600)),
+                  Text(
+                    _fmt(pos),
+                    style: TextStyle(
+                      color: context.textDim,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  Text(
+                    _fmt(dur),
+                    style: TextStyle(
+                      color: context.textDim,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -564,32 +751,49 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> with SingleTick
         IconButton(
           icon: Icon(
             Icons.shuffle_rounded,
-            color: player.isShuffled ? AppColors.brandOrangeLight : context.textSecondary,
+            color: player.isShuffled
+                ? AppColors.brandOrangeLight
+                : context.textSecondary,
             size: 20,
           ),
           onPressed: () => player.toggleShuffle(),
         ),
         IconButton(
-          icon: Icon(Icons.skip_previous_rounded, color: context.textPrimary, size: 34),
+          icon: Icon(
+            Icons.skip_previous_rounded,
+            color: context.textPrimary,
+            size: 34,
+          ),
           onPressed: () => player.previous(),
         ),
         Container(
           width: 68,
           height: 68,
-          decoration: const BoxDecoration(gradient: AppColors.flameGradient, shape: BoxShape.circle),
+          decoration: const BoxDecoration(
+            gradient: AppColors.flameGradient,
+            shape: BoxShape.circle,
+          ),
           child: IconButton(
             icon: Icon(
               player.isBuffering
                   ? Icons.hourglass_top_rounded
-                  : (player.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded),
+                  : (player.isPlaying
+                        ? Icons.pause_rounded
+                        : Icons.play_arrow_rounded),
               color: Colors.white,
               size: 34,
             ),
-            onPressed: player.isBuffering ? null : () => player.togglePlayPause(),
+            onPressed: player.isBuffering
+                ? null
+                : () => player.togglePlayPause(),
           ),
         ),
         IconButton(
-          icon: Icon(Icons.skip_next_rounded, color: context.textPrimary, size: 34),
+          icon: Icon(
+            Icons.skip_next_rounded,
+            color: context.textPrimary,
+            size: 34,
+          ),
           onPressed: () => player.next(),
         ),
         IconButton(
@@ -597,7 +801,9 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> with SingleTick
             player.loopMode == LoopMode.one
                 ? Icons.repeat_one_rounded
                 : Icons.repeat_rounded,
-            color: player.loopMode != LoopMode.off ? AppColors.brandOrangeLight : context.textSecondary,
+            color: player.loopMode != LoopMode.off
+                ? AppColors.brandOrangeLight
+                : context.textSecondary,
             size: 20,
           ),
           onPressed: () => player.cycleRepeatMode(),
@@ -622,7 +828,14 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> with SingleTick
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('Playback Speed', style: TextStyle(color: ctx.textPrimary, fontSize: 16, fontWeight: FontWeight.bold)),
+            Text(
+              'Playback Speed',
+              style: TextStyle(
+                color: ctx.textPrimary,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             const SizedBox(height: 16),
             Wrap(
               spacing: 8,
@@ -650,7 +863,11 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> with SingleTick
     );
   }
 
-  Widget _buildSecondaryActions(BuildContext context, MusicPlayerService player, Video track) {
+  Widget _buildSecondaryActions(
+    BuildContext context,
+    MusicPlayerService player,
+    Video track,
+  ) {
     final manager = ref.watch(downloadManagerProvider);
     final isDownloaded = manager.isDownloaded(track.videoId);
     final activeTask = manager.taskFor(track.videoId);
@@ -663,6 +880,12 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> with SingleTick
           icon: Icons.favorite_border_rounded,
           label: 'Like',
           onTap: () => _toggleLike(track),
+        ),
+        _pillAction(
+          context,
+          icon: Icons.thumb_down_outlined,
+          label: 'Dislike',
+          onTap: () => _toggleDislike(track),
         ),
         _pillAction(
           context,
@@ -686,7 +909,9 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> with SingleTick
         else
           _pillAction(
             context,
-            icon: isDownloaded ? Icons.download_done_rounded : Icons.download_for_offline_outlined,
+            icon: isDownloaded
+                ? Icons.download_done_rounded
+                : Icons.download_for_offline_outlined,
             label: isDownloaded ? 'Saved' : 'Offline',
             highlighted: isDownloaded,
             busy: _downloadBusy,
@@ -714,34 +939,69 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> with SingleTick
             height: 46,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: highlighted ? AppColors.brandOrange.withValues(alpha: 0.16) : context.bgCard.withValues(alpha: 0.7),
-              border: Border.all(color: highlighted ? AppColors.brandOrange.withValues(alpha: 0.5) : context.borderSubtle),
+              color: highlighted
+                  ? AppColors.brandOrange.withValues(alpha: 0.16)
+                  : context.bgCard.withValues(alpha: 0.7),
+              border: Border.all(
+                color: highlighted
+                    ? AppColors.brandOrange.withValues(alpha: 0.5)
+                    : context.borderSubtle,
+              ),
             ),
             child: busy
                 ? Padding(
                     padding: const EdgeInsets.all(14),
-                    child: CircularProgressIndicator(strokeWidth: 2, color: context.textSecondary),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: context.textSecondary,
+                    ),
                   )
-                : Icon(icon, color: highlighted ? AppColors.brandOrangeLight : context.textPrimary, size: 20),
+                : Icon(
+                    icon,
+                    color: highlighted
+                        ? AppColors.brandOrangeLight
+                        : context.textPrimary,
+                    size: 20,
+                  ),
           ),
           const SizedBox(height: 6),
-          Text(label, style: TextStyle(color: context.textSecondary, fontSize: 11, fontWeight: FontWeight.w600)),
+          Text(
+            label,
+            style: TextStyle(
+              color: context.textSecondary,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildLyricsSection(BuildContext context, MusicPlayerService player, Video track) {
+  Widget _buildLyricsSection(
+    BuildContext context,
+    MusicPlayerService player,
+    Video track,
+  ) {
     return StreamBuilder<Duration>(
       stream: player.positionStream,
       builder: (context, snapshot) {
-        final seconds = (snapshot.data ?? Duration.zero).inMilliseconds / 1000.0;
+        final seconds =
+            (snapshot.data ?? Duration.zero).inMilliseconds / 1000.0;
         final activeIndex = activeLyricIndex(track.lyrics, seconds);
-        final durationSeconds = (player.duration ?? Duration.zero).inMilliseconds / 1000.0;
-        final sweep = lyricLineProgress(track.lyrics, activeIndex, seconds, durationSeconds: durationSeconds);
+        final durationSeconds =
+            (player.duration ?? Duration.zero).inMilliseconds / 1000.0;
+        final sweep = lyricLineProgress(
+          track.lyrics,
+          activeIndex,
+          seconds,
+          durationSeconds: durationSeconds,
+        );
 
         if (activeIndex >= 0 && activeIndex != _lastLyricIndex) {
-          WidgetsBinding.instance.addPostFrameCallback((_) => _scrollLyricsTo(activeIndex));
+          WidgetsBinding.instance.addPostFrameCallback(
+            (_) => _scrollLyricsTo(activeIndex),
+          );
         }
 
         return Column(
@@ -749,9 +1009,20 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> with SingleTick
           children: [
             Row(
               children: [
-                Text('LYRICS', style: TextStyle(color: context.textDim, fontSize: 11, fontWeight: FontWeight.w800, letterSpacing: 1.6)),
+                Text(
+                  'LYRICS',
+                  style: TextStyle(
+                    color: context.textDim,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 1.6,
+                  ),
+                ),
                 const Spacer(),
-                Text('Tap line to jump', style: TextStyle(color: context.textDim, fontSize: 10)),
+                Text(
+                  'Tap line to jump',
+                  style: TextStyle(color: context.textDim, fontSize: 10),
+                ),
               ],
             ),
             const SizedBox(height: 10),
@@ -769,7 +1040,9 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> with SingleTick
                   return GestureDetector(
                     behavior: HitTestBehavior.opaque,
                     onTap: () {
-                      player.seek(Duration(milliseconds: (line.time * 1000).round()));
+                      player.seek(
+                        Duration(milliseconds: (line.time * 1000).round()),
+                      );
                     },
                     child: Padding(
                       padding: const EdgeInsets.symmetric(vertical: 5),
@@ -777,11 +1050,15 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> with SingleTick
                         duration: const Duration(milliseconds: 250),
                         style: TextStyle(
                           fontSize: isActive ? 19 : (distance == 1 ? 16 : 14),
-                          fontWeight: isActive ? FontWeight.w900 : FontWeight.w600,
+                          fontWeight: isActive
+                              ? FontWeight.w900
+                              : FontWeight.w600,
                           height: 1.3,
                           color: isActive
                               ? context.textPrimary
-                              : context.textPrimary.withValues(alpha: distance == 1 ? 0.55 : 0.30),
+                              : context.textPrimary.withValues(
+                                  alpha: distance == 1 ? 0.55 : 0.30,
+                                ),
                         ),
                         child: isActive
                             ? ShaderMask(
@@ -796,10 +1073,18 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> with SingleTick
                                       base.withValues(alpha: 0.45),
                                       base.withValues(alpha: 0.45),
                                     ],
-                                    stops: [0.0, sweep.clamp(0.0, 1.0), (sweep + 0.04).clamp(0.0, 1.0), 1.0],
+                                    stops: [
+                                      0.0,
+                                      sweep.clamp(0.0, 1.0),
+                                      (sweep + 0.04).clamp(0.0, 1.0),
+                                      1.0,
+                                    ],
                                   ).createShader(bounds);
                                 },
-                                child: Text(line.text, style: const TextStyle(color: Colors.white)),
+                                child: Text(
+                                  line.text,
+                                  style: const TextStyle(color: Colors.white),
+                                ),
                               )
                             : Text(line.text),
                       ),

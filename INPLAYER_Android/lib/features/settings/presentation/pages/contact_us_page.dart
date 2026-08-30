@@ -1,29 +1,67 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../models/admin_platform_settings.dart';
+import '../../../../services/admin_service.dart';
 
-/// Dedicated Contact Us screen — previously an expandable "CONTACT US"
-/// section inline at the bottom of the hamburger drawer (MobileMenuDrawer).
-/// Moved here per explicit request so the drawer just links out to a real
-/// screen instead of expanding in place. Same three addresses, same
-/// copy-to-clipboard behavior, just given a proper full-screen home.
-class ContactUsPage extends StatefulWidget {
+/// Dedicated Contact Us screen. The values are read from the backend platform
+/// settings so the app stays in sync with the admin panel immediately when the
+/// mail config changes there. The inplayer-specific addresses are kept as a
+/// fallback if the server has not yet published new values.
+class ContactUsPage extends ConsumerStatefulWidget {
   const ContactUsPage({super.key});
 
   @override
-  State<ContactUsPage> createState() => _ContactUsPageState();
+  ConsumerState<ContactUsPage> createState() => _ContactUsPageState();
 }
 
-class _ContactUsPageState extends State<ContactUsPage> {
+class _ContactUsPageState extends ConsumerState<ContactUsPage> {
   String? _copiedEmail;
-
-  final List<Map<String, String>> _contactEmails = const [
-    {'label': 'Contact', 'address': 'contact@inplayer.in'},
-    {'label': 'Help', 'address': 'help@inplayer.in'},
-    {'label': 'Support', 'address': 'support@inplayer.in'},
+  bool _loading = true;
+  List<Map<String, String>> _contactEmails = const [
+    {'label': 'Hammart', 'address': 'Hammart@inplayer.in'},
+    {'label': 'MillonBook', 'address': 'Millonbook@inplayer.in'},
+    {'label': 'Sponsor / Banner Specs', 'address': 'Sponsor@inplayer.in'},
+    {'label': 'InPlayer Digital', 'address': 'inplayerdigital@gmail.com'},
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadPlatformEmails();
+  }
+
+  Future<void> _loadPlatformEmails() async {
+    final settings = await ref.read(adminServiceProvider).getPlatformSettings();
+    if (!mounted) return;
+
+    setState(() {
+      _loading = false;
+      _contactEmails = _buildContactEmails(settings);
+    });
+  }
+
+  List<Map<String, String>> _buildContactEmails(AdminPlatformSettings? settings) {
+    final emails = settings?.contactEmails ?? const <PlatformContactEmail>[];
+    if (emails.isNotEmpty) {
+      return emails
+          .where((email) => email.address.trim().isNotEmpty)
+          .map((email) => {'label': email.label, 'address': email.address})
+          .toList();
+    }
+
+    final fallback = <String, String>{
+      'Hammart': 'Hammart@inplayer.in',
+      'MillonBook': 'Millonbook@inplayer.in',
+      'Sponsor / Banner Specs': 'Sponsor@inplayer.in',
+      'InPlayer Digital': 'inplayerdigital@gmail.com',
+    };
+
+    return fallback.entries.map((entry) => {'label': entry.key, 'address': entry.value}).toList();
+  }
 
   void _copyEmail(String address) {
     Clipboard.setData(ClipboardData(text: address));
@@ -59,36 +97,44 @@ class _ContactUsPageState extends State<ContactUsPage> {
             style: TextStyle(color: context.textSecondary, fontSize: 13),
           ),
           const SizedBox(height: 18),
-          ..._contactEmails.map((contact) {
-            final isCopied = _copiedEmail == contact['address'];
-            return Container(
-              margin: const EdgeInsets.only(bottom: 10),
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-              decoration: BoxDecoration(
-                color: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.03),
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: context.borderSubtle),
+          if (_loading)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.symmetric(vertical: 24),
+                child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2)),
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(contact['label']!, style: const TextStyle(color: AppColors.brandOrangeLight, fontSize: 11, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 2),
-                        Text(contact['address']!, style: TextStyle(color: context.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
-                      ],
+            )
+          else
+            ..._contactEmails.map((contact) {
+              final isCopied = _copiedEmail == contact['address'];
+              return Container(
+                margin: const EdgeInsets.only(bottom: 10),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                decoration: BoxDecoration(
+                  color: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.03),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(color: context.borderSubtle),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(contact['label']!, style: const TextStyle(color: AppColors.brandOrangeLight, fontSize: 11, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 2),
+                          Text(contact['address']!, style: TextStyle(color: context.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+                        ],
+                      ),
                     ),
-                  ),
-                  IconButton(
-                    icon: Icon(isCopied ? Icons.check : Icons.copy, size: 18, color: isCopied ? const Color(0xFF10B981) : context.textSecondary),
-                    onPressed: () => _copyEmail(contact['address']!),
-                  ),
-                ],
-              ),
-            );
-          }),
+                    IconButton(
+                      icon: Icon(isCopied ? Icons.check : Icons.copy, size: 18, color: isCopied ? const Color(0xFF10B981) : context.textSecondary),
+                      onPressed: () => _copyEmail(contact['address']!),
+                    ),
+                  ],
+                ),
+              );
+            }),
         ],
       ),
     );

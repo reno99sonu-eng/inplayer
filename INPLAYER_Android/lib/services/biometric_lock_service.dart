@@ -91,7 +91,9 @@ class BiometricLockNotifier extends StateNotifier<BiometricLockState> with Widge
   /// Toggles the Biometric/Passkey lock on or off.
   Future<bool> setEnabled(bool enabled) async {
     if (enabled) {
-      // Require an immediate successful authentication before enabling
+      // Require an immediate successful authentication before enabling.
+      // Once enabled, the app must remain locked until the next successful
+      // biometric/passcode unlock rather than flip back to an unlocked state.
       final authenticated = await authenticate(
         reason: 'Scan your Fingerprint, Face, or enter Device PIN to enable App Lock',
       );
@@ -102,7 +104,7 @@ class BiometricLockNotifier extends StateNotifier<BiometricLockState> with Widge
     await prefs.setBool(_prefKey, enabled);
     state = state.copyWith(
       isEnabled: enabled,
-      isLocked: false,
+      isLocked: enabled,
     );
     return true;
   }

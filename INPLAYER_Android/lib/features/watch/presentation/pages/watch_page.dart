@@ -52,7 +52,8 @@ class WatchPage extends ConsumerStatefulWidget {
   ConsumerState<WatchPage> createState() => _WatchPageState();
 }
 
-class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserver {
+class _WatchPageState extends ConsumerState<WatchPage>
+    with WidgetsBindingObserver {
   final _logger = Logger();
   final _commentController = TextEditingController();
 
@@ -252,7 +253,9 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
     final playing = _videoController?.value.isPlaying ?? false;
     if (playing == _lastPlayingForPip) return;
     _lastPlayingForPip = playing;
-    unawaited(PipService.setPlaybackActive(playing && _autoPipEnabled && _pipSupported));
+    unawaited(
+      PipService.setPlaybackActive(playing && _autoPipEnabled && _pipSupported),
+    );
   }
 
   // Throttled to once every ~4s (this listener fires many times a second) —
@@ -262,7 +265,8 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
   void _maybeSavePlaybackPosition() {
     final controller = _videoController;
     final video = _video;
-    if (controller == null || video == null || !controller.value.isInitialized) return;
+    if (controller == null || video == null || !controller.value.isInitialized)
+      return;
 
     final now = DateTime.now().millisecondsSinceEpoch;
     if (now - _lastPositionSaveMs < 4000) return;
@@ -303,7 +307,9 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
     final saved = await PlaybackPositionStore.get(widget.videoId);
     if (saved == null || saved <= 0) return;
     final duration = controller.value.duration;
-    if (duration > Duration.zero && duration - Duration(milliseconds: (saved * 1000).round()) < const Duration(seconds: 20)) {
+    if (duration > Duration.zero &&
+        duration - Duration(milliseconds: (saved * 1000).round()) <
+            const Duration(seconds: 20)) {
       await PlaybackPositionStore.clear(widget.videoId);
       return;
     }
@@ -326,7 +332,9 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
   // .../captions/{lang} — see app/lib/captions.ts / vttChunker.ts) and
   // renders it as a synced overlay in PlayerChrome.
   Future<void> _loadCaptions(String videoId) async {
-    final languages = await ref.read(captionServiceProvider).getLanguages(videoId);
+    final languages = await ref
+        .read(captionServiceProvider)
+        .getLanguages(videoId);
     if (!mounted) return;
     setState(() => _captionLanguages = languages);
     if (languages.isEmpty) return;
@@ -358,7 +366,9 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
 
     final video = _video;
     if (video == null) return;
-    final vtt = await ref.read(captionServiceProvider).getVtt(video.videoId, code);
+    final vtt = await ref
+        .read(captionServiceProvider)
+        .getVtt(video.videoId, code);
     if (!mounted) return;
 
     if (vtt == null) {
@@ -390,7 +400,10 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
     final oldController = _videoController;
     if (video?.muxPlaybackId == null || oldController == null) return;
 
-    final chosen = _allQualityOptions.firstWhere((o) => o.label == label, orElse: () => _allQualityOptions.first);
+    final chosen = _allQualityOptions.firstWhere(
+      (o) => o.label == label,
+      orElse: () => _allQualityOptions.first,
+    );
     final effectiveHeight = chosen.heightPx == null
         ? _premiumCeilingHeight
         : math.min(chosen.heightPx!, _premiumCeilingHeight);
@@ -449,7 +462,8 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
       // again from a video grid) — either way, this must NOT create a
       // second, competing controller/player for the same video.
       final miniPlayerService = ref.read(videoMiniPlayerServiceProvider);
-      final adoptedController = widget.adoptController ??
+      final adoptedController =
+          widget.adoptController ??
           (miniPlayerService.video?.videoId == widget.videoId
               ? miniPlayerService.detachForRestore()
               : null);
@@ -464,14 +478,19 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
         final premiumService = ref.read(premiumServiceProvider);
         final playbackSettings = await PlaybackSettingsStore.get();
         final status = await premiumService.getStatus();
-        final maxRes = effectiveMaxResolution(status.maxResolution, playbackSettings.wifiQuality);
-        _premiumCeilingHeight = int.tryParse(maxRes.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1080;
+        final maxRes = effectiveMaxResolution(
+          status.maxResolution,
+          playbackSettings.wifiQuality,
+        );
+        _premiumCeilingHeight =
+            int.tryParse(maxRes.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1080;
         _autoPipEnabled = playbackSettings.pip;
         _videoController = adoptedController;
         _videoController!.addListener(_onPlayerTick);
         _isInitialized = true;
         _resumeApplied = true;
-      } else if (video.muxPlaybackId != null && video.muxPlaybackId!.isNotEmpty) {
+      } else if (video.muxPlaybackId != null &&
+          video.muxPlaybackId!.isNotEmpty) {
         final premiumService = ref.read(premiumServiceProvider);
         final playbackSettings = await PlaybackSettingsStore.get();
         // The real ceiling is the LOWER of the viewer's Premium tier and
@@ -481,11 +500,17 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
         // exactly, including that this is also the ceiling the in-player
         // Quality menu itself offers (see _availableQualityOptions above).
         final status = await premiumService.getStatus();
-        final maxRes = effectiveMaxResolution(status.maxResolution, playbackSettings.wifiQuality);
-        _premiumCeilingHeight = int.tryParse(maxRes.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1080;
+        final maxRes = effectiveMaxResolution(
+          status.maxResolution,
+          playbackSettings.wifiQuality,
+        );
+        _premiumCeilingHeight =
+            int.tryParse(maxRes.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1080;
         _autoPipEnabled = playbackSettings.pip;
         final videoUrl = _muxUrl(video.muxPlaybackId!, maxRes);
-        _videoController = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
+        _videoController = VideoPlayerController.networkUrl(
+          Uri.parse(videoUrl),
+        );
 
         try {
           await _videoController!.initialize();
@@ -523,15 +548,19 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
 
       // Recommendations load in the background and fill in when they land.
       unawaited(
-        videoService.getVideos().then((recommended) {
-          if (!mounted) return;
-          setState(() {
-            _recommendedVideos =
-                recommended.where((v) => v.videoId != widget.videoId).toList();
-          });
-        }).catchError((Object e) {
-          _logger.w('Could not load recommended videos: $e');
-        }),
+        videoService
+            .getVideos()
+            .then((recommended) {
+              if (!mounted) return;
+              setState(() {
+                _recommendedVideos = recommended
+                    .where((v) => v.videoId != widget.videoId)
+                    .toList();
+              });
+            })
+            .catchError((Object e) {
+              _logger.w('Could not load recommended videos: $e');
+            }),
       );
 
       // Record the watch the moment a real video/track has loaded on this
@@ -578,7 +607,9 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
 
   Future<void> _loadComments(String videoId) async {
     setState(() => _commentsLoading = true);
-    final comments = await ref.read(commentServiceProvider).getComments(videoId);
+    final comments = await ref
+        .read(commentServiceProvider)
+        .getComments(videoId);
     if (!mounted) return;
     setState(() {
       _comments = comments;
@@ -587,8 +618,9 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
   }
 
   Future<void> _loadSubscriptionStatus(String creatorId) async {
-    final status =
-        await ref.read(channelServiceProvider).getSubscriptionStatus(creatorId);
+    final status = await ref
+        .read(channelServiceProvider)
+        .getSubscriptionStatus(creatorId);
     if (!mounted || status == null) return;
     setState(() {
       _isSubscribed = status['isSubscribed'] == true;
@@ -614,7 +646,9 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
       _myReaction = effective == 'remove' ? null : effective;
     });
 
-    final ok = await ref.read(likeServiceProvider).react(video.videoId, effective);
+    final ok = await ref
+        .read(likeServiceProvider)
+        .react(video.videoId, effective);
 
     if (!mounted) return;
 
@@ -649,9 +683,13 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
 
     if (!ok) {
       setState(() => _isSaved = prev);
-      _showSnack(prev ? "Couldn't remove from Watch Later." : 'Sign in to save videos.');
+      _showSnack(
+        prev ? "Couldn't remove from Watch Later." : 'Sign in to save videos.',
+      );
     } else {
-      _showSnack(_isSaved ? 'Saved to Watch Later' : 'Removed from Watch Later');
+      _showSnack(
+        _isSaved ? 'Saved to Watch Later' : 'Removed from Watch Later',
+      );
     }
 
     setState(() => _watchlistBusy = false);
@@ -661,7 +699,9 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
     final video = _video;
     if (video == null) return;
     final url = 'https://inplayer.in/watch/${video.videoId}';
-    SharePlus.instance.share(ShareParams(text: '${video.title}\n$url', subject: video.title));
+    SharePlus.instance.share(
+      ShareParams(text: '${video.title}\n$url', subject: video.title),
+    );
   }
 
   // ---------------- Download ----------------
@@ -779,7 +819,14 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
                 ),
               ),
               const SizedBox(height: 18),
-              Text('Download quality', style: TextStyle(color: ctx.textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
+              Text(
+                'Download quality',
+                style: TextStyle(
+                  color: ctx.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 4),
               Text(
                 video.title,
@@ -796,7 +843,10 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
                   },
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
                     margin: const EdgeInsets.only(bottom: 6),
                     child: Row(
                       children: [
@@ -809,10 +859,18 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
                         Expanded(
                           child: Text(
                             _downloadQualityLabel(quality),
-                            style: TextStyle(color: ctx.textPrimary, fontSize: 15, fontWeight: FontWeight.w600),
+                            style: TextStyle(
+                              color: ctx.textPrimary,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ),
-                        Icon(Icons.download_outlined, color: ctx.textDim, size: 18),
+                        Icon(
+                          Icons.download_outlined,
+                          color: ctx.textDim,
+                          size: 18,
+                        ),
                       ],
                     ),
                   ),
@@ -844,10 +902,12 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
         .read(downloadManagerProvider)
         .download(video: video, quality: quality, fileName: fileName)
         .then((_) {
-      if (mounted) _showSnack('Downloaded — find it in Downloads.');
-    }).catchError((Object _) {
-      if (mounted) _showSnack("Couldn't finish downloading. Please try again.");
-    });
+          if (mounted) _showSnack('Downloaded — find it in Downloads.');
+        })
+        .catchError((Object _) {
+          if (mounted)
+            _showSnack("Couldn't finish downloading. Please try again.");
+        });
   }
 
   void _confirmCancelDownload(String videoId) {
@@ -856,7 +916,10 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
       builder: (ctx) => AlertDialog(
         title: const Text('Cancel download?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Keep downloading')),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Keep downloading'),
+          ),
           TextButton(
             onPressed: () {
               ref.read(downloadManagerProvider).cancelDownload(videoId);
@@ -871,7 +934,9 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
 
   Future<void> _toggleSubscribe() async {
     final video = _video;
-    if (video == null || video.uploaderId == null || video.uploaderId!.isEmpty) {
+    if (video == null ||
+        video.uploaderId == null ||
+        video.uploaderId!.isEmpty) {
       return;
     }
     if (_subscribeBusy) return;
@@ -908,8 +973,9 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
 
     setState(() => _postingComment = true);
 
-    final result =
-        await ref.read(commentServiceProvider).postComment(video.videoId, text);
+    final result = await ref
+        .read(commentServiceProvider)
+        .postComment(video.videoId, text);
 
     if (!mounted) return;
     setState(() => _postingComment = false);
@@ -985,31 +1051,33 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
                         alignment: Alignment.center,
                         children: [
                           _buildMediaSurface(),
-                          PlayerChrome(
-                            controller: _videoController!,
-                            title: _video?.title ?? '',
-                            isFullscreen: false,
-                            onToggleFullscreen: _openFullscreen,
-                            onBack: () {
-                              if (context.canPop()) {
-                                context.pop();
-                              } else {
-                                context.go('/');
-                              }
-                            },
-                            qualityLabel: _qualityLabel,
-                            qualityOptions: _availableQualityOptions,
-                            onQualityChange: _switchQuality,
-                            captionLanguages: _captionLanguages,
-                            selectedCaptionLang: _selectedCaptionLang,
-                            captionCues: _captionCues,
-                            onCaptionLanguageChange: _selectCaptionLanguage,
-                            pipSupported: _pipSupported,
-                            onPipTapped: _enterPip,
-                            onMinimize: _minimizeToMiniPlayer,
-                            initialBrightness: _playerBrightness,
-                            onBrightnessChanged: (v) =>
-                                setState(() => _playerBrightness = v),
+                          Positioned.fill(
+                            child: PlayerChrome(
+                              controller: _videoController!,
+                              title: _video?.title ?? '',
+                              isFullscreen: false,
+                              onToggleFullscreen: _openFullscreen,
+                              onBack: () {
+                                if (context.canPop()) {
+                                  context.pop();
+                                } else {
+                                  context.go('/');
+                                }
+                              },
+                              qualityLabel: _qualityLabel,
+                              qualityOptions: _availableQualityOptions,
+                              onQualityChange: _switchQuality,
+                              captionLanguages: _captionLanguages,
+                              selectedCaptionLang: _selectedCaptionLang,
+                              captionCues: _captionCues,
+                              onCaptionLanguageChange: _selectCaptionLanguage,
+                              pipSupported: _pipSupported,
+                              onPipTapped: _enterPip,
+                              onMinimize: _minimizeToMiniPlayer,
+                              initialBrightness: _playerBrightness,
+                              onBrightnessChanged: (v) =>
+                                  setState(() => _playerBrightness = v),
+                            ),
                           ),
                         ],
                       )
@@ -1037,7 +1105,10 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
               // Video Info
               Expanded(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 20,
+                  ),
                   // Was `_video != null ? ... : _buildPlaceholderInfo()` with
                   // no loading check — on a fresh open, `_video` is null for
                   // the entire time `_loadVideo()` is in flight, so this
@@ -1049,8 +1120,8 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
                   child: _isLoading
                       ? const SizedBox.shrink()
                       : _video != null
-                          ? _buildVideoInfo(_video!)
-                          : _buildPlaceholderInfo(),
+                      ? _buildVideoInfo(_video!)
+                      : _buildPlaceholderInfo(),
                 ),
               ),
             ],
@@ -1088,10 +1159,26 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
       // channel scaled by the same factor, alpha untouched. Above 1
       // brightens and clips toward white, below 1 dims.
       colorFilter: ColorFilter.matrix(<double>[
-        b, 0, 0, 0, 0,
-        0, b, 0, 0, 0,
-        0, 0, b, 0, 0,
-        0, 0, 0, 1, 0,
+        b,
+        0,
+        0,
+        0,
+        0,
+        0,
+        b,
+        0,
+        0,
+        0,
+        0,
+        0,
+        b,
+        0,
+        0,
+        0,
+        0,
+        0,
+        1,
+        0,
       ]),
       child: surface,
     );
@@ -1168,7 +1255,9 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
     final video = _video;
     if (controller == null || video == null || !_isInitialized) return;
     controller.removeListener(_onPlayerTick);
-    ref.read(videoMiniPlayerServiceProvider).activate(controller: controller, video: video);
+    ref
+        .read(videoMiniPlayerServiceProvider)
+        .activate(controller: controller, video: video);
     _videoController = null;
     if (context.canPop()) {
       context.pop();
@@ -1193,7 +1282,11 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
         const SizedBox(height: 8),
         Row(
           children: [
-            const Icon(Icons.remove_red_eye_outlined, size: 15, color: AppColors.brandOrange),
+            const Icon(
+              Icons.remove_red_eye_outlined,
+              size: 15,
+              color: AppColors.brandOrange,
+            ),
             const SizedBox(width: 4),
             Text(
               '${video.views} views',
@@ -1214,23 +1307,26 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
               const SizedBox(width: 10),
               Text(
                 video.category,
-                style: const TextStyle(color: AppColors.brandOrange, fontSize: 12.5, fontWeight: FontWeight.w700),
+                style: const TextStyle(
+                  color: AppColors.brandOrange,
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ],
           ],
         ),
         const SizedBox(height: 16),
-        
+
         // Creator Row & Subscribe Button
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
           decoration: BoxDecoration(
-            color: context.isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
+            color: context.isDark
+                ? Colors.white.withValues(alpha: 0.05)
+                : Colors.black.withValues(alpha: 0.03),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(
-              color: context.borderSubtle,
-              width: 1,
-            ),
+            border: Border.all(color: context.borderSubtle, width: 1),
           ),
           child: Row(
             children: [
@@ -1248,7 +1344,8 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
                 child: GestureDetector(
                   onTap: video.uploaderUsername == null
                       ? null
-                      : () => context.push('/channel/${video.uploaderUsername}'),
+                      : () =>
+                            context.push('/channel/${video.uploaderUsername}'),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -1268,7 +1365,11 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
                           ),
                           if (video.verified) ...[
                             const SizedBox(width: 4),
-                            const Icon(Icons.verified, size: 14, color: AppColors.brandGold),
+                            const Icon(
+                              Icons.verified,
+                              size: 14,
+                              color: AppColors.brandGold,
+                            ),
                           ],
                         ],
                       ),
@@ -1289,19 +1390,28 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
                 GestureDetector(
                   onTap: _toggleSubscribe,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 7,
+                    ),
                     decoration: BoxDecoration(
                       gradient: _isSubscribed ? null : AppColors.flameGradient,
-                      color: _isSubscribed ? (context.isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.08)) : null,
+                      color: _isSubscribed
+                          ? (context.isDark
+                                ? Colors.white.withValues(alpha: 0.12)
+                                : Colors.black.withValues(alpha: 0.08))
+                          : null,
                       borderRadius: BorderRadius.circular(20),
                       border: _isSubscribed
                           ? Border.all(color: context.borderSubtle)
                           : null,
                     ),
                     child: Text(
-                      _isSubscribed ? 'Subscribed' : 'Subscribe',
+                      _isSubscribed ? 'In-family' : 'Join In-family',
                       style: TextStyle(
-                        color: _isSubscribed ? context.textPrimary : Colors.black,
+                        color: _isSubscribed
+                            ? context.textPrimary
+                            : Colors.black,
                         fontWeight: FontWeight.w800,
                         fontSize: 12,
                       ),
@@ -1311,9 +1421,9 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
             ],
           ),
         ),
-        
+
         const SizedBox(height: 14),
-        
+
         // Action Bar (Like, Dislike, Share, Download, Save)
         _buildActionBar(video),
 
@@ -1346,15 +1456,19 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
                 borderRadius: BorderRadius.circular(16),
                 image: const DecorationImage(
                   // We'll use a placeholder since it's an ad
-                  image: AssetImage('assets/images/placeholder_ad.png'), 
+                  image: AssetImage('assets/images/placeholder_ad.png'),
                   fit: BoxFit.cover,
                 ),
               ),
-              child: _video == null ? null : CachedNetworkImage(
-                imageUrl: _video!.thumbnail, // fallback to video thumbnail
-                fit: BoxFit.cover,
-                errorWidget: (context, error, stackTrace) => const SizedBox(),
-              ),
+              child: _video == null
+                  ? null
+                  : CachedNetworkImage(
+                      imageUrl:
+                          _video!.thumbnail, // fallback to video thumbnail
+                      fit: BoxFit.cover,
+                      errorWidget: (context, error, stackTrace) =>
+                          const SizedBox(),
+                    ),
             ),
             Positioned(
               top: 12,
@@ -1365,7 +1479,14 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
                   color: Colors.black.withValues(alpha: 0.6),
                   borderRadius: BorderRadius.circular(4),
                 ),
-                child: const Text('AD', style: TextStyle(color: AppColors.brandGold, fontSize: 10, fontWeight: FontWeight.bold)),
+                child: const Text(
+                  'AD',
+                  style: TextStyle(
+                    color: AppColors.brandGold,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ),
           ],
@@ -1379,7 +1500,14 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
                 color: AppColors.brandOrange.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
-              child: const Text('AD', style: TextStyle(color: AppColors.brandOrange, fontSize: 10, fontWeight: FontWeight.bold)),
+              child: const Text(
+                'AD',
+                style: TextStyle(
+                  color: AppColors.brandOrange,
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
             const SizedBox(width: 12),
             Column(
@@ -1395,10 +1523,7 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
                 ),
                 Text(
                   'Sponsored',
-                  style: TextStyle(
-                    color: Colors.blueAccent,
-                    fontSize: 12,
-                  ),
+                  style: TextStyle(color: Colors.blueAccent, fontSize: 12),
                 ),
               ],
             ),
@@ -1412,7 +1537,9 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: context.isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.03),
+        color: context.isDark
+            ? Colors.white.withValues(alpha: 0.05)
+            : Colors.black.withValues(alpha: 0.03),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: context.borderSubtle),
       ),
@@ -1500,7 +1627,11 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
   Widget _buildDownloadActionItem() {
     final video = _video;
     if (video == null) {
-      return _buildActionItem(icon: Icons.download_outlined, label: 'Download', onTap: null);
+      return _buildActionItem(
+        icon: Icons.download_outlined,
+        label: 'Download',
+        onTap: null,
+      );
     }
 
     if (video.contentType == 'short') {
@@ -1512,7 +1643,11 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
     }
 
     if (_downloadPreparing) {
-      return _buildActionItem(icon: Icons.hourglass_top_outlined, label: 'Preparing…', onTap: null);
+      return _buildActionItem(
+        icon: Icons.hourglass_top_outlined,
+        label: 'Preparing…',
+        onTap: null,
+      );
     }
 
     final manager = ref.watch(downloadManagerProvider);
@@ -1542,7 +1677,11 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
                 const SizedBox(height: 3),
                 Text(
                   '$pct%',
-                  style: const TextStyle(color: AppColors.brandOrange, fontSize: 11, fontWeight: FontWeight.w700),
+                  style: const TextStyle(
+                    color: AppColors.brandOrange,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ],
             ),
@@ -1572,7 +1711,9 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
         width: double.infinity,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: context.isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.03),
+          color: context.isDark
+              ? Colors.white.withValues(alpha: 0.04)
+              : Colors.black.withValues(alpha: 0.03),
           borderRadius: BorderRadius.circular(14),
           border: Border.all(color: context.borderSubtle),
         ),
@@ -1608,8 +1749,9 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
 
   Widget _buildCommentsSection() {
     final isSignedIn = ref.watch(authStateProvider) is AuthStateAuthenticated;
-    final visibleComments =
-        _commentsExpanded ? _comments : _comments.take(3).toList();
+    final visibleComments = _commentsExpanded
+        ? _comments
+        : _comments.take(3).toList();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1628,7 +1770,9 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
           children: [
             CircleAvatar(
               radius: 16,
-              backgroundColor: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+              backgroundColor: context.isDark
+                  ? AppColors.surfaceDark
+                  : AppColors.surfaceLight,
               child: Icon(Icons.person, size: 20, color: context.textSecondary),
             ),
             const SizedBox(width: 12),
@@ -1638,39 +1782,59 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
                 children: [
                   Container(
                     decoration: BoxDecoration(
-                      color: context.isDark ? Colors.white.withValues(alpha: 0.05) : Colors.black.withValues(alpha: 0.04),
+                      color: context.isDark
+                          ? Colors.white.withValues(alpha: 0.05)
+                          : Colors.black.withValues(alpha: 0.04),
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: context.borderSubtle,
-                      ),
+                      border: Border.all(color: context.borderSubtle),
                     ),
                     child: TextField(
                       controller: _commentController,
                       enabled: !_postingComment,
-                      style: TextStyle(color: context.textPrimary, fontSize: 13),
+                      style: TextStyle(
+                        color: context.textPrimary,
+                        fontSize: 13,
+                      ),
                       minLines: 1,
                       maxLines: 4,
                       onSubmitted: (_) => _postComment(),
                       decoration: InputDecoration(
                         isDense: true,
-                        hintText: isSignedIn ? 'Write a comment...' : 'Sign in to comment...',
+                        hintText: isSignedIn
+                            ? 'Write a comment...'
+                            : 'Sign in to comment...',
                         hintStyle: TextStyle(
                           color: context.textDim,
                           fontSize: 13,
                         ),
                         border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        contentPadding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 12,
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
-                      Icon(Icons.emoji_emotions_outlined, size: 20, color: context.textDim),
+                      Icon(
+                        Icons.emoji_emotions_outlined,
+                        size: 20,
+                        color: context.textDim,
+                      ),
                       const SizedBox(width: 12),
-                      Icon(Icons.image_outlined, size: 20, color: context.textDim),
+                      Icon(
+                        Icons.image_outlined,
+                        size: 20,
+                        color: context.textDim,
+                      ),
                       const SizedBox(width: 12),
-                      Icon(Icons.gif_box_outlined, size: 20, color: context.textDim),
+                      Icon(
+                        Icons.gif_box_outlined,
+                        size: 20,
+                        color: context.textDim,
+                      ),
                       const Spacer(),
                       if (_postingComment)
                         const SizedBox(
@@ -1678,14 +1842,20 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
                           height: 16,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation(AppColors.brandOrange),
+                            valueColor: AlwaysStoppedAnimation(
+                              AppColors.brandOrange,
+                            ),
                           ),
                         )
                       else if (_commentController.text.isNotEmpty)
                         IconButton(
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(),
-                          icon: const Icon(Icons.send, size: 20, color: AppColors.brandOrange),
+                          icon: const Icon(
+                            Icons.send,
+                            size: 20,
+                            color: AppColors.brandOrange,
+                          ),
                           onPressed: _postComment,
                         ),
                     ],
@@ -1703,7 +1873,10 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
               child: SizedBox(
                 width: 20,
                 height: 20,
-                child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.brandOrange),
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: AppColors.brandOrange,
+                ),
               ),
             ),
           )
@@ -1767,13 +1940,19 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
                     ),
                     if (comment.isVerified) ...[
                       const SizedBox(width: 4),
-                      const Icon(Icons.verified, size: 12, color: AppColors.brandGold),
+                      const Icon(
+                        Icons.verified,
+                        size: 12,
+                        color: AppColors.brandGold,
+                      ),
                     ],
                     if (comment.isMember) ...[
                       const SizedBox(width: 6),
                       Container(
-                        padding:
-                            const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 1,
+                        ),
                         decoration: BoxDecoration(
                           color: AppColors.brandOrange.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(6),
@@ -1791,10 +1970,7 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
                     const SizedBox(width: 6),
                     Text(
                       comment.timeAgo,
-                      style: TextStyle(
-                        color: context.textDim,
-                        fontSize: 11,
-                      ),
+                      style: TextStyle(color: context.textDim, fontSize: 11),
                     ),
                   ],
                 ),
@@ -1821,7 +1997,9 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: context.isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.03),
+        color: context.isDark
+            ? Colors.white.withValues(alpha: 0.04)
+            : Colors.black.withValues(alpha: 0.03),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: context.borderSubtle),
       ),
@@ -1867,7 +2045,9 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
           ListView.separated(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            itemCount: _recommendedVideos.length > 5 ? 5 : _recommendedVideos.length,
+            itemCount: _recommendedVideos.length > 5
+                ? 5
+                : _recommendedVideos.length,
             separatorBuilder: (context, index) => const SizedBox(height: 16),
             itemBuilder: (context, index) {
               final rec = _recommendedVideos[index];
@@ -1882,7 +2062,9 @@ class _WatchPageState extends ConsumerState<WatchPage> with WidgetsBindingObserv
                       width: 140,
                       height: 80,
                       decoration: BoxDecoration(
-                        color: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+                        color: context.isDark
+                            ? AppColors.surfaceDark
+                            : AppColors.surfaceLight,
                         borderRadius: BorderRadius.circular(12),
                         image: smartImageProvider(rec.thumbnail) != null
                             ? DecorationImage(

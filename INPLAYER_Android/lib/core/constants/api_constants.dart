@@ -163,6 +163,21 @@ class ApiConstants {
   static const String premiumMe = '/api/premium/me';
   static const String membershipStatus = '/api/memberships/status';
 
+  // Creator monetization and payout KYC — real website routes that already
+  // write to DynamoDB / AWS and are reviewed in the admin panel. These are
+  // the actual contracts the app should use instead of placeholder status
+  // cards.
+  static const String creatorKyc = '/api/creator/kyc';
+  static const String creatorPayoutStatus = '/api/creator/payout-status';
+  static const String creatorMonetizeStatus = '/api/creator/monetize/status';
+  static const String creatorMonetizeActivate =
+      '/api/creator/monetize/activate';
+
+  // Sponsorships — the sponsor checkout flow starts here and creates a real
+  // Razorpay order via the website backend before opening Razorpay Checkout.
+  static const String sponsorships = '/api/sponsorships';
+  static const String sponsorshipCheckout = '/api/sponsorships/checkout';
+
   // Recommendation feedback (Interested / Not Interested) and content
   // reports — the watch-page and video-card "⋮ More options" menu.
   static const String videoFeedback = '/api/video-feedback';

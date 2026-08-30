@@ -213,7 +213,7 @@ class _ShortsPageState extends ConsumerState<ShortsPage> {
           // confirmed by reading the file fresh before this edit.
           return PageView.builder(
             controller: _pageController,
-            scrollDirection: Axis.horizontal,
+            scrollDirection: Axis.vertical,
             itemCount: shorts.length,
             onPageChanged: (index) {
               setState(() {

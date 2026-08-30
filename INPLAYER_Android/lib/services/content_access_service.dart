@@ -2,6 +2,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'package:dio/dio.dart';
 import '../core/network/dio_client.dart';
 import '../core/constants/api_constants.dart';
 
@@ -73,7 +74,11 @@ class ContentAccessResult {
   final String? error;
   final bool needsPasskey;
 
-  const ContentAccessResult({required this.success, this.error, this.needsPasskey = false});
+  const ContentAccessResult({
+    required this.success,
+    this.error,
+    this.needsPasskey = false,
+  });
 }
 
 class ContentAccessService {
@@ -99,7 +104,10 @@ class ContentAccessService {
       // with our own successful writes — e.g. after signing in on a device
       // that already had a mode set on a different one.
       await _cacheMode(mode);
-      return ContentAccessState(mode: mode, hasPasskey: data['hasPasskey'] == true);
+      return ContentAccessState(
+        mode: mode,
+        hasPasskey: data['hasPasskey'] == true,
+      );
     } catch (e) {
       _logger.e('Error fetching content access state: $e');
       return null;
@@ -113,13 +121,15 @@ class ContentAccessService {
     AudienceMode mode, {
     String? passkey,
   }) async {
+    final cleanedPasskey = passkey?.trim();
     try {
       final response = await _dio.post(
         ApiConstants.contentAccess,
         data: {
           'action': 'set_mode',
           'mode': audienceModeToString(mode),
-          if (passkey != null && passkey.isNotEmpty) 'passkey': passkey,
+          if (cleanedPasskey != null && cleanedPasskey.isNotEmpty)
+            'passkey': cleanedPasskey,
         },
       );
 
@@ -133,16 +143,31 @@ class ContentAccessService {
       }
 
       final data = response.data;
-      final error = data is Map ? data['error'] as String? : null;
+      final error = data is Map
+          ? (data['error']?.toString() ?? data['message']?.toString())
+          : null;
       final needsPasskey = data is Map && data['needsPasskey'] == true;
       return ContentAccessResult(
         success: false,
         error: error ?? "Couldn't update content settings.",
         needsPasskey: needsPasskey,
       );
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      final error = data is Map
+          ? (data['error']?.toString() ?? data['message']?.toString())
+          : null;
+      return ContentAccessResult(
+        success: false,
+        error: error ?? 'Something went wrong.',
+        needsPasskey: data is Map && data['needsPasskey'] == true,
+      );
     } catch (e) {
       _logger.e('Error setting content access mode: $e');
-      return const ContentAccessResult(success: false, error: 'Something went wrong.');
+      return const ContentAccessResult(
+        success: false,
+        error: 'Something went wrong.',
+      );
     }
   }
 
@@ -150,20 +175,38 @@ class ContentAccessService {
   /// existing one (currentPasskey required — proves whoever's doing this
   /// already knows the old code, otherwise anyone signed in on the device
   /// could silently overwrite a parent's code).
-  Future<ContentAccessResult> setPasskey(String passkey, {String? currentPasskey}) async {
+  Future<ContentAccessResult> setPasskey(
+    String passkey, {
+    String? currentPasskey,
+  }) async {
+    final trimmedPasskey = passkey.trim();
+    final trimmedCurrent = currentPasskey?.trim();
+
+    if (trimmedPasskey.length != 6 ||
+        (!RegExp(r'^\d{6}$').hasMatch(trimmedPasskey))) {
+      return const ContentAccessResult(
+        success: false,
+        error: 'Use a 6-digit numeric passkey.',
+      );
+    }
+
+    if (trimmedCurrent != null &&
+        (trimmedCurrent.length != 6 ||
+            !RegExp(r'^\d{6}$').hasMatch(trimmedCurrent))) {
+      return const ContentAccessResult(
+        success: false,
+        error: 'Enter your current 6-digit passkey.',
+      );
+    }
+
     try {
       final response = await _dio.post(
         ApiConstants.contentAccess,
         data: {
           'action': 'set_passkey',
-          'passkey': passkey,
-          // Null-aware map entry (Dart 3.8+, this project targets 3.12) —
-          // 'currentPasskey': ?currentPasskey drops the whole key entirely
-          // when currentPasskey is null, identical behavior to the old
-          // `if (currentPasskey != null) 'currentPasskey': currentPasskey`
-          // this replaces, confirmed against Dart's own language docs
-          // before changing a real request-body construction.
-          'currentPasskey': ?currentPasskey,
+          'passkey': trimmedPasskey,
+          if (trimmedCurrent != null && trimmedCurrent.isNotEmpty)
+            'currentPasskey': trimmedCurrent,
         },
       );
 
@@ -172,11 +215,28 @@ class ContentAccessService {
       }
 
       final data = response.data;
-      final error = data is Map ? data['error'] as String? : null;
-      return ContentAccessResult(success: false, error: error ?? "Couldn't save that passkey.");
+      final error = data is Map
+          ? (data['error']?.toString() ?? data['message']?.toString())
+          : null;
+      return ContentAccessResult(
+        success: false,
+        error: error ?? "Couldn't save that passkey.",
+      );
+    } on DioException catch (e) {
+      final data = e.response?.data;
+      final error = data is Map
+          ? (data['error']?.toString() ?? data['message']?.toString())
+          : null;
+      return ContentAccessResult(
+        success: false,
+        error: error ?? "Couldn't save that passkey.",
+      );
     } catch (e) {
       _logger.e('Error setting passkey: $e');
-      return const ContentAccessResult(success: false, error: 'Something went wrong.');
+      return const ContentAccessResult(
+        success: false,
+        error: 'Something went wrong.',
+      );
     }
   }
 

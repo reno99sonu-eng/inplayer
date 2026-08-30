@@ -20,14 +20,46 @@ class SettingsPage extends ConsumerStatefulWidget {
 }
 
 class _SettingsPageState extends ConsumerState<SettingsPage> {
+  final ScrollController _scrollController = ScrollController();
+  final Map<String, GlobalKey> _sectionKeys = {};
   bool _pushNotifications = true;
   bool _prefsLoaded = false;
   bool _deletingAccount = false;
+  int _activeSectionIndex = 0;
 
   @override
   void initState() {
     super.initState();
     _loadPrefs();
+    _scrollController.addListener(_updateActiveSectionFromScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.removeListener(_updateActiveSectionFromScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _updateActiveSectionFromScroll() {
+    var closest = 0;
+    var closestDistance = double.infinity;
+
+    for (int i = 0; i < _sectionKeys.length; i++) {
+      final key = _sectionKeys.values.elementAt(i);
+      final renderBox = key.currentContext?.findRenderObject() as RenderBox?;
+      if (renderBox == null) continue;
+      final position = renderBox.localToGlobal(Offset.zero, ancestor: context.findRenderObject()).dy;
+      final distance = (position - 120).abs();
+      if (distance < closestDistance) {
+        closestDistance = distance;
+        closest = i;
+      }
+    }
+
+    if (closest != _activeSectionIndex && mounted) {
+      setState(() => _activeSectionIndex = closest);
+    }
   }
 
   Future<void> _loadPrefs() async {
@@ -52,6 +84,28 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         backgroundColor: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
       ),
     );
+  }
+
+  void _jumpToSection(String title, {List<_SettingsSection>? sections}) {
+    final key = _sectionKeys[title];
+    final sectionContext = key?.currentContext;
+    if (sectionContext == null) return;
+
+    final sectionIndex = sectionsByTitle(title, sections ?? const []);
+    setState(() => _activeSectionIndex = sectionIndex);
+    Scrollable.ensureVisible(
+      sectionContext,
+      duration: const Duration(milliseconds: 280),
+      curve: Curves.easeOutCubic,
+      alignment: 0.08,
+    );
+  }
+
+  int sectionsByTitle(String title, List<_SettingsSection> sections) {
+    for (int i = 0; i < sections.length; i++) {
+      if (sections[i].title == title) return i;
+    }
+    return 0;
   }
 
   Future<void> _showThemePicker() async {
@@ -223,11 +277,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   Widget build(BuildContext context) {
     final currentTheme = ref.watch(themeChoiceProvider);
 
+    final sections = _buildSections(currentTheme);
+
     return Scaffold(
       backgroundColor: context.bgCanvas,
       appBar: AppBar(
         backgroundColor: context.bgCanvas,
         elevation: 0,
+        automaticallyImplyLeading: false,
+        leading: Navigator.of(context).canPop()
+            ? IconButton(
+                onPressed: () => Navigator.of(context).pop(),
+                icon: Icon(Icons.arrow_back_ios_new_rounded, color: context.textPrimary),
+              )
+            : null,
         title: Text(
           'Settings',
           style: TextStyle(
@@ -237,11 +300,210 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ),
         ),
       ),
-      body: ListView(
-        children: [
-          // 1. APPEARANCE
-          _buildSectionHeader('Appearance'),
-          _buildMenuItem(
+      body: SafeArea(
+        child: Column(
+          children: [
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 10),
+              child: SizedBox(
+                height: 42,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: sections.length,
+                  separatorBuilder: (_, _) => const SizedBox(width: 8),
+                  itemBuilder: (context, index) {
+                    final section = sections[index];
+                    final selected = index == _activeSectionIndex;
+                    return Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => _jumpToSection(section.title, sections: sections),
+                        borderRadius: BorderRadius.circular(12),
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 200),
+                          curve: Curves.easeOutCubic,
+                          padding: const EdgeInsets.symmetric(horizontal: 14),
+                          decoration: BoxDecoration(
+                            color: selected ? AppColors.brandOrange : context.isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.03),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: selected ? AppColors.brandOrange.withValues(alpha: 0.35) : context.borderSubtle,
+                            ),
+                            boxShadow: selected
+                                ? [
+                                    BoxShadow(
+                                      color: AppColors.brandOrange.withValues(alpha: 0.18),
+                                      blurRadius: 12,
+                                      offset: const Offset(0, 4),
+                                    ),
+                                  ]
+                                : null,
+                          ),
+                          alignment: Alignment.center,
+                          child: Text(
+                            section.title,
+                            style: TextStyle(
+                              color: selected ? Colors.white : context.textPrimary,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 12,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
+            Expanded(
+              child: ListView(
+                controller: _scrollController,
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 28),
+                children: [
+                  for (final section in sections)
+                    Padding(
+                      key: _sectionKeys.putIfAbsent(section.title, () => GlobalKey()),
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: context.bgCard,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: context.borderSubtle),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 6),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Padding(
+                              padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+                              child: Text(
+                                section.title.toUpperCase(),
+                                style: const TextStyle(
+                                  color: AppColors.brandOrange,
+                                  fontWeight: FontWeight.w800,
+                                  fontSize: 11,
+                                  letterSpacing: 1.2,
+                                ),
+                              ),
+                            ),
+                            ...section.items.map((item) => item.build(context)),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  List<_SettingsSection> _buildSections(ThemeChoice currentTheme) {
+    return [
+      _SettingsSection(
+        title: 'Profile',
+        items: [
+          _SettingTile(
+            icon: Icons.person_outline,
+            title: 'Edit Profile & Avatar',
+            onTap: () => context.push('/settings/edit-profile'),
+          ),
+          _SettingTile(
+            icon: Icons.mail_outline,
+            title: 'Email Address',
+            onTap: () => context.push('/settings/change-email'),
+          ),
+          _SettingTile(
+            icon: Icons.lock_outline,
+            title: 'Change Password',
+            onTap: () => context.push('/settings/change-password'),
+          ),
+          _SettingTile(
+            icon: Icons.language_outlined,
+            title: 'Language',
+            trailing: Text('English', style: TextStyle(color: context.textDim, fontSize: 13)),
+            onTap: () => _showSnack('InPlayer is currently available in English only.'),
+          ),
+        ],
+      ),
+      _SettingsSection(
+        title: 'Privacy',
+        items: [
+          _SettingTile(
+            icon: Icons.visibility_outlined,
+            title: 'Privacy, Passkeys & Active Sessions',
+            onTap: () => context.push('/settings/privacy'),
+          ),
+          _SettingTile(
+            icon: Icons.block_outlined,
+            title: 'Blocked Users',
+            onTap: () => context.push('/settings/blocked-users'),
+          ),
+          _SettingSwitch(
+            icon: Icons.notifications_outlined,
+            title: 'Push Notifications',
+            value: _pushNotifications,
+            onChanged: _prefsLoaded ? _setPushNotifications : null,
+          ),
+        ],
+      ),
+      _SettingsSection(
+        title: 'Playback',
+        items: [
+          _SettingTile(
+            icon: Icons.play_circle_outline,
+            title: 'Streaming & Quality Preferences',
+            onTap: () => context.push('/settings/playback'),
+          ),
+          _SettingTile(
+            icon: Icons.download_for_offline_outlined,
+            title: 'Downloads & Offline Videos',
+            onTap: () => context.push('/downloads'),
+          ),
+        ],
+      ),
+      _SettingsSection(
+        title: 'Premium',
+        items: [
+          _SettingTile(
+            icon: Icons.workspace_premium_outlined,
+            title: 'Premium Plans & Subscriptions',
+            onTap: () => context.push('/settings/plans'),
+          ),
+        ],
+      ),
+      _SettingsSection(
+        title: 'Revenue',
+        items: [
+          _SettingTile(
+            icon: Icons.insights_outlined,
+            title: 'Creator & Upload Analytics',
+            onTap: () => context.push('/settings/analytics'),
+          ),
+          _SettingTile(
+            icon: Icons.storage_outlined,
+            title: 'Cloud Storage & Uploads Overview',
+            onTap: () => context.push('/settings/storage'),
+          ),
+        ],
+      ),
+      _SettingsSection(
+        title: 'KYC',
+        items: [
+          _SettingTile(
+            icon: Icons.fact_check_outlined,
+            title: 'Creator KYC & Monetization',
+            onTap: () => context.push('/creator/kyc'),
+          ),
+        ],
+      ),
+      _SettingsSection(
+        title: 'Appearance',
+        items: [
+          _SettingTile(
             icon: currentTheme == ThemeChoice.system
                 ? Icons.brightness_auto
                 : currentTheme == ThemeChoice.light
@@ -258,136 +520,52 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             ),
             onTap: _showThemePicker,
           ),
-          Divider(height: 1, color: context.borderSubtle),
-
-          // 2. GENERAL
-          _buildSectionHeader('General'),
-          _buildMenuItem(
-            icon: Icons.person_outline,
-            title: 'Edit Profile & Avatar',
-            onTap: () => context.push('/settings/edit-profile'),
-          ),
-          _buildMenuItem(
-            icon: Icons.lock_outline,
-            title: 'Change Password',
-            onTap: () => context.push('/settings/change-password'),
-          ),
-          _buildMenuItem(
-            icon: Icons.mail_outline,
-            title: 'Email Address',
-            onTap: () => context.push('/settings/change-email'),
-          ),
-          _buildSwitchItem(
-            icon: Icons.notifications_outlined,
-            title: 'Push Notifications',
-            value: _pushNotifications,
-            onChanged: _prefsLoaded ? _setPushNotifications : null,
-          ),
-          _buildMenuItem(
-            icon: Icons.language_outlined,
-            title: 'Language',
-            trailing: Text('English', style: TextStyle(color: context.textDim, fontSize: 13)),
-            onTap: () => _showSnack('InPlayer is currently available in English only.'),
-          ),
-          Divider(height: 1, color: context.borderSubtle),
-
-          // 3. PLAYBACK
-          _buildSectionHeader('Playback'),
-          _buildMenuItem(
-            icon: Icons.play_circle_outline,
-            title: 'Streaming & Quality Preferences',
-            onTap: () => context.push('/settings/playback'),
-          ),
-          _buildMenuItem(
-            icon: Icons.download_for_offline_outlined,
-            title: 'Downloads & Offline Videos',
-            onTap: () => context.push('/downloads'),
-          ),
-          Divider(height: 1, color: context.borderSubtle),
-
-          // 4. PRIVACY
-          _buildSectionHeader('Account & Privacy'),
-          _buildMenuItem(
-            icon: Icons.visibility_outlined,
-            title: 'Privacy, Passkeys & Active Sessions',
-            onTap: () => context.push('/settings/privacy'),
-          ),
-          _buildMenuItem(
-            icon: Icons.block_outlined,
-            title: 'Blocked Users',
-            onTap: () => context.push('/settings/blocked-users'),
-          ),
-          Divider(height: 1, color: context.borderSubtle),
-
-          // 5. PLANS & PURCHASES
-          _buildSectionHeader('Plans & Purchases'),
-          _buildMenuItem(
-            icon: Icons.workspace_premium_outlined,
-            title: 'Premium Plans & Subscriptions',
-            onTap: () => context.push('/settings/plans'),
-          ),
-          Divider(height: 1, color: context.borderSubtle),
-
-          // 6. ANALYTICS
-          _buildSectionHeader('User Analytics'),
-          _buildMenuItem(
-            icon: Icons.insights_outlined,
-            title: 'Creator & Upload Analytics',
-            onTap: () => context.push('/settings/analytics'),
-          ),
-          Divider(height: 1, color: context.borderSubtle),
-
-          // 7. STORAGE
-          _buildSectionHeader('Storage'),
-          _buildMenuItem(
-            icon: Icons.storage_outlined,
-            title: 'Cloud Storage & Uploads Overview',
-            onTap: () => context.push('/settings/storage'),
-          ),
-          Divider(height: 1, color: context.borderSubtle),
-
-          // 8. ABOUT & LEGAL
-          _buildSectionHeader('About & Legal'),
-          _buildMenuItem(
+        ],
+      ),
+      _SettingsSection(
+        title: 'Legal',
+        items: [
+          _SettingTile(
             icon: Icons.info_outline,
             title: 'About InPlayer',
             onTap: _showAbout,
           ),
-          _buildMenuItem(
+          _SettingTile(
             icon: Icons.bug_report_outlined,
             title: 'Report a Problem',
             onTap: () => context.push('/settings/report-problem'),
           ),
-          _buildMenuItem(
+          _SettingTile(
             icon: Icons.help_outline,
             title: 'Help Center',
             onTap: () => context.push('/settings/help'),
           ),
-          _buildMenuItem(
+          _SettingTile(
             icon: Icons.email_outlined,
             title: 'Contact Support',
             onTap: () => context.push('/contact'),
           ),
-          _buildMenuItem(
+          _SettingTile(
             icon: Icons.description_outlined,
             title: 'Terms of Service',
             onTap: () => context.push('/settings/terms'),
           ),
-          _buildMenuItem(
+          _SettingTile(
             icon: Icons.storefront_outlined,
             title: 'HamMart Vendor Terms',
             onTap: () => context.push('/settings/vendor-terms'),
           ),
-          _buildMenuItem(
+          _SettingTile(
             icon: Icons.privacy_tip_outlined,
             title: 'Privacy Policy',
             onTap: () => context.push('/settings/privacy-policy'),
           ),
-          Divider(height: 1, color: context.borderSubtle),
-
-          // DANGER ZONE
-          _buildSectionHeader('Danger Zone'),
-          _buildMenuItem(
+        ],
+      ),
+      _SettingsSection(
+        title: 'Danger',
+        items: [
+          _SettingTile(
             icon: Icons.delete_forever_outlined,
             title: _deletingAccount ? 'Deleting your account...' : 'Delete Account',
             onTap: _deletingAccount ? () {} : _confirmDeleteAccount,
@@ -400,72 +578,112 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   )
                 : null,
           ),
-          const SizedBox(height: 32),
         ],
       ),
-    );
+    ];
   }
 
-  Widget _buildSectionHeader(String title) {
+}
+
+class _SettingsSection {
+  final String title;
+  final List<_SettingsItem> items;
+
+  const _SettingsSection({required this.title, required this.items});
+}
+
+abstract class _SettingsItem {
+  Widget build(BuildContext context);
+}
+
+class _SettingTile extends _SettingsItem {
+  final IconData icon;
+  final String title;
+  final Widget? trailing;
+  final VoidCallback onTap;
+  final bool isDestructive;
+
+  _SettingTile({
+    required this.icon,
+    required this.title,
+    required this.onTap,
+    this.trailing,
+    this.isDestructive = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          child: Row(
+            children: [
+              Icon(icon, color: isDestructive ? AppColors.error : context.textPrimary, size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  title,
+                  style: TextStyle(
+                    color: isDestructive ? AppColors.error : context.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              if (trailing != null) trailing! else Icon(Icons.chevron_right, color: context.textDim, size: 18),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SettingSwitch extends _SettingsItem {
+  final IconData icon;
+  final String title;
+  final bool value;
+  final ValueChanged<bool>? onChanged;
+
+  _SettingSwitch({
+    required this.icon,
+    required this.title,
+    required this.value,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
-      child: Text(
-        title.toUpperCase(),
-        style: const TextStyle(
-          color: AppColors.brandOrange,
-          fontWeight: FontWeight.w800,
-          fontSize: 11,
-          letterSpacing: 1.2,
-        ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: Row(
+        children: [
+          Icon(icon, color: context.textPrimary, size: 20),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              title,
+              style: TextStyle(color: context.textPrimary, fontSize: 14, fontWeight: FontWeight.w500),
+            ),
+          ),
+          Transform.scale(
+            scale: 0.8,
+            child: Switch.adaptive(
+              value: value,
+              activeThumbColor: Colors.white,
+              activeTrackColor: AppColors.brandOrange,
+              inactiveThumbColor: Colors.white,
+              inactiveTrackColor: context.isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+              onChanged: onChanged,
+              materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+            ),
+          ),
+        ],
       ),
-    );
-  }
-
-  Widget _buildMenuItem({
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-    Widget? trailing,
-    bool isDestructive = false,
-  }) {
-    return ListTile(
-      leading: Icon(
-        icon,
-        color: isDestructive ? AppColors.error : context.textPrimary,
-        size: 22,
-      ),
-      title: Text(
-        title,
-        style: TextStyle(
-          color: isDestructive ? AppColors.error : context.textPrimary,
-          fontSize: 14,
-          fontWeight: FontWeight.w500,
-        ),
-      ),
-      trailing: trailing ?? Icon(Icons.chevron_right, color: context.textDim, size: 20),
-      onTap: onTap,
-    );
-  }
-
-  Widget _buildSwitchItem({
-    required IconData icon,
-    required String title,
-    String? subtitle,
-    required bool value,
-    required ValueChanged<bool>? onChanged,
-  }) {
-    return SwitchListTile(
-      secondary: Icon(icon, color: context.textPrimary, size: 22),
-      title: Text(
-        title,
-        style: TextStyle(color: context.textPrimary, fontSize: 14, fontWeight: FontWeight.w500),
-      ),
-      subtitle: subtitle != null
-          ? Text(subtitle, style: TextStyle(color: context.textSecondary, fontSize: 12))
-          : null,
-      activeThumbColor: AppColors.brandOrange,
-      value: value,
-      onChanged: onChanged,
     );
   }
 }

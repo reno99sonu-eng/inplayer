@@ -154,21 +154,25 @@ export default function GeoGate({
       // ── Layer 2: VPN/proxy/datacenter detection ──
       try {
         const res = await fetch("/api/geo/verify", { cache: "no-store" });
-        if (res.ok) {
-          const data = await res.json();
-          if (data.allowed === false) {
-            // IP flagged as VPN/proxy/datacenter — block
-            if (!cancelled) {
-              setAllowed(false);
-              cacheResult(false);
-              setChecking(false);
-            }
-            return;
+        if (!res.ok) throw new Error(`Geo verification failed: ${res.status}`);
+        const data = await res.json();
+        if (data.allowed !== true) {
+          // IP outside India, or flagged as VPN/proxy/datacenter.
+          if (!cancelled) {
+            setAllowed(false);
+            cacheResult(false);
+            setChecking(false);
           }
+          return;
         }
-        // API failed or returned allowed → continue to Layer 3
       } catch {
-        // API unreachable — fail open (Layer 1 already validated IP country)
+        // API unreachable — fail closed; the network cannot be verified.
+        if (!cancelled) {
+          setAllowed(false);
+          cacheResult(false);
+          setChecking(false);
+        }
+        return;
       }
 
       // ── Layer 3: Browser GPS verification ──

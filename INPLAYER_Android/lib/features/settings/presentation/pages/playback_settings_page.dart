@@ -162,127 +162,286 @@ class _PlaybackSettingsPageState extends State<PlaybackSettingsPage> {
       body: !_loaded
           ? const Center(child: CircularProgressIndicator(color: AppColors.brandOrange))
           : ListView(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
               children: [
-                _sectionHeader('Streaming'),
-                _selectRow(
-                  icon: Icons.smartphone_outlined,
-                  title: 'Shorts & mobile quality',
-                  description: 'Caps the quality used in the Shorts feed.',
-                  value: _qualityLabel(_settings.mobileQuality),
-                  onTap: () => _pickQuality(
-                    title: 'Shorts & mobile quality',
-                    current: _settings.mobileQuality,
-                    onPicked: (v) => _update((s) => s.copyWith(mobileQuality: v)),
-                  ),
-                ),
-                _selectRow(
-                  icon: Icons.wifi,
-                  title: 'Video quality',
-                  description: 'Caps the quality on watch pages.',
-                  value: _qualityLabel(_settings.wifiQuality),
-                  onTap: () => _pickQuality(
-                    title: 'Video quality',
-                    current: _settings.wifiQuality,
-                    onPicked: (v) => _update((s) => s.copyWith(wifiQuality: v)),
-                  ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 4),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      const Icon(Icons.lock_outline, size: 13, color: AppColors.brandOrange),
-                      const SizedBox(width: 6),
-                      Expanded(
-                        child: Text(
-                          'Free accounts stream up to 1080p (Full HD). 1440p and 4K Ultra HD are part of '
-                          'InPlayer Premium — picking them here does nothing on a free account.',
-                          style: TextStyle(color: context.textDim, fontSize: 11.5, height: 1.4),
-                        ),
+                _heroCard(),
+                const SizedBox(height: 14),
+                _settingsCard(
+                  children: [
+                    _sectionHeader('Streaming'),
+                    _selectRow(
+                      icon: Icons.smartphone_outlined,
+                      title: 'Shorts & mobile quality',
+                      description: 'Caps the quality used in the Shorts feed.',
+                      value: _qualityLabel(_settings.mobileQuality),
+                      onTap: () => _pickQuality(
+                        title: 'Shorts & mobile quality',
+                        current: _settings.mobileQuality,
+                        onPicked: (v) => _update((s) => s.copyWith(mobileQuality: v)),
                       ),
-                    ],
-                  ),
+                    ),
+                    _selectRow(
+                      icon: Icons.wifi,
+                      title: 'Video quality',
+                      description: 'Caps the quality on watch pages.',
+                      value: _qualityLabel(_settings.wifiQuality),
+                      onTap: () => _pickQuality(
+                        title: 'Video quality',
+                        current: _settings.wifiQuality,
+                        onPicked: (v) => _update((s) => s.copyWith(wifiQuality: v)),
+                      ),
+                    ),
+                    _premiumNote(
+                      'Free accounts stream up to 1080p (Full HD). 1440p and 4K Ultra HD are part of InPlayer Premium — picking them here does nothing on a free account.',
+                    ),
+                    _selectRow(
+                      icon: Icons.volume_up_outlined,
+                      title: 'Audio Quality',
+                      description: 'Not available yet — uploads are transcoded to a single audio ladder, so there is nothing to choose between.',
+                      value: _settings.audioQuality == 'high' ? 'High' : (_settings.audioQuality == 'low' ? 'Low' : _settings.audioQuality),
+                      onTap: () async {
+                        await showModalBottomSheet<void>(
+                          context: context,
+                          backgroundColor: Colors.transparent,
+                          builder: (ctx) {
+                            return Container(
+                              decoration: BoxDecoration(
+                                color: ctx.bgModal,
+                                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                                border: Border.all(color: ctx.borderSubtle),
+                              ),
+                              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Center(
+                                    child: Container(
+                                      width: 40,
+                                      height: 4,
+                                      decoration: BoxDecoration(
+                                        color: ctx.textDim.withValues(alpha: 0.4),
+                                        borderRadius: BorderRadius.circular(2),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 18),
+                                  Text('Audio Quality', style: TextStyle(color: ctx.textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
+                                  const SizedBox(height: 12),
+                                  for (final choice in [('low', 'Low'), ('high', 'High')])
+                                    InkWell(
+                                      onTap: () {
+                                        Navigator.pop(ctx);
+                                        _update((s) => s.copyWith(audioQuality: choice.$2));
+                                      },
+                                      borderRadius: BorderRadius.circular(12),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                                        margin: const EdgeInsets.only(bottom: 6),
+                                        decoration: BoxDecoration(
+                                          color: choice.$2 == _settings.audioQuality
+                                              ? AppColors.brandOrange.withValues(alpha: 0.12)
+                                              : Colors.transparent,
+                                          borderRadius: BorderRadius.circular(12),
+                                        ),
+                                        child: Row(
+                                          children: [
+                                            Expanded(
+                                              child: Text(
+                                                choice.$2,
+                                                style: TextStyle(
+                                                  color: choice.$2 == _settings.audioQuality ? AppColors.brandOrange : ctx.textPrimary,
+                                                  fontWeight: choice.$2 == _settings.audioQuality ? FontWeight.bold : FontWeight.w500,
+                                                  fontSize: 15,
+                                                ),
+                                              ),
+                                            ),
+                                            if (choice.$2 == _settings.audioQuality)
+                                              const Icon(Icons.check_circle, color: AppColors.brandOrange, size: 20),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ],
                 ),
-                _selectRow(
-                  icon: Icons.volume_up_outlined,
-                  title: 'Audio Quality',
-                  description: 'Not available yet — uploads are transcoded to a single audio ladder, so there is nothing to choose between.',
-                  value: 'High',
-                  onTap: null,
+                const SizedBox(height: 14),
+                _settingsCard(
+                  children: [
+                    _sectionHeader('Playback'),
+                    _switchRow(
+                      icon: Icons.play_circle_outline,
+                      title: 'Autoplay Next Video',
+                      description: 'Not available yet — needs an up-next queue, which the watch page doesn’t have.',
+                      value: _settings.autoplay,
+                      onChanged: (v) => _update((s) => s.copyWith(autoplay: v)),
+                    ),
+                    _switchRow(
+                      icon: Icons.picture_in_picture_alt_outlined,
+                      title: 'Picture in Picture',
+                      description: _pipSupportedOnDevice
+                          ? 'Automatically switch to a small floating window when you leave the app while a video is playing. The in-player PiP button always works either way.'
+                          : 'Not available on this device — needs Android 7.0 or newer.',
+                      value: _settings.pip,
+                      onChanged: _pipSupportedOnDevice ? (v) => _update((s) => s.copyWith(pip: v)) : null,
+                    ),
+                  ],
                 ),
-
-                _sectionHeader('Playback'),
-                _switchRow(
-                  icon: Icons.play_circle_outline,
-                  title: 'Autoplay Next Video',
-                  description: 'Not available yet — needs an up-next queue, which the watch page doesn’t have.',
-                  value: _settings.autoplay,
-                  onChanged: null,
+                const SizedBox(height: 14),
+                _settingsCard(
+                  children: [
+                    _sectionHeader('Accessibility'),
+                    _switchRow(
+                      icon: Icons.closed_caption_outlined,
+                      title: 'Closed Captions',
+                      description: 'Show captions whenever available.',
+                      value: _settings.captions,
+                      onChanged: (v) => _update((s) => s.copyWith(captions: v)),
+                    ),
+                  ],
                 ),
-                _switchRow(
-                  icon: Icons.picture_in_picture_alt_outlined,
-                  title: 'Picture in Picture',
-                  description: _pipSupportedOnDevice
-                      ? 'Automatically switch to a small floating window when you leave the app while a video is playing. The in-player PiP button always works either way.'
-                      : 'Not available on this device — needs Android 7.0 or newer.',
-                  value: _settings.pip,
-                  onChanged: _pipSupportedOnDevice ? (v) => _update((s) => s.copyWith(pip: v)) : null,
+                const SizedBox(height: 14),
+                _settingsCard(
+                  children: [
+                    _sectionHeader('Data'),
+                    _switchRow(
+                      icon: Icons.data_usage_outlined,
+                      title: 'Data Saver',
+                      description: 'Reduce streaming quality to save mobile data.',
+                      value: _settings.dataSaver,
+                      onChanged: (v) => _update((s) => s.copyWith(dataSaver: v)),
+                    ),
+                    _switchRow(
+                      icon: Icons.history,
+                      title: 'Remember playback position',
+                      description: 'Pick up long videos where you left off.',
+                      value: _settings.rememberPosition,
+                      onChanged: (v) async {
+                        await _update((s) => s.copyWith(rememberPosition: v));
+                        if (!v) await PlaybackPositionStore.clearAll();
+                      },
+                    ),
+                    _switchRow(
+                      icon: Icons.fast_forward_outlined,
+                      title: 'Skip Intro Automatically',
+                      description: 'Not available yet — needs automatic intro detection, which nothing generates at upload.',
+                      value: _settings.skipIntro,
+                      onChanged: (v) => _update((s) => s.copyWith(skipIntro: v)),
+                    ),
+                    _switchRow(
+                      icon: Icons.headset_outlined,
+                      title: 'Background Playback',
+                      description: 'Not available yet — needs a foreground media service to keep audio playing after you leave the app.',
+                      value: _settings.backgroundPlayback,
+                      onChanged: (v) => _update((s) => s.copyWith(backgroundPlayback: v)),
+                    ),
+                  ],
                 ),
-
-                _sectionHeader('Accessibility'),
-                _switchRow(
-                  icon: Icons.closed_caption_outlined,
-                  title: 'Closed Captions',
-                  description: 'Show captions whenever available.',
-                  value: _settings.captions,
-                  onChanged: (v) => _update((s) => s.copyWith(captions: v)),
-                ),
-
-                _sectionHeader('Data'),
-                _switchRow(
-                  icon: Icons.data_usage_outlined,
-                  title: 'Data Saver',
-                  description: 'Reduce streaming quality to save mobile data.',
-                  value: _settings.dataSaver,
-                  onChanged: (v) => _update((s) => s.copyWith(dataSaver: v)),
-                ),
-                _switchRow(
-                  icon: Icons.history,
-                  title: 'Remember playback position',
-                  description: 'Pick up long videos where you left off.',
-                  value: _settings.rememberPosition,
-                  onChanged: (v) async {
-                    await _update((s) => s.copyWith(rememberPosition: v));
-                    // Turning it off has to forget what's already saved too —
-                    // otherwise "off" only means "stop adding to the pile"
-                    // while old positions keep resuming. Matches the
-                    // website's own clearAllPlaybackPositions() call.
-                    if (!v) await PlaybackPositionStore.clearAll();
-                  },
-                ),
-                _switchRow(
-                  icon: Icons.fast_forward_outlined,
-                  title: 'Skip Intro Automatically',
-                  description: 'Not available yet — needs automatic intro detection, which nothing generates at upload.',
-                  value: _settings.skipIntro,
-                  onChanged: null,
-                ),
-                _switchRow(
-                  icon: Icons.headset_outlined,
-                  title: 'Background Playback',
-                  description: 'Not available yet — needs a foreground media service to keep audio playing after you leave the app.',
-                  value: _settings.backgroundPlayback,
-                  onChanged: null,
-                ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 24),
               ],
             ),
     );
   }
 
+  Widget _heroCard() {
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(20),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.brandOrange.withValues(alpha: 0.18),
+            context.isDark ? const Color(0xFF111827) : const Color(0xFFFFFFFF),
+          ],
+        ),
+        border: Border.all(color: AppColors.brandOrange.withValues(alpha: 0.22)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 46,
+            height: 46,
+            decoration: BoxDecoration(
+              color: AppColors.brandOrange,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 24),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Playback preferences',
+                  style: TextStyle(
+                    color: context.textPrimary,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  'Tune mobile quality, captions, and how videos resume on your device.',
+                  style: TextStyle(
+                    color: context.textSecondary,
+                    fontSize: 12,
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _settingsCard({required List<Widget> children}) {
+    return Container(
+      decoration: BoxDecoration(
+        color: context.bgCard,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: context.borderSubtle),
+      ),
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: children,
+      ),
+    );
+  }
+
+  Widget _premiumNote(String text) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(Icons.lock_outline, size: 14, color: AppColors.brandOrange),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(color: context.textDim, fontSize: 11.5, height: 1.45),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _sectionHeader(String title) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 20, 16, 8),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: Text(
         title.toUpperCase(),
         style: const TextStyle(color: AppColors.brandOrange, fontWeight: FontWeight.w800, fontSize: 11, letterSpacing: 1.2),
@@ -300,15 +459,31 @@ class _PlaybackSettingsPageState extends State<PlaybackSettingsPage> {
     final enabled = onTap != null;
     return ListTile(
       enabled: enabled,
-      leading: Icon(icon, color: enabled ? context.textPrimary : context.textDim, size: 22),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      leading: Container(
+        width: 34,
+        height: 34,
+        decoration: BoxDecoration(
+          color: enabled ? AppColors.brandOrange.withValues(alpha: 0.12) : context.borderSubtle,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, color: enabled ? AppColors.brandOrange : context.textDim, size: 18),
+      ),
       title: Text(
         title,
-        style: TextStyle(color: enabled ? context.textPrimary : context.textDim, fontSize: 14, fontWeight: FontWeight.w500),
+        style: TextStyle(color: enabled ? context.textPrimary : context.textDim, fontSize: 14, fontWeight: FontWeight.w600),
       ),
       subtitle: Text(description, style: TextStyle(color: context.textDim, fontSize: 11.5, height: 1.35)),
-      trailing: Text(
-        value,
-        style: TextStyle(color: enabled ? AppColors.brandOrange : context.textDim, fontWeight: FontWeight.w700, fontSize: 12.5),
+      trailing: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: enabled ? AppColors.brandOrange.withValues(alpha: 0.12) : Colors.transparent,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Text(
+          value,
+          style: TextStyle(color: enabled ? AppColors.brandOrange : context.textDim, fontWeight: FontWeight.w700, fontSize: 12.5),
+        ),
       ),
       onTap: onTap,
     );
@@ -322,14 +497,26 @@ class _PlaybackSettingsPageState extends State<PlaybackSettingsPage> {
     required ValueChanged<bool>? onChanged,
   }) {
     final enabled = onChanged != null;
-    return SwitchListTile(
-      secondary: Icon(icon, color: enabled ? context.textPrimary : context.textDim, size: 22),
+    return SwitchListTile.adaptive(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+      secondary: Container(
+        width: 34,
+        height: 34,
+        decoration: BoxDecoration(
+          color: enabled ? AppColors.brandOrange.withValues(alpha: 0.12) : context.borderSubtle,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, color: enabled ? AppColors.brandOrange : context.textDim, size: 18),
+      ),
       title: Text(
         title,
-        style: TextStyle(color: enabled ? context.textPrimary : context.textDim, fontSize: 14, fontWeight: FontWeight.w500),
+        style: TextStyle(color: enabled ? context.textPrimary : context.textDim, fontSize: 14, fontWeight: FontWeight.w600),
       ),
       subtitle: Text(description, style: TextStyle(color: context.textDim, fontSize: 11.5, height: 1.35)),
-      activeThumbColor: AppColors.brandOrange,
+      activeThumbColor: Colors.white,
+      activeTrackColor: AppColors.brandOrange,
+      inactiveThumbColor: Colors.white,
+      inactiveTrackColor: context.isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
       value: value,
       onChanged: onChanged,
     );

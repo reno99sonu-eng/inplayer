@@ -45,7 +45,7 @@ class _HomeAdCardState extends ConsumerState<HomeAdCard> {
     ref.read(adServiceProvider).trackEvent(ad.adId, event: 'click');
     final uri = Uri.tryParse(ad.linkUrl);
     if (uri != null && await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      await launchUrl(uri, mode: LaunchMode.inAppWebView);
     }
   }
 

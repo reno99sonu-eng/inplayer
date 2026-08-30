@@ -1,17 +1,16 @@
+// ignore_for_file: deprecated_member_use
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:logger/logger.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../models/video.dart';
 import 'history_service.dart';
 
 class MusicPlayerService extends ChangeNotifier {
-  static const _permissionChannel = MethodChannel('inplayer.app/permissions');
-
   final _logger = Logger();
   final AudioPlayer _player = AudioPlayer();
   final Future<void> Function(String videoId)? onTrackStarted;
@@ -68,7 +67,9 @@ class MusicPlayerService extends ChangeNotifier {
 
   Future<void> _requestNotificationPermission() async {
     try {
-      await _permissionChannel.invokeMethod('requestNotificationPermission');
+      // Android 13+ requires an explicit runtime grant before the media
+      // session notification can appear in the shade/lock screen.
+      await Permission.notification.request();
     } catch (_) {}
   }
 

@@ -21,7 +21,11 @@ class RaftaarShortsRow extends ConsumerStatefulWidget {
   final List<Short>? shorts;
   final String title;
 
-  const RaftaarShortsRow({super.key, this.shorts, this.title = 'Raftaar Shorts'});
+  const RaftaarShortsRow({
+    super.key,
+    this.shorts,
+    this.title = 'Raftaar Shorts',
+  });
 
   @override
   ConsumerState<RaftaarShortsRow> createState() => _RaftaarShortsRowState();
@@ -100,7 +104,7 @@ class _RaftaarShortsRowState extends ConsumerState<RaftaarShortsRow> {
             ],
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 6),
         SizedBox(
           height: 240,
           child: _isLoading
@@ -129,7 +133,9 @@ class _RaftaarShortsRowState extends ConsumerState<RaftaarShortsRow> {
           width: 135,
           margin: const EdgeInsets.only(right: 12),
           decoration: BoxDecoration(
-            color: context.isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06),
+            color: context.isDark
+                ? Colors.white.withValues(alpha: 0.08)
+                : Colors.black.withValues(alpha: 0.06),
             borderRadius: BorderRadius.circular(14),
           ),
         );
@@ -183,10 +189,7 @@ class _RaftaarShortsRowState extends ConsumerState<RaftaarShortsRow> {
               top: 8,
               left: 8,
               child: Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 6,
-                  vertical: 2,
-                ),
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                 decoration: BoxDecoration(
                   color: AppColors.brandOrange.withValues(alpha: 0.95),
                   borderRadius: BorderRadius.circular(4),
@@ -254,8 +257,11 @@ class _RaftaarShortsRowState extends ConsumerState<RaftaarShortsRow> {
 
   Widget _buildPoster(BuildContext context, Short short) {
     String posterUrl = short.poster.trim();
-    if (posterUrl.isEmpty && short.muxPlaybackId != null && short.muxPlaybackId!.isNotEmpty) {
-      posterUrl = 'https://image.mux.com/${short.muxPlaybackId}/thumbnail.webp?width=640&height=1138&fit_mode=smartcrop&time=1';
+    if (posterUrl.isEmpty &&
+        short.muxPlaybackId != null &&
+        short.muxPlaybackId!.isNotEmpty) {
+      posterUrl =
+          'https://image.mux.com/${short.muxPlaybackId}/thumbnail.webp?width=640&height=1138&fit_mode=smartcrop&time=1';
     }
 
     if (posterUrl.isEmpty) {
@@ -284,7 +290,10 @@ class _RaftaarShortsRowState extends ConsumerState<RaftaarShortsRow> {
           child: SizedBox(
             width: 20,
             height: 20,
-            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.brandOrange),
+            child: CircularProgressIndicator(
+              strokeWidth: 2,
+              color: AppColors.brandOrange,
+            ),
           ),
         ),
       ),
@@ -302,7 +311,11 @@ class _RaftaarShortsRowState extends ConsumerState<RaftaarShortsRow> {
         ),
       ),
       child: const Center(
-        child: Icon(Icons.play_arrow_rounded, color: AppColors.brandOrange, size: 36),
+        child: Icon(
+          Icons.play_arrow_rounded,
+          color: AppColors.brandOrange,
+          size: 36,
+        ),
       ),
     );
   }

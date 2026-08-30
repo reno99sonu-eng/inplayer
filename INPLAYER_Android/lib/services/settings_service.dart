@@ -1,3 +1,4 @@
+// ignore_for_file: use_null_aware_elements
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
 import '../core/network/dio_client.dart';

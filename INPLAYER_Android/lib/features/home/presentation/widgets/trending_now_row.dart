@@ -83,7 +83,7 @@ class _TrendingNowRowState extends ConsumerState<TrendingNowRow> {
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -108,7 +108,7 @@ class _TrendingNowRowState extends ConsumerState<TrendingNowRow> {
               ),
             ],
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 3),
           Text(
             'Trending Creators',
             style: TextStyle(
@@ -118,7 +118,7 @@ class _TrendingNowRowState extends ConsumerState<TrendingNowRow> {
               letterSpacing: -0.5,
             ),
           ),
-          const SizedBox(height: 12),
+          const SizedBox(height: 6),
           SizedBox(
             height: 115,
             child: _isLoading
@@ -151,7 +151,9 @@ class _TrendingNowRowState extends ConsumerState<TrendingNowRow> {
                 width: 64,
                 height: 64,
                 decoration: BoxDecoration(
-                  color: context.isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.06),
+                  color: context.isDark
+                      ? Colors.white.withValues(alpha: 0.06)
+                      : Colors.black.withValues(alpha: 0.06),
                   shape: BoxShape.circle,
                 ),
               ),
@@ -160,7 +162,9 @@ class _TrendingNowRowState extends ConsumerState<TrendingNowRow> {
                 width: 48,
                 height: 8,
                 decoration: BoxDecoration(
-                  color: context.isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.06),
+                  color: context.isDark
+                      ? Colors.white.withValues(alpha: 0.06)
+                      : Colors.black.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),

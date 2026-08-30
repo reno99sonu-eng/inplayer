@@ -418,15 +418,35 @@ class _VideoOptionsSheetState extends ConsumerState<VideoOptionsSheet> {
           ],
         ),
         const SizedBox(height: 8),
-        for (final reason in kReportReasons)
-          RadioListTile<String>(
-            contentPadding: EdgeInsets.zero,
-            value: reason['value']!,
-            groupValue: _reportReason,
-            activeColor: AppColors.brandOrange,
-            title: Text(reason['label']!, style: TextStyle(color: context.textPrimary, fontSize: 14)),
-            onChanged: (v) => setState(() => _reportReason = v),
+        RadioGroup<String>(
+          groupValue: _reportReason,
+          onChanged: (value) => setState(() => _reportReason = value),
+          child: Column(
+            children: [
+              for (final reason in kReportReasons)
+                InkWell(
+                  onTap: () => setState(() => _reportReason = reason['value']!),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 6),
+                    child: Row(
+                      children: [
+                        Radio<String>(
+                          value: reason['value']!,
+                          activeColor: AppColors.brandOrange,
+                        ),
+                        Expanded(
+                          child: Text(
+                            reason['label']!,
+                            style: TextStyle(color: context.textPrimary, fontSize: 14),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+            ],
           ),
+        ),
         const SizedBox(height: 4),
         TextField(
           controller: _reportDetailsController,

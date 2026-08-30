@@ -15,7 +15,7 @@ void main() {
       ),
     );
 
-    await tester.tap(find.byType(InkResponse));
+    await tester.tap(find.byType(InkWell));
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
@@ -24,7 +24,7 @@ void main() {
 
     await tester.tap(find.byTooltip('Close InPlayer AI'));
     await tester.pump(); // Trigger the pop
-    await tester.pump(const Duration(milliseconds: 200)); // Wait for transition
+    await tester.pump(const Duration(milliseconds: 400)); // Wait for transition
     await tester.pump(); // Complete removal
 
     expect(find.text('InPlayer AI Studio'), findsNothing);

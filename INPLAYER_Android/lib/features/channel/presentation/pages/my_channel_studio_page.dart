@@ -13,7 +13,8 @@ import '../../../../providers/auth_provider.dart';
 import '../../../../services/video_service.dart';
 import '../../../../services/channel_service.dart';
 import '../../../../services/settings_service.dart';
-import '../../../home/presentation/widgets/mobile_menu_drawer.dart';
+import '../../../../services/platform_update_service.dart';
+import '../../../../services/creator_monetization_service.dart';
 
 enum StudioTab {
   dashboard,
@@ -21,6 +22,52 @@ enum StudioTab {
   profileSettings,
   revenueKYC,
   howItWorks,
+}
+
+class _EligibilityLockNotice extends StatelessWidget {
+  final int subscribers;
+  final int requiredSubscribers;
+  final int videoViews;
+  final int requiredVideoViews;
+
+  const _EligibilityLockNotice({
+    required this.subscribers,
+    required this.requiredSubscribers,
+    required this.videoViews,
+    required this.requiredVideoViews,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final subscriberTarget = requiredSubscribers > 0
+        ? requiredSubscribers
+        : 1000;
+    final viewTarget = requiredVideoViews > 0 ? requiredVideoViews : 50000;
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: context.bgCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.warning.withValues(alpha: .45)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.lock_outline_rounded, color: AppColors.warning),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              'KYC and monetization unlock after reaching $subscriberTarget subscribers and $viewTarget video plays. Progress: $subscribers subscribers, $videoViews plays.',
+              style: TextStyle(
+                color: context.textSecondary,
+                fontSize: 12,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 class MyChannelStudioPage extends ConsumerStatefulWidget {
@@ -31,17 +78,22 @@ class MyChannelStudioPage extends ConsumerStatefulWidget {
       _MyChannelStudioPageState();
 }
 
-class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
+class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage>
+    with WidgetsBindingObserver {
   StudioTab _activeTab = StudioTab.dashboard;
   String _contentFilter = 'all'; // 'all', 'video', 'short', 'music'
   String _analyticsScope = 'video'; // 'video', 'short', 'music'
 
   bool _loading = true;
+  bool _loadInFlight = false;
+  DateTime? _lastBackgroundRefresh;
+  ProviderSubscription<int>? _platformUpdates;
   List<Video> _videos = [];
   int _subscriberCount = 0;
   int _totalViews = 0;
   Map<String, dynamic>? _analytics;
   bool _analyticsUnavailable = false;
+  CreatorMonetizationState _monetization = const CreatorMonetizationState();
 
   // Bio state
   final _bioController = TextEditingController();
@@ -56,24 +108,79 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
   @override
   void initState() {
     super.initState();
-    _loadData();
+    WidgetsBinding.instance.addObserver(this);
+    _platformUpdates = ref.listenManual<int>(platformUpdateRevisionProvider, (
+      previous,
+      next,
+    ) {
+      if (mounted && previous != next) _loadData();
+    });
+    final authState = ref.read(authStateProvider);
+    if (authState is AuthStateAuthenticated) {
+      _loadData();
+    } else {
+      setState(() {
+        _loading = false;
+        _loadInFlight = false;
+      });
+    }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _platformUpdates?.close();
     _bioController.dispose();
     _handleController.dispose();
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed || !mounted || _loadInFlight) return;
+    final now = DateTime.now();
+    if (_lastBackgroundRefresh != null &&
+        now.difference(_lastBackgroundRefresh!).inSeconds < 15) {
+      return;
+    }
+    _lastBackgroundRefresh = now;
+    _loadData();
+  }
+
   Future<void> _loadData() async {
+    if (_loadInFlight) return;
+
     final authState = ref.read(authStateProvider);
     if (authState is! AuthStateAuthenticated) {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _loadInFlight = false;
+        });
+      }
       return;
     }
 
-    final user = authState.user;
+    _loadInFlight = true;
+    if (mounted) setState(() => _loading = true);
+
+    // Fetch the freshest user data from the backend so this dashboard
+    // reflects real-time changes made on the web or other devices.
+    await ref.read(authStateProvider.notifier).refreshUser();
+
+    // Re-read state after refresh
+    final freshAuthState = ref.read(authStateProvider);
+    if (freshAuthState is! AuthStateAuthenticated) {
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _loadInFlight = false;
+        });
+      }
+      return;
+    }
+
+    final user = freshAuthState.user;
     _bioController.text = user.bio;
     _handleController.text = user.handle ?? user.username;
     _privacyLevel =
@@ -85,13 +192,12 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
         ? user.usernamePrivacy
         : 'public';
 
-    if (mounted) setState(() => _loading = true);
-
     try {
       final results = await Future.wait([
         ref.read(videoServiceProvider).getMyVideos(),
         ref.read(channelServiceProvider).getSubscriptionStatus(user.userId),
         ref.read(videoServiceProvider).getChannelAnalytics(),
+        ref.read(creatorMonetizationServiceProvider).getMonetizationStatus(),
       ]);
 
       if (!mounted) return;
@@ -99,6 +205,7 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
       final videos = (results[0] as List<Video>?) ?? [];
       final subStatus = results[1] as Map<String, dynamic>?;
       final analytics = results[2] as Map<String, dynamic>?;
+      final monetization = results[3] as CreatorMonetizationState;
 
       int totalViews = 0;
       for (final v in videos) {
@@ -119,10 +226,17 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
         _totalViews = analyticsViews ?? totalViews;
         _analytics = analytics;
         _analyticsUnavailable = analytics == null;
+        _monetization = monetization;
         _loading = false;
+        _loadInFlight = false;
       });
     } catch (_) {
-      if (mounted) setState(() => _loading = false);
+      if (mounted) {
+        setState(() {
+          _loading = false;
+          _loadInFlight = false;
+        });
+      }
     }
   }
 
@@ -324,8 +438,9 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                             ),
                           ],
                           onChanged: (val) {
-                            if (val != null)
+                            if (val != null) {
                               setModalState(() => selectedVisibility = val);
+                            }
                           },
                         ),
                       ),
@@ -469,19 +584,12 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
 
   @override
   Widget build(BuildContext context) {
-    ref.listen<AuthState>(authStateProvider, (prev, next) {
-      if (next is AuthStateAuthenticated) {
-        _loadData();
-      }
-    });
-
     final authState = ref.watch(authStateProvider);
     final user = authState is AuthStateAuthenticated ? authState.user : null;
 
     if (user == null) {
       if (_loading) {
         return Scaffold(
-          drawer: const MobileMenuDrawer(),
           body: PatternBackground(
             child: const Center(
               child: CircularProgressIndicator(color: AppColors.brandOrange),
@@ -490,7 +598,6 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
         );
       }
       return Scaffold(
-        drawer: const MobileMenuDrawer(),
         body: PatternBackground(
           child: Center(
             child: Padding(
@@ -551,7 +658,6 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
     }
 
     return Scaffold(
-      drawer: const MobileMenuDrawer(),
       body: PatternBackground(
         child: CustomScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -590,28 +696,6 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                         Icons.arrow_back_rounded,
                         color: context.textPrimary,
                         size: 20,
-                      ),
-                    ),
-                  ),
-                  Builder(
-                    builder: (ctx) => GestureDetector(
-                      onTap: () => Scaffold.of(ctx).openDrawer(),
-                      child: Container(
-                        width: 38,
-                        height: 38,
-                        margin: const EdgeInsets.only(right: 10),
-                        decoration: BoxDecoration(
-                          color: context.isDark
-                              ? Colors.white.withValues(alpha: 0.06)
-                              : Colors.black.withValues(alpha: 0.04),
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(color: context.borderSubtle),
-                        ),
-                        child: Icon(
-                          Icons.menu,
-                          color: context.textPrimary,
-                          size: 20,
-                        ),
                       ),
                     ),
                   ),
@@ -828,54 +912,66 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Channel Profile Summary Card
         Container(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
             color: context.bgCard,
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: BorderRadius.circular(18),
             border: Border.all(color: context.borderSubtle),
+            boxShadow: [
+              BoxShadow(
+                color: (context.isDark ? Colors.black : const Color(0xFFE2E8F0))
+                    .withValues(alpha: 0.10),
+                blurRadius: 14,
+                offset: const Offset(0, 6),
+              ),
+            ],
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Container(
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       border: Border.all(
-                        color: AppColors.brandOrange,
+                        color: AppColors.brandOrange.withValues(alpha: 0.5),
                         width: 2,
                       ),
                     ),
                     child: UserAvatar(
                       avatarUrl: user.avatarUrl,
                       name: user.name,
-                      size: 54,
+                      size: 52,
                       isVerified: false,
                     ),
                   ),
-                  const SizedBox(width: 14),
+                  const SizedBox(width: 12),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
                           user.name.isNotEmpty ? user.name : 'Your Channel',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
-                            fontSize: 17,
+                            fontSize: 16,
                             fontWeight: FontWeight.w900,
                             color: context.textPrimary,
                           ),
                         ),
-                        const SizedBox(height: 3),
+                        const SizedBox(height: 2),
                         Text(
                           '@${user.handle ?? user.username} • $_subscriberCount subscribers • ${_formatCount(_totalViews)} views',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             fontSize: 12,
-                            color: context.textSecondary,
                             fontWeight: FontWeight.w500,
+                            color: context.textSecondary,
                           ),
                         ),
                       ],
@@ -883,22 +979,23 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              Divider(height: 1, color: context.borderSubtle),
               const SizedBox(height: 14),
+              Divider(height: 1, color: context.borderSubtle),
+              const SizedBox(height: 12),
               Text(
-                'CHANNEL DESCRIPTION / BIO',
+                'CHANNEL BIO',
                 style: TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w800,
-                  letterSpacing: 1,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.2,
                   color: context.textSecondary,
                 ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: 6), // mb-1.5 equivalent
               TextField(
                 controller: _bioController,
                 maxLines: 3,
+                minLines: 3,
                 style: TextStyle(color: context.textPrimary, fontSize: 13),
                 decoration: InputDecoration(
                   hintText:
@@ -906,56 +1003,90 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                   hintStyle: TextStyle(color: context.textDim, fontSize: 12),
                   filled: true,
                   fillColor: context.isDark
-                      ? Colors.white.withValues(alpha: 0.04)
-                      : Colors.black.withValues(alpha: 0.03),
+                      ? const Color(0xFF060D18)
+                      : Colors.white,
+                  contentPadding: const EdgeInsets.all(12), // p-3
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(14),
+                    borderRadius: BorderRadius.circular(12), // rounded-xl
                     borderSide: BorderSide(color: context.borderSubtle),
+                  ),
+                  enabledBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(color: context.borderSubtle),
+                  ),
+                  focusedBorder: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide(
+                      color: AppColors.brandOrange.withValues(alpha: 0.5),
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(height: 10),
+              const SizedBox(height: 8),
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  Text(
-                    'Visible on public channel page',
-                    style: TextStyle(fontSize: 11, color: context.textDim),
-                  ),
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.brandOrange,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 14,
-                        vertical: 8,
-                      ),
+                  Expanded(
+                    child: Text(
+                      'Visible on your public channel profile page.',
+                      style: TextStyle(fontSize: 11, color: context.textDim),
                     ),
-                    onPressed: _savingBio ? null : _handleSaveBio,
-                    icon: _savingBio
-                        ? const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: Colors.white,
+                  ),
+                  const SizedBox(width: 8),
+                  Material(
+                    color: Colors.transparent,
+                    child: InkWell(
+                      onTap: _savingBio ? null : _handleSaveBio,
+                      borderRadius: BorderRadius.circular(12),
+                      child: AnimatedContainer(
+                        duration: const Duration(milliseconds: 180),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.brandOrange,
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.brandOrange.withValues(
+                                alpha: 0.20,
+                              ),
+                              blurRadius: 12,
+                              offset: const Offset(0, 6),
                             ),
-                          )
-                        : Icon(
-                            _bioSaved ? Icons.check : Icons.save,
-                            size: 14,
-                            color: Colors.white,
-                          ),
-                    label: Text(
-                      _savingBio
-                          ? 'Saving...'
-                          : (_bioSaved ? 'Saved!' : 'Save Bio'),
-                      style: const TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _savingBio
+                                ? const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                : Icon(
+                                    _bioSaved ? Icons.check : Icons.save,
+                                    size: 14,
+                                    color: Colors.white,
+                                  ),
+                            const SizedBox(width: 6),
+                            Text(
+                              _savingBio
+                                  ? 'Saving...'
+                                  : (_bioSaved ? 'Saved!' : 'Save Bio'),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -969,22 +1100,25 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
 
         // Analytics Section
         Text(
-          'Analytics Overview',
+          'Analytics',
           style: TextStyle(
-            fontSize: 18,
+            fontSize: 16,
             fontWeight: FontWeight.w900,
             color: context.textPrimary,
           ),
         ),
         const SizedBox(height: 10),
-        Row(
-          children: [
-            _buildScopePill('video', 'Videos ($videoCount)'),
-            const SizedBox(width: 8),
-            _buildScopePill('short', 'Shorts ($shortCount)'),
-            const SizedBox(width: 8),
-            _buildScopePill('music', 'Music ($musicCount)'),
-          ],
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              _buildScopePill('video', 'Videos ($videoCount)'),
+              const SizedBox(width: 8),
+              _buildScopePill('short', 'Shorts ($shortCount)'),
+              const SizedBox(width: 8),
+              _buildScopePill('music', 'Music ($musicCount)'),
+            ],
+          ),
         ),
         const SizedBox(height: 14),
 
@@ -1072,24 +1206,34 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
 
   Widget _buildScopePill(String scope, String label) {
     final isActive = _analyticsScope == scope;
-    return GestureDetector(
-      onTap: () => setState(() => _analyticsScope = scope),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isActive
-              ? AppColors.brandOrange
-              : (context.isDark
-                    ? Colors.white.withValues(alpha: 0.06)
-                    : Colors.black.withValues(alpha: 0.05)),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.bold,
-            color: isActive ? Colors.white : context.textSecondary,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => setState(() => _analyticsScope = scope),
+        borderRadius: BorderRadius.circular(10),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
+            color: isActive
+                ? AppColors.brandOrange
+                : (context.isDark
+                      ? Colors.white.withValues(alpha: 0.04)
+                      : Colors.black.withValues(alpha: 0.025)),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isActive
+                  ? AppColors.brandOrange.withValues(alpha: 0.30)
+                  : context.borderSubtle,
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: isActive ? Colors.white : context.textSecondary,
+            ),
           ),
         ),
       ),
@@ -1103,11 +1247,19 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
     Color iconColor,
   ) {
     return Container(
-      padding: const EdgeInsets.all(14),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: context.bgCard,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: context.borderSubtle),
+        boxShadow: [
+          BoxShadow(
+            color: (context.isDark ? Colors.black : const Color(0xFFE2E8F0))
+                .withValues(alpha: 0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1119,12 +1271,12 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
               Text(
                 title,
                 style: TextStyle(
-                  fontSize: 12,
-                  fontWeight: FontWeight.w600,
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
                   color: context.textSecondary,
                 ),
               ),
-              Icon(icon, size: 18, color: iconColor),
+              Icon(icon, size: 17, color: iconColor),
             ],
           ),
           Text(
@@ -1143,8 +1295,9 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
   // --- PANEL 2: EDIT CONTENT ---
   Widget _buildEditContentTab() {
     final filtered = _videos.where((v) {
-      if (_contentFilter == 'video')
+      if (_contentFilter == 'video') {
         return v.contentType != 'short' && v.contentType != 'music';
+      }
       if (_contentFilter == 'short') return v.contentType == 'short';
       if (_contentFilter == 'music') return v.contentType == 'music';
       return true;
@@ -1153,16 +1306,19 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Row(
-          children: [
-            _buildFilterPill('all', 'All (${_videos.length})'),
-            const SizedBox(width: 6),
-            _buildFilterPill('video', 'Videos'),
-            const SizedBox(width: 6),
-            _buildFilterPill('short', 'Shorts'),
-            const SizedBox(width: 6),
-            _buildFilterPill('music', 'Music'),
-          ],
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: [
+              _buildFilterPill('all', 'All (${_videos.length})'),
+              const SizedBox(width: 6),
+              _buildFilterPill('video', 'Videos'),
+              const SizedBox(width: 6),
+              _buildFilterPill('short', 'Shorts'),
+              const SizedBox(width: 6),
+              _buildFilterPill('music', 'Music'),
+            ],
+          ),
         ),
         const SizedBox(height: 14),
 
@@ -1375,24 +1531,34 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
 
   Widget _buildFilterPill(String filter, String label) {
     final isActive = _contentFilter == filter;
-    return GestureDetector(
-      onTap: () => setState(() => _contentFilter = filter),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-        decoration: BoxDecoration(
-          color: isActive
-              ? AppColors.brandOrange
-              : (context.isDark
-                    ? Colors.white.withValues(alpha: 0.06)
-                    : Colors.black.withValues(alpha: 0.05)),
-          borderRadius: BorderRadius.circular(10),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            fontSize: 11,
-            fontWeight: FontWeight.bold,
-            color: isActive ? Colors.white : context.textSecondary,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: () => setState(() => _contentFilter = filter),
+        borderRadius: BorderRadius.circular(10),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+          decoration: BoxDecoration(
+            color: isActive
+                ? AppColors.brandOrange
+                : (context.isDark
+                      ? Colors.white.withValues(alpha: 0.04)
+                      : Colors.black.withValues(alpha: 0.025)),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: isActive
+                  ? AppColors.brandOrange.withValues(alpha: 0.30)
+                  : context.borderSubtle,
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 11,
+              fontWeight: FontWeight.bold,
+              color: isActive ? Colors.white : context.textSecondary,
+            ),
           ),
         ),
       ),
@@ -1801,10 +1967,12 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                       color: const Color(0xFF10B981).withValues(alpha: 0.2),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: const Text(
-                      'ACTIVE',
+                    child: Text(
+                      _monetization.isEligible ? 'ELIGIBLE' : 'LOCKED',
                       style: TextStyle(
-                        color: Color(0xFF10B981),
+                        color: _monetization.isEligible
+                            ? const Color(0xFF10B981)
+                            : Colors.white70,
                         fontSize: 10,
                         fontWeight: FontWeight.bold,
                       ),
@@ -1853,14 +2021,14 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Subscribers Target (1,000)',
+                    'Subscribers Target (${_monetization.requiredSubscribers > 0 ? _monetization.requiredSubscribers : 1000})',
                     style: TextStyle(
                       fontSize: 12,
                       color: context.textSecondary,
                     ),
                   ),
                   Text(
-                    '$_subscriberCount / 1,000',
+                    '$_subscriberCount / ${_monetization.requiredSubscribers > 0 ? _monetization.requiredSubscribers : 1000}',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
@@ -1873,7 +2041,12 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
               ClipRRect(
                 borderRadius: BorderRadius.circular(6),
                 child: LinearProgressIndicator(
-                  value: (_subscriberCount / 1000).clamp(0.0, 1.0),
+                  value:
+                      (_subscriberCount /
+                              (_monetization.requiredSubscribers > 0
+                                  ? _monetization.requiredSubscribers
+                                  : 1000))
+                          .clamp(0.0, 1.0),
                   backgroundColor: context.isDark
                       ? Colors.white10
                       : Colors.black12,
@@ -1886,14 +2059,14 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'Watch Hours (4,000 hrs)',
+                    'Video plays target (${_monetization.requiredVideoViews > 0 ? _monetization.requiredVideoViews : 50000})',
                     style: TextStyle(
                       fontSize: 12,
                       color: context.textSecondary,
                     ),
                   ),
                   Text(
-                    '0 / 4,000',
+                    '${_monetization.videoViews} / ${_monetization.requiredVideoViews > 0 ? _monetization.requiredVideoViews : 50000}',
                     style: TextStyle(
                       fontSize: 12,
                       fontWeight: FontWeight.bold,
@@ -1906,7 +2079,12 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
               ClipRRect(
                 borderRadius: BorderRadius.circular(6),
                 child: LinearProgressIndicator(
-                  value: 0.02,
+                  value:
+                      (_monetization.videoViews /
+                              (_monetization.requiredVideoViews > 0
+                                  ? _monetization.requiredVideoViews
+                                  : 50000))
+                          .clamp(0.0, 1.0),
                   backgroundColor: context.isDark
                       ? Colors.white10
                       : Colors.black12,
@@ -1917,6 +2095,16 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage> {
             ],
           ),
         ),
+        const SizedBox(height: 12),
+        if (!_monetization.isEligible)
+          _EligibilityLockNotice(
+            subscribers: _monetization.subscribers > 0
+                ? _monetization.subscribers
+                : _subscriberCount,
+            requiredSubscribers: _monetization.requiredSubscribers,
+            videoViews: _monetization.videoViews,
+            requiredVideoViews: _monetization.requiredVideoViews,
+          ),
       ],
     );
   }

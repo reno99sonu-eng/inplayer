@@ -100,6 +100,33 @@ class PlaybackSettingsStore {
   PlaybackSettingsStore._();
   static const _key = 'inplayer:playback-settings';
 
+  static String _normalizeQualityChoice(String? value) {
+    final raw = (value ?? 'auto').trim().toLowerCase();
+    switch (raw) {
+      case '720p':
+      case '1080p':
+      case '1440p':
+      case '2160p':
+        return raw;
+      case 'auto':
+      default:
+        return 'auto';
+    }
+  }
+
+  static String _normalizeAudioChoice(String? value) {
+    final raw = (value ?? 'High').trim().toLowerCase();
+    return raw == 'low' ? 'Low' : 'High';
+  }
+
+  static PlaybackSettings sanitize(PlaybackSettings settings) {
+    return settings.copyWith(
+      mobileQuality: _normalizeQualityChoice(settings.mobileQuality),
+      wifiQuality: _normalizeQualityChoice(settings.wifiQuality),
+      audioQuality: _normalizeAudioChoice(settings.audioQuality),
+    );
+  }
+
   static Future<PlaybackSettings> get() async {
     final prefs = await SharedPreferences.getInstance();
     final raw = prefs.getString(_key);
@@ -107,17 +134,18 @@ class PlaybackSettingsStore {
     try {
       final decoded = jsonDecode(raw);
       if (decoded is Map<String, dynamic>) {
-        return PlaybackSettings.fromJson(decoded);
+        return sanitize(PlaybackSettings.fromJson(decoded));
       }
     } catch (_) {
       // Corrupt/unparseable blob — fall through to defaults rather than
       // crash the watch page over a bad settings write.
     }
-    return const PlaybackSettings();
+    return sanitize(const PlaybackSettings());
   }
 
   static Future<void> update(PlaybackSettings settings) async {
+    final sanitized = sanitize(settings);
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_key, jsonEncode(settings.toJson()));
+    await prefs.setString(_key, jsonEncode(sanitized.toJson()));
   }
 }

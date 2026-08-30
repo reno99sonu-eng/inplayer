@@ -778,9 +778,9 @@ class _ShopPageState extends ConsumerState<ShopPage> {
                   _buildCreateButton(),
                   _buildNavItem(
                     3,
-                    Icons.cast,
-                    'In-Family',
-                    onTap: () => context.push('/subscriptions'),
+                    Icons.music_note_rounded,
+                    'Music',
+                    onTap: () => context.push('/music'),
                   ),
                   _buildNavItem(
                     4,

@@ -77,7 +77,12 @@ class VideoInteractionService {
     try {
       final response = await _dio.post(
         ApiConstants.reports,
-        data: {'videoId': videoId, 'reason': reason, 'details': details},
+        data: {
+          'targetType': 'video',
+          'videoId': videoId,
+          'reason': reason,
+          if (details.trim().isNotEmpty) 'details': details.trim(),
+        },
       );
       return response.statusCode == 200;
     } catch (e) {

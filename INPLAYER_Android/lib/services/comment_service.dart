@@ -52,7 +52,7 @@ class CommentService {
         data: {
           'videoId': videoId,
           'text': text,
-          'parentUserId': ?parentUserId,
+          if (parentUserId != null && parentUserId.isNotEmpty) 'parentUserId': parentUserId,
         },
       );
 

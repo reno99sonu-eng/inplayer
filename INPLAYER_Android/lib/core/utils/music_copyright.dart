@@ -151,8 +151,8 @@ CopyrightScreening screenMusicMetadata({
   }
 
   final parts = <String>[
-    if (title != null) title,
-    if (description != null) description,
+    ?title,
+    ?description,
     ...tags,
   ];
   final haystack = parts.join(' \n ');

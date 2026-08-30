@@ -7,6 +7,9 @@ class ChatMessage {
   final String text;
   final String createdAt;
   final bool deletedForEveryone;
+  final String? imageUrl;
+  final String? audioUrl;
+  final int? audioDurationSec;
 
   ChatMessage({
     required this.messageId,
@@ -14,6 +17,9 @@ class ChatMessage {
     required this.text,
     required this.createdAt,
     this.deletedForEveryone = false,
+    this.imageUrl,
+    this.audioUrl,
+    this.audioDurationSec,
   });
 
   factory ChatMessage.fromJson(Map<String, dynamic> json) {
@@ -23,6 +29,9 @@ class ChatMessage {
       text: json['text']?.toString() ?? '',
       createdAt: json['createdAt']?.toString() ?? '',
       deletedForEveryone: json['deletedForEveryone'] == true,
+      imageUrl: json['imageUrl'] as String?,
+      audioUrl: json['audioUrl'] as String?,
+      audioDurationSec: (json['audioDurationSec'] as num?)?.toInt(),
     );
   }
 }

@@ -1,3 +1,4 @@
+// ignore_for_file: use_null_aware_elements
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
 import '../core/network/dio_client.dart';
@@ -44,12 +45,21 @@ class MessageService {
   /// started implicitly accepts it server-side — nothing extra to do here.
   Future<SendMessageResult> sendMessage({
     required String otherUserId,
-    required String text,
+    String? text,
+    String? imageUrl,
+    String? audioUrl,
+    int? audioDurationSec,
   }) async {
     try {
       final response = await _dio.post(
         ApiConstants.messages,
-        data: {'otherUserId': otherUserId, 'text': text},
+        data: {
+          'otherUserId': otherUserId,
+          if (text != null) 'text': text,
+          if (imageUrl != null) 'imageUrl': imageUrl,
+          if (audioUrl != null) 'audioUrl': audioUrl,
+          if (audioDurationSec != null) 'audioDurationSec': audioDurationSec,
+        },
       );
 
       if (response.statusCode == 200 && response.data is Map) {
@@ -98,11 +108,15 @@ class MessageService {
   /// PATCH /api/messages/{id} — accept/decline a request, block/unblock,
   /// mute/unmute. (Chat wallpaper themes and disappearing-messages timers
   /// also live on this action endpoint but aren't exposed in the app yet.)
-  Future<bool> conversationAction(String conversationId, String action) async {
+  Future<bool> conversationAction(String conversationId, String action, {String? theme, int? disappearingSeconds}) async {
     try {
       final response = await _dio.patch(
         '${ApiConstants.messages}/$conversationId',
-        data: {'action': action},
+        data: {
+          'action': action,
+          if (theme != null) 'theme': theme,
+          if (disappearingSeconds != null) 'disappearingSeconds': disappearingSeconds,
+        },
       );
       return response.statusCode == 200;
     } catch (e) {

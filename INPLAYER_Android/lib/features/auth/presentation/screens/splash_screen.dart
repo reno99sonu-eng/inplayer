@@ -35,6 +35,8 @@ class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
   late final Animation<double> _logoScale;
   late final Animation<double> _logoOpacity;
   late final Animation<double> _logoTilt;
+  late final Animation<double> _logoFloat;
+  late final Animation<double> _logoGlow;
   late final Animation<double> _flashOpacity;
   late final Animation<double> _shinePosition;
   late final Animation<double> _taglineOpacity;
@@ -52,7 +54,7 @@ class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
     super.initState();
     _controller = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 3400),
+      duration: const Duration(milliseconds: 4200),
     );
 
     _logoScale =
@@ -78,12 +80,53 @@ class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
       parent: _controller,
       curve: const Interval(0, .22, curve: Curves.easeIn),
     );
-    _logoTilt = Tween<double>(begin: .075, end: 0).animate(
+    _logoTilt = Tween<double>(begin: .08, end: 0).animate(
       CurvedAnimation(
         parent: _controller,
-        curve: const Interval(0, .38, curve: Curves.easeOutCubic),
+        curve: const Interval(0, .42, curve: Curves.easeOutCubic),
       ),
     );
+    _logoFloat =
+        TweenSequence<double>([
+          TweenSequenceItem(
+            tween: Tween<double>(
+              begin: 26,
+              end: -18,
+            ).chain(CurveTween(curve: Curves.easeOutBack)),
+            weight: 50,
+          ),
+          TweenSequenceItem(
+            tween: Tween<double>(
+              begin: -18,
+              end: 8,
+            ).chain(CurveTween(curve: Curves.easeInOutCubic)),
+            weight: 50,
+          ),
+        ]).animate(
+          CurvedAnimation(
+            parent: _controller,
+            curve: const Interval(.08, .92, curve: Curves.easeInOutCubic),
+          ),
+        );
+    _logoGlow =
+        TweenSequence<double>([
+          TweenSequenceItem(
+            tween: Tween<double>(
+              begin: .18,
+              end: 1.0,
+            ).chain(CurveTween(curve: Curves.easeOutQuart)),
+            weight: 42,
+          ),
+          TweenSequenceItem(
+            tween: Tween<double>(
+              begin: 1.0,
+              end: .62,
+            ).chain(CurveTween(curve: Curves.easeInOutCubic)),
+            weight: 58,
+          ),
+        ]).animate(
+          CurvedAnimation(parent: _controller, curve: const Interval(.10, .82)),
+        );
     _flashOpacity =
         TweenSequence<double>([
           TweenSequenceItem(
@@ -131,7 +174,7 @@ class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
       if (next is AuthStateAuthenticated) {
         _setDisplayName(_preferredName(next.user), persist: true);
       }
-    }, fireImmediately: true);
+    });
     unawaited(_loadCachedName());
     _startAnimation();
     _triggerGeoCheck();
@@ -139,7 +182,7 @@ class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
 
   void _startAnimation() {
     // This only safeguards an interrupted animation; normal completion wins.
-    _fallbackTimer = Timer(const Duration(milliseconds: 4300), _dismissSplash);
+    _fallbackTimer = Timer(const Duration(milliseconds: 5000), _dismissSplash);
 
     try {
       _audioPlayer = AudioPlayer()..setVolume(1);
@@ -311,18 +354,49 @@ class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
                       children: [
                         AnimatedBuilder(
                           animation: _controller,
-                          builder: (context, child) => Transform.scale(
-                            scale: _logoScale.value,
-                            child: Transform(
-                              alignment: Alignment.center,
-                              transform: Matrix4.identity()
-                                ..setEntry(3, 2, .001)
-                                ..rotateX(_logoTilt.value),
-                              child: Opacity(
-                                opacity: _logoOpacity.value
-                                    .clamp(0, 1)
-                                    .toDouble(),
-                                child: child,
+                          builder: (context, child) => Transform.translate(
+                            offset: Offset(0, _logoFloat.value),
+                            child: Transform.scale(
+                              scale: _logoScale.value,
+                              child: Transform(
+                                alignment: Alignment.center,
+                                transform: Matrix4.identity()
+                                  ..setEntry(3, 2, .001)
+                                  ..rotateX(_logoTilt.value)
+                                  ..rotateZ(-_logoTilt.value * .24),
+                                child: Opacity(
+                                  opacity: _logoOpacity.value
+                                      .clamp(0, 1)
+                                      .toDouble(),
+                                  child: AnimatedBuilder(
+                                    animation: _logoGlow,
+                                    builder: (context, _) => DecoratedBox(
+                                      decoration: BoxDecoration(
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: AppColors.brandOrange
+                                                .withValues(
+                                                  alpha: _logoGlow.value * .35,
+                                                ),
+                                            blurRadius:
+                                                22 + _logoGlow.value * 26,
+                                            spreadRadius:
+                                                2 + _logoGlow.value * 6,
+                                          ),
+                                          BoxShadow(
+                                            color: const Color(0xFF4DD0E1)
+                                                .withValues(
+                                                  alpha: _logoGlow.value * .18,
+                                                ),
+                                            blurRadius:
+                                                30 + _logoGlow.value * 30,
+                                          ),
+                                        ],
+                                      ),
+                                      child: child,
+                                    ),
+                                  ),
+                                ),
                               ),
                             ),
                           ),
@@ -386,6 +460,30 @@ class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
                             ),
                           ),
                         ),
+                      ],
+                    ),
+                  ),
+                ),
+                Positioned(
+                  left: 0,
+                  right: 0,
+                  bottom: 18,
+                  child: FadeTransition(
+                    opacity: _taglineOpacity,
+                    child: const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Text(
+                          'Made in India',
+                          style: TextStyle(
+                            color: Color(0xC9FDE68A),
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 1.1,
+                          ),
+                        ),
+                        SizedBox(width: 7),
+                        Text('🇮🇳', style: TextStyle(fontSize: 15, height: 1)),
                       ],
                     ),
                   ),
@@ -462,148 +560,161 @@ class _AnimatedWordmark extends StatelessWidget {
   }
 }
 
-/// Low-contrast feather silhouettes, deliberately offset away from the
-/// wordmark. This is ornamental background texture, not a second logo.
+/// A full-bleed peacock train backdrop: one faded circular plume of elongated
+/// upper-tail coverts behind the InPlayer wordmark, with a saturated jewel tone
+/// palette that feels luminous against the deep charcoal background.
 class PeacockFeatherPainter extends CustomPainter {
   final double animationProgress;
 
   const PeacockFeatherPainter({required this.animationProgress});
 
+  static const List<Color> _featherPalette = [
+    Color(0xFF22C55E),
+    Color(0xFF14B8A6),
+    Color(0xFF3B82F6),
+    Color(0xFF8B5CF6),
+    Color(0xFFF59E0B),
+    Color(0xFFE879F9),
+    Color(0xFFE11D48),
+    Color(0xFF38BDF8),
+  ];
+
   @override
   void paint(Canvas canvas, Size size) {
-    final shimmer = .75 + (.25 * math.sin(animationProgress * math.pi));
+    final reveal = animationProgress.clamp(0.0, 1.0);
+    final center = Offset(size.width * 0.5, size.height * 0.44);
+    final orbitRadius =
+        math.min(size.width, size.height) * (0.26 + reveal * 0.28);
+
     final ambient = Paint()
       ..shader = RadialGradient(
-        center: const Alignment(.72, -.52),
-        radius: 1.05,
+        center: const Alignment(0.52, 0.42),
+        radius: 1.15,
         colors: [
-          const Color(0xFF0F766E).withValues(alpha: .12 * shimmer),
-          const Color(0xFF172554).withValues(alpha: .10 * shimmer),
-          Colors.transparent,
+          const Color(0xFF1B2A55).withValues(alpha: 0.48),
+          const Color(0xFF0A0F1A).withValues(alpha: 0.82),
+          const Color(0xFF02050A),
         ],
-        stops: const [0, .48, 1],
+        stops: const [0.0, 0.55, 1.0],
       ).createShader(Offset.zero & size);
     canvas.drawRect(Offset.zero & size, ambient);
-
-    final unit = math.min(size.width / 430, size.height / 820);
-    final scale = unit.clamp(.68, 1.18).toDouble();
-    _drawFeather(
-      canvas,
-      eye: Offset(size.width * .83, size.height * .26),
-      scale: scale,
-      opacity: .46 * shimmer,
-      mirrored: false,
-    );
-    _drawFeather(
-      canvas,
-      eye: Offset(size.width * .15, size.height * .79),
-      scale: scale * .82,
-      opacity: .24 * shimmer,
-      mirrored: true,
-    );
-  }
-
-  void _drawFeather(
-    Canvas canvas, {
-    required Offset eye,
-    required double scale,
-    required double opacity,
-    required bool mirrored,
-  }) {
-    canvas.save();
-    canvas.translate(eye.dx, eye.dy);
-    canvas.scale(mirrored ? -scale : scale, scale);
-
-    final stem = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.4
-      ..strokeCap = StrokeCap.round
-      ..shader = const LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [Color(0xFFEAB308), Color(0xFF14B8A6), Color(0xFF0F172A)],
-      ).createShader(const Rect.fromLTWH(-8, 0, 18, 220));
-    canvas.drawPath(
-      Path()
-        ..moveTo(0, 18)
-        ..quadraticBezierTo(-8, 92, 10, 220),
-      stem..color = stem.color.withValues(alpha: opacity),
-    );
-
-    final barb = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-    for (var index = 0; index < 18; index++) {
-      final t = index / 17;
-      final y = 28 + (t * 162);
-      final length = 22 + (math.sin(t * math.pi) * 96);
-      final curve = 12 + (1 - t) * 24;
-      barb
-        ..strokeWidth = 0.7 + ((1 - t) * .6)
-        ..color = Color.lerp(
-          const Color(0xFF22C55E),
-          const Color(0xFF38BDF8),
-          t,
-        )!.withValues(alpha: opacity * (.17 + (math.sin(t * math.pi) * .20)));
-      canvas.drawPath(
-        Path()
-          ..moveTo(-2 + (t * 4), y)
-          ..quadraticBezierTo(
-            -length * .52,
-            y - curve,
-            -length,
-            y - curve * .42,
-          ),
-        barb,
-      );
-      canvas.drawPath(
-        Path()
-          ..moveTo(2 + (t * 4), y)
-          ..quadraticBezierTo(length * .52, y - curve, length, y - curve * .42),
-        barb,
-      );
-    }
 
     final halo = Paint()
       ..shader =
           RadialGradient(
+            center: Alignment.center,
+            radius: 0.9,
             colors: [
-              const Color(0xFF1D4ED8).withValues(alpha: opacity * .28),
+              const Color(0xFF22D3EE).withValues(alpha: 0.18 + reveal * 0.18),
+              const Color(0xFF1D4ED8).withValues(alpha: 0.08 + reveal * 0.08),
               Colors.transparent,
             ],
           ).createShader(
-            Rect.fromCenter(center: Offset.zero, width: 116, height: 138),
+            Rect.fromCenter(
+              center: center,
+              width: size.width * 0.96,
+              height: size.height * 0.92,
+            ),
           );
-    canvas.drawOval(
-      Rect.fromCenter(center: Offset.zero, width: 116, height: 138),
-      halo,
-    );
+    canvas.drawCircle(center, orbitRadius * 1.28, halo);
+
+    for (var i = 0; i < 18; i++) {
+      final angle = (i / 18) * (math.pi * 2) - math.pi / 2;
+      final featherRadius = orbitRadius * (0.58 + (i % 3) * 0.08);
+      final featherLength = size.height * (0.16 + (i % 5) * 0.04);
+      final drawProgress = ((reveal * 1.15) - (i / 18.0) * 0.18).clamp(
+        0.0,
+        1.0,
+      );
+      if (drawProgress <= 0.02) continue;
+
+      final featherCenter = Offset(
+        center.dx + math.cos(angle) * featherRadius,
+        center.dy + math.sin(angle) * featherRadius,
+      );
+
+      canvas.save();
+      canvas.translate(featherCenter.dx, featherCenter.dy);
+      canvas.rotate(angle + math.pi / 2);
+
+      final baseColor = _featherPalette[i % _featherPalette.length];
+      final featherAlpha = (0.18 + reveal * 0.62) * drawProgress;
+      final featherPaint = Paint()
+        ..style = PaintingStyle.fill
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            baseColor.withValues(alpha: featherAlpha * 0.95),
+            baseColor.withValues(alpha: featherAlpha * 0.60),
+            const Color(0xFF0F172A).withValues(alpha: featherAlpha * 0.30),
+          ],
+          stops: const [0.0, 0.52, 1.0],
+        ).createShader(Rect.fromLTWH(-16, -featherLength, 32, featherLength));
+
+      final featherPath = Path()
+        ..moveTo(0, 0)
+        ..quadraticBezierTo(18, -featherLength * 0.14, 10, -featherLength)
+        ..lineTo(0, -(featherLength * 0.92))
+        ..quadraticBezierTo(-10, -featherLength * 0.14, 0, 0);
+
+      canvas.drawPath(featherPath, featherPaint);
+
+      final stemPaint = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.2
+        ..color = Colors.white.withValues(alpha: featherAlpha * 0.32);
+      canvas.drawLine(
+        Offset(0, 0),
+        Offset(0, -featherLength * 0.94),
+        stemPaint,
+      );
+
+      final accent = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.6
+        ..color = const Color(
+          0xFFF8FAFC,
+        ).withValues(alpha: featherAlpha * 0.22);
+      canvas.drawArc(
+        Rect.fromCenter(
+          center: Offset(0, -featherLength * 0.5),
+          width: 24,
+          height: 58,
+        ),
+        -math.pi / 2.2,
+        math.pi / 1.6,
+        false,
+        accent,
+      );
+
+      canvas.restore();
+    }
+
+    final coreGlow = Paint()
+      ..shader =
+          RadialGradient(
+            center: Alignment.center,
+            radius: 1,
+            colors: [
+              const Color(0xFFFEF3C7).withValues(alpha: 0.34 + reveal * 0.22),
+              const Color(0xFF60A5FA).withValues(alpha: 0.12 + reveal * 0.18),
+              Colors.transparent,
+            ],
+          ).createShader(
+            Rect.fromCenter(
+              center: center,
+              width: size.width * 0.32,
+              height: size.height * 0.28,
+            ),
+          );
+    canvas.drawCircle(center, orbitRadius * 0.42, coreGlow);
 
     final ring = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 7
-      ..shader =
-          SweepGradient(
-            colors: [
-              const Color(0xFF0D9488).withValues(alpha: opacity * .48),
-              const Color(0xFF06B6D4).withValues(alpha: opacity * .52),
-              const Color(0xFFF59E0B).withValues(alpha: opacity * .36),
-              const Color(0xFF0D9488).withValues(alpha: opacity * .48),
-            ],
-          ).createShader(
-            Rect.fromCenter(center: Offset.zero, width: 58, height: 76),
-          );
-    canvas.drawOval(
-      Rect.fromCenter(center: Offset.zero, width: 58, height: 76),
-      ring,
-    );
-    final pupil = Paint()
-      ..color = const Color(0xFF312E81).withValues(alpha: opacity * .48);
-    canvas.drawOval(
-      Rect.fromCenter(center: Offset.zero, width: 23, height: 34),
-      pupil,
-    );
-    canvas.restore();
+      ..strokeWidth = 1.6
+      ..color = const Color(0xFFF8FAFC).withValues(alpha: 0.22 + reveal * 0.28);
+    canvas.drawCircle(center, orbitRadius * 0.58, ring);
   }
 
   @override

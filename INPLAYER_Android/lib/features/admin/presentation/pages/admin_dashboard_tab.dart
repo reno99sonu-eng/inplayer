@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'dart:async';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../services/admin_service.dart';
@@ -15,15 +16,23 @@ class AdminDashboardTab extends ConsumerStatefulWidget {
 class _AdminDashboardTabState extends ConsumerState<AdminDashboardTab> {
   bool _loading = true;
   AdminDashboardStats? _stats;
+  Timer? _refreshTimer;
 
   @override
   void initState() {
     super.initState();
     _load();
+    _refreshTimer = Timer.periodic(const Duration(seconds: 30), (_) => _load(background: true));
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
+  @override
+  void dispose() {
+    _refreshTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _load({bool background = false}) async {
+    if (!background && mounted) setState(() => _loading = true);
     final stats = await ref.read(adminServiceProvider).getDashboardStats();
     if (!mounted) return;
     setState(() {
@@ -33,9 +42,13 @@ class _AdminDashboardTabState extends ConsumerState<AdminDashboardTab> {
   }
 
   String _formatCount(int n) {
-    if (n >= 1000000) return '${(n / 1000000).toStringAsFixed(1)}M';
-    if (n >= 1000) return '${(n / 1000).toStringAsFixed(1)}K';
-    return '$n';
+    final digits = n.toString();
+    final buffer = StringBuffer();
+    for (var i = 0; i < digits.length; i++) {
+      if (i > 0 && (digits.length - i) % 3 == 0) buffer.write(',');
+      buffer.write(digits[i]);
+    }
+    return buffer.toString();
   }
 
   @override
@@ -66,6 +79,7 @@ class _AdminDashboardTabState extends ConsumerState<AdminDashboardTab> {
       (icon: Icons.play_circle_outline, label: 'Shorts', value: _formatCount(stats.totalShorts)),
       (icon: Icons.library_music_outlined, label: 'Music Tracks', value: _formatCount(stats.totalMusic)),
       (icon: Icons.visibility_outlined, label: 'Total Views', value: _formatCount(stats.totalViews)),
+      (icon: Icons.flag_outlined, label: 'Pending Reports', value: stats.reportsTableMissing ? '—' : _formatCount(stats.pendingReports)),
       (icon: Icons.hourglass_top, label: 'Processing', value: _formatCount(stats.processingCount)),
     ];
 

@@ -19,6 +19,51 @@ class HammartService {
   final _dio = DioClient().dio;
   final _logger = Logger();
 
+  Future<HammartCheckoutResult> checkout({
+    required List<HammartCartItem> items,
+    required String buyerPhone,
+    required String deliveryAddress,
+    String city = '',
+    String state = '',
+    String pincode = '',
+  }) async {
+    try {
+      final response = await _dio.post(
+        '/api/hammart/checkout',
+        data: {
+          'items': items.map((item) => {
+            'productId': item.productId,
+            'quantity': item.quantity,
+          }).toList(),
+          'buyerPhone': buyerPhone,
+          'deliveryAddress': deliveryAddress,
+          'city': city,
+          'state': state,
+          'pincode': pincode,
+        },
+      );
+      if (response.statusCode == 200 && response.data is Map) {
+        final data = response.data as Map;
+        final groups = (data['groups'] as List? ?? [])
+            .whereType<Map>()
+            .map((group) => HammartCheckoutGroup.fromJson(Map<String, dynamic>.from(group)))
+            .toList();
+        return HammartCheckoutResult(
+          groups: groups,
+          failedItems: (data['failedItems'] as List? ?? [])
+              .whereType<Map>()
+              .map((item) => Map<String, dynamic>.from(item))
+              .toList(),
+        );
+      }
+      final error = response.data is Map ? response.data['error']?.toString() : null;
+      return HammartCheckoutResult(error: error ?? "Couldn't start checkout.");
+    } catch (e) {
+      _logger.e('Error starting Hammart checkout: $e');
+      return HammartCheckoutResult(error: "Couldn't start checkout. Try again.");
+    }
+  }
+
   Future<HammartProductsResult> getProducts({String? category, String? vendorId}) async {
     try {
       final response = await _dio.get(
@@ -212,4 +257,47 @@ class HammartActionResult {
   final bool success;
   final String? error;
   HammartActionResult({required this.success, this.error});
+}
+
+class HammartCheckoutGroup {
+  final bool success;
+  final String? paymentMethod;
+  final String? razorpayOrderId;
+  final String? razorpayKeyId;
+  final String? upiLink;
+  final int amountInr;
+
+  const HammartCheckoutGroup({
+    required this.success,
+    this.paymentMethod,
+    this.razorpayOrderId,
+    this.razorpayKeyId,
+    this.upiLink,
+    this.amountInr = 0,
+  });
+
+  factory HammartCheckoutGroup.fromJson(Map<String, dynamic> json) {
+    return HammartCheckoutGroup(
+      success: json['success'] == true,
+      paymentMethod: json['paymentMethod']?.toString(),
+      razorpayOrderId: json['razorpayOrderId']?.toString(),
+      razorpayKeyId: json['razorpayKeyId']?.toString(),
+      upiLink: json['upiLink']?.toString(),
+      amountInr: (json['amountInr'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+class HammartCheckoutResult {
+  final List<HammartCheckoutGroup> groups;
+  final List<Map<String, dynamic>> failedItems;
+  final String? error;
+
+  const HammartCheckoutResult({
+    this.groups = const [],
+    this.failedItems = const [],
+    this.error,
+  });
+
+  bool get success => error == null && groups.any((group) => group.success);
 }

@@ -75,20 +75,22 @@ class _FloatingAIButtonState extends State<FloatingAIButton>
   Future<void> _openAIStudio() async {
     if (_isDialogOpen || !mounted) return;
     _isDialogOpen = true;
+    _tapController.forward();
 
     final isDark = context.isDark;
     try {
       await showGeneralDialog<void>(
         context: context,
+        useRootNavigator: true,
         barrierDismissible: true,
         barrierLabel: 'Close InPlayer AI',
         barrierColor: isDark
-            ? Colors.black.withValues(alpha: .68)
-            : const Color(0xFF2A2015).withValues(alpha: .48),
-        transitionDuration: const Duration(milliseconds: 180),
-        pageBuilder: (context, animation, secondaryAnimation) =>
+            ? Colors.black.withValues(alpha: .70)
+            : const Color(0xFF25170F).withValues(alpha: .48),
+        transitionDuration: const Duration(milliseconds: 220),
+        pageBuilder: (dialogContext, animation, secondaryAnimation) =>
             const AIStudioModal(),
-        transitionBuilder: (context, animation, secondaryAnimation, child) {
+        transitionBuilder: (dialogContext, animation, secondaryAnimation, child) {
           final curve = CurvedAnimation(
             parent: animation,
             curve: Curves.easeOutCubic,
@@ -96,7 +98,7 @@ class _FloatingAIButtonState extends State<FloatingAIButton>
           return FadeTransition(
             opacity: curve,
             child: ScaleTransition(
-              scale: Tween<double>(begin: .98, end: 1).animate(curve),
+              scale: Tween<double>(begin: 0.96, end: 1.0).animate(curve),
               child: child,
             ),
           );
@@ -104,7 +106,9 @@ class _FloatingAIButtonState extends State<FloatingAIButton>
       );
     } finally {
       _isDialogOpen = false;
-      if (mounted) _tapController.reverse();
+      if (mounted) {
+        _tapController.reverse();
+      }
     }
   }
 
@@ -135,20 +139,21 @@ class _FloatingAIButtonState extends State<FloatingAIButton>
             animation: _pulseAnimation,
             builder: (context, _) {
               return SizedBox(
-                width: 54,
-                height: 54,
+                width: 60,
+                height: 60,
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
                     Container(
-                      width: 54,
-                      height: 54,
+                      width: 60,
+                      height: 60,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
                           color: border.withValues(
-                            alpha: .10 + (_pulseAnimation.value * .34),
+                            alpha: .18 + (_pulseAnimation.value * .38),
                           ),
+                          width: 1.2,
                         ),
                       ),
                     ),
@@ -159,14 +164,14 @@ class _FloatingAIButtonState extends State<FloatingAIButton>
                           BoxShadow(
                             color: glow,
                             blurRadius: 18,
-                            spreadRadius: 1,
+                            spreadRadius: 2,
                           ),
                           BoxShadow(
                             color: Colors.black.withValues(
-                              alpha: isDark ? .32 : .10,
+                              alpha: isDark ? .30 : .12,
                             ),
-                            blurRadius: 8,
-                            offset: const Offset(0, 3),
+                            blurRadius: 10,
+                            offset: const Offset(0, 5),
                           ),
                         ],
                       ),
@@ -174,31 +179,22 @@ class _FloatingAIButtonState extends State<FloatingAIButton>
                         color: surface,
                         shape: const CircleBorder(),
                         clipBehavior: Clip.antiAlias,
-                        child: InkResponse(
-                          radius: 27,
-                          containedInkWell: true,
-                          highlightShape: BoxShape.circle,
-                          splashColor: icon.withValues(alpha: .12),
-                          highlightColor: Colors.transparent,
-                          onHighlightChanged: (highlighted) {
-                            if (highlighted) {
-                              _tapController.forward();
-                            } else {
-                              _tapController.reverse();
-                            }
-                          },
+                        child: InkWell(
                           onTap: _openAIStudio,
+                          splashColor: icon.withValues(alpha: .12),
+                          highlightColor: icon.withValues(alpha: .08),
+                          customBorder: const CircleBorder(),
                           child: SizedBox(
-                            width: 46,
-                            height: 46,
+                            width: 52,
+                            height: 52,
                             child: Center(
                               child: Icon(
                                 Icons.auto_awesome_rounded,
                                 color: icon,
-                                size: 21,
+                                size: 23,
                                 shadows: [
                                   Shadow(
-                                    color: glow.withValues(alpha: .75),
+                                    color: glow.withValues(alpha: .80),
                                     blurRadius: 8,
                                   ),
                                 ],

@@ -8,11 +8,11 @@ import android.os.Build
 import android.util.Rational
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.ryanheise.audioservice.AudioServiceActivity
+import com.ryanheise.audioservice.AudioServiceFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
-class MainActivity : AudioServiceActivity() {
+class MainActivity : AudioServiceFragmentActivity() {
     private val pipChannelName = "inplayer.app/pip"
     private val permissionChannelName = "inplayer.app/permissions"
     private var pipChannel: MethodChannel? = null

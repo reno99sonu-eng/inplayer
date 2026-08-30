@@ -109,6 +109,14 @@ class PlayerChrome extends StatefulWidget {
   State<PlayerChrome> createState() => _PlayerChromeState();
 }
 
+bool shouldTogglePlayOnTap(String? side, bool isPlaying) {
+  // A paused video should react immediately to the first tap. If the code
+  // waits for the chained-seek timer while the player is paused, a second tap
+  // is interpreted as a seek instead of a resume, which leaves the video
+  // stuck on the paused frame.
+  return side == null || !isPlaying;
+}
+
 class _PlayerChromeState extends State<PlayerChrome> {
   // Multi-tap seek tuning — matches VideoPlayer.tsx exactly (see its own
   // comment on TAP_CHAIN_MS for why toggle and seek share one timer/window
@@ -275,7 +283,7 @@ class _PlayerChromeState extends State<PlayerChrome> {
     // already updated above, so a genuine rapid double tap still chains
     // into a seek on the next tap — it just gets playback going first
     // instead of leaving the viewer staring at a frozen frame.
-    if (side == null || !widget.controller.value.isPlaying) {
+    if (shouldTogglePlayOnTap(side, widget.controller.value.isPlaying)) {
       _togglePlayPause();
       return;
     }

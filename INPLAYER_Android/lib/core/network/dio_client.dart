@@ -13,6 +13,10 @@ class DioClient {
   late final Dio _dio;
   final _logger = Logger();
   final _storage = const FlutterSecureStorage();
+  String? _cachedIdToken;
+  DateTime? _authCacheTime;
+  String? _cachedAudience;
+  DateTime? _audienceCacheTime;
 
   DioClient._internal() {
     _dio = Dio(
@@ -49,13 +53,22 @@ class DioClient {
           // in itself still "worked" because that talks to Cognito
           // directly and never went through this header.
           try {
-            final authSession = await Amplify.Auth.fetchAuthSession();
-            if (authSession is CognitoAuthSession) {
-              final idToken =
-                  authSession.userPoolTokensResult.valueOrNull?.idToken.raw;
-              if (idToken != null && idToken.isNotEmpty) {
-                options.headers['Authorization'] = 'Bearer $idToken';
-              }
+            // Session lookup can cross the platform channel. Doing it for
+            // every image/feed request serialized the UI behind dozens of
+            // unnecessary calls. Cache the silently-refreshable ID token for
+            // a short window; Cognito tokens remain valid for about an hour.
+            final now = DateTime.now();
+            if (_authCacheTime == null ||
+                now.difference(_authCacheTime!).inSeconds >= 30) {
+              final authSession = await Amplify.Auth.fetchAuthSession();
+              _cachedIdToken = authSession is CognitoAuthSession
+                  ? authSession.userPoolTokensResult.valueOrNull?.idToken.raw
+                  : null;
+              _authCacheTime = now;
+            }
+            final idToken = _cachedIdToken;
+            if (idToken != null && idToken.isNotEmpty) {
+              options.headers['Authorization'] = 'Bearer $idToken';
             }
           } catch (e) {
             // Not signed in, Amplify not configured yet, or the session
@@ -78,8 +91,14 @@ class DioClient {
             // verified /api/content-access call — never a value the app
             // invented locally, since the server is the source of truth for
             // whether a mode is actually unlocked.
-            final prefs = await SharedPreferences.getInstance();
-            final audience = prefs.getString('audience');
+            final now = DateTime.now();
+            if (_audienceCacheTime == null ||
+                now.difference(_audienceCacheTime!).inSeconds >= 5) {
+              final prefs = await SharedPreferences.getInstance();
+              _cachedAudience = prefs.getString('audience');
+              _audienceCacheTime = now;
+            }
+            final audience = _cachedAudience;
             if (audience != null && audience.isNotEmpty) {
               final existingCookie = options.headers['Cookie'] as String? ?? '';
               final newCookie = existingCookie.isEmpty

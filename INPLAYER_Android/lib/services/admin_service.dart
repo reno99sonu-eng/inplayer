@@ -78,7 +78,7 @@ class AdminService {
         '${ApiConstants.admin}/users',
         queryParameters: {
           if (query != null && query.isNotEmpty) 'query': query,
-          'cursor': ?cursor,
+          if (cursor != null && cursor.isNotEmpty) 'cursor': cursor,
         },
       );
       if (response.statusCode == 200 && response.data is Map) {
@@ -308,10 +308,10 @@ class AdminService {
       final response = await _dio.get(
         '${ApiConstants.admin}/videos',
         queryParameters: {
-          'type': ?type,
-          'status': ?status,
+          if (type != null && type.isNotEmpty) 'type': type,
+          if (status != null && status.isNotEmpty) 'status': status,
           if (query != null && query.isNotEmpty) 'query': query,
-          'cursor': ?cursor,
+          if (cursor != null && cursor.isNotEmpty) 'cursor': cursor,
           if (includeCounts) 'counts': '1',
         },
       );
@@ -366,7 +366,11 @@ class AdminService {
     try {
       final response = await _dio.post(
         '${ApiConstants.admin}/creators',
-        data: {'userId': userId, 'action': action, 'reason': ?reason},
+        data: {
+          'userId': userId,
+          'action': action,
+          if (reason != null && reason.isNotEmpty) 'reason': reason,
+        },
       );
       if (response.statusCode == 200) return AdminActionResult(success: true);
       final error = (response.data is Map ? response.data['error'] : null) as String?;
@@ -458,7 +462,11 @@ class AdminService {
     try {
       final response = await _dio.post(
         '${ApiConstants.admin}/notifications',
-        data: {'target': target, 'message': message, 'username': ?username},
+        data: {
+          'target': target,
+          'message': message,
+          if (username != null && username.isNotEmpty) 'username': username,
+        },
       );
       if (response.statusCode == 200 && response.data is Map) {
         final data = response.data as Map;
@@ -500,9 +508,9 @@ class AdminService {
         '${ApiConstants.admin}/navbar-theme',
         data: {
           'imageUrl': imageUrl,
-          'occasionId': ?occasionId,
-          'occasionName': ?occasionName,
-          'title': ?title,
+          if (occasionId != null && occasionId.isNotEmpty) 'occasionId': occasionId,
+          if (occasionName != null && occasionName.isNotEmpty) 'occasionName': occasionName,
+          if (title != null && title.isNotEmpty) 'title': title,
           'active': active,
         },
       );
@@ -577,7 +585,11 @@ class AdminService {
     try {
       final response = await _dio.post(
         '${ApiConstants.admin}/hammart-vendors',
-        data: {'userId': userId, 'action': action, 'reason': ?reason},
+        data: {
+          'userId': userId,
+          'action': action,
+          if (reason != null && reason.isNotEmpty) 'reason': reason,
+        },
       );
       if (response.statusCode == 200) return AdminActionResult(success: true);
       final error = (response.data is Map ? response.data['error'] : null) as String?;
@@ -621,7 +633,7 @@ class AdminService {
         data: {
           'placement': placement,
           'imageUrl': imageUrl,
-          'imageUrlDesktop': ?imageUrlDesktop,
+          if (imageUrlDesktop != null && imageUrlDesktop.isNotEmpty) 'imageUrlDesktop': imageUrlDesktop,
           'linkUrl': linkUrl,
           'title': title,
         },
@@ -775,7 +787,9 @@ class AdminService {
     try {
       final response = await _dio.get(
         '${ApiConstants.admin}/bug-reports',
-        queryParameters: {'status': ?status},
+        queryParameters: {
+          if (status != null && status.isNotEmpty) 'status': status,
+        },
       );
       if (response.statusCode == 200 && response.data is Map) {
         final data = response.data as Map;
@@ -796,7 +810,11 @@ class AdminService {
     try {
       final response = await _dio.post(
         '${ApiConstants.admin}/bug-reports',
-        data: {'reportId': reportId, 'status': status, 'adminNotes': ?adminNotes},
+        data: {
+          'reportId': reportId,
+          'status': status,
+          if (adminNotes != null && adminNotes.isNotEmpty) 'adminNotes': adminNotes,
+        },
       );
       return response.statusCode == 200;
     } catch (e) {
@@ -891,6 +909,7 @@ class AdminService {
         data: {
           'ticketId': ticketId,
           'status': status,
+          // ignore: use_null_aware_elements
           if (adminNotes != null) 'adminNotes': adminNotes,
         },
       );

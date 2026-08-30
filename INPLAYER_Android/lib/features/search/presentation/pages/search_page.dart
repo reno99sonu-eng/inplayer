@@ -135,6 +135,10 @@ class _SearchPageState extends ConsumerState<SearchPage> {
     _debounce?.cancel();
     _suggestDebounce?.cancel();
 
+    // Keep the trailing clear action and focused visual state in sync with
+    // every keystroke, rather than waiting for a network response.
+    if (mounted) setState(() {});
+
     if (value.trim().isEmpty) {
       setState(() {
         _searchResults = [];
@@ -336,16 +340,12 @@ class _SearchPageState extends ConsumerState<SearchPage> {
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 200),
-      height: 44,
+      height: 50,
       decoration: BoxDecoration(
         color: (isDark ? const Color(0xFF0F172A) : Colors.white).withValues(alpha: 0.90),
-        borderRadius: BorderRadius.circular(22),
-        border: Border.all(
-          color: isFocused
-              ? AppColors.brandOrange
-              : (isDark ? Colors.white.withValues(alpha: 0.12) : Colors.black.withValues(alpha: 0.08)),
-          width: isFocused ? 1.4 : 1.0,
-        ),
+         borderRadius: BorderRadius.circular(25),
+          // Borderless glass treatment; focus is communicated by the glow.
+          border: Border.all(color: Colors.transparent, width: 0),
         boxShadow: isFocused
             ? [
                 BoxShadow(

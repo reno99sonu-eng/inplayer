@@ -18,5 +18,14 @@ class AppConfig {
   static const String cognitoRegion = 'ap-south-1';
 
   // OAuth domain for Google sign-in / Hosted UI
-  static const String? cognitoDomain = 'ap-south-1orihwadfn.auth.ap-south-1.amazoncognito.com';
+  static const String cognitoDomain =
+      'ap-south-1orihwadfn.auth.ap-south-1.amazoncognito.com';
+
+  // Existing AppSync GraphQL endpoint. Keep this out of source control when
+  // building different environments; pass it with
+  // --dart-define=APPSYNC_GRAPHQL_ENDPOINT=https://.../graphql.
+  static const String appSyncGraphqlEndpoint = String.fromEnvironment(
+    'APPSYNC_GRAPHQL_ENDPOINT',
+    defaultValue: '',
+  );
 }

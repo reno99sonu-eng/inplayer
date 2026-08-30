@@ -1,4 +1,4 @@
-﻿import 'package:dio/dio.dart';
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
 
@@ -25,13 +25,10 @@ class GeoVerificationResult {
     this.ip,
   });
 
-  factory GeoVerificationResult.allowedDefault() {
-    return const GeoVerificationResult(allowed: true);
-  }
-
   factory GeoVerificationResult.fromJson(Map<String, dynamic> json) {
     return GeoVerificationResult(
-      allowed: json['allowed'] as bool? ?? true,
+      // A malformed or incomplete response must never grant access.
+      allowed: json['allowed'] as bool? ?? false,
       country: json['country'] as String?,
       isVpn: json['isVpn'] as bool? ?? false,
       isProxy: json['isProxy'] as bool? ?? false,
@@ -42,7 +39,8 @@ class GeoVerificationResult {
 }
 
 /// Service that verifies geo-location restrictions matching the website
-/// (/api/geo/verify) with a resilient fail-open policy for legitimate viewers.
+/// (/api/geo/verify). Verification fails closed so a VPN cannot gain access
+/// when the geo provider is unavailable.
 class GeoService {
   final _logger = Logger();
   final Dio _dio = DioClient().dio;
@@ -65,22 +63,21 @@ class GeoService {
         return GeoVerificationResult.fromJson(data);
       }
     } catch (e) {
-      _logger.w('Geo verification check failed, failing open: ');
+      _logger.w('Geo verification check failed; denying access: $e');
     }
 
-    // Fail open fallback matching website behavior: do not lock out real users
-    return GeoVerificationResult.allowedDefault();
+    return const GeoVerificationResult(allowed: false);
   }
 
   /// Verifies GPS latitude and longitude against India's geographic bounding box.
-  Future<bool> verifyCoordinates({required double latitude, required double longitude}) async {
+  Future<bool> verifyCoordinates({
+    required double latitude,
+    required double longitude,
+  }) async {
     try {
       final response = await _dio.post(
         '/api/geo/verify',
-        data: {
-          'latitude': latitude,
-          'longitude': longitude,
-        },
+        data: {'latitude': latitude, 'longitude': longitude},
         options: Options(
           receiveTimeout: const Duration(seconds: 4),
           sendTimeout: const Duration(seconds: 4),
@@ -89,11 +86,11 @@ class GeoService {
 
       if (response.statusCode == 200 && response.data != null) {
         final data = response.data is Map<String, dynamic> ? response.data : {};
-        return data['allowed'] as bool? ?? true;
+        return data['allowed'] as bool? ?? false;
       }
     } catch (e) {
-      _logger.w('Coordinate verification failed, failing open: ');
+      _logger.w('Coordinate verification failed; denying access: $e');
     }
-    return true; // Fail open
+    return false;
   }
 }

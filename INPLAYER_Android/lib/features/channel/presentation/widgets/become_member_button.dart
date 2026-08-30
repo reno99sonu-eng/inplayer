@@ -60,7 +60,7 @@ class _BecomeMemberButtonState extends ConsumerState<BecomeMemberButton> {
   Future<void> _openMembershipPage() async {
     final uri = Uri.parse('${ApiConstants.websiteOrigin}/${widget.username}');
     if (await canLaunchUrl(uri)) {
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
+      await launchUrl(uri, mode: LaunchMode.inAppWebView);
     }
   }
 

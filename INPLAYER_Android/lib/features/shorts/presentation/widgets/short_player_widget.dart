@@ -68,6 +68,7 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
   bool _isPlaying = false;
   double _progress = 0.0;
   bool _showHeartBurst = false;
+  int _playerGeneration = 0;
 
   // Live interaction state
   bool _isLiked = false;
@@ -81,7 +82,7 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
     super.initState();
     WidgetsBinding.instance.addObserver(this);
     _parseInitialCounts();
-    _initPlayer();
+    if (widget.isActive) _initPlayer();
     _loadInteractionStatus();
   }
 
@@ -124,10 +125,13 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
     } catch (_) {}
 
     // Load subscription status
-    if (widget.short.uploaderId != null && widget.short.uploaderId!.isNotEmpty) {
+    if (widget.short.uploaderId != null &&
+        widget.short.uploaderId!.isNotEmpty) {
       try {
         final channelService = ref.read(channelServiceProvider);
-        final sub = await channelService.getSubscriptionStatus(widget.short.uploaderId!);
+        final sub = await channelService.getSubscriptionStatus(
+          widget.short.uploaderId!,
+        );
         if (mounted && sub != null) {
           setState(() {
             _isSubscribed = sub['isSubscribed'] == true;
@@ -155,7 +159,7 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
     super.didUpdateWidget(oldWidget);
     if (oldWidget.isActive != widget.isActive) {
       if (!widget.isActive) {
-        _pausePlayback();
+        _releasePlayer();
       } else if (_videoController == null) {
         // Becoming active again with no controller means this card gave its
         // player away to the mini window (see _minimize) and the viewer has
@@ -165,6 +169,28 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
       } else {
         _resumePlayback();
       }
+    }
+  }
+
+  /// Keep only the visible Raftaar card backed by a decoder. Leaving paused
+  /// controllers mounted while PageView animates between cards can make
+  /// Android's SurfaceTexture briefly paint stale/partial frames (the visible
+  /// flicker and colour blocks). Releasing the inactive surface also prevents
+  /// two HLS decoders competing during a vertical swipe.
+  void _releasePlayer() {
+    _playerGeneration++;
+    final controller = _videoController;
+    _videoController = null;
+    _audioPlayer?.stop();
+    _audioPlayer?.dispose();
+    _audioPlayer = null;
+    controller?.dispose();
+    if (mounted) {
+      setState(() {
+        _isInitialized = false;
+        _isPlaying = false;
+        _progress = 0;
+      });
     }
   }
 
@@ -186,7 +212,9 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
     final controller = _videoController;
     if (controller == null || !_isInitialized) return;
 
-    ref.read(videoMiniPlayerServiceProvider).activateShort(
+    ref
+        .read(videoMiniPlayerServiceProvider)
+        .activateShort(
           controller: controller,
           soundtrack: _audioPlayer,
           short: widget.short,
@@ -223,6 +251,7 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
   }
 
   Future<void> _initPlayer() async {
+    final generation = ++_playerGeneration;
     try {
       String? videoUrl;
       final premiumService = ref.read(premiumServiceProvider);
@@ -233,27 +262,46 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
       // own Shorts player (ShortsPageContent.tsx), not just the tier alone.
       final status = await premiumService.getStatus();
       final playbackSettings = await PlaybackSettingsStore.get();
-      final maxRes = effectiveMaxResolution(status.maxResolution, playbackSettings.mobileQuality);
+      final maxRes = effectiveMaxResolution(
+        status.maxResolution,
+        playbackSettings.mobileQuality,
+      );
 
-      if (widget.short.muxPlaybackId != null && widget.short.muxPlaybackId!.isNotEmpty) {
-        videoUrl = 'https://stream.mux.com/${widget.short.muxPlaybackId}.m3u8?max_resolution=$maxRes';
+      if (widget.short.muxPlaybackId != null &&
+          widget.short.muxPlaybackId!.isNotEmpty) {
+        videoUrl =
+            'https://stream.mux.com/${widget.short.muxPlaybackId}.m3u8?max_resolution=$maxRes';
       } else if (widget.short.videoId.isNotEmpty) {
         final videoService = ref.read(videoServiceProvider);
         final video = await videoService.getVideoById(widget.short.videoId);
-        if (video != null && video.muxPlaybackId != null && video.muxPlaybackId!.isNotEmpty) {
-          videoUrl = 'https://stream.mux.com/${video.muxPlaybackId}.m3u8?max_resolution=$maxRes';
+        if (video != null &&
+            video.muxPlaybackId != null &&
+            video.muxPlaybackId!.isNotEmpty) {
+          videoUrl =
+              'https://stream.mux.com/${video.muxPlaybackId}.m3u8?max_resolution=$maxRes';
         }
       }
 
-      if (videoUrl != null && mounted) {
-        _videoController = VideoPlayerController.networkUrl(Uri.parse(videoUrl));
-        await _videoController!.initialize();
-        _videoController!.setLooping(true);
+      if (videoUrl != null &&
+          mounted &&
+          widget.isActive &&
+          generation == _playerGeneration) {
+        final controller = VideoPlayerController.networkUrl(
+          Uri.parse(videoUrl),
+        );
+        _videoController = controller;
+        await controller.initialize();
+        if (!mounted || !widget.isActive || generation != _playerGeneration) {
+          await controller.dispose();
+          if (identical(_videoController, controller)) _videoController = null;
+          return;
+        }
+        controller.setLooping(true);
 
         _videoController!.addListener(() {
-          if (!mounted || _videoController == null) return;
-          final duration = _videoController!.value.duration;
-          final position = _videoController!.value.position;
+          if (!mounted || !identical(_videoController, controller)) return;
+          final duration = controller.value.duration;
+          final position = controller.value.position;
           if (duration.inMilliseconds > 0) {
             final p = position.inMilliseconds / duration.inMilliseconds;
             if ((p - _progress).abs() > 0.01) {
@@ -265,13 +313,18 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
         });
 
         // Soundtrack handling: if soundtrack is present, mute the video and loop the soundtrack
-        if (widget.short.soundtrack != null && widget.short.soundtrack!.url.isNotEmpty) {
+        if (widget.short.soundtrack != null &&
+            widget.short.soundtrack!.url.isNotEmpty) {
           _audioPlayer = AudioPlayer();
           await _audioPlayer!.setReleaseMode(ReleaseMode.loop);
           await _audioPlayer!.setSourceUrl(widget.short.soundtrack!.url);
-          _videoController!.setVolume(0.0);
+          if (!mounted || !widget.isActive || generation != _playerGeneration) {
+            await controller.dispose();
+            return;
+          }
+          controller.setVolume(0.0);
         } else {
-          _videoController!.setVolume(1.0);
+          controller.setVolume(1.0);
         }
 
         if (mounted) {
@@ -331,7 +384,10 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
     }
 
     final likeService = ref.read(likeServiceProvider);
-    final ok = await likeService.react(widget.short.videoId, wasLiked ? 'remove' : 'like');
+    final ok = await likeService.react(
+      widget.short.videoId,
+      wasLiked ? 'remove' : 'like',
+    );
     if (!ok && mounted) {
       setState(() {
         _isLiked = wasLiked;
@@ -376,7 +432,12 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
     // /shorts/{id} (not /watch/{id}) so the link lands on the scrolling
     // Shorts feed at this video instead of the raw watch page.
     final url = 'https://inplayer.in/shorts/${widget.short.videoId}';
-    SharePlus.instance.share(ShareParams(text: '${widget.short.title}\n$url', subject: widget.short.title));
+    SharePlus.instance.share(
+      ShareParams(
+        text: '${widget.short.title}\n$url',
+        subject: widget.short.title,
+      ),
+    );
   }
 
   void _showCommentsModal() {
@@ -398,23 +459,27 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
     final parts = text.split(RegExp(r'(\s+)'));
     for (final part in parts) {
       if (part.startsWith('#') && part.length > 1) {
-        spans.add(TextSpan(
-          text: '$part ',
-          style: const TextStyle(
-            color: Color(0xFF7DD3FC), // sky-300 matching web
-            fontWeight: FontWeight.w700,
-            fontSize: 14,
+        spans.add(
+          TextSpan(
+            text: '$part ',
+            style: const TextStyle(
+              color: Color(0xFF7DD3FC), // sky-300 matching web
+              fontWeight: FontWeight.w700,
+              fontSize: 14,
+            ),
           ),
-        ));
+        );
       } else {
-        spans.add(TextSpan(
-          text: '$part ',
-          style: const TextStyle(
-            color: Colors.white,
-            fontSize: 14,
-            fontWeight: FontWeight.w500,
+        spans.add(
+          TextSpan(
+            text: '$part ',
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+            ),
           ),
-        ));
+        );
       }
     }
     return spans;
@@ -436,12 +501,12 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
                   child: FittedBox(
                     fit: BoxFit.cover,
                     child: SizedBox(
-                      width: _videoController!.value.size.width > 0
-                          ? _videoController!.value.size.width
-                          : 1080,
-                      height: _videoController!.value.size.height > 0
-                          ? _videoController!.value.size.height
-                          : 1920,
+                      // Keep the render surface stable while ExoPlayer
+                      // reports its final dimensions; resizing this box from
+                      // the provisional size to the stream size causes a
+                      // visible flash on some devices.
+                      width: 1080,
+                      height: 1920,
                       child: VideoPlayer(_videoController!),
                     ),
                   ),
@@ -462,12 +527,7 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
                     Icons.favorite,
                     size: 110,
                     color: Color(0xFFF43F5E), // rose-500
-                    shadows: [
-                      Shadow(
-                        color: Colors.black54,
-                        blurRadius: 20,
-                      ),
-                    ],
+                    shadows: [Shadow(color: Colors.black54, blurRadius: 20)],
                   ),
                 );
               },
@@ -576,12 +636,20 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white24, width: 1),
                       ),
-                      child: const Icon(Icons.fullscreen, color: Colors.white, size: 24),
+                      child: const Icon(
+                        Icons.fullscreen,
+                        color: Colors.white,
+                        size: 24,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     const Text(
                       'Full page',
-                      style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                 ),
@@ -608,7 +676,9 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
                     size: 36,
                     onTap: () {
                       if (widget.short.uploaderUsername != null) {
-                        context.push('/channel/${widget.short.uploaderUsername}');
+                        context.push(
+                          '/channel/${widget.short.uploaderUsername}',
+                        );
                       }
                     },
                   ),
@@ -617,7 +687,9 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
                     child: GestureDetector(
                       onTap: () {
                         if (widget.short.uploaderUsername != null) {
-                          context.push('/channel/${widget.short.uploaderUsername}');
+                          context.push(
+                            '/channel/${widget.short.uploaderUsername}',
+                          );
                         }
                       },
                       child: Column(
@@ -638,7 +710,11 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
                                 ),
                               ),
                               const SizedBox(width: 4),
-                              const Icon(Icons.verified, size: 14, color: AppColors.brandGold),
+                              const Icon(
+                                Icons.verified,
+                                size: 14,
+                                color: AppColors.brandGold,
+                              ),
                             ],
                           ),
                           if (widget.short.uploaderUsername != null)
@@ -656,14 +732,22 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
                   ),
                   const SizedBox(width: 8),
                   // Subscribe Button
-                  if (widget.short.uploaderId != null && widget.short.uploaderId!.isNotEmpty)
+                  if (widget.short.uploaderId != null &&
+                      widget.short.uploaderId!.isNotEmpty)
                     GestureDetector(
                       onTap: _toggleSubscribe,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 6,
+                        ),
                         decoration: BoxDecoration(
-                          gradient: _isSubscribed ? null : AppColors.flameGradient,
-                          color: _isSubscribed ? Colors.white.withValues(alpha: 0.15) : null,
+                          gradient: _isSubscribed
+                              ? null
+                              : AppColors.flameGradient,
+                          color: _isSubscribed
+                              ? Colors.white.withValues(alpha: 0.15)
+                              : null,
                           borderRadius: BorderRadius.circular(20),
                           border: _isSubscribed
                               ? Border.all(color: Colors.white24)
@@ -705,14 +789,21 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
               Row(
                 children: [
                   if (widget.short.soundtrack != null) ...[
-                    const Icon(Icons.music_note, size: 14, color: AppColors.brandGold),
+                    const Icon(
+                      Icons.music_note,
+                      size: 14,
+                      color: AppColors.brandGold,
+                    ),
                     const SizedBox(width: 4),
                     Flexible(
                       child: Text(
                         widget.short.soundtrack?.title ?? 'Soundtrack',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(color: Colors.white70, fontSize: 12),
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -804,9 +895,7 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
               color: Colors.white,
               fontSize: 10.5,
               fontWeight: FontWeight.w700,
-              shadows: [
-                Shadow(color: Colors.black87, blurRadius: 4),
-              ],
+              shadows: [Shadow(color: Colors.black87, blurRadius: 4)],
             ),
           ),
         ],
@@ -816,8 +905,11 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
 
   Widget _buildShortPoster() {
     String posterUrl = widget.short.poster.trim();
-    if (posterUrl.isEmpty && widget.short.muxPlaybackId != null && widget.short.muxPlaybackId!.isNotEmpty) {
-      posterUrl = 'https://image.mux.com/${widget.short.muxPlaybackId}/thumbnail.webp?width=640&height=1138&fit_mode=smartcrop&time=1';
+    if (posterUrl.isEmpty &&
+        widget.short.muxPlaybackId != null &&
+        widget.short.muxPlaybackId!.isNotEmpty) {
+      posterUrl =
+          'https://image.mux.com/${widget.short.muxPlaybackId}/thumbnail.webp?width=640&height=1138&fit_mode=smartcrop&time=1';
     }
 
     if (posterUrl.isEmpty) {
@@ -841,7 +933,8 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
         return Image.memory(
           bytes,
           fit: BoxFit.cover,
-          errorBuilder: (context, error, stackTrace) => Container(color: Colors.black),
+          errorBuilder: (context, error, stackTrace) =>
+              Container(color: Colors.black),
         );
       }
     }
@@ -864,7 +957,11 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
           ),
         ),
         child: const Center(
-          child: Icon(Icons.play_arrow_rounded, color: AppColors.brandOrange, size: 48),
+          child: Icon(
+            Icons.play_arrow_rounded,
+            color: AppColors.brandOrange,
+            size: 48,
+          ),
         ),
       ),
     );
@@ -882,7 +979,8 @@ class _ShortCommentsSheet extends ConsumerStatefulWidget {
   });
 
   @override
-  ConsumerState<_ShortCommentsSheet> createState() => _ShortCommentsSheetState();
+  ConsumerState<_ShortCommentsSheet> createState() =>
+      _ShortCommentsSheetState();
 }
 
 class _ShortCommentsSheetState extends ConsumerState<_ShortCommentsSheet> {
@@ -973,7 +1071,11 @@ class _ShortCommentsSheetState extends ConsumerState<_ShortCommentsSheet> {
                   ),
                 ),
                 IconButton(
-                  icon: const Icon(Icons.close, color: Colors.white70, size: 20),
+                  icon: const Icon(
+                    Icons.close,
+                    color: Colors.white70,
+                    size: 20,
+                  ),
                   onPressed: () => Navigator.pop(context),
                 ),
               ],
@@ -984,75 +1086,86 @@ class _ShortCommentsSheetState extends ConsumerState<_ShortCommentsSheet> {
           // Comments List
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator(color: AppColors.brandOrange))
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      color: AppColors.brandOrange,
+                    ),
+                  )
                 : _comments.isEmpty
-                    ? const Center(
-                        child: Text(
-                          'No comments yet. Be the first to comment!',
-                          style: TextStyle(color: Colors.white54),
-                        ),
-                      )
-                    : ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        itemCount: _comments.length,
-                        itemBuilder: (ctx, i) {
-                          final c = _comments[i];
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 14),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                CircleAvatar(
-                                  radius: 14,
-                                  backgroundColor: Colors.white12,
-                                  backgroundImage: c.userAvatarUrl != null
-                                      ? smartImageProvider(c.userAvatarUrl!)
-                                      : null,
-                                  child: c.userAvatarUrl == null
-                                      ? const Icon(Icons.person, size: 16, color: Colors.white70)
-                                      : null,
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                ? const Center(
+                    child: Text(
+                      'No comments yet. Be the first to comment!',
+                      style: TextStyle(color: Colors.white54),
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    itemCount: _comments.length,
+                    itemBuilder: (ctx, i) {
+                      final c = _comments[i];
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 14),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            CircleAvatar(
+                              radius: 14,
+                              backgroundColor: Colors.white12,
+                              backgroundImage: c.userAvatarUrl != null
+                                  ? smartImageProvider(c.userAvatarUrl!)
+                                  : null,
+                              child: c.userAvatarUrl == null
+                                  ? const Icon(
+                                      Icons.person,
+                                      size: 16,
+                                      color: Colors.white70,
+                                    )
+                                  : null,
+                            ),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
                                     children: [
-                                      Row(
-                                        children: [
-                                          Text(
-                                            c.userName,
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          const SizedBox(width: 6),
-                                          Text(
-                                            c.timeAgo,
-                                            style: const TextStyle(
-                                              color: Colors.white38,
-                                              fontSize: 10,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                      const SizedBox(height: 3),
                                       Text(
-                                        c.text,
+                                        c.userName,
                                         style: const TextStyle(
-                                          color: Colors.white70,
-                                          fontSize: 13,
+                                          color: Colors.white,
+                                          fontSize: 12,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 6),
+                                      Text(
+                                        c.timeAgo,
+                                        style: const TextStyle(
+                                          color: Colors.white38,
+                                          fontSize: 10,
                                         ),
                                       ),
                                     ],
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(height: 3),
+                                  Text(
+                                    c.text,
+                                    style: const TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 13,
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
-                          );
-                        },
-                      ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
           ),
 
           // Input Bar
@@ -1078,7 +1191,10 @@ class _ShortCommentsSheetState extends ConsumerState<_ShortCommentsSheet> {
                       hintStyle: const TextStyle(color: Colors.white38),
                       filled: true,
                       fillColor: Colors.white.withValues(alpha: 0.08),
-                      contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(20),
                         borderSide: BorderSide.none,
@@ -1094,7 +1210,9 @@ class _ShortCommentsSheetState extends ConsumerState<_ShortCommentsSheet> {
                           height: 18,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation(AppColors.brandOrange),
+                            valueColor: AlwaysStoppedAnimation(
+                              AppColors.brandOrange,
+                            ),
                           ),
                         )
                       : const Icon(Icons.send, color: AppColors.brandOrange),

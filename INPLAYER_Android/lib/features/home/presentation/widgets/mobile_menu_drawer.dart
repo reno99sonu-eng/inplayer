@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../../../core/theme/app_colors.dart';
@@ -37,7 +36,9 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
 
     setState(() => _loadingSubscriptions = true);
     try {
-      final subs = await ref.read(channelServiceProvider).getSubscribedChannels();
+      final subs = await ref
+          .read(channelServiceProvider)
+          .getSubscribedChannels();
       if (mounted) {
         setState(() {
           _subscribedChannels = subs;
@@ -46,24 +47,6 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
       }
     } catch (_) {
       if (mounted) setState(() => _loadingSubscriptions = false);
-    }
-  }
-
-  Future<void> _openUrl(String url) async {
-    final uri = Uri.parse(url);
-    bool launched = false;
-    try {
-      launched = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (_) {
-      launched = false;
-    }
-    if (!launched && mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text("Couldn't open that page."),
-          backgroundColor: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-        ),
-      );
     }
   }
 
@@ -94,7 +77,7 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                   ),
                 ),
               ),
-              ?trailing,
+              trailing ?? const SizedBox.shrink(),
             ],
           ),
         ),
@@ -102,7 +85,11 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
     );
   }
 
-  Widget _buildSectionHeader(String title, {Widget? trailing, VoidCallback? onTap}) {
+  Widget _buildSectionHeader(
+    String title, {
+    Widget? trailing,
+    VoidCallback? onTap,
+  }) {
     return InkWell(
       onTap: onTap,
       child: Padding(
@@ -119,7 +106,7 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                 letterSpacing: 1.8,
               ),
             ),
-            ?trailing,
+            trailing ?? const SizedBox.shrink(),
           ],
         ),
       ),
@@ -128,7 +115,9 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
 
   Widget _buildDivider() {
     return Divider(
-      color: context.isDark ? Colors.white.withValues(alpha: 0.08) : Colors.black.withValues(alpha: 0.06),
+      color: context.isDark
+          ? Colors.white.withValues(alpha: 0.08)
+          : Colors.black.withValues(alpha: 0.06),
       height: 16,
       thickness: 1,
       indent: 12,
@@ -143,7 +132,9 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
     final user = authState is AuthStateAuthenticated ? authState.user : null;
 
     return Drawer(
-      backgroundColor: (isDark ? const Color(0xFF07101F) : const Color(0xFFF5EEDC)).withValues(alpha: 0.98),
+      backgroundColor:
+          (isDark ? const Color(0xFF07101F) : const Color(0xFFF5EEDC))
+              .withValues(alpha: 0.98),
       surfaceTintColor: Colors.transparent,
       width: 320,
       child: SafeArea(
@@ -158,7 +149,11 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                   const AppNavbarLogo(height: 32),
                   const Spacer(),
                   IconButton(
-                    icon: Icon(Icons.close, color: context.textSecondary, size: 22),
+                    icon: Icon(
+                      Icons.close,
+                      color: context.textSecondary,
+                      size: 22,
+                    ),
                     onPressed: () => Navigator.pop(context),
                   ),
                 ],
@@ -195,7 +190,7 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                         // reimplementing each one), so this opens the real
                         // page in the browser rather than a dead in-app
                         // link. Flagged for a future round.
-                        _openUrl('https://inplayer.in/injoy');
+                        context.push('/injoy');
                       },
                     ),
                     _buildMenuItem(
@@ -203,15 +198,7 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                       title: 'Sponsor an Ad',
                       onTap: () {
                         Navigator.pop(context);
-                        // Sponsorships (app/sponsorships) is a real, large
-                        // feature — package tiers, checkout, and a
-                        // dashboard — that touches payments (Razorpay), so
-                        // it's grouped with the other payment-touching
-                        // items (Premium, Hammart checkout) that need the
-                        // user's own involvement before building a native
-                        // purchase flow. Opens the real page for now
-                        // instead of a dead in-app link.
-                        _openUrl('https://inplayer.in/sponsorships');
+                        context.push('/sponsorships/checkout');
                       },
                     ),
                     _buildDivider(),
@@ -268,7 +255,11 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                     // IN-FAMILY (Subscriptions) Section
                     _buildSectionHeader(
                       'IN-FAMILY',
-                      trailing: const Icon(Icons.chevron_right, color: AppColors.brandOrange, size: 16),
+                      trailing: const Icon(
+                        Icons.chevron_right,
+                        color: AppColors.brandOrange,
+                        size: 16,
+                      ),
                       onTap: () {
                         Navigator.pop(context);
                         context.push('/subscriptions');
@@ -278,15 +269,29 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                     if (_loadingSubscriptions)
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 12),
-                        child: Center(child: SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.brandOrange))),
+                        child: Center(
+                          child: SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              color: AppColors.brandOrange,
+                            ),
+                          ),
+                        ),
                       )
                     else if (_subscribedChannels.isEmpty)
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
                         child: Container(
                           padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.03),
+                            color: isDark
+                                ? Colors.white.withValues(alpha: 0.04)
+                                : Colors.black.withValues(alpha: 0.03),
                             borderRadius: BorderRadius.circular(14),
                             border: Border.all(color: context.borderSubtle),
                           ),
@@ -295,12 +300,19 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                             children: [
                               Text(
                                 "You don't have any subscribed channels yet.",
-                                style: TextStyle(color: context.textPrimary, fontSize: 12, fontWeight: FontWeight.w600),
+                                style: TextStyle(
+                                  color: context.textPrimary,
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                               const SizedBox(height: 4),
                               Text(
                                 "Subscribe to your favourite creators and they'll appear here.",
-                                style: TextStyle(color: context.textDim, fontSize: 10),
+                                style: TextStyle(
+                                  color: context.textDim,
+                                  fontSize: 10,
+                                ),
                               ),
                               const SizedBox(height: 8),
                               GestureDetector(
@@ -314,14 +326,21 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                                   context.push('/creators');
                                 },
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
+                                    vertical: 6,
+                                  ),
                                   decoration: BoxDecoration(
                                     color: AppColors.brandOrange,
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: const Text(
                                     'Discover Creators',
-                                    style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                    ),
                                   ),
                                 ),
                               ),
@@ -340,19 +359,29 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                               context.push('/channel/${channel.username}');
                             },
                             child: Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 6,
+                              ),
                               child: Row(
                                 children: [
                                   ClipRRect(
-                                    borderRadius: BorderRadius.circular(14),
+                                    borderRadius: BorderRadius.circular(20),
                                     child: SizedBox(
                                       width: 28,
                                       height: 28,
-                                      child: channel.avatarUrl != null && channel.avatarUrl!.isNotEmpty
+                                      child:
+                                          channel.avatarUrl != null &&
+                                              channel.avatarUrl!.isNotEmpty
                                           ? CachedNetworkImage(
                                               imageUrl: channel.avatarUrl!,
                                               fit: BoxFit.cover,
-                                              errorWidget: (context, url, error) => const Icon(Icons.person, size: 16),
+                                              errorWidget:
+                                                  (context, url, error) =>
+                                                      const Icon(
+                                                        Icons.person,
+                                                        size: 16,
+                                                      ),
                                             )
                                           : const Icon(Icons.person, size: 16),
                                     ),
@@ -361,7 +390,11 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                                   Expanded(
                                     child: Text(
                                       channel.name,
-                                      style: TextStyle(color: context.textPrimary, fontSize: 13, fontWeight: FontWeight.w500),
+                                      style: TextStyle(
+                                        color: context.textPrimary,
+                                        fontSize: 13,
+                                        fontWeight: FontWeight.w500,
+                                      ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
                                     ),
@@ -370,7 +403,10 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                                     Container(
                                       width: 6,
                                       height: 6,
-                                      decoration: const BoxDecoration(color: AppColors.brandOrange, shape: BoxShape.circle),
+                                      decoration: const BoxDecoration(
+                                        color: AppColors.brandOrange,
+                                        shape: BoxShape.circle,
+                                      ),
                                     ),
                                 ],
                               ),
@@ -387,7 +423,11 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                         padding: const EdgeInsets.fromLTRB(16, 8, 16, 2),
                         child: Text(
                           'Signed in as ${user.name.isNotEmpty ? user.name : user.email}',
-                          style: TextStyle(color: context.textDim, fontSize: 11, fontWeight: FontWeight.w500),
+                          style: TextStyle(
+                            color: context.textDim,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                          ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
@@ -402,33 +442,54 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                       ),
                     ] else ...[
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
                         child: Column(
                           children: [
                             ElevatedButton(
                               style: ElevatedButton.styleFrom(
                                 backgroundColor: AppColors.brandOrange,
                                 minimumSize: const Size.fromHeight(40),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
                               ),
                               onPressed: () {
                                 Navigator.pop(context);
                                 showSignInModal(context);
                               },
-                              child: const Text('Sign In', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                              child: const Text(
+                                'Sign In',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
                             ),
                             const SizedBox(height: 8),
                             OutlinedButton(
                               style: OutlinedButton.styleFrom(
                                 side: BorderSide(color: context.borderSubtle),
                                 minimumSize: const Size.fromHeight(40),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                shape: RoundedRectangleBorder(
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
                               ),
                               onPressed: () {
                                 Navigator.pop(context);
                                 showSignUpModal(context);
                               },
-                              child: Text('Create Account', style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.w600, fontSize: 13)),
+                              child: Text(
+                                'Create Account',
+                                style: TextStyle(
+                                  color: context.textPrimary,
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 13,
+                                ),
+                              ),
                             ),
                           ],
                         ),
@@ -456,7 +517,7 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                       title: 'Privacy Policy',
                       onTap: () {
                         Navigator.pop(context);
-                        _openUrl('https://inplayer.in/privacy');
+                        context.push('/settings/privacy-policy');
                       },
                     ),
                     _buildMenuItem(
@@ -464,7 +525,7 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                       title: 'Terms of Service',
                       onTap: () {
                         Navigator.pop(context);
-                        _openUrl('https://inplayer.in/terms');
+                        context.push('/settings/terms');
                       },
                     ),
 

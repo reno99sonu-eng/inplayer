@@ -2,6 +2,19 @@
 /// PlatformSettings shape (minus updatedBy, which the UI doesn't need to
 /// show). PATCH only sends whichever fields actually changed, using the
 /// same whitelist as the backend.
+class PlatformContactEmail {
+  final String label;
+  final String address;
+
+  const PlatformContactEmail({required this.label, required this.address});
+
+  factory PlatformContactEmail.fromJson(Map<String, dynamic> json) {
+    final label = (json['label'] ?? json['name'] ?? 'Contact').toString();
+    final address = (json['address'] ?? json['email'] ?? '').toString();
+    return PlatformContactEmail(label: label, address: address);
+  }
+}
+
 class AdminPlatformSettings {
   final bool maintenanceMode;
   final String maintenanceMessage;
@@ -19,6 +32,11 @@ class AdminPlatformSettings {
   final bool weeklyFeaturedEnabled;
   final bool midrollEnabled;
   final int midrollIntervalSeconds;
+  final List<PlatformContactEmail> contactEmails;
+  final String supportEmail;
+  final String helpEmail;
+  final String contactEmail;
+  final String sponsorEmail;
   final String? updatedAt;
 
   AdminPlatformSettings({
@@ -38,10 +56,33 @@ class AdminPlatformSettings {
     this.weeklyFeaturedEnabled = true,
     this.midrollEnabled = true,
     this.midrollIntervalSeconds = 900,
+    this.contactEmails = const [],
+    this.supportEmail = 'support@inplayer.in',
+    this.helpEmail = 'help@inplayer.in',
+    this.contactEmail = 'contact@inplayer.in',
+    this.sponsorEmail = 'Sponsor@inplayer.in',
     this.updatedAt,
   });
 
   factory AdminPlatformSettings.fromJson(Map<String, dynamic> json) {
+    final rawContactEmails = json['contactEmails'];
+    final parsedContactEmails = rawContactEmails is List
+        ? rawContactEmails
+            .whereType<Map>()
+            .map((item) => PlatformContactEmail.fromJson(Map<String, dynamic>.from(item)))
+            .where((item) => item.address.trim().isNotEmpty)
+            .toList()
+        : <PlatformContactEmail>[];
+
+    final defaultContactEmails = <PlatformContactEmail>[
+      const PlatformContactEmail(label: 'Hammart', address: 'Hammart@inplayer.in'),
+      const PlatformContactEmail(label: 'MillonBook', address: 'Millonbook@inplayer.in'),
+      const PlatformContactEmail(label: 'Sponsor / Banner Specs', address: 'Sponsor@inplayer.in'),
+      const PlatformContactEmail(label: 'InPlayer Digital', address: 'inplayerdigital@gmail.com'),
+    ];
+
+    final contactEmails = parsedContactEmails.isNotEmpty ? parsedContactEmails : defaultContactEmails;
+
     return AdminPlatformSettings(
       maintenanceMode: json['maintenanceMode'] == true,
       maintenanceMessage: json['maintenanceMessage']?.toString() ?? '',
@@ -59,6 +100,11 @@ class AdminPlatformSettings {
       weeklyFeaturedEnabled: json['weeklyFeaturedEnabled'] != false,
       midrollEnabled: json['midrollEnabled'] != false,
       midrollIntervalSeconds: (json['midrollIntervalSeconds'] as num?)?.toInt() ?? 900,
+      contactEmails: contactEmails,
+      supportEmail: json['supportEmail']?.toString() ?? 'support@inplayer.in',
+      helpEmail: json['helpEmail']?.toString() ?? 'help@inplayer.in',
+      contactEmail: json['contactEmail']?.toString() ?? 'contact@inplayer.in',
+      sponsorEmail: json['sponsorEmail']?.toString() ?? 'Sponsor@inplayer.in',
       updatedAt: json['updatedAt'] as String?,
     );
   }
@@ -80,6 +126,11 @@ class AdminPlatformSettings {
     bool? weeklyFeaturedEnabled,
     bool? midrollEnabled,
     int? midrollIntervalSeconds,
+    List<PlatformContactEmail>? contactEmails,
+    String? supportEmail,
+    String? helpEmail,
+    String? contactEmail,
+    String? sponsorEmail,
   }) {
     return AdminPlatformSettings(
       maintenanceMode: maintenanceMode ?? this.maintenanceMode,
@@ -98,6 +149,11 @@ class AdminPlatformSettings {
       weeklyFeaturedEnabled: weeklyFeaturedEnabled ?? this.weeklyFeaturedEnabled,
       midrollEnabled: midrollEnabled ?? this.midrollEnabled,
       midrollIntervalSeconds: midrollIntervalSeconds ?? this.midrollIntervalSeconds,
+      contactEmails: contactEmails ?? this.contactEmails,
+      supportEmail: supportEmail ?? this.supportEmail,
+      helpEmail: helpEmail ?? this.helpEmail,
+      contactEmail: contactEmail ?? this.contactEmail,
+      sponsorEmail: sponsorEmail ?? this.sponsorEmail,
       updatedAt: updatedAt,
     );
   }

@@ -24,7 +24,7 @@ class FeaturedHeroCarousel extends ConsumerStatefulWidget {
 
 class _FeaturedHeroCarouselState extends ConsumerState<FeaturedHeroCarousel> {
   late PageController _pageController;
-  int _currentIndex = 0;
+  final ValueNotifier<int> _currentIndex = ValueNotifier<int>(0);
   Timer? _timer;
   bool _isPaused = false;
 
@@ -48,7 +48,7 @@ class _FeaturedHeroCarouselState extends ConsumerState<FeaturedHeroCarousel> {
 
     _timer = Timer.periodic(const Duration(seconds: 4), (timer) {
       if (_isPaused || !_pageController.hasClients) return;
-      final nextIndex = (_currentIndex + 1) % widget.featuredVideos.length;
+      final nextIndex = (_currentIndex.value + 1) % widget.featuredVideos.length;
       _pageController.animateToPage(
         nextIndex,
         duration: const Duration(milliseconds: 700),
@@ -63,82 +63,82 @@ class _FeaturedHeroCarouselState extends ConsumerState<FeaturedHeroCarousel> {
       return const SizedBox.shrink();
     }
 
-    return AspectRatio(
-      aspectRatio: 16 / 9,
-      child: GestureDetector(
-        onPanDown: (_) => setState(() => _isPaused = true),
-        onPanCancel: () => setState(() => _isPaused = false),
-        onPanEnd: (_) => setState(() => _isPaused = false),
-        child: Container(
-          width: double.infinity,
-          color: Colors.black,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              // 1. Crossfading Background Layer
-              PageView.builder(
-                controller: _pageController,
-                onPageChanged: (index) {
-                  setState(() {
-                    _currentIndex = index;
-                  });
-                },
-                itemCount: widget.featuredVideos.length,
-                itemBuilder: (context, index) {
-                  final video = widget.featuredVideos[index];
-                  return _buildMediaLayer(video);
-                },
-              ),
+    return ValueListenableBuilder<int>(
+      valueListenable: _currentIndex,
+      builder: (context, currentIndex, _) {
+        final activeVideo = widget.featuredVideos[currentIndex % widget.featuredVideos.length];
 
-              // 2. Cinematic Gradient Overlays (left dark wash + bottom fade)
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.centerLeft,
-                        end: Alignment.centerRight,
-                        colors: [
-                          const Color(0xFF050816).withValues(alpha: 0.95),
-                          const Color(0xFF050816).withValues(alpha: 0.65),
-                          const Color(0xFF050816).withValues(alpha: 0.20),
-                          Colors.transparent,
-                        ],
-                        stops: const [0.0, 0.45, 0.75, 1.0],
+        return AspectRatio(
+          aspectRatio: 16 / 9,
+          child: GestureDetector(
+            onPanDown: (_) => setState(() => _isPaused = true),
+            onPanCancel: () => setState(() => _isPaused = false),
+            onPanEnd: (_) => setState(() => _isPaused = false),
+            child: Container(
+              width: double.infinity,
+              color: Colors.black,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  PageView.builder(
+                    controller: _pageController,
+                    onPageChanged: (index) => _currentIndex.value = index,
+                    itemCount: widget.featuredVideos.length,
+                    itemBuilder: (context, index) {
+                      final video = widget.featuredVideos[index];
+                      return _buildMediaLayer(video);
+                    },
+                  ),
+
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.centerLeft,
+                            end: Alignment.centerRight,
+                            colors: [
+                              const Color(0xFF050816).withValues(alpha: 0.95),
+                              const Color(0xFF050816).withValues(alpha: 0.65),
+                              const Color(0xFF050816).withValues(alpha: 0.20),
+                              Colors.transparent,
+                            ],
+                            stops: const [0.0, 0.45, 0.75, 1.0],
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ),
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.bottomCenter,
-                        end: Alignment.topCenter,
-                        colors: [
-                          Colors.black.withValues(alpha: 0.85),
-                          Colors.transparent,
-                        ],
-                        stops: const [0.0, 0.5],
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            begin: Alignment.bottomCenter,
+                            end: Alignment.topCenter,
+                            colors: [
+                              Colors.black.withValues(alpha: 0.85),
+                              Colors.transparent,
+                            ],
+                            stops: const [0.0, 0.5],
+                          ),
+                        ),
                       ),
                     ),
                   ),
-                ),
-              ),
 
-              // 3. Featured Content Overlay
-              Positioned(
-                left: 16,
-                right: 16,
-                bottom: 14,
-                child: _buildSlideContent(widget.featuredVideos[_currentIndex % widget.featuredVideos.length]),
+                  Positioned(
+                    left: 16,
+                    right: 16,
+                    bottom: 14,
+                    child: _buildSlideContent(activeVideo),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 
@@ -174,22 +174,32 @@ class _FeaturedHeroCarouselState extends ConsumerState<FeaturedHeroCarousel> {
     return Stack(
       fit: StackFit.expand,
       children: [
-        // Blurred backdrop copy filling any letterbox
-        CachedNetworkImage(
-          imageUrl: thumb,
-          fit: BoxFit.cover,
-          errorWidget: (context, url, error) => Container(color: const Color(0xFF080C14)),
-        ),
-        BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-          child: Container(color: Colors.black.withValues(alpha: 0.35)),
-        ),
-        // Sharp foreground copy
         CachedNetworkImage(
           imageUrl: thumb,
           fit: BoxFit.cover,
           fadeInDuration: const Duration(milliseconds: 200),
+          fadeOutDuration: const Duration(milliseconds: 150),
+          memCacheWidth: 900,
+          memCacheHeight: 506,
           errorWidget: (context, url, error) => Container(color: const Color(0xFF080C14)),
+        ),
+        BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+          child: Container(color: Colors.black.withValues(alpha: 0.28)),
+        ),
+        AnimatedOpacity(
+          opacity: 1,
+          duration: const Duration(milliseconds: 350),
+          curve: Curves.easeOutCubic,
+          child: CachedNetworkImage(
+            imageUrl: thumb,
+            fit: BoxFit.cover,
+            fadeInDuration: const Duration(milliseconds: 220),
+            fadeOutDuration: const Duration(milliseconds: 120),
+            memCacheWidth: 900,
+            memCacheHeight: 506,
+            errorWidget: (context, url, error) => Container(color: const Color(0xFF080C14)),
+          ),
         ),
       ],
     );

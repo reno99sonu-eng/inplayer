@@ -3,6 +3,7 @@ class User {
   final String username;
   final String name;
   final String email;
+  final String? phoneNumber;
   final String? avatarUrl;
   final String? coverPhotoUrl;
   final String? handle;
@@ -18,6 +19,7 @@ class User {
     required this.username,
     required this.name,
     required this.email,
+    this.phoneNumber,
     this.avatarUrl,
     this.coverPhotoUrl,
     this.handle,
@@ -36,6 +38,7 @@ class User {
       username: json['username'] ?? '',
       name: json['name'] ?? '',
       email: json['email'] ?? '',
+      phoneNumber: json['phoneNumber']?.toString() ?? json['phone']?.toString(),
       avatarUrl: json['avatarUrl'],
       coverPhotoUrl: json['coverPhotoUrl'],
       handle: json['handle'],
@@ -56,6 +59,7 @@ class User {
       'username': username,
       'name': name,
       'email': email,
+      'phoneNumber': phoneNumber,
       'avatarUrl': avatarUrl,
       'coverPhotoUrl': coverPhotoUrl,
       'handle': handle,
@@ -73,6 +77,7 @@ class User {
     String? username,
     String? name,
     String? email,
+    String? phoneNumber,
     String? avatarUrl,
     String? coverPhotoUrl,
     String? handle,
@@ -88,6 +93,7 @@ class User {
       username: username ?? this.username,
       name: name ?? this.name,
       email: email ?? this.email,
+      phoneNumber: phoneNumber ?? this.phoneNumber,
       avatarUrl: avatarUrl ?? this.avatarUrl,
       coverPhotoUrl: coverPhotoUrl ?? this.coverPhotoUrl,
       handle: handle ?? this.handle,

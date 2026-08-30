@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -28,6 +28,7 @@ class _CreatorStudioPageState extends ConsumerState<CreatorStudioPage> {
   }
 
   Future<void> _load() async {
+    await ref.read(authStateProvider.notifier).refreshUser();
     final authState = ref.read(authStateProvider);
     if (authState is! AuthStateAuthenticated) {
       if (mounted) setState(() => _loading = false);
@@ -99,7 +100,10 @@ class _CreatorStudioPageState extends ConsumerState<CreatorStudioPage> {
           backgroundColor: context.bgCard,
           onRefresh: _load,
           child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
             children: [
+              _buildDashboardSummary(),
+              const SizedBox(height: 16),
               _buildSectionHeader('Dashboard'),
               _buildStatCard(
                 icon: Icons.play_circle,
@@ -119,6 +123,7 @@ class _CreatorStudioPageState extends ConsumerState<CreatorStudioPage> {
                 value: _loading ? '—' : '$_videoCount',
                 onTap: () => context.push('/my-videos'),
               ),
+              const SizedBox(height: 8),
               Divider(height: 1, color: context.borderSubtle),
               _buildSectionHeader('Content'),
               _buildMenuItem(
@@ -140,25 +145,24 @@ class _CreatorStudioPageState extends ConsumerState<CreatorStudioPage> {
                 icon: Icons.comment,
                 title: 'Comments',
                 onTap: () => _showSnack('Coming soon.'),
-                trailing: Text('Coming soon',
-                    style: TextStyle(color: context.textDim, fontSize: 12)),
+                trailing: Text('Soon', style: TextStyle(color: context.textDim, fontSize: 12)),
               ),
+              const SizedBox(height: 8),
               Divider(height: 1, color: context.borderSubtle),
               _buildSectionHeader('Analytics'),
               _buildMenuItem(
                 icon: Icons.bar_chart,
                 title: 'View Analytics',
                 onTap: () => _showSnack('Coming soon.'),
-                trailing: Text('Coming soon',
-                    style: TextStyle(color: context.textDim, fontSize: 12)),
+                trailing: Text('Soon', style: TextStyle(color: context.textDim, fontSize: 12)),
               ),
               _buildMenuItem(
                 icon: Icons.trending_up,
                 title: 'Revenue',
                 onTap: () => _showSnack('Coming soon.'),
-                trailing: Text('Coming soon',
-                    style: TextStyle(color: context.textDim, fontSize: 12)),
+                trailing: Text('Soon', style: TextStyle(color: context.textDim, fontSize: 12)),
               ),
+              const SizedBox(height: 8),
               Divider(height: 1, color: context.borderSubtle),
               _buildSectionHeader('Settings'),
               _buildMenuItem(
@@ -174,6 +178,55 @@ class _CreatorStudioPageState extends ConsumerState<CreatorStudioPage> {
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildDashboardSummary() {
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: context.bgCard,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: context.borderSubtle),
+        boxShadow: [
+          BoxShadow(
+            color: (context.isDark ? Colors.black : const Color(0xFFE2E8F0)).withValues(alpha: 0.12),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: AppColors.brandOrange.withValues(alpha: 0.12),
+              border: Border.all(color: AppColors.brandOrange.withValues(alpha: 0.35)),
+            ),
+            child: const Icon(Icons.auto_awesome_rounded, color: AppColors.brandOrange),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Your creator hub',
+                  style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: context.textPrimary),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  'Upload, track reach, and manage your content in one place.',
+                  style: TextStyle(fontSize: 12, color: context.textSecondary),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

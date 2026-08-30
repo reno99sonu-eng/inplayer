@@ -71,16 +71,14 @@ export async function GET(request: NextRequest) {
         });
       }
       
-      // If API returns a fail status, fail open
+      // If the provider returns a failure status, fail closed.
       throw new Error(`ip-api returned status: ${data.status}`);
     } catch (apiError) {
-      // Fail open strategy:
-      // If the 3rd party API is down, times out, or fails for any reason,
-      // we do NOT want to lock out legitimate users. We fail open and allow access.
-      console.warn('IP API check failed, failing open:', apiError);
+      // Fail closed: an unverified network must never be granted access.
+      console.warn('IP API check failed, denying access:', apiError);
       
       return NextResponse.json({
-        allowed: true, // fail open
+        allowed: false,
         country: null,
         isVpn: false,
         isProxy: false,
@@ -90,9 +88,9 @@ export async function GET(request: NextRequest) {
     }
   } catch (error) {
     console.error('Error in GET /api/geo/verify:', error);
-    // Ultimate fallback fail-open
+    // Ultimate fallback also fails closed.
     return NextResponse.json({
-      allowed: true,
+      allowed: false,
       country: null,
       isVpn: false,
       isProxy: false,

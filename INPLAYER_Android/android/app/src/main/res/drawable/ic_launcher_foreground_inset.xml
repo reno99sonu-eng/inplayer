@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Keep the mark comfortably inside Android's circular adaptive-icon safe
+     zone. The launcher is still free to apply its own circle/squircle mask. -->
+<inset xmlns:android="http://schemas.android.com/apk/res/android"
+    android:inset="20%">
+    <bitmap
+        android:src="@mipmap/ic_launcher_foreground"
+        android:gravity="fill" />
+</inset>

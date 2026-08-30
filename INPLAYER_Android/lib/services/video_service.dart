@@ -36,7 +36,6 @@ class VideoService {
   Future<List<Video>> getVideos({bool forceRefresh = false}) async {
     if (!forceRefresh &&
         _cachedVideos != null &&
-        _cachedVideos!.isNotEmpty &&
         _videosCacheTime != null &&
         DateTime.now().difference(_videosCacheTime!).inSeconds < 45) {
       return _cachedVideos!;
@@ -62,11 +61,7 @@ class VideoService {
 
       final result = videosJson
           .whereType<Map>()
-          .map(
-            (json) => Video.fromJson(
-              Map<String, dynamic>.from(json),
-            ),
-          )
+          .map((json) => Video.fromJson(Map<String, dynamic>.from(json)))
           .toList();
 
       _cachedVideos = result;
@@ -86,16 +81,13 @@ class VideoService {
   Future<List<Video>> getFeaturedWeekly({bool forceRefresh = false}) async {
     if (!forceRefresh &&
         _cachedFeatured != null &&
-        _cachedFeatured!.isNotEmpty &&
         _featuredCacheTime != null &&
         DateTime.now().difference(_featuredCacheTime!).inSeconds < 45) {
       return _cachedFeatured!;
     }
 
     try {
-      final response = await _dio.get(
-        ApiConstants.featuredWeekly,
-      );
+      final response = await _dio.get(ApiConstants.featuredWeekly);
 
       if (response.statusCode != 200) {
         return _cachedFeatured ?? [];
@@ -113,11 +105,7 @@ class VideoService {
 
       final result = videosJson
           .whereType<Map>()
-          .map(
-            (json) => Video.fromJson(
-              Map<String, dynamic>.from(json),
-            ),
-          )
+          .map((json) => Video.fromJson(Map<String, dynamic>.from(json)))
           .where((v) => !v.isMusic)
           .toList();
 
@@ -140,9 +128,7 @@ class VideoService {
   /// under its "creators" property rather than returning a bare List.
   Future<List<TrendingCreator>> getTrendingCreatorsData() async {
     try {
-      final response = await _dio.get(
-        ApiConstants.trending,
-      );
+      final response = await _dio.get(ApiConstants.trending);
 
       if (response.statusCode != 200) {
         _logger.w(
@@ -166,9 +152,7 @@ class VideoService {
       return creatorsJson
           .whereType<Map>()
           .map(
-            (json) => TrendingCreator.fromJson(
-              Map<String, dynamic>.from(json),
-            ),
+            (json) => TrendingCreator.fromJson(Map<String, dynamic>.from(json)),
           )
           .toList();
     } catch (e, stackTrace) {
@@ -183,14 +167,10 @@ class VideoService {
 
   Future<List<Video>> getTrendingVideos() async {
     try {
-      final response = await _dio.get(
-        ApiConstants.trending,
-      );
+      final response = await _dio.get(ApiConstants.trending);
 
       if (response.statusCode != 200) {
-        _logger.w(
-          'getTrendingVideos returned HTTP ${response.statusCode}',
-        );
+        _logger.w('getTrendingVideos returned HTTP ${response.statusCode}');
         return [];
       }
 
@@ -218,11 +198,7 @@ class VideoService {
         if (creatorVideos is List) {
           for (final video in creatorVideos) {
             if (video is Map) {
-              videos.add(
-                Video.fromJson(
-                  Map<String, dynamic>.from(video),
-                ),
-              );
+              videos.add(Video.fromJson(Map<String, dynamic>.from(video)));
             }
           }
         }
@@ -241,15 +217,10 @@ class VideoService {
 
   Future<Video?> getVideoById(String videoId) async {
     try {
-      final response = await _dio.get(
-        '${ApiConstants.videoDetail}/$videoId',
-      );
+      final response = await _dio.get('${ApiConstants.videoDetail}/$videoId');
 
-      if (response.statusCode == 200 &&
-          response.data is Map) {
-        return Video.fromJson(
-          Map<String, dynamic>.from(response.data),
-        );
+      if (response.statusCode == 200 && response.data is Map) {
+        return Video.fromJson(Map<String, dynamic>.from(response.data));
       }
 
       return null;
@@ -269,8 +240,7 @@ class VideoService {
         '${ApiConstants.videoPlaybackToken}/$videoId/playback-token',
       );
 
-      if (response.statusCode == 200 &&
-          response.data is Map) {
+      if (response.statusCode == 200 && response.data is Map) {
         return response.data['token'] as String?;
       }
 
@@ -297,23 +267,17 @@ class VideoService {
   /// Raftaar/Shorts always came back empty before).
   Future<List<Short>> getShorts() async {
     try {
-      final response = await _dio.get(
-        ApiConstants.videos,
-      );
+      final response = await _dio.get(ApiConstants.videos);
 
       if (response.statusCode != 200) {
-        _logger.w(
-          'getShorts returned HTTP ${response.statusCode}',
-        );
+        _logger.w('getShorts returned HTTP ${response.statusCode}');
         return [];
       }
 
       final data = response.data;
 
       if (data is! Map || data['videos'] is! List) {
-        _logger.w(
-          'Unexpected /api/videos response format for shorts',
-        );
+        _logger.w('Unexpected /api/videos response format for shorts');
         return [];
       }
 
@@ -344,9 +308,7 @@ class VideoService {
   /// calling a route that returns 404.
   Future<List<Video>> searchVideos(String query) async {
     try {
-      final response = await _dio.get(
-        ApiConstants.videos,
-      );
+      final response = await _dio.get(ApiConstants.videos);
 
       if (response.statusCode != 200) {
         return [];
@@ -364,8 +326,9 @@ class VideoService {
           .whereType<Map>()
           .map((json) => Map<String, dynamic>.from(json))
           .where(
-            (json) => (json['title']?.toString().toLowerCase() ?? '')
-                .contains(lowerQuery),
+            (json) => (json['title']?.toString().toLowerCase() ?? '').contains(
+              lowerQuery,
+            ),
           )
           .map((json) => Video.fromJson(json))
           .toList();
@@ -406,7 +369,9 @@ class VideoService {
 
       return (data['suggestions'] as List)
           .whereType<Map>()
-          .map((json) => VideoSuggestion.fromJson(Map<String, dynamic>.from(json)))
+          .map(
+            (json) => VideoSuggestion.fromJson(Map<String, dynamic>.from(json)),
+          )
           .toList();
     } catch (e, stackTrace) {
       _logger.e(
@@ -462,20 +427,20 @@ class VideoService {
           .map((json) => Video.fromJson(Map<String, dynamic>.from(json)))
           .toList();
     } catch (e, stackTrace) {
-      _logger.e('Error fetching liked videos', error: e, stackTrace: stackTrace);
+      _logger.e(
+        'Error fetching liked videos',
+        error: e,
+        stackTrace: stackTrace,
+      );
       return [];
     }
   }
 
-  Future<List<Video>> getVideosByChannel(
-    String channelId,
-  ) async {
+  Future<List<Video>> getVideosByChannel(String channelId) async {
     try {
       final response = await _dio.get(
         ApiConstants.videos,
-        queryParameters: {
-          'channelId': channelId,
-        },
+        queryParameters: {'channelId': channelId},
       );
 
       if (response.statusCode != 200) {
@@ -496,11 +461,7 @@ class VideoService {
 
       return videosJson
           .whereType<Map>()
-          .map(
-            (json) => Video.fromJson(
-              Map<String, dynamic>.from(json),
-            ),
-          )
+          .map((json) => Video.fromJson(Map<String, dynamic>.from(json)))
           .toList();
     } catch (e, stackTrace) {
       _logger.e(
@@ -521,7 +482,11 @@ class VideoService {
       );
       return response.statusCode == 200;
     } catch (e, stackTrace) {
-      _logger.e('Error updating video $videoId', error: e, stackTrace: stackTrace);
+      _logger.e(
+        'Error updating video $videoId',
+        error: e,
+        stackTrace: stackTrace,
+      );
       return false;
     }
   }
@@ -529,12 +494,14 @@ class VideoService {
   /// Deletes a video owned by the signed-in user (DELETE /api/my-videos/:videoId).
   Future<bool> deleteMyVideo(String videoId) async {
     try {
-      final response = await _dio.delete(
-        '${ApiConstants.myVideos}/$videoId',
-      );
+      final response = await _dio.delete('${ApiConstants.myVideos}/$videoId');
       return response.statusCode == 200;
     } catch (e, stackTrace) {
-      _logger.e('Error deleting video $videoId', error: e, stackTrace: stackTrace);
+      _logger.e(
+        'Error deleting video $videoId',
+        error: e,
+        stackTrace: stackTrace,
+      );
       return false;
     }
   }
@@ -544,10 +511,7 @@ class VideoService {
     try {
       final response = await _dio.post(
         ApiConstants.profileSettings,
-        data: {
-          'action': 'update_bio',
-          'bio': bio,
-        },
+        data: {'action': 'update_bio', 'description': bio},
       );
       return response.statusCode == 200;
     } catch (e, stackTrace) {
@@ -586,9 +550,16 @@ class VideoService {
       } else {
         return [];
       }
-      return raw.whereType<Map>().map((m) => Map<String, dynamic>.from(m)).toList();
+      return raw
+          .whereType<Map>()
+          .map((m) => Map<String, dynamic>.from(m))
+          .toList();
     } catch (e, stackTrace) {
-      _logger.e('Error fetching my-videos stats', error: e, stackTrace: stackTrace);
+      _logger.e(
+        'Error fetching my-videos stats',
+        error: e,
+        stackTrace: stackTrace,
+      );
       return [];
     }
   }

@@ -177,7 +177,8 @@ class _UploadPageState extends ConsumerState<UploadPage> {
   /// website's own initial state (no track, 30s, "original").
   ShortSettings _shortSettings = const ShortSettings();
 
-  bool get _isMusicUpload => _contentType == 'music' || _category.toLowerCase() == 'music';
+  bool get _isMusicUpload =>
+      _contentType == 'music' || _category.toLowerCase() == 'music';
 
   @override
   void dispose() {
@@ -316,7 +317,9 @@ class _UploadPageState extends ConsumerState<UploadPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+        backgroundColor: context.isDark
+            ? AppColors.surfaceDark
+            : AppColors.surfaceLight,
       ),
     );
   }
@@ -350,7 +353,9 @@ class _UploadPageState extends ConsumerState<UploadPage> {
     // just the friendlier place to find out (Round 24 parity fix — Android
     // previously had no client-side check here at all).
     if (_isMusicUpload && _musicCovers.isEmpty) {
-      _showSnack('Please add cover art — a music upload needs at least one image.');
+      _showSnack(
+        'Please add cover art — a music upload needs at least one image.',
+      );
       return;
     }
 
@@ -377,7 +382,9 @@ class _UploadPageState extends ConsumerState<UploadPage> {
     List<String> coverUrls = [];
     if (_isMusicUpload && _musicCovers.isNotEmpty) {
       for (final cover in _musicCovers) {
-        final url = await ref.read(uploadServiceProvider).uploadCoverArt(cover.path);
+        final url = await ref
+            .read(uploadServiceProvider)
+            .uploadCoverArt(cover.path);
         if (url != null && url.isNotEmpty) {
           coverUrls.add(url);
         }
@@ -410,7 +417,9 @@ class _UploadPageState extends ConsumerState<UploadPage> {
       }
     }
 
-    final createResult = await ref.read(uploadServiceProvider).createUpload(
+    final createResult = await ref
+        .read(uploadServiceProvider)
+        .createUpload(
           title: title,
           description: _descriptionController.text.trim(),
           category: _category,
@@ -455,11 +464,19 @@ class _UploadPageState extends ConsumerState<UploadPage> {
 
     _uploadedVideoId = createResult.videoId;
 
-    final uploadOk = await ref.read(uploadServiceProvider).uploadFile(
+    final uploadOk = await ref
+        .read(uploadServiceProvider)
+        .uploadFile(
           createResult.uploadUrl!,
           _file!.path,
           onProgress: (p) {
-            if (mounted) setState(() => _progress = p);
+            // Dio can report hundreds of progress callbacks per second for a
+            // fast connection. Rebuilding the entire upload form for each
+            // callback made scrolling and button taps feel frozen. A visible
+            // 1% step is smooth enough while cutting rebuilds dramatically.
+            if (mounted && (p - _progress).abs() >= 0.01) {
+              setState(() => _progress = p);
+            }
           },
         );
 
@@ -467,7 +484,8 @@ class _UploadPageState extends ConsumerState<UploadPage> {
 
     if (!uploadOk) {
       setState(() {
-        _errorMessage = 'Something went wrong uploading your file. Please try again.';
+        _errorMessage =
+            'Something went wrong uploading your file. Please try again.';
         _stage = _Stage.error;
         _publishing = false;
       });
@@ -507,7 +525,8 @@ class _UploadPageState extends ConsumerState<UploadPage> {
         timer.cancel();
         setState(() {
           _errorMessage =
-              status.error ?? 'Your file finished uploading, but processing failed. Please try a different file.';
+              status.error ??
+              'Your file finished uploading, but processing failed. Please try a different file.';
           _stage = _Stage.error;
         });
       } else if (_pollAttempts >= 100) {
@@ -562,12 +581,12 @@ class _UploadPageState extends ConsumerState<UploadPage> {
   /// upload the same way — the whole reason the website keeps its own
   /// equivalent in a shared aiPrompts.ts rather than per-field.
   AIPromptContext _aiContext({String? userDescription}) => AIPromptContext(
-        title: _titleController.text,
-        description: _descriptionController.text,
-        category: _category,
-        contentType: _isMusicUpload ? 'music' : _contentType,
-        userDescription: userDescription,
-      );
+    title: _titleController.text,
+    description: _descriptionController.text,
+    category: _category,
+    contentType: _isMusicUpload ? 'music' : _contentType,
+    userDescription: userDescription,
+  );
 
   /// Opens the tap-to-stamp lyrics editor against the picked audio file.
   ///
@@ -614,8 +633,9 @@ class _UploadPageState extends ConsumerState<UploadPage> {
     if (_aiBusy) return;
     setState(() => _aiBusy = true);
     try {
-      final text =
-          await ref.read(aiAssistServiceProvider).suggestDescription(_aiContext());
+      final text = await ref
+          .read(aiAssistServiceProvider)
+          .suggestDescription(_aiContext());
       if (!mounted) return;
       setState(() {
         _descriptionController.text = text;
@@ -632,7 +652,9 @@ class _UploadPageState extends ConsumerState<UploadPage> {
     if (_aiBusy) return;
     setState(() => _aiBusy = true);
     try {
-      final tags = await ref.read(aiAssistServiceProvider).suggestTags(_aiContext());
+      final tags = await ref
+          .read(aiAssistServiceProvider)
+          .suggestTags(_aiContext());
       if (!mounted) return;
       // Routed through _addTag rather than assigned straight into _tags so
       // the AI's output goes through exactly the same dedup, '#'-stripping
@@ -664,9 +686,11 @@ class _UploadPageState extends ConsumerState<UploadPage> {
     final ok = await ref.read(uploadServiceProvider).setThumbnail(videoId, url);
     if (!mounted) return;
     setState(() => _savingThumbnail = false);
-    _showSnack(ok
-        ? 'Thumbnail updated.'
-        : "Couldn't save that thumbnail — the automatic one is still live.");
+    _showSnack(
+      ok
+          ? 'Thumbnail updated.'
+          : "Couldn't save that thumbnail — the automatic one is still live.",
+    );
   }
 
   @override
@@ -748,7 +772,11 @@ class _UploadPageState extends ConsumerState<UploadPage> {
             const SizedBox(height: 8),
             Text(
               'Share your high-definition videos, music, and Raftaar shorts with the world.',
-              style: TextStyle(color: context.textSecondary, fontSize: 13, height: 1.4),
+              style: TextStyle(
+                color: context.textSecondary,
+                fontSize: 13,
+                height: 1.4,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
@@ -767,16 +795,25 @@ class _UploadPageState extends ConsumerState<UploadPage> {
               ),
               child: ElevatedButton.icon(
                 onPressed: () => _pickVideo('video'),
-                icon: const Icon(Icons.video_library_rounded, color: Colors.black),
+                icon: const Icon(
+                  Icons.video_library_rounded,
+                  color: Colors.black,
+                ),
                 label: const Text(
                   'Upload Longform Video',
-                  style: TextStyle(color: Colors.black, fontWeight: FontWeight.w800, fontSize: 14),
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 14,
+                  ),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.transparent,
                   shadowColor: Colors.transparent,
                   minimumSize: const Size(double.infinity, 52),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                 ),
               ),
             ),
@@ -790,15 +827,24 @@ class _UploadPageState extends ConsumerState<UploadPage> {
               ),
               child: OutlinedButton.icon(
                 onPressed: () => _pickVideo('short'),
-                icon: const Icon(Icons.play_circle_fill_rounded, color: AppColors.brandOrange),
+                icon: const Icon(
+                  Icons.play_circle_fill_rounded,
+                  color: AppColors.brandOrange,
+                ),
                 label: Text(
                   'Upload Raftaar Short (⚡)',
-                  style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.w700, fontSize: 14),
+                  style: TextStyle(
+                    color: context.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
                 ),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 52),
                   side: BorderSide.none,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                 ),
               ),
             ),
@@ -815,15 +861,24 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                   setState(() => _category = 'Music');
                   _pickVideo('music');
                 },
-                icon: const Icon(Icons.music_note_rounded, color: AppColors.brandOrange),
+                icon: const Icon(
+                  Icons.music_note_rounded,
+                  color: AppColors.brandOrange,
+                ),
                 label: Text(
                   'Upload Music & Audio Track (🎵)',
-                  style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.w700, fontSize: 14),
+                  style: TextStyle(
+                    color: context.textPrimary,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
                 ),
                 style: OutlinedButton.styleFrom(
                   minimumSize: const Size(double.infinity, 52),
                   side: BorderSide.none,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
                 ),
               ),
             ),
@@ -859,7 +914,9 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                 child: Icon(
                   _contentType == 'short'
                       ? Icons.play_circle
-                      : (_isMusicUpload ? Icons.music_note : Icons.movie_outlined),
+                      : (_isMusicUpload
+                            ? Icons.music_note
+                            : Icons.movie_outlined),
                   color: AppColors.brandOrange,
                 ),
               ),
@@ -880,10 +937,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                     const SizedBox(height: 2),
                     Text(
                       '$sizeLabel • ${_contentType == 'short' ? 'Raftaar Short' : (_isMusicUpload ? 'Music Track' : 'Longform Video')}',
-                      style: TextStyle(
-                        color: context.textDim,
-                        fontSize: 12,
-                      ),
+                      style: TextStyle(color: context.textDim, fontSize: 12),
                     ),
                   ],
                 ),
@@ -898,9 +952,21 @@ class _UploadPageState extends ConsumerState<UploadPage> {
         const SizedBox(height: 16),
         SegmentedButton<String>(
           segments: const [
-            ButtonSegment(value: 'video', label: Text('Video'), icon: Icon(Icons.movie_outlined)),
-            ButtonSegment(value: 'short', label: Text('Short'), icon: Icon(Icons.play_circle_outline)),
-            ButtonSegment(value: 'music', label: Text('Music'), icon: Icon(Icons.music_note_outlined)),
+            ButtonSegment(
+              value: 'video',
+              label: Text('Video'),
+              icon: Icon(Icons.movie_outlined),
+            ),
+            ButtonSegment(
+              value: 'short',
+              label: Text('Short'),
+              icon: Icon(Icons.play_circle_outline),
+            ),
+            ButtonSegment(
+              value: 'music',
+              label: Text('Music'),
+              icon: Icon(Icons.music_note_outlined),
+            ),
           ],
           selected: {_contentType},
           onSelectionChanged: (s) => setState(() {
@@ -935,11 +1001,19 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const Icon(Icons.add_photo_alternate_outlined, color: AppColors.brandOrange, size: 32),
+                          const Icon(
+                            Icons.add_photo_alternate_outlined,
+                            color: AppColors.brandOrange,
+                            size: 32,
+                          ),
                           const SizedBox(height: 6),
                           Text(
                             'Upload custom thumbnail',
-                            style: TextStyle(color: context.textSecondary, fontSize: 12, fontWeight: FontWeight.w600),
+                            style: TextStyle(
+                              color: context.textSecondary,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                         ],
                       ),
@@ -949,8 +1023,15 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                       child: Container(
                         margin: const EdgeInsets.all(8),
                         padding: const EdgeInsets.all(4),
-                        decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                        child: const Icon(Icons.edit, color: Colors.white, size: 16),
+                        decoration: const BoxDecoration(
+                          color: Colors.black54,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.edit,
+                          color: Colors.white,
+                          size: 16,
+                        ),
                       ),
                     ),
             ),
@@ -988,8 +1069,15 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                           onTap: () => _removeMusicCover(i),
                           child: Container(
                             padding: const EdgeInsets.all(3),
-                            decoration: const BoxDecoration(color: Colors.black87, shape: BoxShape.circle),
-                            child: const Icon(Icons.close, color: Colors.white, size: 14),
+                            decoration: const BoxDecoration(
+                              color: Colors.black87,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.close,
+                              color: Colors.white,
+                              size: 14,
+                            ),
                           ),
                         ),
                       ),
@@ -1017,10 +1105,13 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                             if (i == 0)
                               Container(
                                 padding: const EdgeInsets.symmetric(
-                                    horizontal: 5, vertical: 2),
+                                  horizontal: 5,
+                                  vertical: 2,
+                                ),
                                 decoration: BoxDecoration(
-                                  color: AppColors.brandOrange
-                                      .withValues(alpha: 0.9),
+                                  color: AppColors.brandOrange.withValues(
+                                    alpha: 0.9,
+                                  ),
                                   borderRadius: BorderRadius.circular(6),
                                 ),
                                 child: const Text(
@@ -1053,15 +1144,28 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                       decoration: BoxDecoration(
                         color: context.bgCard,
                         borderRadius: BorderRadius.circular(14),
-                        border: Border.all(color: context.borderSubtle, style: BorderStyle.solid),
+                        border: Border.all(
+                          color: context.borderSubtle,
+                          style: BorderStyle.solid,
+                        ),
                       ),
                       child: Center(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
-                            const Icon(Icons.add_photo_alternate_outlined, color: AppColors.brandOrange, size: 28),
+                            const Icon(
+                              Icons.add_photo_alternate_outlined,
+                              color: AppColors.brandOrange,
+                              size: 28,
+                            ),
                             const SizedBox(height: 4),
-                            Text('Add Cover', style: TextStyle(color: context.textDim, fontSize: 11)),
+                            Text(
+                              'Add Cover',
+                              style: TextStyle(
+                                color: context.textDim,
+                                fontSize: 11,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -1100,14 +1204,16 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                   : const Color(0xFFF59E0B).withValues(alpha: 0.06),
             ),
             child: InkWell(
-              onTap: () => setState(() => _declaredOwnership = !_declaredOwnership),
+              onTap: () =>
+                  setState(() => _declaredOwnership = !_declaredOwnership),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Checkbox(
                     value: _declaredOwnership,
                     activeColor: const Color(0xFF10B981),
-                    onChanged: (v) => setState(() => _declaredOwnership = v ?? false),
+                    onChanged: (v) =>
+                        setState(() => _declaredOwnership = v ?? false),
                   ),
                   Expanded(
                     child: Padding(
@@ -1141,7 +1247,11 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                             "InPlayer. Uploading someone else's recording — including a song from a film, a "
                             "label release, or a cover of a composition I don't have a licence for — gets the "
                             "track removed and can cost you your channel.",
-                            style: TextStyle(color: context.textDim, fontSize: 11, height: 1.4),
+                            style: TextStyle(
+                              color: context.textDim,
+                              fontSize: 11,
+                              height: 1.4,
+                            ),
                           ),
                         ],
                       ),
@@ -1160,7 +1270,12 @@ class _UploadPageState extends ConsumerState<UploadPage> {
             style: TextStyle(color: context.textPrimary),
             decoration: _inputDecoration(null),
             items: _musicGenres
-                .map((g) => DropdownMenuItem(value: g, child: Text(g, overflow: TextOverflow.ellipsis)))
+                .map(
+                  (g) => DropdownMenuItem(
+                    value: g,
+                    child: Text(g, overflow: TextOverflow.ellipsis),
+                  ),
+                )
                 .toList(),
             onChanged: (v) => setState(() => _genre = v ?? _genre),
           ),
@@ -1180,7 +1295,9 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                   onTap: _openLyricsEditor,
                   child: Container(
                     padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 5),
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.brandOrange.withValues(alpha: 0.12),
                       borderRadius: BorderRadius.circular(20),
@@ -1191,8 +1308,11 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                     child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.graphic_eq_rounded,
-                            size: 13, color: AppColors.brandOrangeLight),
+                        Icon(
+                          Icons.graphic_eq_rounded,
+                          size: 13,
+                          color: AppColors.brandOrangeLight,
+                        ),
                         SizedBox(width: 5),
                         Text(
                           'Sync to audio',
@@ -1213,7 +1333,9 @@ class _UploadPageState extends ConsumerState<UploadPage> {
             controller: _lyricsController,
             maxLines: 4,
             style: TextStyle(color: context.textPrimary, fontSize: 13),
-            decoration: _inputDecoration('Paste your lyrics or [.lrc] timestamps here...'),
+            decoration: _inputDecoration(
+              'Paste your lyrics or [.lrc] timestamps here...',
+            ),
             // Typing here supersedes whatever the editor produced — the two
             // must not silently disagree about which is the real lyric
             // sheet. See _syncedLyrics.
@@ -1224,8 +1346,11 @@ class _UploadPageState extends ConsumerState<UploadPage> {
               padding: const EdgeInsets.only(top: 8),
               child: Row(
                 children: [
-                  const Icon(Icons.check_circle_rounded,
-                      size: 14, color: AppColors.success),
+                  const Icon(
+                    Icons.check_circle_rounded,
+                    size: 14,
+                    color: AppColors.success,
+                  ),
                   const SizedBox(width: 6),
                   Expanded(
                     child: Text(
@@ -1282,7 +1407,12 @@ class _UploadPageState extends ConsumerState<UploadPage> {
           style: TextStyle(color: context.textPrimary),
           decoration: _inputDecoration(null),
           items: _categories
-              .map((c) => DropdownMenuItem(value: c, child: Text(c, overflow: TextOverflow.ellipsis)))
+              .map(
+                (c) => DropdownMenuItem(
+                  value: c,
+                  child: Text(c, overflow: TextOverflow.ellipsis),
+                ),
+              )
               .toList(),
           onChanged: (v) => setState(() {
             _category = v ?? _category;
@@ -1298,7 +1428,12 @@ class _UploadPageState extends ConsumerState<UploadPage> {
           style: TextStyle(color: context.textPrimary),
           decoration: _inputDecoration(null),
           items: _visibilityOptions
-              .map((o) => DropdownMenuItem(value: o.value, child: Text(o.label, overflow: TextOverflow.ellipsis)))
+              .map(
+                (o) => DropdownMenuItem(
+                  value: o.value,
+                  child: Text(o.label, overflow: TextOverflow.ellipsis),
+                ),
+              )
               .toList(),
           onChanged: (v) => setState(() => _visibility = v ?? _visibility),
         ),
@@ -1309,9 +1444,12 @@ class _UploadPageState extends ConsumerState<UploadPage> {
           style: TextStyle(color: context.textPrimary),
           decoration: _inputDecoration(null),
           items: _languageOptions
-              .map((o) => DropdownMenuItem(value: o.value, child: Text(o.label)))
+              .map(
+                (o) => DropdownMenuItem(value: o.value, child: Text(o.label)),
+              )
               .toList(),
-          onChanged: (v) => setState(() => _spokenLanguage = v ?? _spokenLanguage),
+          onChanged: (v) =>
+              setState(() => _spokenLanguage = v ?? _spokenLanguage),
         ),
         // Soundtrack + Look. Hidden for music uploads, matching the website:
         // a music upload IS the audio, so laying a background track over it
@@ -1350,8 +1488,12 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                 label: Text('#$t', style: const TextStyle(fontSize: 12)),
                 deleteIcon: const Icon(Icons.close, size: 14),
                 onDeleted: () => setState(() => _tags.remove(t)),
-                backgroundColor: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                backgroundColor: context.isDark
+                    ? AppColors.surfaceDark
+                    : AppColors.surfaceLight,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               );
             }).toList(),
           ),
@@ -1364,13 +1506,28 @@ class _UploadPageState extends ConsumerState<UploadPage> {
           style: TextStyle(color: context.textPrimary),
           decoration: _inputDecoration(null),
           items: _audienceOptions
-              .map((o) => DropdownMenuItem(value: o.value, child: Text('${o.label} — ${o.hint}', overflow: TextOverflow.ellipsis)))
+              .map(
+                (o) => DropdownMenuItem(
+                  value: o.value,
+                  child: Text(
+                    '${o.label} — ${o.hint}',
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              )
               .toList(),
           onChanged: (v) => setState(() => _audience = v ?? _audience),
         ),
         const SizedBox(height: 12),
         SwitchListTile(
-          title: Text('Allow comments', style: TextStyle(color: context.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+          title: Text(
+            'Allow comments',
+            style: TextStyle(
+              color: context.textPrimary,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           value: _commentsEnabled,
           activeThumbColor: AppColors.brandOrange,
           onChanged: (v) => setState(() => _commentsEnabled = v),
@@ -1381,8 +1538,18 @@ class _UploadPageState extends ConsumerState<UploadPage> {
         // publish. Round 24 parity fix: this used to be video-only.
         if (_contentType == 'video' || _isMusicUpload)
           SwitchListTile(
-            title: Text('Members only (👑)', style: TextStyle(color: context.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
-            subtitle: Text('Only paid subscribers can watch', style: TextStyle(color: context.textDim, fontSize: 12)),
+            title: Text(
+              'Members only (👑)',
+              style: TextStyle(
+                color: context.textPrimary,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            subtitle: Text(
+              'Only paid subscribers can watch',
+              style: TextStyle(color: context.textDim, fontSize: 12),
+            ),
             value: _membersOnly,
             activeThumbColor: AppColors.brandOrange,
             onChanged: (v) => setState(() => _membersOnly = v),
@@ -1408,11 +1575,17 @@ class _UploadPageState extends ConsumerState<UploadPage> {
               backgroundColor: Colors.transparent,
               shadowColor: Colors.transparent,
               minimumSize: const Size(double.infinity, 52),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
             ),
             child: const Text(
               'Publish Upload',
-              style: TextStyle(color: Colors.black, fontWeight: FontWeight.w800, fontSize: 15),
+              style: TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.w800,
+                fontSize: 15,
+              ),
             ),
           ),
         ),
@@ -1444,14 +1617,22 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                 ),
                 Text(
                   '$pct%',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: context.textPrimary),
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: context.textPrimary,
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 24),
             Text(
               'Uploading your file...',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: context.textPrimary),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: context.textPrimary,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
@@ -1483,12 +1664,20 @@ class _UploadPageState extends ConsumerState<UploadPage> {
             const SizedBox(height: 24),
             Text(
               'Processing video...',
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: context.textPrimary),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+                color: context.textPrimary,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               'Generating resolutions and preparing streaming renditions. This usually takes under a minute.',
-              style: TextStyle(color: context.textDim, fontSize: 12, height: 1.4),
+              style: TextStyle(
+                color: context.textDim,
+                fontSize: 12,
+                height: 1.4,
+              ),
               textAlign: TextAlign.center,
             ),
           ],
@@ -1586,10 +1775,15 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                         width: 14,
                         height: 14,
                         child: CircularProgressIndicator(
-                            strokeWidth: 2, color: AppColors.brandOrange),
+                          strokeWidth: 2,
+                          color: AppColors.brandOrange,
+                        ),
                       )
-                    : const Icon(Icons.check_rounded,
-                        size: 16, color: AppColors.brandOrange),
+                    : const Icon(
+                        Icons.check_rounded,
+                        size: 16,
+                        color: AppColors.brandOrange,
+                      ),
                 label: Text(
                   _savingThumbnail ? 'Saving...' : 'Use this thumbnail',
                   style: const TextStyle(
@@ -1627,12 +1821,20 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                 color: AppColors.success.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.check_circle_rounded, color: AppColors.success, size: 64),
+              child: const Icon(
+                Icons.check_circle_rounded,
+                color: AppColors.success,
+                size: 64,
+              ),
             ),
             const SizedBox(height: 20),
             Text(
               'Published!',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: context.textPrimary),
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: context.textPrimary,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
@@ -1651,9 +1853,17 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.brandOrange,
                   minimumSize: const Size(double.infinity, 48),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                 ),
-                child: const Text('Watch Video', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                child: const Text(
+                  'Watch Video',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
               const SizedBox(height: 10),
             ],
@@ -1661,9 +1871,14 @@ class _UploadPageState extends ConsumerState<UploadPage> {
               onPressed: _reset,
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size(double.infinity, 48),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
-              child: Text('Upload Another', style: TextStyle(color: context.textPrimary)),
+              child: Text(
+                'Upload Another',
+                style: TextStyle(color: context.textPrimary),
+              ),
             ),
           ],
         ),
@@ -1684,17 +1899,29 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                 color: AppColors.warning.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
-              child: const Icon(Icons.hourglass_top_rounded, color: AppColors.warning, size: 64),
+              child: const Icon(
+                Icons.hourglass_top_rounded,
+                color: AppColors.warning,
+                size: 64,
+              ),
             ),
             const SizedBox(height: 20),
             Text(
               'Still processing…',
-              style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: context.textPrimary),
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+                color: context.textPrimary,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               "This is taking longer than usual — large files can take a while. It isn't published yet, but it's still working in the background. You can leave this screen; it'll show up in My Videos once it's ready.",
-              style: TextStyle(color: context.textDim, fontSize: 13, height: 1.4),
+              style: TextStyle(
+                color: context.textDim,
+                fontSize: 13,
+                height: 1.4,
+              ),
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 28),
@@ -1706,16 +1933,26 @@ class _UploadPageState extends ConsumerState<UploadPage> {
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.brandOrange,
                 minimumSize: const Size(double.infinity, 48),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
-              child: const Text('Go to My Videos', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+              child: const Text(
+                'Go to My Videos',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
             const SizedBox(height: 10),
             OutlinedButton(
               onPressed: _reset,
               style: OutlinedButton.styleFrom(
                 minimumSize: const Size(double.infinity, 48),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(14),
+                ),
               ),
               child: Text('Done', style: TextStyle(color: context.textPrimary)),
             ),
@@ -1732,11 +1969,19 @@ class _UploadPageState extends ConsumerState<UploadPage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline_rounded, color: AppColors.error, size: 64),
+            const Icon(
+              Icons.error_outline_rounded,
+              color: AppColors.error,
+              size: 64,
+            ),
             const SizedBox(height: 16),
             Text(
               'Upload failed',
-              style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: context.textPrimary),
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: context.textPrimary,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
@@ -1749,9 +1994,17 @@ class _UploadPageState extends ConsumerState<UploadPage> {
               onPressed: () => setState(() => _stage = _Stage.details),
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.brandOrange,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
-              child: const Text('Try Again', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+              child: const Text(
+                'Try Again',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ],
         ),
@@ -1787,8 +2040,11 @@ class _UploadPageState extends ConsumerState<UploadPage> {
         padding: const EdgeInsets.only(top: 12),
         child: Row(
           children: [
-            const Icon(Icons.verified_user_rounded,
-                size: 14, color: AppColors.success),
+            const Icon(
+              Icons.verified_user_rounded,
+              size: 14,
+              color: AppColors.success,
+            ),
             const SizedBox(width: 6),
             Text(
               'No copyright signals — this looks clear to publish.',
@@ -1836,8 +2092,10 @@ class _UploadPageState extends ConsumerState<UploadPage> {
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('•  ',
-                      style: TextStyle(color: context.textDim, fontSize: 11)),
+                  Text(
+                    '•  ',
+                    style: TextStyle(color: context.textDim, fontSize: 11),
+                  ),
                   Expanded(
                     child: Text(
                       s.detail,
@@ -1895,10 +2153,14 @@ class _UploadPageState extends ConsumerState<UploadPage> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
-            color: AppColors.brandOrange.withValues(alpha: _aiBusy ? 0.05 : 0.12),
+            color: AppColors.brandOrange.withValues(
+              alpha: _aiBusy ? 0.05 : 0.12,
+            ),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
-              color: AppColors.brandOrange.withValues(alpha: _aiBusy ? 0.15 : 0.35),
+              color: AppColors.brandOrange.withValues(
+                alpha: _aiBusy ? 0.15 : 0.35,
+              ),
             ),
           ),
           child: Row(
@@ -1913,14 +2175,18 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                         color: AppColors.brandOrangeLight,
                       ),
                     )
-                  : const Icon(Icons.auto_awesome_rounded,
-                      size: 13, color: AppColors.brandOrangeLight),
+                  : const Icon(
+                      Icons.auto_awesome_rounded,
+                      size: 13,
+                      color: AppColors.brandOrangeLight,
+                    ),
               const SizedBox(width: 5),
               Text(
                 text,
                 style: TextStyle(
-                  color: AppColors.brandOrangeLight
-                      .withValues(alpha: _aiBusy ? 0.5 : 1.0),
+                  color: AppColors.brandOrangeLight.withValues(
+                    alpha: _aiBusy ? 0.5 : 1.0,
+                  ),
                   fontSize: 11,
                   fontWeight: FontWeight.w800,
                 ),

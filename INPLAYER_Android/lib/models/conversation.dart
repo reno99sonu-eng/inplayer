@@ -19,6 +19,9 @@ class Conversation {
   final bool blocked;
   final bool blockedByOther;
   final bool muted;
+  final String? chatTheme;
+  final bool disappearingEnabled;
+  final int? disappearingSeconds;
 
   Conversation({
     required this.conversationId,
@@ -34,6 +37,9 @@ class Conversation {
     this.blocked = false,
     this.blockedByOther = false,
     this.muted = false,
+    this.chatTheme,
+    this.disappearingEnabled = false,
+    this.disappearingSeconds,
   });
 
   static String? _resolveUrl(String? url) {
@@ -60,6 +66,9 @@ class Conversation {
       blocked: json['blocked'] == true,
       blockedByOther: json['blockedByOther'] == true,
       muted: json['muted'] == true,
+      chatTheme: json['chatTheme'] as String?,
+      disappearingEnabled: json['disappearingEnabled'] == true,
+      disappearingSeconds: (json['disappearingSeconds'] as num?)?.toInt(),
     );
   }
 }

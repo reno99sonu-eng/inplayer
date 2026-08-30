@@ -2,6 +2,7 @@ import 'dart:convert';
 
 import 'package:amplify_flutter/amplify_flutter.dart';
 import 'package:amplify_auth_cognito/amplify_auth_cognito.dart';
+import 'package:amplify_api/amplify_api.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
 
@@ -24,6 +25,11 @@ class AuthService {
     try {
       await Amplify.addPlugin(AmplifyAuthCognito());
 
+      final apiEnabled = AppConfig.appSyncGraphqlEndpoint.trim().isNotEmpty;
+      if (apiEnabled) {
+        await Amplify.addPlugin(AmplifyAPI());
+      }
+
       final config = AmplifyConfig(
         auth: AuthConfig.cognito(
           userPoolConfig: CognitoUserPoolConfig(
@@ -34,7 +40,22 @@ class AuthService {
         ),
       );
 
-      await Amplify.configure(jsonEncode(config.toJson()));
+      final configJson = Map<String, dynamic>.from(config.toJson());
+      if (apiEnabled) {
+        configJson['api'] = {
+          'plugins': {
+            'awsAPIPlugin': {
+              'InPlayerAppSync': {
+                'endpointType': 'GraphQL',
+                'endpoint': AppConfig.appSyncGraphqlEndpoint.trim(),
+                'region': AppConfig.cognitoRegion,
+                'authorizationType': 'AMAZON_COGNITO_USER_POOLS',
+              },
+            },
+          },
+        };
+      }
+      await Amplify.configure(jsonEncode(configJson));
 
       _isConfigured = true;
       _logger.i('Amplify configured successfully');
@@ -70,6 +91,12 @@ class AuthService {
       final userId = attributes['sub'] ?? '';
       String username = attributes['email'] ?? '';
       final email = attributes['email'] ?? '';
+      final phoneNumber =
+          (attributes['phone_number'] ??
+                  attributes['custom:phoneNumber'] ??
+                  attributes['phoneNumber'] ??
+                  '')
+              .trim();
       String name = attributes['name'] ?? attributes['given_name'] ?? '';
       String? avatarUrl =
           attributes['picture'] ?? attributes['custom:avatarUrl'];
@@ -149,6 +176,7 @@ class AuthService {
         username: username,
         name: name,
         email: email,
+        phoneNumber: phoneNumber.isEmpty ? null : phoneNumber,
         avatarUrl: avatarUrl,
         coverPhotoUrl: coverPhotoUrl,
         handle: handle,

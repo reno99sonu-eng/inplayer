@@ -91,11 +91,8 @@ class _PrivacySettingsPageState extends ConsumerState<PrivacySettingsPage> {
         body: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            Text(
-              'Who can view your full channel profile',
-              style: TextStyle(color: context.textSecondary, fontSize: 13),
-            ),
-            const SizedBox(height: 12),
+            _cardHeader('Channel visibility'),
+            const SizedBox(height: 10),
             ..._options.map((opt) {
               final selected = opt.value == _selected;
               return Padding(
@@ -111,57 +108,41 @@ class _PrivacySettingsPageState extends ConsumerState<PrivacySettingsPage> {
                           : context.bgCard,
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: selected
-                            ? AppColors.brandOrange
-                            : context.borderSubtle,
+                        color: selected ? AppColors.brandOrange : context.borderSubtle,
                       ),
                     ),
                     child: Row(
                       children: [
-                        Icon(opt.icon,
-                            color: selected
-                                ? AppColors.brandOrange
-                                : context.textDim),
+                        Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: selected ? AppColors.brandOrange.withValues(alpha: 0.12) : context.borderSubtle,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Icon(opt.icon, color: selected ? AppColors.brandOrange : context.textDim, size: 18),
+                        ),
                         const SizedBox(width: 14),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(opt.title,
-                                  style: TextStyle(
-                                      color: context.textPrimary,
-                                      fontWeight: FontWeight.w700)),
+                              Text(opt.title, style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.w700)),
                               const SizedBox(height: 2),
-                              Text(opt.subtitle,
-                                  style: TextStyle(
-                                      color: context.textSecondary, fontSize: 12)),
+                              Text(opt.subtitle, style: TextStyle(color: context.textSecondary, fontSize: 12)),
                             ],
                           ),
                         ),
-                        if (selected)
-                          const Icon(Icons.check_circle, color: AppColors.brandOrange, size: 20),
+                        if (selected) const Icon(Icons.check_circle, color: AppColors.brandOrange, size: 20),
                       ],
                     ),
                   ),
                 ),
               );
             }),
-
-            const SizedBox(height: 16),
-            Divider(color: context.borderSubtle),
-            const SizedBox(height: 16),
-
-            Text(
-              'App Security & Passkeys',
-              style: TextStyle(
-                color: AppColors.brandOrange,
-                fontSize: 11.5,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.2,
-              ),
-            ),
+            const SizedBox(height: 18),
+            _dividerLabel('App security & passkeys'),
             const SizedBox(height: 10),
-
             Consumer(
               builder: (context, ref, _) {
                 final lockState = ref.watch(biometricLockProvider);
@@ -173,9 +154,7 @@ class _PrivacySettingsPageState extends ConsumerState<PrivacySettingsPage> {
                     color: context.bgCard,
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: lockState.isEnabled
-                          ? AppColors.brandOrange.withValues(alpha: 0.5)
-                          : context.borderSubtle,
+                      color: lockState.isEnabled ? AppColors.brandOrange.withValues(alpha: 0.5) : context.borderSubtle,
                     ),
                   ),
                   child: Row(
@@ -185,38 +164,20 @@ class _PrivacySettingsPageState extends ConsumerState<PrivacySettingsPage> {
                         height: 44,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: lockState.isEnabled
-                              ? AppColors.brandOrange.withValues(alpha: 0.15)
-                              : context.textPrimary.withValues(alpha: 0.05),
+                          color: lockState.isEnabled ? AppColors.brandOrange.withValues(alpha: 0.15) : context.textPrimary.withValues(alpha: 0.05),
                         ),
-                        child: Icon(
-                          Icons.fingerprint_rounded,
-                          color: lockState.isEnabled ? AppColors.brandOrange : context.textDim,
-                          size: 24,
-                        ),
+                        child: Icon(Icons.fingerprint_rounded, color: lockState.isEnabled ? AppColors.brandOrange : context.textDim, size: 24),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              'Passkey & Fingerprint Lock',
-                              style: TextStyle(
-                                color: context.textPrimary,
-                                fontWeight: FontWeight.w700,
-                                fontSize: 14,
-                              ),
-                            ),
+                            Text('Passkey & Fingerprint Lock', style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.w700, fontSize: 14)),
                             const SizedBox(height: 2),
                             Text(
-                              lockState.isEnabled
-                                  ? 'Biometric lock is ACTIVE upon launch'
-                                  : 'Require biometric or device passkey to open app',
-                              style: TextStyle(
-                                color: context.textSecondary,
-                                fontSize: 11.5,
-                              ),
+                              lockState.isEnabled ? 'Biometric lock is ACTIVE upon launch' : 'Require biometric or device passkey to open app',
+                              style: TextStyle(color: context.textSecondary, fontSize: 11.5),
                             ),
                           ],
                         ),
@@ -224,14 +185,15 @@ class _PrivacySettingsPageState extends ConsumerState<PrivacySettingsPage> {
                       Switch.adaptive(
                         value: lockState.isEnabled,
                         activeTrackColor: AppColors.brandOrange,
+                        activeThumbColor: Colors.white,
+                        inactiveThumbColor: Colors.white,
+                        inactiveTrackColor: context.isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
                         onChanged: (val) async {
                           final success = await lockNotifier.setEnabled(val);
                           if (!context.mounted) return;
                           if (!success && val) {
                             ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(
-                                content: Text('Biometric verification cancelled or unavailable'),
-                              ),
+                              const SnackBar(content: Text('Biometric verification cancelled or unavailable')),
                             );
                           }
                         },
@@ -241,46 +203,43 @@ class _PrivacySettingsPageState extends ConsumerState<PrivacySettingsPage> {
                 );
               },
             ),
-            const SizedBox(height: 16),
-            Divider(color: context.borderSubtle),
-            const SizedBox(height: 16),
-
-            Text(
-              'Active Sessions',
-              style: TextStyle(
-                color: AppColors.brandOrange,
-                fontSize: 11.5,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.2,
-              ),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              'Devices where you are currently signed in to InPlayer.',
-              style: TextStyle(color: context.textSecondary, fontSize: 12),
-            ),
+            const SizedBox(height: 18),
+            _dividerLabel('Active sessions'),
+            const SizedBox(height: 8),
+            Text('Devices where you are currently signed in to InPlayer.', style: TextStyle(color: context.textSecondary, fontSize: 12)),
             const SizedBox(height: 10),
-
             _SessionsSection(),
-
-            const SizedBox(height: 20),
-            Divider(color: context.borderSubtle),
-            const SizedBox(height: 16),
-
-            Text(
-              'Danger Zone',
-              style: const TextStyle(
-                color: AppColors.error,
-                fontSize: 11.5,
-                fontWeight: FontWeight.w800,
-                letterSpacing: 1.2,
-              ),
-            ),
+            const SizedBox(height: 18),
+            _dividerLabel('Danger zone', isDanger: true),
             const SizedBox(height: 10),
             _DeleteAccountRow(),
             const SizedBox(height: 24),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _cardHeader(String label) {
+    return Text(
+      label,
+      style: TextStyle(
+        color: AppColors.brandOrange,
+        fontSize: 11.5,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 1.2,
+      ),
+    );
+  }
+
+  Widget _dividerLabel(String label, {bool isDanger = false}) {
+    return Text(
+      label.toUpperCase(),
+      style: TextStyle(
+        color: isDanger ? AppColors.error : AppColors.brandOrange,
+        fontSize: 11.5,
+        fontWeight: FontWeight.w800,
+        letterSpacing: 1.2,
       ),
     );
   }

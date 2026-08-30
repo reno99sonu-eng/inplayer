@@ -12,14 +12,48 @@ import '../../../../services/face_age_detector_service.dart';
 import 'parental_pin_dialog.dart';
 
 class FaceScanModal extends ConsumerStatefulWidget {
-  const FaceScanModal({super.key});
+  final bool startupScan;
 
-  static Future<void> show(BuildContext context) {
-    return showModalBottomSheet(
+  const FaceScanModal({super.key, this.startupScan = false});
+
+  static Future<FaceScanResult?> show(
+    BuildContext context, {
+    bool startupScan = false,
+  }) {
+    if (!startupScan) {
+      return showModalBottomSheet<FaceScanResult?>(
+        context: context,
+        isScrollControlled: true,
+        backgroundColor: Colors.transparent,
+        builder: (ctx) => const FaceScanModal(),
+      );
+    }
+
+    // Startup mode is a real gate: the feed stays behind an opaque barrier
+    // until the scanner returns a result (or the user explicitly chooses the
+    // safe fallback). Keep the camera sheet as one route so its controller is
+    // disposed before the startup code changes providers.
+    return showGeneralDialog<FaceScanResult?>(
       context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => const FaceScanModal(),
+      useRootNavigator: true,
+      barrierDismissible: false,
+      barrierLabel: 'InPlayer age safety scan',
+      barrierColor: Colors.black.withValues(alpha: .96),
+      transitionDuration: const Duration(milliseconds: 180),
+      pageBuilder: (dialogContext, animation, secondaryAnimation) {
+        return SafeArea(
+          child: Align(
+            alignment: Alignment.bottomCenter,
+            child: FractionallySizedBox(
+              widthFactor: 1,
+              child: FaceScanModal(startupScan: true),
+            ),
+          ),
+        );
+      },
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        return FadeTransition(opacity: animation, child: child);
+      },
     );
   }
 
@@ -27,7 +61,8 @@ class FaceScanModal extends ConsumerStatefulWidget {
   ConsumerState<FaceScanModal> createState() => _FaceScanModalState();
 }
 
-class _FaceScanModalState extends ConsumerState<FaceScanModal> with SingleTickerProviderStateMixin {
+class _FaceScanModalState extends ConsumerState<FaceScanModal>
+    with SingleTickerProviderStateMixin {
   CameraController? _cameraController;
   late FaceAgeDetectorService _ageDetector;
   late AnimationController _scannerAnim;
@@ -36,6 +71,7 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal> with SingleTicker
   bool _isProcessing = false;
   bool _hasPermissionError = false;
   FaceScanResult? _scanResult;
+  Timer? _startupTimeout;
   String _statusText = 'Center your face in the circle';
 
   @override
@@ -46,6 +82,20 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal> with SingleTicker
       vsync: this,
       duration: const Duration(milliseconds: 1400),
     )..repeat(reverse: true);
+
+    if (widget.startupScan) {
+      // A camera/model that is unavailable must never leave the launch screen
+      // black indefinitely. Give the scan a generous window, then continue
+      // with the safe family filter.
+      // ML Kit can download/initialise its on-device model on the first run.
+      // Eight seconds was too short on real devices and closed the scanner
+      // before the first usable frame arrived. Keep the gate open long enough
+      // for cold starts while still guaranteeing a safe fallback.
+      _startupTimeout = Timer(const Duration(seconds: 30), () {
+        if (!mounted || _scanResult != null) return;
+        unawaited(_finishStartupFallback());
+      });
+    }
 
     _initCamera();
   }
@@ -71,7 +121,7 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal> with SingleTicker
       setState(() => _isInitializing = false);
       _startLiveStreamAnalysis();
     } catch (e) {
-      debugPrint('[FaceScanModal] Camera init error: ');
+      debugPrint('[FaceScanModal] Camera init error: $e');
       if (mounted) {
         setState(() {
           _isInitializing = false;
@@ -82,42 +132,74 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal> with SingleTicker
   }
 
   void _startLiveStreamAnalysis() {
-    if (_cameraController == null || !_cameraController!.value.isInitialized) return;
+    if (_cameraController == null || !_cameraController!.value.isInitialized) {
+      return;
+    }
 
     _cameraController!.startImageStream((CameraImage image) {
       if (_isProcessing || _scanResult != null) return;
       _isProcessing = true;
 
-      _processCameraImage(image).then((result) {
-        if (result != null && mounted) {
-          if (result.category != AgeCategory.unknown) {
-            setState(() {
-              _scanResult = result;
-              _statusText = result.isChild ? 'Child Detected (<13)' : 'Adult/Teen Detected (13+)';
-            });
-            _onScanComplete(result);
-          }
-        }
-      }).whenComplete(() {
-        _isProcessing = false;
-      });
+      _processCameraImage(image)
+          .then((result) {
+            if (result != null && mounted) {
+              if (result.category != AgeCategory.unknown) {
+                setState(() {
+                  _scanResult = result;
+                  _statusText = result.isChild
+                      ? 'Child Detected (<13)'
+                      : 'Adult/Teen Detected (13+)';
+                });
+                _onScanComplete(result);
+              }
+            }
+          })
+          .whenComplete(() {
+            _isProcessing = false;
+          });
     });
   }
 
   Future<FaceScanResult?> _processCameraImage(CameraImage image) async {
     try {
-      final WriteBuffer allBytes = WriteBuffer();
-      for (final Plane plane in image.planes) {
-        allBytes.putUint8List(plane.bytes);
+      // With ImageFormatGroup.nv21 Android normally supplies one packed
+      // plane. Concatenating all planes (the old implementation) produced an
+      // invalid image for ML Kit on several camera2 devices, so no face was
+      // ever reported. Handle both packed NV21 and YUV_420_888 safely.
+      final Uint8List bytes;
+      if (image.planes.length == 1) {
+        bytes = image.planes.first.bytes;
+      } else {
+        final y = image.planes[0];
+        final u = image.planes[1];
+        final v = image.planes[2];
+        final output = Uint8List(
+          y.bytes.length + u.bytes.length + v.bytes.length,
+        );
+        output.setRange(0, y.bytes.length, y.bytes);
+        var offset = y.bytes.length;
+        // NV21 is Y + interleaved VU. Respect pixel stride for YUV_420_888.
+        final pixelStride = u.bytesPerPixel ?? 1;
+        for (var i = 0; i < u.bytes.length; i += pixelStride) {
+          output[offset++] =
+              v.bytes[i < v.bytes.length ? i : v.bytes.length - 1];
+          output[offset++] = u.bytes[i];
+        }
+        bytes = output.sublist(0, offset);
       }
-      final bytes = allBytes.done().buffer.asUint8List();
 
-      final Size imageSize = Size(image.width.toDouble(), image.height.toDouble());
+      final Size imageSize = Size(
+        image.width.toDouble(),
+        image.height.toDouble(),
+      );
       final camera = _cameraController!.description;
-      final imageRotation = InputImageRotationValue.fromRawValue(camera.sensorOrientation) ??
+      final imageRotation =
+          InputImageRotationValue.fromRawValue(camera.sensorOrientation) ??
           InputImageRotation.rotation0deg;
-      final inputImageFormat = InputImageFormatValue.fromRawValue(image.format.raw) ??
-          InputImageFormat.nv21;
+      final inputImageFormat = image.planes.length == 1
+          ? (InputImageFormatValue.fromRawValue(image.format.raw) ??
+                InputImageFormat.nv21)
+          : InputImageFormat.nv21;
 
       final inputImage = InputImage.fromBytes(
         bytes: bytes,
@@ -136,6 +218,7 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal> with SingleTicker
   }
 
   Future<void> _onScanComplete(FaceScanResult result) async {
+    _startupTimeout?.cancel();
     HapticFeedback.mediumImpact();
     await Future.delayed(const Duration(milliseconds: 1200));
     if (!mounted) return;
@@ -148,40 +231,58 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal> with SingleTicker
     }
 
     if (mounted) {
-      Navigator.of(context).pop();
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          backgroundColor: result.isChild ? const Color(0xFF10B981) : AppColors.brandOrange,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          content: Row(
-            children: [
-              Icon(
-                result.isChild ? Icons.child_care_rounded : Icons.verified_user_rounded,
-                color: Colors.white,
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
+      Navigator.of(context, rootNavigator: true).pop(result);
+      if (!widget.startupScan && mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            backgroundColor: result.isChild
+                ? const Color(0xFF10B981)
+                : AppColors.brandOrange,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            content: Row(
+              children: [
+                Icon(
                   result.isChild
-                      ? 'InPlayer Kids Safety Mode is now ACTIVE'
-                      : 'Standard Adult Mode Verified',
-                  style: const TextStyle(fontWeight: FontWeight.w700),
+                      ? Icons.child_care_rounded
+                      : Icons.verified_user_rounded,
+                  color: Colors.white,
                 ),
-              ),
-            ],
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    result.isChild
+                        ? 'InPlayer Kids Safety Mode is now ACTIVE'
+                        : 'Standard Adult Mode Verified',
+                    style: const TextStyle(fontWeight: FontWeight.w700),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ),
-      );
+        );
+      }
     }
   }
 
   @override
   void dispose() {
+    _startupTimeout?.cancel();
     _cameraController?.dispose();
     _ageDetector.dispose();
     _scannerAnim.dispose();
     super.dispose();
+  }
+
+  Future<void> _finishStartupFallback() async {
+    try {
+      if (_cameraController?.value.isStreamingImages == true) {
+        await _cameraController!.stopImageStream();
+      }
+    } catch (_) {}
+    if (mounted) Navigator.of(context, rootNavigator: true).pop();
   }
 
   @override
@@ -193,7 +294,9 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal> with SingleTicker
       decoration: BoxDecoration(
         color: isDark ? const Color(0xFF0B111E) : Colors.white,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-        border: Border(top: BorderSide(color: context.borderSubtle, width: 1.5)),
+        border: Border(
+          top: BorderSide(color: context.borderSubtle, width: 1.5),
+        ),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -220,7 +323,8 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal> with SingleTicker
                 ),
               ),
               IconButton(
-                onPressed: () => Navigator.of(context).pop(),
+                onPressed: () =>
+                    Navigator.of(context, rootNavigator: true).pop(),
                 icon: Icon(Icons.close_rounded, color: context.textSecondary),
               ),
             ],
@@ -228,7 +332,11 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal> with SingleTicker
           const SizedBox(height: 8),
           Text(
             '100% on-device neural processing. No pictures or biometric data leave your phone.',
-            style: TextStyle(color: context.textSecondary, fontSize: 12, height: 1.3),
+            style: TextStyle(
+              color: context.textSecondary,
+              fontSize: 12,
+              height: 1.3,
+            ),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 28),
@@ -257,6 +365,11 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal> with SingleTicker
               style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
             ),
           ),
+          if (widget.startupScan && _hasPermissionError)
+            TextButton(
+              onPressed: () => Navigator.of(context, rootNavigator: true).pop(),
+              child: const Text('Continue with safer restricted mode'),
+            ),
         ],
       ),
     );
@@ -278,14 +391,20 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal> with SingleTicker
             child: Text(
               'Camera access required for Face ID.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: Colors.redAccent,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
             ),
           ),
         ),
       );
     }
 
-    if (_isInitializing || _cameraController == null || !_cameraController!.value.isInitialized) {
+    if (_isInitializing ||
+        _cameraController == null ||
+        !_cameraController!.value.isInitialized) {
       return Container(
         width: 220,
         height: 220,
@@ -295,7 +414,10 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal> with SingleTicker
           border: Border.all(color: context.borderSubtle, width: 2),
         ),
         child: const Center(
-          child: CircularProgressIndicator(color: AppColors.brandOrange, strokeWidth: 2.5),
+          child: CircularProgressIndicator(
+            color: AppColors.brandOrange,
+            strokeWidth: 2.5,
+          ),
         ),
       );
     }
@@ -390,7 +512,10 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal> with SingleTicker
             const SizedBox(
               width: 14,
               height: 14,
-              child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.brandOrange),
+              child: CircularProgressIndicator(
+                strokeWidth: 2,
+                color: AppColors.brandOrange,
+              ),
             )
           else
             Icon(

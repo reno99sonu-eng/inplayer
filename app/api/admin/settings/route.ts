@@ -106,6 +106,19 @@ export async function PATCH(request: NextRequest) {
   if (typeof body.monetizationCreatorShare === "number") partial.monetizationCreatorShare = Math.max(0, Math.min(1, body.monetizationCreatorShare));
   if (typeof body.monetizationPlatformShare === "number") partial.monetizationPlatformShare = Math.max(0, Math.min(1, body.monetizationPlatformShare));
 
+  if (Array.isArray(body.contactEmails)) {
+    partial.contactEmails = body.contactEmails
+      .filter((e: any) => e && typeof e === "object" && typeof e.label === "string" && typeof e.address === "string")
+      .map((e: any) => ({
+        label: e.label.trim().slice(0, 50),
+        address: e.address.trim().slice(0, 200),
+      }));
+  }
+  if (typeof body.supportEmail === "string") partial.supportEmail = body.supportEmail.trim().slice(0, 200);
+  if (typeof body.helpEmail === "string") partial.helpEmail = body.helpEmail.trim().slice(0, 200);
+  if (typeof body.contactEmail === "string") partial.contactEmail = body.contactEmail.trim().slice(0, 200);
+  if (typeof body.sponsorEmail === "string") partial.sponsorEmail = body.sponsorEmail.trim().slice(0, 200);
+
   if (Object.keys(partial).length === 0) {
     return NextResponse.json({ error: "No valid settings provided." }, { status: 400 });
   }

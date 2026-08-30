@@ -134,15 +134,32 @@ class AIAssistService {
     final cleaned = <String>[];
 
     for (final line in rawText.split('\n')) {
-      final t = line
-          .replaceFirst(RegExp(r'^\s*\d+[).\-\s]*'), '')
-          // Raw triple-quoted so both quote characters, the curly quotes and
-          // the trailing $ anchor can all sit in one literal without any
-          // escaping games.
-          .replaceAll(RegExp(r'''^["'“]|["'”]$'''), '')
-          .trim();
+      var t = line.trim();
       if (t.isEmpty) continue;
-      final key = t.toLowerCase();
+
+      t = t.replaceFirst(RegExp(r'^[•\-\*]\s*'), '');
+      t = t.replaceFirst(RegExp(r'^\s*\d+[).\-\s]*'), '');
+      t = t.replaceFirst(
+        RegExp(r"^(?:here are|here's|some ideas?|suggestions?)\s*[:\-]?\s*", caseSensitive: false),
+        '',
+      );
+      t = t.replaceFirst(
+        RegExp(r'^(?:title|titles|idea|ideas)\s*[:\-]?\s*', caseSensitive: false),
+        '',
+      );
+      t = t.replaceAll(RegExp(r'''^["'“”‘’]+|["'“”‘’]+$'''), '');
+      t = t.trim();
+
+      if (t.isEmpty) continue;
+      final lowered = t.toLowerCase();
+      if (lowered.contains('here are') ||
+          lowered.contains('suggestions') ||
+          lowered.contains('generated') ||
+          lowered.contains('ideas')) {
+        continue;
+      }
+
+      final key = lowered;
       if (seen.contains(key)) continue;
       seen.add(key);
       cleaned.add(t);

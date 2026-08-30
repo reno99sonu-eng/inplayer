@@ -208,7 +208,7 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> with SingleTick
                       buildDefaultDragHandles: false,
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                       itemCount: player.queue.length,
-                      onReorder: (oldIndex, newIndex) {
+                      onReorderItem: (oldIndex, newIndex) {
                         ref.read(musicPlayerServiceProvider).reorderQueue(oldIndex, newIndex);
                       },
                       itemBuilder: (context, i) {
@@ -345,24 +345,24 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> with SingleTick
                 Expanded(
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                     padding: const EdgeInsets.symmetric(horizontal: 18),
                     child: Column(
                       children: [
                         const SizedBox(height: 8),
                         _buildSleeve(context, coverUrl),
-                        const SizedBox(height: 26),
+                         const SizedBox(height: 16),
                         _buildTitleRow(context, track),
-                        const SizedBox(height: 22),
+                         const SizedBox(height: 16),
                         _buildScrubber(context, player),
                         const SizedBox(height: 6),
                         _buildTransport(context, player),
-                        const SizedBox(height: 22),
+                         const SizedBox(height: 16),
                         _buildSecondaryActions(context, player, track),
                         if (track.lyrics.isNotEmpty) ...[
-                          const SizedBox(height: 28),
+                           const SizedBox(height: 20),
                           _buildLyricsSection(context, player, track),
                         ],
-                        const SizedBox(height: 40),
+                         const SizedBox(height: 20),
                       ],
                     ),
                   ),
@@ -415,6 +415,11 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage> with SingleTick
           IconButton(
             icon: Icon(Icons.queue_music_rounded, color: context.textPrimary, size: 24),
             onPressed: () => _openQueueSheet(context, player),
+          ),
+          IconButton(
+            icon: Icon(Icons.tune_rounded, color: context.textPrimary, size: 22),
+            tooltip: 'Player settings',
+            onPressed: () => context.push('/settings/playback'),
           ),
         ],
       ),

@@ -178,29 +178,31 @@ class _FullscreenPlayerPageState extends State<FullscreenPlayerPage> {
             alignment: Alignment.center,
             children: [
               widget.getMediaSurface(),
-              PlayerChrome(
-                controller: widget.getController(),
-                title: widget.title,
-                isFullscreen: true,
-                onToggleFullscreen: _exit,
-                onBack: _exit,
-                qualityLabel: widget.getQualityLabel(),
-                qualityOptions: widget.qualityOptions,
-                onQualityChange: _handleQualityChange,
-                captionLanguages: widget.captionLanguages,
-                selectedCaptionLang: widget.getSelectedCaptionLang(),
-                captionCues: widget.getCaptionCues(),
-                onCaptionLanguageChange: _handleCaptionChange,
-                pipSupported: widget.pipSupported,
-                onPipTapped: widget.onPipTapped,
-                initialBrightness: widget.getBrightness(),
-                onBrightnessChanged: (v) {
-                  widget.onBrightnessChanged(v);
-                  // Rebuild so getMediaSurface() below is re-invoked with
-                  // the new value — WatchPage's own setState can't reach
-                  // this page's subtree.
-                  if (mounted) setState(() {});
-                },
+              Positioned.fill(
+                child: PlayerChrome(
+                  controller: widget.getController(),
+                  title: widget.title,
+                  isFullscreen: true,
+                  onToggleFullscreen: _exit,
+                  onBack: _exit,
+                  qualityLabel: widget.getQualityLabel(),
+                  qualityOptions: widget.qualityOptions,
+                  onQualityChange: _handleQualityChange,
+                  captionLanguages: widget.captionLanguages,
+                  selectedCaptionLang: widget.getSelectedCaptionLang(),
+                  captionCues: widget.getCaptionCues(),
+                  onCaptionLanguageChange: _handleCaptionChange,
+                  pipSupported: widget.pipSupported,
+                  onPipTapped: widget.onPipTapped,
+                  initialBrightness: widget.getBrightness(),
+                  onBrightnessChanged: (v) {
+                    widget.onBrightnessChanged(v);
+                    // Rebuild so getMediaSurface() below is re-invoked with
+                    // the new value — WatchPage's own setState can't reach
+                    // this page's subtree.
+                    if (mounted) setState(() {});
+                  },
+                ),
               ),
             ],
           ),

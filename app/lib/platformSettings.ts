@@ -20,6 +20,11 @@ export type AdSlotSource = "house" | "adsense" | "off";
 // is the new equivalent on/off switch for Hammart's separate banned-item
 // listing check (app/lib/hammartModeration.ts), which previously had no
 // toggle at all and always ran unconditionally.
+export interface PlatformContactEmail {
+  label: string;
+  address: string;
+}
+
 export interface PlatformSettings {
   inplayerMaintenanceMode: boolean;
   inplayerMaintenanceMessage: string;
@@ -36,7 +41,7 @@ export interface PlatformSettings {
 
   inplayerAnnouncementEnabled: boolean;
   inplayerAnnouncementText: string;
-  // Destination for the announcement overlay's CTA button — optional. When
+  // Destination for the announcement overlay's CTA button ?" optional. When
   // empty, the overlay still shows (headline + close button), it just
   // doesn't render a button pointing nowhere real.
   inplayerAnnouncementLinkUrl: string;
@@ -69,6 +74,12 @@ export interface PlatformSettings {
   monetizationRequireGoodStanding: boolean;
   monetizationCreatorShare: number;
   monetizationPlatformShare: number;
+
+  contactEmails: PlatformContactEmail[];
+  supportEmail: string;
+  helpEmail: string;
+  contactEmail: string;
+  sponsorEmail: string;
 
   updatedAt: string | null;
   updatedBy: string | null;
@@ -110,6 +121,16 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
   monetizationRequireGoodStanding: true,
   monetizationCreatorShare: 0.8,
   monetizationPlatformShare: 0.2,
+  contactEmails: [
+    { label: "Hammart", address: "Hammart@inplayer.in" },
+    { label: "MillonBook", address: "Millonbook@inplayer.in" },
+    { label: "Sponsor / Banner Specs", address: "Sponsor@inplayer.in" },
+    { label: "InPlayer Digital", address: "inplayerdigital@gmail.com" },
+  ],
+  supportEmail: "inplayerdigital@gmail.com",
+  helpEmail: "inplayerdigital@gmail.com",
+  contactEmail: "Millonbook@inplayer.in",
+  sponsorEmail: "Sponsor@inplayer.in",
   updatedAt: null,
   updatedBy: null,
 };
@@ -147,6 +168,11 @@ export type PublicPlatformSettings = Pick<
   | "monetizationRequireGoodStanding"
   | "monetizationCreatorShare"
   | "monetizationPlatformShare"
+  | "contactEmails"
+  | "supportEmail"
+  | "helpEmail"
+  | "contactEmail"
+  | "sponsorEmail"
 >;
 
 async function readPlatformSettings(): Promise<PlatformSettings> {
@@ -234,5 +260,10 @@ export function toPublicSettings(settings: PlatformSettings): PublicPlatformSett
     monetizationRequireGoodStanding: settings.monetizationRequireGoodStanding,
     monetizationCreatorShare: settings.monetizationCreatorShare,
     monetizationPlatformShare: settings.monetizationPlatformShare,
+    contactEmails: settings.contactEmails,
+    supportEmail: settings.supportEmail,
+    helpEmail: settings.helpEmail,
+    contactEmail: settings.contactEmail,
+    sponsorEmail: settings.sponsorEmail,
   };
 }

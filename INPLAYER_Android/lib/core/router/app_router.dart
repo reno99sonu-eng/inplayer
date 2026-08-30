@@ -22,7 +22,8 @@ import '../../features/channel/presentation/pages/my_channel_studio_page.dart';
 import '../../features/shop/presentation/pages/shop_page.dart';
 import '../../features/shop/presentation/pages/product_detail_page.dart';
 import '../../features/shop/presentation/pages/cart_page.dart';
-import '../../features/shop/presentation/pages/wishlist_page.dart' as hammart_wishlist;
+import '../../features/shop/presentation/pages/wishlist_page.dart'
+    as hammart_wishlist;
 import '../../features/notifications/presentation/pages/notifications_page.dart';
 import '../../features/profile/presentation/pages/video_list_page.dart';
 import '../../features/profile/presentation/pages/watch_history_page.dart';
@@ -37,7 +38,6 @@ import '../../features/settings/presentation/pages/playback_settings_page.dart';
 import '../../features/admin/presentation/pages/admin_page.dart';
 import '../../features/live/presentation/pages/go_live_page.dart';
 import '../../features/downloads/presentation/pages/downloads_page.dart';
-import '../../features/settings/presentation/pages/content_access_page.dart';
 import '../../features/settings/presentation/pages/plans_purchases_page.dart';
 import '../../features/settings/presentation/pages/analytics_page.dart';
 import '../../features/settings/presentation/pages/storage_page.dart';
@@ -49,6 +49,13 @@ import '../../features/settings/presentation/pages/contact_us_page.dart';
 import '../../features/settings/presentation/pages/report_problem_page.dart';
 import '../../features/settings/presentation/pages/blocked_users_page.dart';
 import '../../features/settings/presentation/pages/app_legal_page.dart';
+import '../../features/creator/presentation/pages/creator_kyc_page.dart';
+import '../../features/creator/presentation/pages/creator_monetization_page.dart';
+import '../../features/sponsorship/presentation/pages/sponsorship_checkout_page.dart';
+import '../../features/sponsorship/presentation/pages/sponsorship_success_page.dart';
+import '../../features/home/presentation/pages/injoy_page.dart';
+import '../../features/home/presentation/pages/injoy_game_page.dart';
+import '../../features/home/presentation/pages/music_page.dart';
 import '../../services/video_service.dart';
 
 // Bridges authStateProvider's changes into a plain Listenable go_router can
@@ -67,7 +74,10 @@ import '../../services/video_service.dart';
 // Router's own child in main.dart's MaterialApp.router builder.
 class _AuthRefreshNotifier extends ChangeNotifier {
   _AuthRefreshNotifier(Ref ref) {
-    ref.listen<AuthState>(authStateProvider, (previous, next) => notifyListeners());
+    ref.listen<AuthState>(
+      authStateProvider,
+      (previous, next) => notifyListeners(),
+    );
   }
 }
 
@@ -118,7 +128,9 @@ final routerProvider = Provider<GoRouter>((ref) {
         '/admin',
         '/live',
       ];
-      final isProtected = protectedPrefixes.any((prefix) => state.matchedLocation.startsWith(prefix));
+      final isProtected = protectedPrefixes.any(
+        (prefix) => state.matchedLocation.startsWith(prefix),
+      );
 
       // If unauthenticated and accessing a protected action, redirect to signin
       if (!isAuthenticated && isProtected) {
@@ -182,7 +194,9 @@ final routerProvider = Provider<GoRouter>((ref) {
           // of this route never passes `extra`, so this is null for them
           // exactly as before and WatchPage falls back to its normal
           // fresh-controller path unchanged.
-          final adoptController = state.extra is VideoPlayerController ? state.extra as VideoPlayerController : null;
+          final adoptController = state.extra is VideoPlayerController
+              ? state.extra as VideoPlayerController
+              : null;
           return WatchPage(videoId: videoId, adoptController: adoptController);
         },
       ),
@@ -247,7 +261,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/settings/content-access',
         name: 'content-access',
-        builder: (context, state) => const ContentAccessPage(),
+        // Content controls moved to the hamburger drawer. Preserve old
+        // bookmarks without retaining a second, independently implemented
+        // passkey dialog that could drift from the safe drawer flow.
+        redirect: (context, state) => '/',
       ),
       GoRoute(
         path: '/settings/plans',
@@ -279,7 +296,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'terms-of-service',
         builder: (context, state) => const AppLegalPage(
           title: 'Terms of Service',
-          content: 'Welcome to InPlayer. By accessing or using our website, services, and mobile applications, you agree to be bound by these Terms of Service.\n\n1. Acceptance of Terms: By registering for, accessing, or using the InPlayer platform, you confirm that you are at least 13 years of age and agree to comply with these terms.\n\n2. User Accounts: You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account.\n\n3. Content Guidelines: You retain ownership of content you upload, but grant InPlayer a worldwide license to host, display, and distribute it.\n\n4. Monetization & Payouts: Eligible creators may receive revenue share subject to community guidelines and KYC verification.',
+          content:
+              'Welcome to InPlayer. By accessing or using our website, services, and mobile applications, you agree to be bound by these Terms of Service.\n\n1. Acceptance of Terms: By registering for, accessing, or using the InPlayer platform, you confirm that you are at least 13 years of age and agree to comply with these terms.\n\n2. User Accounts: You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account.\n\n3. Content Guidelines: You retain ownership of content you upload, but grant InPlayer a worldwide license to host, display, and distribute it.\n\n4. Monetization & Payouts: Eligible creators may receive revenue share subject to community guidelines and KYC verification.',
         ),
       ),
       GoRoute(
@@ -287,7 +305,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'privacy-policy',
         builder: (context, state) => const AppLegalPage(
           title: 'Privacy Policy',
-          content: 'At InPlayer, your privacy and data security are our top priorities.\n\n1. Information We Collect: We collect information you provide directly (such as name, email, profile photo) and data generated when you interact with content (watch history, likes, subscriptions).\n\n2. How We Use Information: We use your data to personalize recommendations, process creator payouts, enforce safety features (such as on-device age classification and biometric lock), and prevent abuse.\n\n3. Data Protection: All data is encrypted in transit and at rest. We never sell your personal information to third parties.\n\n4. Your Rights: You can update your profile, export your watch history, or delete your account at any time from the Settings menu.',
+          content:
+              'At InPlayer, your privacy and data security are our top priorities.\n\n1. Information We Collect: We collect information you provide directly (such as name, email, profile photo) and data generated when you interact with content (watch history, likes, subscriptions).\n\n2. How We Use Information: We use your data to personalize recommendations, process creator payouts, enforce safety features (such as on-device age classification and biometric lock), and prevent abuse.\n\n3. Data Protection: All data is encrypted in transit and at rest. We never sell your personal information to third parties.\n\n4. Your Rights: You can update your profile, export your watch history, or delete your account at any time from the Settings menu.',
         ),
       ),
       GoRoute(
@@ -295,7 +314,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'vendor-terms',
         builder: (context, state) => const AppLegalPage(
           title: 'HamMart Vendor Terms',
-          content: 'HamMart is InPlayer\'s integrated creator and merchandise marketplace.\n\n1. Eligibility: Verified creators and authorized vendors can list merchandise and digital products for purchase by the community.\n\n2. Fulfillment & Quality: Vendors are solely responsible for product fulfillment, accurate item descriptions, and handling customer inquiries.\n\n3. Revenue & Fees: Transactions are processed securely, with platform commissions and vendor payouts calculated and disbursed according to the vendor agreement.',
+          content:
+              'HamMart is InPlayer\'s integrated creator and merchandise marketplace.\n\n1. Eligibility: Verified creators and authorized vendors can list merchandise and digital products for purchase by the community.\n\n2. Fulfillment & Quality: Vendors are solely responsible for product fulfillment, accurate item descriptions, and handling customer inquiries.\n\n3. Revenue & Fees: Transactions are processed securely, with platform commissions and vendor payouts calculated and disbursed according to the vendor agreement.',
         ),
       ),
       GoRoute(
@@ -303,7 +323,8 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'help-center',
         builder: (context, state) => const AppLegalPage(
           title: 'Help Center & FAQ',
-          content: 'Frequently Asked Questions & Support:\n\nQ: How do I upload a video or Raftaar short?\nA: Tap the "+" button in the top bar or navigation drawer to open the Upload screen.\n\nQ: How do I enable Fingerprint / Passkey lock?\nA: Go to Settings -> Account & Privacy -> Privacy, Passkeys & Active Sessions, and switch on Passkey & Biometric App Lock.\n\nQ: How do I turn on Kids Mode?\nA: Open the hamburger menu and switch on Kids only. A passkey is needed only when turning 18+ content on.\n\nQ: How do I contact the InPlayer team?\nA: Tap "Contact Support" in Settings or email support@inplayer.in.',
+          content:
+              'Frequently Asked Questions & Support:\n\nQ: How do I upload a video or Raftaar short?\nA: Tap the "+" button in the top bar or navigation drawer to open the Upload screen.\n\nQ: How do I enable Fingerprint / Passkey lock?\nA: Go to Settings -> Account & Privacy -> Privacy, Passkeys & Active Sessions, and switch on Passkey & Biometric App Lock.\n\nQ: How do I turn on Kids Mode?\nA: Open the hamburger menu and switch on Kids only. A passkey is needed only when turning 18+ content on.\n\nQ: How do I contact the InPlayer team?\nA: Tap "Contact Support" in Settings or email support@inplayer.in.',
         ),
       ),
       GoRoute(
@@ -315,7 +336,9 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/category/:category',
         name: 'category-videos',
         builder: (context, state) {
-          final category = Uri.decodeComponent(state.pathParameters['category'] ?? '');
+          final category = Uri.decodeComponent(
+            state.pathParameters['category'] ?? '',
+          );
           return CategoryVideosPage(category: category);
         },
       ),
@@ -400,6 +423,45 @@ final routerProvider = Provider<GoRouter>((ref) {
         },
       ),
       GoRoute(
+        path: '/creator/kyc',
+        name: 'creator-kyc',
+        builder: (context, state) => const CreatorKycPage(),
+      ),
+      GoRoute(
+        path: '/creator/monetization',
+        name: 'creator-monetization',
+        builder: (context, state) => const CreatorMonetizationPage(),
+      ),
+      GoRoute(
+        path: '/sponsorships/checkout',
+        name: 'sponsorship-checkout',
+        builder: (context, state) => const SponsorshipCheckoutPage(),
+      ),
+      GoRoute(
+        path: '/injoy/play/:gameId',
+        name: 'injoy-game',
+        builder: (context, state) =>
+            InJoyGamePage(gameId: state.pathParameters['gameId'] ?? ''),
+      ),
+      GoRoute(
+        path: '/injoy',
+        name: 'injoy',
+        builder: (context, state) => const InJoyPage(),
+      ),
+      GoRoute(
+        path: '/music',
+        name: 'music',
+        builder: (context, state) => const MusicPage(),
+      ),
+      GoRoute(
+        path: '/sponsorships/success',
+        name: 'sponsorship-success',
+        builder: (context, state) {
+          final orderId = state.uri.queryParameters['orderId'] ?? 'unknown';
+          return SponsorshipSuccessPage(orderId: orderId);
+        },
+      ),
+      GoRoute(
         path: '/notifications',
         name: 'notifications',
         builder: (context, state) => const NotificationsPage(),
@@ -457,7 +519,9 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/music/genre/:genre',
         name: 'music-genre',
         builder: (context, state) {
-          final genre = Uri.decodeComponent(state.pathParameters['genre'] ?? 'Other');
+          final genre = Uri.decodeComponent(
+            state.pathParameters['genre'] ?? 'Other',
+          );
           return GenrePage(genre: genre);
         },
       ),

@@ -34,6 +34,11 @@ interface CoreSettings {
   announcementEnabled: boolean;
   announcementText: string;
   announcementLinkUrl: string;
+  contactEmails: { label: string; address: string }[];
+  supportEmail: string;
+  helpEmail: string;
+  contactEmail: string;
+  sponsorEmail: string;
 }
 
 // Raw server field names for whichever mode is active — e.g. for
@@ -125,6 +130,11 @@ export default function AdminSettingsPage() {
           announcementEnabled: Boolean(data.settings[fields.announcementEnabled]),
           announcementText: data.settings[fields.announcementText] || "",
           announcementLinkUrl: data.settings[fields.announcementLinkUrl] || "",
+          contactEmails: Array.isArray(data.settings.contactEmails) ? data.settings.contactEmails : [],
+          supportEmail: data.settings.supportEmail || "",
+          helpEmail: data.settings.helpEmail || "",
+          contactEmail: data.settings.contactEmail || "",
+          sponsorEmail: data.settings.sponsorEmail || "",
         });
         setUpdatedMeta({ updatedAt: data.settings.updatedAt, updatedBy: data.settings.updatedBy });
       } catch (err) {
@@ -180,6 +190,11 @@ export default function AdminSettingsPage() {
       [fields.announcementEnabled]: target.announcementEnabled,
       [fields.announcementText]: target.announcementText,
       [fields.announcementLinkUrl]: target.announcementLinkUrl,
+      contactEmails: target.contactEmails,
+      supportEmail: target.supportEmail,
+      helpEmail: target.helpEmail,
+      contactEmail: target.contactEmail,
+      sponsorEmail: target.sponsorEmail,
     };
 
     setSaving(true);
@@ -362,6 +377,89 @@ export default function AdminSettingsPage() {
             </div>
           )}
         </div>
+
+        {/* Contact Emails */}
+        {mode === "inplayer" && (
+        <div className="rounded-3xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-5">
+          <div className="flex items-start justify-between gap-4 mb-4">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-indigo-500/10">
+                <Megaphone size={16} className="text-indigo-300" />
+              </div>
+              <div>
+                <h3 className="font-bold text-white light:text-slate-900">App Contact Emails</h3>
+                <p className="mt-0.5 text-xs text-slate-400 light:text-slate-600">
+                  Manage the emails shown in the mobile app's Contact Us screen.
+                </p>
+              </div>
+            </div>
+          </div>
+          <div className="space-y-4 pl-12">
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-slate-400 light:text-slate-600">Contact Emails List</label>
+              {settings.contactEmails.map((item, idx) => (
+                <div key={idx} className="flex gap-2 mb-2">
+                  <input
+                    type="text"
+                    placeholder="Label (e.g. Hammart)"
+                    value={item.label}
+                    onChange={(e) => {
+                      const newList = [...settings.contactEmails];
+                      newList[idx].label = e.target.value;
+                      update("contactEmails", newList);
+                    }}
+                    className="w-1/3 rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-indigo-400/50"
+                  />
+                  <input
+                    type="email"
+                    placeholder="Email Address"
+                    value={item.address}
+                    onChange={(e) => {
+                      const newList = [...settings.contactEmails];
+                      newList[idx].address = e.target.value;
+                      update("contactEmails", newList);
+                    }}
+                    className="flex-1 rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-indigo-400/50"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const newList = settings.contactEmails.filter((_, i) => i !== idx);
+                      update("contactEmails", newList);
+                    }}
+                    className="px-3 py-2 text-sm text-red-500 hover:text-red-400"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ))}
+              <button
+                type="button"
+                onClick={() => update("contactEmails", [...settings.contactEmails, { label: "", address: "" }])}
+                className="mt-2 px-4 py-2 text-xs font-semibold text-indigo-400 bg-indigo-500/10 rounded-xl hover:bg-indigo-500/20"
+              >
+                + Add Email
+              </button>
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-slate-400 light:text-slate-600">Support Email (App)</label>
+              <input type="email" value={settings.supportEmail} onChange={(e) => update("supportEmail", e.target.value)} className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-indigo-400/50" />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-slate-400 light:text-slate-600">Help Email (App)</label>
+              <input type="email" value={settings.helpEmail} onChange={(e) => update("helpEmail", e.target.value)} className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-indigo-400/50" />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-slate-400 light:text-slate-600">Millonbook Contact</label>
+              <input type="email" value={settings.contactEmail} onChange={(e) => update("contactEmail", e.target.value)} className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-indigo-400/50" />
+            </div>
+            <div>
+              <label className="mb-1.5 block text-xs font-semibold text-slate-400 light:text-slate-600">Sponsorship Contact</label>
+              <input type="email" value={settings.sponsorEmail} onChange={(e) => update("sponsorEmail", e.target.value)} className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-indigo-400/50" />
+            </div>
+          </div>
+        </div>
+        )}
 
         {error && (
           <div className="flex items-start gap-2 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-300 light:text-red-700">

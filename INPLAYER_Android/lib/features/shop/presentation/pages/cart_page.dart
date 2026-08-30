@@ -1,6 +1,8 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:razorpay_flutter/razorpay_flutter.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/pattern_background.dart';
@@ -16,6 +18,7 @@ class CartPage extends ConsumerStatefulWidget {
 }
 
 class _CartPageState extends ConsumerState<CartPage> {
+  late final Razorpay _razorpay;
   bool _loading = true;
   bool _tableMissing = false;
   List<HammartCartItem> _items = [];
@@ -24,7 +27,17 @@ class _CartPageState extends ConsumerState<CartPage> {
   @override
   void initState() {
     super.initState();
+    _razorpay = Razorpay()
+      ..on(Razorpay.EVENT_PAYMENT_ERROR, _onPaymentError)
+      ..on(Razorpay.EVENT_PAYMENT_SUCCESS, _onPaymentSuccess)
+      ..on(Razorpay.EVENT_EXTERNAL_WALLET, _onExternalWallet);
     _load();
+  }
+
+  @override
+  void dispose() {
+    _razorpay.clear();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -89,6 +102,97 @@ class _CartPageState extends ConsumerState<CartPage> {
         );
       }
     }
+  }
+
+  Future<void> _checkout() async {
+    final phone = TextEditingController();
+    final address = TextEditingController();
+    final formKey = GlobalKey<FormState>();
+    final submitted = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Delivery details'),
+        content: Form(
+          key: formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: phone,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(labelText: 'Phone number'),
+                validator: (value) => value == null || value.trim().isEmpty ? 'Required' : null,
+              ),
+              TextFormField(
+                controller: address,
+                maxLines: 3,
+                decoration: const InputDecoration(labelText: 'Delivery address'),
+                validator: (value) => value == null || value.trim().isEmpty ? 'Required' : null,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogContext, false), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () {
+              if (formKey.currentState!.validate()) Navigator.pop(dialogContext, true);
+            },
+            child: const Text('Continue'),
+          ),
+        ],
+      ),
+    );
+    final phoneValue = phone.text.trim();
+    final addressValue = address.text.trim();
+    phone.dispose();
+    address.dispose();
+    if (submitted != true || !mounted) return;
+
+    final result = await ref.read(hammartServiceProvider).checkout(
+          items: _items.where((item) => !item.unavailable).toList(),
+          buyerPhone: phoneValue,
+          deliveryAddress: addressValue,
+        );
+    if (!mounted) return;
+    if (!result.success) {
+      _showMessage(result.error ?? 'Could not start checkout.');
+      return;
+    }
+
+    final group = result.groups.firstWhere((item) => item.success);
+    if (group.paymentMethod == 'razorpay' &&
+        group.razorpayOrderId != null &&
+        group.razorpayKeyId != null) {
+      _razorpay.open({
+        'key': group.razorpayKeyId,
+        'amount': group.amountInr * 100,
+        'order_id': group.razorpayOrderId,
+        'name': 'InPlayer HamMart',
+        'description': 'HamMart order',
+        'theme': {'color': '#F97316'},
+      });
+    } else if (group.paymentMethod == 'upi' && group.upiLink != null) {
+      final opened = await launchUrl(Uri.parse(group.upiLink!), mode: LaunchMode.externalApplication);
+      if (!opened && mounted) _showMessage('Could not open your UPI app.');
+    }
+  }
+
+  void _onPaymentSuccess(PaymentSuccessResponse response) {
+    if (mounted) _showMessage('Payment received. Your order will update after confirmation.');
+    _load();
+  }
+
+  void _onPaymentError(PaymentFailureResponse response) {
+    if (mounted) _showMessage(response.message?.trim().isNotEmpty == true ? response.message! : 'Payment was cancelled.');
+  }
+
+  void _onExternalWallet(ExternalWalletResponse response) {
+    if (mounted) _showMessage('${response.walletName ?? 'Wallet'} selected.');
+  }
+
+  void _showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -183,11 +287,7 @@ class _CartPageState extends ConsumerState<CartPage> {
                       SizedBox(
                         width: double.infinity,
                         child: ElevatedButton(
-                          onPressed: () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              const SnackBar(content: Text("Checkout isn't available yet — we're still wiring up payments.")),
-                            );
-                          },
+                          onPressed: _checkout,
                           style: ElevatedButton.styleFrom(
                             backgroundColor: AppColors.brandOrange,
                             foregroundColor: Colors.white,
@@ -195,7 +295,7 @@ class _CartPageState extends ConsumerState<CartPage> {
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                             elevation: 0,
                           ),
-                          child: const Text('Checkout — coming soon', style: TextStyle(fontWeight: FontWeight.bold)),
+                          child: const Text('Checkout', style: TextStyle(fontWeight: FontWeight.bold)),
                         ),
                       ),
                     ],

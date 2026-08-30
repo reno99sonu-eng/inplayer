@@ -35,13 +35,13 @@ export interface PremiumPlan {
 // VideoPlayer.tsx passes that cap as maxResolution — that is the real,
 // working difference between the tiers.
 //
-// Deliberately does NOT promise ad-free viewing, offline downloads,
-// lossless audio or early access. None of those are built, and a paid tier
-// must not list a benefit the code doesn't deliver.
+// Only list benefits enforced by the server. Offline downloads are now
+// entitlement-checked by both prepare-download and download routes.
 export const PREMIUM_BENEFITS: string[] = [
   "4K Ultra HD (2160p) streaming wherever the creator uploaded it",
   "2K (1440p) on supported videos — free accounts stop at 1080p",
   "The full quality ladder unlocked in Settings → Playback",
+  "Offline downloads for supported videos and music",
   "Everything InPlayer Free already includes",
 ];
 

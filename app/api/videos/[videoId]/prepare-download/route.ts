@@ -3,6 +3,7 @@ import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
 import mux from "@/app/lib/mux";
+import { isPremiumFromRecord } from "@/app/lib/premium";
 
 interface Params {
   params: Promise<{ videoId: string }>;
@@ -73,6 +74,20 @@ export async function POST(request: NextRequest, { params }: Params) {
 
   if (!video) {
     return NextResponse.json({ error: "Video not found." }, { status: 404 });
+  }
+
+  const viewer = await docClient.send(
+    new GetCommand({
+      TableName: "InPlayer-Users",
+      Key: { userId: user.userId },
+      ProjectionExpression: "premiumUntil",
+    })
+  );
+  if (!isPremiumFromRecord(viewer.Item, Date.now())) {
+    return NextResponse.json(
+      { error: "Offline downloads require an active Premium plan." },
+      { status: 403 }
+    );
   }
 
   if (video.contentType === "short") {

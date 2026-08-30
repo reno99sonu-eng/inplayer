@@ -3,6 +3,7 @@ import { GetCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
 import { isActiveMember } from "@/app/lib/memberships";
+import { isPremiumFromRecord } from "@/app/lib/premium";
 
 interface Params {
   params: Promise<{ videoId: string }>;
@@ -29,6 +30,28 @@ export async function GET(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "Not available." }, { status: 404 });
   }
 
+  // Offline downloads are a Premium benefit. Enforce this on the server,
+  // not only in the app UI, so a copied download URL cannot bypass the tier.
+  let user;
+  try {
+    user = await verifyAuth(request);
+    const viewer = await docClient.send(
+      new GetCommand({
+        TableName: "InPlayer-Users",
+        Key: { userId: user.userId },
+        ProjectionExpression: "premiumUntil",
+      })
+    );
+    if (!isPremiumFromRecord(viewer.Item, Date.now())) {
+      return NextResponse.json(
+        { error: "Offline downloads require an active Premium plan." },
+        { status: 403 }
+      );
+    }
+  } catch {
+    return NextResponse.json({ error: "Please sign in to download." }, { status: 401 });
+  }
+
   // This route otherwise needs no sign-in at all — but a members-only
   // video's actual file must never be fetchable by anyone who isn't the
   // owner or an active paid member, download link or not. Without this,
@@ -36,12 +59,6 @@ export async function GET(request: NextRequest, { params }: Params) {
   // this URL regardless of the real playback gating built into the player
   // (see app/api/videos/[videoId]/playback-token).
   if (video.membersOnly) {
-    let user;
-    try {
-      user = await verifyAuth(request);
-    } catch {
-      return NextResponse.json({ error: "Please sign in." }, { status: 401 });
-    }
     const isOwner = video.uploaderId === user.userId;
     const isMember = isOwner ? false : await isActiveMember(user.userId, video.uploaderId);
     if (!isOwner && !isMember) {

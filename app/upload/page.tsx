@@ -434,8 +434,6 @@ export default function UploadPage() {
               };
 
               xhr.onerror = () => reject(new Error("Network connection dropped during upload. Please check your internet connection."));
-              xhr.ontimeout = () => reject(new Error("Upload timed out. Try uploading on a faster connection or Wi-Fi."));
-              xhr.timeout = 300000; // 5 minute timeout for larger files
 
               xhr.send(file);
             });

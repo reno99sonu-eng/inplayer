@@ -75,11 +75,10 @@ export async function POST(request: NextRequest) {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
-        model: "gpt-image-1",
+        model: "dall-e-3",
         prompt,
         size: "1024x1024",
-        quality: "medium",
-        background: "transparent",
+        response_format: "b64_json",
         n: 1,
       }),
       signal: controller.signal,

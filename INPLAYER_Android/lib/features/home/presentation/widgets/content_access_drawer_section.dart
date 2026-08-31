@@ -233,21 +233,22 @@ class _ContentAccessDrawerSectionState
             ),
           ),
         ),
-        _DrawerToggleRow(
-          key: ContentAccessDrawerSection.adultToggleKey,
-          icon: Icons.eighteen_up_rating_rounded,
-          label: '18+ content',
-          hint: _loading
-              ? 'Checking...'
-              : adultOn
-              ? 'Showing everything, 18+ included'
-              : '18+ hidden - passkey to unlock',
-          value: adultOn,
-          disabled: disabled,
-          onChanged: (enabled) => enabled
-              ? _requestAdultMode()
-              : _setNarrowMode(AudienceMode.family),
-        ),
+        if (false)
+          _DrawerToggleRow(
+            key: ContentAccessDrawerSection.adultToggleKey,
+            icon: Icons.eighteen_up_rating_rounded,
+            label: '18+ content',
+            hint: _loading
+                ? 'Checking...'
+                : adultOn
+                ? 'Showing everything, 18+ included'
+                : '18+ hidden - passkey to unlock',
+            value: adultOn,
+            disabled: disabled,
+            onChanged: (enabled) => enabled
+                ? _requestAdultMode()
+                : _setNarrowMode(AudienceMode.family),
+          ),
         _DrawerToggleRow(
           icon: Icons.child_care_rounded,
           label: 'Kids only',

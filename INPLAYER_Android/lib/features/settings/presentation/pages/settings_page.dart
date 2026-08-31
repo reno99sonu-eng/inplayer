@@ -49,7 +49,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       final key = _sectionKeys.values.elementAt(i);
       final renderBox = key.currentContext?.findRenderObject() as RenderBox?;
       if (renderBox == null) continue;
-      final position = renderBox.localToGlobal(Offset.zero, ancestor: context.findRenderObject()).dy;
+      final position = renderBox
+          .localToGlobal(Offset.zero, ancestor: context.findRenderObject())
+          .dy;
       final distance = (position - 120).abs();
       if (distance < closestDistance) {
         closestDistance = distance;
@@ -81,7 +83,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+        backgroundColor: context.isDark
+            ? AppColors.surfaceDark
+            : AppColors.surfaceLight,
       ),
     );
   }
@@ -155,7 +159,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   },
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
                     margin: const EdgeInsets.only(bottom: 8),
                     decoration: BoxDecoration(
                       color: isSelected
@@ -174,9 +181,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                           choice == ThemeChoice.system
                               ? Icons.brightness_auto
                               : choice == ThemeChoice.light
-                                  ? Icons.light_mode
-                                  : Icons.dark_mode,
-                          color: isSelected ? AppColors.brandOrange : ctx.textSecondary,
+                              ? Icons.light_mode
+                              : Icons.dark_mode,
+                          color: isSelected
+                              ? AppColors.brandOrange
+                              : ctx.textSecondary,
                           size: 22,
                         ),
                         const SizedBox(width: 14),
@@ -187,8 +196,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                               Text(
                                 choice.label,
                                 style: TextStyle(
-                                  color: isSelected ? AppColors.brandOrange : ctx.textPrimary,
-                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                  color: isSelected
+                                      ? AppColors.brandOrange
+                                      : ctx.textPrimary,
+                                  fontWeight: isSelected
+                                      ? FontWeight.bold
+                                      : FontWeight.w500,
                                   fontSize: 15,
                                 ),
                               ),
@@ -204,7 +217,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                           ),
                         ),
                         if (isSelected)
-                          const Icon(Icons.check_circle, color: AppColors.brandOrange, size: 20),
+                          const Icon(
+                            Icons.check_circle,
+                            color: AppColors.brandOrange,
+                            size: 20,
+                          ),
                       ],
                     ),
                   ),
@@ -228,7 +245,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           borderRadius: BorderRadius.circular(20),
           side: BorderSide(color: ctx.borderSubtle),
         ),
-        title: Text('Delete Account', style: TextStyle(color: ctx.textPrimary, fontWeight: FontWeight.bold)),
+        title: Text(
+          'Delete Account',
+          style: TextStyle(color: ctx.textPrimary, fontWeight: FontWeight.bold),
+        ),
         content: Text(
           'This permanently deletes your videos, profile, and username reservation, and '
           "signs you out for good. This can't be undone. Are you sure?",
@@ -242,7 +262,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(true),
             style: TextButton.styleFrom(foregroundColor: AppColors.error),
-            child: const Text('Delete', style: TextStyle(fontWeight: FontWeight.bold)),
+            child: const Text(
+              'Delete',
+              style: TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -252,7 +275,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     setState(() => _deletingAccount = true);
 
-    final dataResult = await ref.read(settingsServiceProvider).deleteAccountData();
+    final dataResult = await ref
+        .read(settingsServiceProvider)
+        .deleteAccountData();
 
     if (!dataResult.success) {
       if (!mounted) return;
@@ -269,7 +294,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     if (authResult.success) {
       ref.read(authStateProvider.notifier).setUnauthenticated();
     } else {
-      _showSnack(authResult.error ?? "Your data was deleted, but signing you out failed.");
+      _showSnack(
+        authResult.error ??
+            "Your data was deleted, but signing you out failed.",
+      );
     }
   }
 
@@ -288,7 +316,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         leading: Navigator.of(context).canPop()
             ? IconButton(
                 onPressed: () => Navigator.of(context).pop(),
-                icon: Icon(Icons.arrow_back_ios_new_rounded, color: context.textPrimary),
+                icon: Icon(
+                  Icons.arrow_back_ios_new_rounded,
+                  color: context.textPrimary,
+                ),
               )
             : null,
         title: Text(
@@ -318,22 +349,33 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     return Material(
                       color: Colors.transparent,
                       child: InkWell(
-                        onTap: () => _jumpToSection(section.title, sections: sections),
+                        onTap: () =>
+                            _jumpToSection(section.title, sections: sections),
                         borderRadius: BorderRadius.circular(12),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
                           curve: Curves.easeOutCubic,
                           padding: const EdgeInsets.symmetric(horizontal: 14),
                           decoration: BoxDecoration(
-                            color: selected ? AppColors.brandOrange : context.isDark ? Colors.white.withValues(alpha: 0.04) : Colors.black.withValues(alpha: 0.03),
+                            color: selected
+                                ? AppColors.brandOrange
+                                : context.isDark
+                                ? Colors.white.withValues(alpha: 0.04)
+                                : Colors.black.withValues(alpha: 0.03),
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: selected ? AppColors.brandOrange.withValues(alpha: 0.35) : context.borderSubtle,
+                              color: selected
+                                  ? AppColors.brandOrange.withValues(
+                                      alpha: 0.35,
+                                    )
+                                  : context.borderSubtle,
                             ),
                             boxShadow: selected
                                 ? [
                                     BoxShadow(
-                                      color: AppColors.brandOrange.withValues(alpha: 0.18),
+                                      color: AppColors.brandOrange.withValues(
+                                        alpha: 0.18,
+                                      ),
                                       blurRadius: 12,
                                       offset: const Offset(0, 4),
                                     ),
@@ -344,7 +386,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                           child: Text(
                             section.title,
                             style: TextStyle(
-                              color: selected ? Colors.white : context.textPrimary,
+                              color: selected
+                                  ? Colors.white
+                                  : context.textPrimary,
                               fontWeight: FontWeight.w700,
                               fontSize: 12,
                             ),
@@ -363,7 +407,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 children: [
                   for (final section in sections)
                     Padding(
-                      key: _sectionKeys.putIfAbsent(section.title, () => GlobalKey()),
+                      key: _sectionKeys.putIfAbsent(
+                        section.title,
+                        () => GlobalKey(),
+                      ),
                       padding: const EdgeInsets.only(bottom: 16),
                       child: Container(
                         decoration: BoxDecoration(
@@ -424,8 +471,12 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           _SettingTile(
             icon: Icons.language_outlined,
             title: 'Language',
-            trailing: Text('English', style: TextStyle(color: context.textDim, fontSize: 13)),
-            onTap: () => _showSnack('InPlayer is currently available in English only.'),
+            trailing: Text(
+              'English',
+              style: TextStyle(color: context.textDim, fontSize: 13),
+            ),
+            onTap: () =>
+                _showSnack('InPlayer is currently available in English only.'),
           ),
         ],
       ),
@@ -507,8 +558,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             icon: currentTheme == ThemeChoice.system
                 ? Icons.brightness_auto
                 : currentTheme == ThemeChoice.light
-                    ? Icons.light_mode
-                    : Icons.dark_mode,
+                ? Icons.light_mode
+                : Icons.dark_mode,
             title: 'Theme & Appearance',
             trailing: Text(
               currentTheme.label,
@@ -563,18 +614,23 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ],
       ),
       _SettingsSection(
-        title: 'Danger',
+        title: 'Account controls',
         items: [
           _SettingTile(
             icon: Icons.delete_forever_outlined,
-            title: _deletingAccount ? 'Deleting your account...' : 'Delete Account',
+            title: _deletingAccount
+                ? 'Deleting your account...'
+                : 'Delete Account',
             onTap: _deletingAccount ? () {} : _confirmDeleteAccount,
             isDestructive: true,
             trailing: _deletingAccount
                 ? const SizedBox(
                     width: 16,
                     height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.error),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: AppColors.error,
+                    ),
                   )
                 : null,
           ),
@@ -582,7 +638,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       ),
     ];
   }
-
 }
 
 class _SettingsSection {
@@ -622,19 +677,28 @@ class _SettingTile extends _SettingsItem {
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
           child: Row(
             children: [
-              Icon(icon, color: isDestructive ? AppColors.error : context.textPrimary, size: 20),
+              Icon(
+                icon,
+                color: isDestructive ? AppColors.error : context.textPrimary,
+                size: 20,
+              ),
               const SizedBox(width: 12),
               Expanded(
                 child: Text(
                   title,
                   style: TextStyle(
-                    color: isDestructive ? AppColors.error : context.textPrimary,
+                    color: isDestructive
+                        ? AppColors.error
+                        : context.textPrimary,
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
               ),
-              if (trailing != null) trailing! else Icon(Icons.chevron_right, color: context.textDim, size: 18),
+              if (trailing != null)
+                trailing!
+              else
+                Icon(Icons.chevron_right, color: context.textDim, size: 18),
             ],
           ),
         ),
@@ -667,7 +731,11 @@ class _SettingSwitch extends _SettingsItem {
           Expanded(
             child: Text(
               title,
-              style: TextStyle(color: context.textPrimary, fontSize: 14, fontWeight: FontWeight.w500),
+              style: TextStyle(
+                color: context.textPrimary,
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
             ),
           ),
           Transform.scale(
@@ -677,7 +745,9 @@ class _SettingSwitch extends _SettingsItem {
               activeThumbColor: Colors.white,
               activeTrackColor: AppColors.brandOrange,
               inactiveThumbColor: Colors.white,
-              inactiveTrackColor: context.isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+              inactiveTrackColor: context.isDark
+                  ? const Color(0xFF475569)
+                  : const Color(0xFFCBD5E1),
               onChanged: onChanged,
               materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
             ),

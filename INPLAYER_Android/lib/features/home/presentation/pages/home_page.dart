@@ -147,90 +147,91 @@ class _HomePageState extends ConsumerState<HomePage> {
             ),
             const VideoMiniPlayerOverlay(),
             // Kids Mode Safety Banner Indicator
-            Consumer(
-              builder: (context, ref, _) {
-                final isKid = ref.watch(
-                  kidModeProvider.select((s) => s.isEnabled),
-                );
-                if (!isKid) return const SizedBox.shrink();
+            if (false)
+              Consumer(
+                builder: (context, ref, _) {
+                  final isKid = ref.watch(
+                    kidModeProvider.select((s) => s.isEnabled),
+                  );
+                  if (!isKid) return const SizedBox.shrink();
 
-                return Positioned(
-                  top: MediaQuery.of(context).padding.top + 6,
-                  left: 16,
-                  right: 16,
-                  child: Material(
-                    color: Colors.transparent,
-                    child: InkWell(
-                      // Audience changes are account-level operations and
-                      // must go through the drawer's six-digit passkey flow.
-                      onTap: () => Scaffold.maybeOf(context)?.openDrawer(),
-                      borderRadius: BorderRadius.circular(16),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: const Color(0xE6065F46),
-                          borderRadius: BorderRadius.circular(16),
-                          border: Border.all(
-                            color: const Color(0xFF10B981),
-                            width: 1.2,
+                  return Positioned(
+                    top: MediaQuery.of(context).padding.top + 6,
+                    left: 16,
+                    right: 16,
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        // Audience changes are account-level operations and
+                        // must go through the drawer's six-digit passkey flow.
+                        onTap: () => Scaffold.maybeOf(context)?.openDrawer(),
+                        borderRadius: BorderRadius.circular(16),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 8,
                           ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: const Color(
-                                0xFF10B981,
-                              ).withValues(alpha: 0.3),
-                              blurRadius: 10,
-                              offset: const Offset(0, 3),
+                          decoration: BoxDecoration(
+                            color: const Color(0xE6065F46),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: const Color(0xFF10B981),
+                              width: 1.2,
                             ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            const Icon(
-                              Icons.child_care_rounded,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                            const SizedBox(width: 8),
-                            const Expanded(
-                              child: Text(
-                                'Kids Safe Mode Active • Content Filtered',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w700,
+                            boxShadow: [
+                              BoxShadow(
+                                color: const Color(
+                                  0xFF10B981,
+                                ).withValues(alpha: 0.3),
+                                blurRadius: 10,
+                                offset: const Offset(0, 3),
+                              ),
+                            ],
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(
+                                Icons.child_care_rounded,
+                                color: Colors.white,
+                                size: 18,
+                              ),
+                              const SizedBox(width: 8),
+                              const Expanded(
+                                child: Text(
+                                  'Kids Safe Mode Active • Content Filtered',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                  ),
                                 ),
                               ),
-                            ),
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 3,
-                              ),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: const Text(
-                                'EXIT (PIN)',
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w800,
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 3,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Text(
+                                  'EXIT (PIN)',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w800,
+                                  ),
                                 ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                );
-              },
-            ),
+                  );
+                },
+              ),
           ],
         ),
       ),
@@ -457,6 +458,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                       : null,
                 ),
                 child: UserAvatar(
+                  key: ValueKey<String>(user?.avatarUrl ?? 'guest-avatar'),
                   avatarUrl: user?.avatarUrl,
                   name: user?.name ?? 'User',
                   size: 20,
@@ -540,8 +542,8 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage> {
   void initState() {
     super.initState();
     final videoService = ref.read(videoServiceProvider);
-    _videosFuture = videoService.getVideos();
-    _featuredFuture = videoService.getFeaturedWeekly();
+    _videosFuture = videoService.getVideos(forceRefresh: true);
+    _featuredFuture = videoService.getFeaturedWeekly(forceRefresh: true);
     _shortsFuture = videoService.getShorts();
     // Loaded once here and passed down to every VideoCard, matching
     // RecommendationFeed.tsx's own `feedbackMap` — so 20+ cards on one
@@ -554,8 +556,8 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage> {
   Future<void> _refreshContent() async {
     final videoService = ref.read(videoServiceProvider);
     setState(() {
-      _videosFuture = videoService.getVideos();
-      _featuredFuture = videoService.getFeaturedWeekly();
+      _videosFuture = videoService.getVideos(forceRefresh: true);
+      _featuredFuture = videoService.getFeaturedWeekly(forceRefresh: true);
       _shortsFuture = videoService.getShorts();
       _feedbackFuture = ref
           .read(videoInteractionServiceProvider)

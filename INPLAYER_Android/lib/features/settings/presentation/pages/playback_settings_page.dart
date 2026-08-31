@@ -60,7 +60,9 @@ class _PlaybackSettingsPageState extends State<PlaybackSettingsPage> {
     });
   }
 
-  Future<void> _update(PlaybackSettings Function(PlaybackSettings) patch) async {
+  Future<void> _update(
+    PlaybackSettings Function(PlaybackSettings) patch,
+  ) async {
     final next = patch(_settings);
     setState(() => _settings = next);
     await PlaybackSettingsStore.update(next);
@@ -104,7 +106,14 @@ class _PlaybackSettingsPageState extends State<PlaybackSettingsPage> {
                 ),
               ),
               const SizedBox(height: 18),
-              Text(title, style: TextStyle(color: ctx.textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
+              Text(
+                title,
+                style: TextStyle(
+                  color: ctx.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 12),
               for (final choice in _qualityChoices)
                 InkWell(
@@ -114,7 +123,10 @@ class _PlaybackSettingsPageState extends State<PlaybackSettingsPage> {
                   },
                   borderRadius: BorderRadius.circular(12),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 14,
+                    ),
                     margin: const EdgeInsets.only(bottom: 6),
                     decoration: BoxDecoration(
                       color: choice.$1 == current
@@ -128,14 +140,22 @@ class _PlaybackSettingsPageState extends State<PlaybackSettingsPage> {
                           child: Text(
                             choice.$2,
                             style: TextStyle(
-                              color: choice.$1 == current ? AppColors.brandOrange : ctx.textPrimary,
-                              fontWeight: choice.$1 == current ? FontWeight.bold : FontWeight.w500,
+                              color: choice.$1 == current
+                                  ? AppColors.brandOrange
+                                  : ctx.textPrimary,
+                              fontWeight: choice.$1 == current
+                                  ? FontWeight.bold
+                                  : FontWeight.w500,
                               fontSize: 15,
                             ),
                           ),
                         ),
                         if (choice.$1 == current)
-                          const Icon(Icons.check_circle, color: AppColors.brandOrange, size: 20),
+                          const Icon(
+                            Icons.check_circle,
+                            color: AppColors.brandOrange,
+                            size: 20,
+                          ),
                       ],
                     ),
                   ),
@@ -156,11 +176,17 @@ class _PlaybackSettingsPageState extends State<PlaybackSettingsPage> {
         elevation: 0,
         title: Text(
           'Playback',
-          style: TextStyle(fontWeight: FontWeight.w800, color: context.textPrimary, fontSize: 20),
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            color: context.textPrimary,
+            fontSize: 20,
+          ),
         ),
       ),
       body: !_loaded
-          ? const Center(child: CircularProgressIndicator(color: AppColors.brandOrange))
+          ? const Center(
+              child: CircularProgressIndicator(color: AppColors.brandOrange),
+            )
           : ListView(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
               children: [
@@ -177,7 +203,8 @@ class _PlaybackSettingsPageState extends State<PlaybackSettingsPage> {
                       onTap: () => _pickQuality(
                         title: 'Shorts & mobile quality',
                         current: _settings.mobileQuality,
-                        onPicked: (v) => _update((s) => s.copyWith(mobileQuality: v)),
+                        onPicked: (v) =>
+                            _update((s) => s.copyWith(mobileQuality: v)),
                       ),
                     ),
                     _selectRow(
@@ -188,87 +215,144 @@ class _PlaybackSettingsPageState extends State<PlaybackSettingsPage> {
                       onTap: () => _pickQuality(
                         title: 'Video quality',
                         current: _settings.wifiQuality,
-                        onPicked: (v) => _update((s) => s.copyWith(wifiQuality: v)),
+                        onPicked: (v) =>
+                            _update((s) => s.copyWith(wifiQuality: v)),
                       ),
                     ),
                     _premiumNote(
                       'Free accounts stream up to 1080p (Full HD). 1440p and 4K Ultra HD are part of InPlayer Premium — picking them here does nothing on a free account.',
                     ),
-                    _selectRow(
-                      icon: Icons.volume_up_outlined,
-                      title: 'Audio Quality',
-                      description: 'Not available yet — uploads are transcoded to a single audio ladder, so there is nothing to choose between.',
-                      value: _settings.audioQuality == 'high' ? 'High' : (_settings.audioQuality == 'low' ? 'Low' : _settings.audioQuality),
-                      onTap: () async {
-                        await showModalBottomSheet<void>(
-                          context: context,
-                          backgroundColor: Colors.transparent,
-                          builder: (ctx) {
-                            return Container(
-                              decoration: BoxDecoration(
-                                color: ctx.bgModal,
-                                borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                                border: Border.all(color: ctx.borderSubtle),
-                              ),
-                              padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Center(
-                                    child: Container(
-                                      width: 40,
-                                      height: 4,
-                                      decoration: BoxDecoration(
-                                        color: ctx.textDim.withValues(alpha: 0.4),
-                                        borderRadius: BorderRadius.circular(2),
+                    if (false)
+                      _selectRow(
+                        icon: Icons.volume_up_outlined,
+                        title: 'Audio Quality',
+                        description:
+                            'Not available yet — uploads are transcoded to a single audio ladder, so there is nothing to choose between.',
+                        value: _settings.audioQuality == 'high'
+                            ? 'High'
+                            : (_settings.audioQuality == 'low'
+                                  ? 'Low'
+                                  : _settings.audioQuality),
+                        onTap: () async {
+                          await showModalBottomSheet<void>(
+                            context: context,
+                            backgroundColor: Colors.transparent,
+                            builder: (ctx) {
+                              return Container(
+                                decoration: BoxDecoration(
+                                  color: ctx.bgModal,
+                                  borderRadius: const BorderRadius.vertical(
+                                    top: Radius.circular(24),
+                                  ),
+                                  border: Border.all(color: ctx.borderSubtle),
+                                ),
+                                padding: const EdgeInsets.fromLTRB(
+                                  20,
+                                  16,
+                                  20,
+                                  24,
+                                ),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Center(
+                                      child: Container(
+                                        width: 40,
+                                        height: 4,
+                                        decoration: BoxDecoration(
+                                          color: ctx.textDim.withValues(
+                                            alpha: 0.4,
+                                          ),
+                                          borderRadius: BorderRadius.circular(
+                                            2,
+                                          ),
+                                        ),
                                       ),
                                     ),
-                                  ),
-                                  const SizedBox(height: 18),
-                                  Text('Audio Quality', style: TextStyle(color: ctx.textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
-                                  const SizedBox(height: 12),
-                                  for (final choice in [('low', 'Low'), ('high', 'High')])
-                                    InkWell(
-                                      onTap: () {
-                                        Navigator.pop(ctx);
-                                        _update((s) => s.copyWith(audioQuality: choice.$2));
-                                      },
-                                      borderRadius: BorderRadius.circular(12),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                                        margin: const EdgeInsets.only(bottom: 6),
-                                        decoration: BoxDecoration(
-                                          color: choice.$2 == _settings.audioQuality
-                                              ? AppColors.brandOrange.withValues(alpha: 0.12)
-                                              : Colors.transparent,
-                                          borderRadius: BorderRadius.circular(12),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Expanded(
-                                              child: Text(
-                                                choice.$2,
-                                                style: TextStyle(
-                                                  color: choice.$2 == _settings.audioQuality ? AppColors.brandOrange : ctx.textPrimary,
-                                                  fontWeight: choice.$2 == _settings.audioQuality ? FontWeight.bold : FontWeight.w500,
-                                                  fontSize: 15,
+                                    const SizedBox(height: 18),
+                                    Text(
+                                      'Audio Quality',
+                                      style: TextStyle(
+                                        color: ctx.textPrimary,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    for (final choice in [
+                                      ('low', 'Low'),
+                                      ('high', 'High'),
+                                    ])
+                                      InkWell(
+                                        onTap: () {
+                                          Navigator.pop(ctx);
+                                          _update(
+                                            (s) => s.copyWith(
+                                              audioQuality: choice.$2,
+                                            ),
+                                          );
+                                        },
+                                        borderRadius: BorderRadius.circular(12),
+                                        child: Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 16,
+                                            vertical: 14,
+                                          ),
+                                          margin: const EdgeInsets.only(
+                                            bottom: 6,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color:
+                                                choice.$2 ==
+                                                    _settings.audioQuality
+                                                ? AppColors.brandOrange
+                                                      .withValues(alpha: 0.12)
+                                                : Colors.transparent,
+                                            borderRadius: BorderRadius.circular(
+                                              12,
+                                            ),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              Expanded(
+                                                child: Text(
+                                                  choice.$2,
+                                                  style: TextStyle(
+                                                    color:
+                                                        choice.$2 ==
+                                                            _settings
+                                                                .audioQuality
+                                                        ? AppColors.brandOrange
+                                                        : ctx.textPrimary,
+                                                    fontWeight:
+                                                        choice.$2 ==
+                                                            _settings
+                                                                .audioQuality
+                                                        ? FontWeight.bold
+                                                        : FontWeight.w500,
+                                                    fontSize: 15,
+                                                  ),
                                                 ),
                                               ),
-                                            ),
-                                            if (choice.$2 == _settings.audioQuality)
-                                              const Icon(Icons.check_circle, color: AppColors.brandOrange, size: 20),
-                                          ],
+                                              if (choice.$2 ==
+                                                  _settings.audioQuality)
+                                                const Icon(
+                                                  Icons.check_circle,
+                                                  color: AppColors.brandOrange,
+                                                  size: 20,
+                                                ),
+                                            ],
+                                          ),
                                         ),
                                       ),
-                                    ),
-                                ],
-                              ),
-                            );
-                          },
-                        );
-                      },
-                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          );
+                        },
+                      ),
                   ],
                 ),
                 const SizedBox(height: 14),
@@ -278,7 +362,8 @@ class _PlaybackSettingsPageState extends State<PlaybackSettingsPage> {
                     _switchRow(
                       icon: Icons.play_circle_outline,
                       title: 'Autoplay Next Video',
-                      description: 'Not available yet — needs an up-next queue, which the watch page doesn’t have.',
+                      description:
+                          'Not available yet — needs an up-next queue, which the watch page doesn’t have.',
                       value: _settings.autoplay,
                       onChanged: (v) => _update((s) => s.copyWith(autoplay: v)),
                     ),
@@ -289,7 +374,9 @@ class _PlaybackSettingsPageState extends State<PlaybackSettingsPage> {
                           ? 'Automatically switch to a small floating window when you leave the app while a video is playing. The in-player PiP button always works either way.'
                           : 'Not available on this device — needs Android 7.0 or newer.',
                       value: _settings.pip,
-                      onChanged: _pipSupportedOnDevice ? (v) => _update((s) => s.copyWith(pip: v)) : null,
+                      onChanged: _pipSupportedOnDevice
+                          ? (v) => _update((s) => s.copyWith(pip: v))
+                          : null,
                     ),
                   ],
                 ),
@@ -313,9 +400,11 @@ class _PlaybackSettingsPageState extends State<PlaybackSettingsPage> {
                     _switchRow(
                       icon: Icons.data_usage_outlined,
                       title: 'Data Saver',
-                      description: 'Reduce streaming quality to save mobile data.',
+                      description:
+                          'Reduce streaming quality to save mobile data.',
                       value: _settings.dataSaver,
-                      onChanged: (v) => _update((s) => s.copyWith(dataSaver: v)),
+                      onChanged: (v) =>
+                          _update((s) => s.copyWith(dataSaver: v)),
                     ),
                     _switchRow(
                       icon: Icons.history,
@@ -330,16 +419,20 @@ class _PlaybackSettingsPageState extends State<PlaybackSettingsPage> {
                     _switchRow(
                       icon: Icons.fast_forward_outlined,
                       title: 'Skip Intro Automatically',
-                      description: 'Not available yet — needs automatic intro detection, which nothing generates at upload.',
+                      description:
+                          'Not available yet — needs automatic intro detection, which nothing generates at upload.',
                       value: _settings.skipIntro,
-                      onChanged: (v) => _update((s) => s.copyWith(skipIntro: v)),
+                      onChanged: (v) =>
+                          _update((s) => s.copyWith(skipIntro: v)),
                     ),
                     _switchRow(
                       icon: Icons.headset_outlined,
                       title: 'Background Playback',
-                      description: 'Not available yet — needs a foreground media service to keep audio playing after you leave the app.',
+                      description:
+                          'Not available yet — needs a foreground media service to keep audio playing after you leave the app.',
                       value: _settings.backgroundPlayback,
-                      onChanged: (v) => _update((s) => s.copyWith(backgroundPlayback: v)),
+                      onChanged: (v) =>
+                          _update((s) => s.copyWith(backgroundPlayback: v)),
                     ),
                   ],
                 ),
@@ -362,7 +455,9 @@ class _PlaybackSettingsPageState extends State<PlaybackSettingsPage> {
             context.isDark ? const Color(0xFF111827) : const Color(0xFFFFFFFF),
           ],
         ),
-        border: Border.all(color: AppColors.brandOrange.withValues(alpha: 0.22)),
+        border: Border.all(
+          color: AppColors.brandOrange.withValues(alpha: 0.22),
+        ),
       ),
       child: Row(
         children: [
@@ -373,7 +468,11 @@ class _PlaybackSettingsPageState extends State<PlaybackSettingsPage> {
               color: AppColors.brandOrange,
               borderRadius: BorderRadius.circular(14),
             ),
-            child: const Icon(Icons.play_circle_fill_rounded, color: Colors.white, size: 24),
+            child: const Icon(
+              Icons.play_circle_fill_rounded,
+              color: Colors.white,
+              size: 24,
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -431,7 +530,11 @@ class _PlaybackSettingsPageState extends State<PlaybackSettingsPage> {
           Expanded(
             child: Text(
               text,
-              style: TextStyle(color: context.textDim, fontSize: 11.5, height: 1.45),
+              style: TextStyle(
+                color: context.textDim,
+                fontSize: 11.5,
+                height: 1.45,
+              ),
             ),
           ),
         ],
@@ -444,7 +547,12 @@ class _PlaybackSettingsPageState extends State<PlaybackSettingsPage> {
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
       child: Text(
         title.toUpperCase(),
-        style: const TextStyle(color: AppColors.brandOrange, fontWeight: FontWeight.w800, fontSize: 11, letterSpacing: 1.2),
+        style: const TextStyle(
+          color: AppColors.brandOrange,
+          fontWeight: FontWeight.w800,
+          fontSize: 11,
+          letterSpacing: 1.2,
+        ),
       ),
     );
   }
@@ -464,25 +572,44 @@ class _PlaybackSettingsPageState extends State<PlaybackSettingsPage> {
         width: 34,
         height: 34,
         decoration: BoxDecoration(
-          color: enabled ? AppColors.brandOrange.withValues(alpha: 0.12) : context.borderSubtle,
+          color: enabled
+              ? AppColors.brandOrange.withValues(alpha: 0.12)
+              : context.borderSubtle,
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(icon, color: enabled ? AppColors.brandOrange : context.textDim, size: 18),
+        child: Icon(
+          icon,
+          color: enabled ? AppColors.brandOrange : context.textDim,
+          size: 18,
+        ),
       ),
       title: Text(
         title,
-        style: TextStyle(color: enabled ? context.textPrimary : context.textDim, fontSize: 14, fontWeight: FontWeight.w600),
+        style: TextStyle(
+          color: enabled ? context.textPrimary : context.textDim,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
       ),
-      subtitle: Text(description, style: TextStyle(color: context.textDim, fontSize: 11.5, height: 1.35)),
+      subtitle: Text(
+        description,
+        style: TextStyle(color: context.textDim, fontSize: 11.5, height: 1.35),
+      ),
       trailing: Container(
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
         decoration: BoxDecoration(
-          color: enabled ? AppColors.brandOrange.withValues(alpha: 0.12) : Colors.transparent,
+          color: enabled
+              ? AppColors.brandOrange.withValues(alpha: 0.12)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(999),
         ),
         child: Text(
           value,
-          style: TextStyle(color: enabled ? AppColors.brandOrange : context.textDim, fontWeight: FontWeight.w700, fontSize: 12.5),
+          style: TextStyle(
+            color: enabled ? AppColors.brandOrange : context.textDim,
+            fontWeight: FontWeight.w700,
+            fontSize: 12.5,
+          ),
         ),
       ),
       onTap: onTap,
@@ -503,20 +630,35 @@ class _PlaybackSettingsPageState extends State<PlaybackSettingsPage> {
         width: 34,
         height: 34,
         decoration: BoxDecoration(
-          color: enabled ? AppColors.brandOrange.withValues(alpha: 0.12) : context.borderSubtle,
+          color: enabled
+              ? AppColors.brandOrange.withValues(alpha: 0.12)
+              : context.borderSubtle,
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Icon(icon, color: enabled ? AppColors.brandOrange : context.textDim, size: 18),
+        child: Icon(
+          icon,
+          color: enabled ? AppColors.brandOrange : context.textDim,
+          size: 18,
+        ),
       ),
       title: Text(
         title,
-        style: TextStyle(color: enabled ? context.textPrimary : context.textDim, fontSize: 14, fontWeight: FontWeight.w600),
+        style: TextStyle(
+          color: enabled ? context.textPrimary : context.textDim,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
       ),
-      subtitle: Text(description, style: TextStyle(color: context.textDim, fontSize: 11.5, height: 1.35)),
+      subtitle: Text(
+        description,
+        style: TextStyle(color: context.textDim, fontSize: 11.5, height: 1.35),
+      ),
       activeThumbColor: Colors.white,
       activeTrackColor: AppColors.brandOrange,
       inactiveThumbColor: Colors.white,
-      inactiveTrackColor: context.isDark ? const Color(0xFF475569) : const Color(0xFFCBD5E1),
+      inactiveTrackColor: context.isDark
+          ? const Color(0xFF475569)
+          : const Color(0xFFCBD5E1),
       value: value,
       onChanged: onChanged,
     );

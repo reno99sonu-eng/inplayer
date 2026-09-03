@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
 
@@ -10,9 +11,23 @@ final authStateProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthService _authService;
   final _logger = Logger();
+  static const _cachedNameKey = 'inplayer:cached_user_name';
 
   AuthNotifier(this._authService) : super(const AuthState.initial()) {
     _init();
+  }
+
+  /// Keeps the startup greeting available before Cognito/profile hydration has
+  /// finished on the next cold launch. Some accounts only have a handle, so
+  /// never overwrite a useful cached value with an empty display name.
+  Future<void> _cacheDisplayName(User user) async {
+    final name = user.name.trim().isNotEmpty
+        ? user.name.trim()
+        : user.username.trim();
+    if (name.isEmpty) return;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_cachedNameKey, name);
   }
 
   Future<void> _init() async {
@@ -23,6 +38,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (isSignedIn) {
         final user = await _authService.getCurrentUser();
         if (user != null) {
+          await _cacheDisplayName(user);
           state = AuthState.authenticated(user);
         } else {
           state = const AuthState.unauthenticated();
@@ -36,35 +52,34 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  /// Returns true on success. On failure the reason is also written into
-  /// [state], which is where SignInModal and SignUpModal read it from to show
-  /// the message — so both halves of that contract have to stay in place.
   Future<bool> signIn({required String email, required String password}) async {
     state = const AuthState.loading();
 
     final result = await _authService.signIn(email: email, password: password);
 
     if (result.success && result.user != null) {
+      await _cacheDisplayName(result.user!);
       state = AuthState.authenticated(result.user!);
       return true;
+    } else {
+      state = AuthState.error(result.error ?? 'Sign in failed');
+      return false;
     }
-    state = AuthState.error(result.error ?? 'Sign in failed');
-    return false;
   }
 
-  /// Federated sign-in through Cognito's Google provider. Same contract as
-  /// [signIn]: true on success, reason in [state] on failure.
   Future<bool> signInWithGoogle() async {
     state = const AuthState.loading();
 
     final result = await _authService.signInWithGoogle();
 
     if (result.success && result.user != null) {
+      await _cacheDisplayName(result.user!);
       state = AuthState.authenticated(result.user!);
       return true;
+    } else {
+      state = AuthState.error(result.error ?? 'Google sign in failed');
+      return false;
     }
-    state = AuthState.error(result.error ?? 'Google sign in failed');
-    return false;
   }
 
   Future<void> signUp({
@@ -115,22 +130,22 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   /// For when the session has already ended by some other means (e.g.
-  /// AuthService.deleteUser() during account deletion) — just reflects
+  /// AuthService.deleteUser() during account deletion) ΓÇö just reflects
   /// that locally instead of calling _authService.signOut() again, which
   /// would fail against a session that's already gone.
   void setUnauthenticated() {
     state = const AuthState.unauthenticated();
   }
 
-  /// Returns the masked destination Cognito reported, or null if it reported
-  /// none.
+  /// Returns the masked destination Cognito reported (e.g. `r***@g***.com`),
+  /// or null if it reported none.
   ///
   /// The rethrow is the point. This used to catch the error, write it into
-  /// `state`, and return normally — so the caller's own try/catch never fired
-  /// and ForgotPasswordModal advanced to "we sent you a 6-digit code" even
-  /// when Cognito had rejected the request outright. The screen said an email
-  /// was on its way while nothing had been sent, and the real reason sat in a
-  /// state field nothing was listening to.
+  /// `state`, and return normally — so ForgotPasswordModal's own try/catch
+  /// never fired and it advanced to "we sent you a 6-digit code" even when
+  /// Cognito had rejected the request outright. The screen promised an email
+  /// that was never sent, and the real reason sat in a state field nothing
+  /// was listening to.
   Future<String?> resetPassword({required String email}) async {
     try {
       final destination = await _authService.resetPassword(email: email);
@@ -173,6 +188,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       try {
         final user = await _authService.getCurrentUser();
         if (user != null) {
+          await _cacheDisplayName(user);
           state = AuthState.authenticated(user);
         }
       } catch (e) {
@@ -184,7 +200,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// Applies a local edit to the signed-in user without a round trip to
   /// Cognito. Needed because fields like display name/bio/privacy are the
   /// app's own DynamoDB profile data (see app/api/profile/settings/route.ts),
-  /// not Cognito user attributes — [refreshUser] re-reads from Cognito, so
+  /// not Cognito user attributes ΓÇö [refreshUser] re-reads from Cognito, so
   /// it would NOT pick up a just-saved name/bio/privacy change. Call this
   /// right after a successful settings save instead.
   void updateLocalUser(User Function(User current) update) {

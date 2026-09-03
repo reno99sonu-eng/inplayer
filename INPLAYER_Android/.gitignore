@@ -43,3 +43,18 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Nested plugin packages (packages/ivs_broadcast) run their own Gradle build,
+# and its artifacts are NOT covered by the /build/ and .dart_tool/ rules above
+# — those are anchored to this project root. Without these, every build
+# rewrites lock files and caches that then show up as repo changes.
+**/.gradle/
+packages/*/android/build/
+packages/*/.dart_tool/
+packages/*/build/
+
+# Transfer artifacts for the bundled age model. The joined
+# assets/models/fairface_age_int8.tflite IS committed (the app will not build
+# without it); these split pieces are scaffolding and must never be, or the
+# same 21 MB lands in the repo twice.
+assets/models/*.part*

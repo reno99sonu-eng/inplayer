@@ -147,27 +147,16 @@ List<Soundtrack> searchSoundtracks(String query) {
       .toList();
 }
 
-/// The "Look" filter applied over the video surface. Names and order match
-/// the website's `ShortSettings["filter"]` union exactly, because the value
-/// is stored and read back by the site's own players.
-enum LookFilter { original, warm, vivid, mono }
-
-extension LookFilterWire on LookFilter {
-  String get wire => name;
-  String get label => switch (this) {
-        LookFilter.original => 'Original',
-        LookFilter.warm => 'Warm',
-        LookFilter.vivid => 'Vivid',
-        LookFilter.mono => 'Mono',
-      };
-
-  static LookFilter parse(String? raw) => switch (raw) {
-        'warm' => LookFilter.warm,
-        'vivid' => LookFilter.vivid,
-        'mono' => LookFilter.mono,
-        _ => LookFilter.original,
-      };
-}
+// The "Look" filter (original/warm/vivid/mono) has been removed.
+//
+// It was write-only in this app: the creator picked a Look, the value was
+// uploaded, and nothing in the Android app ever rendered it — only the
+// website applies it, via cssFilterFor(). So the chips changed a stored
+// value the creator could never see the effect of on their own device.
+//
+// The server still defaults this to "original" when it is absent, so
+// omitting it from the payload is safe and changes nothing for existing
+// uploads.
 
 /// The whole picker's value — port of the website's `ShortSettings`.
 class ShortSettings {
@@ -179,29 +168,23 @@ class ShortSettings {
   /// matching the server, which stores it either way for schema consistency.
   final int musicClipSeconds;
 
-  final LookFilter filter;
-
   const ShortSettings({
     this.soundtrack,
     this.musicClipSeconds = 30,
-    this.filter = LookFilter.original,
   });
 
   ShortSettings copyWith({
     ResolvedSoundtrack? soundtrack,
     bool clearSoundtrack = false,
     int? musicClipSeconds,
-    LookFilter? filter,
   }) {
     return ShortSettings(
       soundtrack: clearSoundtrack ? null : (soundtrack ?? this.soundtrack),
       musicClipSeconds: musicClipSeconds ?? this.musicClipSeconds,
-      filter: filter ?? this.filter,
     );
   }
 
-  bool get isDefault =>
-      soundtrack == null && musicClipSeconds == 30 && filter == LookFilter.original;
+  bool get isDefault => soundtrack == null && musicClipSeconds == 30;
 
   /// Exactly the shape `app/api/upload/create/route.ts` expects under the
   /// `shortSettings` key. It re-sanitizes everything server-side regardless,
@@ -209,7 +192,6 @@ class ShortSettings {
   Map<String, dynamic> toJson() => {
         'soundtrack': soundtrack?.toJson(),
         'musicClipSeconds': musicClipSeconds == 20 ? 20 : 30,
-        'filter': filter.wire,
       };
 }
 

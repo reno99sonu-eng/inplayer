@@ -7,6 +7,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -192,7 +193,23 @@ class _UploadPageState extends ConsumerState<UploadPage> {
 
   Future<void> _pickVideo(String contentType) async {
     try {
-      final picked = await ImagePicker().pickVideo(source: ImageSource.gallery);
+      // Music uploads pick an AUDIO file; everything else picks a video.
+      //
+      // This used to call pickVideo() for all three types, so the entire
+      // music branch — covers, genre, lyrics, the sha256 audio fingerprint —
+      // was built on a file the creator could only choose from the video
+      // gallery. An .mp3 was literally unselectable.
+      final XFile? picked;
+      if (contentType == 'music') {
+        final result = await FilePicker.platform.pickFiles(
+          type: FileType.audio,
+          allowMultiple: false,
+        );
+        final path = result?.files.single.path;
+        picked = path == null ? null : XFile(path);
+      } else {
+        picked = await ImagePicker().pickVideo(source: ImageSource.gallery);
+      }
       if (picked == null || !mounted) return;
 
       final size = await File(picked.path).length();
@@ -573,6 +590,11 @@ class _UploadPageState extends ConsumerState<UploadPage> {
       _aiBusy = false;
       _syncedLyrics = const [];
       _shortSettings = const ShortSettings();
+      // These two were missing from the reset, so "Upload Another" after a
+      // music track carried the previous genre and cover interval into the
+      // next upload.
+      _genre = 'Other';
+      _coverIntervalSeconds = 12;
     });
   }
 
@@ -950,33 +972,13 @@ class _UploadPageState extends ConsumerState<UploadPage> {
           ),
         ),
         const SizedBox(height: 16),
-        SegmentedButton<String>(
-          segments: const [
-            ButtonSegment(
-              value: 'video',
-              label: Text('Video'),
-              icon: Icon(Icons.movie_outlined),
-            ),
-            ButtonSegment(
-              value: 'short',
-              label: Text('Short'),
-              icon: Icon(Icons.play_circle_outline),
-            ),
-            ButtonSegment(
-              value: 'music',
-              label: Text('Music'),
-              icon: Icon(Icons.music_note_outlined),
-            ),
-          ],
-          selected: {_contentType},
-          onSelectionChanged: (s) => setState(() {
-            _contentType = s.first;
-            if (_contentType == 'music') {
-              _category = 'Music';
-            }
-          }),
-        ),
-        const SizedBox(height: 16),
+        // The content-type SegmentedButton used to live here.
+        //
+        // It duplicated the three buttons on the previous screen and appeared
+        // AFTER the file was already picked — switching Video to Music on a
+        // chosen .mp4 published it as music without changing the file, and
+        // switching to Short never set the Raftaar category. The choice now
+        // happens once, up front, where it also decides which picker opens.
 
         // Custom Cover / Thumbnail selector
         if (!_isMusicUpload) ...[
@@ -1416,8 +1418,15 @@ class _UploadPageState extends ConsumerState<UploadPage> {
               .toList(),
           onChanged: (v) => setState(() {
             _category = v ?? _category;
-            if (_category.toLowerCase() == 'music') {
+            // Keep category and content type in step BOTH ways. Picking the
+            // Raftaar category used to leave _contentType as 'video', so the
+            // upload published as an ordinary video and never appeared in
+            // the shorts feed at all.
+            final lower = _category.toLowerCase();
+            if (lower == 'music') {
               _contentType = 'music';
+            } else if (lower.startsWith('raftaar')) {
+              _contentType = 'short';
             }
           }),
         ),

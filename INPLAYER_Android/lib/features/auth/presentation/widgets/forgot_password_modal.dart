@@ -1,3 +1,4 @@
+import 'package:amplify_flutter/amplify_flutter.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -24,6 +25,12 @@ class _ForgotPasswordModalState extends ConsumerState<ForgotPasswordModal> {
   final _codeController = TextEditingController();
   final _newPasswordController = TextEditingController();
   bool _codeSent = false;
+
+  /// The masked address Cognito says it sent the code to, e.g.
+  /// `r***@g***.com`. Null means Cognito accepted the request but named no
+  /// destination — worth showing, because that is the case where waiting for
+  /// an email is futile.
+  String? _sentTo;
   bool _loading = false;
   String? _error;
   bool _success = false;
@@ -59,21 +66,62 @@ class _ForgotPasswordModalState extends ConsumerState<ForgotPasswordModal> {
     });
 
     try {
-      await ref.read(authStateProvider.notifier).resetPassword(email: email);
+      final destination = await ref
+          .read(authStateProvider.notifier)
+          .resetPassword(email: email);
       if (mounted) {
         setState(() {
           _codeSent = true;
+          _sentTo = destination;
           _loading = false;
         });
       }
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = _friendlyAuthError(e);
           _loading = false;
         });
       }
     }
+  }
+
+  /// Amplify's raw exceptions read like `AuthException {message: ...,
+  /// recoverySuggestion: ...}`, which is no use to someone locked out of
+  /// their account. These are the cases that actually happen.
+  String _friendlyAuthError(Object e) {
+    final message = e is AuthException ? e.message : e.toString();
+    final lower = message.toLowerCase();
+
+    if (lower.contains('user') && lower.contains('not') &&
+        (lower.contains('exist') || lower.contains('found'))) {
+      return 'No account found with that email address.';
+    }
+    if (lower.contains('verified email') ||
+        lower.contains('no registered/verified')) {
+      return "That account has no confirmed email address, so a code can't be "
+          'sent to it. If you signed up with Google, use the Google button on '
+          'the sign-in screen instead.';
+    }
+    if (lower.contains('limit exceeded') || lower.contains('too many')) {
+      return 'Too many attempts. Wait a few minutes before trying again.';
+    }
+    if (lower.contains('expired')) {
+      return 'That code has expired. Send yourself a new one.';
+    }
+    if (lower.contains('mismatch') ||
+        (lower.contains('code') && lower.contains('invalid'))) {
+      return "That code isn't right. Check it and try again.";
+    }
+    if (lower.contains('password') &&
+        (lower.contains('policy') || lower.contains('length'))) {
+      return "That password doesn't meet the requirements — use at least 8 "
+          'characters with a mix of letters and numbers.';
+    }
+    if (lower.contains('network') || lower.contains('connection')) {
+      return 'No connection. Check your internet and try again.';
+    }
+    return message;
   }
 
   Future<void> _handleResetPassword() async {
@@ -116,7 +164,7 @@ class _ForgotPasswordModalState extends ConsumerState<ForgotPasswordModal> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = e.toString();
+          _error = _friendlyAuthError(e);
           _loading = false;
         });
       }
@@ -257,7 +305,15 @@ class _ForgotPasswordModalState extends ConsumerState<ForgotPasswordModal> {
         const SizedBox(height: 6),
         Text(
           _codeSent
-              ? 'Enter the 6-digit confirmation code sent to your email.'
+              ? (_sentTo != null
+                    // Naming the address it actually went to is the whole
+                    // point: "check your email" is unfalsifiable, whereas a
+                    // masked destination either matches your inbox or tells
+                    // you immediately that it went somewhere else.
+                    ? 'Enter the 6-digit code sent to $_sentTo.'
+                    : 'We asked for a code, but no delivery address came '
+                          'back for that account. Check the email is right, or '
+                          'sign in with Google if that is how you signed up.')
               : 'Enter your email and we’ll send you a password reset code.',
           style: TextStyle(color: context.textSecondary, fontSize: 13),
         ),

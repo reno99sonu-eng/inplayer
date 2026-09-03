@@ -35,7 +35,11 @@ class _CategoryVideosPageState extends ConsumerState<CategoryVideosPage> {
     final all = await ref.read(videoServiceProvider).getVideos();
     if (!mounted) return;
     setState(() {
-      _videos = all.where((v) => v.category == widget.category).toList();
+      if (widget.category.toLowerCase().contains('raftaar')) {
+        _videos = all.where((v) => v.isShort || v.category == widget.category).toList();
+      } else {
+        _videos = all.where((v) => v.category == widget.category && !v.isShort).toList();
+      }
     });
   }
 

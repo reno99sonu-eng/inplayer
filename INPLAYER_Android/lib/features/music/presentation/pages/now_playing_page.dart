@@ -43,6 +43,11 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
   final ScrollController _lyricsScroll = ScrollController();
   int _lastLyricIndex = -1;
 
+  /// Position, in ms, that the finger is currently holding on the scrubber —
+  /// null when not scrubbing. While non-null the slider follows this instead
+  /// of the position stream, so the thumb cannot be yanked back mid-drag.
+  double? _dragMs;
+
   bool _downloadBusy = false;
 
   @override
@@ -223,7 +228,15 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
       backgroundColor: Colors.transparent,
       isScrollControlled: true,
       builder: (ctx) {
-        return DraggableScrollableSheet(
+        // A modal sheet is its own route, so the `ref.watch` in this page's
+        // build() does NOT rebuild it. Without this Consumer the queue was
+        // frozen: removing a track, reordering, or jumping to another song
+        // all fired correctly but left the visible list unchanged, which
+        // read as the queue being completely broken.
+        return Consumer(
+          builder: (ctx, ref, _) {
+            final player = ref.watch(musicPlayerServiceProvider);
+            return DraggableScrollableSheet(
           initialChildSize: 0.6,
           maxChildSize: 0.9,
           minChildSize: 0.4,
@@ -287,10 +300,24 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
                         vertical: 4,
                       ),
                       itemCount: player.queue.length,
+                      // onReorder is deprecated as of Flutter 3.41 in
+                      // favour of onReorderItem, which hands back a newIndex
+                      // that has ALREADY been corrected for the item lifted
+                      // out at oldIndex. Exactly one of the two may be given.
+                      //
+                      // MusicPlayerService.reorderQueue still speaks the old
+                      // raw convention — it does that correction itself, and
+                      // it is shared — so the correction is undone here
+                      // rather than changing a service contract for one call
+                      // site. Dragging down: raw = new + 1; dragging up: raw
+                      // = new; equal is a no-op either way.
                       onReorderItem: (oldIndex, newIndex) {
+                        final rawIndex = oldIndex < newIndex
+                            ? newIndex + 1
+                            : newIndex;
                         ref
                             .read(musicPlayerServiceProvider)
-                            .reorderQueue(oldIndex, newIndex);
+                            .reorderQueue(oldIndex, rawIndex);
                       },
                       itemBuilder: (context, i) {
                         final t = player.queue[i];
@@ -387,6 +414,8 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
                   ),
                 ],
               ),
+            );
+          },
             );
           },
         );
@@ -683,10 +712,13 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
       builder: (context, snapshot) {
         final pos = snapshot.data ?? Duration.zero;
         final dur = player.duration ?? Duration.zero;
-        final maxMs = dur.inMilliseconds > 0
-            ? dur.inMilliseconds.toDouble()
-            : 1.0;
-        final value = pos.inMilliseconds.clamp(0, maxMs.toInt()).toDouble();
+        final hasDuration = dur.inMilliseconds > 0;
+        final maxMs = hasDuration ? dur.inMilliseconds.toDouble() : 1.0;
+        // While a drag is in progress the thumb follows the finger, NOT the
+        // position stream. Letting the stream drive it mid-drag is what made
+        // the thumb rubber-band back under your finger.
+        final value = _dragMs ??
+            pos.inMilliseconds.clamp(0, maxMs.toInt()).toDouble();
 
         return Column(
           children: [
@@ -702,9 +734,22 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
               child: Slider(
                 min: 0,
                 max: maxMs,
-                value: value,
-                onChanged: (v) =>
-                    player.seek(Duration(milliseconds: v.round())),
+                value: value.clamp(0.0, maxMs),
+                // Seek ONCE, on release. This used to call seek() on every
+                // drag update, firing a storm of seeks at the audio backend
+                // and stuttering playback while scrubbing.
+                onChanged: hasDuration
+                    ? (v) => setState(() => _dragMs = v)
+                    : null,
+                onChangeStart: hasDuration
+                    ? (v) => setState(() => _dragMs = v)
+                    : null,
+                onChangeEnd: hasDuration
+                    ? (v) {
+                        player.seek(Duration(milliseconds: v.round()));
+                        setState(() => _dragMs = null);
+                      }
+                    : null,
               ),
             ),
             Padding(
@@ -713,7 +758,10 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    _fmt(pos),
+                    // Show where the finger is while scrubbing.
+                    _fmt(_dragMs != null
+                        ? Duration(milliseconds: _dragMs!.round())
+                        : pos),
                     style: TextStyle(
                       color: context.textDim,
                       fontSize: 11,
@@ -739,9 +787,13 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
 
   String _fmt(Duration d) {
     if (d.isNegative || d == Duration.zero) return '0:00';
-    final m = d.inMinutes;
+    final h = d.inHours;
+    final m = d.inMinutes % 60;
     final s = d.inSeconds % 60;
-    return '$m:${s.toString().padLeft(2, '0')}';
+    final ss = s.toString().padLeft(2, '0');
+    // Without the hours branch a 65-minute track rendered as "65:03".
+    if (h > 0) return '$h:${m.toString().padLeft(2, '0')}:$ss';
+    return '$m:$ss';
   }
 
   Widget _buildTransport(BuildContext context, MusicPlayerService player) {

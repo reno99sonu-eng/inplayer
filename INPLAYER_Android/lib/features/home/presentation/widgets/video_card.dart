@@ -14,7 +14,6 @@ import '../../../../core/utils/playback_settings_store.dart';
 import '../../../../core/utils/video_preview_gate.dart';
 import '../../../../core/widgets/user_avatar.dart';
 import '../../../../models/video.dart';
-import '../../../../services/video_interaction_service.dart';
 import '../../../watch/presentation/widgets/video_options_sheet.dart';
 
 class VideoCard extends ConsumerStatefulWidget {
@@ -40,25 +39,25 @@ class VideoCard extends ConsumerStatefulWidget {
 }
 
 class _VideoCardState extends ConsumerState<VideoCard> {
-  String? _feedback;
-  bool _feedbackBusy = false;
-
   // Video preview player
   VideoPlayerController? _previewController;
   Timer? _hoverTimer;
   Timer? _visibilityTimer;
   bool _isPlayingPreview = false;
+  bool _isFirstFrameRendered = false;
   bool _dataSaver = false;
+  /// Guards against re-entrant _startStreamingPreview calls that would
+  /// otherwise tear down a perfectly good controller mid-init and flash.
+  bool _isStartingPreview = false;
 
   @override
   void initState() {
     super.initState();
-    _feedback = widget.initialFeedback;
     VideoPreviewGate.instance.activeCardId.addListener(_onActivePreviewChanged);
     _checkDataSaver();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
-      _visibilityTimer = Timer.periodic(const Duration(milliseconds: 400), (_) {
+      _visibilityTimer = Timer.periodic(const Duration(milliseconds: 2000), (_) {
         _checkViewportVisibility();
       });
     });
@@ -74,9 +73,9 @@ class _VideoCardState extends ConsumerState<VideoCard> {
   void _onActivePreviewChanged() {
     final activeId = VideoPreviewGate.instance.activeCardId.value;
     final isMe = activeId == widget.video.videoId && widget.video.videoId.isNotEmpty;
-    if (isMe && !_isPlayingPreview) {
+    if (isMe && !_isPlayingPreview && !_isStartingPreview) {
       _startStreamingPreview();
-    } else if (!isMe && _isPlayingPreview) {
+    } else if (!isMe && (_isPlayingPreview || _isStartingPreview)) {
       _stopStreamingPreview();
     }
   }
@@ -85,7 +84,6 @@ class _VideoCardState extends ConsumerState<VideoCard> {
   void didUpdateWidget(covariant VideoCard oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.video.videoId != widget.video.videoId) {
-      _feedback = widget.initialFeedback;
       _stopStreamingPreview();
     }
   }
@@ -96,7 +94,11 @@ class _VideoCardState extends ConsumerState<VideoCard> {
     VideoPreviewGate.instance.releaseActivePreview(widget.video.videoId);
     _hoverTimer?.cancel();
     _visibilityTimer?.cancel();
-    _previewController?.dispose();
+    if (_previewController != null) {
+      final c = _previewController;
+      _previewController = null;
+      c?.dispose();
+    }
     super.dispose();
   }
 
@@ -151,8 +153,11 @@ class _VideoCardState extends ConsumerState<VideoCard> {
     final muxId = widget.video.muxPlaybackId;
     if (muxId == null || muxId.isEmpty || _dataSaver) return;
 
-    _previewController?.dispose();
-    // Low resolution (360p or 480p) muted HLS stream matching Mux preview
+    // If already playing or starting, don't tear down and restart.
+    if (_isPlayingPreview || _isStartingPreview) return;
+    _isStartingPreview = true;
+
+    // Low resolution (360p) muted HLS stream matching Mux preview
     final url = 'https://stream.mux.com/$muxId.m3u8?max_resolution=360p';
     final controller = VideoPlayerController.networkUrl(
       Uri.parse(url),
@@ -163,22 +168,73 @@ class _VideoCardState extends ConsumerState<VideoCard> {
       await controller.initialize();
       await controller.setVolume(0.0); // Always muted on feed cards
       await controller.setLooping(true);
+
+      // `video_player`'s ExoPlayer backend on Android can report a playing
+      // position past zero slightly before the first decoded frame has
+      // actually reached the platform texture — there's no public "first
+      // frame rendered" callback to wait on instead, only position/state.
+      // Without this, the latch below flips a beat before there's really a
+      // picture behind it, and the thumbnail-to-preview swap shows a brief
+      // black flash. Forcing one real decode+paint via a 1ms seek, before
+      // play() and before the listener below is even attached, closes that
+      // gap — same fix Round 29 applied to the watch page and Raftaar.
+      // Harmless if it fails.
+      try {
+        await controller.seekTo(const Duration(milliseconds: 1));
+      } catch (_) {}
+      // The seekTo Future above resolves when ExoPlayer reports the seek
+      // itself complete — not when the decoded frame has actually made it
+      // through to the platform Surface/texture Flutter reads from. That
+      // hand-off is a separate, unsynchronized step, and on some devices it
+      // lags behind the seek-complete callback by more than one frame,
+      // which is why the pre-warm alone still let a flash through on some
+      // hardware even though it closed the gap on others. A short,
+      // deliberate wall-clock wait here is a floor that doesn't depend on
+      // what the plugin's Future actually promises, on top of (not instead
+      // of) the seek above.
+      await Future.delayed(const Duration(milliseconds: 100));
+
       if (!mounted || VideoPreviewGate.instance.activeCardId.value != widget.video.videoId) {
         await controller.dispose();
+        _isStartingPreview = false;
         return;
       }
+
+      // One-way latch: once the first frame is rendered, it stays rendered
+      // for the lifetime of this controller. No resets, no flashing.
+      controller.addListener(() {
+        if (!mounted) return;
+        if (!_isFirstFrameRendered &&
+            controller.value.isPlaying &&
+            controller.value.position > Duration.zero &&
+            controller.value.size.width > 0 &&
+            controller.value.size.height > 0) {
+          setState(() {
+            _isFirstFrameRendered = true;
+          });
+        }
+      });
+
       await controller.play();
+      if (!mounted) {
+        await controller.dispose();
+        _isStartingPreview = false;
+        return;
+      }
       setState(() {
         _previewController = controller;
         _isPlayingPreview = true;
+        _isStartingPreview = false;
       });
     } catch (_) {
       // Network error or unsupported video - thumbnail remains smoothly visible
       await controller.dispose();
+      _isStartingPreview = false;
       if (mounted) {
         setState(() {
           _previewController = null;
           _isPlayingPreview = false;
+          _isFirstFrameRendered = false;
         });
       }
     }
@@ -186,6 +242,7 @@ class _VideoCardState extends ConsumerState<VideoCard> {
 
   void _stopStreamingPreview() {
     _hoverTimer?.cancel();
+    _isStartingPreview = false;
     if (_previewController != null) {
       final controller = _previewController;
       _previewController = null;
@@ -193,26 +250,14 @@ class _VideoCardState extends ConsumerState<VideoCard> {
       controller?.dispose();
     }
     if (mounted) {
-      setState(() => _isPlayingPreview = false);
+      setState(() {
+        _isPlayingPreview = false;
+        _isFirstFrameRendered = false;
+      });
     }
   }
 
   Video get video => widget.video;
-
-  Future<void> _toggleFeedback(String value) async {
-    if (_feedbackBusy || video.videoId.isEmpty) return;
-    final previous = _feedback;
-    setState(() {
-      _feedback = _feedback == value ? null : value;
-      _feedbackBusy = true;
-    });
-    final result = await ref.read(videoInteractionServiceProvider).submitFeedback(video.videoId, value);
-    if (!mounted) return;
-    setState(() {
-      _feedback = result.ok ? result.feedback : previous;
-      _feedbackBusy = false;
-    });
-  }
 
   bool _isDataImage(String value) {
     return value.trim().toLowerCase().startsWith('data:image/');
@@ -260,21 +305,10 @@ class _VideoCardState extends ConsumerState<VideoCard> {
         fit: BoxFit.cover,
         width: double.infinity,
         height: double.infinity,
-        fadeInDuration: const Duration(milliseconds: 150),
+        fadeInDuration: Duration.zero,
+        fadeOutDuration: Duration.zero,
         placeholder: (context, url) => Container(
           color: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-          child: const Center(
-            child: SizedBox(
-              width: 22,
-              height: 22,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                valueColor: AlwaysStoppedAnimation<Color>(
-                  AppColors.brandOrange,
-                ),
-              ),
-            ),
-          ),
         ),
         errorWidget: (context, url, error) {
           return _thumbnailFallback(context);
@@ -314,22 +348,38 @@ class _VideoCardState extends ConsumerState<VideoCard> {
               children: [
                 _buildThumbnail(context),
 
+                // Faded in rather than popped in, same as the watch page and
+                // Raftaar — masks any residual sub-frame gap the seekTo
+                // pre-warm above doesn't fully close, instead of it flashing
+                // in at full strength.
                 if (_isPlayingPreview &&
                     _previewController != null &&
-                    _previewController!.value.isInitialized)
+                    _previewController!.value.isInitialized &&
+                    _isFirstFrameRendered)
                   Positioned.fill(
-                    child: FittedBox(
-                      fit: BoxFit.cover,
-                      clipBehavior: Clip.hardEdge,
-                      child: SizedBox(
-                        width: _previewController!.value.size.width,
-                        height: _previewController!.value.size.height,
-                        child: VideoPlayer(_previewController!),
+                    child: TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 0.0, end: 1.0),
+                      duration: const Duration(milliseconds: 260),
+                      curve: Curves.easeOut,
+                      builder: (context, opacity, child) =>
+                          Opacity(opacity: opacity, child: child),
+                      child: FittedBox(
+                        fit: BoxFit.cover,
+                        clipBehavior: Clip.hardEdge,
+                        child: SizedBox(
+                          width: _previewController!.value.size.width > 0
+                              ? _previewController!.value.size.width
+                              : 640,
+                          height: _previewController!.value.size.height > 0
+                              ? _previewController!.value.size.height
+                              : 360,
+                          child: VideoPlayer(_previewController!),
+                        ),
                       ),
                     ),
                   ),
 
-                if (video.duration.isNotEmpty && !_isPlayingPreview)
+                if (video.duration.isNotEmpty && !_isFirstFrameRendered)
                   Positioned(
                     right: 8,
                     bottom: 8,
@@ -350,7 +400,7 @@ class _VideoCardState extends ConsumerState<VideoCard> {
                     ),
                   ),
 
-                if (video.videoId.isNotEmpty && !_isPlayingPreview)
+                if (video.videoId.isNotEmpty && !_isFirstFrameRendered)
                   Positioned(
                     top: 8,
                     left: 8,
@@ -372,7 +422,7 @@ class _VideoCardState extends ConsumerState<VideoCard> {
                     ),
                   ),
 
-                if (_isPlayingPreview)
+                if (_isFirstFrameRendered)
                   Positioned(
                     top: 8,
                     right: 8,
@@ -461,17 +511,6 @@ class _VideoCardState extends ConsumerState<VideoCard> {
               ),
           ],
         ),
-        if (!isChannelProfile) ...[
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              const SizedBox(width: 46),
-              _buildFeedbackButton(context, Icons.thumb_up_outlined, Icons.thumb_up_alt, 'Interested', 'interested'),
-              const SizedBox(width: 8),
-              _buildFeedbackButton(context, Icons.thumb_down_outlined, Icons.thumb_down_alt, 'Not Interested', 'not_interested'),
-            ],
-          ),
-        ],
       ],
     );
 
@@ -506,38 +545,13 @@ class _VideoCardState extends ConsumerState<VideoCard> {
               ? null
               : () {
                   _stopStreamingPreview();
-                  context.push('/watch/${video.videoId}');
+                  if (video.isShort) {
+                    context.push('/shorts/${video.videoId}');
+                  } else {
+                    context.push('/watch/${video.videoId}');
+                  }
                 },
           child: decorated,
-        ),
-      ),
-    );
-  }
-
-  Widget _buildFeedbackButton(BuildContext context, IconData outlineIcon, IconData filledIcon, String label, String value) {
-    final active = _feedback == value;
-    return GestureDetector(
-      onTap: video.videoId.isEmpty ? null : () => _toggleFeedback(value),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: active ? AppColors.brandOrange : context.borderSubtle),
-          color: active ? AppColors.brandOrange.withValues(alpha: 0.12) : null,
-        ),
-        child: Row(
-          children: [
-            Icon(active ? filledIcon : outlineIcon, size: 12, color: active ? AppColors.brandOrange : context.textSecondary),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: TextStyle(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: active ? AppColors.brandOrange : context.textSecondary,
-              ),
-            ),
-          ],
         ),
       ),
     );

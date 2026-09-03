@@ -41,16 +41,11 @@ class ShortsCard extends StatelessWidget {
                   child: CachedNetworkImage(
                     imageUrl: short.poster,
                     fit: BoxFit.cover,
+                    useOldImageOnUrlChange: true,
+                    fadeInDuration: Duration.zero,
+                    fadeOutDuration: Duration.zero,
                     placeholder: (context, url) => Container(
                       color: AppColors.surfaceDark,
-                      child: const Center(
-                        child: CircularProgressIndicator(
-                          strokeWidth: 2,
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            AppColors.brandOrange,
-                          ),
-                        ),
-                      ),
                     ),
                     errorWidget: (context, url, error) => Container(
                       color: AppColors.surfaceDark,

@@ -33,6 +33,16 @@
     <!-- Required for Passkey & Fingerprint Biometric App Lock -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
     <uses-permission android:name="android.permission.USE_FINGERPRINT"/>
+
+    <!-- The Amazon IVS broadcast AAR (native Go Live, packages/ivs_broadcast)
+         declares minSdkVersion 28. Waiving that merge here rather than
+         raising the app's own minSdk is deliberate: raising it would stop
+         every existing Android 7 and 8 install from ever updating again.
+         Nothing in the SDK is touched on those devices — IvsBroadcastPlugin
+         gates every call behind Build.VERSION.SDK_INT >= 28 and reports
+         isSupported = false, and GoLivePage then shows the same stream-key /
+         external-encoder flow it showed before. -->
+    <uses-sdk tools:overrideLibrary="com.amazonaws.ivs.broadcast"/>
     <application
         android:label="INPLAYER"
         android:name="${applicationName}"

@@ -84,6 +84,21 @@ class PlayerChrome extends StatefulWidget {
   final double initialBrightness;
   final ValueChanged<double>? onBrightnessChanged;
 
+  /// Swipe-down-to-minimise, YouTube style.
+  ///
+  /// Only wired up OUTSIDE fullscreen. Vertical drags on the player already
+  /// mean brightness (left half) and volume (right half), and a swipe-down
+  /// gesture would fight them for the same pointer. YouTube resolves this
+  /// the same way: brightness/volume are fullscreen gestures, and on the
+  /// normal watch page a downward drag shrinks the video away instead.
+  ///
+  /// [onDragDown] reports the cumulative downward distance in logical
+  /// pixels (never negative); [onDragDownEnd] fires on release with the
+  /// vertical velocity, leaving the parent to decide whether that was a
+  /// commit or a cancel.
+  final ValueChanged<double>? onDragDown;
+  final ValueChanged<double>? onDragDownEnd;
+
   const PlayerChrome({
     super.key,
     required this.controller,
@@ -103,6 +118,8 @@ class PlayerChrome extends StatefulWidget {
     this.onMinimize,
     this.initialBrightness = 1.0,
     this.onBrightnessChanged,
+    this.onDragDown,
+    this.onDragDownEnd,
   });
 
   @override
@@ -118,9 +135,6 @@ bool shouldTogglePlayOnTap(String? side, bool isPlaying) {
 }
 
 class _PlayerChromeState extends State<PlayerChrome> {
-  // Multi-tap seek tuning — matches VideoPlayer.tsx exactly (see its own
-  // comment on TAP_CHAIN_MS for why toggle and seek share one timer/window
-  // instead of each having their own).
   static const _tapChainMs = 400;
   static const _seekStepSeconds = 10;
   static const _verticalDragThresholdPx = 12.0;
@@ -134,18 +148,18 @@ class _PlayerChromeState extends State<PlayerChrome> {
   double _brightness = 1.0;
   double _playbackSpeed = 1.0;
 
-  // Tap-chain state (side taps → play/pause vs. chained seek).
+  // Tap-chain state (side taps -> double tap seek)
   String? _tapSide;
   int _tapCount = 0;
   int _tapLastTimeMs = 0;
   Timer? _tapToggleTimer;
 
-  // Seek flash indicator ("+10s" / "-20s").
+  // Seek flash indicator ("+10s" / "-10s")
   String? _seekFlashSide;
   int _seekFlashSeconds = 0;
   Timer? _seekFlashTimer;
 
-  // Vertical brightness/volume drag.
+  // Vertical brightness/volume drag
   Offset? _dragStart;
   bool _dragging = false;
   String? _dragKind; // 'brightness' | 'volume'
@@ -157,10 +171,9 @@ class _PlayerChromeState extends State<PlayerChrome> {
   @override
   void initState() {
     super.initState();
-    // Seed from the parent so brightness survives entering/leaving
-    // fullscreen (which builds a second, fresh PlayerChrome).
     _brightness = widget.initialBrightness;
     widget.controller.addListener(_onControllerTick);
+    _controlsVisible = true;
     _scheduleAutoHide();
   }
 
@@ -179,15 +192,35 @@ class _PlayerChromeState extends State<PlayerChrome> {
 
   void _scheduleAutoHide() {
     _hideControlsTimer?.cancel();
-    if (!widget.controller.value.isPlaying) return;
-    _hideControlsTimer = Timer(const Duration(seconds: 3), () {
-      if (mounted) setState(() => _controlsVisible = false);
-    });
+    // Only auto-hide when actively playing. If paused, keep controls visible!
+    if (widget.controller.value.isPlaying) {
+      _hideControlsTimer = Timer(const Duration(seconds: 4), () {
+        if (mounted && widget.controller.value.isPlaying) {
+          setState(() => _controlsVisible = false);
+        }
+      });
+    }
   }
 
-  void _showControlsBriefly() {
+  void _showControls() {
+    _hideControlsTimer?.cancel();
     setState(() => _controlsVisible = true);
     _scheduleAutoHide();
+  }
+
+  void _hideControls() {
+    _hideControlsTimer?.cancel();
+    if (widget.controller.value.isPlaying) {
+      setState(() => _controlsVisible = false);
+    }
+  }
+
+  void _toggleControls() {
+    if (_controlsVisible) {
+      _hideControls();
+    } else {
+      _showControls();
+    }
   }
 
   void _togglePlayPause() {
@@ -195,21 +228,39 @@ class _PlayerChromeState extends State<PlayerChrome> {
     final value = c.value;
     if (value.isPlaying) {
       c.pause();
+      _hideControlsTimer?.cancel();
+      setState(() => _controlsVisible = true);
     } else {
-      // A video parked exactly at its end is a dead end for play(): the
-      // platform player is already sitting on the last frame and just stays
-      // there, so the control appears completely dead no matter how many
-      // times it's pressed — one of the ways this player could get "stuck".
-      // Rewinding first is what any real player does with a replay press.
-      // The 200ms tolerance covers streams whose final reported position
-      // lands a few frames short of the declared duration.
       final duration = value.duration;
-      final atEnd = duration > Duration.zero &&
+      final atEnd =
+          duration > Duration.zero &&
           value.position >= duration - const Duration(milliseconds: 200);
       if (atEnd) c.seekTo(Duration.zero);
       c.play();
+      _showControls();
     }
-    _showControlsBriefly();
+  }
+
+  void _seekBy(int seconds) {
+    final c = widget.controller;
+    final duration = c.value.duration;
+    if (duration == Duration.zero) return;
+    final current = c.value.position;
+    var next = current + Duration(seconds: seconds);
+    if (next < Duration.zero) next = Duration.zero;
+    if (next > duration) next = duration;
+    c.seekTo(next);
+
+    final side = seconds < 0 ? 'left' : 'right';
+    _seekFlashTimer?.cancel();
+    setState(() {
+      _seekFlashSide = side;
+      _seekFlashSeconds = seconds.abs();
+    });
+    _seekFlashTimer = Timer(const Duration(milliseconds: 700), () {
+      if (mounted) setState(() => _seekFlashSide = null);
+    });
+    _showControls();
   }
 
   void _clearToggleTimer() {
@@ -242,14 +293,15 @@ class _PlayerChromeState extends State<PlayerChrome> {
 
   void _handleTapUp(TapUpDetails details, Size size) {
     final dx = details.localPosition.dx;
-    final side = dx < size.width * 0.4
+    final side = dx < size.width * 0.35
         ? 'left'
-        : dx > size.width * 0.6
-            ? 'right'
-            : null;
+        : dx > size.width * 0.65
+        ? 'right'
+        : null;
 
     final now = DateTime.now().millisecondsSinceEpoch;
 
+    // Double-tap or chained tap on left/right for seek
     if (side != null &&
         _tapSide == side &&
         now - _tapLastTimeMs < _tapChainMs &&
@@ -266,42 +318,39 @@ class _PlayerChromeState extends State<PlayerChrome> {
     _tapLastTimeMs = now;
     _clearToggleTimer();
 
-    // Centre zone, OR a video that isn't currently playing: respond now.
-    //
-    // The 400ms wait further down exists so that a quick second tap on the
-    // same side can upgrade itself into a seek rather than a play/pause.
-    // That trade is only worth making while the video is actually playing.
-    // On a paused video the delay is actively harmful: the first tap looks
-    // like it did nothing, so people tap again — and because the chain
-    // check above runs first, that second tap is read as a seek, which
-    // cancels the pending toggle and scrubs instead of starting playback.
-    // Tap again and the same thing happens. The video then never starts no
-    // matter how many times it's tapped, which is exactly the "clicked the
-    // player and it's stuck, won't play or pause" report this fixes.
-    //
-    // Nothing is lost by answering instantly here: the tap-state fields are
-    // already updated above, so a genuine rapid double tap still chains
-    // into a seek on the next tap — it just gets playback going first
-    // instead of leaving the viewer staring at a frozen frame.
-    if (shouldTogglePlayOnTap(side, widget.controller.value.isPlaying)) {
-      _togglePlayPause();
+    // If controls are hidden, tapping reveals them
+    if (!_controlsVisible) {
+      _showControls();
       return;
     }
 
-    // Might become a chained seek — wait the same window before committing
-    // to a play/pause toggle (see TAP_CHAIN_MS comment on the website).
-    _tapToggleTimer = Timer(const Duration(milliseconds: _tapChainMs), () {
-      _tapToggleTimer = null;
-      _togglePlayPause();
-    });
-    _showControlsBriefly();
+    // If controls are visible, toggle them off
+    if (side != null) {
+      _tapToggleTimer = Timer(const Duration(milliseconds: _tapChainMs), () {
+        _tapToggleTimer = null;
+        _toggleControls();
+      });
+    } else {
+      _toggleControls();
+    }
   }
 
+  /// True when this drag should shrink the player away rather than change
+  /// brightness/volume — see the note on [PlayerChrome.onDragDown].
+  bool get _dragMinimizes =>
+      !widget.isFullscreen && widget.onDragDown != null;
+
   void _handleVerticalDragStart(DragStartDetails details, Size size) {
-    if (details.localPosition.dy > size.height - 64) return; // control-bar strip
+    if (details.localPosition.dy > size.height - 64) return;
     _dragStart = details.localPosition;
     _dragging = false;
-    _dragKind = details.localPosition.dx < size.width / 2 ? 'brightness' : 'volume';
+    if (_dragMinimizes) {
+      _dragKind = 'minimize';
+      return;
+    }
+    _dragKind = details.localPosition.dx < size.width / 2
+        ? 'brightness'
+        : 'volume';
     _dragStartBrightness = _brightness;
     _dragStartVolume = widget.controller.value.volume;
   }
@@ -319,19 +368,26 @@ class _PlayerChromeState extends State<PlayerChrome> {
       _tapCount = 0;
     }
 
+    if (_dragKind == 'minimize') {
+      // deltaY is positive upward, so a downward swipe is negative.
+      final down = -deltaY;
+      widget.onDragDown?.call(down > 0 ? down : 0);
+      return;
+    }
+
     final ratio = deltaY / size.height;
 
     if (_dragKind == 'brightness') {
       const range = _brightnessMax - _brightnessMin;
-      final next = (_dragStartBrightness + ratio * range).clamp(_brightnessMin, _brightnessMax);
+      final next = (_dragStartBrightness + ratio * range).clamp(
+        _brightnessMin,
+        _brightnessMax,
+      );
       setState(() {
         _brightness = next;
         _dragIndicatorKind = 'brightness';
         _dragIndicatorPercent = (next - _brightnessMin) / range;
       });
-      // Hand it to whoever owns the actual video pixels — see the doc on
-      // onBrightnessChanged. Without this the swipe moves the indicator and
-      // nothing else, which is precisely how it was behaving.
       widget.onBrightnessChanged?.call(next);
     } else {
       final next = (_dragStartVolume + ratio).clamp(0.0, 1.0);
@@ -344,6 +400,9 @@ class _PlayerChromeState extends State<PlayerChrome> {
   }
 
   void _handleVerticalDragEnd(DragEndDetails details) {
+    if (_dragKind == 'minimize') {
+      widget.onDragDownEnd?.call(details.velocity.pixelsPerSecond.dy);
+    }
     _dragStart = null;
     _dragging = false;
     _dragKind = null;
@@ -354,11 +413,13 @@ class _PlayerChromeState extends State<PlayerChrome> {
   }
 
   void _showSpeedMenu() {
-    _showControlsBriefly();
+    _showControls();
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF0B1020),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (ctx) {
         return SafeArea(
           child: Column(
@@ -366,18 +427,30 @@ class _PlayerChromeState extends State<PlayerChrome> {
             children: [
               const Padding(
                 padding: EdgeInsets.all(16),
-                child: Text('Playback speed', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                child: Text(
+                  'Playback speed',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ),
               for (final speed in _speedOptions)
                 ListTile(
                   title: Text(
                     speed == 1.0 ? 'Normal' : '${_speedLabel(speed)}x',
                     style: TextStyle(
-                      color: speed == _playbackSpeed ? AppColors.brandOrange : Colors.white,
-                      fontWeight: speed == _playbackSpeed ? FontWeight.w800 : FontWeight.w500,
+                      color: speed == _playbackSpeed
+                          ? AppColors.brandOrange
+                          : Colors.white,
+                      fontWeight: speed == _playbackSpeed
+                          ? FontWeight.w800
+                          : FontWeight.w500,
                     ),
                   ),
-                  trailing: speed == _playbackSpeed ? const Icon(Icons.check, color: AppColors.brandOrange) : null,
+                  trailing: speed == _playbackSpeed
+                      ? const Icon(Icons.check, color: AppColors.brandOrange)
+                      : null,
                   onTap: () {
                     widget.controller.setPlaybackSpeed(speed);
                     setState(() => _playbackSpeed = speed);
@@ -393,11 +466,13 @@ class _PlayerChromeState extends State<PlayerChrome> {
   }
 
   void _showQualityMenu() {
-    _showControlsBriefly();
+    _showControls();
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF0B1020),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (ctx) {
         return SafeArea(
           child: Column(
@@ -405,18 +480,30 @@ class _PlayerChromeState extends State<PlayerChrome> {
             children: [
               const Padding(
                 padding: EdgeInsets.all(16),
-                child: Text('Quality', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                child: Text(
+                  'Quality',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ),
               for (final option in widget.qualityOptions)
                 ListTile(
                   title: Text(
                     option.label,
                     style: TextStyle(
-                      color: option.label == widget.qualityLabel ? AppColors.brandOrange : Colors.white,
-                      fontWeight: option.label == widget.qualityLabel ? FontWeight.w800 : FontWeight.w500,
+                      color: option.label == widget.qualityLabel
+                          ? AppColors.brandOrange
+                          : Colors.white,
+                      fontWeight: option.label == widget.qualityLabel
+                          ? FontWeight.w800
+                          : FontWeight.w500,
                     ),
                   ),
-                  trailing: option.label == widget.qualityLabel ? const Icon(Icons.check, color: AppColors.brandOrange) : null,
+                  trailing: option.label == widget.qualityLabel
+                      ? const Icon(Icons.check, color: AppColors.brandOrange)
+                      : null,
                   onTap: () {
                     Navigator.of(ctx).pop();
                     widget.onQualityChange(option.label);
@@ -431,11 +518,13 @@ class _PlayerChromeState extends State<PlayerChrome> {
   }
 
   void _showCaptionsMenu() {
-    _showControlsBriefly();
+    _showControls();
     showModalBottomSheet(
       context: context,
       backgroundColor: const Color(0xFF0B1020),
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (ctx) {
         return SafeArea(
           child: Column(
@@ -443,14 +532,24 @@ class _PlayerChromeState extends State<PlayerChrome> {
             children: [
               const Padding(
                 padding: EdgeInsets.all(16),
-                child: Text('Captions', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w800)),
+                child: Text(
+                  'Captions',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
               ),
               ListTile(
                 title: Text(
                   'Off',
                   style: TextStyle(
-                    color: widget.selectedCaptionLang == null ? AppColors.brandOrange : Colors.white,
-                    fontWeight: widget.selectedCaptionLang == null ? FontWeight.w800 : FontWeight.w500,
+                    color: widget.selectedCaptionLang == null
+                        ? AppColors.brandOrange
+                        : Colors.white,
+                    fontWeight: widget.selectedCaptionLang == null
+                        ? FontWeight.w800
+                        : FontWeight.w500,
                   ),
                 ),
                 trailing: widget.selectedCaptionLang == null
@@ -466,8 +565,12 @@ class _PlayerChromeState extends State<PlayerChrome> {
                   title: Text(
                     lang.label,
                     style: TextStyle(
-                      color: widget.selectedCaptionLang == lang.code ? AppColors.brandOrange : Colors.white,
-                      fontWeight: widget.selectedCaptionLang == lang.code ? FontWeight.w800 : FontWeight.w500,
+                      color: widget.selectedCaptionLang == lang.code
+                          ? AppColors.brandOrange
+                          : Colors.white,
+                      fontWeight: widget.selectedCaptionLang == lang.code
+                          ? FontWeight.w800
+                          : FontWeight.w500,
                     ),
                   ),
                   trailing: widget.selectedCaptionLang == lang.code
@@ -486,26 +589,25 @@ class _PlayerChromeState extends State<PlayerChrome> {
     );
   }
 
-  // The cue active at the controller's current position, or null. Recomputed
-  // on every build (which already happens on every controller tick via
-  // _onControllerTick), so captions stay in sync without a second timer.
   CaptionCue? _currentCaption() {
-    if (widget.selectedCaptionLang == null || widget.captionCues.isEmpty) return null;
-    return WebVttParser.cueAt(widget.captionCues, widget.controller.value.position);
+    if (widget.selectedCaptionLang == null || widget.captionCues.isEmpty) {
+      return null;
+    }
+    return WebVttParser.cueAt(
+      widget.captionCues,
+      widget.controller.value.position,
+    );
   }
 
-  // "1080p (Full HD)" -> "1080p", "Auto" -> "Auto" — the persistent bottom
-  // bar has room for a short chip, not the full descriptive label the
-  // Settings-style menu items use.
   String _qualityChipLabel(String label) {
     final parenIndex = label.indexOf('(');
     return parenIndex == -1 ? label : label.substring(0, parenIndex).trim();
   }
 
-  // "2.0" -> "2", "1.75" -> "1.75" — drops a pointless trailing ".0" for
-  // whole-number speeds without truncating real fractional ones.
   String _speedLabel(double speed) {
-    return speed == speed.roundToDouble() ? speed.toStringAsFixed(0) : speed.toString();
+    return speed == speed.roundToDouble()
+        ? speed.toStringAsFixed(0)
+        : speed.toString();
   }
 
   String _fmt(Duration d) {
@@ -524,7 +626,10 @@ class _PlayerChromeState extends State<PlayerChrome> {
     final duration = value.duration;
     if (duration == Duration.zero || value.buffered.isEmpty) return 0;
     final bufferedEnd = value.buffered.last.end;
-    return (bufferedEnd.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0);
+    return (bufferedEnd.inMilliseconds / duration.inMilliseconds).clamp(
+      0.0,
+      1.0,
+    );
   }
 
   @override
@@ -539,20 +644,6 @@ class _PlayerChromeState extends State<PlayerChrome> {
     return LayoutBuilder(
       builder: (context, constraints) {
         final size = Size(constraints.maxWidth, constraints.maxHeight);
-        // NOTE: the brightness ColorFilter deliberately does NOT live here.
-        //
-        // It used to wrap this whole subtree, which looked right but could
-        // never have worked: PlayerChrome is stacked ON TOP of the video in
-        // both watch_page.dart and fullscreen_player_page.dart, so a filter
-        // applied here only ever tinted the chrome's own icons and scrims —
-        // the picture underneath was untouched. Dragging on the left half
-        // moved the indicator and changed nothing else.
-        //
-        // The filter now lives on the media surface itself (see
-        // _WatchPageState._buildMediaSurface), driven by the
-        // onBrightnessChanged callback below. Because FullscreenPlayerPage
-        // renders that same _buildMediaSurface, fullscreen picks it up for
-        // free rather than needing its own copy.
         return GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTapUp: (d) => _handleTapUp(d, size),
@@ -560,98 +651,134 @@ class _PlayerChromeState extends State<PlayerChrome> {
           onVerticalDragUpdate: (d) => _handleVerticalDragUpdate(d, size),
           onVerticalDragEnd: _handleVerticalDragEnd,
           child: Stack(
-              alignment: Alignment.center,
-              fit: StackFit.expand,
-              children: [
-                // Seek flash ("+10s" / "-20s")
-                if (_seekFlashSide != null)
-                  Align(
-                    alignment: _seekFlashSide == 'left' ? Alignment.centerLeft : Alignment.centerRight,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 28),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.55),
-                          borderRadius: BorderRadius.circular(40),
+            alignment: Alignment.center,
+            fit: StackFit.expand,
+            children: [
+              // Seek flash ("+10s" / "-10s")
+              if (_seekFlashSide != null)
+                Align(
+                  alignment: _seekFlashSide == 'left'
+                      ? Alignment.centerLeft
+                      : Alignment.centerRight,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 28),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 10,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.7),
+                        borderRadius: BorderRadius.circular(40),
+                        border: Border.all(
+                          color: AppColors.brandOrange.withValues(alpha: 0.6),
+                          width: 1.5,
                         ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              _seekFlashSide == 'left' ? Icons.fast_rewind_rounded : Icons.fast_forward_rounded,
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _seekFlashSide == 'left'
+                                ? Icons.fast_rewind_rounded
+                                : Icons.fast_forward_rounded,
+                            color: AppColors.brandOrange,
+                            size: 20,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            '${_seekFlashSeconds}s',
+                            style: const TextStyle(
                               color: Colors.white,
-                              size: 18,
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14,
                             ),
-                            const SizedBox(width: 6),
-                            Text('${_seekFlashSeconds}s', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 13)),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
+                ),
 
-                // Brightness/volume drag indicator
-                if (_dragIndicatorKind != null && _dragIndicatorPercent != null)
-                  Align(
-                    alignment: _dragIndicatorKind == 'brightness' ? Alignment.centerLeft : Alignment.centerRight,
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 28),
-                      child: Container(
-                        width: 40,
-                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.55),
-                          borderRadius: BorderRadius.circular(20),
+              // Brightness/volume drag indicator
+              if (_dragIndicatorKind != null && _dragIndicatorPercent != null)
+                Align(
+                  alignment: _dragIndicatorKind == 'brightness'
+                      ? Alignment.centerLeft
+                      : Alignment.centerRight,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 28),
+                    child: Container(
+                      width: 44,
+                      padding: const EdgeInsets.symmetric(
+                        vertical: 12,
+                        horizontal: 8,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.75),
+                        borderRadius: BorderRadius.circular(22),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.2),
                         ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              _dragIndicatorKind == 'brightness'
-                                  ? Icons.brightness_6_rounded
-                                  : (_dragIndicatorPercent! <= 0 ? Icons.volume_off_rounded : Icons.volume_up_rounded),
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                            const SizedBox(height: 6),
-                            SizedBox(
-                              height: 60,
-                              width: 4,
-                              child: Stack(
-                                alignment: Alignment.bottomCenter,
-                                children: [
-                                  Container(color: Colors.white.withValues(alpha: 0.25)),
-                                  FractionallySizedBox(
-                                    heightFactor: _dragIndicatorPercent!.clamp(0.0, 1.0),
-                                    child: Container(color: AppColors.brandOrange),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _dragIndicatorKind == 'brightness'
+                                ? Icons.brightness_6_rounded
+                                : (_dragIndicatorPercent! <= 0
+                                      ? Icons.volume_off_rounded
+                                      : Icons.volume_up_rounded),
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            height: 64,
+                            width: 4,
+                            child: Stack(
+                              alignment: Alignment.bottomCenter,
+                              children: [
+                                Container(
+                                  color: Colors.white.withValues(alpha: 0.25),
+                                ),
+                                FractionallySizedBox(
+                                  heightFactor: _dragIndicatorPercent!.clamp(
+                                    0.0,
+                                    1.0,
                                   ),
-                                ],
-                              ),
+                                  child: Container(
+                                    color: AppColors.brandOrange,
+                                  ),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
+                ),
 
-                // Live caption cue — rendered regardless of chrome
-                // visibility (real captions don't fade with the controls),
-                // just shifted down to hug the bottom edge when the bar
-                // that would otherwise sit under it is hidden.
-                Builder(builder: (context) {
+              // Live caption cue
+              Builder(
+                builder: (context) {
                   final cue = _currentCaption();
                   if (cue == null) return const SizedBox.shrink();
                   return Positioned(
                     left: 24,
                     right: 24,
-                    bottom: _controlsVisible ? 74 : 20,
+                    bottom: _controlsVisible ? 84 : 20,
                     child: IgnorePointer(
                       child: Center(
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.72),
+                            color: Colors.black.withValues(alpha: 0.8),
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(
@@ -668,263 +795,432 @@ class _PlayerChromeState extends State<PlayerChrome> {
                       ),
                     ),
                   );
-                }),
+                },
+              ),
 
-                // Buffering spinner. `value.isPlaying` reflects INTENT
-                // (play() was called and pause() wasn't) — not whether
-                // frames are actually advancing. With no signal at all for
-                // an in-progress stall, playback could freeze dead
-                // mid-video with nothing on screen to explain why, reading
-                // as the app hanging rather than the network catching up.
-                // Shown regardless of _controlsVisible (same reasoning as
-                // the caption cue above) since controls have usually
-                // already auto-hidden by the time a real stall happens.
-                if (value.isPlaying && value.isBuffering)
-                  const IgnorePointer(
-                    child: Center(
-                      child: SizedBox(
-                        width: 42,
-                        height: 42,
-                        child: CircularProgressIndicator(
-                          strokeWidth: 3,
-                          color: AppColors.brandOrange,
-                        ),
+              // Buffering spinner
+              if (value.isPlaying && value.isBuffering)
+                const IgnorePointer(
+                  child: Center(
+                    child: SizedBox(
+                      width: 44,
+                      height: 44,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 3,
+                        color: AppColors.brandOrange,
                       ),
                     ),
                   ),
+                ),
 
-                if (_controlsVisible) ...[
-                  // Top gradient / back / title
-                  Positioned(
-                    top: 0, left: 0, right: 0,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [Color(0xCC000000), Colors.transparent],
-                        ),
+              // Interactive Player Controls Overlay with Smooth Fade
+              AnimatedOpacity(
+                opacity: _controlsVisible ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 250),
+                curve: Curves.easeInOut,
+                child: IgnorePointer(
+                  ignoring: !_controlsVisible,
+                  child: Stack(
+                    alignment: Alignment.center,
+                    fit: StackFit.expand,
+                    children: [
+                      // Dark scrim background for contrast
+                      Container(
+                        color: Colors.black.withValues(alpha: 0.4),
                       ),
-                      child: Row(
-                        children: [
-                          if (widget.onBack != null)
-                            GestureDetector(
-                              onTap: widget.onBack,
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.2),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: Icon(
-                                  widget.isFullscreen ? Icons.arrow_back_rounded : Icons.arrow_back_ios_new,
-                                  color: Colors.white,
-                                  size: 14,
-                                ),
-                              ),
-                            ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              widget.title.toUpperCase(),
-                              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+
+                      // TOP BAR: Back + Title + Minimize
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [Color(0xCC000000), Colors.transparent],
                             ),
                           ),
-                          if (widget.onMinimize != null) ...[
-                            const SizedBox(width: 8),
+                          child: Row(
+                            children: [
+                              if (widget.onBack != null)
+                                GestureDetector(
+                                  onTap: widget.onBack,
+                                  behavior: HitTestBehavior.opaque,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withValues(alpha: 0.4),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: Icon(
+                                      widget.isFullscreen
+                                          ? Icons.arrow_back_rounded
+                                          : Icons.arrow_back_ios_new,
+                                      color: Colors.white,
+                                      size: 16,
+                                    ),
+                                  ),
+                                ),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(
+                                  widget.title,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 14,
+                                    shadows: [
+                                      Shadow(
+                                        color: Colors.black87,
+                                        blurRadius: 4,
+                                      ),
+                                    ],
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              if (widget.onMinimize != null) ...[
+                                const SizedBox(width: 8),
+                                GestureDetector(
+                                  onTap: widget.onMinimize,
+                                  behavior: HitTestBehavior.opaque,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(6),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black.withValues(alpha: 0.4),
+                                      shape: BoxShape.circle,
+                                    ),
+                                    child: const Icon(
+                                      Icons.keyboard_arrow_down_rounded,
+                                      color: Colors.white,
+                                      size: 20,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ),
+
+                      // CENTER CONTROLS: Rewind 10s + Play/Pause + Forward 10s
+                      Center(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            // Rewind 10s
                             GestureDetector(
-                              onTap: widget.onMinimize,
+                              onTap: () => _seekBy(-10),
+                              behavior: HitTestBehavior.opaque,
                               child: Container(
-                                padding: const EdgeInsets.all(4),
+                                padding: const EdgeInsets.all(10),
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.2),
+                                  color: Colors.black.withValues(alpha: 0.5),
                                   shape: BoxShape.circle,
                                 ),
                                 child: const Icon(
-                                  Icons.keyboard_arrow_down_rounded,
+                                  Icons.replay_10_rounded,
                                   color: Colors.white,
-                                  size: 18,
+                                  size: 32,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 24),
+                            // Big Center Play/Pause
+                            GestureDetector(
+                              onTap: _togglePlayPause,
+                              behavior: HitTestBehavior.opaque,
+                              child: Container(
+                                padding: const EdgeInsets.all(16),
+                                decoration: BoxDecoration(
+                                  color: AppColors.brandOrange.withValues(alpha: 0.9),
+                                  shape: BoxShape.circle,
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: AppColors.brandOrange.withValues(alpha: 0.4),
+                                      blurRadius: 16,
+                                      spreadRadius: 2,
+                                    ),
+                                  ],
+                                ),
+                                child: Icon(
+                                  value.isPlaying
+                                      ? Icons.pause_rounded
+                                      : Icons.play_arrow_rounded,
+                                  color: Colors.white,
+                                  size: 40,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 24),
+                            // Forward 10s
+                            GestureDetector(
+                              onTap: () => _seekBy(10),
+                              behavior: HitTestBehavior.opaque,
+                              child: Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.5),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(
+                                  Icons.forward_10_rounded,
+                                  color: Colors.white,
+                                  size: 32,
                                 ),
                               ),
                             ),
                           ],
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // Center play/pause
-                  if (!value.isPlaying)
-                    IgnorePointer(
-                      child: Container(
-                        padding: const EdgeInsets.all(14),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.5),
-                          shape: BoxShape.circle,
-                        ),
-                        child: const Icon(Icons.play_arrow_rounded, color: Colors.white, size: 44),
-                      ),
-                    ),
-
-                  // Bottom control bar
-                  Positioned(
-                    bottom: 0, left: 0, right: 0,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.bottomCenter,
-                          end: Alignment.topCenter,
-                          colors: [Color(0xCC000000), Colors.transparent],
                         ),
                       ),
-                      // FittedBox(scaleDown) as a defensive safety margin
-                      // for the reported bottom-overflow on some
-                      // devices/content — scale factor stays 1.0 (no visual
-                      // change) whenever this bar already fits, and only
-                      // shrinks proportionally, never clips, on the rare
-                      // combination of a very short video area and a long
-                      // quality/speed label that would otherwise overflow.
-                      child: FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          // Scrubber with buffered range
-                          SizedBox(
-                            height: 20,
-                            child: Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                Container(
-                                  height: 3,
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.25),
-                                    borderRadius: BorderRadius.circular(2),
-                                  ),
-                                ),
-                                FractionallySizedBox(
-                                  alignment: Alignment.centerLeft,
-                                  widthFactor: _bufferedFraction(),
-                                  child: Container(
-                                    height: 3,
-                                    decoration: BoxDecoration(
-                                      color: Colors.white.withValues(alpha: 0.45),
-                                      borderRadius: BorderRadius.circular(2),
-                                    ),
-                                  ),
-                                ),
-                                SliderTheme(
-                                  data: SliderThemeData(
-                                    trackHeight: 3,
-                                    trackShape: const _TransparentTrackShape(),
-                                    thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
-                                    overlayShape: const RoundSliderOverlayShape(overlayRadius: 12),
-                                    activeTrackColor: AppColors.brandOrange,
-                                    inactiveTrackColor: Colors.transparent,
-                                    thumbColor: Colors.white,
-                                  ),
-                                  child: Slider(
-                                    value: progress,
-                                    onChanged: duration == Duration.zero
-                                        ? null
-                                        : (v) {
-                                            _showControlsBriefly();
-                                            widget.controller.seekTo(Duration(milliseconds: (v * duration.inMilliseconds).round()));
-                                          },
-                                    onChangeEnd: (_) => _scheduleAutoHide(),
-                                  ),
-                                ),
+
+                      // BOTTOM BAR: Scrubber + Controls Row
+                      Positioned(
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        child: Container(
+                          padding: const EdgeInsets.fromLTRB(12, 16, 12, 8),
+                          decoration: const BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.bottomCenter,
+                              end: Alignment.topCenter,
+                              colors: [
+                                Color(0xEE000000),
+                                Color(0x88000000),
+                                Colors.transparent,
                               ],
                             ),
                           ),
-                          Row(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
                             children: [
-                              GestureDetector(
-                                onTap: _togglePlayPause,
-                                child: Icon(value.isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded, color: Colors.white, size: 22),
+                              // 1. Scrubber / Slider with Buffered Range
+                              SizedBox(
+                                height: 22,
+                                child: Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    // Inactive track
+                                    Container(
+                                      height: 3,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withValues(alpha: 0.25),
+                                        borderRadius: BorderRadius.circular(2),
+                                      ),
+                                    ),
+                                    // Buffered fraction
+                                    FractionallySizedBox(
+                                      alignment: Alignment.centerLeft,
+                                      widthFactor: _bufferedFraction(),
+                                      child: Container(
+                                        height: 3,
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withValues(
+                                            alpha: 0.45,
+                                          ),
+                                          borderRadius: BorderRadius.circular(2),
+                                        ),
+                                      ),
+                                    ),
+                                    // Active thumb & slider
+                                    SliderTheme(
+                                      data: SliderThemeData(
+                                        trackHeight: 3,
+                                        trackShape: const _TransparentTrackShape(),
+                                        thumbShape: const RoundSliderThumbShape(
+                                          enabledThumbRadius: 6,
+                                        ),
+                                        overlayShape: const RoundSliderOverlayShape(
+                                          overlayRadius: 14,
+                                        ),
+                                        activeTrackColor: AppColors.brandOrange,
+                                        inactiveTrackColor: Colors.transparent,
+                                        thumbColor: Colors.white,
+                                      ),
+                                      child: Slider(
+                                        value: progress,
+                                        onChanged: duration == Duration.zero
+                                            ? null
+                                            : (v) {
+                                                _showControls();
+                                                widget.controller.seekTo(
+                                                  Duration(
+                                                    milliseconds:
+                                                        (v *
+                                                                duration
+                                                                    .inMilliseconds)
+                                                            .round(),
+                                                  ),
+                                                );
+                                              },
+                                        onChangeEnd: (_) => _scheduleAutoHide(),
+                                      ),
+                                    ),
+                                  ],
+                                ),
                               ),
-                              const SizedBox(width: 10),
-                              Text(
-                                '${_fmt(position)} / ${_fmt(duration)}',
-                                style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w700),
-                              ),
-                              const Spacer(),
-                              if (widget.captionLanguages.isNotEmpty) ...[
-                                GestureDetector(
-                                  onTap: _showCaptionsMenu,
-                                  child: Padding(
-                                    padding: const EdgeInsets.symmetric(horizontal: 6),
-                                    child: Icon(
-                                      widget.selectedCaptionLang != null
-                                          ? Icons.closed_caption
-                                          : Icons.closed_caption_outlined,
-                                      color: widget.selectedCaptionLang != null ? AppColors.brandOrange : Colors.white,
-                                      size: 19,
+                              // 2. Control items row
+                              Row(
+                                children: [
+                                  // Play/Pause icon button
+                                  GestureDetector(
+                                    onTap: _togglePlayPause,
+                                    behavior: HitTestBehavior.opaque,
+                                    child: Padding(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 4,
+                                        vertical: 2,
+                                      ),
+                                      child: Icon(
+                                        value.isPlaying
+                                            ? Icons.pause_rounded
+                                            : Icons.play_arrow_rounded,
+                                        color: Colors.white,
+                                        size: 24,
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
-                              GestureDetector(
-                                onTap: _showQualityMenu,
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                                  // The full descriptive label ("1080p (Full
-                                  // HD)") is what the bottom-sheet menu shows
-                                  // and what state/equality checks compare
-                                  // against — this compact bar just needs the
-                                  // short form so it doesn't crowd out the
-                                  // speed/fullscreen controls next to it.
-                                  child: Text(_qualityChipLabel(widget.qualityLabel), style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800)),
-                                ),
-                              ),
-                              const SizedBox(width: 6),
-                              GestureDetector(
-                                onTap: _showSpeedMenu,
-                                child: Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 6),
-                                  child: Text(
-                                    _playbackSpeed == 1.0 ? '1x' : '${_speedLabel(_playbackSpeed)}x',
-                                    style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.w800),
+                                  const SizedBox(width: 8),
+                                  // Time text (0:45 / 4:12)
+                                  Text(
+                                    '${_fmt(position)} / ${_fmt(duration)}',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
-                                ),
-                              ),
-                              if (widget.pipSupported && widget.onPipTapped != null) ...[
-                                const SizedBox(width: 6),
-                                GestureDetector(
-                                  onTap: () {
-                                    _showControlsBriefly();
-                                    widget.onPipTapped!();
-                                  },
-                                  child: const Icon(
-                                    Icons.picture_in_picture_alt_rounded,
-                                    color: Colors.white,
-                                    size: 19,
+                                  const Spacer(),
+                                  // Closed Captions (CC)
+                                  if (widget.captionLanguages.isNotEmpty) ...[
+                                    GestureDetector(
+                                      onTap: _showCaptionsMenu,
+                                      behavior: HitTestBehavior.opaque,
+                                      child: Padding(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 2,
+                                        ),
+                                        child: Icon(
+                                          widget.selectedCaptionLang != null
+                                              ? Icons.closed_caption
+                                              : Icons.closed_caption_outlined,
+                                          color: widget.selectedCaptionLang != null
+                                              ? AppColors.brandOrange
+                                              : Colors.white,
+                                          size: 20,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                  // Quality chip
+                                  GestureDetector(
+                                    onTap: _showQualityMenu,
+                                    behavior: HitTestBehavior.opaque,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 7,
+                                        vertical: 3,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        _qualityChipLabel(widget.qualityLabel),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ),
                                   ),
-                                ),
-                              ],
-                              const SizedBox(width: 8),
-                              GestureDetector(
-                                onTap: widget.onToggleFullscreen,
-                                child: Icon(
-                                  widget.isFullscreen ? Icons.fullscreen_exit_rounded : Icons.fullscreen_rounded,
-                                  color: Colors.white,
-                                  size: 20,
-                                ),
+                                  const SizedBox(width: 6),
+                                  // Speed chip
+                                  GestureDetector(
+                                    onTap: _showSpeedMenu,
+                                    behavior: HitTestBehavior.opaque,
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 7,
+                                        vertical: 3,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withValues(alpha: 0.15),
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        _playbackSpeed == 1.0
+                                            ? '1x'
+                                            : '${_speedLabel(_playbackSpeed)}x',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w800,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                  // Picture-in-Picture
+                                  if (widget.pipSupported &&
+                                      widget.onPipTapped != null) ...[
+                                    const SizedBox(width: 6),
+                                    GestureDetector(
+                                      onTap: () {
+                                        _showControls();
+                                        widget.onPipTapped!();
+                                      },
+                                      behavior: HitTestBehavior.opaque,
+                                      child: const Padding(
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: 4,
+                                          vertical: 2,
+                                        ),
+                                        child: Icon(
+                                          Icons.picture_in_picture_alt_rounded,
+                                          color: Colors.white,
+                                          size: 20,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                  const SizedBox(width: 6),
+                                  // Fullscreen toggle
+                                  GestureDetector(
+                                    onTap: widget.onToggleFullscreen,
+                                    behavior: HitTestBehavior.opaque,
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(4),
+                                      child: Icon(
+                                        widget.isFullscreen
+                                            ? Icons.fullscreen_exit_rounded
+                                            : Icons.fullscreen_rounded,
+                                        color: Colors.white,
+                                        size: 22,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
-                        ],
+                        ),
                       ),
-                    ),
+                    ],
                   ),
-                  ),
-                ],
-              ],
-            ),
+                ),
+              ),
+            ],
+          ),
         );
       },
     );
@@ -951,6 +1247,11 @@ class _TransparentTrackShape extends RoundedRectSliderTrackShape {
     final trackLeft = offset.dx;
     final trackTop = offset.dy + (parentBox.size.height - trackHeight) / 2;
     final trackWidth = parentBox.size.width;
-    return Rect.fromLTWH(trackLeft, trackTop, math.max(0.0, trackWidth), trackHeight);
+    return Rect.fromLTWH(
+      trackLeft,
+      trackTop,
+      math.max(0.0, trackWidth),
+      trackHeight,
+    );
   }
 }

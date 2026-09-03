@@ -1,0 +1,18 @@
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- The Amazon IVS broadcast AAR declares minSdkVersion 28 (Android 9).
+         This app supports older phones and must keep supporting them, so the
+         merge is waived here and the SDK is only ever touched at runtime
+         behind a Build.VERSION.SDK_INT >= 28 guard. On anything older,
+         IvsBroadcastPlugin reports isSupported = false and Go Live keeps
+         using the stream-key / external-encoder path it used before. -->
+    <uses-sdk tools:overrideLibrary="com.amazonaws.ivs.broadcast" />
+
+    <!-- CAMERA and RECORD_AUDIO are already declared by the app itself
+         (android/app/src/main/AndroidManifest.xml) for face scanning and
+         voice search; re-declared here so this package is self-describing. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.INTERNET" />
+</manifest>

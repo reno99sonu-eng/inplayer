@@ -30,6 +30,8 @@ class VideoService {
     _videosCacheTime = null;
     _cachedFeatured = null;
     _featuredCacheTime = null;
+    _cachedShorts = null;
+    _shortsCacheTime = null;
   }
 
   /// Loads the real video feed from the InPlayer website backend with instant in-memory caching.
@@ -262,40 +264,89 @@ class VideoService {
   /// NOTE: the website has no standalone `/api/shorts` REST endpoint —
   /// app/shorts/page.tsx renders Shorts server-side by filtering the same
   /// video list down to `contentType === "short"`. We reuse `/api/videos`
-  /// here and apply that identical filter client-side so the app reads
-  /// from real data instead of a route that doesn't exist (which is why
-  /// Raftaar/Shorts always came back empty before).
-  Future<List<Short>> getShorts() async {
+  static List<Short>? _cachedShorts;
+  static DateTime? _shortsCacheTime;
+
+  /// Synchronous in-memory access to cached Shorts for instantaneous, zero-flash transitions.
+  static List<Short>? get cachedShorts {
+    if (_cachedShorts != null && _cachedShorts!.isNotEmpty) {
+      return _cachedShorts;
+    }
+    if (_cachedVideos != null && _cachedVideos!.isNotEmpty) {
+      final fromCache = _cachedVideos!
+          .where((v) => v.isShort)
+          .map((v) => Short.fromVideo(v))
+          .toList();
+      if (fromCache.isNotEmpty) {
+        _cachedShorts = fromCache;
+        _shortsCacheTime = DateTime.now();
+        return fromCache;
+      }
+    }
+    return null;
+  }
+
+  /// Loads the real InPlayer Shorts/Raftaar video feed with in-memory caching.
+  Future<List<Short>> getShorts({bool forceRefresh = false}) async {
+    if (!forceRefresh &&
+        _cachedShorts != null &&
+        _shortsCacheTime != null &&
+        DateTime.now().difference(_shortsCacheTime!).inSeconds < 45) {
+      return _cachedShorts!;
+    }
+
     try {
+      // First check if videos are already cached in memory
+      if (_cachedVideos != null && _cachedVideos!.isNotEmpty) {
+        final fromCache = _cachedVideos!
+            .where((v) => v.isShort)
+            .map((v) => Short.fromVideo(v))
+            .toList();
+        if (fromCache.isNotEmpty) {
+          _cachedShorts = fromCache;
+          _shortsCacheTime = DateTime.now();
+          return fromCache;
+        }
+      }
+
       final response = await _dio.get(ApiConstants.videos);
 
       if (response.statusCode != 200) {
         _logger.w('getShorts returned HTTP ${response.statusCode}');
-        return [];
+        return _cachedShorts ?? [];
       }
 
       final data = response.data;
 
       if (data is! Map || data['videos'] is! List) {
         _logger.w('Unexpected /api/videos response format for shorts');
-        return [];
+        return _cachedShorts ?? [];
       }
 
       final videosJson = data['videos'] as List;
 
-      return videosJson
+      final result = videosJson
           .whereType<Map>()
           .map((json) => Map<String, dynamic>.from(json))
-          .where((json) => json['contentType'] == 'short')
+          .where((json) {
+            final type = json['contentType']?.toString().toLowerCase() ?? '';
+            final cat = json['category']?.toString().toLowerCase() ?? '';
+            final isShortFlag = json['isShort'] == true;
+            return type == 'short' || type == 'raftaar' || cat.contains('raftaar') || cat.contains('vertical') || isShortFlag;
+          })
           .map((json) => Short.fromJson(json))
           .toList();
+
+      _cachedShorts = result;
+      _shortsCacheTime = DateTime.now();
+      return result;
     } catch (e, stackTrace) {
       _logger.e(
         'Error fetching real InPlayer Shorts',
         error: e,
         stackTrace: stackTrace,
       );
-      return [];
+      return _cachedShorts ?? [];
     }
   }
 

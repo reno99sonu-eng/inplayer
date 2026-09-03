@@ -70,6 +70,11 @@ class Video {
     this.genre,
   });
 
+  bool get isShort =>
+      contentType.toLowerCase() == 'short' ||
+      contentType.toLowerCase() == 'raftaar' ||
+      category.toLowerCase().contains('raftaar');
+
   static String _resolveUrl(String url) {
     if (url.startsWith('/')) {
       return '${AppConfig.apiBaseUrl}$url';

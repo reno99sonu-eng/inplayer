@@ -29,6 +29,7 @@ import '../../../../core/widgets/pattern_background.dart';
 import '../../../../core/widgets/user_avatar.dart';
 import '../../../../core/utils/playback_position_store.dart';
 import '../../../../core/utils/playback_settings_store.dart';
+import '../../../../core/utils/video_preview_gate.dart';
 import '../../../../core/utils/webvtt_parser.dart';
 import '../../../../services/video_mini_player_service.dart';
 import '../widgets/music_stage.dart';
@@ -90,6 +91,11 @@ class _WatchPageState extends ConsumerState<WatchPage>
 
   VideoPlayerController? _videoController;
   bool _isInitialized = false;
+  // Latched once (see _onPlayerTick) the first time a real decoded frame has
+  // actually rendered to the texture — deliberately NOT recomputed live from
+  // controller.value on every build. See the comment in
+  // _buildRawMediaSurface() for why: a live check flickers.
+  bool _firstFrameRendered = false;
   bool _isLoading = true;
   Video? _video;
   bool _descExpanded = false;
@@ -157,6 +163,12 @@ class _WatchPageState extends ConsumerState<WatchPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    // A muted feed preview is a second hardware video decoder, and this
+    // page is about to open a full one. See VideoPreviewGate.suspend —
+    // two concurrent AVC decoders is what corrupted and stalled playback
+    // on several chipsets, so the feed hands its decoder over while a
+    // full-screen player is up.
+    VideoPreviewGate.instance.suspend();
     PipService.setPipModeChangedListener(_handlePipModeChanged);
     unawaited(() async {
       final supported = await PipService.isSupported();
@@ -167,6 +179,7 @@ class _WatchPageState extends ConsumerState<WatchPage>
 
   @override
   void dispose() {
+    VideoPreviewGate.instance.resume();
     WidgetsBinding.instance.removeObserver(this);
     // Belt-and-braces — a stale "playback active" flag left on the native
     // side after this page closes could otherwise cause a phantom auto-PiP
@@ -223,6 +236,20 @@ class _WatchPageState extends ConsumerState<WatchPage>
   }
 
   void _onPlayerTick() {
+    // Latch the first-frame-rendered flag exactly once. This is the ONLY
+    // place it flips true, and it's what _buildRawMediaSurface() gates the
+    // video texture on instead of a live isPlaying check — see that method
+    // for why a live check flickers.
+    if (!_firstFrameRendered) {
+      final value = _videoController?.value;
+      if (value != null &&
+          value.isInitialized &&
+          value.isPlaying &&
+          value.position > Duration.zero) {
+        _firstFrameRendered = true;
+        if (mounted) setState(() {});
+      }
+    }
     // MusicStage (the lyrics/cover-art surface _buildMediaSurface() renders
     // for music-content videos) reads controller.value.position as a plain
     // constructor param, so it only gets fresh numbers when THIS page
@@ -265,8 +292,9 @@ class _WatchPageState extends ConsumerState<WatchPage>
   void _maybeSavePlaybackPosition() {
     final controller = _videoController;
     final video = _video;
-    if (controller == null || video == null || !controller.value.isInitialized)
+    if (controller == null || video == null || !controller.value.isInitialized) {
       return;
+    }
 
     final now = DateTime.now().millisecondsSinceEpoch;
     if (now - _lastPositionSaveMs < 4000) return;
@@ -488,62 +516,93 @@ class _WatchPageState extends ConsumerState<WatchPage>
         _videoController = adoptedController;
         _videoController!.addListener(_onPlayerTick);
         _isInitialized = true;
+        // The adopted controller has already been playing uninterrupted in
+        // the mini player, so a real frame is already on screen — no need
+        // to wait for the tick-based latch above.
+        _firstFrameRendered = true;
         _resumeApplied = true;
       } else if (video.muxPlaybackId != null &&
           video.muxPlaybackId!.isNotEmpty) {
-        final premiumService = ref.read(premiumServiceProvider);
-        final playbackSettings = await PlaybackSettingsStore.get();
-        // The real ceiling is the LOWER of the viewer's Premium tier and
-        // whatever they picked in Settings > Playback > Video quality —
-        // matches maxResolution={effectiveMaxResolution(premium.premium,
-        // preferredResolution(playback.wifiQuality))} in VideoPlayer.tsx
-        // exactly, including that this is also the ceiling the in-player
-        // Quality menu itself offers (see _availableQualityOptions above).
-        final status = await premiumService.getStatus();
-        final maxRes = effectiveMaxResolution(
-          status.maxResolution,
-          playbackSettings.wifiQuality,
-        );
-        _premiumCeilingHeight =
-            int.tryParse(maxRes.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1080;
-        _autoPipEnabled = playbackSettings.pip;
-        final videoUrl = _muxUrl(video.muxPlaybackId!, maxRes);
-        _videoController = VideoPlayerController.networkUrl(
+        final videoUrl = _muxUrl(video.muxPlaybackId!, '1080p');
+        final controller = VideoPlayerController.networkUrl(
           Uri.parse(videoUrl),
+          videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
         );
+        _videoController = controller;
+
+        // Fetch settings and premium tier in background without delaying player initialization
+        unawaited(() async {
+          try {
+            final premiumService = ref.read(premiumServiceProvider);
+            final playbackSettings = await PlaybackSettingsStore.get();
+            final status = await premiumService.getStatus();
+            final maxRes = effectiveMaxResolution(
+              status.maxResolution,
+              playbackSettings.wifiQuality,
+            );
+            if (mounted) {
+              setState(() {
+                _premiumCeilingHeight =
+                    int.tryParse(maxRes.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1080;
+                _autoPipEnabled = playbackSettings.pip;
+              });
+            }
+          } catch (_) {}
+        }());
 
         try {
-          await _videoController!.initialize();
-          _videoController!.addListener(_onPlayerTick);
-          _isInitialized = true;
+          await controller.initialize();
+          // Forces ExoPlayer to decode and paint one real frame onto the
+          // texture immediately, before playback visually starts. Without
+          // this, `video_player` on Android can report isInitialized/
+          // isPlaying and even a nonzero position slightly before the first
+          // frame has actually been rendered to the texture — that gap is
+          // what showed up as a brief black flash right when the player
+          // became visible. Harmless if it fails; playback still starts
+          // normally either way.
+          try {
+            await controller.seekTo(const Duration(milliseconds: 1));
+          } catch (_) {}
+          // The seekTo Future above resolves when ExoPlayer reports the seek
+          // itself complete — not when the decoded frame has actually made
+          // it through to the platform Surface/texture Flutter reads from.
+          // That hand-off is a separate, unsynchronized step, and on some
+          // devices it lags behind the seek-complete callback by more than
+          // one frame, which is why the pre-warm alone still let a flash
+          // through on some hardware even though it closed the gap on
+          // others. A short, deliberate wall-clock wait here is a floor
+          // that doesn't depend on what the plugin's Future actually
+          // promises, on top of (not instead of) the seek above.
+          await Future.delayed(const Duration(milliseconds: 100));
+          if (!mounted) return;
+          controller.addListener(_onPlayerTick);
+          if (mounted) {
+            setState(() {
+              _isInitialized = true;
+              _video = video;
+              _isLoading = false;
+            });
+            controller.play();
+          }
           await _applyResumePosition();
         } catch (e) {
           _logger.e('Error initializing video player: $e');
-          _isInitialized = false;
+          if (mounted) {
+            setState(() {
+              _isInitialized = false;
+              _isLoading = false;
+            });
+          }
         }
       }
 
       if (!mounted) return;
 
-      // Paint the player the instant the video itself is ready.
-      //
-      // This setState used to sit AFTER `await videoService.getVideos()`
-      // below, so the entire recommended-videos feed — a second full
-      // network round trip, unrelated to playback — had to come back before
-      // _isLoading flipped and the player was built at all. On a slow
-      // connection that left a spinner sitting over a fully initialized,
-      // ready-to-play video for seconds. Worse, play() was being called
-      // inside that window, into a VideoPlayer widget that did not exist in
-      // the tree yet, so the stream could start advancing (and on some
-      // devices start making sound) before any picture appeared, and the
-      // frame you eventually got was already out of sync with the controls.
-      // Recommendations are not part of the player and no longer gate it.
       setState(() {
         _video = video;
         _isLoading = false;
       });
 
-      // Only now, with the surface actually mounted, start playback.
       if (_isInitialized) _videoController?.play();
 
       // Recommendations load in the background and fill in when they land.
@@ -905,8 +964,9 @@ class _WatchPageState extends ConsumerState<WatchPage>
           if (mounted) _showSnack('Downloaded — find it in Downloads.');
         })
         .catchError((Object _) {
-          if (mounted)
+          if (mounted) {
             _showSnack("Couldn't finish downloading. Please try again.");
+          }
         });
   }
 
@@ -1027,10 +1087,25 @@ class _WatchPageState extends ConsumerState<WatchPage>
             : const SizedBox(),
       );
     }
+    // Follows the finger: the page slides down, shrinks slightly and fades
+    // toward the corner, so the video visibly becomes the floating window
+    // rather than just vanishing when the gesture commits.
+    final dragProgress =
+        (_minimizeDrag / (_minimizeCommitPx * 2)).clamp(0.0, 1.0);
+    final dragScale = 1.0 - (dragProgress * 0.22);
+    final dragOpacity = 1.0 - (dragProgress * 0.45);
+
     return PatternBackground(
       child: Scaffold(
         backgroundColor: Colors.transparent,
-        body: SafeArea(
+        body: Transform.translate(
+          offset: Offset(0, _minimizeDrag * 0.6),
+          child: Transform.scale(
+            scale: dragScale,
+            alignment: Alignment.topCenter,
+            child: Opacity(
+              opacity: dragOpacity,
+              child: SafeArea(
           bottom: false,
           child: Column(
             children: [
@@ -1074,6 +1149,13 @@ class _WatchPageState extends ConsumerState<WatchPage>
                               pipSupported: _pipSupported,
                               onPipTapped: _enterPip,
                               onMinimize: _minimizeToMiniPlayer,
+                              // Swipe the player down to dock it into the
+                              // floating window. PlayerChrome only routes
+                              // the gesture here outside fullscreen, where
+                              // vertical drags still mean brightness and
+                              // volume.
+                              onDragDown: _onPlayerDragDown,
+                              onDragDownEnd: _onPlayerDragDownEnd,
                               initialBrightness: _playerBrightness,
                               onBrightnessChanged: (v) =>
                                   setState(() => _playerBrightness = v),
@@ -1125,6 +1207,9 @@ class _WatchPageState extends ConsumerState<WatchPage>
                 ),
               ),
             ],
+          ),
+              ),
+            ),
           ),
         ),
       ),
@@ -1199,7 +1284,46 @@ class _WatchPageState extends ConsumerState<WatchPage>
         artist: video.artist ?? video.creator,
       );
     }
-    return VideoPlayer(controller);
+    // Sticky, latched once by _onPlayerTick the first time a real frame has
+    // actually rendered (_firstFrameRendered) — deliberately NOT recomputed
+    // live from controller.value.isPlaying on every build. This page
+    // rebuilds for lots of reasons that have nothing to do with the player
+    // (likes/comments/watchlist/subscription/captions each finishing their
+    // own load, PiP state, brightness, quality label) — a live isPlaying
+    // check flipped the video texture out of the tree and back to the bare
+    // thumbnail on any of those rebuilds that happened to land mid-buffer or
+    // right as playback started, which is exactly the flicker/flash being
+    // reported. It also meant pausing reverted the screen to the static
+    // thumbnail instead of leaving the paused frame on screen. Latching
+    // fixes both: once a frame has rendered, the texture stays mounted and
+    // simply stops advancing while paused, same as every other video app.
+    final showVideo = _firstFrameRendered && controller.value.isInitialized;
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        if (video.thumbnail.isNotEmpty)
+          Positioned.fill(
+            child: CachedNetworkImage(
+              imageUrl: video.thumbnail,
+              fit: BoxFit.cover,
+              fadeInDuration: Duration.zero,
+              fadeOutDuration: Duration.zero,
+              errorWidget: (context, url, error) => const SizedBox(),
+            ),
+          ),
+        if (showVideo)
+          Positioned.fill(
+            child: TweenAnimationBuilder<double>(
+              tween: Tween(begin: 0.0, end: 1.0),
+              duration: const Duration(milliseconds: 260),
+              curve: Curves.easeOut,
+              builder: (context, opacity, child) =>
+                  Opacity(opacity: opacity, child: child),
+              child: VideoPlayer(controller),
+            ),
+          ),
+      ],
+    );
   }
 
   Future<void> _openFullscreen() async {
@@ -1250,6 +1374,29 @@ class _WatchPageState extends ConsumerState<WatchPage>
   /// `_videoController` is set to null (not disposed) right after handing
   /// it over, so dispose() below — which only ever acts when the field is
   /// non-null — naturally leaves the now-service-owned controller alone.
+  /// How far the player has been dragged down, in logical pixels. Drives
+  /// the shrink-away animation; 0 when not dragging.
+  double _minimizeDrag = 0;
+
+  /// Past this much travel (or a firm downward fling) the drag commits and
+  /// the video docks into the floating window, YouTube style. Below it the
+  /// page springs back.
+  static const double _minimizeCommitPx = 130;
+  static const double _minimizeCommitVelocity = 700;
+
+  void _onPlayerDragDown(double distance) {
+    if (!mounted) return;
+    setState(() => _minimizeDrag = distance);
+  }
+
+  void _onPlayerDragDownEnd(double velocityY) {
+    if (!mounted) return;
+    final commit =
+        _minimizeDrag >= _minimizeCommitPx || velocityY >= _minimizeCommitVelocity;
+    setState(() => _minimizeDrag = 0);
+    if (commit) _minimizeToMiniPlayer();
+  }
+
   void _minimizeToMiniPlayer() {
     final controller = _videoController;
     final video = _video;
@@ -1847,16 +1994,43 @@ class _WatchPageState extends ConsumerState<WatchPage>
                             ),
                           ),
                         )
-                      else if (_commentController.text.isNotEmpty)
-                        IconButton(
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          icon: const Icon(
-                            Icons.send,
-                            size: 20,
-                            color: AppColors.brandOrange,
-                          ),
-                          onPressed: _postComment,
+                      else
+                        // ValueListenableBuilder instead of reading
+                        // _commentController.text directly in the outer
+                        // build: nothing here was listening for keystrokes
+                        // before, so this send button only ever appeared or
+                        // disappeared on some unrelated rebuild rather than
+                        // live as the user typed. Scoping the listener to
+                        // just this button (rather than a controller
+                        // listener + setState on the whole comments
+                        // section) keeps every keystroke's rebuild cost
+                        // down to this one small widget.
+                        ValueListenableBuilder<TextEditingValue>(
+                          valueListenable: _commentController,
+                          builder: (context, value, _) {
+                            if (value.text.trim().isEmpty) {
+                              return const SizedBox.shrink();
+                            }
+                            // Small circular "enter" arrow button, replacing
+                            // the old bare paper-plane icon.
+                            return GestureDetector(
+                              onTap: _postComment,
+                              child: Container(
+                                width: 30,
+                                height: 30,
+                                decoration: const BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  color: AppColors.brandOrange,
+                                ),
+                                alignment: Alignment.center,
+                                child: const Icon(
+                                  Icons.arrow_upward_rounded,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
+                              ),
+                            );
+                          },
                         ),
                     ],
                   ),

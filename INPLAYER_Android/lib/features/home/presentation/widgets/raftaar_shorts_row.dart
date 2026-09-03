@@ -46,6 +46,17 @@ class _RaftaarShortsRowState extends ConsumerState<RaftaarShortsRow> {
     }
   }
 
+  @override
+  void didUpdateWidget(covariant RaftaarShortsRow oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.shorts != null && widget.shorts != oldWidget.shorts) {
+      setState(() {
+        _shorts = widget.shorts!;
+        _isLoading = false;
+      });
+    }
+  }
+
   Future<void> _loadShorts() async {
     try {
       final videoService = ref.read(videoServiceProvider);
@@ -146,7 +157,11 @@ class _RaftaarShortsRowState extends ConsumerState<RaftaarShortsRow> {
   Widget _buildShortCard(BuildContext context, Short short) {
     return GestureDetector(
       onTap: () {
-        context.push('/shorts');
+        if (short.videoId.isNotEmpty) {
+          context.push('/shorts/${short.videoId}');
+        } else {
+          context.push('/shorts');
+        }
       },
       child: Container(
         width: 135,
@@ -283,19 +298,11 @@ class _RaftaarShortsRowState extends ConsumerState<RaftaarShortsRow> {
     return CachedNetworkImage(
       imageUrl: posterUrl,
       fit: BoxFit.cover,
-      fadeInDuration: const Duration(milliseconds: 150),
+      useOldImageOnUrlChange: true,
+      fadeInDuration: Duration.zero,
+      fadeOutDuration: Duration.zero,
       placeholder: (context, url) => Container(
         color: AppColors.surfaceDark,
-        child: const Center(
-          child: SizedBox(
-            width: 20,
-            height: 20,
-            child: CircularProgressIndicator(
-              strokeWidth: 2,
-              color: AppColors.brandOrange,
-            ),
-          ),
-        ),
       ),
       errorWidget: (context, url, error) => _buildPosterFallback(),
     );

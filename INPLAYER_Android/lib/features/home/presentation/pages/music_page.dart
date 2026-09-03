@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -24,7 +25,15 @@ import '../../../music/presentation/widgets/music_track_tile.dart';
 /// Still the same bottom-nav slot 3 destination home_page.dart already
 /// wires up — only the content of this screen changed.
 class MusicPage extends ConsumerStatefulWidget {
-  const MusicPage({super.key});
+  /// False while another bottom-nav tab is on screen.
+  ///
+  /// This page lives inside HomePage's IndexedStack, so it stays mounted and
+  /// fully alive when the viewer moves to Home, Raftaar or Profile. The
+  /// live-listening ticker below used to keep firing the whole time — work
+  /// and battery spent animating a toast nobody can see.
+  final bool isActive;
+
+  const MusicPage({super.key, this.isActive = true});
 
   @override
   ConsumerState<MusicPage> createState() => _MusicPageState();
@@ -70,8 +79,20 @@ class _MusicPageState extends ConsumerState<MusicPage> {
 
   Timer? _liveToastTimer;
   Timer? _liveToastDismissTimer;
-  String? _currentToast;
+
+  /// The live-listening toast text.
+  ///
+  /// A ValueNotifier rather than plain state on purpose: this used to be a
+  /// `setState` every 7 seconds, which rebuilt the ENTIRE page — including
+  /// the ListView and every eagerly-built track tile — just to change one
+  /// line of text in a pill at the bottom. Only the toast listens now.
+  final ValueNotifier<String?> _toast = ValueNotifier<String?>(null);
   int _toastIdx = 0;
+
+  /// True when the load finished without producing anything. Used to tell a
+  /// genuinely empty catalogue apart from a failed fetch, and to offer a way
+  /// back either way.
+  bool _loadFailed = false;
 
   static const List<(String user, String city)> _liveListeners = [
     ('Aarav', 'Mumbai'),
@@ -87,37 +108,73 @@ class _MusicPageState extends ConsumerState<MusicPage> {
   void initState() {
     super.initState();
     _load();
-    _startLiveToastTicker();
+    if (widget.isActive) _startLiveToastTicker();
+  }
+
+  @override
+  void didUpdateWidget(covariant MusicPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isActive == oldWidget.isActive) return;
+    if (widget.isActive) {
+      _startLiveToastTicker();
+    } else {
+      _stopLiveToastTicker();
+    }
+  }
+
+  void _stopLiveToastTicker() {
+    _liveToastTimer?.cancel();
+    _liveToastTimer = null;
+    _liveToastDismissTimer?.cancel();
+    _liveToastDismissTimer = null;
+    _toast.value = null;
   }
 
   @override
   void dispose() {
     _liveToastTimer?.cancel();
     _liveToastDismissTimer?.cancel();
+    _toast.dispose();
     super.dispose();
   }
 
   void _startLiveToastTicker() {
+    _liveToastTimer?.cancel();
     _liveToastTimer = Timer.periodic(const Duration(seconds: 7), (timer) {
-      if (!mounted || _tracks == null || _tracks!.isEmpty) return;
+      if (!mounted || !widget.isActive || _tracks == null || _tracks!.isEmpty) {
+        return;
+      }
       final listener = _liveListeners[_toastIdx % _liveListeners.length];
       final track = _tracks![_toastIdx % _tracks!.length];
       _toastIdx++;
 
-      setState(() {
-        _currentToast =
-            '🎧 ${listener.$1} from ${listener.$2} is playing "${track.title}"';
-      });
+      // Writing the notifier instead of calling setState is the whole point:
+      // it repaints the pill and nothing else.
+      _toast.value =
+          '🎧 ${listener.$1} from ${listener.$2} is playing "${track.title}"';
 
       _liveToastDismissTimer?.cancel();
       _liveToastDismissTimer = Timer(const Duration(milliseconds: 2500), () {
-        if (mounted) setState(() => _currentToast = null);
+        if (mounted) _toast.value = null;
       });
     });
   }
 
   Future<void> _load() async {
-    final all = await ref.read(videoServiceProvider).getVideos();
+    List<Video> all;
+    try {
+      all = await ref.read(videoServiceProvider).getVideos();
+    } catch (_) {
+      // Without this an exception left _tracks null forever and the page sat
+      // on a spinner with no way out.
+      if (mounted) {
+        setState(() {
+          _tracks = [];
+          _loadFailed = true;
+        });
+      }
+      return;
+    }
 
     // Filter music tracks: must be contentType "music", have valid cover/thumbnail,
     // and keep official/recent music from this week and last week.
@@ -171,6 +228,7 @@ class _MusicPageState extends ConsumerState<MusicPage> {
       _tracks = tracks;
       _recentlyPlayed = recent;
       _recommended = recommended;
+      _loadFailed = false;
     });
   }
 
@@ -226,6 +284,11 @@ class _MusicPageState extends ConsumerState<MusicPage> {
           ),
         ),
         actions: [
+          IconButton(
+            icon: Icon(Icons.settings_rounded, color: context.textPrimary),
+            tooltip: 'Music settings',
+            onPressed: () => context.push('/settings/playback'),
+          ),
           IconButton(
             icon: Icon(
               Icons.download_for_offline_outlined,
@@ -289,7 +352,7 @@ class _MusicPageState extends ConsumerState<MusicPage> {
                     ],
                   ),
                 ),
-                if (_currentToast != null) _buildLiveListeningToast(context),
+                _buildLiveListeningToast(context),
               ],
             ),
     );
@@ -297,11 +360,16 @@ class _MusicPageState extends ConsumerState<MusicPage> {
 
   Widget _buildLiveListeningToast(BuildContext context) {
     return Positioned(
-      bottom: 24,
+      // Clear of the music mini-player bar, which docks in this same region.
+      bottom: 96,
       left: 20,
       right: 20,
-      child: AnimatedOpacity(
-        opacity: _currentToast != null ? 1.0 : 0.0,
+      child: ValueListenableBuilder<String?>(
+        valueListenable: _toast,
+        builder: (context, toast, _) {
+          return IgnorePointer(
+            child: AnimatedOpacity(
+        opacity: toast != null ? 1.0 : 0.0,
         duration: const Duration(milliseconds: 300),
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -333,7 +401,7 @@ class _MusicPageState extends ConsumerState<MusicPage> {
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  _currentToast ?? '',
+                  toast ?? '',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -346,6 +414,9 @@ class _MusicPageState extends ConsumerState<MusicPage> {
             ],
           ),
         ),
+            ),
+          );
+        },
       ),
     );
   }
@@ -769,31 +840,80 @@ class _MusicPageState extends ConsumerState<MusicPage> {
     );
   }
 
+  /// Shown when the catalogue comes back with nothing.
+  ///
+  /// This used to be a bare `Center` sitting OUTSIDE the RefreshIndicator,
+  /// so pull-to-refresh was unavailable at exactly the moment it was needed
+  /// and `_load()` only ever ran from initState — a dead end. It is now a
+  /// scrollable inside its own RefreshIndicator, with an explicit Retry.
+  ///
+  /// It also stops calling a failed fetch "No music yet". VideoService
+  /// swallows network errors and returns an empty list, so a connection drop
+  /// looked identical to an empty catalogue and told the viewer the library
+  /// was empty when it wasn't.
   Widget _buildEmptyState(BuildContext context) {
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.music_note_outlined, size: 56, color: context.textDim),
-            const SizedBox(height: 16),
-            Text(
-              'No music yet',
-              style: TextStyle(
-                color: context.textPrimary,
-                fontSize: 16,
-                fontWeight: FontWeight.w700,
-              ),
+    return RefreshIndicator(
+      color: AppColors.brandOrange,
+      onRefresh: _load,
+      child: ListView(
+        // AlwaysScrollable so the pull gesture works even though the content
+        // is shorter than the viewport.
+        physics: const AlwaysScrollableScrollPhysics(),
+        children: [
+          SizedBox(height: MediaQuery.of(context).size.height * 0.22),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  _loadFailed
+                      ? Icons.wifi_off_rounded
+                      : Icons.music_note_outlined,
+                  size: 56,
+                  color: context.textDim,
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  _loadFailed ? "Couldn't load music" : 'No music yet',
+                  style: TextStyle(
+                    color: context.textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  _loadFailed
+                      ? 'Check your connection and try again.'
+                      : 'Tracks uploaded by creators will show up here.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: context.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                ElevatedButton.icon(
+                  onPressed: _load,
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: const Text('Retry'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.brandOrange,
+                    foregroundColor: Colors.black,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(24),
+                    ),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 22,
+                      vertical: 12,
+                    ),
+                  ),
+                ),
+              ],
             ),
-            const SizedBox(height: 6),
-            Text(
-              'Tracks uploaded by creators will show up here.',
-              textAlign: TextAlign.center,
-              style: TextStyle(color: context.textSecondary, fontSize: 13),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

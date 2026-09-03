@@ -90,6 +90,11 @@ class ContentAccessService {
     await prefs.setString('audience', audienceModeToString(mode));
   }
 
+  /// Sets audience mode locally without prompting for passcodes.
+  Future<void> setModeLocally(AudienceMode mode) async {
+    await _cacheMode(mode);
+  }
+
   /// GET /api/content-access -> {mode, hasPasskey}. Works signed-out too —
   /// a visitor who's never touched this still has a mode (the safe
   /// default), which is why this doesn't require auth.

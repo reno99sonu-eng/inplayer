@@ -1,3 +1,5 @@
+import 'dart:async';
+import 'dart:async' as async;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart';
@@ -12,13 +14,77 @@ import '../../../../core/widgets/user_avatar.dart';
 import '../../../../models/short.dart';
 import '../../../../models/comment.dart';
 import '../../../../services/video_service.dart';
-import '../../../../services/premium_service.dart';
-import '../../../../core/utils/playback_settings_store.dart';
 import '../../../../services/like_service.dart';
 import '../../../../services/watchlist_service.dart';
 import '../../../../services/channel_service.dart';
 import '../../../../services/comment_service.dart';
+import '../../../../services/short_warm_cache.dart';
+import '../../../../services/shorts_mute_state.dart';
 import '../../../../services/video_mini_player_service.dart';
+
+/// True once the decoder has genuinely produced moving picture for this
+/// controller — real frame dimensions plus a playhead that has actually
+/// advanced.
+///
+/// Deliberately does NOT require `value.isPlaying`. That flag drops to
+/// false on every buffering stall, so ANDing it in meant a short that
+/// buffered at the wrong moment could sit behind its poster indefinitely
+/// — the "stuck, never plays" report. Position advancing past a couple of
+/// frames is the honest signal that pictures are flowing; combined with
+/// the hard fallback timer in _initPlayer, the reveal can no longer
+/// deadlock.
+bool shouldRevealShortFrame(VideoPlayerValue value) {
+  final size = value.size;
+  final hasRealFrame = size.width > 0 && size.height > 0;
+  final hasPlaybackProgress = value.position > const Duration(milliseconds: 80);
+  return value.isInitialized && hasRealFrame && hasPlaybackProgress;
+}
+
+/// Poster/thumbnail URL for a short — the exact derivation the player
+/// renders, exposed as a top-level function so the feed can warm these
+/// images a page or two ahead (see ShortsPage._precacheUpcomingPosters).
+///
+/// Sharing one implementation matters: if the prefetch ever computed even
+/// a slightly different URL than the one the card actually renders, the
+/// prefetch would silently warm the wrong cache entry and the poster would
+/// still pop in on arrival.
+/// HLS URL for a short, when its Mux playback id is already known.
+///
+/// Shared with ShortsPage so a warmed-up controller is guaranteed to have
+/// been opened on the exact same URL the player would have requested —
+/// otherwise the warm-up would quietly prepare the wrong thing.
+/// Returns null when the short has no playback id, in which case the
+/// player falls back to resolving it via the API and no warm-up happens.
+String? shortStreamUrl(Short short) {
+  final playbackId = short.muxPlaybackId;
+  if (playbackId == null || playbackId.isEmpty) return null;
+  return 'https://stream.mux.com/$playbackId.m3u8?max_resolution=720p';
+}
+
+String shortPosterUrl(Short short) {
+  final poster = short.poster.trim();
+  if (poster.isNotEmpty) return poster;
+  final playbackId = short.muxPlaybackId;
+  if (playbackId != null && playbackId.isNotEmpty) {
+    // time=0 and NO forced crop, both deliberate — this is the poster the
+    // video has to replace without a visible jump.
+    //
+    // It used to request `time=1`, i.e. the frame one second IN, while the
+    // video starts at 0. So the still on screen was a different moment than
+    // the first frame of playback, and the swap visibly cut to another point
+    // in the video. The site avoids this by construction: MuxPlayer is given
+    // `thumbnailTime={0}`, so its poster IS frame zero.
+    //
+    // It also forced width=640&height=1138&fit_mode=smartcrop — a 9:16 crop.
+    // Shorts are not all 9:16 (logcat shows 720x900 among others), and both
+    // poster and video render with BoxFit.cover, so a 4:5 video cropped to
+    // 9:16 as a still and then cover-cropped as video framed differently —
+    // the picture shifted the instant the video appeared. Asking for a width
+    // only lets Mux preserve the source aspect ratio, so the two match.
+    return 'https://image.mux.com/$playbackId/thumbnail.webp?width=720&time=0';
+  }
+  return '';
+}
 
 class ShortPlayerWidget extends ConsumerStatefulWidget {
   final Short short;
@@ -41,6 +107,14 @@ class ShortPlayerWidget extends ConsumerStatefulWidget {
   /// bottom nav over it — only the tab inside HomePage passes a real value.
   final double bottomInset;
 
+  /// Fired once this short has actually put a frame on screen.
+  ///
+  /// ShortsPage uses this as the cue to warm up the NEXT short's decoder.
+  /// Waiting for a real frame matters: it guarantees a second decoder is
+  /// only ever allocated while this one is already playing happily, never
+  /// while it is still competing to start.
+  final VoidCallback? onFirstFrame;
+
   /// Fired after this card has handed its player off to the floating mini
   /// window, so the feed can get out of the way — there is no point sitting
   /// on a full-screen shorts feed whose video is now playing in a corner.
@@ -53,6 +127,7 @@ class ShortPlayerWidget extends ConsumerStatefulWidget {
     required this.short,
     this.isActive = true,
     this.bottomInset = 0,
+    this.onFirstFrame,
     this.onMinimized,
   });
 
@@ -65,25 +140,101 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
   VideoPlayerController? _videoController;
   AudioPlayer? _audioPlayer;
   bool _isInitialized = false;
+  bool _isFirstFrameRendered = false;
   bool _isPlaying = false;
-  double _progress = 0.0;
   bool _showHeartBurst = false;
   int _playerGeneration = 0;
+  late final String _posterUrl;
+  final ValueNotifier<double> _progressNotifier = ValueNotifier<double>(0.0);
 
-  // Live interaction state
   bool _isLiked = false;
   int _likeCount = 0;
   bool _isSaved = false;
   bool _isSubscribed = false;
   int _commentCount = 0;
+  bool _posterPrecached = false;
+  async.Timer? _firstFrameRevealTimer;
+
+  /// Hold-to-fast-forward, mirroring the site's `startHold`/`endHold`.
+  /// 300ms press engages 2x; release restores 1x.
+  async.Timer? _holdTimer;
+  bool _speedBoost = false;
+
+  /// The site sets `suppressClickRef.current = true` when a boost ends, so
+  /// the click that terminates a hold is not also treated as a tap. Same
+  /// idea here — without it, letting go of a fast-forward would toggle
+  /// play/pause.
+  bool _suppressNextTap = false;
+
+  void _startHold(TapDownDetails _) {
+    _holdTimer?.cancel();
+    _holdTimer = async.Timer(const Duration(milliseconds: 300), () {
+      _holdTimer = null;
+      final controller = _videoController;
+      if (controller == null || !_isInitialized || !mounted) return;
+      controller.setPlaybackSpeed(2.0);
+      setState(() => _speedBoost = true);
+    });
+  }
+
+  void _endHold() {
+    _holdTimer?.cancel();
+    _holdTimer = null;
+    if (!_speedBoost) return;
+    _videoController?.setPlaybackSpeed(1.0);
+    _suppressNextTap = true;
+    if (mounted) setState(() => _speedBoost = false);
+  }
+
+  /// True when this short's own audio must stay silent regardless of the
+  /// viewer's mute choice, because a creator-picked soundtrack replaces it.
+  /// Mirrors the site's `muted={muted || shortHasSoundtrack(short)}`.
+  bool get _hasSoundtrack {
+    final soundtrack = widget.short.soundtrack;
+    return soundtrack != null && soundtrack.url.isNotEmpty;
+  }
+
+  void _onMuteChanged() {
+    _applyMute();
+    if (mounted) setState(() {});
+  }
+
+  /// Pushes the global mute choice onto whichever audio this short actually
+  /// uses — the video's own track, or the separate soundtrack player.
+  void _applyMute() {
+    final muted = ShortsMuteState.instance.isMuted;
+    if (_hasSoundtrack) {
+      // Camera audio stays off permanently for soundtrack shorts; the
+      // track itself follows the viewer's choice.
+      _videoController?.setVolume(0.0);
+      _audioPlayer?.setVolume(muted ? 0.0 : 1.0);
+    } else {
+      _videoController?.setVolume(muted ? 0.0 : 1.0);
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    ShortsMuteState.instance.muted.addListener(_onMuteChanged);
+    _initPosterUrl();
     _parseInitialCounts();
     if (widget.isActive) _initPlayer();
     _loadInteractionStatus();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_posterPrecached && _posterUrl.isNotEmpty && !isDataImageUrl(_posterUrl)) {
+      _posterPrecached = true;
+      precacheImage(CachedNetworkImageProvider(_posterUrl), context);
+    }
+  }
+
+  void _initPosterUrl() {
+    _posterUrl = shortPosterUrl(widget.short);
   }
 
   void _parseInitialCounts() {
@@ -101,43 +252,49 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
   Future<void> _loadInteractionStatus() async {
     if (widget.short.videoId.isEmpty) return;
 
-    // Load like status
-    try {
-      final likeService = ref.read(likeServiceProvider);
-      final status = await likeService.getStatus(widget.short.videoId);
-      if (mounted) {
-        setState(() {
-          _isLiked = status['myReaction'] == 'like';
-          if (status['likeCount'] != null && status['likeCount'] is int) {
-            _likeCount = status['likeCount'] as int;
+    bool? isLiked;
+    int? likeCount;
+    bool? isSaved;
+    bool? isSubscribed;
+
+    await Future.wait([
+      (() async {
+        try {
+          final likeService = ref.read(likeServiceProvider);
+          final status = await likeService.getStatus(widget.short.videoId);
+          isLiked = status['myReaction'] == 'like';
+          if (status['likeCount'] is int) {
+            likeCount = status['likeCount'] as int;
           }
-        });
-      }
-    } catch (_) {}
-
-    // Load watchlist status
-    try {
-      final watchlistService = ref.read(watchlistServiceProvider);
-      final saved = await watchlistService.isSaved(widget.short.videoId);
-      if (mounted) {
-        setState(() => _isSaved = saved);
-      }
-    } catch (_) {}
-
-    // Load subscription status
-    if (widget.short.uploaderId != null &&
-        widget.short.uploaderId!.isNotEmpty) {
-      try {
-        final channelService = ref.read(channelServiceProvider);
-        final sub = await channelService.getSubscriptionStatus(
-          widget.short.uploaderId!,
-        );
-        if (mounted && sub != null) {
-          setState(() {
-            _isSubscribed = sub['isSubscribed'] == true;
-          });
+        } catch (_) {}
+      })(),
+      (() async {
+        try {
+          final watchlistService = ref.read(watchlistServiceProvider);
+          isSaved = await watchlistService.isSaved(widget.short.videoId);
+        } catch (_) {}
+      })(),
+      (() async {
+        final creatorId = widget.short.uploaderId;
+        if (creatorId != null && creatorId.isNotEmpty) {
+          try {
+            final channelService = ref.read(channelServiceProvider);
+            final sub = await channelService.getSubscriptionStatus(creatorId);
+            if (sub != null) {
+              isSubscribed = sub['isSubscribed'] == true;
+            }
+          } catch (_) {}
         }
-      } catch (_) {}
+      })(),
+    ]);
+
+    if (mounted) {
+      setState(() {
+        if (isLiked != null) _isLiked = isLiked!;
+        if (likeCount != null) _likeCount = likeCount!;
+        if (isSaved != null) _isSaved = isSaved!;
+        if (isSubscribed != null) _isSubscribed = isSubscribed!;
+      });
     }
   }
 
@@ -157,57 +314,41 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
   @override
   void didUpdateWidget(covariant ShortPlayerWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.isActive != widget.isActive) {
-      if (!widget.isActive) {
-        _releasePlayer();
-      } else if (_videoController == null) {
-        // Becoming active again with no controller means this card gave its
-        // player away to the mini window (see _minimize) and the viewer has
-        // now come back to the feed. Build a fresh one rather than sitting
-        // on a dead poster forever.
+    if (oldWidget.isActive == widget.isActive) return;
+
+    if (widget.isActive) {
+      // Normally _videoController is null here (becoming active always
+      // follows a teardown via _releasePlayer below) and this cold-inits.
+      // The `else` branch is a defensive fallback only.
+      if (_videoController == null) {
         _initPlayer();
       } else {
         _resumePlayback();
       }
+    } else {
+      _releasePlayer();
     }
   }
 
-  /// Keep only the visible Raftaar card backed by a decoder. Leaving paused
-  /// controllers mounted while PageView animates between cards can make
-  /// Android's SurfaceTexture briefly paint stale/partial frames (the visible
-  /// flicker and colour blocks). Releasing the inactive surface also prevents
-  /// two HLS decoders competing during a vertical swipe.
   void _releasePlayer() {
     _playerGeneration++;
+    _firstFrameRevealTimer?.cancel();
     final controller = _videoController;
     _videoController = null;
     _audioPlayer?.stop();
     _audioPlayer?.dispose();
     _audioPlayer = null;
     controller?.dispose();
+    _progressNotifier.value = 0.0;
     if (mounted) {
       setState(() {
         _isInitialized = false;
+        _isFirstFrameRendered = false;
         _isPlaying = false;
-        _progress = 0;
       });
     }
   }
 
-  /// Hand this card's player to the floating mini window and step aside.
-  ///
-  /// Ownership genuinely transfers: the refs are nulled rather than
-  /// disposed, so this widget's own dispose() becomes a no-op for them and
-  /// the mini player is left holding the only reference. The anonymous
-  /// progress listener attached in _initPlayer already guards on
-  /// `_videoController == null`, so it goes quiet on its own the moment
-  /// that happens — no dangling callback into a card that no longer owns
-  /// the player.
-  ///
-  /// The soundtrack AudioPlayer travels with it. A short with a picked
-  /// soundtrack mutes its video and plays the track separately, so leaving
-  /// the audio behind would mean silent video in the corner and music still
-  /// coming from a page nobody is looking at.
   void _minimize() {
     final controller = _videoController;
     if (controller == null || !_isInitialized) return;
@@ -220,12 +361,12 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
           short: widget.short,
         );
 
+    _progressNotifier.value = 0.0;
     setState(() {
       _videoController = null;
       _audioPlayer = null;
-      // Falls the card back to its poster image instead of a black hole
-      // where the video surface used to be.
       _isInitialized = false;
+      _isFirstFrameRendered = false;
       _isPlaying = false;
     });
 
@@ -250,95 +391,218 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
     }
   }
 
+  /// Flips the poster-to-video crossfade on. Safe to call repeatedly and
+  /// from either the frame listener or the fallback timer — whichever gets
+  /// there first wins, the other becomes a no-op.
+  void _revealVideoLayer(VideoPlayerController controller) {
+    if (!mounted || _isFirstFrameRendered) return;
+    if (!identical(_videoController, controller)) return;
+    _firstFrameRevealTimer?.cancel();
+    setState(() {
+      _isFirstFrameRendered = true;
+    });
+    // Only now — with this short demonstrably playing — is it safe to
+    // spend a second decoder preparing the next one.
+    if (widget.isActive) widget.onFirstFrame?.call();
+  }
+
+  void _attachListenerAndReveal(VideoPlayerController controller) {
+    controller.addListener(() {
+      if (!mounted || !identical(_videoController, controller)) return;
+      if (!_isFirstFrameRendered && shouldRevealShortFrame(controller.value)) {
+        _revealVideoLayer(controller);
+      }
+      final duration = controller.value.duration;
+      final position = controller.value.position;
+      if (duration.inMilliseconds > 0) {
+        final p = position.inMilliseconds / duration.inMilliseconds;
+        if ((p - _progressNotifier.value).abs() > 0.005) {
+          _progressNotifier.value = p.clamp(0.0, 1.0);
+        }
+      }
+    });
+  }
+
+  /// Attaches this short's looping soundtrack, if it has one, without
+  /// holding playback back while the audio loads.
+  void _setupSoundtrack(VideoPlayerController controller, int generation) {
+    final soundtrack = widget.short.soundtrack;
+    if (soundtrack == null || soundtrack.url.isEmpty) {
+      controller.setVolume(ShortsMuteState.instance.isMuted ? 0.0 : 1.0);
+      return;
+    }
+    final audio = AudioPlayer();
+    _audioPlayer = audio;
+    controller.setVolume(0.0);
+    audio.setVolume(ShortsMuteState.instance.isMuted ? 0.0 : 1.0);
+    unawaited(() async {
+      try {
+        await audio.setReleaseMode(ReleaseMode.loop);
+        await audio.setSourceUrl(soundtrack.url);
+        if (!mounted ||
+            generation != _playerGeneration ||
+            !identical(_audioPlayer, audio)) {
+          return;
+        }
+        await audio.resume();
+      } catch (_) {}
+    }());
+  }
+
   Future<void> _initPlayer() async {
     final generation = ++_playerGeneration;
     try {
-      String? videoUrl;
-      final premiumService = ref.read(premiumServiceProvider);
-      // Combines the viewer's real Premium tier with Settings > Playback >
-      // "Shorts & mobile quality" — matches maxResolution={
-      //   effectiveMaxResolution(premium.premium,
-      //   preferredResolution(playback.mobileQuality)) } on the website's
-      // own Shorts player (ShortsPageContent.tsx), not just the tier alone.
-      final status = await premiumService.getStatus();
-      final playbackSettings = await PlaybackSettingsStore.get();
-      final maxRes = effectiveMaxResolution(
-        status.maxResolution,
-        playbackSettings.mobileQuality,
-      );
+      // Did the feed already warm this exact short while the previous one
+      // was playing? Then there is no decoder to allocate and no manifest
+      // to fetch standing between the swipe and the picture.
+      final warmed = ShortWarmCache.instance.take(widget.short.videoId);
+      if (warmed != null) {
+        if (!mounted || !widget.isActive || generation != _playerGeneration) {
+          await warmed.dispose();
+          return;
+        }
+        _videoController = warmed;
+        _setupSoundtrack(warmed, generation);
+        _attachListenerAndReveal(warmed);
+        unawaited(warmed.play());
+        if (mounted) {
+          setState(() {
+            _isInitialized = true;
+            _isPlaying = true;
+          });
+        }
+        // Same backstop as the cold path — the picture is never allowed to
+        // stay hidden behind the poster indefinitely.
+        _firstFrameRevealTimer?.cancel();
+        _firstFrameRevealTimer = async.Timer(
+          const Duration(milliseconds: 1200),
+          () => _revealVideoLayer(warmed),
+        );
+        return;
+      }
 
-      if (widget.short.muxPlaybackId != null &&
-          widget.short.muxPlaybackId!.isNotEmpty) {
-        videoUrl =
-            'https://stream.mux.com/${widget.short.muxPlaybackId}.m3u8?max_resolution=$maxRes';
-      } else if (widget.short.videoId.isNotEmpty) {
+      String? videoUrl = shortStreamUrl(widget.short);
+      if (videoUrl == null && widget.short.videoId.isNotEmpty) {
         final videoService = ref.read(videoServiceProvider);
         final video = await videoService.getVideoById(widget.short.videoId);
         if (video != null &&
             video.muxPlaybackId != null &&
             video.muxPlaybackId!.isNotEmpty) {
           videoUrl =
-              'https://stream.mux.com/${video.muxPlaybackId}.m3u8?max_resolution=$maxRes';
+              'https://stream.mux.com/${video.muxPlaybackId}.m3u8?max_resolution=720p';
         }
       }
 
-      if (videoUrl != null &&
-          mounted &&
-          widget.isActive &&
-          generation == _playerGeneration) {
-        final controller = VideoPlayerController.networkUrl(
-          Uri.parse(videoUrl),
-        );
-        _videoController = controller;
-        await controller.initialize();
-        if (!mounted || !widget.isActive || generation != _playerGeneration) {
-          await controller.dispose();
-          if (identical(_videoController, controller)) _videoController = null;
-          return;
-        }
-        controller.setLooping(true);
+      if (videoUrl == null ||
+          !mounted ||
+          !widget.isActive ||
+          generation != _playerGeneration) {
+        return;
+      }
 
-        _videoController!.addListener(() {
-          if (!mounted || !identical(_videoController, controller)) return;
-          final duration = controller.value.duration;
-          final position = controller.value.position;
-          if (duration.inMilliseconds > 0) {
-            final p = position.inMilliseconds / duration.inMilliseconds;
-            if ((p - _progress).abs() > 0.01) {
-              setState(() {
-                _progress = p;
-              });
-            }
-          }
+      final controller = VideoPlayerController.networkUrl(
+        Uri.parse(videoUrl),
+        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+      );
+      _videoController = controller;
+
+      // Start the video opening IMMEDIATELY, and let any soundtrack set
+      // itself up alongside it instead of in front of it.
+      //
+      // This used to `await` the soundtrack's setSourceUrl before it even
+      // touched the video, which put a whole extra network round-trip in
+      // front of time-to-first-picture for every short that has a
+      // soundtrack — dead time where the poster sits alone on screen.
+      // Nothing about loading the audio is needed in order to decode
+      // video, so there is no reason for one to wait on the other.
+      final videoReady = controller.initialize();
+
+      Future<void>? audioReady;
+      final soundtrack = widget.short.soundtrack;
+      if (soundtrack != null && soundtrack.url.isNotEmpty) {
+        final audio = AudioPlayer();
+        _audioPlayer = audio;
+        controller.setVolume(0.0);
+        audio.setVolume(ShortsMuteState.instance.isMuted ? 0.0 : 1.0);
+        audioReady = () async {
+          await audio.setReleaseMode(ReleaseMode.loop);
+          await audio.setSourceUrl(soundtrack.url);
+        }();
+        // Swallow failures here so a bad soundtrack URL can never surface
+        // as an unhandled async error; the await below re-throws into the
+        // guarded block instead.
+        audioReady.catchError((_) {});
+      } else {
+        controller.setVolume(ShortsMuteState.instance.isMuted ? 0.0 : 1.0);
+      }
+
+      await videoReady;
+      if (!mounted || !widget.isActive || generation != _playerGeneration) {
+        await controller.dispose();
+        if (identical(_videoController, controller)) _videoController = null;
+        return;
+      }
+      controller.setLooping(true);
+
+      // NOTE: there used to be a `seekTo(1ms)` "pre-warm" here, plus a
+      // 100ms wall-clock wait, meant to force one decoded frame onto the
+      // texture before play(). Both are gone on purpose.
+      //
+      // Seeking an HLS stream that has only just finished initialize()
+      // makes ExoPlayer jump to a sync sample and hand MediaCodec an
+      // output buffer that has not been fully decoded yet. Rendering that
+      // buffer is exactly what produced the green/blocky diagonal
+      // garbage — uninitialized chroma planes read as green — and it
+      // varied by handset because every SoC's decoder recovers from a
+      // seek-before-first-keyframe differently. The pre-warm also made
+      // playback re-buffer from the network right at open, which is what
+      // left shorts sitting frozen on their poster.
+      //
+      // Letting the stream simply play from its natural start is both
+      // faster to first picture and the only version that decodes a clean
+      // frame on every device. The black-flash worry it was originally
+      // added for is handled properly now by mounting the video texture
+      // immediately (see build) and crossfading it in, rather than
+      // mounting it late.
+
+      _attachListenerAndReveal(controller);
+
+      if (widget.isActive) {
+        unawaited(controller.play());
+        // The soundtrack may still be loading — start it the moment it is
+        // ready rather than holding the video back waiting for it.
+        final audio = _audioPlayer;
+        if (audio != null) {
+          unawaited(() async {
+            try {
+              await audioReady;
+              if (!mounted ||
+                  generation != _playerGeneration ||
+                  !identical(_audioPlayer, audio)) {
+                return;
+              }
+              await audio.resume();
+            } catch (_) {}
+          }());
+        }
+      }
+
+      // Hard backstop: whatever the decoder/network do, the video layer
+      // is never allowed to stay hidden behind the poster forever. If no
+      // frame callback has revealed it by now, reveal anyway — a short
+      // that is quietly buffering should still show its own picture the
+      // moment it has one, and never present as permanently "stuck".
+      _firstFrameRevealTimer?.cancel();
+      _firstFrameRevealTimer = async.Timer(
+        const Duration(milliseconds: 1200),
+        () => _revealVideoLayer(controller),
+      );
+
+      if (mounted) {
+        setState(() {
+          _isInitialized = true;
+          _isPlaying = widget.isActive;
         });
-
-        // Soundtrack handling: if soundtrack is present, mute the video and loop the soundtrack
-        if (widget.short.soundtrack != null &&
-            widget.short.soundtrack!.url.isNotEmpty) {
-          _audioPlayer = AudioPlayer();
-          await _audioPlayer!.setReleaseMode(ReleaseMode.loop);
-          await _audioPlayer!.setSourceUrl(widget.short.soundtrack!.url);
-          if (!mounted || !widget.isActive || generation != _playerGeneration) {
-            await controller.dispose();
-            return;
-          }
-          controller.setVolume(0.0);
-        } else {
-          controller.setVolume(1.0);
-        }
-
-        if (mounted) {
-          setState(() {
-            _isInitialized = true;
-          });
-
-          // Only start playing if this short is currently active
-          if (widget.isActive) {
-            _resumePlayback();
-          } else {
-            _pausePlayback();
-          }
-        }
       }
     } catch (_) {}
   }
@@ -346,16 +610,25 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    ShortsMuteState.instance.muted.removeListener(_onMuteChanged);
+    _holdTimer?.cancel();
+    _firstFrameRevealTimer?.cancel();
     _videoController?.pause();
     _videoController?.dispose();
     _videoController = null;
     _audioPlayer?.stop();
     _audioPlayer?.dispose();
     _audioPlayer = null;
+    _progressNotifier.dispose();
     super.dispose();
   }
 
   void _togglePlay() {
+    // Swallow the tap that ended a fast-forward hold.
+    if (_suppressNextTap) {
+      _suppressNextTap = false;
+      return;
+    }
     if (_videoController == null || !_isInitialized) return;
     if (_videoController!.value.isPlaying) {
       _pausePlayback();
@@ -378,7 +651,8 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
     });
 
     if (_showHeartBurst) {
-      Future.delayed(const Duration(milliseconds: 900), () {
+      // 800ms, matching the site's `setTimeout(() => setBurstIndex(null), 800)`.
+      Future.delayed(const Duration(milliseconds: 800), () {
         if (mounted) setState(() => _showHeartBurst = false);
       });
     }
@@ -493,30 +767,72 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
         // 1. Video or Poster Layer with Tap to Toggle / Double Tap to Like
         GestureDetector(
           onTap: _togglePlay,
+          onTapDown: _startHold,
+          onTapUp: (_) => _endHold(),
+          onTapCancel: _endHold,
           onDoubleTap: () {
             if (!_isLiked) _toggleLike();
           },
-          child: _isInitialized && _videoController != null
-              ? SizedBox.expand(
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              // Steady base poster - always visible behind video
+              _buildShortPoster(),
+
+              // Zero-flash video surface — the same shape the website has.
+              //
+              // There is deliberately NO opacity animation here, and the
+              // poster above is never removed. That is the entire fix for
+              // the flash, and the previous code had the reasoning exactly
+              // backwards.
+              //
+              // It used to mount this at opacity 0 and crossfade to 1 on the
+              // first frame, on the theory that the texture would attach
+              // harmlessly behind the poster. It never did: RenderOpacity
+              // SKIPS PAINTING ITS CHILD ENTIRELY at alpha 0
+              // (`if (_alpha == 0) return;`), so the texture's first real
+              // composite was deferred until the fade began — landing on
+              // precisely the moment the fade was there to make seamless.
+              // That was the flash. The 220ms fade then pushed every video
+              // frame through an offscreen saveLayer for another dozen
+              // frames, which was the stutter on weaker GPUs.
+              //
+              // Without the opacity layer, a platform Texture that has not
+              // decoded anything yet simply paints nothing, so the poster
+              // shows through and the first real pictures paint straight
+              // over it. No crossfade, no second state flip in the paint
+              // path — which is how MuxPlayer swaps its own poster for video
+              // internally on the site, and why the site has never had this
+              // problem.
+              if (_isInitialized && _videoController != null)
+                Positioned.fill(
                   child: FittedBox(
                     fit: BoxFit.cover,
+                    clipBehavior: Clip.hardEdge,
                     child: SizedBox(
-                      // Keep the render surface stable while ExoPlayer
-                      // reports its final dimensions; resizing this box from
-                      // the provisional size to the stream size causes a
-                      // visible flash on some devices.
-                      width: 1080,
-                      height: 1920,
+                      width: _videoController!.value.size.width > 0
+                          ? _videoController!.value.size.width
+                          : 720,
+                      height: _videoController!.value.size.height > 0
+                          ? _videoController!.value.size.height
+                          : 1280,
                       child: VideoPlayer(_videoController!),
                     ),
                   ),
-                )
-              : _buildShortPoster(),
+                ),
+            ],
+          ),
         ),
 
         // 2. Heart Burst on Double-Tap
+        //
+        // Every overlay from here down is wrapped in IgnorePointer, matching
+        // the `pointer-events-none` the website puts on the same layers.
+        // In Flutter a decorated Container is hit-testable, so any of these
+        // sitting above the tap GestureDetector silently ate the tap.
         if (_showHeartBurst)
-          Center(
+          IgnorePointer(
+            child: Center(
             child: TweenAnimationBuilder<double>(
               tween: Tween(begin: 0.0, end: 1.2),
               duration: const Duration(milliseconds: 400),
@@ -533,21 +849,29 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
               },
             ),
           ),
+        ),
 
-        // 3. Play/Pause central indicator when paused
-        if (!_isPlaying && _isInitialized)
-          Center(
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.black.withValues(alpha: 0.5),
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white24, width: 1.5),
-              ),
-              child: const Icon(
-                Icons.play_arrow,
-                size: 48,
-                color: Colors.white,
+        // 3. Play/Pause central indicator when explicitly paused.
+        //
+        // This one was the cruellest: as a bare Container it absorbed taps
+        // itself, so once a short was paused the play badge sat exactly
+        // where you would tap to resume and blocked it. Purely decorative
+        // now — the tap goes through to the video layer underneath.
+        if (!_isPlaying && _isInitialized && _isFirstFrameRendered)
+          IgnorePointer(
+            child: Center(
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.5),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: Colors.white24, width: 1.5),
+                ),
+                child: const Icon(
+                  Icons.play_arrow,
+                  size: 48,
+                  color: Colors.white,
+                ),
               ),
             ),
           ),
@@ -557,22 +881,28 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
         // still runs behind the translucent nav bar rather than stopping
         // short of it and leaving a hard edge — but it grows by the same
         // amount so the fade still starts above the raised content.
+        // THE tap thief: this scrim covers the bottom 360dp of the screen —
+        // most of where a thumb naturally lands — and as a decorated
+        // Container it swallowed every tap in that area. The site marks the
+        // identical gradient `pointer-events-none`.
         Positioned(
           bottom: 0,
           left: 0,
           right: 0,
           height: 360 + widget.bottomInset,
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.bottomCenter,
-                end: Alignment.topCenter,
-                colors: [
-                  Colors.black.withValues(alpha: 0.90),
-                  Colors.black.withValues(alpha: 0.50),
-                  Colors.transparent,
-                ],
-                stops: const [0.0, 0.5, 1.0],
+          child: IgnorePointer(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.bottomCenter,
+                  end: Alignment.topCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.90),
+                    Colors.black.withValues(alpha: 0.50),
+                    Colors.transparent,
+                  ],
+                  stops: const [0.0, 0.5, 1.0],
+                ),
               ),
             ),
           ),
@@ -818,18 +1148,104 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
           ),
         ),
 
-        // 7. Top Linear Progress Bar — matches the website's ShortsPlayer.tsx,
-        // which puts this at the top of the card (like Stories), not the
-        // bottom, and uses a plain white fill rather than brand orange.
+        // 7. Top Linear Progress Bar
         Positioned(
           top: 0,
           left: 0,
           right: 0,
-          child: LinearProgressIndicator(
-            value: _progress,
-            minHeight: 2.5,
-            backgroundColor: Colors.white24,
-            valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+          child: IgnorePointer(
+            child: ValueListenableBuilder<double>(
+              valueListenable: _progressNotifier,
+              builder: (context, progress, child) {
+                return LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 2.5,
+                  backgroundColor: Colors.white24,
+                  valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
+                );
+              },
+            ),
+          ),
+        ),
+
+        // 7b. "2x Speed" badge while holding — top-centre black pill,
+        // mirroring the site's badge (`left-1/2 top-6`, bg-black/60).
+        if (_speedBoost)
+          IgnorePointer(
+            child: Align(
+              alignment: Alignment.topCenter,
+              child: SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.only(top: 24),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.6),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: const Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '2\u00D7',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                            height: 1,
+                          ),
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          'SPEED',
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 1.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+
+        // 8a. Mute / unmute. Top-right, mirroring the website's header
+        // control (`toggleMuted`, VolumeX / Volume2). The site keeps this
+        // as ONE feed-level choice rather than per short, so it is backed
+        // by ShortsMuteState and every card reflects the same value.
+        Positioned(
+          top: 0,
+          right: widget.onMinimized != null ? 56 : 0,
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.only(right: 10, top: 8),
+              child: GestureDetector(
+                onTap: () => ShortsMuteState.instance.toggle(),
+                behavior: HitTestBehavior.opaque,
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.42),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    ShortsMuteState.instance.isMuted
+                        ? Icons.volume_off_rounded
+                        : Icons.volume_up_rounded,
+                    color: Colors.white,
+                    size: 19,
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
 
@@ -904,58 +1320,41 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
   }
 
   Widget _buildShortPoster() {
-    String posterUrl = widget.short.poster.trim();
-    if (posterUrl.isEmpty &&
-        widget.short.muxPlaybackId != null &&
-        widget.short.muxPlaybackId!.isNotEmpty) {
-      posterUrl =
-          'https://image.mux.com/${widget.short.muxPlaybackId}/thumbnail.webp?width=640&height=1138&fit_mode=smartcrop&time=1';
+    // Every "no picture yet" surface below is pure black, deliberately.
+    //
+    // AppColors.surfaceDark is #0A0D18 — a dark navy, not black — while
+    // the shorts Scaffold behind this is Colors.black. Painting the
+    // placeholder navy therefore drew a visibly lighter rectangle over a
+    // black screen for as long as the thumbnail took to arrive, and then
+    // snapped to the real image. Black-on-black makes that same waiting
+    // period invisible instead of a flash.
+    if (_posterUrl.isEmpty) {
+      return const ColoredBox(color: Colors.black);
     }
 
-    if (posterUrl.isEmpty) {
-      return Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF1E293B), Color(0xFF0F172A), Colors.black],
-          ),
-        ),
-        child: const Center(
-          child: CircularProgressIndicator(color: AppColors.brandOrange),
-        ),
-      );
-    }
-
-    if (isDataImageUrl(posterUrl)) {
-      final bytes = decodeDataImageUrl(posterUrl);
+    if (isDataImageUrl(_posterUrl)) {
+      final bytes = decodeDataImageUrl(_posterUrl);
       if (bytes != null) {
         return Image.memory(
           bytes,
           fit: BoxFit.cover,
           errorBuilder: (context, error, stackTrace) =>
-              Container(color: Colors.black),
+              const ColoredBox(color: Colors.black),
         );
       }
     }
 
     return CachedNetworkImage(
-      imageUrl: posterUrl,
+      imageUrl: _posterUrl,
       fit: BoxFit.cover,
-      placeholder: (context, url) => Container(
+      useOldImageOnUrlChange: true,
+      fadeInDuration: Duration.zero,
+      fadeOutDuration: Duration.zero,
+      placeholder: (context, url) => const ColoredBox(
         color: Colors.black,
-        child: const Center(
-          child: CircularProgressIndicator(color: AppColors.brandOrange),
-        ),
       ),
       errorWidget: (context, url, error) => Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFF1E293B), Color(0xFF0F172A), Colors.black],
-          ),
-        ),
+        color: Colors.black,
         child: const Center(
           child: Icon(
             Icons.play_arrow_rounded,
@@ -1186,6 +1585,8 @@ class _ShortCommentsSheetState extends ConsumerState<_ShortCommentsSheet> {
                   child: TextField(
                     controller: _commentCtrl,
                     style: const TextStyle(color: Colors.white, fontSize: 13),
+                    textInputAction: TextInputAction.send,
+                    onSubmitted: (_) => _postComment(),
                     decoration: InputDecoration(
                       hintText: 'Add a comment...',
                       hintStyle: const TextStyle(color: Colors.white38),
@@ -1203,20 +1604,35 @@ class _ShortCommentsSheetState extends ConsumerState<_ShortCommentsSheet> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                IconButton(
-                  icon: _posting
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation(
-                              AppColors.brandOrange,
+                // Small circular "enter" arrow button, replacing the old
+                // bare paper-plane icon — same _postComment call, which
+                // already no-ops on empty text/while posting, so tap
+                // behavior is unchanged either way.
+                GestureDetector(
+                  onTap: _postComment,
+                  child: Container(
+                    width: 34,
+                    height: 34,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.brandOrange,
+                    ),
+                    alignment: Alignment.center,
+                    child: _posting
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation(Colors.white),
                             ),
+                          )
+                        : const Icon(
+                            Icons.arrow_upward_rounded,
+                            color: Colors.white,
+                            size: 18,
                           ),
-                        )
-                      : const Icon(Icons.send, color: AppColors.brandOrange),
-                  onPressed: _postComment,
+                  ),
                 ),
               ],
             ),

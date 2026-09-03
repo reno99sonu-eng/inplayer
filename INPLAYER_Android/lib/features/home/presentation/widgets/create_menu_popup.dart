@@ -73,8 +73,8 @@ class CreateMenuPopup extends StatelessWidget {
                 _buildCreateItem(
                   context: context,
                   icon: Icons.videocam_rounded,
-                  title: 'Upload Video',
-                  subtitle: 'Movies • Shorts • Series',
+                  title: 'Upload',
+                  subtitle: 'Video • Raftaar • Music',
                   gradient: const LinearGradient(
                     colors: [Color(0xFFEF4444), Color(0xFFF97316)],
                   ),
@@ -99,35 +99,10 @@ class CreateMenuPopup extends StatelessWidget {
                   },
                 ),
 
-                // Podcast
-                _buildCreateItem(
-                  context: context,
-                  icon: Icons.mic_external_on_rounded,
-                  title: 'Podcast',
-                  subtitle: 'Voice & Audio Shows',
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF06B6D4), Color(0xFF38BDF8)],
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    context.push('/upload');
-                  },
-                ),
-
-                // AI Studio
-                _buildCreateItem(
-                  context: context,
-                  icon: Icons.auto_awesome_rounded,
-                  title: 'AI Studio',
-                  subtitle: 'Generate with AI Assistant',
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFF8B5CF6), Color(0xFFD946EF)],
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    context.push('/creator-studio');
-                  },
-                ),
+                // Podcast and AI Studio removed on purpose. Podcast was a
+                // duplicate — it pushed '/upload', exactly the same route as
+                // Upload above, so it was a second door into one screen. The
+                // menu is now the two things you can actually start here.
               ],
             ),
           ),

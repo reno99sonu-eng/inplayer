@@ -479,11 +479,23 @@ class AuthService {
     }
   }
 
-  Future<void> resetPassword({required String email}) async {
+  /// Starts the signed-out "forgot password" flow.
+  ///
+  /// Returns the masked destination Cognito says it sent the code to (e.g.
+  /// `r***@g***.com`), or null if it reported none. That distinction matters:
+  /// Cognito returns success for several situations where no email is
+  /// actually sent, so "no destination" is the difference between "check your
+  /// inbox" and "nothing was sent and you would have waited forever".
+  Future<String?> resetPassword({required String email}) async {
     try {
-      await Amplify.Auth.resetPassword(username: email);
+      final result = await Amplify.Auth.resetPassword(username: email);
+      final destination = result.nextStep.codeDeliveryDetails?.destination;
 
-      _logger.i('Password reset initiated for $email');
+      _logger.i(
+        'Password reset initiated for $email — code delivery: '
+        '${destination ?? 'NONE REPORTED'}',
+      );
+      return destination;
     } on AuthException catch (e) {
       _logger.e('Reset password error: ${e.message}');
       rethrow;

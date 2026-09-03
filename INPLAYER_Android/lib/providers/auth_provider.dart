@@ -1,6 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
 
@@ -11,23 +10,9 @@ final authStateProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthService _authService;
   final _logger = Logger();
-  static const _cachedNameKey = 'inplayer:cached_user_name';
 
   AuthNotifier(this._authService) : super(const AuthState.initial()) {
     _init();
-  }
-
-  /// Keeps the startup greeting available before Cognito/profile hydration has
-  /// finished on the next cold launch. Some accounts only have a handle, so
-  /// never overwrite a useful cached value with an empty display name.
-  Future<void> _cacheDisplayName(User user) async {
-    final name = user.name.trim().isNotEmpty
-        ? user.name.trim()
-        : user.username.trim();
-    if (name.isEmpty) return;
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_cachedNameKey, name);
   }
 
   Future<void> _init() async {
@@ -38,7 +23,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (isSignedIn) {
         final user = await _authService.getCurrentUser();
         if (user != null) {
-          await _cacheDisplayName(user);
           state = AuthState.authenticated(user);
         } else {
           state = const AuthState.unauthenticated();
@@ -52,34 +36,35 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
+  /// Returns true on success. On failure the reason is also written into
+  /// [state], which is where SignInModal and SignUpModal read it from to show
+  /// the message — so both halves of that contract have to stay in place.
   Future<bool> signIn({required String email, required String password}) async {
     state = const AuthState.loading();
 
     final result = await _authService.signIn(email: email, password: password);
 
     if (result.success && result.user != null) {
-      await _cacheDisplayName(result.user!);
       state = AuthState.authenticated(result.user!);
       return true;
-    } else {
-      state = AuthState.error(result.error ?? 'Sign in failed');
-      return false;
     }
+    state = AuthState.error(result.error ?? 'Sign in failed');
+    return false;
   }
 
+  /// Federated sign-in through Cognito's Google provider. Same contract as
+  /// [signIn]: true on success, reason in [state] on failure.
   Future<bool> signInWithGoogle() async {
     state = const AuthState.loading();
 
     final result = await _authService.signInWithGoogle();
 
     if (result.success && result.user != null) {
-      await _cacheDisplayName(result.user!);
       state = AuthState.authenticated(result.user!);
       return true;
-    } else {
-      state = AuthState.error(result.error ?? 'Google sign in failed');
-      return false;
     }
+    state = AuthState.error(result.error ?? 'Google sign in failed');
+    return false;
   }
 
   Future<void> signUp({
@@ -137,13 +122,24 @@ class AuthNotifier extends StateNotifier<AuthState> {
     state = const AuthState.unauthenticated();
   }
 
-  Future<void> resetPassword({required String email}) async {
+  /// Returns the masked destination Cognito reported, or null if it reported
+  /// none.
+  ///
+  /// The rethrow is the point. This used to catch the error, write it into
+  /// `state`, and return normally — so the caller's own try/catch never fired
+  /// and ForgotPasswordModal advanced to "we sent you a 6-digit code" even
+  /// when Cognito had rejected the request outright. The screen said an email
+  /// was on its way while nothing had been sent, and the real reason sat in a
+  /// state field nothing was listening to.
+  Future<String?> resetPassword({required String email}) async {
     try {
-      await _authService.resetPassword(email: email);
+      final destination = await _authService.resetPassword(email: email);
       state = AuthState.passwordResetSent(email);
+      return destination;
     } catch (e) {
       _logger.e('Error resetting password: $e');
       state = AuthState.error('Password reset failed');
+      rethrow;
     }
   }
 
@@ -162,8 +158,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
       state = const AuthState.unauthenticated();
     } catch (e) {
+      // Same swallow as resetPassword above, and worse here: a wrong or
+      // expired code reported SUCCESS and bounced the person to sign-in,
+      // where their old password still worked and nothing explained why.
       _logger.e('Error confirming password reset: $e');
       state = AuthState.error('Password reset confirmation failed');
+      rethrow;
     }
   }
 
@@ -173,7 +173,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
       try {
         final user = await _authService.getCurrentUser();
         if (user != null) {
-          await _cacheDisplayName(user);
           state = AuthState.authenticated(user);
         }
       } catch (e) {

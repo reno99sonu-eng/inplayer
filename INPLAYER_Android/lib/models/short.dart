@@ -82,6 +82,25 @@ class Short {
     );
   }
 
+  factory Short.fromVideo(dynamic video) {
+    final v = video;
+    return Short(
+      id: v.id.isNotEmpty ? v.id : v.videoId,
+      videoId: v.videoId,
+      title: v.title,
+      creator: v.creator,
+      uploaderUsername: v.uploaderUsername,
+      uploaderId: v.uploaderId,
+      uploaderAvatarUrl: v.avatar,
+      poster: v.thumbnail,
+      views: v.views,
+      likes: '0',
+      comments: '0',
+      description: v.description,
+      muxPlaybackId: v.muxPlaybackId,
+    );
+  }
+
   static String _formatViews(dynamic views) {
     if (views is int) {
       return '$views views';

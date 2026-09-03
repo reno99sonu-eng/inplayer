@@ -87,14 +87,13 @@ final _authRefreshNotifierProvider = Provider<_AuthRefreshNotifier>((ref) {
   return notifier;
 });
 
+final rootNavigatorKey = GlobalKey<NavigatorState>();
+
 final routerProvider = Provider<GoRouter>((ref) {
-  // Watching this (not authStateProvider itself) is what keeps GoRouter
-  // stable: _authRefreshNotifierProvider's own body has no watched
-  // dependencies, so it's built exactly once and never invalidates —
-  // routerProvider's builder only ever runs once per app lifetime now.
   final refreshNotifier = ref.watch(_authRefreshNotifierProvider);
 
   return GoRouter(
+    navigatorKey: rootNavigatorKey,
     initialLocation: '/',
     refreshListenable: refreshNotifier,
     redirect: (context, state) {
@@ -169,7 +168,17 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/shorts',
         name: 'shorts',
-        builder: (context, state) => const ShortsPage(),
+        pageBuilder: (context, state) => CustomTransitionPage(
+          key: state.pageKey,
+          opaque: true,
+          barrierColor: Colors.black,
+          child: const ShortsPage(),
+          transitionDuration: const Duration(milliseconds: 150),
+          reverseTransitionDuration: const Duration(milliseconds: 120),
+          transitionsBuilder: (context, animation, secondaryAnimation, child) {
+            return FadeTransition(opacity: animation, child: child);
+          },
+        ),
       ),
       // Deep-link target for shared Raftaar (Shorts) videos — lands on the
       // scrolling Shorts feed positioned at this video, instead of the raw
@@ -179,9 +188,19 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/shorts/:videoId',
         name: 'shorts-video',
-        builder: (context, state) {
+        pageBuilder: (context, state) {
           final videoId = state.pathParameters['videoId'] ?? '';
-          return ShortsPage(startVideoId: videoId);
+          return CustomTransitionPage(
+            key: state.pageKey,
+            opaque: true,
+            barrierColor: Colors.black,
+            child: ShortsPage(startVideoId: videoId),
+            transitionDuration: const Duration(milliseconds: 150),
+            reverseTransitionDuration: const Duration(milliseconds: 120),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return FadeTransition(opacity: animation, child: child);
+            },
+          );
         },
       ),
       GoRoute(

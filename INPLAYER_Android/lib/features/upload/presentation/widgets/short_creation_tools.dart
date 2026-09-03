@@ -11,7 +11,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../models/soundtrack.dart';
 import '../../../../services/soundtrack_service.dart';
 
-/// Soundtrack picker, clip length and Look filter — the app's counterpart to
+/// Soundtrack picker and clip length — the app's counterpart to
 /// the website's `ShortCreationTools.tsx`.
 ///
 /// Two catalogues feed the same picker: InPlayer's own local instrumentals
@@ -157,14 +157,6 @@ class _ShortCreationToolsState extends ConsumerState<ShortCreationTools> {
           ),
         ],
 
-        _sectionLabel(context, 'Look'),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: LookFilter.values
-              .map((f) => _lookChip(context, f))
-              .toList(),
-        ),
         const SizedBox(height: 4),
       ],
     );
@@ -612,32 +604,4 @@ class _ShortCreationToolsState extends ConsumerState<ShortCreationTools> {
     );
   }
 
-  Widget _lookChip(BuildContext context, LookFilter f) {
-    final active = widget.value.filter == f;
-    return GestureDetector(
-      onTap: () => widget.onChanged(widget.value.copyWith(filter: f)),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-        decoration: BoxDecoration(
-          color: active
-              ? AppColors.brandOrange.withValues(alpha: 0.15)
-              : context.textPrimary.withValues(alpha: 0.03),
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(
-            color: active
-                ? AppColors.brandOrange.withValues(alpha: 0.45)
-                : context.borderSubtle,
-          ),
-        ),
-        child: Text(
-          f.label,
-          style: TextStyle(
-            color: active ? AppColors.brandOrangeLight : context.textSecondary,
-            fontSize: 12,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-      ),
-    );
-  }
 }

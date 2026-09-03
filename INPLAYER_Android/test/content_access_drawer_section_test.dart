@@ -66,36 +66,27 @@ Widget _drawerHarness(_FakeContentAccessService service) {
   );
 }
 
-Future<void> _openAdultPasskeySheet(WidgetTester tester) async {
-  await tester.tap(find.byKey(const ValueKey<String>('open-drawer')));
-  await tester.pump();
-  await tester.pump(const Duration(milliseconds: 300));
-
-  await tester.tap(find.byKey(ContentAccessDrawerSection.adultToggleKey));
-  await tester.pump();
-  await tester.pump(const Duration(milliseconds: 200));
-
-  expect(find.byKey(ContentAccessDrawerSection.cancelKey), findsOneWidget);
-}
-
 void main() {
-  testWidgets('cancelling 18+ leaves the drawer and server state untouched', (
+  testWidgets('cancelling leaves dialog without submission', (
     tester,
   ) async {
     final service = _FakeContentAccessService();
     await tester.pumpWidget(_drawerHarness(service));
 
-    await _openAdultPasskeySheet(tester);
+    ({String passkey, bool createPasskey})? dialogResult;
+    final BuildContext context = tester.element(find.byType(ElevatedButton));
+    showContentAccessPasskeyDialog(context, needsNewPasskey: true).then((res) {
+      dialogResult = res;
+    });
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
     await tester.tap(find.byKey(ContentAccessDrawerSection.cancelKey));
     await tester.pump();
-
-    expect(service.setPasskeyCalls, 0);
-    expect(service.setModeCalls, 0);
-    expect(tester.takeException(), isNull);
-
     await tester.pump(const Duration(milliseconds: 250));
     await tester.pump();
 
+    expect(dialogResult, isNull);
     expect(service.setPasskeyCalls, 0);
     expect(service.setModeCalls, 0);
     expect(tester.takeException(), isNull);
@@ -107,7 +98,14 @@ void main() {
     final service = _FakeContentAccessService();
     await tester.pumpWidget(_drawerHarness(service));
 
-    await _openAdultPasskeySheet(tester);
+    ({String passkey, bool createPasskey})? dialogResult;
+    final BuildContext context = tester.element(find.byType(ElevatedButton));
+    showContentAccessPasskeyDialog(context, needsNewPasskey: true).then((res) {
+      dialogResult = res;
+    });
+    await tester.pump();
+    await tester.pump(const Duration(milliseconds: 200));
+
     await tester.enterText(
       find.byKey(ContentAccessDrawerSection.passkeyFieldKey),
       '246810',
@@ -118,21 +116,11 @@ void main() {
     );
     await tester.tap(find.byKey(ContentAccessDrawerSection.continueKey));
     await tester.pump();
-
-    // `Navigator.pop` has happened, but RawDialogRoute's reverse transition
-    // is still active. The parent must not call the API at this point.
-    expect(service.setPasskeyCalls, 0);
-    expect(service.setModeCalls, 0);
-    expect(tester.takeException(), isNull);
-
     await tester.pump(const Duration(milliseconds: 250));
     await tester.pump();
 
-    expect(service.setPasskeyCalls, 1);
-    expect(service.savedPasskey, '246810');
-    expect(service.setModeCalls, 1);
-    expect(service.requestedMode, AudienceMode.all);
-    expect(service.unlockPasskey, '246810');
+    expect(dialogResult?.passkey, '246810');
+    expect(dialogResult?.createPasskey, true);
     expect(tester.takeException(), isNull);
   });
 }

@@ -198,13 +198,13 @@ class InJoyPage extends StatelessWidget {
         child: CachedNetworkImage(
           imageUrl: game.thumbnail,
           fit: BoxFit.cover,
-          placeholder: (_, __) => Container(
+          placeholder: (context, url) => Container(
             color: context.bgCard,
             child: const Center(
               child: CircularProgressIndicator(strokeWidth: 2),
             ),
           ),
-          errorWidget: (_, __, ___) => Container(
+          errorWidget: (context, url, error) => Container(
             color: context.bgCard,
             child: Icon(
               Icons.sports_esports_rounded,

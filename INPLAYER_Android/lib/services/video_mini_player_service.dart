@@ -123,6 +123,76 @@ class VideoMiniPlayerService extends ChangeNotifier {
     return c;
   }
 
+  /// Whether the floating window is currently playing.
+  bool get isPlaying => _controller?.value.isPlaying ?? false;
+
+  /// Play/pause from the window's own controls.
+  ///
+  /// Goes through the service rather than poking the controller directly so
+  /// a Raftaar short's separate soundtrack player is kept in step — pausing
+  /// only the video would leave its music playing on its own.
+  void togglePlayPause() {
+    final controller = _controller;
+    if (controller == null) return;
+    if (controller.value.isPlaying) {
+      controller.pause();
+      _audio?.pause();
+    } else {
+      controller.play();
+      _audio?.resume();
+    }
+    notifyListeners();
+  }
+
+  /// True while a full-screen player has asked this window to hold off.
+  bool _suspended = false;
+
+  /// Remembers whether the window was actually playing when it was
+  /// suspended, so releasing restores what the viewer had rather than
+  /// starting something they had paused themselves.
+  bool _wasPlayingBeforeSuspend = false;
+
+  /// Pause the floating window because a full-screen player is taking over
+  /// the screen (the Raftaar feed, or the watch page).
+  ///
+  /// This window is a SECOND hardware video decoder, and it renders on top
+  /// of every tab in the home shell — including Raftaar. Left running, a
+  /// minimized 16:9 video decodes underneath the short you are actually
+  /// watching: two decoders competing (logcat shows the short's frame rate
+  /// collapsing and `pipelineFull` spam), and two AudioTracks playing at
+  /// once. It also makes tap-to-play/pause on a short feel broken, because
+  /// the audio you can still hear belongs to the other player entirely.
+  ///
+  /// Pausing rather than closing is deliberate: the viewer minimized this
+  /// on purpose and should get it back, with its position intact, when they
+  /// leave the full-screen player.
+  void suspendForFullscreenPlayer() {
+    if (_suspended) return;
+    _suspended = true;
+    final controller = _controller;
+    if (controller == null) return;
+    _wasPlayingBeforeSuspend = controller.value.isPlaying;
+    if (_wasPlayingBeforeSuspend) {
+      controller.pause();
+      _audio?.pause();
+      notifyListeners();
+    }
+  }
+
+  /// Resume after the full-screen player has gone, but only if this window
+  /// was genuinely playing beforehand.
+  void releaseFullscreenSuspension() {
+    if (!_suspended) return;
+    _suspended = false;
+    if (!_wasPlayingBeforeSuspend) return;
+    _wasPlayingBeforeSuspend = false;
+    final controller = _controller;
+    if (controller == null) return;
+    controller.play();
+    _audio?.resume();
+    notifyListeners();
+  }
+
   /// Stop and tear everything down.
   ///
   /// Also the restore path for a short: `ShortPlayerWidget` builds and owns

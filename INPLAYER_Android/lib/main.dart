@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'core/theme/app_theme.dart';
@@ -9,15 +10,13 @@ import 'core/router/app_router.dart';
 import 'features/auth/presentation/screens/splash_screen.dart';
 import 'features/auth/presentation/screens/biometric_lock_screen.dart';
 import 'features/safety/presentation/widgets/face_scan_modal.dart';
-import 'features/home/presentation/widgets/content_access_drawer_section.dart';
-import 'features/home/presentation/widgets/floating_ai_button.dart';
 import 'services/content_access_service.dart';
 import 'services/geo_service.dart';
 import 'services/video_service.dart';
 import 'providers/kid_mode_provider.dart';
-import 'providers/auth_provider.dart';
 import 'services/platform_update_service.dart';
 import 'services/device_location_service.dart';
+import 'services/face_age_detector_service.dart';
 import 'providers/theme_provider.dart';
 
 Future<void> main() async {
@@ -79,6 +78,7 @@ class _InplayerAppState extends ConsumerState<InplayerApp> {
   bool _startupScanComplete = false;
   bool _geoBlocked = false;
   Future<void>? _startupPermissionsFuture;
+  final _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
 
   @override
   void initState() {
@@ -95,7 +95,12 @@ class _InplayerAppState extends ConsumerState<InplayerApp> {
   Future<void> _requestStartupPermissions() async {
     try {
       await Permission.locationWhenInUse.request();
-      await Permission.camera.request();
+      // Camera is deliberately NOT requested here. Asking for it this early
+      // means the OS permission dialog fires before the person has seen any
+      // explanation of what it's for or why — FaceScanModal requests it
+      // itself, with its "InPlayer Safety — on-device face verification"
+      // branding already on screen at that point, which is closer to
+      // informed consent than a bare system dialog on a black screen.
     } catch (e) {
       debugPrint('[InPlayer] Startup permission request failed: $e');
     }
@@ -133,75 +138,84 @@ class _InplayerAppState extends ConsumerState<InplayerApp> {
       return;
     }
 
-    final accessService = ref.read(contentAccessServiceProvider);
-    final previousAccessFuture = accessService.getState();
-    final result = await FaceScanModal.show(context, startupScan: true);
-    if (!mounted) return;
-    final previousAccess = await previousAccessFuture;
-    if (!mounted) return;
-
-    // A mode transition is always server-authorised with the account's
-    // six-digit content passkey. The face estimate only selects the desired
-    // filter; it never bypasses that authorization or changes local state.
-    var mode = result?.isChild == true
-        ? AudienceMode.kids
-        : result?.isChild == false && previousAccess?.mode == AudienceMode.all
-        ? AudienceMode.all
-        : AudienceMode.family;
-    var applied = const ContentAccessResult(success: true);
-    if (previousAccess?.mode != mode) {
-      // Auth hydration runs in parallel with the branded splash. Do not treat
-      // its transient initial/loading state as signed-out and accidentally
-      // skip the passkey gate for an already signed-in account.
-      for (var attempt = 0; attempt < 50; attempt++) {
-        final authState = ref.read(authStateProvider);
-        if (authState is! AuthStateInitial && authState is! AuthStateLoading) {
-          break;
-        }
-        await Future<void>.delayed(const Duration(milliseconds: 100));
-        if (!mounted) return;
-      }
-      final signedIn = ref.read(authStateProvider) is AuthStateAuthenticated;
-      if (!signedIn) {
-        // There is no account passkey to verify while signed out. Keep the
-        // server's existing safe state rather than making a local-only claim.
-        mode = previousAccess?.mode ?? AudienceMode.family;
-        applied = const ContentAccessResult(success: false);
-      } else {
-        final request = await showContentAccessPasskeyDialog(
-          context,
-          needsNewPasskey: !(previousAccess?.hasPasskey ?? false),
-        );
-        if (!mounted) return;
-        if (request == null) {
-          mode = previousAccess?.mode ?? AudienceMode.family;
-          applied = const ContentAccessResult(success: false);
-        } else {
-          if (request.createPasskey) {
-            final created = await accessService.setPasskey(request.passkey);
-            if (!created.success) {
-              mode = previousAccess?.mode ?? AudienceMode.family;
-              applied = created;
-            }
-          }
-          if (applied.success) {
-            applied = await accessService.setMode(
-              mode,
-              passkey: request.passkey,
-            );
-            if (!applied.success) {
-              mode = previousAccess?.mode ?? AudienceMode.family;
-            }
-          }
-        }
+    final navContext = rootNavigatorKey.currentContext;
+    FaceScanResult? result;
+    if (navContext != null && navContext.mounted) {
+      try {
+        result = await FaceScanModal.show(navContext, startupScan: true);
+      } catch (e) {
+        debugPrint('[InPlayer] Startup face scan error: $e');
       }
     }
+    if (!mounted) return;
+
+    // Read persisted preference from SharedPreferences
+    final prefs = await SharedPreferences.getInstance();
+    final savedKidMode = prefs.getBool('inplayer:kids_mode_enabled') ?? false;
+
+    // Content filtering based on face scan and user preference:
+    // If the user previously turned ON Kids Mode toggle, keep Kids Mode.
+    // If Kids Mode toggle is OFF (default):
+    // Face scan dynamically and immediately filters content for the person in front of camera:
+    //   - Minor/Child detected (<13) -> Kids content only (AudienceMode.kids)
+    //   - Adult/Standard (13+) -> Standard content (AudienceMode.family)
+    //   - No face / Skipped -> Fallback to Standard content (AudienceMode.family)
+    // NO PASSKEY / PASSCODE IS EVER REQUESTED ON STARTUP / FACE SCAN!
+    AudienceMode mode;
+    if (savedKidMode) {
+      mode = AudienceMode.kids;
+    } else if (result != null) {
+      mode = result.isChild ? AudienceMode.kids : AudienceMode.family;
+    } else {
+      mode = AudienceMode.family;
+    }
+
+    final accessService = ref.read(contentAccessServiceProvider);
     await ref
         .read(kidModeProvider.notifier)
-        .setKidMode(applied.success && mode == AudienceMode.kids);
+        .setKidMode(mode == AudienceMode.kids);
+    await accessService.setModeLocally(mode);
     VideoService.clearAudienceCaches();
     ref.read(contentAccessRevisionProvider.notifier).state++;
     if (mounted) setState(() => _startupScanComplete = true);
+    _showAudienceFlashCard(mode, fromScan: result != null && !savedKidMode);
+  }
+
+  /// The small, dismissible confirmation the person sees once they're
+  /// actually in the app — separate from the full-screen scan UI itself,
+  /// which they've already seen close by this point. Deliberately honest
+  /// about what happened rather than implying certainty: this is a default,
+  /// not a verified fact about the viewer, and it says so.
+  void _showAudienceFlashCard(AudienceMode mode, {required bool fromScan}) {
+    final messenger = _scaffoldMessengerKey.currentState;
+    if (messenger == null) return;
+
+    final String message;
+    switch (mode) {
+      case AudienceMode.kids:
+        message = fromScan
+            ? "Estimated a younger viewer — starting in Kids Mode. Change it anytime in Settings."
+            : 'Starting in Kids Mode.';
+        break;
+      case AudienceMode.family:
+        message = fromScan
+            ? 'Starting in Standard Mode. Change it anytime in Settings.'
+            : 'Starting in Standard Mode.';
+        break;
+      case AudienceMode.all:
+        message = 'Starting in All Content mode.';
+        break;
+    }
+
+    messenger.clearSnackBars();
+    messenger.showSnackBar(
+      SnackBar(
+        content: Text(message),
+        duration: const Duration(seconds: 4),
+        behavior: SnackBarBehavior.floating,
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      ),
+    );
   }
 
   @override
@@ -217,6 +231,7 @@ class _InplayerAppState extends ConsumerState<InplayerApp> {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode,
+      scaffoldMessengerKey: _scaffoldMessengerKey,
       routerConfig: router,
       builder: (context, child) {
         return Stack(
@@ -224,10 +239,10 @@ class _InplayerAppState extends ConsumerState<InplayerApp> {
           children: [
             ?child,
             if (_geoBlocked) const _RegionBlockedOverlay(),
-            // Keep the support/AI action available over every route, not just
-            // the Home tab. It uses a single root dialog and is safe to tap
-            // from HamMart, chat, settings, watch, and creator screens.
-            if (!_geoBlocked) const FloatingAIButton(),
+            // FloatingAIButton used to live here, above the router, so it
+            // floated over EVERY route — watch, shorts, chat, settings,
+            // checkout. It now belongs to the Home tab only and is mounted
+            // in home_page.dart instead.
             if (!_geoBlocked)
               SplashScreenOverlay(
                 onDismiss: () {

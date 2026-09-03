@@ -15,6 +15,7 @@ import 'music_page.dart';
 import '../../../upload/presentation/pages/upload_page.dart';
 import '../widgets/video_card.dart';
 import '../widgets/featured_hero_carousel.dart';
+import '../widgets/floating_ai_button.dart';
 import '../widgets/trending_now_row.dart';
 import '../widgets/raftaar_shorts_row.dart';
 import '../widgets/kids_row.dart';
@@ -32,7 +33,6 @@ import '../widgets/profile_menu_modal.dart';
 import '../widgets/create_menu_popup.dart';
 import '../../../auth/presentation/widgets/auth_modals.dart';
 import '../../../../core/widgets/notification_permission_helper.dart';
-import '../../../../providers/kid_mode_provider.dart';
 import '../../../../core/widgets/pattern_background.dart';
 import '../../../../core/widgets/user_avatar.dart';
 import '../../../../models/user.dart';
@@ -99,7 +99,14 @@ class _HomePageState extends ConsumerState<HomePage> {
           : const SizedBox.shrink(),
       _builtTabs.contains(1)
           ? ShortsPage(
-              key: ValueKey('shorts-$feedRevision'),
+              // Stable key on purpose. Folding feedRevision in here meant
+              // every content-access/platform-update bump destroyed and
+              // rebuilt the whole Raftaar feed — killing the video mid-play
+              // — which is what made opening it from the nav bar flicker.
+              // The revision now goes in as a field and the feed refreshes
+              // its own list instead. See ShortsPage.feedRevision.
+              key: const ValueKey('shorts'),
+              feedRevision: feedRevision,
               isActive: _currentIndex == _raftaarTab,
               bottomInset: shortsBottomInset,
               // Nothing to pop here — Raftaar is a tab, not a pushed route — so
@@ -109,7 +116,10 @@ class _HomePageState extends ConsumerState<HomePage> {
           : const SizedBox.shrink(),
       _builtTabs.contains(2) ? const UploadPage() : const SizedBox.shrink(),
       _builtTabs.contains(3)
-          ? MusicPage(key: ValueKey('music-$feedRevision'))
+          ? MusicPage(
+              key: ValueKey('music-$feedRevision'),
+              isActive: _currentIndex == 3,
+            )
           : const SizedBox.shrink(),
       _builtTabs.contains(4) ? const ProfilePage() : const SizedBox.shrink(),
     ];
@@ -145,93 +155,10 @@ class _HomePageState extends ConsumerState<HomePage> {
                 feedRevision: feedRevision,
               ),
             ),
+            // Home tab only. Previously mounted above the router in
+            // main.dart, which put it over every screen in the app.
+            if (_currentIndex == 0) const FloatingAIButton(),
             const VideoMiniPlayerOverlay(),
-            // Kids Mode Safety Banner Indicator
-            if (false)
-              Consumer(
-                builder: (context, ref, _) {
-                  final isKid = ref.watch(
-                    kidModeProvider.select((s) => s.isEnabled),
-                  );
-                  if (!isKid) return const SizedBox.shrink();
-
-                  return Positioned(
-                    top: MediaQuery.of(context).padding.top + 6,
-                    left: 16,
-                    right: 16,
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        // Audience changes are account-level operations and
-                        // must go through the drawer's six-digit passkey flow.
-                        onTap: () => Scaffold.maybeOf(context)?.openDrawer(),
-                        borderRadius: BorderRadius.circular(16),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 8,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xE6065F46),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: const Color(0xFF10B981),
-                              width: 1.2,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: const Color(
-                                  0xFF10B981,
-                                ).withValues(alpha: 0.3),
-                                blurRadius: 10,
-                                offset: const Offset(0, 3),
-                              ),
-                            ],
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.child_care_rounded,
-                                color: Colors.white,
-                                size: 18,
-                              ),
-                              const SizedBox(width: 8),
-                              const Expanded(
-                                child: Text(
-                                  'Kids Safe Mode Active • Content Filtered',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 8,
-                                  vertical: 3,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.white.withValues(alpha: 0.2),
-                                  borderRadius: BorderRadius.circular(8),
-                                ),
-                                child: const Text(
-                                  'EXIT (PIN)',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w800,
-                                  ),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
           ],
         ),
       ),
@@ -525,51 +452,63 @@ class HomeFeedPage extends ConsumerStatefulWidget {
   ConsumerState<HomeFeedPage> createState() => _HomeFeedPageState();
 }
 
+class _HomeFeedData {
+  final List<Video> videos;
+  final List<Video> featured;
+  final List<Short> shorts;
+  final Map<String, String> feedback;
+
+  const _HomeFeedData({
+    required this.videos,
+    required this.featured,
+    required this.shorts,
+    required this.feedback,
+  });
+}
+
 class _HomeFeedPageState extends ConsumerState<HomeFeedPage> {
-  late Future<List<Video>> _videosFuture;
-  late Future<List<Video>> _featuredFuture;
-  late Future<List<Short>> _shortsFuture;
-  late Future<Map<String, String>> _feedbackFuture;
+  late Future<_HomeFeedData> _feedDataFuture;
 
   /// Incremented on every pull-to-refresh and handed to child shelves that
   /// own their own fetch rather than reading one of the futures above.
-  /// TrendingNowRow is the one that needs it — it lives inside HomePage's
-  /// IndexedStack, so it is built once and kept alive for the whole session,
-  /// and without a signal like this it never re-fetched at all.
   int _feedRefreshTick = 0;
 
   @override
   void initState() {
     super.initState();
+    _feedDataFuture = _fetchFeedData(forceRefresh: false);
+  }
+
+  Future<_HomeFeedData> _fetchFeedData({bool forceRefresh = false}) async {
     final videoService = ref.read(videoServiceProvider);
-    _videosFuture = videoService.getVideos(forceRefresh: true);
-    _featuredFuture = videoService.getFeaturedWeekly(forceRefresh: true);
-    _shortsFuture = videoService.getShorts();
-    // Loaded once here and passed down to every VideoCard, matching
-    // RecommendationFeed.tsx's own `feedbackMap` — so 20+ cards on one
-    // screen share a single request instead of each firing its own.
-    _feedbackFuture = ref
-        .read(videoInteractionServiceProvider)
-        .getFeedbackMap();
+    final feedbackService = ref.read(videoInteractionServiceProvider);
+
+    final videosFuture = videoService.getVideos(forceRefresh: forceRefresh);
+    final featuredFuture = videoService.getFeaturedWeekly(forceRefresh: forceRefresh);
+    final shortsFuture = videoService.getShorts(forceRefresh: forceRefresh);
+    final feedbackFuture = feedbackService.getFeedbackMap();
+
+    final results = await Future.wait([
+      videosFuture,
+      featuredFuture,
+      shortsFuture,
+      feedbackFuture,
+    ]);
+
+    return _HomeFeedData(
+      videos: results[0] as List<Video>,
+      featured: results[1] as List<Video>,
+      shorts: results[2] as List<Short>,
+      feedback: results[3] as Map<String, String>,
+    );
   }
 
   Future<void> _refreshContent() async {
-    final videoService = ref.read(videoServiceProvider);
     setState(() {
-      _videosFuture = videoService.getVideos(forceRefresh: true);
-      _featuredFuture = videoService.getFeaturedWeekly(forceRefresh: true);
-      _shortsFuture = videoService.getShorts();
-      _feedbackFuture = ref
-          .read(videoInteractionServiceProvider)
-          .getFeedbackMap();
+      _feedDataFuture = _fetchFeedData(forceRefresh: true);
       _feedRefreshTick++;
     });
-    await Future.wait([
-      _videosFuture,
-      _featuredFuture,
-      _shortsFuture,
-      _feedbackFuture,
-    ]);
+    await _feedDataFuture;
   }
 
   @override
@@ -727,17 +666,19 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage> {
   /// Music belongs to the dedicated Music tab and nowhere else on home.
   /// Applying the filter here rather than inside VideoService.getVideos()
   /// is deliberate: getVideos() is shared with search, channel pages, the
-  /// Music tab itself and the "Music" category chip, all of which
-  /// legitimately need music rows. The exclusion is a property of the home
-  /// feed, not of the data layer, so it lives with the home feed.
-  static List<Video> _withoutMusic(List<Video> videos) =>
-      videos.where((v) => !v.isMusic).toList();
+  /// Filters out Music tracks and Raftaar Shorts from the main long-form video feed.
+  ///
+  /// Longform videos belong on the main feed grid, Raftaar Shorts belong in the
+  /// dedicated Raftaar tab and the horizontal Raftaar shelf, and Music belongs in the
+  /// dedicated Music tab.
+  static List<Video> _onlyLongformVideos(List<Video> videos) =>
+      videos.where((v) => !v.isMusic && !v.isShort).toList();
 
   Widget _buildHomeContent() {
-    return FutureBuilder<List<Video>>(
-      future: _videosFuture,
-      builder: (context, videoSnapshot) {
-        if (videoSnapshot.connectionState == ConnectionState.waiting) {
+    return FutureBuilder<_HomeFeedData>(
+      future: _feedDataFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return Padding(
             padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 80),
             child: Center(
@@ -756,22 +697,25 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage> {
           );
         }
 
-        if (videoSnapshot.hasError) {
+        if (snapshot.hasError || !snapshot.hasData) {
           return _buildErrorState();
         }
 
-        final videos = _withoutMusic(videoSnapshot.data ?? []);
+        final data = snapshot.data!;
+        final videos = _onlyLongformVideos(data.videos);
+        final featured = _onlyLongformVideos(data.featured);
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             _buildCategoryChips(),
-            _buildFeaturedFromBackend(),
+            if (featured.isNotEmpty)
+              FeaturedHeroCarousel(featuredVideos: featured),
             const SizedBox(height: 16),
             if (videos.isEmpty)
               _buildEmptyState()
             else
-              _buildRhythmFeed(videos),
+              _buildRhythmFeed(videos, data.shorts, data.feedback),
           ],
         );
       },
@@ -781,16 +725,12 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage> {
   /// The real home feed shelf rhythm — mirrors
   /// RecommendationFeed.tsx: videos in blocks of 4, with
   /// TrendingNow after the first block, the InJoy games shelf after the
-  /// second, and a Raftaar Shorts shelf after every odd block (using a
-  /// cursor that only advances when a shelf actually gets content, so a
-  /// short shorts list doesn't leave later shelves empty). Kids/Music
-  /// shelves come from the same already-fetched video list ([Video.audience]
-  /// / [Video.isMusic]), matching getRealContent() on the website rather
-  /// than a separate endpoint. The website also inserts one ad slot at a
-  /// random position among the visible items — this app places it once,
-  /// after the first block, a deliberate simplification of that
-  /// randomness rather than a missed feature.
-  Widget _buildRhythmFeed(List<Video> videos) {
+  /// second, and a Raftaar Shorts shelf after every odd block.
+  Widget _buildRhythmFeed(
+    List<Video> videos,
+    List<Short> allShorts,
+    Map<String, String> feedbackMap,
+  ) {
     const blockSize = 4;
     const shortsPerShelf = 8;
 
@@ -806,69 +746,52 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage> {
       );
     }
 
-    return FutureBuilder<List<Object>>(
-      // Combined so the shelf rhythm only rebuilds once both the shorts
-      // list (for the repeating Raftaar shelves) and the feedback map
-      // (for every VideoCard's Interested/Not Interested state) are in,
-      // rather than flashing an unfed state for one and not the other.
-      future: Future.wait([_shortsFuture, _feedbackFuture]),
-      builder: (context, snapshot) {
-        final results = snapshot.data;
-        final allShorts = results != null
-            ? results[0] as List<Short>
-            : const <Short>[];
-        final feedbackMap = results != null
-            ? results[1] as Map<String, String>
-            : const <String, String>{};
+    int shelfCursor = 0;
+    final widgets = <Widget>[];
 
-        int shelfCursor = 0;
-        final widgets = <Widget>[];
+    if (kidsVideos.isNotEmpty) {
+      widgets.add(KidsRow(videos: kidsVideos));
+      widgets.add(const SizedBox(height: 12));
+    }
 
-        if (kidsVideos.isNotEmpty) {
-          widgets.add(KidsRow(videos: kidsVideos));
+    for (var blockIndex = 0; blockIndex < blocks.length; blockIndex++) {
+      widgets.add(_buildVideoGrid(blocks[blockIndex], feedbackMap));
+      widgets.add(const SizedBox(height: 12));
+
+      if (blockIndex == 0) {
+        widgets.add(const HomeAdCard());
+        widgets.add(const SizedBox(height: 12));
+        widgets.add(TrendingNowRow(refreshToken: _feedRefreshTick));
+        widgets.add(const SizedBox(height: 12));
+      }
+      if (blockIndex == 1) {
+        widgets.add(const PlayablesShelf());
+        widgets.add(const SizedBox(height: 12));
+      }
+
+      if (blockIndex.isOdd && shelfCursor < allShorts.length) {
+        final end = (shelfCursor + shortsPerShelf > allShorts.length)
+            ? allShorts.length
+            : shelfCursor + shortsPerShelf;
+        final slice = allShorts.sublist(shelfCursor, end);
+        if (slice.isNotEmpty) {
+          widgets.add(
+            RaftaarShortsRow(
+              shorts: slice,
+              title: shelfCursor == 0
+                  ? 'Raftaar Shorts'
+                  : 'More Raftaar Shorts',
+            ),
+          );
           widgets.add(const SizedBox(height: 12));
+          shelfCursor = end;
         }
+      }
+    }
 
-        for (var blockIndex = 0; blockIndex < blocks.length; blockIndex++) {
-          widgets.add(_buildVideoGrid(blocks[blockIndex], feedbackMap));
-          widgets.add(const SizedBox(height: 12));
-
-          if (blockIndex == 0) {
-            widgets.add(const HomeAdCard());
-            widgets.add(const SizedBox(height: 12));
-            widgets.add(TrendingNowRow(refreshToken: _feedRefreshTick));
-            widgets.add(const SizedBox(height: 12));
-          }
-          if (blockIndex == 1) {
-            widgets.add(const PlayablesShelf());
-            widgets.add(const SizedBox(height: 12));
-          }
-
-          if (blockIndex.isOdd && shelfCursor < allShorts.length) {
-            final end = (shelfCursor + shortsPerShelf > allShorts.length)
-                ? allShorts.length
-                : shelfCursor + shortsPerShelf;
-            final slice = allShorts.sublist(shelfCursor, end);
-            if (slice.isNotEmpty) {
-              widgets.add(
-                RaftaarShortsRow(
-                  shorts: slice,
-                  title: shelfCursor == 0
-                      ? 'Raftaar Shorts'
-                      : 'More Raftaar Shorts',
-                ),
-              );
-              widgets.add(const SizedBox(height: 12));
-              shelfCursor = end;
-            }
-          }
-        }
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: widgets,
-        );
-      },
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: widgets,
     );
   }
 
@@ -927,9 +850,7 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage> {
       // this chip is just a link back to "/".
       return;
     }
-    if (cat == 'Verticals') {
-      // The website switches the home feed's own orientation in place;
-      // this app already has that same content as a dedicated tab.
+    if (cat == 'Verticals' || cat == 'Raftaar (Vertical Videos)' || cat.toLowerCase().contains('raftaar')) {
       context.go('/shorts');
       return;
     }
@@ -993,27 +914,6 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage> {
     );
   }
 
-  Widget _buildFeaturedFromBackend() {
-    return FutureBuilder<List<Video>>(
-      future: _featuredFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const SizedBox(
-            height: 380,
-            child: Center(
-              child: CircularProgressIndicator(color: AppColors.brandOrange),
-            ),
-          );
-        }
-        final featuredVideos = _withoutMusic(snapshot.data ?? []);
-        if (featuredVideos.isEmpty) {
-          return const SizedBox.shrink();
-        }
-        return FeaturedHeroCarousel(featuredVideos: featuredVideos);
-      },
-    );
-  }
-
   Widget _buildVideoGrid(
     List<Video> videos, [
     Map<String, String> feedbackMap = const {},
@@ -1027,6 +927,7 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage> {
       itemBuilder: (context, index) {
         final video = videos[index];
         return VideoCard(
+          key: ValueKey(video.videoId),
           video: video,
           initialFeedback: feedbackMap[video.videoId],
         );

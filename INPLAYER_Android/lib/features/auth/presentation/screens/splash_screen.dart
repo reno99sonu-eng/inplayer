@@ -40,6 +40,7 @@ class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
   late final Animation<double> _flashOpacity;
   late final Animation<double> _shinePosition;
   late final Animation<double> _taglineOpacity;
+  late final Animation<double> _madeInIndiaOpacity;
   late final Animation<double> _greetingOpacity;
   late final Animation<double> _curtainOpacity;
   late final ProviderSubscription<AuthState> _authSubscription;
@@ -155,6 +156,10 @@ class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
     _taglineOpacity = CurvedAnimation(
       parent: _controller,
       curve: const Interval(.43, .65, curve: Curves.easeOut),
+    );
+    _madeInIndiaOpacity = CurvedAnimation(
+      parent: _controller,
+      curve: const Interval(0.0, .16, curve: Curves.easeIn),
     );
     _greetingOpacity = CurvedAnimation(
       parent: _controller,
@@ -476,9 +481,9 @@ class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
                 Positioned(
                   left: 0,
                   right: 0,
-                  bottom: 18,
+                  bottom: 68,
                   child: FadeTransition(
-                    opacity: _taglineOpacity,
+                    opacity: _madeInIndiaOpacity,
                     child: const Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
@@ -486,13 +491,13 @@ class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
                           'Made in India',
                           style: TextStyle(
                             color: Color(0xC9FDE68A),
-                            fontSize: 11,
+                            fontSize: 14.5,
                             fontWeight: FontWeight.w600,
-                            letterSpacing: 1.1,
+                            letterSpacing: 1.4,
                           ),
                         ),
-                        SizedBox(width: 7),
-                        Text('🇮🇳', style: TextStyle(fontSize: 15, height: 1)),
+                        SizedBox(width: 8),
+                        Text('🇮🇳', style: TextStyle(fontSize: 20, height: 1)),
                       ],
                     ),
                   ),

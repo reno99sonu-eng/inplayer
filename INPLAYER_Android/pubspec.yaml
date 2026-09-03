@@ -188,10 +188,35 @@ dependencies:
   crypto: ^3.0.7
 
   # On-Device Face ID & Age Detection (Kids Safety Mode)
+  # `image` was already present transitively, but the age scan imports it
+  # directly (cropping and resizing the captured face before inference), and
+  # relying on someone else's transitive dependency for that is how a build
+  # breaks the day an unrelated package drops it.
+  image: ^4.9.1
   camera: ^0.11.3
   google_mlkit_face_detection: ^0.13.0
   geolocator: ^13.0.2
   permission_handler: ^12.0.1
+
+  # Native in-app live broadcasting — the app-side counterpart of what the
+  # website does on app/live/page.tsx with `amazon-ivs-web-broadcast`. That
+  # SDK is JavaScript-only with no Flutter port, so this local package wraps
+  # AWS's own Amazon IVS Broadcast SDK for Android instead, against the exact
+  # same IVS channel: the ingestEndpoint + streamKey that
+  # POST /api/live/ivs-create already returns, unchanged.
+  #
+  # A path package rather than platform code in android/app on purpose — a
+  # pubspec plugin is wired up by GeneratedPluginRegistrant automatically, so
+  # MainActivity.kt is never touched. Falls back to the stream-key flow on
+  # Android 8 and older, which the IVS SDK does not support.
+  ivs_broadcast:
+    path: packages/ivs_broadcast
+
+  # On-device inference for the face age scan (AgeModelService). Runs the
+  # bundled FairFace network; the maintained successor to tflite_flutter,
+  # which is discontinued. Auto-bundles its native libraries, so there is no
+  # manual .so step in the Android build.
+  flutter_litert: ^3.8.0
 
 dev_dependencies:
   flutter_test:
@@ -206,6 +231,11 @@ flutter:
   assets:
     - assets/images/
     - assets/sounds/
+    # Listed as an explicit FILE, never as `assets/models/`. The model is
+    # delivered in three .part pieces that are joined in place, and a folder
+    # glob would bundle those leftovers too — another 21 MB of dead weight
+    # inside the APK for nothing.
+    - assets/models/fairface_age_int8.tflite
 
   # Uncomment and add font files to enable custom fonts
   # fonts:

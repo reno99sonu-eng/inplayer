@@ -1,0 +1,85 @@
+group = "com.inplayer.ivsbroadcast"
+version = "1.0-SNAPSHOT"
+
+// Versions here deliberately match the ones the app itself resolves in
+// android/settings.gradle.kts (AGP 8.11.1, Kotlin 2.2.20) so this module can
+// never drag a second, different Android Gradle Plugin onto the build
+// classpath. Same shape as the first-party Flutter plugins already in this
+// app (camera_android, video_player_android), which all carry a buildscript
+// block of their own.
+buildscript {
+    ext.kotlin_version = "2.2.20"
+    repositories {
+        google()
+        mavenCentral()
+    }
+    dependencies {
+        classpath "com.android.tools.build:gradle:8.11.1"
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
+    }
+}
+
+rootProject.allprojects {
+    repositories {
+        google()
+        mavenCentral()
+    }
+}
+
+apply plugin: "com.android.library"
+apply plugin: "kotlin-android"
+
+android {
+    namespace = "com.inplayer.ivsbroadcast"
+
+    // Must be <= the app module's compileSdk (which is flutter.compileSdkVersion).
+    // If Gradle ever says "requires ... compile against version N or later",
+    // raise this to match the app rather than lowering the app.
+    compileSdk = 36
+
+    compileOptions {
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
+    }
+
+    sourceSets {
+        main.java.srcDirs += "src/main/kotlin"
+    }
+
+    defaultConfig {
+        // Intentionally lower than the IVS broadcast SDK's own floor of 28.
+        // The whole point is that adding this must NOT raise the app's minSdk
+        // and cut off existing Android 7 and 8 installs: the manifest merge is
+        // waived with tools:overrideLibrary (see src/main/AndroidManifest.xml)
+        // and every call into the SDK is gated behind Build.VERSION.SDK_INT
+        // >= 28 in IvsBroadcastPlugin, which reports isSupported = false on
+        // older phones so Go Live falls back to the stream-key flow.
+        minSdk = 21
+    }
+
+    buildTypes {
+        release {
+            consumerProguardFiles "proguard-rules.pro"
+        }
+    }
+}
+
+// Same form the app module uses — Kotlin 2.x's compilerOptions DSL rather
+// than the deprecated kotlinOptions block.
+kotlin {
+    compilerOptions {
+        jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
+    }
+}
+
+dependencies {
+    // Amazon IVS Broadcast SDK for Android — the native counterpart of the
+    // website's amazon-ivs-web-broadcast. Same AWS IVS channel, same
+    // ingestEndpoint + streamKey returned by /api/live/ivs-create.
+    //
+    // The SDK itself depends on OkHttp at runtime. Without an explicit OkHttp
+    // dependency present on the app classpath, R8 strips those classes during
+    // release minification and the build fails with the missing-class error.
+    api "com.amazonaws:ivs-broadcast:1.45.0"
+    implementation "com.squareup.okhttp3:okhttp:4.12.0"
+}

@@ -1,0 +1,28 @@
+name: ivs_broadcast
+description: >
+  Native Amazon IVS broadcasting for the InPlayer Android app. Exists so the
+  app can go live from the phone's own camera and microphone, exactly like
+  app/live/page.tsx does in the browser with amazon-ivs-web-broadcast — that
+  web SDK is JavaScript-only and has no Flutter port, so the equivalent
+  native Amazon IVS Broadcast SDK for Android is wrapped here instead.
+
+  Deliberately a local path package rather than app-module platform code: a
+  pubspec plugin is registered automatically by GeneratedPluginRegistrant,
+  which keeps MainActivity.kt untouched.
+version: 1.0.0
+publish_to: "none"
+
+environment:
+  sdk: ^3.12.2
+  flutter: ">=3.3.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+flutter:
+  plugin:
+    platforms:
+      android:
+        package: com.inplayer.ivsbroadcast
+        pluginClass: IvsBroadcastPlugin

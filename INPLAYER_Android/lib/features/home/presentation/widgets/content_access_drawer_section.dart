@@ -10,24 +10,12 @@ import '../../../../providers/auth_provider.dart';
 import '../../../../providers/kid_mode_provider.dart';
 import '../../../../services/content_access_service.dart';
 import '../../../../services/video_service.dart';
-import '../../../auth/presentation/widgets/auth_modals.dart';
 
 /// The single source of truth for 18+ and Kids content controls in the
-/// hamburger drawer. It mirrors the website's one-mode model:
-///
-/// * 18+ on = `all` (requires the account passkey)
-/// * 18+ off = `family`
-/// * Kids on = `kids`
-/// * Kids off = `family`
-/// Every transition is confirmed with the same account-owned six-digit passkey.
-///
-/// The passkey sheet is deliberately independent from this drawer state.
-/// It only returns an input after its route is completely popped; network
-/// requests and drawer updates happen afterwards. This avoids deactivating a
-/// dependent drawer widget while a dialog is still mounted, the source of
-/// Flutter's `_dependents.isEmpty` assertion on cancel/submit.
+/// hamburger drawer.
 class ContentAccessDrawerSection extends ConsumerStatefulWidget {
   static const adultToggleKey = ValueKey<String>('content-access-adult-toggle');
+  static const kidsToggleKey = ValueKey<String>('content-access-kids-toggle');
   static const passkeyFieldKey = ValueKey<String>('content-access-passkey');
   static const confirmPasskeyFieldKey = ValueKey<String>(
     'content-access-confirm-passkey',
@@ -87,9 +75,8 @@ Future<({String passkey, bool createPasskey})?> showContentAccessPasskeyDialog(
 class _ContentAccessDrawerSectionState
     extends ConsumerState<ContentAccessDrawerSection> {
   AudienceMode _mode = AudienceMode.family;
-  bool _hasPasskey = false;
   bool _loading = true;
-  bool _busy = false;
+  final bool _busy = false;
   String? _error;
 
   @override
@@ -100,11 +87,13 @@ class _ContentAccessDrawerSectionState
 
   Future<void> _load() async {
     final access = await ref.read(contentAccessServiceProvider).getState();
+    final isKid = ref.read(kidModeProvider).isEnabled;
     if (!mounted) return;
     setState(() {
       if (access != null) {
         _mode = access.mode;
-        _hasPasskey = access.hasPasskey;
+      } else if (isKid) {
+        _mode = AudienceMode.kids;
       }
       _loading = false;
     });
@@ -122,99 +111,21 @@ class _ContentAccessDrawerSectionState
   }
 
   Future<void> _exitKidsMode() async {
-    await _setNarrowMode(AudienceMode.family);
+    _applyAudienceChange(AudienceMode.family);
+    if (_signedIn) {
+      unawaited(ref.read(contentAccessServiceProvider).setMode(AudienceMode.family));
+    }
   }
 
   Future<void> _enableKidsMode() async {
-    await _setNarrowMode(AudienceMode.kids);
-  }
-
-  Future<void> _setNarrowMode(AudienceMode next) async {
-    if (_loading || _busy) return;
-    await _requestAdultMode(next);
-  }
-
-  Future<void> _requestAdultMode([
-    AudienceMode target = AudienceMode.all,
-  ]) async {
-    if (_loading || _busy) return;
-    if (!_signedIn) {
-      showSignInModal(context);
-      return;
-    }
-
-    // `Navigator.push` completes as soon as the route is popped, before its
-    // reverse transition has removed the overlay. Retain the route and await
-    // `completed` too: only then may this drawer update providers or state.
-    // That keeps InheritedWidget dependents out of a deactivating dialog route,
-    // including when the user presses Cancel.
-    final route = RawDialogRoute<_AdultUnlockRequest>(
-      barrierDismissible: false,
-      barrierLabel: 'Content access passkey',
-      barrierColor: Colors.black.withValues(alpha: .68),
-      transitionDuration: const Duration(milliseconds: 180),
-      pageBuilder: (context, animation, secondaryAnimation) =>
-          _AdultPasskeySheet(needsNewPasskey: !_hasPasskey),
-      transitionBuilder: (context, animation, secondaryAnimation, child) {
-        final curve = CurvedAnimation(
-          parent: animation,
-          curve: Curves.easeOutCubic,
-        );
-        return FadeTransition(
-          opacity: curve,
-          child: ScaleTransition(
-            scale: Tween<double>(begin: .97, end: 1).animate(curve),
-            child: child,
-          ),
-        );
-      },
-    );
-    final navigator = Navigator.of(context, rootNavigator: true);
-    final request = await navigator.push(route);
-    await route.completed;
-    if (!mounted || request == null) return;
-
-    setState(() {
-      _busy = true;
-      _error = null;
-    });
-    final service = ref.read(contentAccessServiceProvider);
-
-    if (request.createPasskey) {
-      final created = await service.setPasskey(request.passkey);
-      if (!mounted) return;
-      if (!created.success) {
-        setState(() {
-          _busy = false;
-          _error = created.error ?? 'Could not save the passkey.';
-        });
-        return;
-      }
-      // The server has accepted the new code even if the subsequent mode
-      // request is interrupted. Keep this truth locally so a retry asks for
-      // the existing passkey instead of trying to create it a second time.
-      if (mounted) setState(() => _hasPasskey = true);
-    }
-
-    final unlocked = await service.setMode(target, passkey: request.passkey);
-    if (!mounted) return;
-    setState(() => _busy = false);
-    if (unlocked.success) {
-      setState(() => _hasPasskey = true);
-      _applyAudienceChange(target);
-    } else {
-      // A stale cached `hasPasskey` must not trap someone in a broken flow.
-      // The server's 409 is authoritative, so offer create-passkey next time.
-      setState(() {
-        if (unlocked.needsPasskey) _hasPasskey = false;
-        _error = unlocked.error ?? 'Could not update content access.';
-      });
+    _applyAudienceChange(AudienceMode.kids);
+    if (_signedIn) {
+      unawaited(ref.read(contentAccessServiceProvider).setMode(AudienceMode.kids));
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final adultOn = _mode == AudienceMode.all;
     final kidsOn = _mode == AudienceMode.kids;
     final disabled = _loading || _busy;
 
@@ -233,23 +144,8 @@ class _ContentAccessDrawerSectionState
             ),
           ),
         ),
-        if (false)
-          _DrawerToggleRow(
-            key: ContentAccessDrawerSection.adultToggleKey,
-            icon: Icons.eighteen_up_rating_rounded,
-            label: '18+ content',
-            hint: _loading
-                ? 'Checking...'
-                : adultOn
-                ? 'Showing everything, 18+ included'
-                : '18+ hidden - passkey to unlock',
-            value: adultOn,
-            disabled: disabled,
-            onChanged: (enabled) => enabled
-                ? _requestAdultMode()
-                : _setNarrowMode(AudienceMode.family),
-          ),
         _DrawerToggleRow(
+          key: ContentAccessDrawerSection.kidsToggleKey,
           icon: Icons.child_care_rounded,
           label: 'Kids only',
           hint: _loading

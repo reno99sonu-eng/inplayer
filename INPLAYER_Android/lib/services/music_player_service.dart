@@ -1,4 +1,6 @@
 // ignore_for_file: deprecated_member_use
+import 'dart:async';
+
 import 'package:audio_session/audio_session.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,16 +9,41 @@ import 'package:just_audio_background/just_audio_background.dart';
 import 'package:logger/logger.dart';
 import 'package:permission_handler/permission_handler.dart';
 
+import '../core/utils/equalizer_store.dart';
+import '../core/utils/playback_settings_store.dart';
 import '../models/video.dart';
 import 'history_service.dart';
 
 class MusicPlayerService extends ChangeNotifier {
   final _logger = Logger();
-  final AudioPlayer _player = AudioPlayer();
+
+  /// Android's own equalizer AudioEffect, attached to this player's audio
+  /// pipeline.
+  ///
+  /// It has to be constructed WITH the player — an AudioPipeline cannot be
+  /// attached to an AudioPlayer after the fact — so it exists for the life
+  /// of the service whether or not anyone ever opens the equalizer screen.
+  /// While disabled it is a pass-through and costs nothing.
+  ///
+  /// If this ever needs backing out, deleting the `audioPipeline:` argument
+  /// below returns the player to exactly its previous behaviour; nothing
+  /// else in playback reads it.
+  final AndroidEqualizer _equalizer = AndroidEqualizer();
+
+  /// `late` because a field initializer cannot reference another instance
+  /// field. It is created on first touch, which is inside the constructor
+  /// body below, by which point _equalizer exists.
+  late final AudioPlayer _player = AudioPlayer(
+    audioPipeline: AudioPipeline(androidAudioEffects: [_equalizer]),
+  );
+
+  AndroidEqualizer get equalizer => _equalizer;
+
   final Future<void> Function(String videoId)? onTrackStarted;
 
   MusicPlayerService({this.onTrackStarted}) {
     _initAudioSession();
+    unawaited(_restoreEqualizer());
     _player.currentIndexStream.listen((index) {
       final changed = index != _currentIndex;
       _currentIndex = index;
@@ -106,9 +133,55 @@ class MusicPlayerService extends ChangeNotifier {
   Duration get position => _player.position;
   Duration? get duration => _player.duration;
 
+  /// Cached copy of Settings > Music > Audio quality. Refreshed when a queue
+  /// starts rather than watched, so changing it applies from the next queue
+  /// instead of yanking the source out from under what is already playing.
+  bool _audioDataSaver = false;
+
+  /// Re-applies the saved equalizer settings at startup.
+  ///
+  /// Deliberately fire-and-forget and fully guarded: `parameters` does not
+  /// resolve until the effect has actually attached on the platform side,
+  /// which only happens once an audio source is loaded. If no track is ever
+  /// played this simply stays pending, which costs nothing — and it must
+  /// never be allowed to take playback down with it.
+  Future<void> _restoreEqualizer() async {
+    try {
+      final saved = await EqualizerStore.get();
+      if (!saved.enabled) return;
+      await _equalizer.setEnabled(true);
+      if (saved.gains.isEmpty) return;
+      final params = await _equalizer.parameters;
+      final bands = params.bands;
+      for (var i = 0; i < bands.length && i < saved.gains.length; i++) {
+        await bands[i].setGain(saved.gains[i]);
+      }
+    } catch (e) {
+      _logger.w('Could not restore equalizer settings: $e');
+    }
+  }
+
+  Future<void> _refreshAudioQuality() async {
+    try {
+      final settings = await PlaybackSettingsStore.get();
+      _audioDataSaver = settings.audioQuality.toLowerCase() == 'low';
+    } catch (_) {
+      // Never block playback on a preference read — keep the last value.
+    }
+  }
+
+  /// Mux publishes exactly one audio-only static rendition per asset, at a
+  /// deterministic URL alongside the adaptive HLS manifest. Data Saver uses
+  /// it: for music the video renditions inside the HLS master are pure waste.
+  /// There is no lower-bitrate audio variant to choose between, which is why
+  /// this is a two-way switch and not a quality ladder.
+  String _streamUrlFor(String playbackId) => _audioDataSaver
+      ? 'https://stream.mux.com/$playbackId/audio.m4a'
+      : 'https://stream.mux.com/$playbackId.m3u8';
+
   AudioSource _sourceFor(Video track) {
     final playbackId = track.muxPlaybackId ?? '';
-    final url = 'https://stream.mux.com/$playbackId.m3u8';
+    final url = _streamUrlFor(playbackId);
     final coverUrl = track.covers.isNotEmpty ? track.covers.first : track.thumbnail;
     return AudioSource.uri(
       Uri.parse(url),
@@ -128,6 +201,8 @@ class MusicPlayerService extends ChangeNotifier {
   Future<void> playQueue(List<Video> tracks, {int startIndex = 0}) async {
     final playable = tracks.where((t) => (t.muxPlaybackId ?? '').isNotEmpty).toList();
     if (playable.isEmpty) return;
+
+    await _refreshAudioQuality();
 
     final requested = startIndex >= 0 && startIndex < tracks.length ? tracks[startIndex] : null;
     var initialIndex = requested != null
@@ -153,6 +228,17 @@ class MusicPlayerService extends ChangeNotifier {
       // to notice and tap Play manually. One retry covers that without
       // requiring them to.
       try {
+        // A failure here while Data Saver is on is usually the audio-only
+        // rendition missing for this particular asset — nothing else in the
+        // app requests that URL. Drop back to the adaptive manifest for this
+        // queue rather than leaving the person with silence.
+        if (_audioDataSaver) {
+          _audioDataSaver = false;
+          _playlist = ConcatenatingAudioSource(
+            children: playable.map(_sourceFor).toList(),
+          );
+          await _player.setAudioSource(_playlist, initialIndex: initialIndex);
+        }
         await _player.play();
       } catch (e2, stackTrace2) {
         _logger.e('Retry also failed to start music queue', error: e2, stackTrace: stackTrace2);

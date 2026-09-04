@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'package:cached_network_image/cached_network_image.dart';
 
 import 'package:flutter/material.dart';
@@ -77,87 +76,10 @@ class _MusicPageState extends ConsumerState<MusicPage> {
   List<Video> _recentlyPlayed = [];
   List<Video> _recommended = [];
 
-  Timer? _liveToastTimer;
-  Timer? _liveToastDismissTimer;
-
-  /// The live-listening toast text.
-  ///
-  /// A ValueNotifier rather than plain state on purpose: this used to be a
-  /// `setState` every 7 seconds, which rebuilt the ENTIRE page — including
-  /// the ListView and every eagerly-built track tile — just to change one
-  /// line of text in a pill at the bottom. Only the toast listens now.
-  final ValueNotifier<String?> _toast = ValueNotifier<String?>(null);
-  int _toastIdx = 0;
-
-  /// True when the load finished without producing anything. Used to tell a
-  /// genuinely empty catalogue apart from a failed fetch, and to offer a way
-  /// back either way.
-  bool _loadFailed = false;
-
-  static const List<(String user, String city)> _liveListeners = [
-    ('Aarav', 'Mumbai'),
-    ('Priya', 'Bangalore'),
-    ('Rohit', 'Delhi NCR'),
-    ('Sneha', 'Kolkata'),
-    ('Vikram', 'Pune'),
-    ('Ananya', 'Hyderabad'),
-    ('Kabir', 'Chennai'),
-  ];
-
   @override
   void initState() {
     super.initState();
     _load();
-    if (widget.isActive) _startLiveToastTicker();
-  }
-
-  @override
-  void didUpdateWidget(covariant MusicPage oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (widget.isActive == oldWidget.isActive) return;
-    if (widget.isActive) {
-      _startLiveToastTicker();
-    } else {
-      _stopLiveToastTicker();
-    }
-  }
-
-  void _stopLiveToastTicker() {
-    _liveToastTimer?.cancel();
-    _liveToastTimer = null;
-    _liveToastDismissTimer?.cancel();
-    _liveToastDismissTimer = null;
-    _toast.value = null;
-  }
-
-  @override
-  void dispose() {
-    _liveToastTimer?.cancel();
-    _liveToastDismissTimer?.cancel();
-    _toast.dispose();
-    super.dispose();
-  }
-
-  void _startLiveToastTicker() {
-    _liveToastTimer?.cancel();
-    _liveToastTimer = Timer.periodic(const Duration(seconds: 7), (timer) {
-      if (!mounted || !widget.isActive || _tracks == null || _tracks!.isEmpty) {
-        return;
-      }
-      final listener = _liveListeners[_toastIdx % _liveListeners.length];
-      final track = _tracks![_toastIdx % _tracks!.length];
-      _toastIdx++;
-
-      // Writing the notifier instead of calling setState is the whole point:
-      // it repaints the pill and nothing else.
-      _toast.value =
-          '🎧 ${listener.$1} from ${listener.$2} is playing "${track.title}"';
-
-      _liveToastDismissTimer?.cancel();
-      _liveToastDismissTimer = Timer(const Duration(milliseconds: 2500), () {
-        if (mounted) _toast.value = null;
-      });
-    });
   }
 
   Future<void> _load() async {
@@ -287,7 +209,7 @@ class _MusicPageState extends ConsumerState<MusicPage> {
           IconButton(
             icon: Icon(Icons.settings_rounded, color: context.textPrimary),
             tooltip: 'Music settings',
-            onPressed: () => context.push('/settings/playback'),
+            onPressed: () => context.push('/settings/music'),
           ),
           IconButton(
             icon: Icon(
@@ -352,72 +274,8 @@ class _MusicPageState extends ConsumerState<MusicPage> {
                     ],
                   ),
                 ),
-                _buildLiveListeningToast(context),
               ],
             ),
-    );
-  }
-
-  Widget _buildLiveListeningToast(BuildContext context) {
-    return Positioned(
-      // Clear of the music mini-player bar, which docks in this same region.
-      bottom: 96,
-      left: 20,
-      right: 20,
-      child: ValueListenableBuilder<String?>(
-        valueListenable: _toast,
-        builder: (context, toast, _) {
-          return IgnorePointer(
-            child: AnimatedOpacity(
-        opacity: toast != null ? 1.0 : 0.0,
-        duration: const Duration(milliseconds: 300),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.88),
-            borderRadius: BorderRadius.circular(30),
-            border: Border.all(
-              color: AppColors.brandOrange.withValues(alpha: 0.5),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.4),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                width: 8,
-                height: 8,
-                decoration: const BoxDecoration(
-                  color: Color(0xFF10B981),
-                  shape: BoxShape.circle,
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  toast ?? '',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-            ),
-          );
-        },
-      ),
     );
   }
 

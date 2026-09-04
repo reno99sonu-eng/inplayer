@@ -26,6 +26,18 @@ class _ForgotPasswordModalState extends ConsumerState<ForgotPasswordModal> {
   final _newPasswordController = TextEditingController();
   bool _codeSent = false;
 
+  /// True when this modal moved itself into verify mode, because the reset
+  /// request hit an account whose email was never confirmed. Only affects the
+  /// wording, so it is obvious why a different code is being asked for.
+  bool _autoVerification = false;
+
+  /// The modal is confirming the account's EMAIL, not resetting a password.
+  bool _verifyMode = false;
+
+  /// Shown once after a successful verification, so it's obvious why the
+  /// screen jumped back to the beginning.
+  bool _justVerified = false;
+
   /// The masked address Cognito says it sent the code to, e.g.
   /// `r***@g***.com`. Null means Cognito accepted the request but named no
   /// destination — worth showing, because that is the case where waiting for
@@ -62,6 +74,8 @@ class _ForgotPasswordModalState extends ConsumerState<ForgotPasswordModal> {
 
     setState(() {
       _error = null;
+      _autoVerification = false;
+      _justVerified = false;
       _loading = true;
     });
 
@@ -77,12 +91,123 @@ class _ForgotPasswordModalState extends ConsumerState<ForgotPasswordModal> {
         });
       }
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _error = _friendlyAuthError(e);
-          _loading = false;
-        });
+      if (!mounted) return;
+      // An account that exists but was never email-confirmed has no verified
+      // address for Cognito to send a reset code to, so this request can only
+      // ever fail. Showing a red error plus a second button made the user
+      // solve that themselves; instead send the sign-up confirmation code and
+      // carry straight on into verify mode. One button, no dead end.
+      if (_isUnconfirmedAccount(e)) {
+        await _handleResendVerification(auto: true);
+        return;
       }
+      setState(() {
+        _error = _friendlyAuthError(e);
+        _loading = false;
+      });
+    }
+  }
+
+  /// Whether the failure is "this account was never confirmed" — the one
+  /// error with a genuine way out rather than just a message.
+  bool _isUnconfirmedAccount(Object e) {
+    final message = (e is AuthException ? e.message : e.toString()).toLowerCase();
+    return message.contains('verified email') ||
+        message.contains('no registered/verified') ||
+        message.contains('not confirmed') ||
+        message.contains('unconfirmed');
+  }
+
+  /// Sends a fresh sign-up code, then switches this modal into verify mode.
+  /// Reached only from the fallback above, so it deliberately carries no
+  /// `_loading` guard — it inherits the spinner the reset attempt started.
+  Future<void> _handleResendVerification({bool auto = false}) async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
+      setState(() {
+        _error = 'Please enter your account email.';
+        _loading = false;
+      });
+      return;
+    }
+
+    setState(() {
+      _error = null;
+      _loading = true;
+    });
+
+    try {
+      final destination = await ref
+          .read(authStateProvider.notifier)
+          .resendVerificationCode(email: email);
+      if (!mounted) return;
+      setState(() {
+        _verifyMode = true;
+        _autoVerification = auto;
+        _sentTo = destination;
+        _codeController.clear();
+        _loading = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _error = _friendlyAuthError(e);
+        _loading = false;
+      });
+    }
+  }
+
+  /// Confirms the account with the emailed code, which makes the email
+  /// verified — and only then can Cognito deliver a password reset code.
+  Future<void> _handleConfirmVerification() async {
+    final email = _emailController.text.trim();
+    final code = _codeController.text.trim();
+    if (code.isEmpty) {
+      setState(() => _error = 'Enter the verification code from your email.');
+      return;
+    }
+
+    setState(() {
+      _error = null;
+      _loading = true;
+    });
+
+    final ok = await ref
+        .read(authStateProvider.notifier)
+        .confirmSignUp(email: email, code: code);
+    if (!mounted) return;
+
+    if (!ok) {
+      final authState = ref.read(authStateProvider);
+      setState(() {
+        _error = authState is AuthStateError
+            ? authState.message
+            : "That code isn't right. Try again.";
+        _loading = false;
+      });
+      return;
+    }
+
+    // Straight back to the start of the reset flow rather than making them
+    // find their way there — the thing they originally wanted still hasn't
+    // happened.
+    final wasAutomatic = _autoVerification;
+    setState(() {
+      _verifyMode = false;
+      _autoVerification = false;
+      _codeSent = false;
+      _justVerified = true;
+      _sentTo = null;
+      _codeController.clear();
+      _loading = false;
+      _error = null;
+    });
+
+    // The password reset is still what they came for, and the only reason it
+    // failed a minute ago has just been fixed. Finish it for them rather than
+    // making them tap the same button a second time.
+    if (wasAutomatic) {
+      await _handleSendCode();
     }
   }
 
@@ -169,6 +294,38 @@ class _ForgotPasswordModalState extends ConsumerState<ForgotPasswordModal> {
         });
       }
     }
+  }
+
+  String get _subtitle {
+    if (_verifyMode) {
+      if (_autoVerification) {
+        return _sentTo != null
+            ? 'This email was never confirmed, so we sent a confirmation code '
+                  'to $_sentTo first. Enter it and your reset code follows '
+                  'automatically.'
+            : 'This email was never confirmed, so we sent a confirmation code '
+                  'first. Enter it and your reset code follows automatically.';
+      }
+      return _sentTo != null
+          ? 'Enter the verification code sent to $_sentTo to confirm your '
+                'email.'
+          : 'Enter the verification code from your email to confirm your '
+                'account.';
+    }
+    if (_codeSent) {
+      // Naming the address it actually went to is the whole point: "check
+      // your email" is unfalsifiable, whereas a masked destination either
+      // matches your inbox or tells you immediately it went elsewhere.
+      return _sentTo != null
+          ? 'Enter the 6-digit code sent to $_sentTo.'
+          : 'We asked for a code, but no delivery address came back for that '
+                'account. Check the email is right, or sign in with Google if '
+                'that is how you signed up.';
+    }
+    if (_justVerified) {
+      return 'Email confirmed. Send yourself a reset code now.';
+    }
+    return 'Enter your email and we’ll send you a password reset code.';
   }
 
   @override
@@ -304,21 +461,44 @@ class _ForgotPasswordModalState extends ConsumerState<ForgotPasswordModal> {
         ),
         const SizedBox(height: 6),
         Text(
-          _codeSent
-              ? (_sentTo != null
-                    // Naming the address it actually went to is the whole
-                    // point: "check your email" is unfalsifiable, whereas a
-                    // masked destination either matches your inbox or tells
-                    // you immediately that it went somewhere else.
-                    ? 'Enter the 6-digit code sent to $_sentTo.'
-                    : 'We asked for a code, but no delivery address came '
-                          'back for that account. Check the email is right, or '
-                          'sign in with Google if that is how you signed up.')
-              : 'Enter your email and we’ll send you a password reset code.',
+          _subtitle,
           style: TextStyle(color: context.textSecondary, fontSize: 13),
         ),
         const SizedBox(height: 20),
-        if (!_codeSent) ...[
+        if (_verifyMode) ...[
+          Text('Verification Code', style: TextStyle(color: context.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
+          const SizedBox(height: 6),
+          _buildInput(
+            controller: _codeController,
+            hint: '6-digit code',
+            icon: Icons.mark_email_read_outlined,
+            isDark: isDark,
+          ),
+          if (_error != null) ...[
+            const SizedBox(height: 10),
+            Text(_error!, style: const TextStyle(color: Color(0xFFEF4444), fontSize: 12)),
+          ],
+          const SizedBox(height: 20),
+          GestureDetector(
+            onTap: _loading ? null : _handleConfirmVerification,
+            child: Container(
+              height: 48,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                gradient: AppColors.flameGradient,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Center(
+                child: _loading
+                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0F172A)))
+                    : const Text(
+                        'Confirm Email',
+                        style: TextStyle(color: Color(0xFF0F172A), fontSize: 15, fontWeight: FontWeight.w900),
+                      ),
+              ),
+            ),
+          ),
+        ] else if (!_codeSent) ...[
           Text('Email', style: TextStyle(color: context.textSecondary, fontSize: 12, fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
           _buildInput(

@@ -13,7 +13,22 @@ import 'ai_studio_modal.dart';
 class FloatingAIButton extends StatefulWidget {
   final ScrollController? scrollController;
 
-  const FloatingAIButton({super.key, this.scrollController});
+  /// Distance from the bottom of the screen while visible.
+  ///
+  /// Not a constant, because what sits underneath this button changes. The
+  /// nav bar is always there, but MiniPlayerBar stacks ABOVE it whenever a
+  /// track is loaded and is roughly 64px tall — so with a fixed 88 the
+  /// button covered the music bar the moment anything was playing. HomePage
+  /// already tracks exactly that (see _miniPlayerInset) and passes it in,
+  /// and AnimatedPositioned turns the change into a glide rather than a
+  /// jump as music starts and stops.
+  final double bottomInset;
+
+  const FloatingAIButton({
+    super.key,
+    this.scrollController,
+    this.bottomInset = 88,
+  });
 
   @override
   State<FloatingAIButton> createState() => _FloatingAIButtonState();
@@ -129,8 +144,8 @@ class _FloatingAIButtonState extends State<FloatingAIButton>
     return AnimatedPositioned(
       duration: const Duration(milliseconds: 300),
       curve: Curves.easeInOut,
-      bottom: _isHidden ? -100 : 84,
-      right: 16,
+      bottom: _isHidden ? -80 : widget.bottomInset,
+      right: 14,
       child: IgnorePointer(
         ignoring: _isHidden || _isDialogOpen,
         child: ScaleTransition(
@@ -139,14 +154,14 @@ class _FloatingAIButtonState extends State<FloatingAIButton>
             animation: _pulseAnimation,
             builder: (context, _) {
               return SizedBox(
-                width: 60,
-                height: 60,
+                width: 52,
+                height: 52,
                 child: Stack(
                   alignment: Alignment.center,
                   children: [
                     Container(
-                      width: 60,
-                      height: 60,
+                      width: 52,
+                      height: 52,
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         border: Border.all(
@@ -185,13 +200,13 @@ class _FloatingAIButtonState extends State<FloatingAIButton>
                           highlightColor: icon.withValues(alpha: .08),
                           customBorder: const CircleBorder(),
                           child: SizedBox(
-                            width: 52,
-                            height: 52,
+                            width: 44,
+                            height: 44,
                             child: Center(
                               child: Icon(
                                 Icons.auto_awesome_rounded,
                                 color: icon,
-                                size: 23,
+                                size: 20,
                                 shadows: [
                                   Shadow(
                                     color: glow.withValues(alpha: .80),

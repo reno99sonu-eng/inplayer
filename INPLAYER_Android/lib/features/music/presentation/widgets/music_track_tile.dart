@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/share_utils.dart';
 import '../../../../models/video.dart';
 import '../../../../services/music_player_service.dart';
 import '../../../../services/like_service.dart';
@@ -104,9 +105,7 @@ class MusicTrackTile extends ConsumerWidget {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      (track.artist?.isNotEmpty == true
-                          ? track.artist!
-                          : track.creator),
+                      _artistAndPlays(track),
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -369,6 +368,15 @@ void showMusicTrackQuickActions(
                 _showQueuedSnack(context, 'Added to queue');
               },
             ),
+            _quickActionTile(
+              context: ctx,
+              icon: Icons.reply_outlined,
+              label: 'Share',
+              onTap: () {
+                Navigator.pop(ctx);
+                shareVideoLink(track);
+              },
+            ),
             Divider(
               color: ctx.borderSubtle,
               height: 20,
@@ -389,6 +397,28 @@ void showMusicTrackQuickActions(
       );
     },
   );
+}
+
+/// Second line of a track row: who made it, and how many times it has been
+/// played.
+String _artistAndPlays(Video track) {
+  final who = track.artist?.isNotEmpty == true ? track.artist! : track.creator;
+  final plays = _playsLabel(track.views);
+  return plays == null ? who : '$who · $plays';
+}
+
+/// `Video.views` arrives ALREADY formatted as "1234 views" (see
+/// Video.fromJson), so the count has to be read back out of the string
+/// rather than used as a number — and a track is played, not viewed, so the
+/// noun changes with it.
+String? _playsLabel(String rawViews) {
+  final match = RegExp(r'\d+').firstMatch(rawViews.replaceAll(',', ''));
+  if (match == null) return null;
+  final count = int.tryParse(match.group(0)!);
+  if (count == null) return null;
+  if (count >= 1000000) return '${(count / 1000000).toStringAsFixed(1)}M plays';
+  if (count >= 1000) return '${(count / 1000).toStringAsFixed(1)}K plays';
+  return count == 1 ? '1 play' : '$count plays';
 }
 
 Widget _quickActionTile({

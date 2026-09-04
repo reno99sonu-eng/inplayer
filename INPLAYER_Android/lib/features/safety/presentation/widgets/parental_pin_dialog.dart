@@ -72,9 +72,19 @@ class _ParentalPinDialogState extends ConsumerState<ParentalPinDialog> {
   Future<void> _submitPin() async {
     final notifier = ref.read(kidModeProvider.notifier);
     if (widget.isSettingNewPin) {
-      await notifier.setParentalPin(_pin);
-      if (mounted) {
+      // setParentalPin returns false for anything that isn't four digits.
+      // Ignoring that and popping `true` regardless would report a PIN as set
+      // when none was saved — the same "screen says it worked" failure this
+      // dialog's verify branch already had.
+      final saved = await notifier.setParentalPin(_pin);
+      if (!mounted) return;
+      if (saved) {
         Navigator.of(context).pop(true);
+      } else {
+        setState(() {
+          _pin = '';
+          _error = 'A PIN must be exactly 4 digits.';
+        });
       }
     } else {
       final isValid = await notifier.verifyPin(_pin);
@@ -83,12 +93,20 @@ class _ParentalPinDialogState extends ConsumerState<ParentalPinDialog> {
         if (mounted) {
           Navigator.of(context).pop(true);
         }
-      } else {
-        setState(() {
-          _pin = '';
-          _error = 'Incorrect PIN. Try again (Default: 0000)';
-        });
+        return;
       }
+      if (!mounted) return;
+      // Never name a default here. The old text was
+      // 'Incorrect PIN. Try again (Default: 0000)', and verifyPin did accept
+      // 0000 when no PIN had been set — so a child who guessed wrong once was
+      // handed the answer by the control that was meant to stop them.
+      final hasPin = ref.read(kidModeProvider).hasPin;
+      setState(() {
+        _pin = '';
+        _error = hasPin
+            ? 'Incorrect PIN. Try again.'
+            : 'No parental PIN has been set on this device yet.';
+      });
     }
   }
 

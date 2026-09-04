@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../services/video_service.dart';
 
 /// Real counts of what's actually stored under this creator's account,
@@ -8,6 +9,10 @@ import '../../../../services/video_service.dart';
 /// means content counts (Videos/Shorts/Processing) — InPlayer doesn't
 /// expose a byte-size quota anywhere in the API, so this deliberately
 /// doesn't invent one.
+///
+/// Colours come from the `AppThemeContext` extension rather than the
+/// `*Dark` constants: this page was pinned to the dark palette, so it stayed
+/// black in light mode while the rest of Settings switched.
 class StoragePage extends ConsumerStatefulWidget {
   const StoragePage({super.key});
 
@@ -27,12 +32,13 @@ class _StoragePageState extends ConsumerState<StoragePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
+      backgroundColor: context.bgCanvas,
       appBar: AppBar(
-        backgroundColor: AppColors.backgroundDark,
+        backgroundColor: context.bgCanvas,
+        foregroundColor: context.textPrimary,
         elevation: 0,
-        title: const Text('Storage',
-            style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimaryDark)),
+        title: Text('Storage',
+            style: TextStyle(fontWeight: FontWeight.bold, color: context.textPrimary)),
       ),
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: _videosFuture,
@@ -57,7 +63,7 @@ class _StoragePageState extends ConsumerState<StoragePage> {
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Text(
                   '${items.length} item${items.length == 1 ? '' : 's'} total on your channel',
-                  style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 12),
+                  style: TextStyle(color: context.textSecondary, fontSize: 12),
                 ),
               ),
             ],
@@ -72,9 +78,9 @@ class _StoragePageState extends ConsumerState<StoragePage> {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.cardDark,
+        color: context.bgCard,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        border: Border.all(color: context.borderSubtle),
       ),
       child: Row(
         children: [
@@ -93,17 +99,17 @@ class _StoragePageState extends ConsumerState<StoragePage> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(label,
-                    style: const TextStyle(color: AppColors.textPrimaryDark, fontWeight: FontWeight.w600)),
+                    style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.w600)),
                 if (subtitle != null) ...[
                   const SizedBox(height: 2),
-                  Text(subtitle, style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 11)),
+                  Text(subtitle, style: TextStyle(color: context.textSecondary, fontSize: 11)),
                 ],
               ],
             ),
           ),
           Text(count.toString(),
-              style: const TextStyle(
-                  color: AppColors.textPrimaryDark, fontSize: 18, fontWeight: FontWeight.bold)),
+              style: TextStyle(
+                  color: context.textPrimary, fontSize: 18, fontWeight: FontWeight.bold)),
         ],
       ),
     );

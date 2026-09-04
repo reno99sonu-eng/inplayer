@@ -46,6 +46,29 @@ class LiveService {
     }
   }
 
+  /// Current viewer count for a broadcast this user owns.
+  ///
+  /// Returns null when the number genuinely is not knowable right now —
+  /// the request failed, or the encoder has not connected yet — so the UI
+  /// can stay quiet rather than claiming an audience of zero to someone who
+  /// may well have viewers.
+  Future<int?> getViewerCount(String videoId) async {
+    try {
+      final response = await _dio.post(
+        ApiConstants.liveViewers,
+        data: {'videoId': videoId},
+      );
+      if (response.statusCode != 200 || response.data is! Map) return null;
+      final data = Map<String, dynamic>.from(response.data as Map);
+      if (data['live'] != true) return null;
+      final count = data['viewerCount'];
+      return count is num ? count.toInt() : null;
+    } catch (e) {
+      _logger.w('Could not read live viewer count: $e');
+      return null;
+    }
+  }
+
   /// Ends the stream — flips the InPlayer-Videos record to "processing" so
   /// it stops appearing as live (matches the website's own end-of-stream
   /// behavior; a real recorded VOD would need IVS Auto-Record-to-S3 +

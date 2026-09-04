@@ -36,7 +36,7 @@ import '../../../../services/video_mini_player_service.dart';
 bool shouldRevealShortFrame(VideoPlayerValue value) {
   final size = value.size;
   final hasRealFrame = size.width > 0 && size.height > 0;
-  final hasPlaybackProgress = value.position > const Duration(milliseconds: 80);
+  final hasPlaybackProgress = value.position > const Duration(milliseconds: 250);
   return value.isInitialized && hasRealFrame && hasPlaybackProgress;
 }
 
@@ -406,6 +406,44 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
     if (widget.isActive) widget.onFirstFrame?.call();
   }
 
+  /// Polls the platform playhead directly so the poster comes off the
+  /// instant pictures are genuinely moving.
+  ///
+  /// This exists because of a detail of video_player that quietly cost half
+  /// a second on every short: `VideoPlayerController` only refreshes
+  /// `value.position` on its OWN 500ms periodic timer. Every reveal signal
+  /// built on the controller's listener therefore fires up to 500ms after
+  /// the video actually started playing — so the poster sat on top of an
+  /// already-playing video for that whole time, which is indistinguishable
+  /// from "stuck, hasn't started yet".
+  ///
+  /// `controller.position` is not that cached value; it is a live query to
+  /// the platform. Asking it every 40ms gets the real answer roughly ten
+  /// times sooner. Bounded at 1.5s, after which the existing backstop timer
+  /// takes over.
+  Future<void> _startFastRevealPoll(VideoPlayerController controller) async {
+    final generation = _playerGeneration;
+    final deadline = DateTime.now().add(const Duration(milliseconds: 1500));
+    while (mounted &&
+        !_isFirstFrameRendered &&
+        generation == _playerGeneration &&
+        identical(_videoController, controller) &&
+        DateTime.now().isBefore(deadline)) {
+      try {
+        final position = await controller.position;
+        if (position != null &&
+            position > const Duration(milliseconds: 250) &&
+            controller.value.size.width > 0) {
+          _revealVideoLayer(controller);
+          return;
+        }
+      } catch (_) {
+        return;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 40));
+    }
+  }
+
   void _attachListenerAndReveal(VideoPlayerController controller) {
     controller.addListener(() {
       if (!mounted || !identical(_videoController, controller)) return;
@@ -465,19 +503,13 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
         _setupSoundtrack(warmed, generation);
         _attachListenerAndReveal(warmed);
         unawaited(warmed.play());
+        unawaited(_startFastRevealPoll(warmed));
         if (mounted) {
           setState(() {
             _isInitialized = true;
             _isPlaying = true;
           });
         }
-        // Same backstop as the cold path — the picture is never allowed to
-        // stay hidden behind the poster indefinitely.
-        _firstFrameRevealTimer?.cancel();
-        _firstFrameRevealTimer = async.Timer(
-          const Duration(milliseconds: 1200),
-          () => _revealVideoLayer(warmed),
-        );
         return;
       }
 
@@ -569,6 +601,7 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
 
       if (widget.isActive) {
         unawaited(controller.play());
+        unawaited(_startFastRevealPoll(controller));
         // The soundtrack may still be loading — start it the moment it is
         // ready rather than holding the video back waiting for it.
         final audio = _audioPlayer;
@@ -586,17 +619,6 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
           }());
         }
       }
-
-      // Hard backstop: whatever the decoder/network do, the video layer
-      // is never allowed to stay hidden behind the poster forever. If no
-      // frame callback has revealed it by now, reveal anyway — a short
-      // that is quietly buffering should still show its own picture the
-      // moment it has one, and never present as permanently "stuck".
-      _firstFrameRevealTimer?.cancel();
-      _firstFrameRevealTimer = async.Timer(
-        const Duration(milliseconds: 1200),
-        () => _revealVideoLayer(controller),
-      );
 
       if (mounted) {
         setState(() {
@@ -776,34 +798,33 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
           child: Stack(
             fit: StackFit.expand,
             children: [
-              // Steady base poster - always visible behind video
-              _buildShortPoster(),
-
-              // Zero-flash video surface — the same shape the website has.
+              // Video surface FIRST, poster on top of it — the order is the
+              // whole fix, and it has now been wrong in both directions.
               //
-              // There is deliberately NO opacity animation here, and the
-              // poster above is never removed. That is the entire fix for
-              // the flash, and the previous code had the reasoning exactly
-              // backwards.
-              //
-              // It used to mount this at opacity 0 and crossfade to 1 on the
-              // first frame, on the theory that the texture would attach
-              // harmlessly behind the poster. It never did: RenderOpacity
-              // SKIPS PAINTING ITS CHILD ENTIRELY at alpha 0
+              // Attempt one mounted this at opacity 0 and crossfaded in on
+              // the first frame. That failed because RenderOpacity SKIPS
+              // PAINTING ITS CHILD ENTIRELY at alpha 0
               // (`if (_alpha == 0) return;`), so the texture's first real
               // composite was deferred until the fade began — landing on
-              // precisely the moment the fade was there to make seamless.
-              // That was the flash. The 220ms fade then pushed every video
-              // frame through an offscreen saveLayer for another dozen
-              // frames, which was the stutter on weaker GPUs.
+              // precisely the moment the fade existed to make seamless.
               //
-              // Without the opacity layer, a platform Texture that has not
-              // decoded anything yet simply paints nothing, so the poster
-              // shows through and the first real pictures paint straight
-              // over it. No crossfade, no second state flip in the paint
-              // path — which is how MuxPlayer swaps its own poster for video
-              // internally on the site, and why the site has never had this
-              // problem.
+              // Attempt two dropped the opacity layer and put the poster
+              // permanently underneath, on the theory that a Texture with
+              // nothing decoded in it "simply paints nothing". It does not.
+              // A TextureLayer composites whatever its SurfaceTexture
+              // currently holds, and before the first frame arrives that is
+              // undefined — in practice black. So the moment `_isInitialized`
+              // flipped, an opaque black rectangle was laid over the poster
+              // for the frame or three before real picture arrived. That is
+              // the single flash still being reported.
+              //
+              // The fix is neither: mount the texture as early as possible
+              // so it attaches and decodes, and keep the POSTER ABOVE IT
+              // until the decoder has demonstrably produced moving picture
+              // (see shouldRevealShortFrame — real frame dimensions plus a
+              // playhead that has actually advanced). The poster is only
+              // withdrawn once there is something real behind it, so there
+              // is never a frame where an empty texture is what's on screen.
               if (_isInitialized && _videoController != null)
                 Positioned.fill(
                   child: FittedBox(
@@ -820,6 +841,12 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
                     ),
                   ),
                 ),
+
+              // Held above the texture, withdrawn (not faded — a fade is
+              // another offscreen saveLayer over a video texture) the
+              // instant real frames are flowing.
+              if (!_isFirstFrameRendered)
+                Positioned.fill(child: _buildShortPoster()),
             ],
           ),
         ),

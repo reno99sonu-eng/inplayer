@@ -36,23 +36,21 @@ enum ThemeChoice {
 }
 
 class ThemeNotifier extends StateNotifier<ThemeChoice> {
-  Timer? _autoCheckTimer;
-
   ThemeNotifier() : super(ThemeChoice.system) {
     _loadSavedTheme();
-    // Re-check periodically for daytime boundary flips when in Auto mode
-    _autoCheckTimer = Timer.periodic(const Duration(minutes: 1), (_) {
-      if (state == ThemeChoice.system) {
-        state = ThemeChoice.system; // trigger notification
-      }
-    });
   }
 
-  @override
-  void dispose() {
-    _autoCheckTimer?.cancel();
-    super.dispose();
-  }
+  // There used to be a Timer.periodic here that ran every minute and did
+  // `state = ThemeChoice.system; // trigger notification` whenever the choice
+  // was already system. It never notified anything: StateNotifier only tells
+  // listeners about a value that actually CHANGED, and that assigns the same
+  // enum back. So themeModeProvider never recomputed and "Auto (Day/Night)"
+  // simply never flipped at 06:00 or 18:00 — you got whichever mode was
+  // current when the app launched, until you restarted it.
+  //
+  // The recomputation now lives in themeModeProvider below, which schedules
+  // itself for the next boundary rather than waking up sixty times an hour to
+  // do nothing.
 
   Future<void> _loadSavedTheme() async {
     final prefs = await SharedPreferences.getInstance();
@@ -80,8 +78,36 @@ final themeModeProvider = Provider<ThemeMode>((ref) {
     case ThemeChoice.dark:
       return ThemeMode.dark;
     case ThemeChoice.system:
-      final hour = DateTime.now().hour;
-      final isDay = hour >= _dayStartHour && hour < _dayEndHour;
+      final now = DateTime.now();
+
+      // One timer, aimed at the exact next boundary, which then invalidates
+      // this provider so it recomputes. Polling every minute would do the
+      // same job 1,439 times a day for nothing; this fires twice.
+      final timer = Timer(_untilNextDayNightBoundary(now), ref.invalidateSelf);
+      ref.onDispose(timer.cancel);
+
+      final isDay = now.hour >= _dayStartHour && now.hour < _dayEndHour;
       return isDay ? ThemeMode.light : ThemeMode.dark;
   }
 });
+
+/// Time from [now] until the next 06:00 or 18:00, whichever comes first.
+Duration _untilNextDayNightBoundary(DateTime now) {
+  final dayStart = DateTime(now.year, now.month, now.day, _dayStartHour);
+  final dayEnd = DateTime(now.year, now.month, now.day, _dayEndHour);
+  final nextDayStart = dayStart.add(const Duration(days: 1));
+
+  final DateTime next;
+  if (now.isBefore(dayStart)) {
+    next = dayStart;
+  } else if (now.isBefore(dayEnd)) {
+    next = dayEnd;
+  } else {
+    next = nextDayStart;
+  }
+
+  // A second of slack. A timer that fires a hair early would land back inside
+  // the window it just left, recompute the same answer, and reschedule almost
+  // immediately — a tight loop rather than a theme change.
+  return next.difference(now) + const Duration(seconds: 1);
+}

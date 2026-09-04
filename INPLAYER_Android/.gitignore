@@ -58,3 +58,10 @@ packages/*/build/
 # without it); these split pieces are scaffolding and must never be, or the
 # same 21 MB lands in the repo twice.
 assets/models/*.part*
+
+# Release signing. A committed keystore or password file is unrecoverable
+# damage: the upload key cannot be rotated after publishing, and anyone
+# holding the .jks plus its password can sign builds Android accepts as yours.
+android/key.properties
+*.jks
+*.keystore

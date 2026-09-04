@@ -9,6 +9,7 @@ import 'package:just_audio/just_audio.dart' show LoopMode;
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/music_track_utils.dart';
+import '../../../../core/utils/share_utils.dart';
 import '../../../../models/video.dart';
 import '../../../../services/download_manager.dart';
 import '../../../../services/download_service.dart';
@@ -589,7 +590,7 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
               size: 22,
             ),
             tooltip: 'Player settings',
-            onPressed: () => context.push('/settings/playback'),
+            onPressed: () => context.push('/settings/music'),
           ),
         ],
       ),
@@ -707,18 +708,38 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
   }
 
   Widget _buildScrubber(BuildContext context, MusicPlayerService player) {
-    return StreamBuilder<Duration>(
-      stream: player.positionStream,
-      builder: (context, snapshot) {
+    // Duration is watched as a STREAM rather than read as a plain getter.
+    // Read as a getter inside a builder driven only by positionStream, it is
+    // whatever it happened to be at the last position tick — so on a track
+    // change, where the playhead resets a beat before the new length
+    // arrives, the bar was briefly drawn against the PREVIOUS track's
+    // duration.
+    return StreamBuilder<Duration?>(
+      stream: player.durationStream,
+      builder: (context, durSnapshot) {
+        return StreamBuilder<Duration>(
+          stream: player.positionStream,
+          builder: (context, snapshot) {
         final pos = snapshot.data ?? Duration.zero;
-        final dur = player.duration ?? Duration.zero;
+        final dur = durSnapshot.data ?? player.duration ?? Duration.zero;
         final hasDuration = dur.inMilliseconds > 0;
         final maxMs = hasDuration ? dur.inMilliseconds.toDouble() : 1.0;
         // While a drag is in progress the thumb follows the finger, NOT the
         // position stream. Letting the stream drive it mid-drag is what made
         // the thumb rubber-band back under your finger.
+        //
+        // The `hasDuration` guard on the fallback is load-bearing and was
+        // missing: with no duration yet, maxMs is 1.0, so clamping the
+        // position into 0..1 gave 1 for any playhead past a single
+        // millisecond — against a slider whose max is also 1. The bar
+        // therefore rendered COMPLETELY FULL for the whole window before
+        // duration resolved, and stayed full forever on any stream that
+        // never reported one. Showing nothing is the honest answer while
+        // the length is unknown.
         final value = _dragMs ??
-            pos.inMilliseconds.clamp(0, maxMs.toInt()).toDouble();
+            (hasDuration
+                ? pos.inMilliseconds.clamp(0, maxMs.toInt()).toDouble()
+                : 0.0);
 
         return Column(
           children: [
@@ -780,6 +801,8 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
               ),
             ),
           ],
+        );
+          },
         );
       },
     );
@@ -924,8 +947,15 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
     final isDownloaded = manager.isDownloaded(track.videoId);
     final activeTask = manager.taskFor(track.videoId);
 
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceAround,
+    // Wrap rather than Row. This row went from five actions to six, and six
+    // 46px circles plus their labels is close enough to a narrow phone's
+    // usable width that a Row would overflow on the smallest screens. Wrap
+    // spreads them identically when they fit and drops to a second line
+    // when they don't, instead of painting an overflow stripe.
+    return Wrap(
+      alignment: WrapAlignment.spaceAround,
+      spacing: 4,
+      runSpacing: 14,
       children: [
         _pillAction(
           context,
@@ -969,6 +999,14 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
             busy: _downloadBusy,
             onTap: isDownloaded ? () {} : () => _handleDownload(track),
           ),
+        // Appended rather than slotted in among the others so the existing
+        // actions keep the positions people already reach for.
+        _pillAction(
+          context,
+          icon: Icons.reply_outlined,
+          label: 'Share',
+          onTap: () => shareVideoLink(track),
+        ),
       ],
     );
   }

@@ -93,6 +93,11 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage>
   int _totalViews = 0;
   Map<String, dynamic>? _analytics;
   bool _analyticsUnavailable = false;
+
+  /// Why the upload list is empty, when it is empty because something went
+  /// wrong rather than because nothing has been uploaded. Null means the
+  /// fetch genuinely succeeded.
+  String? _videosError;
   CreatorMonetizationState _monetization = const CreatorMonetizationState();
 
   // Bio state
@@ -194,7 +199,7 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage>
 
     try {
       final results = await Future.wait([
-        ref.read(videoServiceProvider).getMyVideos(),
+        ref.read(videoServiceProvider).getMyVideosResult(),
         ref.read(channelServiceProvider).getSubscriptionStatus(user.userId),
         ref.read(videoServiceProvider).getChannelAnalytics(),
         ref.read(creatorMonetizationServiceProvider).getMonetizationStatus(),
@@ -202,7 +207,8 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage>
 
       if (!mounted) return;
 
-      final videos = (results[0] as List<Video>?) ?? [];
+      final videosResult = results[0] as MyVideosResult;
+      final videos = videosResult.videos;
       final subStatus = results[1] as Map<String, dynamic>?;
       final analytics = results[2] as Map<String, dynamic>?;
       final monetization = results[3] as CreatorMonetizationState;
@@ -220,6 +226,7 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage>
 
       setState(() {
         _videos = videos;
+        _videosError = videosResult.error;
         _subscriberCount = analyticsSubscribers is num
             ? analyticsSubscribers.toInt()
             : (subStatus?['subscriberCount'] as num?)?.toInt() ?? 0;
@@ -1335,12 +1342,28 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage>
                 ),
                 const SizedBox(height: 12),
                 Text(
-                  'No content uploaded in this category',
+                  _videosError ?? 'No content uploaded in this category',
+                  textAlign: TextAlign.center,
                   style: TextStyle(
-                    color: context.textSecondary,
+                    color: _videosError != null
+                        ? AppColors.error
+                        : context.textSecondary,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
+                if (_videosError != null) ...[
+                  const SizedBox(height: 12),
+                  TextButton(
+                    onPressed: _loadInFlight ? null : () => _loadData(),
+                    child: const Text(
+                      'Try again',
+                      style: TextStyle(
+                        color: AppColors.brandOrange,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           )

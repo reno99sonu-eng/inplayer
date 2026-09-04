@@ -21,6 +21,21 @@ class AppConfig {
   static const String cognitoDomain =
       'ap-south-1orihwadfn.auth.ap-south-1.amazoncognito.com';
 
+  /// Where Cognito sends the browser back to after Hosted UI sign-in.
+  ///
+  /// Three places have to agree on this or Google sign-in fails silently
+  /// after the browser closes:
+  ///   1. here, passed to CognitoOAuthConfig in AuthService.configureAmplify
+  ///   2. the intent-filter in android/app/src/main/AndroidManifest.xml,
+  ///      which must declare [oauthScheme]
+  ///   3. the Cognito app client's Allowed callback / sign-out URLs, which
+  ///      must list these two strings verbatim, trailing slash included
+  static const String oauthScheme = 'inplayer';
+  // 'auth', not 'callback': this must match the Allowed callback URL that
+  // already exists on the Cognito app client character for character.
+  static const String oauthRedirectSignIn = '$oauthScheme://auth/';
+  static const String oauthRedirectSignOut = '$oauthScheme://signout/';
+
   // Existing AppSync GraphQL endpoint. Keep this out of source control when
   // building different environments; pass it with
   // --dart-define=APPSYNC_GRAPHQL_ENDPOINT=https://.../graphql.

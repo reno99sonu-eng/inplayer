@@ -37,6 +37,27 @@ class AuthService {
             appClientId: AppConfig.cognitoUserPoolClientId,
             region: AppConfig.cognitoRegion,
           ),
+          // Google sign-in goes through Cognito's Hosted UI, exactly as it
+          // does on the website (NEXT_PUBLIC_COGNITO_DOMAIN). Without this
+          // block, signInWithWebUI has no domain to open, so it threw every
+          // time and the app reported "Google sign-in isn't set up for this
+          // site yet" — which was true of the app, though the pool itself
+          // has had Google configured all along.
+          hostedUiConfig: CognitoOAuthConfig(
+            appClientId: AppConfig.cognitoUserPoolClientId,
+            webDomain: AppConfig.cognitoDomain,
+            scopes: const [
+              'openid',
+              'email',
+              'profile',
+              // Required for the SDK to call Cognito on the user's behalf
+              // afterwards (fetching and updating attributes). Without it
+              // sign-in appears to work and later profile reads 401.
+              'aws.cognito.signin.user.admin',
+            ],
+            signInRedirectUri: AppConfig.oauthRedirectSignIn,
+            signOutRedirectUri: AppConfig.oauthRedirectSignOut,
+          ),
         ),
       );
 
@@ -486,6 +507,34 @@ class AuthService {
   /// Cognito returns success for several situations where no email is
   /// actually sent, so "no destination" is the difference between "check your
   /// inbox" and "nothing was sent and you would have waited forever".
+  /// Sends a fresh sign-up confirmation code.
+  ///
+  /// This is the only way out of a state that was otherwise permanent. An
+  /// account created but never confirmed cannot sign in (unverified), cannot
+  /// reset its password (Cognito refuses without a verified email), and had
+  /// no way to request a new code — nothing in this app called
+  /// resendSignUpCode at all. The only remaining option was abandoning the
+  /// email address and signing up again.
+  ///
+  /// Returns the masked destination Cognito reports, or null if it names none.
+  Future<String?> resendVerificationCode({required String email}) async {
+    try {
+      final result = await Amplify.Auth.resendSignUpCode(username: email);
+      final destination = result.codeDeliveryDetails.destination;
+      _logger.i(
+        'Verification code resent for $email — delivery: '
+        '${destination ?? 'NONE REPORTED'}',
+      );
+      return destination;
+    } on AuthException catch (e) {
+      _logger.e('Resend verification code error: ${e.message}');
+      rethrow;
+    } catch (e) {
+      _logger.e('Unexpected resend verification error: $e');
+      rethrow;
+    }
+  }
+
   Future<String?> resetPassword({required String email}) async {
     try {
       final result = await Amplify.Auth.resetPassword(username: email);

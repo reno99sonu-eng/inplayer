@@ -23,6 +23,8 @@ import '../widgets/playables_shelf.dart';
 import '../widgets/home_ad_card.dart';
 import '../../../music/presentation/widgets/mini_player_bar.dart';
 import '../../../../services/music_player_service.dart';
+import '../../../../services/platform_settings_service.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../../services/content_access_service.dart';
 import '../../../../services/platform_update_service.dart';
 import '../../../watch/presentation/widgets/video_mini_player_overlay.dart';
@@ -45,6 +47,10 @@ class HomePage extends ConsumerStatefulWidget {
 }
 
 class _HomePageState extends ConsumerState<HomePage> {
+  /// Per-session dismissal of the admin's announcement banner. Deliberately
+  /// not persisted: if an admin puts a notice up, it should come back on the
+  /// next launch until they take it down.
+  bool _announcementDismissed = false;
   int _currentIndex = 0;
   final Set<int> _builtTabs = <int>{0};
 
@@ -141,6 +147,15 @@ class _HomePageState extends ConsumerState<HomePage> {
     final shortsBottomInset =
         _bottomNavInset + (musicLoaded ? _miniPlayerInset : 0.0);
 
+    // Platform-wide switches written by the admin panel. `.value ?? normal`
+    // is the fail-open rule: while the request is in flight, and if it
+    // never lands at all, the app behaves as though everything is running
+    // — a settings fetch that times out must never be able to show a
+    // maintenance screen over a platform that is actually fine.
+    final platformSettings =
+        ref.watch(publicPlatformSettingsProvider).value ??
+        PublicPlatformSettings.normal;
+
     return Scaffold(
       extendBody: true,
       backgroundColor: Colors.transparent,
@@ -157,8 +172,22 @@ class _HomePageState extends ConsumerState<HomePage> {
             ),
             // Home tab only. Previously mounted above the router in
             // main.dart, which put it over every screen in the app.
-            if (_currentIndex == 0) const FloatingAIButton(),
+            if (_currentIndex == 0)
+              FloatingAIButton(
+                bottomInset: 88 + (musicLoaded ? _miniPlayerInset : 0.0),
+              ),
             const VideoMiniPlayerOverlay(),
+            if (platformSettings.announcementEnabled &&
+                platformSettings.announcementText.isNotEmpty &&
+                !_announcementDismissed &&
+                !platformSettings.maintenanceMode)
+              _buildAnnouncementBanner(platformSettings, musicLoaded),
+            // Last in the Stack so it covers everything above, including the
+            // nav shell. Note this covers the TAB shell — a screen pushed on
+            // top of it (a watch page opened from a deep link) sits above
+            // this and is not blocked.
+            if (platformSettings.maintenanceMode)
+              _buildMaintenanceOverlay(platformSettings),
           ],
         ),
       ),
@@ -179,6 +208,153 @@ class _HomePageState extends ConsumerState<HomePage> {
   /// - backdrop-blur-2xl
   /// - border-t: theme adaptive
   /// - Active: orange-400 icon with drop-shadow glow, font-black, scale-105
+  /// The admin panel's announcement, shown low on the screen so it never
+  /// covers the top bar. Tappable when a link was set with it.
+  Widget _buildAnnouncementBanner(
+    PublicPlatformSettings settings,
+    bool musicLoaded,
+  ) {
+    final link = settings.announcementLinkUrl;
+    return Positioned(
+      left: 16,
+      right: 16,
+      bottom: 96 + (musicLoaded ? _miniPlayerInset : 0.0),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: link.isEmpty
+              ? null
+              : () {
+                  final uri = Uri.tryParse(link);
+                  if (uri != null) {
+                    launchUrl(uri, mode: LaunchMode.externalApplication);
+                  }
+                },
+          child: Container(
+            padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
+            decoration: BoxDecoration(
+              color: context.bgModal,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: AppColors.brandOrange.withValues(alpha: 0.45),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.25),
+                  blurRadius: 14,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                const Icon(
+                  Icons.campaign_outlined,
+                  color: AppColors.brandOrange,
+                  size: 18,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text(
+                    settings.announcementText,
+                    maxLines: 3,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: context.textPrimary,
+                      fontSize: 12.5,
+                      height: 1.35,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  tooltip: 'Dismiss',
+                  icon: Icon(
+                    Icons.close_rounded,
+                    size: 18,
+                    color: context.textSecondary,
+                  ),
+                  onPressed: () =>
+                      setState(() => _announcementDismissed = true),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Shown when the admin switches InPlayer into maintenance mode, using
+  /// their own message rather than a generic one.
+  Widget _buildMaintenanceOverlay(PublicPlatformSettings settings) {
+    final message = settings.maintenanceMessage.isNotEmpty
+        ? settings.maintenanceMessage
+        : 'InPlayer is down for maintenance right now. Please check back '
+              'shortly.';
+    return Positioned.fill(
+      child: ColoredBox(
+        color: context.bgCanvas,
+        child: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.construction_rounded,
+                    size: 52,
+                    color: AppColors.brandOrange,
+                  ),
+                  const SizedBox(height: 18),
+                  Text(
+                    'Back shortly',
+                    style: TextStyle(
+                      color: context.textPrimary,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    message,
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: context.textSecondary,
+                      fontSize: 13.5,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 22),
+                  OutlinedButton(
+                    onPressed: () =>
+                        ref.invalidate(publicPlatformSettingsProvider),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppColors.brandOrange),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 22,
+                        vertical: 12,
+                      ),
+                    ),
+                    child: const Text(
+                      'Check again',
+                      style: TextStyle(
+                        color: AppColors.brandOrange,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Widget _buildBottomNavigationBar(BuildContext context) {
     final isDark = context.isDark;
     final authState = ref.watch(authStateProvider);

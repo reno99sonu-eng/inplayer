@@ -19,7 +19,15 @@ void main() {
     await tester.pump();
     await tester.pump(const Duration(milliseconds: 300));
 
-    expect(find.text('InPlayer AI Studio'), findsOneWidget);
+    // Assert on the tooltip rather than only the header text: the title is
+    // copy and has already been renamed once (it was 'InPlayer AI Studio'
+    // before the panel was split into compose/results), which silently
+    // broke this test. The tooltip is a stable handle on the same dialog.
+    expect(find.byTooltip('Close InPlayer AI'), findsOneWidget);
+    expect(find.text('InPlayer AI'), findsOneWidget);
+    // The compose panel's primary action must be built — this is the panel
+    // whose whole purpose is fitting without a scroll.
+    expect(find.text('Generate ideas'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
     await tester.tap(find.byTooltip('Close InPlayer AI'));
@@ -27,7 +35,7 @@ void main() {
     await tester.pump(const Duration(milliseconds: 400)); // Wait for transition
     await tester.pump(); // Complete removal
 
-    expect(find.text('InPlayer AI Studio'), findsNothing);
+    expect(find.text('InPlayer AI'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

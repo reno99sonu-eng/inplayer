@@ -66,14 +66,20 @@ class KidModeNotifier extends StateNotifier<KidModeState> {
     return true;
   }
 
-  /// Verifies if the entered PIN matches the saved parental PIN.
+  /// Verifies the entered PIN against the saved parental PIN.
+  ///
+  /// Returns false when no PIN has ever been set. It used to accept '0000' in
+  /// that case, and ParentalPinDialog printed "(Default: 0000)" in its own
+  /// failure message — so the control told anyone who got it wrong once
+  /// exactly how to get past it. A parental PIN that advertises its own
+  /// bypass is worse than having none, because it looks like protection.
+  ///
+  /// Callers should check [KidModeState.hasPin] first and simply not present
+  /// a verification prompt when there is nothing to verify.
   Future<bool> verifyPin(String enteredPin) async {
     final prefs = await SharedPreferences.getInstance();
     final savedPin = prefs.getString(_prefPinKey);
-    // If no pin is set yet, default to '0000' or accept matching
-    if (savedPin == null || savedPin.isEmpty) {
-      return enteredPin == '0000';
-    }
+    if (savedPin == null || savedPin.isEmpty) return false;
     return savedPin == enteredPin;
   }
 }

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/app_logo.dart';
 
 class VerifyEmailPage extends ConsumerStatefulWidget {
@@ -68,12 +69,12 @@ class _VerifyEmailPageState extends ConsumerState<VerifyEmailPage> {
                   const SizedBox(height: 24),
 
                   // Title
-                  const Text(
+                  Text(
                     'Verify Your Email',
                     style: TextStyle(
                       fontSize: 24,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.textPrimaryDark,
+                      color: context.textPrimary,
                     ),
                     textAlign: TextAlign.center,
                   ),
@@ -82,8 +83,8 @@ class _VerifyEmailPageState extends ConsumerState<VerifyEmailPage> {
                   // Instructions
                   Text(
                     'We sent a verification code to\n${widget.email}',
-                    style: const TextStyle(
-                      color: AppColors.textSecondaryDark,
+                    style: TextStyle(
+                      color: context.textSecondary,
                     ),
                     textAlign: TextAlign.center,
                   ),

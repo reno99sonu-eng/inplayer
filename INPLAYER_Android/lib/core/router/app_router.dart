@@ -34,6 +34,8 @@ import '../../features/settings/presentation/pages/edit_profile_page.dart';
 import '../../features/settings/presentation/pages/privacy_settings_page.dart';
 import '../../features/settings/presentation/pages/change_password_page.dart';
 import '../../features/settings/presentation/pages/change_email_page.dart';
+import '../../features/settings/presentation/pages/music_equalizer_page.dart';
+import '../../features/settings/presentation/pages/music_settings_page.dart';
 import '../../features/settings/presentation/pages/playback_settings_page.dart';
 import '../../features/admin/presentation/pages/admin_page.dart';
 import '../../features/live/presentation/pages/go_live_page.dart';
@@ -277,6 +279,19 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'playback-settings',
         builder: (context, state) => const PlaybackSettingsPage(),
       ),
+      // Audio-side counterpart of /settings/playback. The music player's own
+      // gear used to land on the video page, which offered Shorts and video
+      // resolution caps and nothing about audio at all.
+      GoRoute(
+        path: '/settings/music',
+        name: 'music-settings',
+        builder: (context, state) => const MusicSettingsPage(),
+      ),
+      GoRoute(
+        path: '/settings/music/equalizer',
+        name: 'music-equalizer',
+        builder: (context, state) => const MusicEqualizerPage(),
+      ),
       GoRoute(
         path: '/settings/content-access',
         name: 'content-access',
@@ -341,9 +356,9 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/settings/help',
         name: 'help-center',
         builder: (context, state) => const AppLegalPage(
-          title: 'Help Center & FAQ',
+          title: 'FAQ',
           content:
-              'Frequently Asked Questions & Support:\n\nQ: How do I upload a video or Raftaar short?\nA: Tap the "+" button in the top bar or navigation drawer to open the Upload screen.\n\nQ: How do I enable Fingerprint / Passkey lock?\nA: Go to Settings -> Account & Privacy -> Privacy, Passkeys & Active Sessions, and switch on Passkey & Biometric App Lock.\n\nQ: How do I turn on Kids Mode?\nA: Open the hamburger menu and switch on Kids only. A passkey is needed only when turning 18+ content on.\n\nQ: How do I contact the InPlayer team?\nA: Tap "Contact Support" in Settings or email support@inplayer.in.',
+              'Frequently Asked Questions & Support:\n\nQ: How do I upload a video or Raftaar short?\nA: Tap the "+" button in the top bar or navigation drawer to open the Upload screen.\n\nQ: How do I enable Fingerprint / Passkey lock?\nA: Go to Settings -> Account & Privacy -> Privacy, Passkeys & Active Sessions, and switch on Passkey & Biometric App Lock.\n\nQ: How do I turn on Kids Mode?\nA: Open the hamburger menu and switch on Kids only. A passkey is needed only when turning 18+ content on.\n\nQ: How do I contact the InPlayer team?\nA: Email support@inplayer.in and we will get back to you.',
         ),
       ),
       GoRoute(

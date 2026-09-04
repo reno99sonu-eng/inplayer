@@ -62,7 +62,7 @@ class KidsRow extends StatelessWidget {
         margin: const EdgeInsets.only(right: 12),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(14),
-          color: AppColors.surfaceDark,
+          color: context.bgSurface,
         ),
         clipBehavior: Clip.hardEdge,
         child: Column(
@@ -74,9 +74,9 @@ class KidsRow extends StatelessWidget {
                   ? CachedNetworkImage(
                       imageUrl: video.thumbnail,
                       fit: BoxFit.cover,
-                      errorWidget: (context, url, error) => _fallback(),
+                      errorWidget: (context, url, error) => _fallback(context),
                     )
-                  : _fallback(),
+                  : _fallback(context),
             ),
             Padding(
               padding: const EdgeInsets.all(8),
@@ -110,9 +110,9 @@ class KidsRow extends StatelessWidget {
     );
   }
 
-  Widget _fallback() {
+  Widget _fallback(BuildContext context) {
     return Container(
-      color: AppColors.surfaceDark,
+      color: context.bgSurface,
       child: const Center(
         child: Icon(Icons.child_care, color: AppColors.brandOrange, size: 28),
       ),

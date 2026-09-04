@@ -83,6 +83,17 @@ class _GoLivePageState extends ConsumerState<GoLivePage>
   StreamSubscription<IvsBroadcastEvent>? _events;
   IvsBroadcastState _broadcastState = IvsBroadcastState.invalid;
   bool _onAir = false;
+
+  /// When this broadcast actually reached IVS, used for the elapsed timer.
+  /// Set from the connected event rather than from when Start was tapped,
+  /// so the clock measures time genuinely on air.
+  DateTime? _onAirSince;
+  Timer? _airTimer;
+
+  /// Live viewer count, or null while it is not knowable — see
+  /// LiveService.getViewerCount.
+  int? _viewerCount;
+  Timer? _viewerPollTimer;
   bool _micMuted = false;
   bool _cameraOn = true;
   bool _frontCamera = true;
@@ -146,6 +157,7 @@ class _GoLivePageState extends ConsumerState<GoLivePage>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _cameraWatchdog?.cancel();
+    _stopAirTimers();
     _events?.cancel();
     // Last-resort backstop. PopScope below normally handles leaving properly,
     // but if this screen goes away by any other route the camera and mic must
@@ -345,6 +357,8 @@ class _GoLivePageState extends ConsumerState<GoLivePage>
       _creds = result;
       _stage = _Stage.live;
       _onAir = false;
+      _onAirSince = null;
+      _viewerCount = null;
       _micMuted = false;
       _cameraOn = true;
       _frontCamera = true;
@@ -388,8 +402,10 @@ class _GoLivePageState extends ConsumerState<GoLivePage>
             _cameraWatchdog = null;
             setState(() {
               _onAir = true;
+              _onAirSince ??= DateTime.now();
               _error = null;
             });
+            _startAirTimers();
           }
         case IvsPreviewEvent(:final ready):
           setState(() => _previewReady = ready);
@@ -475,6 +491,8 @@ class _GoLivePageState extends ConsumerState<GoLivePage>
       _stage = _Stage.setup;
       _creds = null;
       _onAir = false;
+      _onAirSince = null;
+      _viewerCount = null;
       _broadcastState = IvsBroadcastState.disconnected;
       _error = error;
       _cameraTimeoutNotice = notice;
@@ -578,12 +596,17 @@ class _GoLivePageState extends ConsumerState<GoLivePage>
     if (!mounted) return;
 
     setState(() => _ending = false);
+    // The broadcast is over — stop the clock and the viewer poll rather than
+    // leaving a 1-second timer running behind the "ended" screen.
+    _stopAirTimers();
 
     if (ok) {
       VideoService.clearAudienceCaches();
       setState(() {
         _stage = _Stage.ended;
         _onAir = false;
+        _onAirSince = null;
+        _viewerCount = null;
       });
     } else {
       // The camera is already off either way — say what actually happened
@@ -594,6 +617,8 @@ class _GoLivePageState extends ConsumerState<GoLivePage>
       setState(() {
         _stage = _Stage.ended;
         _onAir = false;
+        _onAirSince = null;
+        _viewerCount = null;
       });
     }
   }
@@ -690,19 +715,89 @@ class _GoLivePageState extends ConsumerState<GoLivePage>
             // live stream by accident — same reasoning as the website hiding
             // its back button once you're on air.
             automaticallyImplyLeading: !locked,
-            title: Text(
-              _onAir ? 'You are LIVE' : 'Go Live',
-              style: TextStyle(
-                color: context.textPrimary,
-                fontWeight: FontWeight.w800,
-                letterSpacing: -0.5,
-              ),
+            title: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  _onAir ? 'You are LIVE' : 'Go Live',
+                  style: TextStyle(
+                    color: context.textPrimary,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                // Elapsed time is local and always true. The viewer count is
+                // only shown once IVS has actually reported one — an absent
+                // number is left absent rather than rendered as "0 watching",
+                // which would tell a broadcaster nobody is there when the
+                // truth is that nobody has counted yet.
+                if (_onAir && _onAirSince != null)
+                  Text(
+                    () {
+                      final elapsed = _formatElapsed(
+                        DateTime.now().difference(_onAirSince!),
+                      );
+                      final count = _viewerCount;
+                      if (count == null) return elapsed;
+                      return '$elapsed  ·  $count '
+                          '${count == 1 ? 'viewer' : 'viewers'}';
+                    }(),
+                    style: TextStyle(
+                      color: context.textSecondary,
+                      fontSize: 11.5,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+              ],
             ),
           ),
           body: SafeArea(child: _buildStage()),
         ),
       ),
     );
+  }
+
+  /// Runs the on-air clock and the viewer-count poll.
+  ///
+  /// The clock ticks locally every second; the viewer count is polled every
+  /// 15 seconds, which is as often as it is worth asking — IVS updates it
+  /// on its own cadence and a tighter loop would just burn battery and
+  /// requests for a number that has not moved.
+  void _startAirTimers() {
+    _airTimer?.cancel();
+    _airTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (mounted && _onAir) setState(() {});
+    });
+
+    _viewerPollTimer?.cancel();
+    unawaited(_pollViewerCount());
+    _viewerPollTimer = Timer.periodic(
+      const Duration(seconds: 15),
+      (_) => unawaited(_pollViewerCount()),
+    );
+  }
+
+  void _stopAirTimers() {
+    _airTimer?.cancel();
+    _airTimer = null;
+    _viewerPollTimer?.cancel();
+    _viewerPollTimer = null;
+  }
+
+  Future<void> _pollViewerCount() async {
+    final videoId = _creds?.videoId;
+    if (videoId == null || !mounted || !_onAir) return;
+    final count = await _liveService.getViewerCount(videoId);
+    if (!mounted) return;
+    setState(() => _viewerCount = count);
+  }
+
+  String _formatElapsed(Duration d) {
+    final h = d.inHours;
+    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return h > 0 ? '$h:$m:$s' : '$m:$s';
   }
 
   Widget _buildStage() {
@@ -863,8 +958,36 @@ class _GoLivePageState extends ConsumerState<GoLivePage>
     );
   }
 
+  /// On a phone that can broadcast natively there is nothing to explain —
+  /// the form below is self-evident — so this is just a section title.
+  ///
+  /// The notice is kept only for the phones that CANNOT broadcast in-app.
+  /// There the screen silently changes into a stream-key handout, and
+  /// without a line saying why, a server URL appearing where a camera was
+  /// expected reads as a bug.
   Widget _buildIntroBanner() {
-    final native = _nativeSupported;
+    if (_nativeSupported) {
+      return Row(
+        children: [
+          const Icon(
+            Icons.videocam_outlined,
+            color: AppColors.brandOrange,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'Set up your broadcast',
+            style: TextStyle(
+              color: context.textPrimary,
+              fontSize: 16,
+              fontWeight: FontWeight.w800,
+              letterSpacing: -0.2,
+            ),
+          ),
+        ],
+      );
+    }
+
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
@@ -877,21 +1000,17 @@ class _GoLivePageState extends ConsumerState<GoLivePage>
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(
-            native ? Icons.videocam_outlined : Icons.info_outline,
+          const Icon(
+            Icons.info_outline,
             color: AppColors.brandOrange,
             size: 18,
           ),
           const SizedBox(width: 10),
           Expanded(
             child: Text(
-              native
-                  ? "Your phone's camera and microphone broadcast straight to "
-                        'your channel — no other apps needed. Fill in the '
-                        'details, then tap Start Broadcast.'
-                  : "This phone's Android version can't broadcast from inside "
-                        "the app, so we'll give you a server URL and stream "
-                        'key to use in a streaming app like OBS or Larix.',
+              "This phone's Android version can't broadcast from inside "
+              "the app, so we'll give you a server URL and stream "
+              'key to use in a streaming app like OBS or Larix.',
               style: TextStyle(
                 color: context.textPrimary,
                 fontSize: 12.5,

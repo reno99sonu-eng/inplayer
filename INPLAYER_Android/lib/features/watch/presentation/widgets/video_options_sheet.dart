@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/share_utils.dart';
 import '../../../../models/playlist.dart';
 import '../../../../models/video.dart';
 import '../../../../services/playlist_service.dart';
@@ -253,6 +254,11 @@ class _VideoOptionsSheetState extends ConsumerState<VideoOptionsSheet> {
           ],
         ),
         const SizedBox(height: 8),
+        _menuRow(
+          icon: Icons.reply_outlined,
+          label: 'Share',
+          onTap: () => shareVideoLink(widget.video),
+        ),
         _menuRow(
           icon: Icons.playlist_add,
           label: 'Save to playlist',

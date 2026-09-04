@@ -162,8 +162,16 @@ export async function GET(request: NextRequest) {
           new QueryCommand({
             TableName: "InPlayer-Comments",
             KeyConditionExpression: "videoId = :videoId",
+            // `hidden` is a RESERVED WORD in DynamoDB, so it cannot appear
+            // literally in an expression — doing so fails the whole query
+            // with "Invalid FilterExpression: Attribute name is a reserved
+            // keyword". Every one of these queries was throwing, the catch
+            // below swallowed it to a count of 0, and creator analytics
+            // therefore reported ZERO comments on every video for every
+            // creator. Aliasing the name is the documented fix.
             FilterExpression:
-              "attribute_not_exists(hidden) OR hidden = :notHidden",
+              "attribute_not_exists(#hidden) OR #hidden = :notHidden",
+            ExpressionAttributeNames: { "#hidden": "hidden" },
             ExpressionAttributeValues: {
               ":videoId": v.videoId,
               ":notHidden": false,

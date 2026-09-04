@@ -182,7 +182,7 @@ class PlayablesShelf extends StatelessWidget {
                       imageUrl: game.thumbnail,
                       fit: BoxFit.cover,
                       errorWidget: (context, url, error) => Container(
-                        color: AppColors.surfaceDark,
+                        color: context.bgSurface,
                         child: const Icon(
                           Icons.sports_esports,
                           color: AppColors.brandOrange,

@@ -329,7 +329,7 @@ class _SearchPageState extends ConsumerState<SearchPage> {
 
   Widget _suggestionThumbnailFallback() {
     return Container(
-      color: AppColors.surfaceDark,
+      color: context.bgSurface,
       child: const Icon(Icons.play_circle_outline, size: 18, color: AppColors.brandOrange),
     );
   }
@@ -533,12 +533,12 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                                   imageUrl: creator.avatarUrl!,
                                   fit: BoxFit.cover,
                                   errorWidget: (context, url, error) => Container(
-                                    color: AppColors.surfaceDark,
+                                    color: context.bgSurface,
                                     child: const Icon(Icons.person, size: 16, color: AppColors.brandOrange),
                                   ),
                                 )
                               : Container(
-                                  color: AppColors.surfaceDark,
+                                  color: context.bgSurface,
                                   child: const Icon(Icons.person, size: 16, color: AppColors.brandOrange),
                                 ),
                         ),

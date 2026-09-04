@@ -3,7 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../services/ad_service.dart';
 
 /// Real house ad card for the home feed's "home" placement — mirrors
@@ -62,8 +62,8 @@ class _HomeAdCardState extends ConsumerState<HomeAdCard> {
           clipBehavior: Clip.hardEdge,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
-            color: AppColors.surfaceDark,
-            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+            color: context.bgSurface,
+            border: Border.all(color: context.borderSubtle),
           ),
           child: Stack(
             children: [
@@ -72,7 +72,8 @@ class _HomeAdCardState extends ConsumerState<HomeAdCard> {
                 child: CachedNetworkImage(
                   imageUrl: ad.imageUrl,
                   fit: BoxFit.cover,
-                  errorWidget: (context, url, error) => Container(color: AppColors.surfaceDark),
+                  errorWidget: (context, url, error) =>
+                      Container(color: context.bgSurface),
                 ),
               ),
               Positioned(

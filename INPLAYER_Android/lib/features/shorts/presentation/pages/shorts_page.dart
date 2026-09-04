@@ -165,7 +165,7 @@ class _ShortsPageState extends ConsumerState<ShortsPage> {
   /// cap; `kWarmNextShortEnabled` in that file turns the whole thing off.
   void _warmNextShort() {
     if (!mounted || !widget.isActive) return;
-    // Deliberately NOT immediate.
+    // Deliberately not immediate, but 1600ms was far too late.
     //
     // onFirstFrame fires as soon as the playhead passes ~80ms, which is
     // still inside the window where the decoder is filling its pipeline —
@@ -173,10 +173,16 @@ class _ShortsPageState extends ConsumerState<ShortsPage> {
     // first second before settling to ~29fps. Allocating a second decoder
     // in the middle of that steals bandwidth from the short you are
     // actually watching and shows up as stutter right after it starts.
-    // Waiting until playback is genuinely steady moves the allocation
-    // into quiet time, well before the next swipe needs it.
+    //
+    // But a warm-up itself takes 1–2 seconds (manifest, playlist, first
+    // segment, MediaCodec session). Starting it 1.6s in meant it only ever
+    // finished if you sat on a short for well over three seconds — so on
+    // any normal scroll speed the warm controller was never ready and
+    // every swipe still paid the full cold start. 500ms is past the worst
+    // of the ramp (roughly 600ms into playback) and leaves the warm-up a
+    // realistic chance of being finished before the next swipe.
     _warmDelayTimer?.cancel();
-    _warmDelayTimer = Timer(const Duration(milliseconds: 1600), () {
+    _warmDelayTimer = Timer(const Duration(milliseconds: 500), () {
       if (!mounted || !widget.isActive) return;
       final shorts = _shorts;
       if (shorts == null) return;

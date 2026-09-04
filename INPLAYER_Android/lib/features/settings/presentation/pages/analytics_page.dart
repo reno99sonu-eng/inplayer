@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../services/video_service.dart';
 
 /// Real creator analytics computed from GET /api/my-videos — the same raw
 /// scan used by the website's own analytics/dashboard surfaces. No fake or
 /// estimated numbers: everything here is derived directly from the
 /// creator's own uploaded videos/shorts (views, upload count, status).
+///
+/// Colours come from the `AppThemeContext` extension rather than the
+/// `*Dark` constants: this page was pinned to the dark palette, so it stayed
+/// black in light mode while the rest of Settings switched.
 class AnalyticsPage extends ConsumerStatefulWidget {
   const AnalyticsPage({super.key});
 
@@ -32,12 +37,13 @@ class _AnalyticsPageState extends ConsumerState<AnalyticsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.backgroundDark,
+      backgroundColor: context.bgCanvas,
       appBar: AppBar(
-        backgroundColor: AppColors.backgroundDark,
+        backgroundColor: context.bgCanvas,
+        foregroundColor: context.textPrimary,
         elevation: 0,
-        title: const Text('Analytics',
-            style: TextStyle(fontWeight: FontWeight.bold, color: AppColors.textPrimaryDark)),
+        title: Text('Analytics',
+            style: TextStyle(fontWeight: FontWeight.bold, color: context.textPrimary)),
       ),
       body: FutureBuilder<List<Map<String, dynamic>>>(
         future: _videosFuture,
@@ -47,13 +53,13 @@ class _AnalyticsPageState extends ConsumerState<AnalyticsPage> {
           }
           final videos = snapshot.data!;
           if (videos.isEmpty) {
-            return const Center(
+            return Center(
               child: Padding(
-                padding: EdgeInsets.all(24),
+                padding: const EdgeInsets.all(24),
                 child: Text(
                   "You haven't uploaded anything yet — analytics will show up here once you do.",
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: AppColors.textSecondaryDark),
+                  style: TextStyle(color: context.textSecondary),
                 ),
               ),
             );
@@ -93,18 +99,18 @@ class _AnalyticsPageState extends ConsumerState<AnalyticsPage> {
               ),
               if (top != null) ...[
                 const SizedBox(height: 20),
-                const Text(
+                Text(
                   'Top Performer',
                   style: TextStyle(
-                      color: AppColors.textPrimaryDark, fontWeight: FontWeight.w700, fontSize: 15),
+                      color: context.textPrimary, fontWeight: FontWeight.w700, fontSize: 15),
                 ),
                 const SizedBox(height: 10),
                 Container(
                   padding: const EdgeInsets.all(14),
                   decoration: BoxDecoration(
-                    color: AppColors.cardDark,
+                    color: context.bgCard,
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+                    border: Border.all(color: context.borderSubtle),
                   ),
                   child: Row(
                     children: [
@@ -126,12 +132,12 @@ class _AnalyticsPageState extends ConsumerState<AnalyticsPage> {
                               (top['title'] ?? 'Untitled').toString(),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(color: AppColors.textPrimaryDark, fontWeight: FontWeight.w600),
+                              style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.w600),
                             ),
                             const SizedBox(height: 2),
                             Text(
                               '${_formatCount(topViews)} views',
-                              style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 12),
+                              style: TextStyle(color: context.textSecondary, fontSize: 12),
                             ),
                           ],
                         ),
@@ -151,9 +157,9 @@ class _AnalyticsPageState extends ConsumerState<AnalyticsPage> {
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppColors.cardDark,
+        color: context.bgCard,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+        border: Border.all(color: context.borderSubtle),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -161,9 +167,9 @@ class _AnalyticsPageState extends ConsumerState<AnalyticsPage> {
         children: [
           Icon(icon, color: AppColors.brandOrange, size: 20),
           Text(value,
-              style: const TextStyle(
-                  color: AppColors.textPrimaryDark, fontSize: 20, fontWeight: FontWeight.bold)),
-          Text(label, style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 12)),
+              style: TextStyle(
+                  color: context.textPrimary, fontSize: 20, fontWeight: FontWeight.bold)),
+          Text(label, style: TextStyle(color: context.textSecondary, fontSize: 12)),
         ],
       ),
     );

@@ -139,6 +139,11 @@ class ApiConstants {
   // project doc for the full explanation.
   static const String liveCreate = '/api/live/ivs-create';
   static const String liveEnd = '/api/live/end';
+  // Owner-only live viewer count, read from IVS server-side (see
+  // app/api/live/viewers/route.ts). IVS is the only thing that knows this
+  // number and only the server may ask it, so there is no way to get it
+  // client-side without this route.
+  static const String liveViewers = '/api/live/viewers';
 
   // Upload
   //

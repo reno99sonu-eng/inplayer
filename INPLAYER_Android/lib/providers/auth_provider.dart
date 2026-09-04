@@ -102,7 +102,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  Future<void> confirmSignUp({
+  /// Returns true on success; the reason for a failure is also written to
+  /// [state]. ForgotPasswordModal needs the boolean because it drives a flow
+  /// rather than just watching state, and verify_email_page keeps watching
+  /// state as before — awaiting and discarding the result is fine.
+  Future<bool> confirmSignUp({
     required String email,
     required String code,
   }) async {
@@ -112,8 +116,20 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
     if (result.success) {
       state = const AuthState.unauthenticated();
-    } else {
-      state = AuthState.error(result.error ?? 'Verification failed');
+      return true;
+    }
+    state = AuthState.error(result.error ?? 'Verification failed');
+    return false;
+  }
+
+  /// Sends a fresh sign-up confirmation code. See
+  /// AuthService.resendVerificationCode for why this exists.
+  Future<String?> resendVerificationCode({required String email}) async {
+    try {
+      return await _authService.resendVerificationCode(email: email);
+    } catch (e) {
+      _logger.e('Error resending verification code: $e');
+      rethrow;
     }
   }
 

@@ -184,7 +184,7 @@ class _CreatorMonetizationPageState extends ConsumerState<CreatorMonetizationPag
       case 'rejected':
         return AppColors.error;
       default:
-        return AppColors.textSecondaryDark;
+        return context.textSecondary;
     }
   }
 
@@ -195,7 +195,7 @@ class _CreatorMonetizationPageState extends ConsumerState<CreatorMonetizationPag
       case 'ELIGIBLE':
         return AppColors.brandOrange;
       default:
-        return AppColors.textSecondaryDark;
+        return context.textSecondary;
     }
   }
 }

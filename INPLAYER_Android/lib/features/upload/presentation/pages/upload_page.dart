@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
@@ -15,6 +14,7 @@ import '../../../../core/theme/pattern_background.dart';
 import '../../../../core/utils/music_track_utils.dart';
 import '../../../../core/utils/music_copyright.dart';
 import '../../../../core/utils/mux_thumbnail.dart';
+import '../../../../core/utils/thumbnail_compress.dart';
 import '../../../../services/ai_assist_service.dart';
 import '../../../../services/upload_service.dart';
 import '../../../../models/lyric_line.dart';
@@ -383,15 +383,45 @@ class _UploadPageState extends ConsumerState<UploadPage> {
       _progress = 0;
     });
 
-    // 1. Prepare thumbnail data URL if present
+    // 1. Prepare thumbnail data URL if present.
+    //
+    // This has to be COMPRESSED, not merely base64-encoded, and getting
+    // that wrong is why uploads carrying a custom thumbnail failed. The
+    // server caps thumbnailDataUrl at 200,000 characters
+    // (THUMBNAIL_DATA_URL_MAX_LENGTH in app/lib/imageCompress.ts) and
+    // rejects the whole request above it. The old code read the picked file
+    // and base64'd it as-is — a 1920x1080 JPEG from the picker is 400-700KB,
+    // i.e. 550k-950k base64 characters, several times over the limit. Every
+    // such upload came back "That thumbnail image is too large or invalid",
+    // and because the server REQUIRES a thumbnail for music (audio has no
+    // video frame to generate one from) no music track could publish at all.
+    //
+    // compressImageToThumbnailDataUrl ports the website's
+    // compressImageToThumbnail(): centre-crop to 16:9, scale to 640 wide,
+    // JPEG quality 82 — the exact output this endpoint was written against.
     String? thumbnailDataUrl;
     if (_thumbnailFile != null) {
-      try {
-        final bytes = await File(_thumbnailFile!.path).readAsBytes();
-        final base64 = base64Encode(bytes);
-        thumbnailDataUrl = 'data:image/jpeg;base64,$base64';
-      } catch (e) {
-        // non-fatal
+      thumbnailDataUrl =
+          await compressImageToThumbnailDataUrl(_thumbnailFile!.path);
+      if (!mounted) return;
+      if (thumbnailDataUrl == null) {
+        if (_isMusicUpload) {
+          // Fatal here: the server rejects a music upload with no cover, so
+          // carrying on would only trade this message for a worse one.
+          setState(() {
+            _errorMessage = "Couldn't process that cover image. Please try a "
+                'different one.';
+            _stage = _Stage.error;
+            _publishing = false;
+          });
+          return;
+        }
+        // A video still publishes fine — Mux generates a frame — so say what
+        // happened rather than throwing the whole upload away.
+        _showSnack(
+          "Couldn't process that thumbnail. Publishing with the automatic "
+          'one instead.',
+        );
       }
     }
 

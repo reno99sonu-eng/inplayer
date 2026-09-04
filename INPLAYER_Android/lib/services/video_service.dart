@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
 
@@ -7,6 +8,24 @@ import '../models/video.dart';
 import '../models/short.dart';
 import '../models/trending_creator.dart';
 import '../models/video_suggestion.dart';
+
+/// Outcome of a my-videos fetch, so a failure can be told apart from a
+/// creator who genuinely has not uploaded anything.
+///
+/// [VideoService.getMyVideos] returns a bare list and swallows every
+/// failure — an expired session's 401, a timeout, a 500 — all of which
+/// reach the UI as an empty list and get rendered as "No content uploaded
+/// in this category". That sentence is a claim about the creator's account,
+/// and it was being printed on top of errors that had nothing to do with
+/// their account at all.
+class MyVideosResult {
+  final List<Video> videos;
+  final String? error;
+
+  const MyVideosResult({this.videos = const [], this.error});
+
+  bool get failed => error != null;
+}
 
 final videoServiceProvider = Provider<VideoService>((ref) {
   return VideoService();
@@ -438,6 +457,61 @@ class VideoService {
   /// GET /api/my-videos (app/api/my-videos/route.ts) — every video where
   /// uploaderId matches the caller, any status/visibility (unlike the
   /// public feed, this includes the owner's own drafts/private videos).
+  /// Same request as [getMyVideos], but reports why it failed instead of
+  /// returning an empty list and letting the screen invent an explanation.
+  Future<MyVideosResult> getMyVideosResult() async {
+    try {
+      final response = await _dio.get(ApiConstants.myVideos);
+
+      if (response.statusCode != 200) {
+        return MyVideosResult(
+          error: "Couldn't load your uploads "
+              '(server error ${response.statusCode}).',
+        );
+      }
+      if (response.data is! Map) {
+        return const MyVideosResult(
+          error: "Couldn't read your uploads from the server.",
+        );
+      }
+
+      final videosJson = (response.data as Map)['videos'];
+      if (videosJson is! List) {
+        return const MyVideosResult(
+          error: "Couldn't read your uploads from the server.",
+        );
+      }
+
+      return MyVideosResult(
+        videos: videosJson
+            .whereType<Map>()
+            .map((json) => Video.fromJson(Map<String, dynamic>.from(json)))
+            .toList(),
+      );
+    } on DioException catch (e, stackTrace) {
+      _logger.e('Error fetching my videos', error: e, stackTrace: stackTrace);
+      final code = e.response?.statusCode;
+      if (code == 401 || code == 403) {
+        return const MyVideosResult(
+          error: 'Your session has expired. Sign in again to see your uploads.',
+        );
+      }
+      if (e.type == DioExceptionType.connectionError) {
+        return const MyVideosResult(
+          error: 'No internet connection.',
+        );
+      }
+      return MyVideosResult(
+        error: "Couldn't reach the server to load your uploads.",
+      );
+    } catch (e, stackTrace) {
+      _logger.e('Error fetching my videos', error: e, stackTrace: stackTrace);
+      return const MyVideosResult(
+        error: "Couldn't load your uploads. Please try again.",
+      );
+    }
+  }
+
   Future<List<Video>> getMyVideos() async {
     try {
       final response = await _dio.get(ApiConstants.myVideos);

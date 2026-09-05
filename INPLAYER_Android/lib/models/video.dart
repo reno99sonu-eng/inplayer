@@ -129,8 +129,12 @@ class Video {
       title: json['title'] ?? '',
       creator: json['creator'] ?? json['uploaderName'] ?? 'Unknown',
       uploaderUsername: json['uploaderUsername'],
-      avatar: _resolveUrl(
-          json['avatar'] ?? json['uploaderAvatarUrl'] ?? '/avatars/avatar.png'),
+        avatar: _resolveUrl(
+          json['avatar'] ??
+            json['avatarUrl'] ??
+            json['uploaderAvatarUrl'] ??
+            json['creatorAvatarUrl'] ??
+            '/avatars/avatar.png'),
       thumbnail: _resolveUrl(rawThumb),
       views: _formatViews(json['views'] ?? 0),
       uploaded: _formatTimeAgo(json['uploadedAt'] ?? json['uploaded']),

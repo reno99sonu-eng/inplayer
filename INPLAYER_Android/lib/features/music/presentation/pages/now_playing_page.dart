@@ -10,6 +10,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/music_track_utils.dart';
 import '../../../../core/utils/share_utils.dart';
+import '../../../../core/widgets/user_avatar.dart';
 import '../../../../models/video.dart';
 import '../../../../services/download_manager.dart';
 import '../../../../services/download_service.dart';
@@ -652,6 +653,24 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
+        UserAvatar(
+          avatarUrl: track.avatar,
+          name: track.artist?.isNotEmpty == true
+              ? track.artist!
+              : track.creator,
+          size: 40,
+          isVerified: track.verified,
+          onTap: track.uploaderUsername != null &&
+                  track.uploaderUsername!.isNotEmpty
+              ? () {
+                  Navigator.of(context, rootNavigator: true).maybePop();
+                  context.push(
+                    '/channel/${Uri.encodeComponent(track.uploaderUsername!)}',
+                  );
+                }
+              : null,
+        ),
+        const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,

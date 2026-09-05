@@ -53,7 +53,7 @@ class Short {
     final playbackId = json['muxPlaybackId']?.toString();
     String rawPoster = json['poster']?.toString() ?? json['thumbnailUrl']?.toString() ?? json['thumbnail']?.toString() ?? '';
     if (rawPoster.trim().isEmpty && playbackId != null && playbackId.isNotEmpty) {
-      rawPoster = 'https://image.mux.com/$playbackId/thumbnail.webp?width=640&height=1138&fit_mode=smartcrop&time=1';
+      rawPoster = 'https://image.mux.com/$playbackId/thumbnail.webp?width=720&time=0';
     }
 
     return Short(

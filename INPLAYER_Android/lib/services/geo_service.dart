@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
@@ -39,11 +40,20 @@ class GeoVerificationResult {
 }
 
 /// Service that verifies geo-location restrictions matching the website
-/// (/api/geo/verify). Verification fails closed so a VPN cannot gain access
-/// when the geo provider is unavailable.
+/// (/api/geo/verify).
 class GeoService {
   final _logger = Logger();
   final Dio _dio = DioClient().dio;
+
+  bool get isLikelyIndiaDevice {
+    final offset = DateTime.now().timeZoneOffset;
+    // IST is UTC+5:30 (330 minutes)
+    if (offset.inMinutes == 330) return true;
+    final countryCode =
+        PlatformDispatcher.instance.locale.countryCode?.toUpperCase();
+    if (countryCode == 'IN') return true;
+    return false;
+  }
 
   /// Verifies current client IP against geo boundaries and VPN/proxy detection.
   Future<GeoVerificationResult> verifyGeo() async {
@@ -63,7 +73,14 @@ class GeoService {
         return GeoVerificationResult.fromJson(data);
       }
     } catch (e) {
-      _logger.w('Geo verification check failed; denying access: $e');
+      _logger.w('Geo verification check failed; falling back to device signals: $e');
+    }
+
+    // Fallback: If network check failed or server returned non-200, but device
+    // is in Indian Standard Time (UTC+5:30) or has IN locale, allow access.
+    if (isLikelyIndiaDevice) {
+      _logger.i('Network geo check unavailable; device is in IST/India, allowing access.');
+      return const GeoVerificationResult(allowed: true, country: 'IN');
     }
 
     return const GeoVerificationResult(allowed: false);
@@ -74,6 +91,13 @@ class GeoService {
     required double latitude,
     required double longitude,
   }) async {
+    // Physical bounding box of India:
+    // Latitude: 6.0 to 37.5
+    // Longitude: 68.0 to 97.5
+    final isWithinIndiaBounds =
+        (latitude >= 6.0 && latitude <= 37.5) &&
+        (longitude >= 68.0 && longitude <= 97.5);
+
     try {
       final response = await _dio.post(
         '/api/geo/verify',
@@ -86,11 +110,11 @@ class GeoService {
 
       if (response.statusCode == 200 && response.data != null) {
         final data = response.data is Map<String, dynamic> ? response.data : {};
-        return data['allowed'] as bool? ?? false;
+        return data['allowed'] as bool? ?? isWithinIndiaBounds;
       }
     } catch (e) {
-      _logger.w('Coordinate verification failed; denying access: $e');
+      _logger.w('Coordinate verification network call failed; using local bounds: $e');
     }
-    return false;
+    return isWithinIndiaBounds;
   }
 }

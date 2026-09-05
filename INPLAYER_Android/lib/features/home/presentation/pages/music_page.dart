@@ -76,6 +76,11 @@ class _MusicPageState extends ConsumerState<MusicPage> {
   List<Video> _recentlyPlayed = [];
   List<Video> _recommended = [];
 
+  /// True when the load finished without producing anything. Used to tell a
+  /// genuinely empty catalogue apart from a failed fetch, and to offer a way
+  /// back either way.
+  bool _loadFailed = false;
+
   @override
   void initState() {
     super.initState();

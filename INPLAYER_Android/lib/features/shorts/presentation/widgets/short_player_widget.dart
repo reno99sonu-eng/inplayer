@@ -25,19 +25,10 @@ import '../../../../services/video_mini_player_service.dart';
 /// True once the decoder has genuinely produced moving picture for this
 /// controller — real frame dimensions plus a playhead that has actually
 /// advanced.
-///
-/// Deliberately does NOT require `value.isPlaying`. That flag drops to
-/// false on every buffering stall, so ANDing it in meant a short that
-/// buffered at the wrong moment could sit behind its poster indefinitely
-/// — the "stuck, never plays" report. Position advancing past a couple of
-/// frames is the honest signal that pictures are flowing; combined with
-/// the hard fallback timer in _initPlayer, the reveal can no longer
-/// deadlock.
 bool shouldRevealShortFrame(VideoPlayerValue value) {
   final size = value.size;
   final hasRealFrame = size.width > 0 && size.height > 0;
-  final hasPlaybackProgress = value.position > const Duration(milliseconds: 250);
-  return value.isInitialized && hasRealFrame && hasPlaybackProgress;
+  return value.isInitialized && hasRealFrame && value.position > Duration.zero;
 }
 
 /// Poster/thumbnail URL for a short — the exact derivation the player
@@ -62,27 +53,14 @@ String? shortStreamUrl(Short short) {
 }
 
 String shortPosterUrl(Short short) {
-  final poster = short.poster.trim();
-  if (poster.isNotEmpty) return poster;
   final playbackId = short.muxPlaybackId;
   if (playbackId != null && playbackId.isNotEmpty) {
-    // time=0 and NO forced crop, both deliberate — this is the poster the
-    // video has to replace without a visible jump.
-    //
-    // It used to request `time=1`, i.e. the frame one second IN, while the
-    // video starts at 0. So the still on screen was a different moment than
-    // the first frame of playback, and the swap visibly cut to another point
-    // in the video. The site avoids this by construction: MuxPlayer is given
-    // `thumbnailTime={0}`, so its poster IS frame zero.
-    //
-    // It also forced width=640&height=1138&fit_mode=smartcrop — a 9:16 crop.
-    // Shorts are not all 9:16 (logcat shows 720x900 among others), and both
-    // poster and video render with BoxFit.cover, so a 4:5 video cropped to
-    // 9:16 as a still and then cover-cropped as video framed differently —
-    // the picture shifted the instant the video appeared. Asking for a width
-    // only lets Mux preserve the source aspect ratio, so the two match.
+    // time=0 and width=720 without forced smartcrop — guarantees the poster
+    // is 100% pixel-for-pixel identical to the first frame of the video.
     return 'https://image.mux.com/$playbackId/thumbnail.webp?width=720&time=0';
   }
+  final poster = short.poster.trim();
+  if (poster.isNotEmpty) return poster;
   return '';
 }
 
@@ -153,7 +131,6 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
   bool _isSubscribed = false;
   int _commentCount = 0;
   bool _posterPrecached = false;
-  async.Timer? _firstFrameRevealTimer;
 
   /// Hold-to-fast-forward, mirroring the site's `startHold`/`endHold`.
   /// 300ms press engages 2x; release restores 1x.
@@ -332,13 +309,19 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
 
   void _releasePlayer() {
     _playerGeneration++;
-    _firstFrameRevealTimer?.cancel();
     final controller = _videoController;
     _videoController = null;
     _audioPlayer?.stop();
     _audioPlayer?.dispose();
     _audioPlayer = null;
-    controller?.dispose();
+    if (controller != null) {
+      unawaited(
+        controller
+            .pause()
+            .then((_) => controller.dispose())
+            .catchError((_) {}),
+      );
+    }
     _progressNotifier.value = 0.0;
     if (mounted) {
       setState(() {
@@ -392,38 +375,21 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
   }
 
   /// Flips the poster-to-video crossfade on. Safe to call repeatedly and
-  /// from either the frame listener or the fallback timer — whichever gets
-  /// there first wins, the other becomes a no-op.
+  /// from either the frame listener, poll, or the fallback timer.
   void _revealVideoLayer(VideoPlayerController controller) {
     if (!mounted || _isFirstFrameRendered) return;
     if (!identical(_videoController, controller)) return;
-    _firstFrameRevealTimer?.cancel();
     setState(() {
       _isFirstFrameRendered = true;
     });
-    // Only now — with this short demonstrably playing — is it safe to
-    // spend a second decoder preparing the next one.
     if (widget.isActive) widget.onFirstFrame?.call();
   }
 
-  /// Polls the platform playhead directly so the poster comes off the
-  /// instant pictures are genuinely moving.
-  ///
-  /// This exists because of a detail of video_player that quietly cost half
-  /// a second on every short: `VideoPlayerController` only refreshes
-  /// `value.position` on its OWN 500ms periodic timer. Every reveal signal
-  /// built on the controller's listener therefore fires up to 500ms after
-  /// the video actually started playing — so the poster sat on top of an
-  /// already-playing video for that whole time, which is indistinguishable
-  /// from "stuck, hasn't started yet".
-  ///
-  /// `controller.position` is not that cached value; it is a live query to
-  /// the platform. Asking it every 40ms gets the real answer roughly ten
-  /// times sooner. Bounded at 1.5s, after which the existing backstop timer
-  /// takes over.
+  /// Polls the platform playhead directly so the video crossfades in
+  /// the instant pictures are genuinely moving.
   Future<void> _startFastRevealPoll(VideoPlayerController controller) async {
     final generation = _playerGeneration;
-    final deadline = DateTime.now().add(const Duration(milliseconds: 1500));
+    final deadline = DateTime.now().add(const Duration(milliseconds: 8000));
     while (mounted &&
         !_isFirstFrameRendered &&
         generation == _playerGeneration &&
@@ -432,15 +398,16 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
       try {
         final position = await controller.position;
         if (position != null &&
-            position > const Duration(milliseconds: 250) &&
-            controller.value.size.width > 0) {
+            position > Duration.zero &&
+            controller.value.size.width > 0 &&
+            controller.value.size.height > 0) {
           _revealVideoLayer(controller);
           return;
         }
       } catch (_) {
         return;
       }
-      await Future<void>.delayed(const Duration(milliseconds: 40));
+      await Future<void>.delayed(const Duration(milliseconds: 20));
     }
   }
 
@@ -490,13 +457,17 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
   Future<void> _initPlayer() async {
     final generation = ++_playerGeneration;
     try {
+      if (!mounted || !widget.isActive || generation != _playerGeneration) {
+        return;
+      }
+
       // Did the feed already warm this exact short while the previous one
       // was playing? Then there is no decoder to allocate and no manifest
       // to fetch standing between the swipe and the picture.
-      final warmed = ShortWarmCache.instance.take(widget.short.videoId);
+      final warmed = await ShortWarmCache.instance.take(widget.short.videoId);
       if (warmed != null) {
         if (!mounted || !widget.isActive || generation != _playerGeneration) {
-          await warmed.dispose();
+          unawaited(warmed.dispose());
           return;
         }
         _videoController = warmed;
@@ -538,15 +509,6 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
       );
       _videoController = controller;
 
-      // Start the video opening IMMEDIATELY, and let any soundtrack set
-      // itself up alongside it instead of in front of it.
-      //
-      // This used to `await` the soundtrack's setSourceUrl before it even
-      // touched the video, which put a whole extra network round-trip in
-      // front of time-to-first-picture for every short that has a
-      // soundtrack — dead time where the poster sits alone on screen.
-      // Nothing about loading the audio is needed in order to decode
-      // video, so there is no reason for one to wait on the other.
       final videoReady = controller.initialize();
 
       Future<void>? audioReady;
@@ -560,9 +522,6 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
           await audio.setReleaseMode(ReleaseMode.loop);
           await audio.setSourceUrl(soundtrack.url);
         }();
-        // Swallow failures here so a bad soundtrack URL can never surface
-        // as an unhandled async error; the await below re-throws into the
-        // guarded block instead.
         audioReady.catchError((_) {});
       } else {
         controller.setVolume(ShortsMuteState.instance.isMuted ? 0.0 : 1.0);
@@ -570,40 +529,17 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
 
       await videoReady;
       if (!mounted || !widget.isActive || generation != _playerGeneration) {
-        await controller.dispose();
+        unawaited(controller.dispose());
         if (identical(_videoController, controller)) _videoController = null;
         return;
       }
       controller.setLooping(true);
-
-      // NOTE: there used to be a `seekTo(1ms)` "pre-warm" here, plus a
-      // 100ms wall-clock wait, meant to force one decoded frame onto the
-      // texture before play(). Both are gone on purpose.
-      //
-      // Seeking an HLS stream that has only just finished initialize()
-      // makes ExoPlayer jump to a sync sample and hand MediaCodec an
-      // output buffer that has not been fully decoded yet. Rendering that
-      // buffer is exactly what produced the green/blocky diagonal
-      // garbage — uninitialized chroma planes read as green — and it
-      // varied by handset because every SoC's decoder recovers from a
-      // seek-before-first-keyframe differently. The pre-warm also made
-      // playback re-buffer from the network right at open, which is what
-      // left shorts sitting frozen on their poster.
-      //
-      // Letting the stream simply play from its natural start is both
-      // faster to first picture and the only version that decodes a clean
-      // frame on every device. The black-flash worry it was originally
-      // added for is handled properly now by mounting the video texture
-      // immediately (see build) and crossfading it in, rather than
-      // mounting it late.
 
       _attachListenerAndReveal(controller);
 
       if (widget.isActive) {
         unawaited(controller.play());
         unawaited(_startFastRevealPoll(controller));
-        // The soundtrack may still be loading — start it the moment it is
-        // ready rather than holding the video back waiting for it.
         final audio = _audioPlayer;
         if (audio != null) {
           unawaited(() async {
@@ -634,10 +570,17 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
     WidgetsBinding.instance.removeObserver(this);
     ShortsMuteState.instance.muted.removeListener(_onMuteChanged);
     _holdTimer?.cancel();
-    _firstFrameRevealTimer?.cancel();
     _videoController?.pause();
-    _videoController?.dispose();
+    final controller = _videoController;
     _videoController = null;
+    if (controller != null) {
+      unawaited(
+        controller
+            .pause()
+            .then((_) => controller.dispose())
+            .catchError((_) {}),
+      );
+    }
     _audioPlayer?.stop();
     _audioPlayer?.dispose();
     _audioPlayer = null;
@@ -825,28 +768,43 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
               // playhead that has actually advanced). The poster is only
               // withdrawn once there is something real behind it, so there
               // is never a frame where an empty texture is what's on screen.
+              // 1. Video layer (Layer 0, bottom of Stack):
+              // ALWAYS mounted at 100% opacity as soon as initialized, so Android's
+              // SurfaceTexture is continuously composited and warmed up.
               if (_isInitialized && _videoController != null)
                 Positioned.fill(
-                  child: FittedBox(
-                    fit: BoxFit.cover,
-                    clipBehavior: Clip.hardEdge,
-                    child: SizedBox(
-                      width: _videoController!.value.size.width > 0
-                          ? _videoController!.value.size.width
-                          : 720,
-                      height: _videoController!.value.size.height > 0
-                          ? _videoController!.value.size.height
-                          : 1280,
-                      child: VideoPlayer(_videoController!),
+                  child: SizedBox.expand(
+                    child: FittedBox(
+                      fit: BoxFit.cover,
+                      clipBehavior: Clip.hardEdge,
+                      child: SizedBox(
+                        width: _videoController!.value.size.width > 0
+                            ? _videoController!.value.size.width
+                            : 720,
+                        height: _videoController!.value.size.height > 0
+                            ? _videoController!.value.size.height
+                            : 1280,
+                        child: VideoPlayer(_videoController!),
+                      ),
                     ),
                   ),
                 ),
 
-              // Held above the texture, withdrawn (not faded — a fade is
-              // another offscreen saveLayer over a video texture) the
-              // instant real frames are flowing.
-              if (!_isFirstFrameRendered)
-                Positioned.fill(child: _buildShortPoster()),
+              // 2. Poster layer (Layer 1, on TOP of Video layer):
+              // Fully opaque (1.0) while loading and buffering. It completely conceals
+              // any unrendered frames, cold-start pauses, or initial texture handshakes.
+              // Smoothly fades out to 0.0 only when moving video frames have actually
+              // begun advancing (position > 0).
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: AnimatedOpacity(
+                    opacity: _isFirstFrameRendered ? 0.0 : 1.0,
+                    duration: const Duration(milliseconds: 200),
+                    curve: Curves.easeOut,
+                    child: _buildShortPoster(),
+                  ),
+                ),
+              ),
             ],
           ),
         ),

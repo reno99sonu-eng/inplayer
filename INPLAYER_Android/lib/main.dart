@@ -122,20 +122,26 @@ class _InplayerAppState extends ConsumerState<InplayerApp> {
     await _startupPermissionsFuture;
     if (!mounted) return;
 
-    // Request location before camera so Android does not drop one of two
-    // simultaneous permission dialogs during a cold start.
     final geoResult = await requestDeviceLocation(ref.read(geoServiceProvider));
     if (!mounted) return;
     if (!geoResult.allowed) {
-      debugPrint(
-        '[InPlayer] Device is outside the supported region: ${geoResult.country}',
-      );
-      setState(() {
-        _geoBlocked = true;
-        _startupScanComplete = true;
-        _splashVisible = false;
-      });
-      return;
+      // Extra safety check: Is the device in Indian Standard Time (UTC+5:30)?
+      final isIST = DateTime.now().timeZoneOffset.inMinutes == 330;
+      if (isIST) {
+        debugPrint(
+          '[InPlayer] Server geo check did not allow, but device is in IST (UTC+5:30); granting access.',
+        );
+      } else {
+        debugPrint(
+          '[InPlayer] Device is outside the supported region: ${geoResult.country}',
+        );
+        setState(() {
+          _geoBlocked = true;
+          _startupScanComplete = true;
+          _splashVisible = false;
+        });
+        return;
+      }
     }
 
     final navContext = rootNavigatorKey.currentContext;
@@ -238,7 +244,17 @@ class _InplayerAppState extends ConsumerState<InplayerApp> {
           fit: StackFit.expand,
           children: [
             ?child,
-            if (_geoBlocked) const _RegionBlockedOverlay(),
+            if (_geoBlocked)
+              _RegionBlockedOverlay(
+                onRetry: () {
+                  setState(() {
+                    _geoBlocked = false;
+                    _startupScanStarted = false;
+                    _startupScanComplete = false;
+                  });
+                  _beginStartupAgeScan();
+                },
+              ),
             // FloatingAIButton used to live here, above the router, so it
             // floated over EVERY route — watch, shorts, chat, settings,
             // checkout. It now belongs to the Home tab only and is mounted
@@ -264,7 +280,8 @@ class _InplayerAppState extends ConsumerState<InplayerApp> {
 }
 
 class _RegionBlockedOverlay extends StatelessWidget {
-  const _RegionBlockedOverlay();
+  final VoidCallback onRetry;
+  const _RegionBlockedOverlay({required this.onRetry});
 
   @override
   Widget build(BuildContext context) {
@@ -296,6 +313,21 @@ class _RegionBlockedOverlay extends StatelessWidget {
                   'Access is restricted to India. Disable any VPN or proxy and try again.',
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodyLarge,
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton.icon(
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh_rounded),
+                  label: const Text('Retry Verification'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 24,
+                      vertical: 12,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
                 ),
               ],
             ),

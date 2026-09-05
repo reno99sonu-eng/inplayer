@@ -141,15 +141,6 @@ class ShortPreloadCache {
 
       await controller.initialize();
       controller.setLooping(true);
-      // Same pre-warm + wall-clock floor used by ShortPlayerWidget's own
-      // cold-start path — forces a real decoded frame onto the texture
-      // ahead of time so there's nothing left to flash once this
-      // controller gets adopted.
-      try {
-        await controller.seekTo(const Duration(milliseconds: 1));
-      } catch (_) {}
-      await Future.delayed(const Duration(milliseconds: 100));
-
       return PreloadedShort(controller: controller, audioPlayer: audioPlayer);
     } catch (e) {
       debugPrint('[ShortPreloadCache] preload failed: $e');

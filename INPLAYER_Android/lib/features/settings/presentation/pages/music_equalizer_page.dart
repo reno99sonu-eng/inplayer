@@ -4,18 +4,21 @@ import 'package:just_audio/just_audio.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/equalizer_presets.dart';
 import '../../../../core/utils/equalizer_store.dart';
 import '../../../../services/music_player_service.dart';
 
 /// A real equalizer, not a decorative one.
 ///
-/// The sliders drive Android's own Equalizer AudioEffect through just_audio's
-/// AudioPipeline (see MusicPlayerService._equalizer), so a change is audible
-/// on the currently playing track immediately. The band list, their centre
-/// frequencies and the decibel range are all read FROM the platform rather
-/// than invented here — they vary by device, and a hardcoded five-band 60Hz
-/// to 16kHz layout would be a picture of an equalizer rather than the one
-/// this phone actually has.
+/// Picking a preset drives Android's own Equalizer AudioEffect through
+/// just_audio's AudioPipeline (see MusicPlayerService._equalizer), so the
+/// change is audible on the currently playing track immediately. The band
+/// list, their centre frequencies and the decibel range are all read FROM
+/// the platform rather than invented here — they vary by device, and a
+/// hardcoded five-band 60Hz to 16kHz layout would be a picture of an
+/// equalizer rather than the one this phone actually has. Presets are
+/// therefore stored as curves and sampled onto whatever bands turn up; see
+/// equalizer_presets.dart.
 ///
 /// The catch, and why this screen can legitimately say it is unavailable:
 /// Android only creates the effect once audio is actually running, so
@@ -31,7 +34,8 @@ class MusicEqualizerPage extends ConsumerStatefulWidget {
 class _MusicEqualizerPageState extends ConsumerState<MusicEqualizerPage> {
   late final Future<AndroidEqualizerParameters?> _paramsFuture;
   bool _enabled = false;
-  bool _loadedEnabled = false;
+  String _preset = 'flat';
+  bool _loadedSettings = false;
 
   @override
   void initState() {
@@ -41,15 +45,16 @@ class _MusicEqualizerPageState extends ConsumerState<MusicEqualizerPage> {
         .timeout(const Duration(seconds: 4))
         .then<AndroidEqualizerParameters?>((p) => p)
         .catchError((_) => null);
-    _loadEnabled();
+    _loadSettings();
   }
 
-  Future<void> _loadEnabled() async {
+  Future<void> _loadSettings() async {
     final saved = await EqualizerStore.get();
     if (!mounted) return;
     setState(() {
       _enabled = saved.enabled;
-      _loadedEnabled = true;
+      _preset = saved.preset;
+      _loadedSettings = true;
     });
   }
 
@@ -65,22 +70,40 @@ class _MusicEqualizerPageState extends ConsumerState<MusicEqualizerPage> {
     await EqualizerStore.save(saved.copyWith(enabled: value));
   }
 
-  Future<void> _persistGains(AndroidEqualizerParameters params) async {
+  /// Applies a named preset to every band this device reports and stores
+  /// both the id and the resolved gains.
+  Future<void> _applyPreset(
+    EqualizerPreset preset,
+    AndroidEqualizerParameters params,
+  ) async {
+    final gains = preset.gainsFor(
+      params.bands.map((b) => b.centerFrequency).toList(growable: false),
+      minDb: params.minDecibels,
+      maxDb: params.maxDecibels,
+    );
+    for (var i = 0; i < params.bands.length && i < gains.length; i++) {
+      await params.bands[i].setGain(gains[i]);
+    }
+    if (!mounted) return;
+    setState(() => _preset = preset.id);
     final saved = await EqualizerStore.get();
     await EqualizerStore.save(
-      saved.copyWith(
-        gains: params.bands.map((b) => b.gain).toList(growable: false),
-      ),
+      saved.copyWith(preset: preset.id, gains: gains),
     );
   }
 
-  Future<void> _resetFlat(AndroidEqualizerParameters params) async {
-    for (final band in params.bands) {
-      await band.setGain(0);
+  /// Called when a slider is moved. Once a band has been set by hand no
+  /// named preset describes the result any more, so the selection falls
+  /// back to Custom rather than continuing to claim "Rock".
+  Future<void> _persistCustom(AndroidEqualizerParameters params) async {
+    final gains = params.bands.map((b) => b.gain).toList(growable: false);
+    if (mounted && _preset != EqualizerPreset.customId) {
+      setState(() => _preset = EqualizerPreset.customId);
     }
-    if (!mounted) return;
-    setState(() {});
-    await _persistGains(params);
+    final saved = await EqualizerStore.get();
+    await EqualizerStore.save(
+      saved.copyWith(preset: EqualizerPreset.customId, gains: gains),
+    );
   }
 
   static String _formatHz(double hz) {
@@ -112,7 +135,7 @@ class _MusicEqualizerPageState extends ConsumerState<MusicEqualizerPage> {
         future: _paramsFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState != ConnectionState.done ||
-              !_loadedEnabled) {
+              !_loadedSettings) {
             return const Center(
               child: CircularProgressIndicator(color: AppColors.brandOrange),
             );
@@ -154,45 +177,12 @@ class _MusicEqualizerPageState extends ConsumerState<MusicEqualizerPage> {
                 opacity: _enabled ? 1 : 0.45,
                 child: IgnorePointer(
                   ignoring: !_enabled,
-                  child: _card(
-                    context,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
-                          child: Text(
-                            'BANDS',
-                            style: TextStyle(
-                              color: AppColors.brandOrange,
-                              fontWeight: FontWeight.w800,
-                              fontSize: 11,
-                              letterSpacing: 1.2,
-                            ),
-                          ),
-                        ),
-                        for (final band in params.bands)
-                          _bandRow(context, params, band),
-                        Padding(
-                          padding: const EdgeInsets.fromLTRB(8, 0, 8, 8),
-                          child: TextButton.icon(
-                            onPressed: () => _resetFlat(params),
-                            icon: const Icon(
-                              Icons.restart_alt_rounded,
-                              size: 18,
-                              color: AppColors.brandOrange,
-                            ),
-                            label: const Text(
-                              'Reset to flat',
-                              style: TextStyle(
-                                color: AppColors.brandOrange,
-                                fontWeight: FontWeight.w700,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
+                  child: Column(
+                    children: [
+                      _presetsCard(context, params),
+                      const SizedBox(height: 14),
+                      _bandsCard(context, params),
+                    ],
                   ),
                 ),
               ),
@@ -200,9 +190,10 @@ class _MusicEqualizerPageState extends ConsumerState<MusicEqualizerPage> {
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 4),
                 child: Text(
-                  'These are the bands your phone reports, not a fixed list — '
-                  'the count and frequencies come from Android itself, so they '
-                  'differ between devices.',
+                  'Presets are shapes, not fixed numbers — each one is fitted '
+                  'to the bands your phone reports, so it sounds the same '
+                  'whether Android gives the app five bands or ten. Move any '
+                  'slider and the preset becomes Custom.',
                   style: TextStyle(
                     color: context.textDim,
                     fontSize: 11.5,
@@ -213,6 +204,132 @@ class _MusicEqualizerPageState extends ConsumerState<MusicEqualizerPage> {
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _presetsCard(
+    BuildContext context,
+    AndroidEqualizerParameters params,
+  ) {
+    final isCustom = EqualizerPreset.byId(_preset) == null;
+    return _card(
+      context,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 2),
+            child: Text(
+              'PRESET',
+              style: TextStyle(
+                color: AppColors.brandOrange,
+                fontWeight: FontWeight.w800,
+                fontSize: 11,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+            child: Text(
+              EqualizerPreset.labelFor(_preset),
+              style: TextStyle(
+                color: context.textPrimary,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 0, 12, 14),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final preset in EqualizerPreset.all)
+                  _presetPill(
+                    context,
+                    label: preset.label,
+                    selected: preset.id == _preset,
+                    onTap: () => _applyPreset(preset, params),
+                  ),
+                if (isCustom)
+                  _presetPill(
+                    context,
+                    label: 'Custom',
+                    selected: true,
+                    onTap: null,
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _presetPill(
+    BuildContext context, {
+    required String label,
+    required bool selected,
+    required VoidCallback? onTap,
+  }) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(999),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+          decoration: BoxDecoration(
+            color: selected
+                ? AppColors.brandOrange
+                : AppColors.brandOrange.withValues(alpha: 0.10),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: selected
+                  ? AppColors.brandOrange
+                  : AppColors.brandOrange.withValues(alpha: 0.28),
+            ),
+          ),
+          child: Text(
+            label,
+            style: TextStyle(
+              color: selected ? Colors.white : AppColors.brandOrange,
+              fontSize: 12.5,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _bandsCard(
+    BuildContext context,
+    AndroidEqualizerParameters params,
+  ) {
+    return _card(
+      context,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+            child: Text(
+              'FINE TUNING',
+              style: TextStyle(
+                color: AppColors.brandOrange,
+                fontWeight: FontWeight.w800,
+                fontSize: 11,
+                letterSpacing: 1.2,
+              ),
+            ),
+          ),
+          for (final band in params.bands) _bandRow(context, params, band),
+          const SizedBox(height: 4),
+        ],
       ),
     );
   }
@@ -229,56 +346,56 @@ class _MusicEqualizerPageState extends ConsumerState<MusicEqualizerPage> {
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
       child: Row(
         children: [
-              SizedBox(
-                width: 62,
-                child: Text(
-                  _formatHz(band.centerFrequency),
-                  style: TextStyle(
-                    color: context.textSecondary,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
+          SizedBox(
+            width: 62,
+            child: Text(
+              _formatHz(band.centerFrequency),
+              style: TextStyle(
+                color: context.textSecondary,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          Expanded(
+            child: SliderTheme(
+              data: SliderTheme.of(context).copyWith(
+                trackHeight: 3,
+                activeTrackColor: AppColors.brandOrange,
+                inactiveTrackColor: context.borderMedium,
+                thumbColor: AppColors.brandOrange,
+                thumbShape: const RoundSliderThumbShape(
+                  enabledThumbRadius: 7,
                 ),
               ),
-              Expanded(
-                child: SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    trackHeight: 3,
-                    activeTrackColor: AppColors.brandOrange,
-                    inactiveTrackColor: context.borderMedium,
-                    thumbColor: AppColors.brandOrange,
-                    thumbShape: const RoundSliderThumbShape(
-                      enabledThumbRadius: 7,
-                    ),
-                  ),
-                  child: Slider(
-                    min: params.minDecibels,
-                    max: params.maxDecibels,
-                    value: band.gain.clamp(
-                      params.minDecibels,
-                      params.maxDecibels,
-                    ),
-                    onChanged: (value) {
-                      band.setGain(value);
-                      setState(() {});
-                    },
-                    onChangeEnd: (_) => _persistGains(params),
-                  ),
+              child: Slider(
+                min: params.minDecibels,
+                max: params.maxDecibels,
+                value: band.gain.clamp(
+                  params.minDecibels,
+                  params.maxDecibels,
                 ),
+                onChanged: (value) {
+                  band.setGain(value);
+                  setState(() {});
+                },
+                onChangeEnd: (_) => _persistCustom(params),
               ),
-              SizedBox(
-                width: 56,
-                child: Text(
-                  '${band.gain >= 0 ? '+' : ''}'
-                  '${band.gain.toStringAsFixed(1)} dB',
-                  textAlign: TextAlign.right,
-                  style: TextStyle(
-                    color: context.textDim,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
+            ),
+          ),
+          SizedBox(
+            width: 56,
+            child: Text(
+              '${band.gain >= 0 ? '+' : ''}'
+              '${band.gain.toStringAsFixed(1)} dB',
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                color: context.textDim,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
               ),
+            ),
+          ),
         ],
       ),
     );

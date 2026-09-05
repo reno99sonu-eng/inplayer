@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -20,7 +19,7 @@ class ProfileMenuModal extends ConsumerWidget {
       width: 300,
       margin: const EdgeInsets.only(bottom: 74, right: 12),
       decoration: BoxDecoration(
-        color: (isDark ? const Color(0xFF08111F) : const Color(0xFFF5EEDC)).withValues(alpha: 0.95),
+        color: isDark ? const Color(0xFF08111F) : const Color(0xFFF5EEDC),
         borderRadius: BorderRadius.circular(24),
         border: Border.all(
           color: isDark ? Colors.white.withValues(alpha: 0.10) : Colors.black.withValues(alpha: 0.08),
@@ -36,151 +35,148 @@ class ProfileMenuModal extends ConsumerWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // 1. User Header
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                child: Row(
-                  children: [
-                    UserAvatar(
-                      avatarUrl: user?.avatarUrl,
-                      name: user?.name ?? 'User',
-                      size: 40,
-                      isVerified: false,
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            user?.name ?? 'InPlayer User',
-                            style: TextStyle(
-                              color: isDark ? Colors.white : const Color(0xFF0F172A),
-                              fontSize: 14,
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -0.2,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 1. User Header
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              child: Row(
+                children: [
+                  UserAvatar(
+                    avatarUrl: user?.avatarUrl,
+                    name: user?.name ?? 'User',
+                    size: 40,
+                    isVerified: false,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          user?.name ?? 'InPlayer User',
+                          style: TextStyle(
+                            color: isDark ? Colors.white : const Color(0xFF0F172A),
+                            fontSize: 14,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: -0.2,
                           ),
-                          const SizedBox(height: 1),
-                          Text(
-                            user?.email ?? '',
-                            style: TextStyle(
-                              color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
-                              fontSize: 11.5,
-                              fontWeight: FontWeight.w500,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 1),
+                        Text(
+                          user?.email ?? '',
+                          style: TextStyle(
+                            color: isDark ? const Color(0xFF94A3B8) : const Color(0xFF64748B),
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w500,
                           ),
-                        ],
-                      ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
+            ),
 
-              Divider(
-                color: isDark ? Colors.white.withValues(alpha: 0.10) : Colors.black.withValues(alpha: 0.08),
-                height: 1,
-                thickness: 1,
-              ),
+            Divider(
+              color: isDark ? Colors.white.withValues(alpha: 0.10) : Colors.black.withValues(alpha: 0.08),
+              height: 1,
+              thickness: 1,
+            ),
 
-              // 2. Menu Items
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                child: Column(
-                  children: [
-                    _buildItem(
-                      context: context,
-                      icon: Icons.person_outline_rounded,
-                      label: 'Your Channel',
-                      onTap: () {
-                        Navigator.pop(context);
-                        context.push('/my-videos');
-                      },
-                    ),
-                    _buildItem(
-                      context: context,
-                      icon: Icons.favorite_border_rounded,
-                      label: 'Watchlist',
-                      onTap: () {
-                        Navigator.pop(context);
-                        context.push('/watchlist');
-                      },
-                    ),
-                    _buildItem(
-                      context: context,
-                      icon: Icons.chat_bubble_outline_rounded,
-                      label: 'My MilonBook',
-                      onTap: () {
-                        Navigator.pop(context);
-                        context.push('/messages');
-                      },
-                    ),
-                    _buildItem(
-                      context: context,
-                      icon: Icons.settings_outlined,
-                      label: 'Settings',
-                      onTap: () {
-                        Navigator.pop(context);
-                        context.push('/settings');
-                      },
-                    ),
-                  ],
-                ),
-              ),
-
-              Divider(
-                color: isDark ? Colors.white.withValues(alpha: 0.10) : Colors.black.withValues(alpha: 0.08),
-                height: 1,
-                thickness: 1,
-              ),
-
-              // 3. Sign Out Action
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-                child: Material(
-                  color: Colors.transparent,
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(14),
-                    onTap: () async {
+            // 2. Menu Items
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              child: Column(
+                children: [
+                  _buildItem(
+                    context: context,
+                    icon: Icons.person_outline_rounded,
+                    label: 'Your Channel',
+                    onTap: () {
                       Navigator.pop(context);
-                      await ref.read(authStateProvider.notifier).signOut();
+                      context.push('/my-videos');
                     },
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                      child: Row(
-                        children: const [
-                          Icon(
-                            Icons.logout_rounded,
+                  ),
+                  _buildItem(
+                    context: context,
+                    icon: Icons.favorite_border_rounded,
+                    label: 'Watchlist',
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.push('/watchlist');
+                    },
+                  ),
+                  _buildItem(
+                    context: context,
+                    icon: Icons.chat_bubble_outline_rounded,
+                    label: 'My MilonBook',
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.push('/messages');
+                    },
+                  ),
+                  _buildItem(
+                    context: context,
+                    icon: Icons.settings_outlined,
+                    label: 'Settings',
+                    onTap: () {
+                      Navigator.pop(context);
+                      context.push('/settings');
+                    },
+                  ),
+                ],
+              ),
+            ),
+
+            Divider(
+              color: isDark ? Colors.white.withValues(alpha: 0.10) : Colors.black.withValues(alpha: 0.08),
+              height: 1,
+              thickness: 1,
+            ),
+
+            // 3. Sign Out Action
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(14),
+                  onTap: () async {
+                    Navigator.pop(context);
+                    await ref.read(authStateProvider.notifier).signOut();
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                    child: Row(
+                      children: const [
+                        Icon(
+                          Icons.logout_rounded,
+                          color: Color(0xFFF87171),
+                          size: 18,
+                        ),
+                        SizedBox(width: 12),
+                        Text(
+                          'Sign Out',
+                          style: TextStyle(
                             color: Color(0xFFF87171),
-                            size: 18,
+                            fontSize: 13.5,
+                            fontWeight: FontWeight.w700,
                           ),
-                          SizedBox(width: 12),
-                          Text(
-                            'Sign Out',
-                            style: TextStyle(
-                              color: Color(0xFFF87171),
-                              fontSize: 13.5,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

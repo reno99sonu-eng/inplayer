@@ -41,7 +41,7 @@ import 'device_capability_service.dart';
 /// warming is gated on [DeviceCapabilityService.canPreloadVideo], the
 /// Android 10+ check written for exactly this and never wired up until
 /// now. Anything below that keeps the old cold-start path.
-const bool kWarmNextShortEnabled = false;
+const bool kWarmNextShortEnabled = true;
 
 /// Holds at most ONE fully-initialized, not-yet-playing video controller
 /// for the short the viewer is most likely to swipe to next.
@@ -72,15 +72,10 @@ class ShortWarmCache {
   /// Non-null while an initialize() is in flight, so a second warm-up can
   /// never overlap the first.
   String? _warmingId;
+  VideoPlayerController? _warmingController;
+  Future<void>? _warmingFuture;
 
   /// A warm-up requested while another was still in flight.
-  ///
-  /// The old code simply dropped those, which quietly defeated the whole
-  /// feature exactly when it mattered: swipe faster than one warm-up takes
-  /// and every subsequent request landed while the previous was still
-  /// running, so nothing was ever warm again for the rest of the session.
-  /// Queueing one keeps the decoder cap intact while still honouring the
-  /// most recent request.
   String? _pendingId;
   Uri? _pendingUrl;
 
@@ -101,6 +96,7 @@ class ShortWarmCache {
     if (videoId.isEmpty) return;
     if (!await _allowedOnThisDevice()) return;
     if (_videoId == videoId && _controller != null) return;
+    if (_warmingId == videoId) return;
 
     if (_warmingId != null) {
       if (_warmingId != videoId) {
@@ -113,9 +109,6 @@ class ShortWarmCache {
   }
 
   Future<void> _startWarm(String videoId, Uri url) async {
-    // Drop whatever stale short was warm before taking a new decoder.
-    // Deliberately not discard(): that also clears the pending request,
-    // which is the thing we may be in the middle of servicing.
     await _disposeReady();
 
     _warmingId = videoId;
@@ -123,9 +116,13 @@ class ShortWarmCache {
       url,
       videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
     );
+    _warmingController = controller;
+
     try {
-      await controller.initialize();
-      // A swipe (or leaving the feed) during initialize() invalidates this.
+      final initFuture = controller.initialize();
+      _warmingFuture = initFuture;
+      await initFuture;
+
       if (_warmingId != videoId) {
         await controller.dispose();
         return;
@@ -139,7 +136,11 @@ class ShortWarmCache {
         await controller.dispose();
       } catch (_) {}
     } finally {
-      if (_warmingId == videoId) _warmingId = null;
+      if (_warmingId == videoId) {
+        _warmingId = null;
+        _warmingController = null;
+        _warmingFuture = null;
+      }
       _drainPending();
     }
   }
@@ -156,14 +157,39 @@ class ShortWarmCache {
   }
 
   /// Hands ownership of the warm controller to the caller, if it happens to
-  /// be the short being asked for. The caller becomes responsible for
-  /// disposing it.
-  VideoPlayerController? take(String videoId) {
-    if (videoId.isEmpty || _videoId != videoId) return null;
-    final controller = _controller;
-    _controller = null;
-    _videoId = null;
-    return controller;
+  /// be the short being asked for. Also awaits an in-flight warmup if one is
+  /// currently preparing this exact short so work isn't discarded.
+  Future<VideoPlayerController?> take(String videoId) async {
+    if (videoId.isEmpty) return null;
+
+    // 1. Controller is fully ready
+    if (_videoId == videoId && _controller != null) {
+      final controller = _controller;
+      _controller = null;
+      _videoId = null;
+      return controller;
+    }
+
+    // 2. Controller is currently in-flight initializing
+    if (_warmingId == videoId && _warmingController != null) {
+      final controller = _warmingController;
+      final future = _warmingFuture;
+      _warmingId = null;
+      _warmingController = null;
+      _warmingFuture = null;
+      try {
+        if (future != null) await future;
+        controller?.setLooping(true);
+        return controller;
+      } catch (e) {
+        try {
+          await controller?.dispose();
+        } catch (_) {}
+        return null;
+      }
+    }
+
+    return null;
   }
 
   /// Releases the warm decoder. Called when leaving the feed, so a short
@@ -172,6 +198,14 @@ class ShortWarmCache {
     _warmingId = null;
     _pendingId = null;
     _pendingUrl = null;
+    final wc = _warmingController;
+    _warmingController = null;
+    _warmingFuture = null;
+    if (wc != null) {
+      try {
+        await wc.dispose();
+      } catch (_) {}
+    }
     await _disposeReady();
   }
 

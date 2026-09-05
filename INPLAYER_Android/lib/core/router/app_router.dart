@@ -35,6 +35,7 @@ import '../../features/settings/presentation/pages/privacy_settings_page.dart';
 import '../../features/settings/presentation/pages/change_password_page.dart';
 import '../../features/settings/presentation/pages/change_email_page.dart';
 import '../../features/settings/presentation/pages/music_equalizer_page.dart';
+import '../../features/settings/presentation/pages/music_quality_page.dart';
 import '../../features/settings/presentation/pages/music_settings_page.dart';
 import '../../features/settings/presentation/pages/playback_settings_page.dart';
 import '../../features/admin/presentation/pages/admin_page.dart';
@@ -291,6 +292,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/settings/music/equalizer',
         name: 'music-equalizer',
         builder: (context, state) => const MusicEqualizerPage(),
+      ),
+      GoRoute(
+        path: '/settings/music/quality',
+        name: 'music-quality',
+        builder: (context, state) => const MusicQualityPage(),
       ),
       GoRoute(
         path: '/settings/content-access',

@@ -2,6 +2,7 @@
 import 'dart:async';
 
 import 'package:audio_session/audio_session.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
@@ -10,9 +11,10 @@ import 'package:logger/logger.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 import '../core/utils/equalizer_store.dart';
-import '../core/utils/playback_settings_store.dart';
+import '../core/utils/music_settings_store.dart';
 import '../models/video.dart';
 import 'history_service.dart';
+import 'video_service.dart';
 
 class MusicPlayerService extends ChangeNotifier {
   final _logger = Logger();
@@ -30,20 +32,47 @@ class MusicPlayerService extends ChangeNotifier {
   /// else in playback reads it.
   final AndroidEqualizer _equalizer = AndroidEqualizer();
 
+  /// Android's LoudnessEnhancer, which powers Volume levelling.
+  ///
+  /// It amplifies up to a target gain and compresses anything that would
+  /// clip, so quiet tracks come up to meet loud ones instead of the whole
+  /// queue lurching in volume. Like the equalizer it must be attached at
+  /// construction, and like the equalizer it starts DISABLED — so a build
+  /// with this in it behaves identically to one without until someone
+  /// turns the switch on.
+  ///
+  /// Rollback is the same shape as the equalizer's: drop `_loudness` from
+  /// the effects list below and nothing else reads it.
+  final AndroidLoudnessEnhancer _loudness = AndroidLoudnessEnhancer();
+
+  /// Maximum lift Volume levelling will apply, in decibels. Enough to pull
+  /// a quietly-mastered track up to the rest of the queue; low enough not
+  /// to audibly pump on material that is already loud.
+  static const double _levellingTargetGainDb = 6.0;
+
   /// `late` because a field initializer cannot reference another instance
   /// field. It is created on first touch, which is inside the constructor
-  /// body below, by which point _equalizer exists.
+  /// body below, by which point the effects exist.
   late final AudioPlayer _player = AudioPlayer(
-    audioPipeline: AudioPipeline(androidAudioEffects: [_equalizer]),
+    audioPipeline: AudioPipeline(
+      androidAudioEffects: [_equalizer, _loudness],
+    ),
   );
 
   AndroidEqualizer get equalizer => _equalizer;
 
   final Future<void> Function(String videoId)? onTrackStarted;
 
-  MusicPlayerService({this.onTrackStarted}) {
+  /// Supplies more music when the queue runs out and Autoplay is on.
+  /// Injected rather than reached for directly so the service stays free of
+  /// a dependency on the video API — and so it simply does nothing when no
+  /// source is wired up.
+  final Future<List<Video>> Function()? fetchMoreTracks;
+
+  MusicPlayerService({this.onTrackStarted, this.fetchMoreTracks}) {
     _initAudioSession();
     unawaited(_restoreEqualizer());
+    unawaited(_restoreMusicSettings());
     _player.currentIndexStream.listen((index) {
       final changed = index != _currentIndex;
       _currentIndex = index;
@@ -53,7 +82,12 @@ class MusicPlayerService extends ChangeNotifier {
         onTrackStarted?.call(track.videoId);
       }
     });
-    _player.playerStateStream.listen((_) => notifyListeners());
+    _player.playerStateStream.listen((state) {
+      notifyListeners();
+      if (state.processingState == ProcessingState.completed) {
+        unawaited(_maybeAutoplayMore());
+      }
+    });
   }
 
   Future<void> _initAudioSession() async {
@@ -112,6 +146,18 @@ class MusicPlayerService extends ChangeNotifier {
   List<Video> _queue = [];
   int? _currentIndex;
 
+  /// True while an autoplay top-up is running. See [_maybeAutoplayMore].
+  bool _autoplayInFlight = false;
+
+  /// Queue length at the last autoplay attempt.
+  ///
+  /// `playerStateStream` re-emits while the player sits in `completed` —
+  /// `playing` flips to false right after the last track ends — so without
+  /// this the top-up would fire the catalogue fetch a second time for the
+  /// same queue end. A successful top-up changes the queue length, which
+  /// clears the guard on its own.
+  int? _autoplayTriedAtQueueLength;
+
   List<Video> get queue => List.unmodifiable(_queue);
   int? get currentIndex => _currentIndex;
   Video? get currentTrack {
@@ -133,10 +179,19 @@ class MusicPlayerService extends ChangeNotifier {
   Duration get position => _player.position;
   Duration? get duration => _player.duration;
 
-  /// Cached copy of Settings > Music > Audio quality. Refreshed when a queue
-  /// starts rather than watched, so changing it applies from the next queue
-  /// instead of yanking the source out from under what is already playing.
+  /// Cached copy of Settings > Music. Refreshed when a queue starts rather
+  /// than watched, so a quality change applies from the next queue instead
+  /// of yanking the source out from under what is already playing.
+  MusicSettings _musicSettings = const MusicSettings();
+
+  /// Resolved from [_musicSettings] plus the network the phone is currently
+  /// on. Kept as its own field because the retry path in [playQueue] needs
+  /// to be able to clear it for one queue without touching the preference.
   bool _audioDataSaver = false;
+
+  /// True on Wi-Fi or Ethernet. Unknown networks count as Wi-Fi so a failed
+  /// probe never silently downgrades someone who asked for the full stream.
+  bool _onWifi = true;
 
   /// Re-applies the saved equalizer settings at startup.
   ///
@@ -161,12 +216,113 @@ class MusicPlayerService extends ChangeNotifier {
     }
   }
 
-  Future<void> _refreshAudioQuality() async {
+  /// Applies the saved music preferences at startup.
+  Future<void> _restoreMusicSettings() async {
+    await _refreshMusicSettings();
+    await _applyVolumeLevelling(_musicSettings.volumeLevelling);
+  }
+
+  Future<void> _refreshMusicSettings() async {
     try {
-      final settings = await PlaybackSettingsStore.get();
-      _audioDataSaver = settings.audioQuality.toLowerCase() == 'low';
+      _musicSettings = await MusicSettingsStore.get();
     } catch (_) {
       // Never block playback on a preference read — keep the last value.
+    }
+    await _refreshNetworkClass();
+  }
+
+  /// Re-resolves which of the two quality preferences applies right now.
+  Future<void> _refreshNetworkClass() async {
+    try {
+      final results = await Connectivity().checkConnectivity();
+      _onWifi = results.contains(ConnectivityResult.wifi) ||
+          results.contains(ConnectivityResult.ethernet);
+    } catch (_) {
+      _onWifi = true;
+    }
+    _audioDataSaver = _musicSettings.dataSaverOn(onWifi: _onWifi);
+  }
+
+  /// Called by the settings screens so a change is heard immediately rather
+  /// than at the next queue — someone who flips Volume levelling is
+  /// listening at that moment.
+  Future<void> applyMusicSettings(MusicSettings next) async {
+    _musicSettings = next;
+    await _refreshNetworkClass();
+    await _applyVolumeLevelling(next.volumeLevelling);
+  }
+
+  Future<void> _applyVolumeLevelling(bool enabled) async {
+    try {
+      if (enabled) {
+        await _loudness.setTargetGain(_levellingTargetGainDb);
+      }
+      await _loudness.setEnabled(enabled);
+    } catch (e) {
+      // A device that will not create the effect is not a reason to stop
+      // playing music; the switch simply has no audible result there.
+      _logger.w('Could not apply volume levelling: $e');
+    }
+  }
+
+  /// Extends the queue with more music when the last track finishes and
+  /// Autoplay is on.
+  ///
+  /// Guarded by [_autoplayInFlight] because `completed` can be emitted more
+  /// than once while the player settles, and appending the same ten tracks
+  /// twice is exactly the kind of thing a listener notices.
+  Future<void> _maybeAutoplayMore() async {
+    if (_autoplayInFlight) return;
+    if (!_musicSettings.autoplay) return;
+    // Repeat already decides what happens at the end of the queue.
+    if (_player.loopMode != LoopMode.off) return;
+    final fetch = fetchMoreTracks;
+    if (fetch == null || _queue.isEmpty) return;
+
+    if (_autoplayTriedAtQueueLength == _queue.length) return;
+
+    _autoplayInFlight = true;
+    _autoplayTriedAtQueueLength = _queue.length;
+    try {
+      final seed = _queue.last;
+      final already = _queue.map((t) => t.videoId).toSet();
+      final candidates = (await fetch())
+          .where((t) => (t.muxPlaybackId ?? '').isNotEmpty)
+          .where((t) => !already.contains(t.videoId))
+          .toList();
+      if (candidates.isEmpty) return;
+
+      // Same artist first, then same genre, then the rest of the catalogue,
+      // so autoplay never dead-ends on a track nothing else matches.
+      final seedGenre = (seed.genre ?? '').toLowerCase();
+      final seedArtist = (seed.artist ?? seed.creator).toLowerCase();
+      int rank(Video t) {
+        if (seedArtist.isNotEmpty &&
+            (t.artist ?? t.creator).toLowerCase() == seedArtist) {
+          return 0;
+        }
+        if (seedGenre.isNotEmpty &&
+            (t.genre ?? '').toLowerCase() == seedGenre) {
+          return 1;
+        }
+        return 2;
+      }
+
+      candidates.sort((a, b) => rank(a).compareTo(rank(b)));
+      final additions = candidates.take(10).toList();
+
+      final resumeAt = _queue.length;
+      for (final track in additions) {
+        await _playlist.add(_sourceFor(track));
+        _queue.add(track);
+      }
+      notifyListeners();
+      await _player.seek(Duration.zero, index: resumeAt);
+      await _player.play();
+    } catch (e) {
+      _logger.w('Autoplay could not extend the queue: $e');
+    } finally {
+      _autoplayInFlight = false;
     }
   }
 
@@ -202,7 +358,7 @@ class MusicPlayerService extends ChangeNotifier {
     final playable = tracks.where((t) => (t.muxPlaybackId ?? '').isNotEmpty).toList();
     if (playable.isEmpty) return;
 
-    await _refreshAudioQuality();
+    await _refreshMusicSettings();
 
     final requested = startIndex >= 0 && startIndex < tracks.length ? tracks[startIndex] : null;
     var initialIndex = requested != null
@@ -212,6 +368,7 @@ class MusicPlayerService extends ChangeNotifier {
 
     _queue = playable;
     _currentIndex = initialIndex;
+    _autoplayTriedAtQueueLength = null;
     _playlist = ConcatenatingAudioSource(children: playable.map(_sourceFor).toList());
     notifyListeners();
 
@@ -422,6 +579,10 @@ class MusicPlayerService extends ChangeNotifier {
 final musicPlayerServiceProvider = ChangeNotifierProvider<MusicPlayerService>((ref) {
   final service = MusicPlayerService(
     onTrackStarted: (videoId) => ref.read(historyServiceProvider).recordWatch(videoId),
+    fetchMoreTracks: () async {
+      final all = await ref.read(videoServiceProvider).getVideos();
+      return all.where((v) => v.isMusic).toList(growable: false);
+    },
   );
   ref.onDispose(service.dispose);
   return service;

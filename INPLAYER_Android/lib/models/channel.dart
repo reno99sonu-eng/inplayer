@@ -76,6 +76,10 @@ class ChannelVideo {
       'uploadedAt': uploadedAt,
       'muxPlaybackId': muxPlaybackId,
       'uploaderId': uploaderId,
+      'contentType': contentType,
+      'isMusic': contentType.toLowerCase() == 'music',
+      'category': category ??
+          (contentType.toLowerCase() == 'music' ? 'Music' : 'Entertainment'),
     });
   }
 }

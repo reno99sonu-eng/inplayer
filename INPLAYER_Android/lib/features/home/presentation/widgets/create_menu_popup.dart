@@ -1,7 +1,5 @@
-﻿import 'dart:ui';
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 
 class CreateMenuPopup extends StatelessWidget {
@@ -15,12 +13,9 @@ class CreateMenuPopup extends StatelessWidget {
       constraints: const BoxConstraints(maxWidth: 360),
       margin: const EdgeInsets.fromLTRB(16, 0, 16, 80),
       decoration: BoxDecoration(
-        color: (isDark ? const Color(0xFF08111F) : const Color(0xFFF5EEDC)).withValues(alpha: 0.96),
+        color: isDark ? const Color(0xFF08111F) : const Color(0xFFF5EEDC),
         borderRadius: BorderRadius.circular(28),
-        border: Border.all(
-          color: AppColors.brandOrange.withValues(alpha: isDark ? 0.25 : 0.35),
-          width: 1,
-        ),
+        border: Border.all(color: context.borderSubtle, width: 1),
         boxShadow: [
           BoxShadow(
             color: Colors.black.withValues(alpha: isDark ? 0.60 : 0.20),
@@ -31,80 +26,77 @@ class CreateMenuPopup extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(28),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Header
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 6, 8, 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'Create',
-                        style: TextStyle(
-                          color: context.textPrimary,
-                          fontSize: 18,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.4,
-                        ),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(8, 6, 8, 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Create',
+                      style: TextStyle(
+                        color: context.textPrimary,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: -0.4,
                       ),
-                      const SizedBox(height: 2),
-                      Text(
-                        'Start creating on InPlayer',
-                        style: TextStyle(
-                          color: context.textSecondary,
-                          fontSize: 12,
-                        ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Start creating on InPlayer',
+                      style: TextStyle(
+                        color: context.textSecondary,
+                        fontSize: 12,
                       ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
+              ),
 
-                Divider(color: context.borderSubtle, height: 1),
-                const SizedBox(height: 8),
+              Divider(color: context.borderSubtle, height: 1),
+              const SizedBox(height: 8),
 
-                // Upload Video
-                _buildCreateItem(
-                  context: context,
-                  icon: Icons.videocam_rounded,
-                  title: 'Upload',
-                  subtitle: 'Video • Raftaar • Music',
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFEF4444), Color(0xFFF97316)],
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    context.push('/upload');
-                  },
+              // Upload Video
+              _buildCreateItem(
+                context: context,
+                icon: Icons.videocam_rounded,
+                title: 'Upload',
+                subtitle: 'Video • Raftaar • Music',
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFEF4444), Color(0xFFF97316)],
                 ),
+                onTap: () {
+                  Navigator.pop(context);
+                  context.push('/upload');
+                },
+              ),
 
-                // Go Live
-                _buildCreateItem(
-                  context: context,
-                  icon: Icons.podcasts_rounded,
-                  title: 'Go Live',
-                  subtitle: 'Streaming & Events',
-                  gradient: const LinearGradient(
-                    colors: [Color(0xFFF97316), Color(0xFFFBBF24)],
-                  ),
-                  onTap: () {
-                    Navigator.pop(context);
-                    context.push('/live');
-                  },
+              // Go Live
+              _buildCreateItem(
+                context: context,
+                icon: Icons.podcasts_rounded,
+                title: 'Go Live',
+                subtitle: 'Streaming & Events',
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFF97316), Color(0xFFFBBF24)],
                 ),
+                onTap: () {
+                  Navigator.pop(context);
+                  context.push('/live');
+                },
+              ),
 
-                // Podcast and AI Studio removed on purpose. Podcast was a
-                // duplicate — it pushed '/upload', exactly the same route as
-                // Upload above, so it was a second door into one screen. The
-                // menu is now the two things you can actually start here.
-              ],
-            ),
+              // Podcast and AI Studio removed on purpose. Podcast was a
+              // duplicate — it pushed '/upload', exactly the same route as
+              // Upload above, so it was a second door into one screen. The
+              // menu is now the two things you can actually start here.
+            ],
           ),
         ),
       ),

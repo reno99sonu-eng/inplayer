@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -15,6 +17,8 @@ import '../../../../services/channel_service.dart';
 import '../../../../services/settings_service.dart';
 import '../../../../services/platform_update_service.dart';
 import '../../../../services/creator_monetization_service.dart';
+import '../../../../services/music_player_service.dart';
+import '../../../music/presentation/pages/now_playing_page.dart';
 
 enum StudioTab {
   dashboard,
@@ -1300,6 +1304,26 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage>
   }
 
   // --- PANEL 2: EDIT CONTENT ---
+  void _openContent(Video video) {
+    if (video.videoId.isEmpty) return;
+    if (video.isShort) {
+      context.push('/shorts/${video.videoId}');
+      return;
+    }
+    if (video.isMusic) {
+      unawaited(
+        ref.read(musicPlayerServiceProvider).playSingle(video),
+      );
+      Navigator.of(context, rootNavigator: true).push(
+        MaterialPageRoute<void>(
+          builder: (_) => const NowPlayingPage(),
+        ),
+      );
+      return;
+    }
+    context.push('/watch/${video.videoId}');
+  }
+
   Widget _buildEditContentTab() {
     final filtered = _videos.where((v) {
       if (_contentFilter == 'video') {
@@ -1321,7 +1345,7 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage>
               const SizedBox(width: 6),
               _buildFilterPill('video', 'Videos'),
               const SizedBox(width: 6),
-              _buildFilterPill('short', 'Shorts'),
+              _buildFilterPill('short', 'Raftaar'),
               const SizedBox(width: 6),
               _buildFilterPill('music', 'Music'),
             ],
@@ -1375,13 +1399,18 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage>
             separatorBuilder: (context, index) => const SizedBox(height: 12),
             itemBuilder: (context, index) {
               final v = filtered[index];
-              return Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: context.bgCard,
+              return Material(
+                color: Colors.transparent,
+                child: InkWell(
                   borderRadius: BorderRadius.circular(16),
-                  border: Border.all(color: context.borderSubtle),
-                ),
+                  onTap: () => _openContent(v),
+                  child: Container(
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: context.bgCard,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: context.borderSubtle),
+                    ),
                 child: Column(
                   children: [
                     Row(
@@ -1393,33 +1422,7 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage>
                           child: SizedBox(
                             width: 100,
                             height: 60,
-                            child: v.thumbnail.isNotEmpty
-                                ? CachedNetworkImage(
-                                    imageUrl: v.thumbnail,
-                                    fit: BoxFit.cover,
-                                    placeholder: (context, url) => Container(
-                                      color: context.isDark
-                                          ? AppColors.surfaceDark
-                                          : AppColors.surfaceLight,
-                                    ),
-                                    errorWidget: (context, url, error) =>
-                                        Container(
-                                          color: context.isDark
-                                              ? AppColors.surfaceDark
-                                              : AppColors.surfaceLight,
-                                          child: const Icon(
-                                            Icons.play_circle_outline,
-                                          ),
-                                        ),
-                                  )
-                                : Container(
-                                    color: context.isDark
-                                        ? AppColors.surfaceDark
-                                        : AppColors.surfaceLight,
-                                    child: const Icon(
-                                      Icons.play_circle_outline,
-                                    ),
-                                  ),
+                            child: _thumbnailFor(context, v.thumbnail),
                           ),
                         ),
                         const SizedBox(width: 12),
@@ -1441,7 +1444,7 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage>
                               Row(
                                 children: [
                                   Text(
-                                    '${v.views} • ${v.uploaded}',
+                                    '${_statLabel(v)} • ${v.uploaded}',
                                     style: TextStyle(
                                       fontSize: 11,
                                       color: context.textSecondary,
@@ -1543,6 +1546,8 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage>
                       ],
                     ),
                   ],
+                    ),
+                  ),
                 ),
               );
             },
@@ -1550,6 +1555,45 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage>
         const SizedBox(height: 40),
       ],
     );
+  }
+
+  /// Thumbnails for creator uploads come back in two shapes. A processed
+  /// upload gets a real https URL; a creator-picked custom thumbnail is stored
+  /// inline as a `data:image/...;base64,...` URI. CachedNetworkImage cannot
+  /// load a data URI at all, which is why these tiles rendered blank. Decode
+  /// data URIs ourselves and only hand real URLs to the network cache.
+  Widget _thumbnailFor(BuildContext context, String url) {
+    final fallback = Container(
+      color: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+      child: const Icon(Icons.play_circle_outline),
+    );
+    if (url.trim().isEmpty) return fallback;
+
+    if (isDataImageUrl(url)) {
+      final bytes = decodeDataImageUrl(url);
+      if (bytes == null) return fallback;
+      return Image.memory(
+        bytes,
+        fit: BoxFit.cover,
+        errorBuilder: (context, error, stackTrace) => fallback,
+      );
+    }
+
+    return CachedNetworkImage(
+      imageUrl: url,
+      fit: BoxFit.cover,
+      placeholder: (context, url) => Container(
+        color: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+      ),
+      errorWidget: (context, url, error) => fallback,
+    );
+  }
+
+  /// Music is measured in plays, not views. The API returns one preformatted
+  /// string ("1.2K views"), so relabel it rather than recomputing it.
+  String _statLabel(Video v) {
+    if (v.contentType != 'music') return v.views;
+    return v.views.replaceAll('views', 'plays').replaceAll('view', 'play');
   }
 
   Widget _buildFilterPill(String filter, String label) {
@@ -2014,7 +2058,8 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage>
               ),
               const SizedBox(height: 6),
               const Text(
-                'Earnings from ad impressions, memberships, and super chats.',
+                'Earned from views and plays on your videos, Raftaar and '
+                'music, plus memberships and super chats.',
                 style: TextStyle(color: Colors.white70, fontSize: 12),
               ),
             ],

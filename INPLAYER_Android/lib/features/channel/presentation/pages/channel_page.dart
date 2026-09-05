@@ -13,7 +13,9 @@ import '../../../../services/channel_service.dart';
 import '../../../../services/notification_badge_service.dart';
 import '../../../../services/platform_update_service.dart';
 import '../../../../models/channel.dart';
+import '../../../../models/video.dart';
 import '../../../home/presentation/widgets/video_card.dart';
+import '../../../music/presentation/widgets/music_track_tile.dart';
 import '../widgets/become_member_button.dart';
 
 class ChannelPage extends ConsumerStatefulWidget {
@@ -86,7 +88,9 @@ class _ChannelPageState extends ConsumerState<ChannelPage>
     // Shorts get their own horizontal "Raftaar" shelf above this list (see
     // _buildRaftaarShelf) — excluded here so they don't also show up as
     // full-width cards in the main grid underneath it.
-    var videos = channel.videos.where((v) => v.contentType != 'short').toList();
+    var videos = channel.videos
+      .where((v) => v.contentType != 'short' && v.contentType != 'music')
+      .toList();
     if (_query.isNotEmpty) {
       videos = videos
           .where((v) => v.title.toLowerCase().contains(_query))
@@ -110,6 +114,21 @@ class _ChannelPageState extends ConsumerState<ChannelPage>
         break;
     }
     return videos;
+  }
+
+  List<Video> _channelMusic(Channel channel) {
+    return channel.videos
+        .where((v) => v.contentType.toLowerCase() == 'music')
+        .map(
+          (v) => v.toVideo(
+            creatorName: channel.name,
+            creatorAvatar: channel.avatarUrl,
+            uploaderUsername: channel.username,
+            uploaderId: channel.creatorId,
+          ),
+        )
+        .where((track) => track.videoId.isNotEmpty)
+        .toList();
   }
 
   Future<void> _load() async {
@@ -658,6 +677,53 @@ class _ChannelPageState extends ConsumerState<ChannelPage>
                                   ),
                                 );
                               },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+              Builder(
+                builder: (context) {
+                  final music = _channelMusic(channel);
+                  if (music.isEmpty) {
+                    return const SliverToBoxAdapter(child: SizedBox.shrink());
+                  }
+                  return SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.music_note_rounded,
+                                color: AppColors.brandOrange,
+                                size: 17,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Music',
+                                style: TextStyle(
+                                  color: context.textPrimary,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          ...music.asMap().entries.map(
+                            (entry) => MusicTrackTile(
+                              key: ValueKey(
+                                'channel-music-${entry.value.videoId}',
+                              ),
+                              track: entry.value,
+                              queue: music,
+                              index: entry.key,
                             ),
                           ),
                         ],

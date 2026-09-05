@@ -11,21 +11,6 @@ import '../../../../services/auth_service.dart';
 import '../../../../services/settings_service.dart';
 
 const _pushNotificationsPrefKey = 'push_notifications_enabled';
-const _languagePrefKey = 'app_language';
-const _languageOptions = <String, String>{
-  'hi': 'Hindi',
-  'bn': 'Bengali',
-  'te': 'Telugu',
-  'mr': 'Marathi',
-  'ta': 'Tamil',
-  'gu': 'Gujarati',
-  'kn': 'Kannada',
-  'ml': 'Malayalam',
-  'pa': 'Punjabi',
-  'or': 'Odia',
-  'as': 'Assamese',
-  'ur': 'Urdu',
-};
 
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
@@ -38,7 +23,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   final ScrollController _scrollController = ScrollController();
   final Map<String, GlobalKey> _sectionKeys = {};
   bool _pushNotifications = true;
-  String _languageCode = 'hi';
   bool _prefsLoaded = false;
   bool _deletingAccount = false;
   int _activeSectionIndex = 0;
@@ -85,80 +69,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     if (!mounted) return;
     setState(() {
       _pushNotifications = prefs.getBool(_pushNotificationsPrefKey) ?? true;
-        final savedLanguage = prefs.getString(_languagePrefKey);
-        _languageCode = _languageOptions.containsKey(savedLanguage)
-          ? savedLanguage!
-          : 'hi';
       _prefsLoaded = true;
     });
-  }
-
-  Future<void> _showLanguagePicker() async {
-    final selected = await showModalBottomSheet<String>(
-      context: context,
-      backgroundColor: Colors.transparent,
-      builder: (ctx) => Container(
-        decoration: BoxDecoration(
-          color: ctx.bgModal,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          border: Border.all(color: ctx.borderSubtle),
-        ),
-        padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: ctx.textDim.withValues(alpha: 0.4),
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-            ),
-            const SizedBox(height: 18),
-            Text(
-              'App language',
-              style: TextStyle(
-                color: ctx.textPrimary,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 12),
-            ..._languageOptions.entries.map(
-              (entry) => ListTile(
-                contentPadding: EdgeInsets.zero,
-                leading: Icon(
-                  Icons.language_outlined,
-                  color: entry.key == _languageCode
-                      ? AppColors.brandOrange
-                      : ctx.textSecondary,
-                ),
-                title: Text(
-                  entry.value,
-                  style: TextStyle(color: ctx.textPrimary),
-                ),
-                trailing: entry.key == _languageCode
-                    ? const Icon(Icons.check_circle, color: AppColors.brandOrange)
-                    : null,
-                onTap: () => Navigator.of(ctx).pop(entry.key),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (selected == null || selected == _languageCode || !mounted) return;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString(_languagePrefKey, selected);
-    if (!mounted) return;
-    setState(() => _languageCode = selected);
-    _showSnack(
-      '${_languageOptions[selected]} selected. Translation updates will apply as they become available.',
-    );
   }
 
   Future<void> _setPushNotifications(bool value) async {
@@ -555,15 +467,6 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             icon: Icons.lock_outline,
             title: 'Change Password',
             onTap: () => context.push('/settings/change-password'),
-          ),
-          _SettingTile(
-            icon: Icons.language_outlined,
-            title: 'Language',
-            trailing: Text(
-              _languageOptions[_languageCode] ?? 'Hindi',
-              style: TextStyle(color: context.textDim, fontSize: 13),
-            ),
-            onTap: _showLanguagePicker,
           ),
         ],
       ),

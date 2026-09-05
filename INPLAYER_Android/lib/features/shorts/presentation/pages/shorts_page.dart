@@ -148,7 +148,7 @@ class _ShortsPageState extends ConsumerState<ShortsPage> {
     if (!mounted) return;
     final shorts = _shorts;
     if (shorts == null || shorts.isEmpty) return;
-    for (var offset = 0; offset <= 2; offset++) {
+    for (var offset = -1; offset <= 2; offset++) {
       final index = _currentIndex + offset;
       if (index < 0 || index >= shorts.length) continue;
       final url = shortPosterUrl(shorts[index]);
@@ -182,7 +182,7 @@ class _ShortsPageState extends ConsumerState<ShortsPage> {
     // of the ramp (roughly 600ms into playback) and leaves the warm-up a
     // realistic chance of being finished before the next swipe.
     _warmDelayTimer?.cancel();
-    _warmDelayTimer = Timer(const Duration(milliseconds: 500), () {
+    _warmDelayTimer = Timer(const Duration(milliseconds: 100), () {
       if (!mounted || !widget.isActive) return;
       final shorts = _shorts;
       if (shorts == null) return;
@@ -432,57 +432,13 @@ class _ShortsPageState extends ConsumerState<ShortsPage> {
       itemBuilder: (context, index) {
         final short = shorts[index];
         final isCurrent = _currentIndex == index;
-        // The site's signature swipe feel: neighbouring slides sit back at
-        // 94% scale and dimmed, and grow into place over 500ms as they
-        // become active —
-        //   `transition-all duration-500 ease-out
-        //    ${isActive ? "scale-100 opacity-100" : "scale-[0.94] opacity-60"}`
-        // Without this the feed reads flat compared to the browser.
-        //
-        // The dimming is a black scrim, NOT an AnimatedOpacity, and that
-        // difference is load-bearing. In a browser, `opacity` on a div that
-        // already has its own compositing layer is close to free. In Flutter,
-        // RenderOpacity at any alpha strictly between 0 and 255 pushes an
-        // OpacityLayer, which forces its child — here a full-screen video
-        // texture — to be rasterised offscreen for every frame of the
-        // animation. Both the outgoing AND incoming slide were paying that
-        // for 500ms on every single swipe, on the incoming one at exactly
-        // the moment its decoder was starting up. That was the stutter that
-        // survived every earlier fix.
-        //
-        // Against this page's black background, compositing content at 60%
-        // opacity and laying 40% black over it are visually the same thing —
-        // so the scrim buys back the identical look for an ordinary blended
-        // paint with no offscreen layer at all. AnimatedScale is kept as-is:
-        // a transform on a texture is a compositor matrix, not a rasterise.
-        return AnimatedScale(
-          scale: isCurrent ? 1.0 : 0.94,
-          duration: const Duration(milliseconds: 500),
-          curve: Curves.easeOut,
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              ShortPlayerWidget(
-                key: ValueKey(short.videoId),
-                short: short,
-                isActive: widget.isActive && isCurrent,
-                bottomInset: widget.bottomInset,
-                onFirstFrame: _warmNextShort,
-                onMinimized: _handleBack,
-              ),
-              // Never intercept a tap: the player underneath owns every
-              // gesture on the slide.
-              IgnorePointer(
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 500),
-                  curve: Curves.easeOut,
-                  color: isCurrent
-                      ? Colors.transparent
-                      : Colors.black.withValues(alpha: 0.4),
-                ),
-              ),
-            ],
-          ),
+        return ShortPlayerWidget(
+          key: ValueKey(short.videoId),
+          short: short,
+          isActive: widget.isActive && isCurrent,
+          bottomInset: widget.bottomInset,
+          onFirstFrame: _warmNextShort,
+          onMinimized: _handleBack,
         );
       },
     );

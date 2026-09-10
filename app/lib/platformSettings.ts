@@ -112,7 +112,7 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
   watchPageBannerSource: "house",
   weeklyFeaturedEnabled: true, // ON by default
   midrollEnabled: true,
-  midrollIntervalSeconds: 900,
+  midrollIntervalSeconds: 120,
   monetizationEnabled: false,
   monetizationRequiredSubscribers: 500,
   monetizationRequiredVideoViews: 50000,

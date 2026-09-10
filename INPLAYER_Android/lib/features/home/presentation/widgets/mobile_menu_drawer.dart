@@ -6,6 +6,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/app_logo.dart';
+import '../../../../core/theme/pattern_background.dart';
 import '../../../../core/widgets/about_app_dialog.dart';
 import '../../../../models/channel.dart';
 import '../../../../providers/auth_provider.dart';
@@ -132,12 +133,12 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
     final user = authState is AuthStateAuthenticated ? authState.user : null;
 
     return Drawer(
-      backgroundColor:
-          (isDark ? const Color(0xFF07101F) : const Color(0xFFF5EEDC))
-              .withValues(alpha: 0.98),
+      backgroundColor: Colors.transparent,
       surfaceTintColor: Colors.transparent,
+      clipBehavior: Clip.antiAliasWithSaveLayer,
       width: 320,
-      child: SafeArea(
+      child: PatternBackground(
+        child: SafeArea(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
@@ -562,6 +563,7 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
             ),
           ],
         ),
+      ),
       ),
     );
   }

@@ -45,6 +45,7 @@ import {
   VolumeX,
   Play,
   Pause,
+  ExternalLink,
 } from "lucide-react";
 
 interface VideoPlayerProps {
@@ -230,9 +231,18 @@ export default function VideoPlayer({
     linkUrl: string;
     title: string;
   } | null>(null);
+  const [midrollAdsPool, setMidrollAdsPool] = useState<
+    Array<{
+      adId: string;
+      imageUrl: string;
+      linkUrl: string;
+      title: string;
+    }>
+  >([]);
   const [midrollBreakActive, setMidrollBreakActive] = useState(false);
   const [midrollSkipUnlocked, setMidrollSkipUnlocked] = useState(false);
   const [midrollCountdown, setMidrollCountdown] = useState(0);
+  const [adMuted, setAdMuted] = useState(false);
   const midrollBreaksShownRef = useRef<Set<number>>(new Set());
   const midrollWasPlayingRef = useRef(false);
 
@@ -243,15 +253,23 @@ export default function VideoPlayer({
         const res = await fetch("/api/midroll-ads");
         const data = await res.json().catch(() => ({ enabled: false }));
         if (cancelled) return;
-        if (data.enabled && data.ad) {
+        if (data.enabled && (data.ad || (Array.isArray(data.ads) && data.ads.length > 0))) {
+          const adsList =
+            Array.isArray(data.ads) && data.ads.length > 0
+              ? data.ads
+              : data.ad
+              ? [data.ad]
+              : [];
           setMidrollConfig({
             enabled: true,
-            intervalSeconds: data.intervalSeconds || 300,
-            skipTiersSeconds: Array.isArray(data.skipTiersSeconds) && data.skipTiersSeconds.length
-              ? data.skipTiersSeconds
-              : [5, 10, 15],
+            intervalSeconds: data.intervalSeconds || 120,
+            skipTiersSeconds:
+              Array.isArray(data.skipTiersSeconds) && data.skipTiersSeconds.length
+                ? data.skipTiersSeconds
+                : [5, 10, 15],
           });
-          setMidrollAd(data.ad);
+          setMidrollAdsPool(adsList);
+          setMidrollAd(data.ad || adsList[0] || null);
         }
       } catch (err) {
         console.error("VideoPlayer: mid-roll config fetch failed:", err);
@@ -296,20 +314,47 @@ export default function VideoPlayer({
 
   const handleMidrollTimeUpdate = () => {
     const player = playerRef.current;
-    if (!player || !midrollConfig?.enabled || !midrollAd || midrollBreakActive) return;
+    if (!player || !midrollConfig?.enabled || midrollBreakActive) return;
+
+    const currentAd = midrollAd || midrollAdsPool[0];
+    if (!currentAd) return;
 
     const currentTime = player.currentTime || 0;
     const duration = player.duration || 0;
-    const breakIndex = Math.floor(currentTime / midrollConfig.intervalSeconds);
 
-    // breakIndex 0 covers "before the first interval has elapsed" — never
-    // a real break. Also never trigger in the last few seconds, so a
-    // break can't fire moments before the video ends anyway.
-    if (breakIndex < 1) return;
+    // Never trigger a break in the final 5 seconds before the video ends
     if (duration && duration - currentTime < 5) return;
-    if (midrollBreaksShownRef.current.has(breakIndex)) return;
 
-    midrollBreaksShownRef.current.add(breakIndex);
+    let shouldTrigger = false;
+    let triggerKey = 1;
+
+    // For videos shorter than 1.5x the configured interval, place a mid-roll break
+    // at the video's midpoint (at least 15s into playback) so short/medium videos
+    // still receive house ad monetization as expected.
+    if (duration && duration < midrollConfig.intervalSeconds * 1.5) {
+      const midPoint = Math.max(15, Math.floor(duration / 2));
+      if (currentTime >= midPoint && !midrollBreaksShownRef.current.has(1)) {
+        shouldTrigger = true;
+        triggerKey = 1;
+      }
+    } else {
+      // Standard multiple-interval calculation for longer videos
+      const breakIndex = Math.floor(currentTime / midrollConfig.intervalSeconds);
+      if (breakIndex >= 1 && !midrollBreaksShownRef.current.has(breakIndex)) {
+        shouldTrigger = true;
+        triggerKey = breakIndex;
+      }
+    }
+
+    if (!shouldTrigger) return;
+
+    // Rotate creative if multiple house ads exist
+    if (midrollAdsPool.length > 1) {
+      const nextIndex = midrollBreaksShownRef.current.size % midrollAdsPool.length;
+      setMidrollAd(midrollAdsPool[nextIndex]);
+    }
+
+    midrollBreaksShownRef.current.add(triggerKey);
     midrollWasPlayingRef.current = !player.paused;
     player.pause();
 
@@ -1338,31 +1383,39 @@ export default function VideoPlayer({
           bail out early on midrollBreakActive as a backstop). */}
       {midrollBreakActive && midrollAd && (
         <div
-          className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-4 bg-black/95 p-6 text-center"
+          className="absolute inset-0 z-40 flex flex-col items-center justify-center gap-3 bg-black/95 p-4 sm:p-6 text-center select-none"
           onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
         >
-          <span className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-black uppercase tracking-wide text-slate-300">
-            Advertisement
-          </span>
-          <a
-            href={midrollAd.linkUrl}
-            target="_blank"
-            rel="noopener noreferrer sponsored"
-            onClick={() => trackMidrollEvent("click")}
-            className="block max-h-[55%] max-w-full overflow-hidden rounded-2xl border border-white/10"
-          >
-            {/* eslint-disable-next-line @next/next/no-img-element -- an
-                admin-uploaded data URL, not a static app asset. */}
+          {/* Header pill */}
+          <div className="flex items-center gap-2">
+            <span className="rounded-full bg-amber-500/20 border border-amber-500/30 px-3 py-0.5 text-[11px] font-black uppercase tracking-wider text-amber-300">
+              Sponsored Break
+            </span>
+            {midrollAd.title && (
+              <span className="text-xs font-medium text-slate-300 max-w-xs truncate">
+                {midrollAd.title}
+              </span>
+            )}
+          </div>
+
+          {/* Ad video/media frame: Fixed 16:9 container */}
+          <div className="relative w-full max-w-2xl aspect-video overflow-hidden rounded-2xl border border-white/20 bg-black shadow-2xl flex items-center justify-center group">
             {midrollAd.imageUrl.startsWith("mux:") ? (
               <MuxPlayer
                 playbackId={midrollAd.imageUrl.replace("mux:", "")}
-                autoPlay="muted"
+                autoPlay="any"
                 loop
-                muted
+                muted={adMuted}
                 playsInline
-                className="max-h-full max-w-full object-contain"
-                style={{ "--controls": "none" } as MuxCSSProperties}
+                className="w-full h-full object-contain"
+                style={
+                  {
+                    width: "100%",
+                    height: "100%",
+                    "--controls": "none",
+                  } as MuxCSSProperties
+                }
               />
             ) : midrollAd.imageUrl.startsWith("data:video/") ? (
               <video
@@ -1370,32 +1423,73 @@ export default function VideoPlayer({
                 aria-label={midrollAd.title}
                 autoPlay
                 loop
-                muted
+                muted={adMuted}
                 playsInline
-                preload="metadata"
-                className="max-h-full max-w-full object-contain"
+                preload="auto"
+                className="w-full h-full object-contain"
               />
             ) : (
               <img
                 src={midrollAd.imageUrl}
                 alt={midrollAd.title}
-                className="max-h-full max-w-full object-contain"
+                className="w-full h-full object-contain"
               />
             )}
-          </a>
-          <p className="max-w-xs text-xs text-slate-400">{midrollAd.title}</p>
-          <button
-            type="button"
-            onClick={skipMidroll}
-            disabled={!midrollSkipUnlocked}
-            className={`rounded-full px-5 py-2.5 text-sm font-bold transition ${
-              midrollSkipUnlocked
-                ? "bg-white text-black hover:bg-white/90"
-                : "cursor-not-allowed bg-white/10 text-slate-400"
-            }`}
-          >
-            {midrollSkipUnlocked ? "Skip Ad" : `Skip in ${midrollCountdown}s`}
-          </button>
+
+            {/* Floating Top Controls: Audio toggle */}
+            <div className="absolute top-3 right-3 z-10 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setAdMuted((m) => !m);
+                }}
+                className="flex items-center gap-1.5 rounded-full bg-black/75 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-black/90 border border-white/20 active:scale-95 shadow-lg"
+                aria-label={adMuted ? "Unmute advertisement" : "Mute advertisement"}
+              >
+                {adMuted ? (
+                  <>
+                    <VolumeX className="h-4 w-4 text-red-400" />
+                    <span>Unmute</span>
+                  </>
+                ) : (
+                  <>
+                    <Volume2 className="h-4 w-4 text-emerald-400" />
+                    <span>Mute</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+
+          {/* Action Row: Visit Advertiser link + Skip Countdown Button */}
+          <div className="flex flex-wrap items-center justify-center gap-3 pt-1">
+            {midrollAd.linkUrl && (
+              <a
+                href={midrollAd.linkUrl}
+                target="_blank"
+                rel="noopener noreferrer sponsored"
+                onClick={() => trackMidrollEvent("click")}
+                className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-5 py-2 text-xs font-semibold text-white backdrop-blur transition hover:bg-white/20 active:scale-95"
+              >
+                <span>Visit Sponsor</span>
+                <ExternalLink className="h-3.5 w-3.5 text-slate-300" />
+              </a>
+            )}
+
+            <button
+              type="button"
+              onClick={skipMidroll}
+              disabled={!midrollSkipUnlocked}
+              className={`rounded-full px-6 py-2 text-xs font-bold transition shadow-lg ${
+                midrollSkipUnlocked
+                  ? "bg-white text-black hover:bg-white/90 active:scale-95"
+                  : "cursor-not-allowed bg-white/10 text-slate-400 border border-white/10"
+              }`}
+            >
+              {midrollSkipUnlocked ? "Skip Ad →" : `Skip in ${midrollCountdown}s`}
+            </button>
+          </div>
         </div>
       )}
 

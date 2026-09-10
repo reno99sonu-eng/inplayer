@@ -67,9 +67,9 @@ class _MusicQualityPageState extends ConsumerState<MusicQualityPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: context.bgCanvas,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: context.bgCanvas,
+        backgroundColor: Colors.transparent,
         foregroundColor: context.textPrimary,
         elevation: 0,
         title: Text(

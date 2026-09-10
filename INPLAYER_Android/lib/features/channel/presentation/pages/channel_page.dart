@@ -248,9 +248,9 @@ class _ChannelPageState extends ConsumerState<ChannelPage>
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return Scaffold(
-        backgroundColor: context.bgCanvas,
-        body: const Center(
+      return const Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Center(
           child: CircularProgressIndicator(color: AppColors.brandOrange),
         ),
       );
@@ -258,9 +258,9 @@ class _ChannelPageState extends ConsumerState<ChannelPage>
 
     if (_notFound || _channel == null) {
       return Scaffold(
-        backgroundColor: context.bgCanvas,
+        backgroundColor: Colors.transparent,
         appBar: AppBar(
-          backgroundColor: context.bgCanvas,
+          backgroundColor: Colors.transparent,
           elevation: 0,
           iconTheme: IconThemeData(color: context.textPrimary),
         ),
@@ -284,9 +284,9 @@ class _ChannelPageState extends ConsumerState<ChannelPage>
 
     if (channel.gated) {
       return Scaffold(
-        backgroundColor: context.bgCanvas,
+        backgroundColor: Colors.transparent,
         appBar: AppBar(
-          backgroundColor: context.bgCanvas,
+          backgroundColor: Colors.transparent,
           elevation: 0,
           title: Text(
             '@${channel.username}',

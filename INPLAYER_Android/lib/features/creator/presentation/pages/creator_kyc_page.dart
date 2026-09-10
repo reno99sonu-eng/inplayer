@@ -191,9 +191,9 @@ class _CreatorKycPageState extends ConsumerState<CreatorKycPage> {
       );
     }
     return Scaffold(
-      backgroundColor: context.bgCanvas,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: context.bgCanvas,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: IconThemeData(color: context.textPrimary),
         title: Text(

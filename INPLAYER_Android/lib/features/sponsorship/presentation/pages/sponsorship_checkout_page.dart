@@ -145,9 +145,9 @@ class _SponsorshipCheckoutPageState extends ConsumerState<SponsorshipCheckoutPag
     ];
 
     return Scaffold(
-      backgroundColor: context.bgCanvas,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: context.bgCanvas,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: IconThemeData(color: context.textPrimary),
         title: Text('Sponsor an Ad', style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.bold)),

@@ -91,10 +91,8 @@ export async function PATCH(request: NextRequest) {
   }
   if (typeof body.midrollEnabled === "boolean") partial.midrollEnabled = body.midrollEnabled;
   if (typeof body.midrollIntervalSeconds === "number" && Number.isFinite(body.midrollIntervalSeconds)) {
-    // Floor of 60s — anything shorter turns every video into an ad break
-    // every few sentences, which isn't a real product decision anyone
-    // would want to be one fat-fingered admin input away from.
-    partial.midrollIntervalSeconds = Math.max(60, Math.min(3600, Math.round(body.midrollIntervalSeconds)));
+    // Floor of 30s — allows responsive ad breaks for short/testing videos
+    partial.midrollIntervalSeconds = Math.max(30, Math.min(3600, Math.round(body.midrollIntervalSeconds)));
   }
 
   if (typeof body.monetizationEnabled === "boolean") partial.monetizationEnabled = body.monetizationEnabled;

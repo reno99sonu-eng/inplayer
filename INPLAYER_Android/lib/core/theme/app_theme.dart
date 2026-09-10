@@ -22,7 +22,7 @@ class AppTheme {
       brightness: Brightness.dark,
       textTheme: textTheme,
       fontFamily: GoogleFonts.plusJakartaSans().fontFamily,
-      scaffoldBackgroundColor: AppColors.backgroundDark,
+      scaffoldBackgroundColor: Colors.transparent,
       canvasColor: AppColors.canvasDark,
       colorScheme: const ColorScheme.dark(
         primary: AppColors.brandOrange,
@@ -146,7 +146,7 @@ class AppTheme {
       brightness: Brightness.light,
       textTheme: textTheme,
       fontFamily: GoogleFonts.plusJakartaSans().fontFamily,
-      scaffoldBackgroundColor: AppColors.backgroundLight,
+      scaffoldBackgroundColor: Colors.transparent,
       canvasColor: AppColors.canvasLight,
       colorScheme: const ColorScheme.light(
         primary: AppColors.brandOrange,

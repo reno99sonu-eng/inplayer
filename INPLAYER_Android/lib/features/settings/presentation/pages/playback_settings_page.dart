@@ -170,9 +170,9 @@ class _PlaybackSettingsPageState extends State<PlaybackSettingsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: context.bgCanvas,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: context.bgCanvas,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         title: Text(
           'Playback',

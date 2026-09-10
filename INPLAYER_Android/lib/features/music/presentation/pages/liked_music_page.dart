@@ -39,9 +39,9 @@ class _LikedMusicPageState extends ConsumerState<LikedMusicPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: context.bgCanvas,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: context.bgCanvas,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         title: Text('Liked Songs', style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.w800, fontSize: 19)),
       ),

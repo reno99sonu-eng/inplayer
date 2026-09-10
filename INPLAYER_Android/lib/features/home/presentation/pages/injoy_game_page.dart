@@ -43,9 +43,9 @@ class _InJoyGamePageState extends State<InJoyGamePage> {
     final matches = inJoyGames.where((g) => g.id == widget.gameId);
     final game = matches.isEmpty ? null : matches.first;
     return Scaffold(
-      backgroundColor: context.bgCanvas,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: context.bgCanvas,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           onPressed: () => context.pop(),

@@ -39,6 +39,9 @@ class Video {
   /// topical content category vs. 'Pop' the actual genre — two different
   /// taxonomies that happen to both live on a music row).
   final String? genre;
+  final int likeCount;
+  final int commentCount;
+  final bool commentsEnabled;
 
   Video({
     required this.id,
@@ -68,6 +71,9 @@ class Video {
     this.artist,
     this.audience = 'everyone',
     this.genre,
+    this.likeCount = 0,
+    this.commentCount = 0,
+    this.commentsEnabled = true,
   });
 
   bool get isShort =>
@@ -129,12 +135,15 @@ class Video {
       title: json['title'] ?? '',
       creator: json['creator'] ?? json['uploaderName'] ?? 'Unknown',
       uploaderUsername: json['uploaderUsername'],
-        avatar: _resolveUrl(
-          json['avatar'] ??
-            json['avatarUrl'] ??
-            json['uploaderAvatarUrl'] ??
-            json['creatorAvatarUrl'] ??
-            '/avatars/avatar.png'),
+      avatar: () {
+        for (final key in ['avatar', 'avatarUrl', 'uploaderAvatarUrl', 'creatorAvatarUrl']) {
+          final val = json[key]?.toString().trim();
+          if (val != null && val.isNotEmpty) {
+            return _resolveUrl(val);
+          }
+        }
+        return _resolveUrl('/avatars/avatar.png');
+      }(),
       thumbnail: _resolveUrl(rawThumb),
       views: _formatViews(json['views'] ?? 0),
       uploaded: _formatTimeAgo(json['uploadedAt'] ?? json['uploaded']),
@@ -156,6 +165,9 @@ class Video {
       artist: json['artist']?.toString() ?? json['creator']?.toString(),
       audience: resolvedAudience,
       genre: json['genre']?.toString().trim().isNotEmpty == true ? json['genre'].toString().trim() : null,
+      likeCount: (json['likeCount'] as num?)?.toInt() ?? (json['likes'] as num?)?.toInt() ?? 0,
+      commentCount: (json['commentCount'] as num?)?.toInt() ?? (json['comments'] as num?)?.toInt() ?? 0,
+      commentsEnabled: json['commentsEnabled'] != false,
     );
   }
 
@@ -241,6 +253,9 @@ class Video {
       'artist': artist,
       'audience': audience,
       'genre': genre,
+      'likeCount': likeCount,
+      'commentCount': commentCount,
+      'commentsEnabled': commentsEnabled,
     };
   }
 }

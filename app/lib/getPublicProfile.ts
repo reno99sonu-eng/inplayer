@@ -64,6 +64,20 @@ export async function getPublicProfile(
     let targetUserId: string | null = handleResult.Item?.userId ?? null;
 
     if (!targetUserId) {
+      // Direct lookup in case usernameRaw is a userId
+      try {
+        const directUser = await docClient.send(
+          new GetCommand({ TableName: "InPlayer-Users", Key: { userId: usernameRaw } })
+        );
+        if (directUser.Item?.userId) {
+          targetUserId = directUser.Item.userId as string;
+        }
+      } catch (err) {
+        console.warn("Direct userId lookup check failed:", err);
+      }
+    }
+
+    if (!targetUserId) {
       // Fast path missed (no InPlayer-Usernames reservation for this handle).
       // Legacy accounts created before usernameLower existed have no
       // usernameLower attribute at all, so a FilterExpression keyed on it can
@@ -86,6 +100,7 @@ export async function getPublicProfile(
       } while (scanStartKey);
 
       const match = candidates.find((item) => {
+        if (item.userId === usernameRaw) return true;
         const handle = (item.usernameLower as string) || (item.username as string);
         return Boolean(handle) && normalizeUsername(handle) === usernameLower;
       });

@@ -327,6 +327,23 @@ function AdvertisingPage() {
     })();
   }, []);
 
+  // Auto-poll midroll ads if any uploaded video creative is still in "processing"
+  useEffect(() => {
+    const hasProcessing = midrollAds.some((ad) => ad?.status && ad.status !== "ready");
+    if (!hasProcessing) return;
+
+    let pollCount = 0;
+    const interval = setInterval(async () => {
+      pollCount++;
+      await loadMidrollAds();
+      if (pollCount >= 15) {
+        clearInterval(interval);
+      }
+    }, 4000);
+
+    return () => clearInterval(interval);
+  }, [midrollAds]);
+
   const safeCreatives = useMemo(() => (Array.isArray(creatives) ? creatives.filter(Boolean) : []), [creatives]);
   const safeMidrollAds = useMemo(() => (Array.isArray(midrollAds) ? midrollAds.filter(Boolean) : []), [midrollAds]);
 
@@ -563,6 +580,23 @@ function AdvertisingPage() {
               xhr.onerror = () => reject(new Error("Network error during upload"));
               xhr.send(rawFile);
             });
+            if (data?.adId) {
+              setMidrollAds((prev) => [
+                {
+                  adId: data.adId,
+                  imageUrl: "",
+                  linkUrl: midrollLink.trim(),
+                  title: batchTitle,
+                  active: true,
+                  createdAt: new Date().toISOString(),
+                  impressions: 0,
+                  clicks: 0,
+                  skips: 0,
+                  status: "processing",
+                },
+                ...prev.filter((a) => a.adId !== data.adId),
+              ]);
+            }
           } else {
             const res = await authedFetch("/api/admin/midroll-ads", {
               method: "POST",
@@ -1001,10 +1035,28 @@ function AdvertisingPage() {
           xhr.send(midrollFile);
         });
 
-        // The ad will appear once the webhook processes it. 
-        // We could manually insert a placeholder into the UI if desired, but 
-        // a page refresh or waiting for webhook will load it. 
-        alert("Video ad uploaded and is currently processing!");
+        if (adId) {
+          setMidrollAds((prev) => [
+            {
+              adId,
+              imageUrl: "",
+              linkUrl: midrollLink.trim(),
+              title: midrollTitle.trim(),
+              active: true,
+              createdAt: new Date().toISOString(),
+              impressions: 0,
+              clicks: 0,
+              skips: 0,
+              status: "processing",
+            },
+            ...prev.filter((a) => a.adId !== adId),
+          ]);
+        }
+
+        // Trigger an initial check after 2 seconds to self-heal/confirm status
+        setTimeout(() => {
+          loadMidrollAds();
+        }, 2000);
       } else {
         // Handle standard image ad creation
         const res = await authedFetch("/api/admin/midroll-ads", {
@@ -1754,19 +1806,19 @@ function AdvertisingPage() {
               <div>
                 <span className="text-[11px] font-semibold text-slate-300 light:text-slate-700 block">Break Interval</span>
                 <span className="text-[10px] text-slate-500">
-                  Seconds of playback between ad breaks (60–3600). Defaulted to 900s (15 min) — lower this if breaks
+                  Seconds of playback between ad breaks (30–3600). Lower this if breaks
                   aren&apos;t showing up on shorter videos.
                 </span>
               </div>
               <input
                 type="number"
-                min={60}
+                min={30}
                 max={3600}
-                step={30}
+                step={15}
                 value={settings.midrollIntervalSeconds}
                 onChange={(e) => setSettings({ ...settings, midrollIntervalSeconds: Number(e.target.value) || 0 })}
                 onBlur={() => {
-                  const clamped = Math.min(3600, Math.max(60, settings.midrollIntervalSeconds || DEFAULT_SETTINGS.midrollIntervalSeconds));
+                  const clamped = Math.min(3600, Math.max(30, settings.midrollIntervalSeconds || DEFAULT_SETTINGS.midrollIntervalSeconds));
                   const next = { ...settings, midrollIntervalSeconds: clamped };
                   setSettings(next);
                   setSaved(false);
@@ -1924,15 +1976,19 @@ function AdvertisingPage() {
                   <div key={ad.adId} className="rounded-xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-3 space-y-2">
                     <div className="relative h-28 overflow-hidden rounded-lg border border-white/10 light:border-black/10 bg-black/40 flex items-center justify-center">
                       {isProcessing ? (
-                        // Uploaded but Mux hasn't finished transcoding it
-                        // yet — imageUrl is still empty at this point, so
-                        // showing a broken <img>/<video> here (as this list
-                        // used to for every "mux:"-prefixed ad, ready or
-                        // not — see the isMuxVideo fix just above) reads as
-                        // "this is broken" when it's really just still
-                        // processing. Uploads near the 50MB ceiling can take a few
-                        // minutes.
-                        <span className="text-[11px] font-semibold text-slate-400">Processing on Mux…</span>
+                        <div className="flex flex-col items-center justify-center gap-1.5 p-2 text-center">
+                          <div className="flex items-center gap-1.5 text-amber-400">
+                            <Loader2 size={13} className="animate-spin" />
+                            <span className="text-[11px] font-semibold">Processing on Mux…</span>
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => loadMidrollAds()}
+                            className="inline-flex items-center gap-1 rounded bg-white/10 px-2.5 py-1 text-[10px] font-bold text-slate-300 hover:bg-white/20 transition cursor-pointer"
+                          >
+                            <RefreshCw size={10} /> Check Status
+                          </button>
+                        </div>
                       ) : isMuxVideo ? (
                         // A plain <video src=".m3u8"> only plays in Safari
                         // (HLS needs a JS player almost everywhere else —

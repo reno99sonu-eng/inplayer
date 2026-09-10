@@ -107,9 +107,9 @@ class _AdminPageState extends ConsumerState<AdminPage> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return Scaffold(
-        backgroundColor: context.bgCanvas,
-        body: const Center(child: CircularProgressIndicator(color: AppColors.brandOrange)),
+      return const Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Center(child: CircularProgressIndicator(color: AppColors.brandOrange)),
       );
     }
 

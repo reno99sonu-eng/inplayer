@@ -107,12 +107,34 @@ export async function GET(request: NextRequest) {
     })(),
   ]);
 
-  const commentsWithUsernames = comments.map((c) => ({
-    ...c,
-    userUsername: usernames.get(c.userId),
-    isMember: memberIds.has(c.userId),
-    isVerified: verifiedIds.has(c.userId),
-  }));
+  let viewerId: string | null = null;
+  try {
+    const viewer = await verifyAuth(request);
+    viewerId = viewer.userId;
+  } catch {}
+
+  const commentsWithUsernames = comments.map((c) => {
+    const likedBy: string[] = Array.isArray(c.likedBy) ? c.likedBy : [];
+    const dislikedBy: string[] = Array.isArray(c.dislikedBy) ? c.dislikedBy : [];
+    const likeCount = typeof c.likeCount === "number" ? c.likeCount : likedBy.length;
+    const dislikeCount = typeof c.dislikeCount === "number" ? c.dislikeCount : dislikedBy.length;
+    const myReaction = viewerId
+      ? (likedBy.includes(viewerId) ? "like" : (dislikedBy.includes(viewerId) ? "dislike" : null))
+      : null;
+
+    return {
+      ...c,
+      userUsername: usernames.get(c.userId) || c.userUsername,
+      isMember: memberIds.has(c.userId),
+      isVerified: verifiedIds.has(c.userId),
+      likeCount,
+      dislikeCount,
+      myReaction,
+      parentCommentId: c.parentCommentId || null,
+      parentUserId: c.parentUserId || null,
+      parentUserName: c.parentUserName || null,
+    };
+  });
 
   return NextResponse.json({ comments: commentsWithUsernames });
 }
@@ -126,7 +148,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Please sign in to comment." }, { status: 401 });
   }
 
-  const { videoId, text, parentUserId } = await request.json();
+  const { videoId, text, parentUserId, parentCommentId, parentUserName } = await request.json();
 
   if (!videoId || !text?.trim()) {
     return NextResponse.json({ error: "Comment text is required." }, { status: 400 });
@@ -162,6 +184,14 @@ export async function POST(request: NextRequest) {
     userId: user.userId,
     userName: user.name || "Anonymous",
     userAvatarUrl,
+    userUsername: profileResult.Item?.username || null,
+    parentCommentId: parentCommentId || null,
+    parentUserId: parentUserId || null,
+    parentUserName: parentUserName || null,
+    likeCount: 0,
+    dislikeCount: 0,
+    likedBy: [],
+    dislikedBy: [],
     text: text.trim(),
     createdAt: new Date().toISOString(),
     ...(moderation.checked &&
@@ -320,4 +350,72 @@ export async function DELETE(request: NextRequest) {
   }
 
   return NextResponse.json({ success: true });
+}
+
+export async function PATCH(request: NextRequest) {
+  let user;
+  try {
+    user = await verifyAuth(request);
+  } catch {
+    return NextResponse.json({ error: "Please sign in to react." }, { status: 401 });
+  }
+
+  const { videoId, commentId, action } = await request.json();
+
+  if (!videoId || !commentId || !["like", "dislike", "remove"].includes(action)) {
+    return NextResponse.json({ error: "Invalid request." }, { status: 400 });
+  }
+
+  try {
+    const commentRes = await docClient.send(
+      new GetCommand({
+        TableName: "InPlayer-Comments",
+        Key: { videoId, commentId },
+      })
+    );
+
+    const item = commentRes.Item;
+    if (!item) {
+      return NextResponse.json({ error: "Comment not found." }, { status: 404 });
+    }
+
+    let likedBy: string[] = Array.isArray(item.likedBy) ? [...item.likedBy] : [];
+    let dislikedBy: string[] = Array.isArray(item.dislikedBy) ? [...item.dislikedBy] : [];
+
+    likedBy = likedBy.filter((id) => id !== user.userId);
+    dislikedBy = dislikedBy.filter((id) => id !== user.userId);
+
+    let newReaction: "like" | "dislike" | null = null;
+    if (action === "like") {
+      likedBy.push(user.userId);
+      newReaction = "like";
+    } else if (action === "dislike") {
+      dislikedBy.push(user.userId);
+      newReaction = "dislike";
+    }
+
+    await docClient.send(
+      new UpdateCommand({
+        TableName: "InPlayer-Comments",
+        Key: { videoId, commentId },
+        UpdateExpression: "SET likedBy = :lb, dislikedBy = :db, likeCount = :lc, dislikeCount = :dc",
+        ExpressionAttributeValues: {
+          ":lb": likedBy,
+          ":db": dislikedBy,
+          ":lc": likedBy.length,
+          ":dc": dislikedBy.length,
+        },
+      })
+    );
+
+    return NextResponse.json({
+      success: true,
+      likeCount: likedBy.length,
+      dislikeCount: dislikedBy.length,
+      myReaction: newReaction,
+    });
+  } catch (err) {
+    console.error("Failed to update comment reaction:", err);
+    return NextResponse.json({ error: "Couldn't update reaction." }, { status: 500 });
+  }
 }

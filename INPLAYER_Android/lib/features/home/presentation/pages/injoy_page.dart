@@ -11,9 +11,9 @@ class InJoyPage extends StatelessWidget {
   Widget build(BuildContext context) {
     final games = getRotatedInJoyGames();
     return Scaffold(
-      backgroundColor: context.bgCanvas,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: context.bgCanvas,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         leading: IconButton(
           onPressed: () => context.pop(),

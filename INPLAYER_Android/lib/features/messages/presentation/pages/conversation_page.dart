@@ -8,7 +8,6 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/theme/pattern_background.dart';
 import '../../../../core/utils/image_utils.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../services/message_service.dart';
@@ -533,7 +532,6 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
             height: double.infinity,
           ),
         ),
-        PatternBackground(transparent: true, child: const SizedBox.expand()),
         Scaffold(
           backgroundColor: Colors.transparent,
           appBar: AppBar(

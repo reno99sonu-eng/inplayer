@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
-import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
+import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
+import { createNotification } from "@/app/lib/notifications";
+import { verifyAuth } from "@/app/lib/verifyAuth";
 
 // Records a share. Fires when someone actually completes a share (the OS
 // share sheet was used, or the link was copied) — same "honest, simple
@@ -18,7 +20,7 @@ export async function POST(
   }
 
   try {
-    await docClient.send(
+    const updatePromise = docClient.send(
       new UpdateCommand({
         TableName: "InPlayer-Videos",
         Key: { videoId },
@@ -27,6 +29,43 @@ export async function POST(
         ExpressionAttributeValues: { ":inc": 1, ":zero": 0 },
       })
     );
+
+    // Notify the video owner if possible
+    try {
+      const videoResult = await docClient.send(
+        new GetCommand({
+          TableName: "InPlayer-Videos",
+          Key: { videoId },
+          ProjectionExpression: "videoId, title, uploaderId",
+        })
+      );
+      const video = videoResult.Item;
+      if (video && video.uploaderId) {
+        let sharerName = "Someone";
+        let sharerUserId: string | null = null;
+        try {
+          const authUser = await verifyAuth(request);
+          sharerUserId = authUser.userId;
+          if (authUser.name) sharerName = authUser.name;
+          else if (authUser.email) sharerName = authUser.email.split("@")[0];
+        } catch {
+          // Anonymous or unsigned sharer
+        }
+
+        if (sharerUserId !== video.uploaderId) {
+          await createNotification({
+            userId: video.uploaderId,
+            type: "share",
+            message: `${sharerName} shared your video "${video.title || "video"}"`,
+            videoId,
+          });
+        }
+      }
+    } catch (notifErr) {
+      console.error("Failed to create share notification:", notifErr);
+    }
+
+    await updatePromise;
     return NextResponse.json({ success: true });
   } catch (err) {
     console.error("Failed to record share:", err);

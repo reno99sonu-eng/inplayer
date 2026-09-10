@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -146,16 +146,16 @@ class _ProductDetailPageState extends ConsumerState<ProductDetailPage> {
   @override
   Widget build(BuildContext context) {
     if (_loading) {
-      return Scaffold(
-        backgroundColor: context.bgCanvas,
-        body: const Center(child: CircularProgressIndicator(color: AppColors.brandOrange)),
+      return const Scaffold(
+        backgroundColor: Colors.transparent,
+        body: Center(child: CircularProgressIndicator(color: AppColors.brandOrange)),
       );
     }
     final product = _product;
     if (product == null) {
       return Scaffold(
-        backgroundColor: context.bgCanvas,
-        appBar: AppBar(backgroundColor: context.bgCanvas, elevation: 0),
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0),
         body: Center(child: Text("Listing not found", style: TextStyle(color: context.textSecondary))),
       );
     }

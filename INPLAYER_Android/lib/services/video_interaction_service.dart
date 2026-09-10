@@ -90,6 +90,30 @@ class VideoInteractionService {
       return false;
     }
   }
+
+  Future<bool> reportComment({
+    required String videoId,
+    required String commentId,
+    required String reason,
+    String details = '',
+  }) async {
+    try {
+      final response = await _dio.post(
+        ApiConstants.reports,
+        data: {
+          'targetType': 'comment',
+          'videoId': videoId,
+          'commentId': commentId,
+          'reason': reason,
+          if (details.trim().isNotEmpty) 'details': details.trim(),
+        },
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      _logger.e('Error submitting report for comment $commentId: $e');
+      return false;
+    }
+  }
 }
 
 /// The 8 fixed report reasons — matches REPORT_REASONS in

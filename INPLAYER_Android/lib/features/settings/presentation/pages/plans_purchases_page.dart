@@ -191,9 +191,9 @@ class _PlansPurchasesPageState extends ConsumerState<PlansPurchasesPage> {
     final renewalLabel = _formatDate(_status?.premiumUntil);
 
     return Scaffold(
-      backgroundColor: context.bgCanvas,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: context.bgCanvas,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: IconThemeData(color: context.textPrimary),
         title: Text(

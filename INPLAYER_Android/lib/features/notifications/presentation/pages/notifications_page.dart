@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -45,15 +45,32 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
     }
   }
 
-  IconData _iconFor(String type) {
+  IconData _iconFor(NotificationItem n) {
+    final type = n.type;
+    final msg = n.message.toLowerCase();
+    if (type == 'share' || msg.contains('shared your')) {
+      return Icons.share_rounded;
+    }
+    if (type == 'copyright' || msg.contains('copyright')) {
+      return Icons.copyright_rounded;
+    }
+    if (type == 'ai_flag' ||
+        msg.contains('violating') ||
+        msg.contains('content guidelines') ||
+        msg.contains('strike') ||
+        msg.contains('suspended') ||
+        msg.contains('blocked')) {
+      return Icons.security_rounded;
+    }
     switch (type) {
       case 'subscribe':
         return Icons.person_add_alt_1;
       case 'like':
         return Icons.thumb_up_alt;
       case 'comment':
-      case 'comment_reply':
         return Icons.mode_comment_outlined;
+      case 'comment_reply':
+        return Icons.reply_rounded;
       case 'live_stream':
         return Icons.podcasts;
       case 'message':
@@ -67,37 +84,115 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
     }
   }
 
-  bool _isMessageType(String type) => type == 'message' || type == 'message_request';
+  Color _iconColorFor(NotificationItem n) {
+    final type = n.type;
+    final msg = n.message.toLowerCase();
+    if (type == 'ai_flag' ||
+        msg.contains('violating') ||
+        msg.contains('strike') ||
+        msg.contains('suspended') ||
+        msg.contains('blocked')) {
+      return Colors.amber.shade700;
+    }
+    if (type == 'copyright' || msg.contains('copyright')) {
+      return AppColors.brandOrange;
+    }
+    if (type == 'like') {
+      return Colors.redAccent;
+    }
+    if (type == 'share' || msg.contains('shared your')) {
+      return Colors.blueAccent;
+    }
+    return AppColors.brandOrange;
+  }
 
-  /// Whether tapping this row does anything — mirrors [_handleTap]'s own
-  /// branches so the row's tap target and its actual behavior never drift
-  /// apart.
+  bool _isMessageType(String type) =>
+      type == 'message' || type == 'message_request';
+
+  /// Whether tapping this row does anything
   bool _isTappable(NotificationItem n) {
     if (n.type == 'live_stream') return true;
+    if (n.type == 'subscribe') return true;
     if (_isMessageType(n.type)) return n.conversationId != null;
-    return n.videoId != null;
+    if (n.videoId != null) return true;
+    final msg = n.message.toLowerCase();
+    if (msg.contains('copyright') ||
+        msg.contains('guidelines') ||
+        msg.contains('strike') ||
+        msg.contains('suspended') ||
+        msg.contains('blocked')) {
+      return true;
+    }
+    return false;
   }
 
   void _handleTap(NotificationItem n) {
     if (n.type == 'live_stream') {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text("Watching other creators' live streams isn't available in the app yet."),
-          backgroundColor: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+          content: const Text(
+              "Watching other creators' live streams isn't available in the app yet."),
+          backgroundColor:
+              context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
         ),
       );
       return;
     }
-    // Matches the website's NavbarActions.tsx click routing exactly:
-    // message/message_request rows go to their conversation, everything
-    // else (that has one) goes to its video. admin_announcement rows have
-    // neither and are display-only, same as on the website.
+    if (n.type == 'subscribe') {
+      context.push('/studio');
+      return;
+    }
     if (_isMessageType(n.type) && n.conversationId != null) {
       context.push('/messages/${n.conversationId}');
       return;
     }
     if (n.videoId != null) {
       context.push('/watch/${n.videoId}');
+      return;
+    }
+    final msg = n.message.toLowerCase();
+    if (msg.contains('copyright') ||
+        msg.contains('guidelines') ||
+        msg.contains('strike') ||
+        msg.contains('suspended') ||
+        msg.contains('blocked')) {
+      showDialog(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: ctx.bgModal,
+          title: const Row(
+            children: [
+              Icon(Icons.info_outline, color: AppColors.brandOrange, size: 22),
+              SizedBox(width: 8),
+              Text(
+                'Notice Detail',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          content: Text(
+            n.message,
+            style: TextStyle(
+              color: ctx.textPrimary,
+              fontSize: 14,
+              height: 1.4,
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text(
+                'OK',
+                style: TextStyle(
+                  color: AppColors.brandOrange,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+      return;
     }
   }
 
@@ -161,8 +256,11 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
                             leading: CircleAvatar(
                               radius: 18,
                               backgroundColor: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-                              child: Icon(_iconFor(n.type),
-                                  size: 18, color: AppColors.brandOrange),
+                              child: Icon(
+                                _iconFor(n),
+                                size: 18,
+                                color: _iconColorFor(n),
+                              ),
                             ),
                             title: Text(
                               n.message,

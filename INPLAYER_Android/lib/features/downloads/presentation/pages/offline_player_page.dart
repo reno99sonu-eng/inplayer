@@ -85,9 +85,9 @@ class _OfflinePlayerPageState extends State<OfflinePlayerPage> {
     final provider = item.thumbnailUrl.isNotEmpty ? smartImageProvider(item.thumbnailUrl) : null;
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: Colors.black,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white),
         title: Text(

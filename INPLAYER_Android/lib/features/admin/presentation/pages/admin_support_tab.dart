@@ -169,7 +169,7 @@ class _AdminSupportTabState extends ConsumerState<AdminSupportTab> {
     }
 
     return Scaffold(
-      backgroundColor: context.bgCanvas,
+      backgroundColor: Colors.transparent,
       body: RefreshIndicator(
         color: AppColors.brandOrange,
         backgroundColor: context.bgCard,

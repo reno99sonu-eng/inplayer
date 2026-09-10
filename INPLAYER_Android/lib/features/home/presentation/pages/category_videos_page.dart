@@ -46,9 +46,9 @@ class _CategoryVideosPageState extends ConsumerState<CategoryVideosPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: context.bgCanvas,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: context.bgCanvas,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         title: Text(
           widget.category,

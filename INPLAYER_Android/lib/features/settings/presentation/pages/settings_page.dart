@@ -308,9 +308,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     final sections = _buildSections(currentTheme);
 
     return Scaffold(
-      backgroundColor: context.bgCanvas,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: context.bgCanvas,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         automaticallyImplyLeading: false,
         leading: Navigator.of(context).canPop()

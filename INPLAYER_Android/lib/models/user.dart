@@ -14,6 +14,9 @@ class User {
   final int? age;
   final bool termsAccepted;
 
+  String get displayName =>
+      name.trim().isNotEmpty ? name.trim() : (username.trim().isNotEmpty ? username.trim() : 'User');
+
   User({
     required this.userId,
     required this.username,

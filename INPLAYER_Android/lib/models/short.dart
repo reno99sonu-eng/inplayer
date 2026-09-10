@@ -94,8 +94,8 @@ class Short {
       uploaderAvatarUrl: v.avatar,
       poster: v.thumbnail,
       views: v.views,
-      likes: '0',
-      comments: '0',
+      likes: _formatCount(v.likeCount),
+      comments: _formatCount(v.commentCount),
       description: v.description,
       muxPlaybackId: v.muxPlaybackId,
     );

@@ -62,9 +62,9 @@ class _CreatorMonetizationPageState extends ConsumerState<CreatorMonetizationPag
   Widget build(BuildContext context) {
     if (_loading) {
       return Scaffold(
-        backgroundColor: context.bgCanvas,
+        backgroundColor: Colors.transparent,
         appBar: AppBar(
-          backgroundColor: context.bgCanvas,
+          backgroundColor: Colors.transparent,
           elevation: 0,
           iconTheme: IconThemeData(color: context.textPrimary),
           title: Text('Monetization', style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.bold)),
@@ -78,9 +78,9 @@ class _CreatorMonetizationPageState extends ConsumerState<CreatorMonetizationPag
     final kycState = status.kycStatus;
 
     return Scaffold(
-      backgroundColor: context.bgCanvas,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: context.bgCanvas,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         iconTheme: IconThemeData(color: context.textPrimary),
         title: Text('Monetization', style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.bold)),

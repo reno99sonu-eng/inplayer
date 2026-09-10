@@ -17,7 +17,8 @@ Uint8List? decodeDataImageUrl(String value) {
   try {
     final commaIndex = value.indexOf(',');
     if (commaIndex == -1) return null;
-    return base64Decode(value.substring(commaIndex + 1));
+    final b64 = value.substring(commaIndex + 1).replaceAll(RegExp(r'\s+'), '');
+    return base64Decode(b64);
   } catch (_) {
     return null;
   }

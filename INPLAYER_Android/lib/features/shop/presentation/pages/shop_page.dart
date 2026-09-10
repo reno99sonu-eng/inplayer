@@ -10,6 +10,7 @@ import '../../../../core/utils/image_utils.dart';
 import '../../../../core/widgets/pattern_background.dart';
 import '../../../../models/hammart_product.dart';
 import '../../../../services/hammart_service.dart';
+import '../../../../services/notification_badge_service.dart';
 import '../../../home/presentation/widgets/mobile_menu_drawer.dart';
 
 const _categories = [
@@ -250,9 +251,31 @@ class _ShopPageState extends ConsumerState<ShopPage> {
           icon: Icon(Icons.search, color: context.textPrimary),
           onPressed: () => context.push('/search'),
         ),
-        IconButton(
-          icon: Icon(Icons.notifications_none, color: context.textPrimary),
-          onPressed: () => context.push('/notifications'),
+        Stack(
+          clipBehavior: Clip.none,
+          children: [
+            IconButton(
+              icon: Icon(Icons.notifications_none, color: context.textPrimary),
+              onPressed: () => context.push('/notifications'),
+            ),
+            if (ref.watch(
+              notificationBadgeServiceProvider.select(
+                (s) => s.unreadCount > 0,
+              ),
+            ))
+              Positioned(
+                top: 10,
+                right: 10,
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                    color: AppColors.brandOrange,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+              ),
+          ],
         ),
         const SizedBox(width: 8),
       ],

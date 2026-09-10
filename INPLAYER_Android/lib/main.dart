@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'core/theme/app_theme.dart';
+import 'core/theme/pattern_background.dart';
 import 'core/router/app_router.dart';
 import 'features/auth/presentation/screens/splash_screen.dart';
 import 'features/auth/presentation/screens/biometric_lock_screen.dart';
@@ -240,10 +241,11 @@ class _InplayerAppState extends ConsumerState<InplayerApp> {
       scaffoldMessengerKey: _scaffoldMessengerKey,
       routerConfig: router,
       builder: (context, child) {
+        final content = child ?? const SizedBox.shrink();
         return Stack(
           fit: StackFit.expand,
           children: [
-            ?child,
+            PatternBackground(child: content),
             if (_geoBlocked)
               _RegionBlockedOverlay(
                 onRetry: () {

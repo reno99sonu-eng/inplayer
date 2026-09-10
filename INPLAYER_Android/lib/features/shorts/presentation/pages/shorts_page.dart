@@ -308,7 +308,7 @@ class _ShortsPageState extends ConsumerState<ShortsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black, // Shorts background is always black
+      backgroundColor: Colors.transparent,
       body: Stack(
         children: [
           _buildBody(),
@@ -347,7 +347,7 @@ class _ShortsPageState extends ConsumerState<ShortsPage> {
   Widget _buildBody() {
     if (_isLoading && (_shorts == null || _shorts!.isEmpty)) {
       return Container(
-        color: Colors.black,
+        color: Colors.transparent,
         child: const Center(
           child: CircularProgressIndicator(color: AppColors.brandOrange),
         ),
@@ -356,7 +356,7 @@ class _ShortsPageState extends ConsumerState<ShortsPage> {
 
     if (_hasError && (_shorts == null || _shorts!.isEmpty)) {
       return Container(
-        color: Colors.black,
+        color: Colors.transparent,
         child: Center(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,

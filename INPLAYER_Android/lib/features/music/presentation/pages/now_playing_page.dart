@@ -444,7 +444,7 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
         : track.thumbnail;
 
     return Scaffold(
-      backgroundColor: context.bgCanvas,
+      backgroundColor: Colors.transparent,
       body: Stack(
         fit: StackFit.expand,
         children: [
@@ -460,7 +460,7 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
               ),
             )
           else
-            Positioned.fill(child: Container(color: context.bgCanvas)),
+            Positioned.fill(child: Container(color: Colors.transparent)),
           // Theme-adaptive wash — a warm parchment tint in light mode, an
           // obsidian one in dark mode, both derived from the same tokens
           // the rest of the app uses. This (not a fixed black canvas) is

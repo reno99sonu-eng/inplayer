@@ -63,7 +63,7 @@ class _AdminHammartOrdersTabState extends ConsumerState<AdminHammartOrdersTab> {
     final paidCount = _orders.where((o) => o.status == 'paid' || o.status == 'vendor_confirmed').length;
 
     return Scaffold(
-      backgroundColor: context.bgCanvas,
+      backgroundColor: Colors.transparent,
       body: RefreshIndicator(
         color: AppColors.brandOrange,
         backgroundColor: context.bgCard,

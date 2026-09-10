@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/user_avatar.dart';
 import '../../../../models/video.dart';
 import '../../../../services/history_service.dart';
 import '../../../../services/music_player_service.dart';
@@ -174,11 +175,17 @@ class _MusicPageState extends ConsumerState<MusicPage> {
     final seen = <String>{};
     final result = <({String username, String name, String avatar})>[];
     for (final t in tracks) {
-      final username = t.uploaderUsername;
-      if (username == null || username.isEmpty || !seen.add(username)) continue;
+      final username = t.uploaderUsername ?? '';
+      final artistName = (t.artist?.isNotEmpty == true)
+          ? t.artist!
+          : (t.creator.isNotEmpty && t.creator != 'Unknown'
+              ? t.creator
+              : (username.isNotEmpty ? username : 'Artist'));
+      final key = username.isNotEmpty ? username : artistName;
+      if (!seen.add(key)) continue;
       result.add((
         username: username,
-        name: t.artist?.isNotEmpty == true ? t.artist! : t.creator,
+        name: artistName,
         avatar: t.avatar,
       ));
       if (result.length >= 15) break;
@@ -191,9 +198,9 @@ class _MusicPageState extends ConsumerState<MusicPage> {
     final tracks = _tracks;
 
     return Scaffold(
-      backgroundColor: context.bgCanvas,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: context.bgCanvas,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         automaticallyImplyLeading: false,
         titleSpacing: 20,
@@ -646,7 +653,7 @@ class _MusicPageState extends ConsumerState<MusicPage> {
     List<({String username, String name, String avatar})> artists,
   ) {
     return SizedBox(
-      height: 100,
+      height: 105,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
@@ -654,33 +661,29 @@ class _MusicPageState extends ConsumerState<MusicPage> {
         separatorBuilder: (context, index) => const SizedBox(width: 14),
         itemBuilder: (context, i) {
           final a = artists[i];
+          final profilePath = a.username.isNotEmpty
+              ? '/channel/${Uri.encodeComponent(a.username)}'
+              : null;
           return GestureDetector(
-            onTap: () =>
-                context.push('/channel/${Uri.encodeComponent(a.username)}'),
+            onTap: profilePath != null ? () => context.push(profilePath) : null,
             child: SizedBox(
               width: 72,
               child: Column(
                 children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(36),
-                    child: SizedBox(
-                      width: 64,
-                      height: 64,
-                      child: a.avatar.isNotEmpty
-                          ? CachedNetworkImage(
-                              imageUrl: a.avatar,
-                              fit: BoxFit.cover,
-                              errorWidget: (context, url, error) =>
-                                  _artistFallback(),
-                            )
-                          : _artistFallback(),
-                    ),
+                  UserAvatar(
+                    avatarUrl: a.avatar,
+                    name: a.name,
+                    size: 64,
+                    onTap: profilePath != null
+                        ? () => context.push(profilePath)
+                        : null,
                   ),
                   const SizedBox(height: 6),
                   Text(
                     a.name,
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
                     style: TextStyle(
                       color: context.textPrimary,
                       fontSize: 11,
@@ -693,13 +696,6 @@ class _MusicPageState extends ConsumerState<MusicPage> {
           );
         },
       ),
-    );
-  }
-
-  Widget _artistFallback() {
-    return Container(
-      decoration: const BoxDecoration(gradient: AppColors.flameGradient),
-      child: const Icon(Icons.person, color: Colors.white, size: 26),
     );
   }
 

@@ -2,21 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { getPlatformSettings } from "@/app/lib/platformSettings";
+import { selfHealMidrollAdsBatch } from "@/app/lib/videoAdsHealer";
 import { MIDROLL_ADS_TABLE, MIDROLL_SKIP_TIERS_SECONDS, getAllMidrollAds } from "@/app/lib/videoAds";
 
 // Public, unauthenticated — app/components/VideoPlayer.tsx calls this
 // once per mount to learn whether mid-roll breaks are on at all and, if
-// so, which creative to show when a break triggers. Same
-// "resolve-once-then-reuse" shape as the homepage/watch ad slots' own
-// /api/ads fetch, not fetched again
-// per break — a single video playback shows the same picked creative at
-// every break it triggers, which also keeps the impression counter
-// meaning "this creative was queued up for a viewer," same convention as
-// the homepage/watch banner's impression count.
-//
-// See app/api/platform-settings/route.ts's comment on force-dynamic — same
-// no-request-signal shape, same problem: whether mid-rolls are on/off must
-// be read fresh on every request, not served from a frozen snapshot.
+// so, which creative to show when a break triggers.
 export const dynamic = "force-dynamic";
 
 export async function GET() {
@@ -26,29 +17,29 @@ export async function GET() {
     return NextResponse.json({ enabled: false });
   }
 
-  // Reads the shared 30-second cached scan (see getAllMidrollAds in
-  // app/lib/videoAds.ts) instead of running a fresh full table Scan on
-  // every single video mount — this endpoint fires once per playback, so
-  // on a busy video that was one uncached Scan per viewer per view.
   try {
     const allAds = await getAllMidrollAds();
     const now = Date.now();
-    // Video ad creatives go through Mux processing and carry a `status`
-    // ("processing" -> "ready", set by app/api/webhooks/mux/route.ts) —
-    // without this check, a just-uploaded video ad that's still
-    // transcoding (or one whose Mux transcode failed outright) could get
-    // picked and served, silently rendering nothing (VideoPlayer.tsx has
-    // no fallback for an empty/unready imageUrl). Static image ad
-    // creatives never get a `status` field at all, so their absence of
-    // one is treated as "ready" — this only excludes items that HAVE a
-    // status and it isn't "ready" yet. expiresAt is the same paid-sponsor
-    // expiry check as the banner placements (see app/lib/adCreatives.ts).
-    const items = allAds.filter(
+
+    let items = allAds.filter(
       (item) =>
         item.active === true &&
         (item.status === undefined || item.status === "ready") &&
         (!item.expiresAt || new Date(item.expiresAt as string).getTime() > now)
     );
+
+    // If no ready ads yet, but there are processing video ads, attempt
+    // an immediate self-heal check with Mux so newly-uploaded ads become
+    // live without waiting for a webhook.
+    if (items.length === 0 && allAds.some((a) => a.status === "processing")) {
+      const healed = await selfHealMidrollAdsBatch(allAds);
+      items = healed.filter(
+        (item) =>
+          item.active === true &&
+          (item.status === undefined || item.status === "ready") &&
+          (!item.expiresAt || new Date(item.expiresAt as string).getTime() > now)
+      );
+    }
 
     if (items.length === 0) {
       return NextResponse.json({ enabled: false });
@@ -77,6 +68,12 @@ export async function GET() {
         linkUrl: pick.linkUrl,
         title: pick.title,
       },
+      ads: items.map((i) => ({
+        adId: i.adId,
+        imageUrl: i.imageUrl,
+        linkUrl: i.linkUrl,
+        title: i.title,
+      })),
     });
   } catch (err) {
     console.error("Midroll ad lookup failed (table may not exist yet):", err);

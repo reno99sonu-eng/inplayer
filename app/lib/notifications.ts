@@ -13,9 +13,13 @@ import { isAdminEmail } from "@/app/lib/isAdmin";
 export type NotificationType =
   | "like"
   | "comment"
+  | "comment_reply"
   | "subscribe"
+  | "share"
   | "message"
   | "message_request"
+  | "ai_flag"
+  | "copyright"
   | "admin_announcement"
   | "live_stream";
 

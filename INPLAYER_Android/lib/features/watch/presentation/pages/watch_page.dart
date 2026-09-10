@@ -35,6 +35,7 @@ import '../../../../services/video_mini_player_service.dart';
 import '../widgets/music_stage.dart';
 import '../widgets/player_chrome.dart';
 import '../widgets/video_options_sheet.dart';
+import '../widgets/comment_thread_tile.dart';
 import 'fullscreen_player_page.dart';
 
 class WatchPage extends ConsumerStatefulWidget {
@@ -97,6 +98,7 @@ class _WatchPageState extends ConsumerState<WatchPage>
   // _buildRawMediaSurface() for why: a live check flickers.
   bool _firstFrameRendered = false;
   bool _isLoading = true;
+  bool _hasPlayerError = false;
   Video? _video;
   bool _descExpanded = false;
   List<Video> _recommendedVideos = [];
@@ -483,6 +485,16 @@ class _WatchPageState extends ConsumerState<WatchPage>
         return;
       }
 
+      // Immediately render video metadata, channel details, and start loading comments/likes/watchlist
+      if (mounted) {
+        setState(() {
+          _video = video;
+          _isLoading = false;
+          _hasPlayerError = false;
+        });
+        _loadEngagementState(video);
+      }
+
       // Adopt an already-playing controller either explicitly (re-expanding
       // the mini player — see the class doc on `adoptController`) or
       // implicitly (this exact video happens to already be minimized and
@@ -579,8 +591,7 @@ class _WatchPageState extends ConsumerState<WatchPage>
           if (mounted) {
             setState(() {
               _isInitialized = true;
-              _video = video;
-              _isLoading = false;
+              _hasPlayerError = false;
             });
             controller.play();
           }
@@ -590,18 +601,13 @@ class _WatchPageState extends ConsumerState<WatchPage>
           if (mounted) {
             setState(() {
               _isInitialized = false;
-              _isLoading = false;
+              _hasPlayerError = true;
             });
           }
         }
       }
 
       if (!mounted) return;
-
-      setState(() {
-        _video = video;
-        _isLoading = false;
-      });
 
       if (_isInitialized) _videoController?.play();
 
@@ -630,8 +636,6 @@ class _WatchPageState extends ConsumerState<WatchPage>
       // just returns false.
       unawaited(ref.read(historyServiceProvider).recordWatch(video.videoId));
       unawaited(_loadCaptions(video.videoId));
-
-      _loadEngagementState(video);
     } catch (e) {
       _logger.e('Error loading video: $e');
       if (mounted) setState(() => _isLoading = false);
@@ -671,7 +675,7 @@ class _WatchPageState extends ConsumerState<WatchPage>
         .getComments(videoId);
     if (!mounted) return;
     setState(() {
-      _comments = comments;
+      _comments = Comment.assembleThreadedComments(comments);
       _commentsLoading = false;
     });
   }
@@ -1026,10 +1030,65 @@ class _WatchPageState extends ConsumerState<WatchPage>
     setState(() => _subscribeBusy = false);
   }
 
+  static const List<String> _quickEmojis = [
+    '❤️', '🔥', '👏', '😂', '😍', '😮', '💯', '🙌', '✨', '🎉',
+  ];
+
+  void _insertEmoji(String emoji) {
+    final text = _commentController.text;
+    final selection = _commentController.selection;
+    final start = selection.start >= 0 ? selection.start : text.length;
+    final end = selection.end >= 0 ? selection.end : text.length;
+    final newText = text.replaceRange(start, end, emoji);
+    _commentController.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: start + emoji.length),
+    );
+  }
+
+  void _showCommentsBottomSheet() {
+    final video = _video;
+    if (video == null) return;
+
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _WatchCommentsSheet(
+        videoId: video.videoId,
+        initialComments: _comments,
+        onCommentAdded: (newComment) {
+          if (mounted) {
+            setState(() {
+              final updated = [
+                newComment,
+                ..._comments.where((c) => c.commentId != newComment.commentId),
+              ];
+              _comments = Comment.assembleThreadedComments(updated);
+            });
+          }
+        },
+        onCommentDeleted: (deletedId) {
+          if (mounted) {
+            setState(() {
+              _comments = _comments.where((c) => c.commentId != deletedId).toList();
+            });
+          }
+        },
+      ),
+    );
+  }
+
   Future<void> _postComment() async {
     final video = _video;
     final text = _commentController.text.trim();
     if (video == null || text.isEmpty || _postingComment) return;
+
+    final authState = ref.read(authStateProvider);
+    if (authState is! AuthStateAuthenticated) {
+      _showSnack('Sign in to comment.');
+      return;
+    }
 
     setState(() => _postingComment = true);
 
@@ -1051,13 +1110,30 @@ class _WatchPageState extends ConsumerState<WatchPage>
       return;
     }
 
-    if (result.success) {
+    if (result.success && result.comment != null) {
       _commentController.clear();
-      setState(() => _comments = [result.comment!, ..._comments]);
+      FocusScope.of(context).unfocus();
+      var commentToAdd = result.comment!;
+      if ((commentToAdd.userUsername == null || commentToAdd.userUsername!.isEmpty) &&
+          authState.user.username.isNotEmpty) {
+        commentToAdd = commentToAdd.copyWith(
+          userUsername: authState.user.handle ?? authState.user.username,
+        );
+      }
+      setState(() {
+        final updated = [
+          commentToAdd,
+          ..._comments.where((c) => c.commentId != commentToAdd.commentId),
+        ];
+        _comments = Comment.assembleThreadedComments(updated);
+      });
+      _showSnack('Comment posted!');
     } else {
       _showSnack(result.error ?? "Couldn't post your comment.");
     }
   }
+
+
 
   void _showSnack(String message) {
     if (!mounted) return;
@@ -1112,16 +1188,7 @@ class _WatchPageState extends ConsumerState<WatchPage>
               // Video Player
               AspectRatio(
                 aspectRatio: 16 / 9,
-                child: _isLoading
-                    ? Container(
-                        color: Colors.black,
-                        child: const Center(
-                          child: CircularProgressIndicator(
-                            color: AppColors.brandOrange,
-                          ),
-                        ),
-                      )
-                    : _isInitialized && _videoController != null
+                child: _isInitialized && _videoController != null
                     ? Stack(
                         alignment: Alignment.center,
                         children: [
@@ -1163,26 +1230,35 @@ class _WatchPageState extends ConsumerState<WatchPage>
                           ),
                         ],
                       )
-                    : Container(
-                        color: Colors.black,
-                        child: Center(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              const Icon(
-                                Icons.error_outline,
-                                size: 64,
-                                color: Colors.white,
+                    : _hasPlayerError
+                        ? Container(
+                            color: Colors.black,
+                            child: const Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.error_outline,
+                                    size: 64,
+                                    color: Colors.white,
+                                  ),
+                                  SizedBox(height: 16),
+                                  Text(
+                                    'Video not available',
+                                    style: TextStyle(color: Colors.white),
+                                  ),
+                                ],
                               ),
-                              const SizedBox(height: 16),
-                              const Text(
-                                'Video not available',
-                                style: TextStyle(color: Colors.white),
+                            ),
+                          )
+                        : Container(
+                            color: Colors.black,
+                            child: const Center(
+                              child: CircularProgressIndicator(
+                                color: AppColors.brandOrange,
                               ),
-                            ],
+                            ),
                           ),
-                        ),
-                      ),
               ),
               // Video Info
               Expanded(
@@ -1895,273 +1971,349 @@ class _WatchPageState extends ConsumerState<WatchPage>
   }
 
   Widget _buildCommentsSection() {
-    final isSignedIn = ref.watch(authStateProvider) is AuthStateAuthenticated;
-    final visibleComments = _commentsExpanded
-        ? _comments
-        : _comments.take(3).toList();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '${_comments.length} Comments',
-          style: TextStyle(
-            color: context.textPrimary,
-            fontWeight: FontWeight.w800,
-            fontSize: 16,
-          ),
+    if (_video?.commentsEnabled == false) {
+      return Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: context.isDark
+              ? Colors.white.withValues(alpha: 0.04)
+              : Colors.black.withValues(alpha: 0.03),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: context.borderSubtle),
         ),
-        const SizedBox(height: 12),
-        Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
+        child: Row(
           children: [
-            CircleAvatar(
-              radius: 16,
-              backgroundColor: context.isDark
-                  ? AppColors.surfaceDark
-                  : AppColors.surfaceLight,
-              child: Icon(Icons.person, size: 20, color: context.textSecondary),
+            Icon(
+              Icons.comments_disabled_outlined,
+              size: 20,
+              color: context.textDim,
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      color: context.isDark
-                          ? Colors.white.withValues(alpha: 0.05)
-                          : Colors.black.withValues(alpha: 0.04),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: context.borderSubtle),
-                    ),
-                    child: TextField(
-                      controller: _commentController,
-                      enabled: !_postingComment,
-                      style: TextStyle(
-                        color: context.textPrimary,
-                        fontSize: 13,
-                      ),
-                      minLines: 1,
-                      maxLines: 4,
-                      onSubmitted: (_) => _postComment(),
-                      decoration: InputDecoration(
-                        isDense: true,
-                        hintText: isSignedIn
-                            ? 'Write a comment...'
-                            : 'Sign in to comment...',
-                        hintStyle: TextStyle(
-                          color: context.textDim,
-                          fontSize: 13,
-                        ),
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 12,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.emoji_emotions_outlined,
-                        size: 20,
-                        color: context.textDim,
-                      ),
-                      const SizedBox(width: 12),
-                      Icon(
-                        Icons.image_outlined,
-                        size: 20,
-                        color: context.textDim,
-                      ),
-                      const SizedBox(width: 12),
-                      Icon(
-                        Icons.gif_box_outlined,
-                        size: 20,
-                        color: context.textDim,
-                      ),
-                      const Spacer(),
-                      if (_postingComment)
-                        const SizedBox(
-                          width: 16,
-                          height: 16,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            valueColor: AlwaysStoppedAnimation(
-                              AppColors.brandOrange,
-                            ),
-                          ),
-                        )
-                      else
-                        // ValueListenableBuilder instead of reading
-                        // _commentController.text directly in the outer
-                        // build: nothing here was listening for keystrokes
-                        // before, so this send button only ever appeared or
-                        // disappeared on some unrelated rebuild rather than
-                        // live as the user typed. Scoping the listener to
-                        // just this button (rather than a controller
-                        // listener + setState on the whole comments
-                        // section) keeps every keystroke's rebuild cost
-                        // down to this one small widget.
-                        ValueListenableBuilder<TextEditingValue>(
-                          valueListenable: _commentController,
-                          builder: (context, value, _) {
-                            if (value.text.trim().isEmpty) {
-                              return const SizedBox.shrink();
-                            }
-                            // Small circular "enter" arrow button, replacing
-                            // the old bare paper-plane icon.
-                            return GestureDetector(
-                              onTap: _postComment,
-                              child: Container(
-                                width: 30,
-                                height: 30,
-                                decoration: const BoxDecoration(
-                                  shape: BoxShape.circle,
-                                  color: AppColors.brandOrange,
-                                ),
-                                alignment: Alignment.center,
-                                child: const Icon(
-                                  Icons.arrow_upward_rounded,
-                                  color: Colors.white,
-                                  size: 16,
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                    ],
-                  ),
-                ],
+            const SizedBox(width: 10),
+            Text(
+              'Comments are turned off for this video.',
+              style: TextStyle(
+                color: context.textSecondary,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],
         ),
-        const SizedBox(height: 16),
-        if (_commentsLoading)
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: Center(
-              child: SizedBox(
-                width: 20,
-                height: 20,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2,
-                  color: AppColors.brandOrange,
-                ),
-              ),
-            ),
-          )
-        else if (_comments.isEmpty)
-          Text(
-            'No comments yet. Be the first to say something.',
-            style: TextStyle(color: context.textSecondary),
-          )
-        else ...[
-          const SizedBox(height: 16),
-          ...visibleComments.map(_buildCommentTile),
-        ],
-        if (!_commentsExpanded && _comments.length > 3)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: GestureDetector(
-              onTap: () => setState(() => _commentsExpanded = true),
-              child: const Text(
-                'Show all comments',
+      );
+    }
+
+    final authState = ref.watch(authStateProvider);
+    final currentUser =
+        authState is AuthStateAuthenticated ? authState.user : null;
+    final isSignedIn = currentUser != null;
+    final visibleComments =
+        _commentsExpanded ? _comments : _comments.take(3).toList();
+    final totalCount = _comments.isNotEmpty
+        ? _comments.length
+        : (_video?.commentCount ?? 0);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: context.isDark
+            ? Colors.white.withValues(alpha: 0.04)
+            : Colors.black.withValues(alpha: 0.03),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: context.borderSubtle),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header Row: Comments count + View all sheet launcher
+          Row(
+            children: [
+              Text(
+                'Comments',
                 style: TextStyle(
-                  color: AppColors.brandOrange,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 13,
+                  color: context.textPrimary,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
                 ),
               ),
-            ),
+              if (totalCount > 0) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 2,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.brandOrange.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '$totalCount',
+                    style: const TextStyle(
+                      color: AppColors.brandOrange,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
+              const Spacer(),
+              if (_comments.isNotEmpty)
+                GestureDetector(
+                  onTap: _showCommentsBottomSheet,
+                  child: Row(
+                    children: [
+                      Text(
+                        'View all',
+                        style: TextStyle(
+                          color: AppColors.brandOrange,
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(width: 2),
+                      const Icon(
+                        Icons.chevron_right,
+                        size: 16,
+                        color: AppColors.brandOrange,
+                      ),
+                    ],
+                  ),
+                ),
+            ],
           ),
-      ],
+          const SizedBox(height: 14),
+
+          // Real comment(s) displayed directly below the header
+          if (_commentsLoading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 14),
+              child: Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: AppColors.brandOrange,
+                  ),
+                ),
+              ),
+            )
+          else if (_comments.isNotEmpty) ...[
+            ...visibleComments.map(_buildCommentTile),
+            if (!_commentsExpanded && _comments.length > 3)
+              Padding(
+                padding: const EdgeInsets.only(top: 10),
+                child: GestureDetector(
+                  onTap: () => setState(() => _commentsExpanded = true),
+                  child: Text(
+                    'Show all ${_comments.length} comments',
+                    style: const TextStyle(
+                      color: AppColors.brandOrange,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
+                ),
+              ),
+            const SizedBox(height: 16),
+            Divider(color: context.borderSubtle, height: 1),
+            const SizedBox(height: 14),
+          ] else
+            Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: Text(
+                'No comments yet. Be the first to say something.',
+                style: TextStyle(color: context.textSecondary, fontSize: 13),
+              ),
+            ),
+
+          // Comment Composer
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              UserAvatar(
+                avatarUrl: currentUser?.avatarUrl,
+                name: currentUser?.displayName ?? 'User',
+                size: 32,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        color: context.isDark
+                            ? Colors.white.withValues(alpha: 0.05)
+                            : Colors.black.withValues(alpha: 0.04),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: context.borderSubtle),
+                      ),
+                      child: TextField(
+                        controller: _commentController,
+                        enabled: !_postingComment,
+                        style: TextStyle(
+                          color: context.textPrimary,
+                          fontSize: 13,
+                        ),
+                        minLines: 1,
+                        maxLines: 4,
+                        onSubmitted: (_) => _postComment(),
+                        decoration: InputDecoration(
+                          isDense: true,
+                          hintText: isSignedIn
+                              ? 'Add a comment...'
+                              : 'Sign in to comment...',
+                          hintStyle: TextStyle(
+                            color: context.textDim,
+                            fontSize: 13,
+                          ),
+                          border: InputBorder.none,
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 10,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    // Quick Emoji Bar + Working Post Button
+                    Row(
+                      children: [
+                        Expanded(
+                          child: SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                for (final emoji in _quickEmojis)
+                                  Padding(
+                                    padding: const EdgeInsets.only(right: 6),
+                                    child: InkWell(
+                                      onTap: () => _insertEmoji(emoji),
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(
+                                          horizontal: 6,
+                                          vertical: 3,
+                                        ),
+                                        decoration: BoxDecoration(
+                                          color: context.isDark
+                                              ? Colors.white.withValues(alpha: 0.06)
+                                              : Colors.black.withValues(alpha: 0.04),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: Text(
+                                          emoji,
+                                          style: const TextStyle(fontSize: 15),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        ValueListenableBuilder<TextEditingValue>(
+                          valueListenable: _commentController,
+                          builder: (context, value, _) {
+                            final hasText = value.text.trim().isNotEmpty;
+                            return GestureDetector(
+                              onTap: hasText && !_postingComment
+                                  ? _postComment
+                                  : (isSignedIn
+                                      ? null
+                                      : () => _showSnack(
+                                            'Please sign in to comment.',
+                                          )),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 150),
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  gradient: hasText && !_postingComment
+                                      ? AppColors.flameGradient
+                                      : null,
+                                  color: hasText && !_postingComment
+                                      ? null
+                                      : (context.isDark
+                                          ? Colors.white.withValues(alpha: 0.1)
+                                          : Colors.black.withValues(alpha: 0.08)),
+                                  borderRadius: BorderRadius.circular(16),
+                                ),
+                                child: _postingComment
+                                    ? const SizedBox(
+                                        width: 14,
+                                        height: 14,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation(
+                                            Colors.white,
+                                          ),
+                                        ),
+                                      )
+                                    : Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            'Post',
+                                            style: TextStyle(
+                                              color: hasText
+                                                  ? Colors.white
+                                                  : context.textDim,
+                                              fontSize: 12,
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Icon(
+                                            Icons.arrow_upward_rounded,
+                                            size: 14,
+                                            color: hasText
+                                                ? Colors.white
+                                                : context.textDim,
+                                          ),
+                                        ],
+                                      ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
   Widget _buildCommentTile(Comment comment) {
-    return Padding(
-      padding: const EdgeInsets.only(top: 14),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          UserAvatar(
-            avatarUrl: comment.userAvatarUrl,
-            name: comment.userName,
-            size: 28,
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(
-                      child: Text(
-                        comment.userName,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          color: context.textPrimary,
-                          fontSize: 12.5,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ),
-                    if (comment.isVerified) ...[
-                      const SizedBox(width: 4),
-                      const Icon(
-                        Icons.verified,
-                        size: 12,
-                        color: AppColors.brandGold,
-                      ),
-                    ],
-                    if (comment.isMember) ...[
-                      const SizedBox(width: 6),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 6,
-                          vertical: 1,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.brandOrange.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: const Text(
-                          'Member',
-                          style: TextStyle(
-                            color: AppColors.brandOrange,
-                            fontSize: 9,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ],
-                    const SizedBox(width: 6),
-                    Text(
-                      comment.timeAgo,
-                      style: TextStyle(color: context.textDim, fontSize: 11),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  comment.text,
-                  style: TextStyle(
-                    color: context.textSecondary,
-                    fontSize: 13,
-                    height: 1.35,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+    return CommentThreadTile(
+      key: ValueKey(comment.commentId),
+      comment: comment,
+      videoId: widget.videoId,
+      onCommentDeleted: (deletedId) {
+        setState(() {
+          _comments = _comments.where((c) => c.commentId != deletedId).toList();
+        });
+      },
+      onReplyAdded: (newReply) {
+        setState(() {
+          final updated = [
+            newReply,
+            ..._comments.where((c) => c.commentId != newReply.commentId),
+          ];
+          _comments = Comment.assembleThreadedComments(updated);
+        });
+      },
     );
   }
 
@@ -2313,6 +2465,418 @@ class _WatchPageState extends ConsumerState<WatchPage>
           style: TextStyle(color: context.textSecondary),
         ),
       ],
+    );
+  }
+}
+
+class _WatchCommentsSheet extends ConsumerStatefulWidget {
+  final String videoId;
+  final List<Comment> initialComments;
+  final ValueChanged<Comment> onCommentAdded;
+  final ValueChanged<String>? onCommentDeleted;
+
+  const _WatchCommentsSheet({
+    required this.videoId,
+    required this.initialComments,
+    required this.onCommentAdded,
+    this.onCommentDeleted,
+  });
+
+  @override
+  ConsumerState<_WatchCommentsSheet> createState() =>
+      _WatchCommentsSheetState();
+}
+
+class _WatchCommentsSheetState extends ConsumerState<_WatchCommentsSheet> {
+  late List<Comment> _comments;
+  final _commentCtrl = TextEditingController();
+  bool _loading = false;
+  bool _posting = false;
+
+  static const List<String> _sheetEmojis = [
+    '❤️', '🔥', '👏', '😂', '😍', '😮', '💯', '🙌', '✨', '🎉',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _comments = Comment.assembleThreadedComments(widget.initialComments);
+    if (_comments.isEmpty) {
+      _fetchComments();
+    }
+  }
+
+  @override
+  void dispose() {
+    _commentCtrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _fetchComments() async {
+    setState(() => _loading = true);
+    try {
+      final list =
+          await ref.read(commentServiceProvider).getComments(widget.videoId);
+      if (mounted) {
+        setState(() {
+          _comments = Comment.assembleThreadedComments(list);
+          _loading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  void _insertEmoji(String emoji) {
+    final text = _commentCtrl.text;
+    final selection = _commentCtrl.selection;
+    final start = selection.start >= 0 ? selection.start : text.length;
+    final end = selection.end >= 0 ? selection.end : text.length;
+    final newText = text.replaceRange(start, end, emoji);
+    _commentCtrl.value = TextEditingValue(
+      text: newText,
+      selection: TextSelection.collapsed(offset: start + emoji.length),
+    );
+  }
+
+  Future<void> _postComment() async {
+    final text = _commentCtrl.text.trim();
+    if (text.isEmpty || _posting) return;
+
+    final authState = ref.read(authStateProvider);
+    if (authState is! AuthStateAuthenticated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please sign in to comment.'),
+          backgroundColor: AppColors.surfaceDark,
+        ),
+      );
+      return;
+    }
+
+    setState(() => _posting = true);
+    final service = ref.read(commentServiceProvider);
+    final res = await service.postComment(widget.videoId, text);
+
+    if (mounted) {
+      setState(() => _posting = false);
+      if (res.requiresSignIn) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please sign in to comment.'),
+            backgroundColor: AppColors.surfaceDark,
+          ),
+        );
+        return;
+      }
+      if (res.flagged) {
+        _commentCtrl.clear();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Your comment was submitted for review.'),
+            backgroundColor: AppColors.surfaceDark,
+          ),
+        );
+        return;
+      }
+      if (res.comment != null) {
+        _commentCtrl.clear();
+        FocusScope.of(context).unfocus();
+        var commentToAdd = res.comment!;
+        final auth = ref.read(authStateProvider);
+        if ((commentToAdd.userUsername == null || commentToAdd.userUsername!.isEmpty) &&
+            auth is AuthStateAuthenticated &&
+            auth.user.username.isNotEmpty) {
+          commentToAdd = commentToAdd.copyWith(
+            userUsername: auth.user.handle ?? auth.user.username,
+          );
+        }
+        setState(() {
+          final updated = [
+            commentToAdd,
+            ..._comments.where((c) => c.commentId != commentToAdd.commentId),
+          ];
+          _comments = Comment.assembleThreadedComments(updated);
+        });
+        widget.onCommentAdded(commentToAdd);
+      } else if (res.error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(res.error!),
+            backgroundColor: AppColors.surfaceDark,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final authState = ref.watch(authStateProvider);
+    final currentUser =
+        authState is AuthStateAuthenticated ? authState.user : null;
+    final isSignedIn = currentUser != null;
+
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.70,
+      decoration: BoxDecoration(
+        color: context.isDark ? AppColors.drawerDark : AppColors.surfaceLight,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+        border: Border.all(color: context.borderSubtle),
+      ),
+      child: Column(
+        children: [
+          // Drag Handle
+          Container(
+            margin: const EdgeInsets.only(top: 10, bottom: 6),
+            width: 38,
+            height: 4,
+            decoration: BoxDecoration(
+              color: context.textDim.withValues(alpha: 0.3),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Row(
+                  children: [
+                    Text(
+                      'Comments',
+                      style: TextStyle(
+                        color: context.textPrimary,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    if (_comments.isNotEmpty) ...[
+                      const SizedBox(width: 8),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppColors.brandOrange.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(
+                          '${_comments.length}',
+                          style: const TextStyle(
+                            color: AppColors.brandOrange,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+                IconButton(
+                  icon: Icon(
+                    Icons.close,
+                    color: context.textSecondary,
+                    size: 20,
+                  ),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ],
+            ),
+          ),
+          Divider(color: context.borderSubtle, height: 1),
+
+          // Comments List
+          Expanded(
+            child: _loading
+                ? const Center(
+                    child: CircularProgressIndicator(
+                      color: AppColors.brandOrange,
+                    ),
+                  )
+                : _comments.isEmpty
+                ? Center(
+                    child: Text(
+                      'No comments yet. Be the first to comment!',
+                      style: TextStyle(color: context.textSecondary),
+                    ),
+                  )
+                : ListView.builder(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    itemCount: _comments.length,
+                    itemBuilder: (ctx, i) {
+                      final c = _comments[i];
+                      return CommentThreadTile(
+                        key: ValueKey(c.commentId),
+                        comment: c,
+                        videoId: widget.videoId,
+                        onProfileNavigated: () {
+                          Navigator.of(context).pop();
+                        },
+                        onCommentDeleted: (deletedId) {
+                          setState(() {
+                            _comments = _comments.where((x) => x.commentId != deletedId).toList();
+                          });
+                          widget.onCommentDeleted?.call(deletedId);
+                        },
+                        onReplyAdded: (newReply) {
+                          setState(() {
+                            final updated = [
+                              newReply,
+                              ..._comments.where((x) => x.commentId != newReply.commentId),
+                            ];
+                            _comments = Comment.assembleThreadedComments(updated);
+                          });
+                          widget.onCommentAdded(newReply);
+                        },
+                      );
+                    },
+                  ),
+          ),
+
+          // Composer Bar at Bottom
+          Container(
+            padding: EdgeInsets.fromLTRB(
+              16,
+              8,
+              16,
+              MediaQuery.of(context).viewInsets.bottom + 12,
+            ),
+            decoration: BoxDecoration(
+              color: context.isDark
+                  ? Colors.black.withValues(alpha: 0.5)
+                  : Colors.white,
+              border: Border(top: BorderSide(color: context.borderSubtle)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    UserAvatar(
+                      avatarUrl: currentUser?.avatarUrl,
+                      name: currentUser?.displayName ?? 'User',
+                      size: 28,
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: TextField(
+                        controller: _commentCtrl,
+                        style: TextStyle(
+                          color: context.textPrimary,
+                          fontSize: 13,
+                        ),
+                        textInputAction: TextInputAction.send,
+                        onSubmitted: (_) => _postComment(),
+                        decoration: InputDecoration(
+                          hintText: isSignedIn
+                              ? 'Add a comment...'
+                              : 'Sign in to comment...',
+                          hintStyle: TextStyle(
+                            color: context.textDim,
+                            fontSize: 13,
+                          ),
+                          filled: true,
+                          fillColor: context.isDark
+                              ? Colors.white.withValues(alpha: 0.08)
+                              : Colors.black.withValues(alpha: 0.04),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(20),
+                            borderSide: BorderSide.none,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    ValueListenableBuilder<TextEditingValue>(
+                      valueListenable: _commentCtrl,
+                      builder: (context, value, _) {
+                        final hasText = value.text.trim().isNotEmpty;
+                        return GestureDetector(
+                          onTap: hasText && !_posting ? _postComment : null,
+                          child: Container(
+                            width: 34,
+                            height: 34,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: hasText ? AppColors.flameGradient : null,
+                              color: hasText
+                                  ? null
+                                  : (context.isDark
+                                      ? Colors.white12
+                                      : Colors.black12),
+                            ),
+                            alignment: Alignment.center,
+                            child: _posting
+                                ? const SizedBox(
+                                    width: 14,
+                                    height: 14,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor:
+                                          AlwaysStoppedAnimation(Colors.white),
+                                    ),
+                                  )
+                                : Icon(
+                                    Icons.arrow_upward_rounded,
+                                    color: hasText
+                                        ? Colors.white
+                                        : context.textDim,
+                                    size: 16,
+                                  ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                // Sheet Quick Emojis
+                SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    children: [
+                      for (final emoji in _sheetEmojis)
+                        Padding(
+                          padding: const EdgeInsets.only(right: 6),
+                          child: InkWell(
+                            onTap: () => _insertEmoji(emoji),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 7,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: context.isDark
+                                    ? Colors.white.withValues(alpha: 0.06)
+                                    : Colors.black.withValues(alpha: 0.04),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                emoji,
+                                style: const TextStyle(fontSize: 15),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

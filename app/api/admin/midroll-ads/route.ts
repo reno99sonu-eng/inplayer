@@ -5,6 +5,7 @@ import { revalidateTag } from "next/cache";
 import { docClient } from "@/app/lib/dynamodb";
 import { requireAdmin } from "@/app/lib/isAdmin";
 import { logAdminAction } from "@/app/lib/auditLog";
+import { selfHealMidrollAdsBatch } from "@/app/lib/videoAdsHealer";
 import {
   MIDROLL_ADS_TABLE,
   MIDROLL_ADS_TAG,
@@ -30,11 +31,13 @@ export async function GET(request: NextRequest) {
       exclusiveStartKey = result.LastEvaluatedKey;
     } while (exclusiveStartKey);
 
-    items.sort(
+    const healedItems = await selfHealMidrollAdsBatch(items);
+
+    healedItems.sort(
       (a, b) => new Date(b.createdAt as string).getTime() - new Date(a.createdAt as string).getTime()
     );
 
-    return NextResponse.json({ items });
+    return NextResponse.json({ items: healedItems });
   } catch (err) {
     console.error("Midroll ad creatives scan failed (table may not exist yet):", err);
     return NextResponse.json({ items: [], tableMissing: true });

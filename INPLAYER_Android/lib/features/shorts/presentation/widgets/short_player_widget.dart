@@ -21,6 +21,8 @@ import '../../../../services/comment_service.dart';
 import '../../../../services/short_warm_cache.dart';
 import '../../../../services/shorts_mute_state.dart';
 import '../../../../services/video_mini_player_service.dart';
+import '../../../../providers/auth_provider.dart';
+import '../../../watch/presentation/widgets/comment_thread_tile.dart';
 
 /// True once the decoder has genuinely produced moving picture for this
 /// controller — real frame dimensions plus a playhead that has actually
@@ -130,6 +132,7 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
   bool _isSaved = false;
   bool _isSubscribed = false;
   int _commentCount = 0;
+  List<Comment> _comments = [];
   bool _posterPrecached = false;
 
   /// Hold-to-fast-forward, mirroring the site's `startHold`/`endHold`.
@@ -233,6 +236,7 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
     int? likeCount;
     bool? isSaved;
     bool? isSubscribed;
+    List<Comment>? comments;
 
     await Future.wait([
       (() async {
@@ -263,6 +267,12 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
           } catch (_) {}
         }
       })(),
+      (() async {
+        try {
+          final commentService = ref.read(commentServiceProvider);
+          comments = await commentService.getComments(widget.short.videoId);
+        } catch (_) {}
+      })(),
     ]);
 
     if (mounted) {
@@ -271,6 +281,10 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
         if (likeCount != null) _likeCount = likeCount!;
         if (isSaved != null) _isSaved = isSaved!;
         if (isSubscribed != null) _isSubscribed = isSubscribed!;
+        if (comments != null) {
+          _comments = Comment.assembleThreadedComments(comments!);
+          _commentCount = comments!.length;
+        }
       });
     }
   }
@@ -686,8 +700,22 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
       backgroundColor: Colors.transparent,
       builder: (ctx) => _ShortCommentsSheet(
         videoId: widget.short.videoId,
-        onCommentAdded: () {
-          setState(() => _commentCount++);
+        initialComments: _comments,
+        onCommentAdded: (newComment) {
+          setState(() {
+            final updated = <Comment>[
+              newComment,
+              ..._comments.where((c) => c.commentId != newComment.commentId),
+            ];
+            _comments = Comment.assembleThreadedComments(updated);
+            _commentCount = _comments.length;
+          });
+        },
+        onCommentDeleted: (deletedId) {
+          setState(() {
+            _comments = _comments.where((c) => c.commentId != deletedId).toList();
+            _commentCount = _comments.length;
+          });
         },
       ),
     );
@@ -1129,6 +1157,52 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
                   ),
                 ],
               ),
+
+              // Interactive comment teaser below the contents
+              GestureDetector(
+                onTap: _showCommentsModal,
+                child: Container(
+                  margin: const EdgeInsets.only(top: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 10,
+                    vertical: 5,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.chat_bubble_outline_rounded,
+                        size: 13,
+                        color: Colors.white70,
+                      ),
+                      const SizedBox(width: 6),
+                      Flexible(
+                        child: Text(
+                          _comments.isNotEmpty
+                              ? '${_comments.first.userName}: ${_comments.first.text}'
+                              : (_commentCount > 0
+                                  ? '$_commentCount comments • Add a comment...'
+                                  : 'Add a comment...'),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11.5,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -1355,11 +1429,15 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
 /// Frosted Glass Comments Sheet for Shorts
 class _ShortCommentsSheet extends ConsumerStatefulWidget {
   final String videoId;
-  final VoidCallback onCommentAdded;
+  final List<Comment>? initialComments;
+  final ValueChanged<Comment> onCommentAdded;
+  final ValueChanged<String>? onCommentDeleted;
 
   const _ShortCommentsSheet({
     required this.videoId,
+    this.initialComments,
     required this.onCommentAdded,
+    this.onCommentDeleted,
   });
 
   @override
@@ -1369,13 +1447,17 @@ class _ShortCommentsSheet extends ConsumerStatefulWidget {
 
 class _ShortCommentsSheetState extends ConsumerState<_ShortCommentsSheet> {
   final TextEditingController _commentCtrl = TextEditingController();
-  List<Comment> _comments = [];
-  bool _loading = true;
+  late List<Comment> _comments;
+  late bool _loading;
   bool _posting = false;
 
   @override
   void initState() {
     super.initState();
+    _comments = widget.initialComments != null
+        ? Comment.assembleThreadedComments(widget.initialComments!)
+        : [];
+    _loading = _comments.isEmpty;
     _fetchComments();
   }
 
@@ -1391,7 +1473,7 @@ class _ShortCommentsSheetState extends ConsumerState<_ShortCommentsSheet> {
       final list = await service.getComments(widget.videoId);
       if (mounted) {
         setState(() {
-          _comments = list;
+          _comments = Comment.assembleThreadedComments(list);
           _loading = false;
         });
       }
@@ -1410,18 +1492,62 @@ class _ShortCommentsSheetState extends ConsumerState<_ShortCommentsSheet> {
 
     if (mounted) {
       setState(() => _posting = false);
+      if (res.requiresSignIn) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please sign in to comment.'),
+            backgroundColor: AppColors.surfaceDark,
+          ),
+        );
+        return;
+      }
+      if (res.flagged) {
+        _commentCtrl.clear();
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Your comment was submitted for review.'),
+            backgroundColor: AppColors.surfaceDark,
+          ),
+        );
+        return;
+      }
       if (res.comment != null) {
         _commentCtrl.clear();
+        var commentToAdd = res.comment!;
+        final auth = ref.read(authStateProvider);
+        if ((commentToAdd.userUsername == null || commentToAdd.userUsername!.isEmpty) &&
+            auth is AuthStateAuthenticated &&
+            auth.user.username.isNotEmpty) {
+          commentToAdd = commentToAdd.copyWith(
+            userUsername: auth.user.handle ?? auth.user.username,
+          );
+        }
         setState(() {
-          _comments.insert(0, res.comment!);
+          final updated = <Comment>[
+            commentToAdd,
+            ..._comments.where((c) => c.commentId != commentToAdd.commentId),
+          ];
+          _comments = Comment.assembleThreadedComments(updated);
         });
-        widget.onCommentAdded();
+        widget.onCommentAdded(commentToAdd);
+      } else if (res.error != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(res.error!),
+            backgroundColor: AppColors.surfaceDark,
+          ),
+        );
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authStateProvider);
+    final currentUser =
+        authState is AuthStateAuthenticated ? authState.user : null;
+    final isSignedIn = currentUser != null;
+
     return Container(
       height: MediaQuery.of(context).size.height * 0.65,
       decoration: BoxDecoration(
@@ -1490,63 +1616,29 @@ class _ShortCommentsSheetState extends ConsumerState<_ShortCommentsSheet> {
                     itemCount: _comments.length,
                     itemBuilder: (ctx, i) {
                       final c = _comments[i];
-                      return Padding(
-                        padding: const EdgeInsets.only(bottom: 14),
-                        child: Row(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            CircleAvatar(
-                              radius: 14,
-                              backgroundColor: Colors.white12,
-                              backgroundImage: c.userAvatarUrl != null
-                                  ? smartImageProvider(c.userAvatarUrl!)
-                                  : null,
-                              child: c.userAvatarUrl == null
-                                  ? const Icon(
-                                      Icons.person,
-                                      size: 16,
-                                      color: Colors.white70,
-                                    )
-                                  : null,
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Text(
-                                        c.userName,
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 12,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        c.timeAgo,
-                                        style: const TextStyle(
-                                          color: Colors.white38,
-                                          fontSize: 10,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 3),
-                                  Text(
-                                    c.text,
-                                    style: const TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
+                      return CommentThreadTile(
+                        key: ValueKey(c.commentId),
+                        comment: c,
+                        videoId: widget.videoId,
+                        onProfileNavigated: () {
+                          Navigator.of(context).pop();
+                        },
+                        onCommentDeleted: (deletedId) {
+                          setState(() {
+                            _comments = _comments.where((x) => x.commentId != deletedId).toList();
+                          });
+                          widget.onCommentDeleted?.call(deletedId);
+                        },
+                        onReplyAdded: (newReply) {
+                          setState(() {
+                            final updated = <Comment>[
+                              newReply,
+                              ..._comments.where((x) => x.commentId != newReply.commentId),
+                            ];
+                            _comments = Comment.assembleThreadedComments(updated);
+                          });
+                          widget.onCommentAdded(newReply);
+                        },
                       );
                     },
                   ),
@@ -1566,6 +1658,12 @@ class _ShortCommentsSheetState extends ConsumerState<_ShortCommentsSheet> {
             ),
             child: Row(
               children: [
+                UserAvatar(
+                  avatarUrl: currentUser?.avatarUrl,
+                  name: currentUser?.displayName ?? 'User',
+                  size: 28,
+                ),
+                const SizedBox(width: 10),
                 Expanded(
                   child: TextField(
                     controller: _commentCtrl,
@@ -1573,7 +1671,9 @@ class _ShortCommentsSheetState extends ConsumerState<_ShortCommentsSheet> {
                     textInputAction: TextInputAction.send,
                     onSubmitted: (_) => _postComment(),
                     decoration: InputDecoration(
-                      hintText: 'Add a comment...',
+                      hintText: isSignedIn
+                          ? 'Add a comment...'
+                          : 'Sign in to comment...',
                       hintStyle: const TextStyle(color: Colors.white38),
                       filled: true,
                       fillColor: Colors.white.withValues(alpha: 0.08),
@@ -1589,10 +1689,7 @@ class _ShortCommentsSheetState extends ConsumerState<_ShortCommentsSheet> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                // Small circular "enter" arrow button, replacing the old
-                // bare paper-plane icon — same _postComment call, which
-                // already no-ops on empty text/while posting, so tap
-                // behavior is unchanged either way.
+                // Small circular "enter" arrow button
                 GestureDetector(
                   onTap: _postComment,
                   child: Container(

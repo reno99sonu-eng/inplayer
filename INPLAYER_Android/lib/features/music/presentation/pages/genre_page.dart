@@ -44,9 +44,9 @@ class _GenrePageState extends ConsumerState<GenrePage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: context.bgCanvas,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
-        backgroundColor: context.bgCanvas,
+        backgroundColor: Colors.transparent,
         elevation: 0,
         title: Text(widget.genre, style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.w800, fontSize: 19)),
       ),

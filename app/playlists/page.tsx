@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { fetchAuthSession } from "aws-amplify/auth";
-import { ListMusic, Loader2, Plus, Film, Trash2, Bookmark } from "lucide-react";
+import { ListMusic, Loader2, Plus, Film, Bookmark } from "lucide-react";
 import Link from "next/link";
 import BackButton from "@/app/components/BackButton";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";

@@ -185,11 +185,17 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <head>
-        <script
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9015405021941451"
-          crossOrigin="anonymous"
-        />
+        {settings.adsenseEnabled && settings.adsensePublisherId ? (
+          <script
+            async
+            src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${
+              settings.adsensePublisherId.startsWith("ca-")
+                ? settings.adsensePublisherId
+                : `ca-${settings.adsensePublisherId}`
+            }`}
+            crossOrigin="anonymous"
+          />
+        ) : null}
       </head>
       <body
   className={`

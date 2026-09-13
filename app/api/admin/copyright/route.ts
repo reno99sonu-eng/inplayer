@@ -60,8 +60,8 @@ export async function GET(request: NextRequest) {
 
   try {
     const reports = await scanAll(
-      "reason = :r AND targetType = :t AND #s = :open",
-      { ":r": "copyright", ":t": "video", ":open": "open" },
+      "(reason = :r OR reason = :a) AND targetType = :t AND #s = :open",
+      { ":r": "copyright", ":a": "copyright_appeal", ":t": "video", ":open": "open" },
       { "#s": "status" }
     );
 
@@ -72,8 +72,8 @@ export async function GET(request: NextRequest) {
     const items = await Promise.all(
       sorted.map(async (r) => {
         const videoId = r.videoId as string;
-        let title = "(video not found)";
-        let uploaderId: string | null = null;
+        let title = (r.targetTitle as string) || "(video not found)";
+        let uploaderId: string | null = (r.uploaderId as string) || null;
         let uploaderUsername: string | null = null;
         let currentStrikes = 0;
 
@@ -86,8 +86,8 @@ export async function GET(request: NextRequest) {
             })
           );
           if (video.Item) {
-            title = (video.Item.title as string) || "Untitled";
-            uploaderId = (video.Item.uploaderId as string) || null;
+            title = (video.Item.title as string) || title;
+            uploaderId = (video.Item.uploaderId as string) || uploaderId;
           }
         } catch {
           /* video gone — report still shown, just without a title */
@@ -119,11 +119,21 @@ export async function GET(request: NextRequest) {
           details: (r.details as string) || "",
           createdAt: r.createdAt as string,
           currentStrikes,
-          // Raised by the upload screening rather than by a person. A
-          // reviewer has to be able to see the difference before issuing a
-          // strike: nobody has actually claimed this recording yet, the
-          // wording just looked like a re-upload. See
-          // COPYRIGHT_SCREEN_REPORTER.
+          isAppeal: r.reason === "copyright_appeal" || Boolean(r.isCounterNotice),
+          isFormalNotice: Boolean(r.isFormalNotice),
+          complainantName: (r.complainantName as string) || null,
+          complainantEmail: (r.complainantEmail as string) || null,
+          complainantPhone: (r.complainantPhone as string) || null,
+          workTitle: (r.workTitle as string) || null,
+          workType: (r.workType as string) || null,
+          ownershipBasis: (r.ownershipBasis as string) || null,
+          infringingUrl: (r.infringingUrl as string) || null,
+          creatorName: (r.creatorName as string) || null,
+          creatorEmail: (r.creatorEmail as string) || null,
+          appealBasis: (r.appealBasis as string) || null,
+          explanation: (r.explanation as string) || null,
+          evidenceUrls: (r.evidenceUrls as string) || null,
+          signature: (r.signature as string) || null,
           autoFlagged: r.reporterId === COPYRIGHT_SCREEN_REPORTER,
         };
       })
@@ -158,7 +168,7 @@ export async function POST(request: NextRequest) {
   const action = body?.action;
   const removeVideo = Boolean(body?.removeVideo);
 
-  if (!reportId || (action !== "strike" && action !== "dismiss")) {
+  if (!reportId || (action !== "strike" && action !== "dismiss" && action !== "accept_appeal" && action !== "reject_appeal")) {
     return NextResponse.json({ error: "reportId and a valid action are required." }, { status: 400 });
   }
 
@@ -168,6 +178,142 @@ export async function POST(request: NextRequest) {
   const report = reportResult.Item;
   if (!report) {
     return NextResponse.json({ error: "Report not found." }, { status: 404 });
+  }
+
+  if (action === "accept_appeal") {
+    const videoId = report.videoId as string | undefined;
+    const uploaderId = (report.uploaderId as string) || null;
+    let videoTitle = (report.targetTitle as string) || "video";
+
+    if (videoId) {
+      try {
+        const video = await docClient.send(
+          new GetCommand({
+            TableName: "InPlayer-Videos",
+            Key: { videoId },
+            ProjectionExpression: "title, uploaderId, moderationHidden, copyrightRisk",
+          })
+        );
+        if (video.Item) {
+          videoTitle = (video.Item.title as string) || videoTitle;
+          if (video.Item.copyrightRisk === "review" || video.Item.moderationHidden) {
+            await docClient.send(
+              new UpdateCommand({
+                TableName: "InPlayer-Videos",
+                Key: { videoId },
+                UpdateExpression: "SET moderationHidden = :f, copyrightRisk = :c",
+                ExpressionAttributeValues: { ":f": false, ":c": "clear" },
+              })
+            );
+          }
+        }
+      } catch (err) {
+        console.error("Failed to restore video upon appeal acceptance:", err);
+      }
+    }
+
+    if (uploaderId) {
+      try {
+        const user = await docClient.send(
+          new GetCommand({
+            TableName: USERS_TABLE,
+            Key: { userId: uploaderId },
+            ProjectionExpression: "copyrightStrikes, isSuspended",
+          })
+        );
+        const curStrikes = (user.Item?.copyrightStrikes as number) || 0;
+        const newStrikes = Math.max(0, curStrikes - 1);
+
+        await docClient.send(
+          new UpdateCommand({
+            TableName: USERS_TABLE,
+            Key: { userId: uploaderId },
+            UpdateExpression: "SET copyrightStrikes = :s, isSuspended = :susp, updatedAt = :u",
+            ExpressionAttributeValues: {
+              ":s": newStrikes,
+              ":susp": newStrikes >= STRIKE_THRESHOLD ? Boolean(user.Item?.isSuspended) : false,
+              ":u": new Date().toISOString(),
+            },
+          })
+        );
+
+        await createNotification({
+          userId: uploaderId,
+          type: "admin_announcement",
+          message: `Your copyright counter-notice for "${videoTitle}" was accepted. Strike removed (${newStrikes}/${STRIKE_THRESHOLD}).`,
+          ...(videoId && { videoId }),
+        });
+      } catch (err) {
+        console.error("Failed to update user strikes upon appeal acceptance:", err);
+      }
+    }
+
+    await docClient.send(
+      new UpdateCommand({
+        TableName: REPORTS_TABLE,
+        Key: { reportId },
+        UpdateExpression: "SET #s = :s, reviewedAt = :r, appealResolution = :res",
+        ExpressionAttributeNames: { "#s": "status" },
+        ExpressionAttributeValues: {
+          ":s": "resolved",
+          ":r": new Date().toISOString(),
+          ":res": "accepted",
+        },
+      })
+    );
+
+    await logAdminAction({
+      request,
+      adminId: admin.userId,
+      adminEmail: admin.email,
+      action: "copyright.appeal_accept",
+      targetType: "report",
+      targetId: reportId,
+      details: `Accepted counter-notice for report ${reportId}${videoId ? `, video ${videoId}` : ""}`,
+    });
+
+    return NextResponse.json({ success: true, action: "accepted" });
+  }
+
+  if (action === "reject_appeal") {
+    const videoId = report.videoId as string | undefined;
+    const uploaderId = (report.uploaderId as string) || null;
+    const videoTitle = (report.targetTitle as string) || "video";
+
+    if (uploaderId) {
+      await createNotification({
+        userId: uploaderId,
+        type: "admin_announcement",
+        message: `Your copyright counter-notice for "${videoTitle}" was reviewed and rejected. The restriction remains in effect.`,
+        ...(videoId && { videoId }),
+      }).catch(() => {});
+    }
+
+    await docClient.send(
+      new UpdateCommand({
+        TableName: REPORTS_TABLE,
+        Key: { reportId },
+        UpdateExpression: "SET #s = :s, reviewedAt = :r, appealResolution = :res",
+        ExpressionAttributeNames: { "#s": "status" },
+        ExpressionAttributeValues: {
+          ":s": "resolved",
+          ":r": new Date().toISOString(),
+          ":res": "rejected",
+        },
+      })
+    );
+
+    await logAdminAction({
+      request,
+      adminId: admin.userId,
+      adminEmail: admin.email,
+      action: "copyright.appeal_reject",
+      targetType: "report",
+      targetId: reportId,
+      details: `Rejected counter-notice for report ${reportId}${videoId ? `, video ${videoId}` : ""}`,
+    });
+
+    return NextResponse.json({ success: true, action: "rejected" });
   }
 
   if (action === "dismiss") {
@@ -265,7 +411,7 @@ export async function POST(request: NextRequest) {
   await createNotification({
     userId: uploaderId,
     type: "admin_announcement",
-    message: `Your video has received a copyright strike. You now have ${newStrikeCount}/${STRIKE_THRESHOLD} strikes.`,
+    message: `Your video has received a copyright strike. You now have ${newStrikeCount}/${STRIKE_THRESHOLD} strikes. If this was in error or you hold a valid license, you may submit a counter-notice at /copyright?tab=appeal.`,
     ...(videoId && { videoId }),
   });
 

@@ -45,6 +45,7 @@ interface VideoOptionsMenuProps {
 }
 
 const REPORT_REASONS: { value: string; label: string }[] = [
+  { value: "child_safety", label: "Child exploitation or safety concern (Urgent)" },
   { value: "spam", label: "Spam or misleading" },
   { value: "harassment", label: "Harassment or bullying" },
   { value: "sexual_content", label: "Sexual content" },
@@ -586,6 +587,20 @@ export default function VideoOptionsMenu({
                         placeholder="Add details (optional)"
                         className="mt-2 w-full resize-none rounded-xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.03] px-3 py-2 text-sm text-white light:text-slate-900 outline-none placeholder:text-slate-500 focus:border-orange-400/50"
                       />
+
+                      {reportReason === "copyright" && (
+                        <p className="mt-1.5 px-1 text-[11px] text-slate-400 light:text-slate-600 leading-tight">
+                          Need to submit a formal legal notice?{" "}
+                          <a
+                            href={`/copyright?tab=notice&videoId=${encodeURIComponent(videoId)}`}
+                            className="font-medium text-orange-400 hover:underline"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            Use the Copyright Form &rarr;
+                          </a>
+                        </p>
+                      )}
 
                       <button
                         onClick={submitReport}

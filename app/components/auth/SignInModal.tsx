@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Mail, Lock, X, Loader2, Check } from "lucide-react";
 import { signIn, signOut } from "@/app/lib/auth";
-import { fetchAuthSession, signInWithRedirect } from "aws-amplify/auth";
+import { signInWithRedirect } from "aws-amplify/auth";
 import { useRouter } from "next/navigation";
 import { cognitoUserPoolsTokenProvider } from "aws-amplify/auth/cognito";
 import {

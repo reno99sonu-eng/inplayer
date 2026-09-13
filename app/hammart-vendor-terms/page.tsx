@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
+import LegalNav from "../components/LegalNav";
 
 // Real, Hammart-specific Vendor Terms of Service — written against the
 // actual Consumer Protection (E-Commerce) Rules 2020 (Rule 6's duties for
@@ -41,6 +42,9 @@ export default function HammartVendorTermsPage() {
       <Link href="/shop" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-400 light:text-slate-600 hover:text-orange-400">
         <ArrowLeft size={16} /> Back to Hammart
       </Link>
+      <div className="mt-4">
+        <LegalNav />
+      </div>
 
       <h1 className="mt-6 text-3xl font-black text-white light:text-slate-900">Hammart Vendor Terms</h1>
       <p className="mt-2 text-sm text-slate-500">Last updated {LAST_UPDATED}</p>

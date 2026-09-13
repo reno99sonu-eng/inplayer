@@ -500,23 +500,26 @@ export default function AuthProvider({
 
   async function handleRejectTerms() {
     setUser(null);
-    setActiveModal("signup");
+    const pendingAgeRaw = localStorage.getItem("inplayer-pending-age");
     localStorage.removeItem("inplayer-pending-age");
     try {
-      // deleteUser() removes the Cognito account entirely (and ends the
-      // session as part of that) — a plain signOut would leave the
-      // account behind, so trying to sign up again with the same email
-      // would fail with "an account already exists," which breaks the
-      // whole point of "reject sends you back to sign up again."
-      await deleteUser();
+      // If this was during fresh registration (pendingAge exists), deleting the newly
+      // created cognito account allows the user to re-register cleanly.
+      // If this is an existing user declining updated terms, sign them out safely
+      // instead of deleting their account.
+      if (pendingAgeRaw) {
+        setActiveModal("signup");
+        await deleteUser();
+      } else {
+        setActiveModal(null);
+        await amplifySignOut();
+      }
     } catch (error) {
-      console.error("Failed to delete account after rejecting terms:", error);
-      // Best-effort fallback so the session doesn't linger even if the
-      // delete itself failed for some reason (e.g. a network blip).
+      console.error("Failed to process terms decline:", error);
       try {
         await amplifySignOut();
       } catch (signOutError) {
-        console.error("Fallback sign-out after failed account deletion also failed:", signOutError);
+        console.error("Fallback sign-out after failed terms decline:", signOutError);
       }
     }
   }

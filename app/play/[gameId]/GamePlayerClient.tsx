@@ -4,7 +4,6 @@ import { useEffect } from "react";
 import { notFound } from "next/navigation";
 import { playables } from "../../data/playables";
 import { useParams } from "next/navigation";
-import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 
 // Moved verbatim out of page.tsx (see that file's top comment) — every line

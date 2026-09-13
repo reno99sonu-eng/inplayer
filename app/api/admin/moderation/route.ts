@@ -123,10 +123,15 @@ export async function GET(request: NextRequest) {
       }, { "#s": "status" });
 
       const sorted = reports
-        .sort(
-          (a, b) =>
+        .sort((a, b) => {
+          const aUrgent = a.priority === "urgent" || a.reason === "child_safety";
+          const bUrgent = b.priority === "urgent" || b.reason === "child_safety";
+          if (aUrgent && !bUrgent) return -1;
+          if (!aUrgent && bUrgent) return 1;
+          return (
             new Date(b.createdAt as string).getTime() - new Date(a.createdAt as string).getTime()
-        )
+          );
+        })
         .slice(0, 150);
 
       // Reports previously carried only raw ids. Resolving both sides means
@@ -142,6 +147,8 @@ export async function GET(request: NextRequest) {
       const items = await Promise.all(
         sorted.map(async (r) => ({
           ...r,
+          priority: r.priority || (r.reason === "child_safety" ? "urgent" : "normal"),
+          isChildSafety: r.isChildSafety === true || r.reason === "child_safety",
           snippet: await hydrateReportSnippet(r),
           reporterUsername: reportUsernames.get(r.reporterId as string) || null,
           targetUsername: reportUsernames.get(r.targetUserId as string) || null,

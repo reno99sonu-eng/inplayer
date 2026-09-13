@@ -18,9 +18,14 @@ const browse = [
 
 const company = [
   { label: "About", href: "/settings?tab=about" },
-  { label: "Privacy Policy", href: "/privacy" },
   { label: "Terms of Service", href: "/terms" },
+  { label: "Privacy Policy", href: "/privacy" },
+  { label: "Copyright Policy", href: "/copyright" },
+  { label: "Child Safety Policy", href: "/child-safety" },
+  { label: "Community Guidelines", href: "/community-guidelines" },
+  { label: "Creator Monetization", href: "/creator-monetization" },
   { label: "HamMart Vendor Terms", href: "/hammart-vendor-terms" },
+  { label: "Delete Account", href: "/delete-account" },
   { label: "Help & Support", href: "/help" },
 ];
 

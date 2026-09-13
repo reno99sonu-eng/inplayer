@@ -127,7 +127,7 @@ export default function VendorSettingsPage() {
         <div className="rounded-2xl border border-white/10 bg-white/[0.02] p-6">
           <div className="mb-4">
             <h2 className="text-base font-bold text-white light:text-slate-900">Hyperlocal Delivery Area</h2>
-            <p className="text-xs text-slate-400">Set your store's base location. Customers within 15km of this area will be able to see and buy your products.</p>
+            <p className="text-xs text-slate-400">Set your store&apos;s base location. Customers within 15km of this area will be able to see and buy your products.</p>
           </div>
 
           <div className="space-y-4">

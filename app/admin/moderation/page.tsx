@@ -38,6 +38,8 @@ interface ReportItem {
   targetUsername?: string | null;
   createdAt: string;
   snippet: string | null;
+  priority?: string;
+  isChildSafety?: boolean;
 }
 
 interface AutoFlagItem {
@@ -367,9 +369,18 @@ export default function AdminModerationPage() {
             {filteredReports.map((r) => (
               <div
                 key={r.reportId}
-                className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4"
+                className={`rounded-2xl border p-4 ${
+                  r.isChildSafety || r.priority === "urgent"
+                    ? "border-rose-500/40 bg-rose-500/[0.06] light:border-rose-400 light:bg-rose-50"
+                    : "border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02]"
+                }`}
               >
                 <div className="flex flex-wrap items-center gap-2">
+                  {(r.isChildSafety || r.priority === "urgent") && (
+                    <span className="rounded-full bg-rose-600 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-white animate-pulse">
+                      Urgent — Child Safety
+                    </span>
+                  )}
                   <span className="rounded-full bg-white/10 light:bg-black/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-300 light:text-slate-700">
                     {r.targetType}
                   </span>

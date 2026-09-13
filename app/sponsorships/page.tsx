@@ -448,7 +448,7 @@ export default function SponsorshipsPage() {
       {activeTab === "buy" && view === "paymentFailed" && (
         <div className="flex flex-col items-center justify-center gap-3 py-20 text-center">
           <AlertTriangle size={32} className="text-red-400" />
-          <p className="font-bold text-white light:text-slate-900">Payment didn't go through</p>
+          <p className="font-bold text-white light:text-slate-900">Payment didn&apos;t go through</p>
           <p className="text-xs text-slate-400 light:text-slate-600">No charge was made. You can try again anytime.</p>
           <button
             onClick={() => setView("pricing")}
@@ -486,7 +486,7 @@ export default function SponsorshipsPage() {
             </p>
             <p className="mt-1">
               Send your ad file(s) and website URL to <strong>inplayerdigital@gmail.com</strong>, mentioning reference{" "}
-              <strong>{sponsorshipId}</strong>. Your {durationDays}-day run starts the moment it's activated.
+              <strong>{sponsorshipId}</strong>. Your {durationDays}-day run starts the moment it&apos;s activated.
             </p>
           </div>
 

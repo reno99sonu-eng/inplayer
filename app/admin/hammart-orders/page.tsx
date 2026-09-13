@@ -108,7 +108,7 @@ export default function AdminHammartOrdersPage() {
         <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
           Every order across every vendor, read-only. Status here is never set from this page — a direct-UPI order
           only moves once its own vendor confirms they actually received the payment (Vendor → Orders Received), and
-          a Razorpay order only moves once Razorpay's signature-verified webhook says so. This is purely visibility.
+          a Razorpay order only moves once Razorpay&apos;s signature-verified webhook says so. This is purely visibility.
         </p>
       </div>
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2, Package, IndianRupee, RefreshCw, MessageSquare, AlertTriangle, Star, StarHalf, X } from "lucide-react";
+import { Loader2, Package, IndianRupee, RefreshCw, MessageSquare, AlertTriangle, Star, X } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { authedFetch } from "@/app/lib/apiFetch";
 import { orderTotalInr } from "@/app/lib/hammartOrderMath";

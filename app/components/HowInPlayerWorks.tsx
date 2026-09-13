@@ -126,7 +126,7 @@ function TrendingAnswer() {
       ))}
       <p className="text-[11px] leading-relaxed text-slate-500">
         Note: admins can occasionally swap this real carousel for a sponsored
-        banner (Advertising settings). When that's off — the default — the
+        banner (Advertising settings). When that&apos;s off — the default — the
         hero always shows genuine top videos, never a made-up placement.
       </p>
     </div>

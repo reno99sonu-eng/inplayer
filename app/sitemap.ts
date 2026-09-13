@@ -22,7 +22,12 @@ const STATIC_ROUTES: Array<{ path: string; priority: number }> = [
   { path: "/help", priority: 0.4 },
   { path: "/terms", priority: 0.3 },
   { path: "/privacy", priority: 0.3 },
+  { path: "/copyright", priority: 0.3 },
+  { path: "/child-safety", priority: 0.3 },
+  { path: "/community-guidelines", priority: 0.3 },
+  { path: "/creator-monetization", priority: 0.3 },
   { path: "/hammart-vendor-terms", priority: 0.3 },
+  { path: "/delete-account", priority: 0.3 },
 ];
 
 // Rebuild at most once an hour — a sitemap doesn't need to be

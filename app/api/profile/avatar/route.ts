@@ -3,6 +3,7 @@ import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
 import { ensureUsername } from "@/app/lib/ensureUsername";
+import { isCurrentPolicyAccepted } from "@/app/lib/termsVersion";
 
 const DEFAULT_SOCIAL_LINKS = { social: {}, other: [] };
 
@@ -49,7 +50,12 @@ const result = await docClient.send(
     description: result.Item?.description || result.Item?.bio || "",
     socialLinks: result.Item?.socialLinks || DEFAULT_SOCIAL_LINKS,
     age: typeof result.Item?.age === "number" ? result.Item.age : null,
-    termsAccepted: Boolean(result.Item?.termsAcceptedAt),
+    termsAccepted: isCurrentPolicyAccepted(
+      result.Item?.termsAcceptedAt,
+      result.Item?.termsPolicyVersion
+    ),
+    termsAcceptedAt: result.Item?.termsAcceptedAt || null,
+    termsPolicyVersion: result.Item?.termsPolicyVersion || null,
   });
 }
 

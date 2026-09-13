@@ -242,9 +242,13 @@ export default function VideoPlayer({
   const [midrollBreakActive, setMidrollBreakActive] = useState(false);
   const [midrollSkipUnlocked, setMidrollSkipUnlocked] = useState(false);
   const [midrollCountdown, setMidrollCountdown] = useState(0);
-  const [adMuted, setAdMuted] = useState(false);
+  const [adMuted, setAdMuted] = useState(true);
   const midrollBreaksShownRef = useRef<Set<number>>(new Set());
   const midrollWasPlayingRef = useRef(false);
+
+  useEffect(() => {
+    midrollBreaksShownRef.current.clear();
+  }, [videoId]);
 
   useEffect(() => {
     let cancelled = false;
@@ -364,6 +368,7 @@ export default function VideoPlayer({
     );
     setMidrollCountdown(midrollConfig.skipTiersSeconds[tierIndex] ?? 5);
     setMidrollSkipUnlocked(false);
+    setAdMuted(true);
     setMidrollBreakActive(true);
   };
 
@@ -394,12 +399,22 @@ export default function VideoPlayer({
     });
   };
 
-  const skipMidroll = () => {
-    if (!midrollSkipUnlocked) return;
-    trackMidrollEvent("skip");
+  const finishMidroll = (reason: "ended" | "skip" | "error") => {
+    if (reason === "skip" || reason === "ended") {
+      trackMidrollEvent("skip");
+    }
     setMidrollBreakActive(false);
     const player = playerRef.current;
-    if (player && midrollWasPlayingRef.current) player.play();
+    if (player && midrollWasPlayingRef.current) {
+      player.play().catch((err) => {
+        console.warn("VideoPlayer: resume main video playback caught:", err);
+      });
+    }
+  };
+
+  const skipMidroll = () => {
+    if (!midrollSkipUnlocked) return;
+    finishMidroll("skip");
   };
   // --- End mid-roll ad breaks ---------------------------------------------
 
@@ -1405,9 +1420,13 @@ export default function VideoPlayer({
               <MuxPlayer
                 playbackId={midrollAd.imageUrl.replace("mux:", "")}
                 autoPlay="any"
-                loop
                 muted={adMuted}
                 playsInline
+                onEnded={() => finishMidroll("ended")}
+                onError={() => {
+                  console.warn("VideoPlayer: mid-roll Mux error, finishing ad");
+                  finishMidroll("error");
+                }}
                 className="w-full h-full object-contain"
                 style={
                   {
@@ -1422,16 +1441,24 @@ export default function VideoPlayer({
                 src={midrollAd.imageUrl}
                 aria-label={midrollAd.title}
                 autoPlay
-                loop
                 muted={adMuted}
                 playsInline
                 preload="auto"
+                onEnded={() => finishMidroll("ended")}
+                onError={() => {
+                  console.warn("VideoPlayer: mid-roll video error, finishing ad");
+                  finishMidroll("error");
+                }}
                 className="w-full h-full object-contain"
               />
             ) : (
               <img
                 src={midrollAd.imageUrl}
                 alt={midrollAd.title}
+                onError={() => {
+                  console.warn("VideoPlayer: mid-roll image error, finishing ad");
+                  finishMidroll("error");
+                }}
                 className="w-full h-full object-contain"
               />
             )}
@@ -1444,12 +1471,12 @@ export default function VideoPlayer({
                   e.stopPropagation();
                   setAdMuted((m) => !m);
                 }}
-                className="flex items-center gap-1.5 rounded-full bg-black/75 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-black/90 border border-white/20 active:scale-95 shadow-lg"
+                className="flex items-center gap-1.5 rounded-full bg-black/75 px-3 py-1.5 text-xs font-semibold text-white backdrop-blur-md transition hover:bg-black/90 border border-white/20 active:scale-95 shadow-lg cursor-pointer"
                 aria-label={adMuted ? "Unmute advertisement" : "Mute advertisement"}
               >
                 {adMuted ? (
                   <>
-                    <VolumeX className="h-4 w-4 text-red-400" />
+                    <VolumeX className="h-4 w-4 text-amber-400" />
                     <span>Unmute</span>
                   </>
                 ) : (

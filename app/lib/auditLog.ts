@@ -43,6 +43,8 @@ export type AuditAction =
   | "copyright.strike"
   | "copyright.dismiss"
   | "copyright.autosuspend"
+  | "copyright.appeal_accept"
+  | "copyright.appeal_reject"
   | "ad.create"
   | "ad.update"
   | "ad.delete"

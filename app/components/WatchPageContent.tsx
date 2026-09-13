@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { fetchAuthSession } from "aws-amplify/auth";
-import { Maximize2, MessageSquareOff, Minimize2, ShieldAlert, ArrowDownRight, PictureInPicture2 } from "lucide-react";
+import { Maximize2, MessageSquareOff, Minimize2, ShieldAlert, PictureInPicture2 } from "lucide-react";
 import VideoPlayer from "@/app/components/VideoPlayer";
 import MembersOnlyVideoPlayer from "@/app/components/MembersOnlyVideoPlayer";
 import CommentSection from "@/app/components/CommentSection";

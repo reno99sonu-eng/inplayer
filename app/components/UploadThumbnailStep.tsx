@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { fetchAuthSession } from "aws-amplify/auth";
-import { CheckCircle2, Loader2, Sparkles } from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import { getMuxThumbnailCandidates } from "@/app/lib/muxThumbnail";
 
 interface UploadThumbnailStepProps {

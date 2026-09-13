@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { UploadCloud, X, Globe, Link2, Lock, Film, PlaySquare, Loader2, Sparkles } from "lucide-react";
+import { UploadCloud, X, Globe, Link2, Lock, Sparkles } from "lucide-react";
 import { AUDIENCE_OPTIONS, type VideoAudience } from "@/app/lib/contentAccess";
 
 export const CONTENT_TYPES = [

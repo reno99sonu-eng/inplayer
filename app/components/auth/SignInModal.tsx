@@ -147,9 +147,11 @@ export default function SignInModal({
       if (result.isSignedIn) {
         setSuccess(true);
         onSuccess?.();
+        // Trimmed from 700ms — long enough to register the checkmark
+        // without making a successful sign-in feel slow to close.
         setTimeout(() => {
           onClose();
-        }, 700);
+        }, 250);
       } else {
         const step = result.nextStep?.signInStep;
 

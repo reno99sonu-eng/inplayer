@@ -101,6 +101,14 @@ class AuthService {
 
   Future<User?> getCurrentUser() async {
     try {
+      // Both calls below only need a valid session — neither's result
+      // feeds the other's request — so the avatar/profile fetch is kicked
+      // off here, before awaiting the Cognito attributes call, so the two
+      // run concurrently on the wire instead of one after another. This
+      // used to add a full extra network leg to every login and every
+      // cold-start session check (getCurrentUser() runs on both).
+      final avatarResponseFuture = DioClient().dio.get('/api/profile/avatar');
+
       final result = await Amplify.Auth.fetchUserAttributes();
 
       final Map<String, String> attributes = {};
@@ -131,8 +139,9 @@ class AuthService {
       bool termsAccepted = false;
 
       // Fetch the full rich profile from DynamoDB via /api/profile/avatar
+      // — kicked off above, already in flight by the time we get here.
       try {
-        final response = await DioClient().dio.get('/api/profile/avatar');
+        final response = await avatarResponseFuture;
         if (response.statusCode == 200 && response.data != null) {
           final data = response.data is Map<String, dynamic>
               ? response.data as Map<String, dynamic>
@@ -214,6 +223,24 @@ class AuthService {
     }
   }
 
+  /// Records acceptance of the active platform terms & policies (version 2026-09-05)
+  /// via the production endpoint POST /api/profile/settings with action: "accept_terms".
+  Future<bool> acceptTerms() async {
+    try {
+      final response = await DioClient().dio.post(
+        '/api/profile/settings',
+        data: {'action': 'accept_terms'},
+      );
+      if (response.statusCode == 200) {
+        return true;
+      }
+      return false;
+    } catch (e) {
+      _logger.e('Error accepting terms: $e');
+      return false;
+    }
+  }
+
   Future<SignInResult> signIn({
     required String email,
     required String password,
@@ -229,6 +256,50 @@ class AuthService {
       if (result.isSignedIn) {
         final user = await getCurrentUser();
         return SignInResult(success: true, user: user);
+      }
+
+      // Cognito didn't throw, but sign-in isn't actually done either — it
+      // wants one more step first. The website already branches on this
+      // exact shape (SignInModal.tsx's `result.nextStep?.signInStep`); this
+      // used to collapse every one of these into a flat, unhelpful "Sign in
+      // failed" with no way forward, which is exactly what "sign-in doesn't
+      // work" looks like for an unverified account, an admin-forced
+      // password reset, or an MFA-enabled account. Deliberately an if-chain
+      // (not a switch) so a future Amplify SDK bump adding a new
+      // AuthSignInStep value can't turn this into a compile error — it
+      // just falls through to the generic message below, same as today.
+      final step = result.nextStep.signInStep;
+      if (step == AuthSignInStep.confirmSignUp) {
+        return SignInResult(
+          success: false,
+          needsVerification: true,
+          error:
+              "Your account isn't verified yet. Please check your email for a verification code.",
+        );
+      }
+      if (step == AuthSignInStep.confirmSignInWithNewPassword) {
+        return SignInResult(
+          success: false,
+          error:
+              'A new password is required for this account. Please use "Forgot password" to set one.',
+        );
+      }
+      if (step == AuthSignInStep.resetPassword) {
+        return SignInResult(
+          success: false,
+          error:
+              'Your password needs to be reset before you can sign in. Please use "Forgot password".',
+        );
+      }
+      final stepName = step.toString();
+      if (stepName.contains('Mfa') ||
+          stepName.contains('Totp') ||
+          stepName.contains('CustomChallenge')) {
+        return SignInResult(
+          success: false,
+          error:
+              "This account needs an extra verification step that the app doesn't support yet. Please sign in on the website instead.",
+        );
       }
 
       return SignInResult(success: false, error: 'Sign in failed');
@@ -581,8 +652,18 @@ class SignInResult {
   final bool success;
   final User? user;
   final String? error;
+  // True only for the "account exists but was never verified" case
+  // (Cognito's confirmSignUp next-step) — lets the caller route straight
+  // to the verify-email screen instead of just showing an error the user
+  // has no way to act on from the sign-in form.
+  final bool needsVerification;
 
-  SignInResult({required this.success, this.user, this.error});
+  SignInResult({
+    required this.success,
+    this.user,
+    this.error,
+    this.needsVerification = false,
+  });
 }
 
 class SignUpResult {

@@ -115,13 +115,21 @@ class _SignInModalState extends ConsumerState<SignInModal>
           _success = true;
           _loading = false;
         });
-        await Future.delayed(const Duration(milliseconds: 500));
+        // Trimmed from 500ms — long enough to register the success
+        // animation without making sign-in feel slow to close.
+        await Future.delayed(const Duration(milliseconds: 200));
         if (mounted) {
           _handleSuccess();
         }
       } else if (mounted) {
         final authState = ref.read(authStateProvider);
-        if (authState is AuthStateError) {
+        if (authState is AuthStateNeedsVerification) {
+          // The router's own redirect (app_router.dart) is about to send
+          // this screen to /verify — just stop the spinner rather than
+          // flashing a "check your email and password" error right before
+          // that navigation happens, which would read as a contradiction.
+          setState(() => _loading = false);
+        } else if (authState is AuthStateError) {
           _triggerError(authState.message);
         } else {
           _triggerError('Failed to sign in. Please check your email and password.');
@@ -147,7 +155,8 @@ class _SignInModalState extends ConsumerState<SignInModal>
           _success = true;
           _googleLoading = false;
         });
-        await Future.delayed(const Duration(milliseconds: 500));
+        // Trimmed from 500ms — same reasoning as the email/password path.
+        await Future.delayed(const Duration(milliseconds: 200));
         if (mounted) {
           _handleSuccess();
         }

@@ -30,7 +30,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
     await prefs.setString(_cachedNameKey, name);
   }
 
-  Future<void> _init() async {
+  Future<void> _init() => _attemptInit(retriesLeft: 1);
+
+  Future<void> _attemptInit({required int retriesLeft}) async {
     try {
       await _authService.configureAmplify();
       final isSignedIn = await _authService.isSignedIn();
@@ -47,6 +49,17 @@ class AuthNotifier extends StateNotifier<AuthState> {
         state = const AuthState.unauthenticated();
       }
     } catch (e) {
+      if (retriesLeft > 0) {
+        // A cold-start network hiccup (Wi-Fi/DNS not ready yet, a brief
+        // connectivity gap) can make Amplify's own calls throw even though
+        // the device genuinely has a valid, signed-in session — retrying
+        // once after a short pause avoids treating that blip as "never
+        // signed in" and silently showing a real user as signed out on
+        // their own home screen.
+        _logger.w('Auth init failed, retrying once: $e');
+        await Future.delayed(const Duration(seconds: 2));
+        return _attemptInit(retriesLeft: retriesLeft - 1);
+      }
       _logger.e('Error initializing auth: $e');
       state = const AuthState.unauthenticated();
     }
@@ -58,9 +71,21 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final result = await _authService.signIn(email: email, password: password);
 
     if (result.success && result.user != null) {
-      await _cacheDisplayName(result.user!);
+      try {
+        await _cacheDisplayName(result.user!);
+      } catch (e) {
+        // A local shared_preferences write failing here is not a reason to
+        // leave the notifier stuck at AuthState.loading() forever even
+        // though Cognito genuinely authenticated the user — the display
+        // name is just a cold-launch greeting cache, not required for the
+        // rest of the app to treat this sign-in as successful.
+        _logger.w('Failed to cache display name after sign in: $e');
+      }
       state = AuthState.authenticated(result.user!);
       return true;
+    } else if (result.needsVerification) {
+      state = AuthState.needsVerification(email.trim());
+      return false;
     } else {
       state = AuthState.error(result.error ?? 'Sign in failed');
       return false;
@@ -73,7 +98,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final result = await _authService.signInWithGoogle();
 
     if (result.success && result.user != null) {
-      await _cacheDisplayName(result.user!);
+      try {
+        await _cacheDisplayName(result.user!);
+      } catch (e) {
+        _logger.w('Failed to cache display name after Google sign in: $e');
+      }
       state = AuthState.authenticated(result.user!);
       return true;
     } else {
@@ -146,11 +175,26 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   /// For when the session has already ended by some other means (e.g.
-  /// AuthService.deleteUser() during account deletion) ΓÇö just reflects
+  /// AuthService.deleteUser() during account deletion) — just reflects
   /// that locally instead of calling _authService.signOut() again, which
   /// would fail against a session that's already gone.
   void setUnauthenticated() {
     state = const AuthState.unauthenticated();
+  }
+
+  /// Accepts updated terms and policies, updates backend via AuthService,
+  /// and updates the local user state with termsAccepted: true.
+  Future<bool> acceptTerms() async {
+    final success = await _authService.acceptTerms();
+    if (success) {
+      final current = state;
+      if (current is AuthStateAuthenticated) {
+        final updatedUser = current.user.copyWith(termsAccepted: true);
+        state = AuthState.authenticated(updatedUser);
+      }
+      return true;
+    }
+    return false;
   }
 
   /// Returns the masked destination Cognito reported (e.g. `r***@g***.com`),

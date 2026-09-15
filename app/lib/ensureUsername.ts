@@ -32,13 +32,27 @@ async function tryReserveUsername(
   }
 }
 
-export async function ensureUsername(userId: string) {
-  const existing = await docClient.send(
-    new GetCommand({
-      TableName: USERS_TABLE,
-      Key: { userId },
-    })
-  );
+// `existingItem` lets a caller that already fetched this same InPlayer-Users
+// row (e.g. app/api/profile/avatar/route.ts, which needs the full row for
+// its own response right after this call) hand it over instead of this
+// function doing its own separate, fully redundant GetCommand on the exact
+// same item a moment later — that duplicate read used to add a whole extra
+// DynamoDB round trip to every login and every passive session-restore
+// (both hit /api/profile/avatar). Every other caller (e.g.
+// resolveUsernames.ts, which doesn't already have the row) omits it and
+// gets the original single-fetch behavior, unchanged.
+export async function ensureUsername(
+  userId: string,
+  existingItem?: Record<string, unknown>
+) {
+  const existing = existingItem
+    ? { Item: existingItem }
+    : await docClient.send(
+        new GetCommand({
+          TableName: USERS_TABLE,
+          Key: { userId },
+        })
+      );
 
   const storedUsername = existing.Item?.username;
   if (

@@ -680,7 +680,7 @@ export default function ProfilePage() {
             <label className="mb-2 block text-xs font-bold uppercase tracking-[0.2em] text-orange-300/80 light:text-orange-600/90">
               Email
             </label>
-            <p className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.02] light:bg-black/[0.02] px-4 py-3 text-slate-400 light:text-slate-600">
+            <p className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.02] light:bg-black/[0.02] px-4 py-3 text-slate-400 light:text-slate-600 break-all">
               {user?.email}
             </p>
           </div>

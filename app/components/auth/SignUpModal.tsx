@@ -207,13 +207,15 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
 
       setSuccess(true);
 
+      // Trimmed from 900ms — long enough to register the success state
+      // without making signup feel slow to move on from.
       setTimeout(() => {
         if (result.nextStep?.signUpStep === "CONFIRM_SIGN_UP") {
           openVerifyEmail(email.trim());
         } else {
           openSignIn();
         }
-      }, 900);
+      }, 250);
     } catch (err: unknown) {
       const name = (err as { name?: string })?.name;
       const message =

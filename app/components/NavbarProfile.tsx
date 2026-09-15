@@ -172,7 +172,7 @@ bg-[#08111F]/95
           backdrop-blur-3xl
           shadow-[0_30px_80px_rgba(0,0,0,.55)]
           light:shadow-[0_30px_80px_rgba(0,0,0,.15)]
-          transition-all
+          transition-[opacity,transform]
           duration-300
           origin-top-right
           ${

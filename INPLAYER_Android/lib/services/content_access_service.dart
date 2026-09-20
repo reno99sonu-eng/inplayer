@@ -87,7 +87,9 @@ class ContentAccessService {
 
   Future<void> _cacheMode(AudienceMode mode) async {
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('audience', audienceModeToString(mode));
+    final modeStr = audienceModeToString(mode);
+    await prefs.setString('audience', modeStr);
+    DioClient().setCachedAudience(modeStr);
   }
 
   /// Sets audience mode locally without prompting for passcodes.
@@ -127,6 +129,7 @@ class ContentAccessService {
     String? passkey,
   }) async {
     final cleanedPasskey = passkey?.trim();
+    await _cacheMode(mode);
     try {
       final response = await _dio.post(
         ApiConstants.contentAccess,

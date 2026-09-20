@@ -13,11 +13,32 @@ import 'package:permission_handler/permission_handler.dart';
 import '../core/utils/equalizer_store.dart';
 import '../core/utils/music_settings_store.dart';
 import '../models/video.dart';
+import 'ad_service.dart';
 import 'history_service.dart';
+import 'premium_service.dart';
 import 'video_service.dart';
 
 class MusicPlayerService extends ChangeNotifier {
   final _logger = Logger();
+
+  final AdService? adService;
+  final PremiumService? premiumService;
+
+  int _sessionTrackCount = 0;
+  String? _lastTrackId;
+  bool _adActive = false;
+  MidrollAd? _currentAd;
+  int _adCountdown = 10;
+  bool _skipUnlocked = false;
+  Timer? _adTimer;
+  bool _isPremiumCached = false;
+  DateTime? _lastPremiumCheck;
+
+  int get sessionTrackCount => _sessionTrackCount;
+  bool get isAdActive => _adActive;
+  MidrollAd? get currentAd => _currentAd;
+  int get adCountdown => _adCountdown;
+  bool get skipUnlocked => _skipUnlocked;
 
   /// Android's own equalizer AudioEffect, attached to this player's audio
   /// pipeline.
@@ -69,7 +90,12 @@ class MusicPlayerService extends ChangeNotifier {
   /// source is wired up.
   final Future<List<Video>> Function()? fetchMoreTracks;
 
-  MusicPlayerService({this.onTrackStarted, this.fetchMoreTracks}) {
+  MusicPlayerService({
+    this.onTrackStarted,
+    this.fetchMoreTracks,
+    this.adService,
+    this.premiumService,
+  }) {
     _initAudioSession();
     unawaited(_restoreEqualizer());
     unawaited(_restoreMusicSettings());
@@ -80,6 +106,7 @@ class MusicPlayerService extends ChangeNotifier {
       final track = currentTrack;
       if (changed && track != null) {
         onTrackStarted?.call(track.videoId);
+        unawaited(_handleTrackStarted(track.videoId));
       }
     });
     _player.playerStateStream.listen((state) {
@@ -562,27 +589,130 @@ class MusicPlayerService extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<bool> _isPremiumUser() async {
+    if (premiumService == null) return false;
+    if (_lastPremiumCheck != null &&
+        DateTime.now().difference(_lastPremiumCheck!).inMinutes < 5) {
+      return _isPremiumCached;
+    }
+    try {
+      final status = await premiumService!.getStatus();
+      _isPremiumCached = status.premium;
+      _lastPremiumCheck = DateTime.now();
+      return _isPremiumCached;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  Future<void> _handleTrackStarted(String videoId) async {
+    if (_lastTrackId == videoId) return;
+    _lastTrackId = videoId;
+    _sessionTrackCount++;
+
+    final isPrem = await _isPremiumUser();
+    if (isPrem) return;
+
+    // Free users: Track 1, then 3-4 tracks ad-free, then Track 5, Track 9, etc.
+    final bool isAdTrack = _sessionTrackCount == 1 || (_sessionTrackCount - 1) % 4 == 0;
+    if (!isAdTrack) return;
+
+    await _triggerSessionAd();
+  }
+
+  Future<void> _triggerSessionAd() async {
+    try {
+      final config = await adService?.getMidrollConfig();
+      if (config == null || !config.enabled || (config.ad == null && config.ads.isEmpty)) {
+        return;
+      }
+
+      final ad = config.ad ?? (config.ads.isNotEmpty ? config.ads.first : null);
+      if (ad == null) return;
+
+      _currentAd = ad;
+      _adActive = true;
+      _adCountdown = 10;
+      _skipUnlocked = false;
+
+      // Hold playback while the ad is active
+      await _player.pause();
+      notifyListeners();
+
+      // Track impression
+      unawaited(adService?.trackMidrollEvent(ad.adId, kind: 'impression'));
+
+      _adTimer?.cancel();
+      _adTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (!_adActive) {
+          timer.cancel();
+          return;
+        }
+        if (_adCountdown > 1) {
+          _adCountdown--;
+          notifyListeners();
+        } else {
+          _adCountdown = 0;
+          _skipUnlocked = true;
+          timer.cancel();
+          notifyListeners();
+        }
+      });
+    } catch (e) {
+      _logger.w('Music session ad failed to trigger: $e');
+      _adActive = false;
+      _currentAd = null;
+      notifyListeners();
+    }
+  }
+
+  Future<void> skipAd() async {
+    if (!_skipUnlocked && _adCountdown > 0) return;
+    _adTimer?.cancel();
+    if (_currentAd != null) {
+      unawaited(adService?.trackMidrollEvent(_currentAd!.adId, kind: 'skip'));
+    }
+    _adActive = false;
+    _currentAd = null;
+    notifyListeners();
+    try {
+      await _player.play();
+    } catch (e) {
+      _logger.w('Failed to resume music after ad skip: $e');
+    }
+  }
+
   Future<void> stop() async {
+    _adTimer?.cancel();
+    _adActive = false;
+    _currentAd = null;
     await _player.stop();
     _queue = [];
     _currentIndex = null;
+    _sessionTrackCount = 0;
+    _lastTrackId = null;
     notifyListeners();
   }
 
   @override
   void dispose() {
+    _adTimer?.cancel();
     _player.dispose();
     super.dispose();
   }
 }
 
 final musicPlayerServiceProvider = ChangeNotifierProvider<MusicPlayerService>((ref) {
+  final adService = ref.read(adServiceProvider);
+  final premiumService = ref.read(premiumServiceProvider);
   final service = MusicPlayerService(
     onTrackStarted: (videoId) => ref.read(historyServiceProvider).recordWatch(videoId),
     fetchMoreTracks: () async {
-      final all = await ref.read(videoServiceProvider).getVideos();
+      final all = await ref.read(videoServiceProvider).getMusicTracks();
       return all.where((v) => v.isMusic).toList(growable: false);
     },
+    adService: adService,
+    premiumService: premiumService,
   );
   ref.onDispose(service.dispose);
   return service;

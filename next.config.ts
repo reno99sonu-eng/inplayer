@@ -1,6 +1,18 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Opt sharp out of server bundling so native Linux binaries load properly on Vercel
+  serverExternalPackages: ["sharp"],
+
+  outputFileTracingIncludes: {
+    "/api/admin/ai-navbar-theme-generate": [
+      "./node_modules/@img/sharp-libvips-linux-x64/**/*",
+      "./node_modules/@img/sharp-linux-x64/**/*",
+      "./node_modules/@img/**/*",
+      "./node_modules/sharp/**/*",
+    ],
+  },
+
   // Gzip compress all responses for faster transfer
   compress: true,
 

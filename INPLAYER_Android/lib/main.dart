@@ -15,10 +15,13 @@ import 'services/content_access_service.dart';
 import 'services/geo_service.dart';
 import 'services/video_service.dart';
 import 'providers/kid_mode_provider.dart';
+import 'providers/auth_provider.dart';
 import 'services/platform_update_service.dart';
 import 'services/device_location_service.dart';
 import 'services/face_age_detector_service.dart';
 import 'providers/theme_provider.dart';
+import 'providers/app_language_provider.dart';
+import 'features/auth/presentation/widgets/terms_acceptance_modal.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -118,11 +121,7 @@ class _InplayerAppState extends ConsumerState<InplayerApp> {
   Future<void> _runStartupAgeScan() async {
     if (!mounted) return;
 
-    // If the system dialog is still visible, wait for the user's response
-    // before starting geo verification or opening the camera sheet.
-    await _startupPermissionsFuture;
-    if (!mounted) return;
-
+    // Fast non-blocking geo verification (concurrent with permission request)
     final geoResult = await requestDeviceLocation(ref.read(geoServiceProvider));
     if (!mounted) return;
     if (!geoResult.allowed) {
@@ -229,6 +228,7 @@ class _InplayerAppState extends ConsumerState<InplayerApp> {
   Widget build(BuildContext context) {
     final router = ref.watch(routerProvider);
     final themeMode = ref.watch(themeModeProvider);
+    final appLanguage = ref.watch(appLanguageProvider);
     // Keep one process-wide AppSync subscription alive above the router.
     ref.watch(platformUpdateServiceProvider);
 
@@ -238,10 +238,16 @@ class _InplayerAppState extends ConsumerState<InplayerApp> {
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: themeMode,
+      locale: appLanguage.locale,
+      supportedLocales: AppLanguages.supportedLocales,
       scaffoldMessengerKey: _scaffoldMessengerKey,
       routerConfig: router,
       builder: (context, child) {
         final content = child ?? const SizedBox.shrink();
+        final authState = ref.watch(authStateProvider);
+        final needsTermsAcceptance =
+            authState is AuthStateAuthenticated && !authState.user.termsAccepted;
+
         return Stack(
           fit: StackFit.expand,
           children: [
@@ -257,10 +263,9 @@ class _InplayerAppState extends ConsumerState<InplayerApp> {
                   _beginStartupAgeScan();
                 },
               ),
-            // FloatingAIButton used to live here, above the router, so it
-            // floated over EVERY route — watch, shorts, chat, settings,
-            // checkout. It now belongs to the Home tab only and is mounted
-            // in home_page.dart instead.
+            // Policy acceptance modal - appears if signed-in user has not accepted policy v2026-09-05
+            if (needsTermsAcceptance && !_splashVisible && !_geoBlocked)
+              const TermsAcceptanceModalOverlay(),
             if (!_geoBlocked)
               SplashScreenOverlay(
                 onDismiss: () {
@@ -272,7 +277,7 @@ class _InplayerAppState extends ConsumerState<InplayerApp> {
             // Age safety runs first; biometric unlock must not cover or race
             // the camera route. It is mounted only after audience filtering
             // has completed.
-            if (!_geoBlocked && !_splashVisible && _startupScanComplete)
+            if (!_geoBlocked && !_splashVisible && _startupScanComplete && !needsTermsAcceptance)
               const BiometricLockScreen(),
           ],
         );

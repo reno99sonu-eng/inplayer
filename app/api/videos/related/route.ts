@@ -3,9 +3,10 @@ import { QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
 import { getVisibleVideos } from "@/app/lib/contentAccessServer";
+import { isMusicType } from "@/app/lib/contentTypes";
 
-// "Up Next" for the video watch page — Videos only (Shorts are excluded
-// entirely; they live in their own swipeable feed) and, for signed-in
+// "Up Next" for the video watch page — Videos only (Shorts and Music are excluded
+// entirely; they live in their own dedicated feeds) and, for signed-in
 // viewers, ranked toward the categories they actually watch most (real
 // signal from InPlayer-WatchHistory), not just a static "same category"
 // match. Falls back to the plain same-category-then-recency ordering for
@@ -19,6 +20,7 @@ export async function GET(request: NextRequest) {
     (v) =>
       v.videoId !== excludeVideoId &&
       v.contentType !== "short" &&
+      !isMusicType(v.contentType) &&
       (!v.visibility || v.visibility === "public")
   );
 

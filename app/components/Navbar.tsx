@@ -1094,11 +1094,20 @@ lg:right-auto
                 <ul className="mt-2 space-y-1.5">
                   <li>
                     <Link
-                      href="/settings?tab=about"
+                      href="/about"
                       onClick={() => setMenuOpen(false)}
                       className="block text-xs text-slate-400 light:text-slate-600 transition hover:text-orange-300 light:hover:text-orange-600"
                     >
-                      About
+                      About Us
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      href="/contact"
+                      onClick={() => setMenuOpen(false)}
+                      className="block text-xs text-slate-400 light:text-slate-600 transition hover:text-orange-300 light:hover:text-orange-600"
+                    >
+                      Contact Us
                     </Link>
                   </li>
                   <li>

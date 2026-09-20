@@ -34,6 +34,9 @@ function describeOpenAIError(status: number, body: string): { message: string; h
   return { message: "Couldn't reach OpenAI right now. Please try again shortly.", httpStatus: 502 };
 }
 
+export const maxDuration = 60;
+export const dynamic = "force-dynamic";
+
 export async function POST(request: NextRequest) {
   try {
     await requireAdmin(request);

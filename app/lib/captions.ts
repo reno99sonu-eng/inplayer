@@ -20,6 +20,7 @@ export const CAPTION_TARGETS: Array<{
   { code: "ml", name: "Malayalam", label: "മലയാളം" },
   { code: "pa", name: "Punjabi", label: "ਪੰਜਾਬੀ" },
   { code: "or", name: "Odia", label: "ଓଡ଼ିଆ" },
+  { code: "as", name: "Assamese", label: "অসমীয়া" },
 ];
 
 // Collapses a Mux-detected BCP-47 code down to its base language, folding

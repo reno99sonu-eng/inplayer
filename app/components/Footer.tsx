@@ -17,7 +17,8 @@ const browse = [
 ];
 
 const company = [
-  { label: "About", href: "/settings?tab=about" },
+  { label: "About Us", href: "/about" },
+  { label: "Contact Us", href: "/contact" },
   { label: "Terms of Service", href: "/terms" },
   { label: "Privacy Policy", href: "/privacy" },
   { label: "Copyright Policy", href: "/copyright" },

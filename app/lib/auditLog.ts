@@ -28,6 +28,7 @@ export type AuditAction =
   | "user.session_revoke_all"
   | "video.delete"
   | "video.restore"
+  | "video.update_audience"
   | "kyc.approve"
   | "kyc.reject"
   | "monetization.suspend"

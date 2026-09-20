@@ -99,10 +99,9 @@ class _ContentAccessDrawerSectionState
     });
   }
 
-  bool get _signedIn => ref.read(contentAccessSignedInProvider);
-
   void _applyAudienceChange(AudienceMode mode) {
     VideoService.clearAudienceCaches();
+    unawaited(ref.read(contentAccessServiceProvider).setModeLocally(mode));
     ref.read(contentAccessRevisionProvider.notifier).state++;
     setState(() => _mode = mode);
     unawaited(
@@ -112,16 +111,12 @@ class _ContentAccessDrawerSectionState
 
   Future<void> _exitKidsMode() async {
     _applyAudienceChange(AudienceMode.family);
-    if (_signedIn) {
-      unawaited(ref.read(contentAccessServiceProvider).setMode(AudienceMode.family));
-    }
+    unawaited(ref.read(contentAccessServiceProvider).setMode(AudienceMode.family));
   }
 
   Future<void> _enableKidsMode() async {
     _applyAudienceChange(AudienceMode.kids);
-    if (_signedIn) {
-      unawaited(ref.read(contentAccessServiceProvider).setMode(AudienceMode.kids));
-    }
+    unawaited(ref.read(contentAccessServiceProvider).setMode(AudienceMode.kids));
   }
 
   @override

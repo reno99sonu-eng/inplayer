@@ -62,14 +62,16 @@ export function normalizeVideoAudience(raw: unknown): VideoAudience | null {
 // live changes classification: an existing 18+ video stays 18+, and
 // everything else becomes "everyone" (which is what it effectively was).
 export function videoAudience(
-  video: { audience?: unknown; ageRestricted?: unknown } | null | undefined
+  video: { audience?: unknown; ageRestricted?: unknown; madeForKids?: unknown } | null | undefined
 ): VideoAudience {
   if (!video) return "everyone";
 
   const explicit = normalizeVideoAudience(video.audience);
   if (explicit) return explicit;
 
-  return video.ageRestricted === true ? "adult" : "everyone";
+  if (video.ageRestricted === true) return "adult";
+  if (video.madeForKids === true) return "kids";
+  return "everyone";
 }
 
 // The single rule every surface in the app shares.
@@ -125,8 +127,7 @@ export function togglesFromMode(mode: AudienceMode): { showAdult: boolean; kidsO
 // of its directions ("kids" on, "family" off) are non-loosening. Turning
 // 18+ ON is the one action that stops and asks.
 export function modeRequiresPasskey(mode: AudienceMode): boolean {
-  void mode;
-  return true;
+  return mode === "all";
 }
 
 // ── Backwards compatibility with the two older per-video flags ────────

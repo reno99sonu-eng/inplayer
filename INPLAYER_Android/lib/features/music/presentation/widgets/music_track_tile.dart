@@ -1,9 +1,10 @@
-import 'package:cached_network_image/cached_network_image.dart';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/image_utils.dart';
 import '../../../../core/utils/share_utils.dart';
 import '../../../../models/video.dart';
 import '../../../../services/music_player_service.dart';
@@ -65,11 +66,28 @@ class MusicTrackTile extends ConsumerWidget {
                     fit: StackFit.expand,
                     children: [
                       coverUrl.isNotEmpty
-                          ? CachedNetworkImage(
-                              imageUrl: coverUrl,
-                              fit: BoxFit.cover,
-                              errorWidget: (context, url, error) =>
-                                  _fallbackArt(context),
+                          ? Stack(
+                              fit: StackFit.expand,
+                              children: [
+                                SafeAppImage(
+                                  imageUrl: coverUrl,
+                                  fit: BoxFit.cover,
+                                  errorWidget: (context, url, error) =>
+                                      _fallbackArt(context),
+                                ),
+                                BackdropFilter(
+                                  filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                                  child: Container(
+                                    color: Colors.black.withValues(alpha: 0.28),
+                                  ),
+                                ),
+                                SafeAppImage(
+                                  imageUrl: coverUrl,
+                                  fit: BoxFit.contain,
+                                  errorWidget: (context, url, error) =>
+                                      const SizedBox.shrink(),
+                                ),
+                              ],
                             )
                           : _fallbackArt(context),
                       if (isCurrent)
@@ -303,7 +321,7 @@ void showMusicTrackQuickActions(
                                   ? track.covers.first
                                   : track.thumbnail)
                               .isNotEmpty
-                          ? CachedNetworkImage(
+                          ? SafeAppImage(
                               imageUrl: track.covers.isNotEmpty
                                   ? track.covers.first
                                   : track.thumbnail,

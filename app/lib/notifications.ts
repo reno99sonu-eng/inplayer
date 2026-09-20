@@ -21,7 +21,8 @@ export type NotificationType =
   | "ai_flag"
   | "copyright"
   | "admin_announcement"
-  | "live_stream";
+  | "live_stream"
+  | "video_upload";
 
 interface CreateNotificationInput {
   userId: string; // recipient

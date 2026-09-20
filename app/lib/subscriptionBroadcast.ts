@@ -2,6 +2,7 @@ import { QueryCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { sendEmail } from "@/app/lib/ses";
 import { resolveCognitoEmails } from "@/app/lib/cognitoClient";
+import { createNotification } from "@/app/lib/notifications";
 
 interface VideoBroadcastParams {
   videoId: string;
@@ -46,7 +47,20 @@ export async function broadcastNewVideoToSubscribers(params: VideoBroadcastParam
     const subscriberUserIds = activeSubscribers.map((sub) => sub.subscriberId);
     if (subscriberUserIds.length === 0) return 0;
 
-    // 2. Resolve subscriber emails from Cognito
+    // 2. Dispatch in-app notifications for all active subscribers in InPlayer-Notifications
+    const inAppMessage = `${uploaderName} uploaded a new ${noun}: "${title}"`;
+    await Promise.allSettled(
+      subscriberUserIds.map((subscriberId) =>
+        createNotification({
+          userId: subscriberId,
+          type: "video_upload",
+          message: inAppMessage,
+          videoId,
+        })
+      )
+    );
+
+    // 3. Resolve subscriber emails from Cognito
     const emailMap = await resolveCognitoEmails(subscriberUserIds);
     if (emailMap.size === 0) return 0;
 
@@ -57,7 +71,7 @@ export async function broadcastNewVideoToSubscribers(params: VideoBroadcastParam
     let sentCount = 0;
 
     // 3. Dispatch personalized broadcast emails
-    for (const [userId, recipientEmail] of emailMap.entries()) {
+    for (const [, recipientEmail] of emailMap.entries()) {
       if (!recipientEmail) continue;
 
       const html = `
@@ -123,7 +137,7 @@ export async function broadcastNewVideoToSubscribers(params: VideoBroadcastParam
  * Broadcasts YouTube-style email notifications to all subscribers of a channel when they go live.
  */
 export async function broadcastLiveStreamToSubscribers(params: Omit<VideoBroadcastParams, "contentType">): Promise<number> {
-  const { videoId, title, description, thumbnailUrl, uploaderId, uploaderName, uploaderAvatarUrl } = params;
+  const { videoId, title, description, uploaderId, uploaderName, uploaderAvatarUrl } = params;
 
   try {
     // 1. Query all subscribers of the creator from InPlayer-Subscriptions GSI (creatorId-index)
@@ -146,7 +160,20 @@ export async function broadcastLiveStreamToSubscribers(params: Omit<VideoBroadca
     const subscriberUserIds = activeSubscribers.map((sub) => sub.subscriberId);
     if (subscriberUserIds.length === 0) return 0;
 
-    // 2. Resolve subscriber emails from Cognito
+    // 2. Dispatch in-app notifications for all active subscribers in InPlayer-Notifications
+    const liveNotifMessage = `🔴 ${uploaderName} is live: "${title}"`;
+    await Promise.allSettled(
+      subscriberUserIds.map((subscriberId) =>
+        createNotification({
+          userId: subscriberId,
+          type: "live_stream",
+          message: liveNotifMessage,
+          videoId,
+        })
+      )
+    );
+
+    // 3. Resolve subscriber emails from Cognito
     const emailMap = await resolveCognitoEmails(subscriberUserIds);
     if (emailMap.size === 0) return 0;
 
@@ -157,7 +184,7 @@ export async function broadcastLiveStreamToSubscribers(params: Omit<VideoBroadca
     let sentCount = 0;
 
     // 3. Dispatch personalized broadcast emails
-    for (const [userId, recipientEmail] of emailMap.entries()) {
+    for (const [, recipientEmail] of emailMap.entries()) {
       if (!recipientEmail) continue;
 
       const html = `

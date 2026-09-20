@@ -110,7 +110,17 @@ class _ShopPageState extends ConsumerState<ShopPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go('/');
+        }
+      },
+      child: Scaffold(
       extendBody: true,
       backgroundColor: Colors.transparent,
       drawer: const MobileMenuDrawer(),
@@ -186,6 +196,7 @@ class _ShopPageState extends ConsumerState<ShopPage> {
         ),
       ),
       bottomNavigationBar: _buildBottomNavigationBar(),
+      ),
     );
   }
 
@@ -223,9 +234,15 @@ class _ShopPageState extends ConsumerState<ShopPage> {
       ),
       title: Row(
         children: [
-          Builder(
-            builder: (context) => GestureDetector(
-              onTap: () => Scaffold.of(context).openDrawer(),
+          if (Navigator.of(context).canPop())
+            GestureDetector(
+              onTap: () {
+                if (context.canPop()) {
+                  context.pop();
+                } else {
+                  context.go('/');
+                }
+              },
               child: Container(
                 width: 38,
                 height: 38,
@@ -236,13 +253,33 @@ class _ShopPageState extends ConsumerState<ShopPage> {
                   border: Border.all(color: context.borderSubtle),
                 ),
                 child: Icon(
-                  Icons.menu,
+                  Icons.arrow_back_rounded,
                   color: context.textPrimary,
                   size: 20,
                 ),
               ),
+            )
+          else
+            Builder(
+              builder: (context) => GestureDetector(
+                onTap: () => Scaffold.of(context).openDrawer(),
+                child: Container(
+                  width: 38,
+                  height: 38,
+                  margin: const EdgeInsets.only(right: 10),
+                  decoration: BoxDecoration(
+                    color: context.isDark ? Colors.white.withValues(alpha: 0.06) : Colors.black.withValues(alpha: 0.04),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: context.borderSubtle),
+                  ),
+                  child: Icon(
+                    Icons.menu,
+                    color: context.textPrimary,
+                    size: 20,
+                  ),
+                ),
+              ),
             ),
-          ),
           const AppNavbarLogo(height: 32),
         ],
       ),
@@ -680,8 +717,8 @@ class _ShopPageState extends ConsumerState<ShopPage> {
     return SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       sliver: SliverGrid(
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
+        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+          maxCrossAxisExtent: 220,
           mainAxisSpacing: 12,
           crossAxisSpacing: 12,
           childAspectRatio: 0.68,
@@ -790,7 +827,13 @@ class _ShopPageState extends ConsumerState<ShopPage> {
                     0,
                     Icons.home_outlined,
                     'Home',
-                    onTap: () => context.go('/'),
+                    onTap: () {
+                      if (context.canPop()) {
+                        context.pop();
+                      } else {
+                        context.go('/');
+                      }
+                    },
                   ),
                   _buildNavItem(
                     1,

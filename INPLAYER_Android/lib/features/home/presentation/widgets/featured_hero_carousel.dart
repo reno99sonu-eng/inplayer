@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -63,82 +62,91 @@ class _FeaturedHeroCarouselState extends ConsumerState<FeaturedHeroCarousel> {
       return const SizedBox.shrink();
     }
 
-    return ValueListenableBuilder<int>(
-      valueListenable: _currentIndex,
-      builder: (context, currentIndex, _) {
-        final activeVideo = widget.featuredVideos[currentIndex % widget.featuredVideos.length];
+    final screenWidth = MediaQuery.of(context).size.width;
+    final double bannerRatio = screenWidth >= 1200
+        ? (21 / 9)
+        : (screenWidth >= 700 ? (18 / 9) : (16 / 9));
 
-        return AspectRatio(
-          aspectRatio: 16 / 9,
-          child: GestureDetector(
-            onPanDown: (_) => setState(() => _isPaused = true),
-            onPanCancel: () => setState(() => _isPaused = false),
-            onPanEnd: (_) => setState(() => _isPaused = false),
-            child: Container(
-              width: double.infinity,
-              color: Colors.black,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  PageView.builder(
-                    controller: _pageController,
-                    onPageChanged: (index) => _currentIndex.value = index,
-                    itemCount: widget.featuredVideos.length,
-                    itemBuilder: (context, index) {
-                      final video = widget.featuredVideos[index];
-                      return _buildMediaLayer(video);
-                    },
-                  ),
-
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.centerLeft,
-                            end: Alignment.centerRight,
-                            colors: [
-                              const Color(0xFF050816).withValues(alpha: 0.95),
-                              const Color(0xFF050816).withValues(alpha: 0.65),
-                              const Color(0xFF050816).withValues(alpha: 0.20),
-                              Colors.transparent,
-                            ],
-                            stops: const [0.0, 0.45, 0.75, 1.0],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: Container(
-                        decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.bottomCenter,
-                            end: Alignment.topCenter,
-                            colors: [
-                              Colors.black.withValues(alpha: 0.85),
-                              Colors.transparent,
-                            ],
-                            stops: const [0.0, 0.5],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  Positioned(
-                    left: 16,
-                    right: 16,
-                    bottom: 14,
-                    child: _buildSlideContent(activeVideo),
-                  ),
-                ],
+    final carouselBody = AspectRatio(
+      aspectRatio: bannerRatio,
+      child: GestureDetector(
+        onPanDown: (_) => setState(() => _isPaused = true),
+        onPanCancel: () => setState(() => _isPaused = false),
+        onPanEnd: (_) => setState(() => _isPaused = false),
+        child: Container(
+          width: double.infinity,
+          color: Colors.black,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              PageView.builder(
+                controller: _pageController,
+                onPageChanged: (index) => _currentIndex.value = index,
+                itemCount: widget.featuredVideos.length,
+                itemBuilder: (context, index) {
+                  final video = widget.featuredVideos[index];
+                  return _buildMediaLayer(video);
+                },
               ),
-            ),
+
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: [
+                          const Color(0xFF050816).withValues(alpha: 0.95),
+                          const Color(0xFF050816).withValues(alpha: 0.65),
+                          const Color(0xFF050816).withValues(alpha: 0.20),
+                          Colors.transparent,
+                        ],
+                        stops: const [0.0, 0.45, 0.75, 1.0],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.85),
+                          Colors.transparent,
+                        ],
+                        stops: const [0.0, 0.5],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              Positioned(
+                left: 16,
+                right: 16,
+                bottom: 14,
+                child: ValueListenableBuilder<int>(
+                  valueListenable: _currentIndex,
+                  builder: (context, currentIndex, _) {
+                    final activeVideo = widget.featuredVideos[currentIndex % widget.featuredVideos.length];
+                    return _buildSlideContent(activeVideo);
+                  },
+                ),
+              ),
+            ],
           ),
-        );
-      },
+        ),
+      ),
+    );
+
+    return SizedBox(
+      width: double.infinity,
+      child: carouselBody,
     );
   }
 
@@ -157,51 +165,23 @@ class _FeaturedHeroCarouselState extends ConsumerState<FeaturedHeroCarousel> {
     if (isDataImageUrl(thumb)) {
       final bytes = decodeDataImageUrl(thumb);
       if (bytes != null) {
-        return Stack(
-          fit: StackFit.expand,
-          children: [
-            Image.memory(bytes, fit: BoxFit.cover),
-            BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-              child: Container(color: Colors.black.withValues(alpha: 0.3)),
-            ),
-            Image.memory(bytes, fit: BoxFit.contain),
-          ],
+        return Image.memory(
+          bytes,
+          fit: BoxFit.cover,
+          width: double.infinity,
+          height: double.infinity,
         );
       }
     }
 
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        CachedNetworkImage(
-          imageUrl: thumb,
-          fit: BoxFit.cover,
-          fadeInDuration: const Duration(milliseconds: 200),
-          fadeOutDuration: const Duration(milliseconds: 150),
-          memCacheWidth: 900,
-          memCacheHeight: 506,
-          errorWidget: (context, url, error) => Container(color: const Color(0xFF080C14)),
-        ),
-        BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-          child: Container(color: Colors.black.withValues(alpha: 0.28)),
-        ),
-        AnimatedOpacity(
-          opacity: 1,
-          duration: const Duration(milliseconds: 350),
-          curve: Curves.easeOutCubic,
-          child: CachedNetworkImage(
-            imageUrl: thumb,
-            fit: BoxFit.cover,
-            fadeInDuration: const Duration(milliseconds: 220),
-            fadeOutDuration: const Duration(milliseconds: 120),
-            memCacheWidth: 900,
-            memCacheHeight: 506,
-            errorWidget: (context, url, error) => Container(color: const Color(0xFF080C14)),
-          ),
-        ),
-      ],
+    return CachedNetworkImage(
+      imageUrl: thumb,
+      fit: BoxFit.cover,
+      width: double.infinity,
+      height: double.infinity,
+      fadeInDuration: const Duration(milliseconds: 200),
+      fadeOutDuration: const Duration(milliseconds: 150),
+      errorWidget: (context, url, error) => Container(color: const Color(0xFF080C14)),
     );
   }
 

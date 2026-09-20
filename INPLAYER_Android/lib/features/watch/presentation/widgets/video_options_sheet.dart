@@ -186,34 +186,39 @@ class _VideoOptionsSheetState extends ConsumerState<VideoOptionsSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.75),
-      decoration: BoxDecoration(
-        color: context.bgModal,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        border: Border.all(color: context.borderSubtle),
-      ),
-      padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(context).padding.bottom + 20),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: context.textDim.withValues(alpha: 0.4),
-                  borderRadius: BorderRadius.circular(2),
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 560),
+        child: Container(
+          constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.75),
+          decoration: BoxDecoration(
+            color: context.bgModal,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+            border: Border.all(color: context.borderSubtle),
+          ),
+          padding: EdgeInsets.fromLTRB(20, 16, 20, MediaQuery.of(context).padding.bottom + 20),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 40,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: context.textDim.withValues(alpha: 0.4),
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
                 ),
-              ),
+                const SizedBox(height: 18),
+                if (_view == _PanelView.main) _buildMainPanel(),
+                if (_view == _PanelView.playlists) _buildPlaylistsPanel(),
+                if (_view == _PanelView.report) _buildReportPanel(),
+              ],
             ),
-            const SizedBox(height: 18),
-            if (_view == _PanelView.main) _buildMainPanel(),
-            if (_view == _PanelView.playlists) _buildPlaylistsPanel(),
-            if (_view == _PanelView.report) _buildReportPanel(),
-          ],
+          ),
         ),
       ),
     );

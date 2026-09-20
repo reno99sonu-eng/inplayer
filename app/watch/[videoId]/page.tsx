@@ -53,6 +53,22 @@ export async function generateMetadata({
       ? rawDescription.slice(0, 160)
       : `Watch "${title}" on INPLAYER.`;
 
+    let thumbUrl: string | undefined;
+    const rawThumb = typeof video.thumbnailUrl === "string" ? video.thumbnailUrl.trim() : "";
+    if (rawThumb.startsWith("http://") || rawThumb.startsWith("https://")) {
+      thumbUrl = rawThumb;
+    } else if (
+      typeof video.muxPlaybackId === "string" &&
+      video.muxPlaybackId.trim() &&
+      !video.membersOnly
+    ) {
+      thumbUrl = `https://image.mux.com/${encodeURIComponent(
+        video.muxPlaybackId.trim()
+      )}/thumbnail.jpg?width=1200&height=630&fit_mode=smartcrop&time=1`;
+    } else {
+      thumbUrl = "https://inplayer.in/logos/inplayer-full.png";
+    }
+
     return {
       title,
       description,
@@ -61,12 +77,13 @@ export async function generateMetadata({
         type: "video.other",
         title,
         description,
-        // Only ever the stored thumbnail field, never derived from
-        // muxPlaybackId here — a members-only video's playback ID must
-        // never end up in publicly-crawlable page metadata (see the same
-        // restriction already applied to muxPlaybackId further down in
-        // this file, in the actual page body).
-        images: video.thumbnailUrl ? [video.thumbnailUrl as string] : undefined,
+        images: thumbUrl ? [{ url: thumbUrl, width: 1200, height: 630, alt: title }] : undefined,
+      },
+      twitter: {
+        card: "summary_large_image",
+        title,
+        description,
+        images: thumbUrl ? [thumbUrl] : undefined,
       },
     };
   } catch (err) {

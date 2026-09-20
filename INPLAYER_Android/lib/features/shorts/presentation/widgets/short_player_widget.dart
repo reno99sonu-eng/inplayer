@@ -754,7 +754,7 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
+    final playerStack = Stack(
       fit: StackFit.expand,
       children: [
         // 1. Video or Poster Layer with Tap to Toggle / Double Tap to Like
@@ -1340,6 +1340,24 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
             ),
           ),
       ],
+    );
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxWidth >= 600) {
+          return Container(
+            color: Colors.black,
+            alignment: Alignment.center,
+            child: AspectRatio(
+              aspectRatio: 9 / 16,
+              child: ClipRect(
+                child: playerStack,
+              ),
+            ),
+          );
+        }
+        return playerStack;
+      },
     );
   }
 

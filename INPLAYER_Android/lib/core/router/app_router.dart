@@ -38,6 +38,7 @@ import '../../features/settings/presentation/pages/music_equalizer_page.dart';
 import '../../features/settings/presentation/pages/music_quality_page.dart';
 import '../../features/settings/presentation/pages/music_settings_page.dart';
 import '../../features/settings/presentation/pages/playback_settings_page.dart';
+import '../../features/settings/presentation/pages/language_settings_page.dart';
 import '../../features/admin/presentation/pages/admin_page.dart';
 import '../../features/live/presentation/pages/go_live_page.dart';
 import '../../features/downloads/presentation/pages/downloads_page.dart';
@@ -256,6 +257,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const SettingsPage(),
       ),
       GoRoute(
+        path: '/settings/language',
+        name: 'language-settings',
+        builder: (context, state) => const LanguageSettingsPage(),
+      ),
+      GoRoute(
         path: '/settings/edit-profile',
         name: 'edit-profile',
         builder: (context, state) => const EditProfilePage(),
@@ -335,9 +341,10 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/settings/terms',
         name: 'terms-of-service',
         builder: (context, state) => const AppLegalPage(
-          title: 'Terms of Service',
-          content:
-              'Welcome to InPlayer. By accessing or using our website, services, and mobile applications, you agree to be bound by these Terms of Service.\n\n1. Acceptance of Terms: By registering for, accessing, or using the InPlayer platform, you confirm that you are at least 13 years of age and agree to comply with these terms.\n\n2. User Accounts: You are responsible for maintaining the confidentiality of your account credentials and for all activities that occur under your account.\n\n3. Content Guidelines: You retain ownership of content you upload, but grant InPlayer a worldwide license to host, display, and distribute it.\n\n4. Monetization & Payouts: Eligible creators may receive revenue share subject to community guidelines and KYC verification.',
+          title: 'Terms & Conditions',
+          policyId: 'terms',
+          effectiveDate: 'September 5, 2026',
+          externalUrl: 'https://inplayer.in/terms',
         ),
       ),
       GoRoute(
@@ -345,17 +352,109 @@ final routerProvider = Provider<GoRouter>((ref) {
         name: 'privacy-policy',
         builder: (context, state) => const AppLegalPage(
           title: 'Privacy Policy',
-          content:
-              'At InPlayer, your privacy and data security are our top priorities.\n\n1. Information We Collect: We collect information you provide directly (such as name, email, profile photo) and data generated when you interact with content (watch history, likes, subscriptions).\n\n2. How We Use Information: We use your data to personalize recommendations, process creator payouts, enforce safety features (such as on-device age classification and biometric lock), and prevent abuse.\n\n3. Data Protection: All data is encrypted in transit and at rest. We never sell your personal information to third parties.\n\n4. Your Rights: You can update your profile, export your watch history, or delete your account at any time from the Settings menu.',
+          policyId: 'privacy',
+          effectiveDate: 'September 5, 2026',
+          externalUrl: 'https://inplayer.in/privacy',
+        ),
+      ),
+      GoRoute(
+        path: '/settings/copyright-policy',
+        name: 'copyright-policy',
+        builder: (context, state) => const AppLegalPage(
+          title: 'Copyright & Intellectual Property Policy',
+          policyId: 'copyright',
+          effectiveDate: 'September 5, 2026',
+          externalUrl: 'https://inplayer.in/copyright',
+        ),
+      ),
+      GoRoute(
+        path: '/settings/child-safety',
+        name: 'child-safety',
+        builder: (context, state) => const AppLegalPage(
+          title: 'Child Safety Policy',
+          policyId: 'child-safety',
+          effectiveDate: 'September 5, 2026',
+          externalUrl: 'https://inplayer.in/child-safety',
+        ),
+      ),
+      GoRoute(
+        path: '/settings/community-guidelines',
+        name: 'community-guidelines',
+        builder: (context, state) => const AppLegalPage(
+          title: 'Community Guidelines',
+          policyId: 'community-guidelines',
+          effectiveDate: 'September 5, 2026',
+          externalUrl: 'https://inplayer.in/community-guidelines',
+        ),
+      ),
+      GoRoute(
+        path: '/settings/monetization-policy',
+        name: 'monetization-policy',
+        builder: (context, state) => const AppLegalPage(
+          title: 'Creator Monetization Policy',
+          policyId: 'creator-monetization',
+          effectiveDate: 'September 5, 2026',
+          externalUrl: 'https://inplayer.in/monetization-policy',
+        ),
+      ),
+      GoRoute(
+        path: '/settings/chat-messaging-policy',
+        name: 'chat-messaging-policy',
+        builder: (context, state) => const AppLegalPage(
+          title: 'Online Chat & Messaging Policy',
+          policyId: 'chat-messaging',
+          effectiveDate: 'September 5, 2026',
+          externalUrl: 'https://inplayer.in/chat-messaging-policy',
+        ),
+      ),
+      GoRoute(
+        path: '/settings/strike-suspension-policy',
+        name: 'strike-suspension-policy',
+        builder: (context, state) => const AppLegalPage(
+          title: 'Strike, Suspension & Appeals Policy',
+          policyId: 'strikes-appeals',
+          effectiveDate: 'September 5, 2026',
+          externalUrl: 'https://inplayer.in/strike-suspension-policy',
+        ),
+      ),
+      GoRoute(
+        path: '/settings/report-grievance-policy',
+        name: 'report-grievance-policy',
+        builder: (context, state) => const AppLegalPage(
+          title: 'Report, Complaint & Grievance Policy',
+          policyId: 'report-grievance',
+          effectiveDate: 'September 5, 2026',
+          externalUrl: 'https://inplayer.in/report-grievance-policy',
+        ),
+      ),
+      GoRoute(
+        path: '/settings/advertising-sponsorship-policy',
+        name: 'advertising-sponsorship-policy',
+        builder: (context, state) => const AppLegalPage(
+          title: 'Advertising & Sponsorship Policy',
+          policyId: 'advertising-sponsorship',
+          effectiveDate: 'September 5, 2026',
+          externalUrl: 'https://inplayer.in/advertising-sponsorship-policy',
+        ),
+      ),
+      GoRoute(
+        path: '/settings/mart-seller-policy',
+        name: 'mart-seller-policy',
+        builder: (context, state) => const AppLegalPage(
+          title: 'InPlayer MART Shop & Seller Policy',
+          policyId: 'mart-seller',
+          effectiveDate: 'September 5, 2026',
+          externalUrl: 'https://inplayer.in/mart-seller-policy',
         ),
       ),
       GoRoute(
         path: '/settings/vendor-terms',
         name: 'vendor-terms',
         builder: (context, state) => const AppLegalPage(
-          title: 'HamMart Vendor Terms',
-          content:
-              'HamMart is InPlayer\'s integrated creator and merchandise marketplace.\n\n1. Eligibility: Verified creators and authorized vendors can list merchandise and digital products for purchase by the community.\n\n2. Fulfillment & Quality: Vendors are solely responsible for product fulfillment, accurate item descriptions, and handling customer inquiries.\n\n3. Revenue & Fees: Transactions are processed securely, with platform commissions and vendor payouts calculated and disbursed according to the vendor agreement.',
+          title: 'InPlayer MART Shop & Seller Policy',
+          policyId: 'mart-seller',
+          effectiveDate: 'September 5, 2026',
+          externalUrl: 'https://inplayer.in/mart-seller-policy',
         ),
       ),
       GoRoute(

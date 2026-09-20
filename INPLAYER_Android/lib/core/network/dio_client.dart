@@ -105,6 +105,8 @@ class DioClient {
                   ? 'inplayer-audience=$audience'
                   : '$existingCookie; inplayer-audience=$audience';
               options.headers['Cookie'] = newCookie;
+              options.headers['inplayer-audience'] = audience;
+              options.headers['x-audience-mode'] = audience;
             }
           } catch (e) {
             _logger.d('Could not read audience preference: $e');
@@ -128,6 +130,11 @@ class DioClient {
   }
 
   Dio get dio => _dio;
+
+  void setCachedAudience(String? audience) {
+    _cachedAudience = audience;
+    _audienceCacheTime = DateTime.now();
+  }
 
   // Legacy manual-token helpers. No longer used for the Authorization
   // header (see onRequest above, which now reads live from Amplify on

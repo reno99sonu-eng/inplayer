@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { getReadyVideos } from "./videoStore";
 import {
   AUDIENCE_COOKIE,
@@ -22,11 +22,18 @@ import {
 
 export async function getAudienceMode(): Promise<AudienceMode> {
   try {
-    const store = await cookies();
-    return normalizeAudienceMode(store.get(AUDIENCE_COOKIE)?.value);
+    const [store, reqHeaders] = await Promise.all([cookies(), headers()]);
+    const cookieVal = store.get(AUDIENCE_COOKIE)?.value;
+    if (cookieVal) {
+      return normalizeAudienceMode(cookieVal);
+    }
+    const headerVal = reqHeaders.get(AUDIENCE_COOKIE) || reqHeaders.get("x-audience-mode");
+    if (headerVal) {
+      return normalizeAudienceMode(headerVal);
+    }
+    return DEFAULT_AUDIENCE_MODE;
   } catch {
-    // cookies() throws in any genuinely static rendering context. Falling
-    // back to the default is the safe direction: hide 18+, never reveal it.
+    // cookies() or headers() throws in any genuinely static rendering context.
     return DEFAULT_AUDIENCE_MODE;
   }
 }

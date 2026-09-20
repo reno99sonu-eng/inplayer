@@ -18,7 +18,6 @@ import '../widgets/featured_hero_carousel.dart';
 import '../widgets/floating_ai_button.dart';
 import '../widgets/trending_now_row.dart';
 import '../widgets/raftaar_shorts_row.dart';
-import '../widgets/kids_row.dart';
 import '../widgets/playables_shelf.dart';
 import '../widgets/home_ad_card.dart';
 import '../../../music/presentation/widgets/mini_player_bar.dart';
@@ -160,44 +159,55 @@ class _HomePageState extends ConsumerState<HomePage> {
         ref.watch(publicPlatformSettingsProvider).value ??
         PublicPlatformSettings.normal;
 
-    return Scaffold(
-      extendBody: true,
-      backgroundColor: Colors.transparent,
-      drawer: const MobileMenuDrawer(),
-      body: PatternBackground(
-        child: Stack(
-          children: [
-            IndexedStack(
-              index: _currentIndex,
-              children: _buildPages(
-                shortsBottomInset: shortsBottomInset,
-                feedRevision: feedRevision,
+    return PopScope(
+      canPop: _currentIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_currentIndex != 0) {
+          setState(() {
+            _currentIndex = 0;
+          });
+        }
+      },
+      child: Scaffold(
+        extendBody: true,
+        backgroundColor: Colors.transparent,
+        drawer: const MobileMenuDrawer(),
+        body: PatternBackground(
+          child: Stack(
+            children: [
+              IndexedStack(
+                index: _currentIndex,
+                children: _buildPages(
+                  shortsBottomInset: shortsBottomInset,
+                  feedRevision: feedRevision,
+                ),
               ),
-            ),
-            // Home tab only. Previously mounted above the router in
-            // main.dart, which put it over every screen in the app.
-            if (_currentIndex == 0)
-              FloatingAIButton(
-                bottomInset: 88 + (musicLoaded ? _miniPlayerInset : 0.0),
-              ),
-            const VideoMiniPlayerOverlay(),
-            if (platformSettings.announcementEnabled &&
-                platformSettings.announcementText.isNotEmpty &&
-                !_announcementDismissed &&
-                !platformSettings.maintenanceMode)
-              _buildAnnouncementBanner(platformSettings, musicLoaded),
-            // Last in the Stack so it covers everything above, including the
-            // nav shell. Note this covers the TAB shell — a screen pushed on
-            // top of it (a watch page opened from a deep link) sits above
-            // this and is not blocked.
-            if (platformSettings.maintenanceMode)
-              _buildMaintenanceOverlay(platformSettings),
-          ],
+              // Home tab only. Previously mounted above the router in
+              // main.dart, which put it over every screen in the app.
+              if (_currentIndex == 0)
+                FloatingAIButton(
+                  bottomInset: 88 + (musicLoaded ? _miniPlayerInset : 0.0),
+                ),
+              const VideoMiniPlayerOverlay(),
+              if (platformSettings.announcementEnabled &&
+                  platformSettings.announcementText.isNotEmpty &&
+                  !_announcementDismissed &&
+                  !platformSettings.maintenanceMode)
+                _buildAnnouncementBanner(platformSettings, musicLoaded),
+              // Last in the Stack so it covers everything above, including the
+              // nav shell. Note this covers the TAB shell — a screen pushed on
+              // top of it (a watch page opened from a deep link) sits above
+              // this and is not blocked.
+              if (platformSettings.maintenanceMode)
+                _buildMaintenanceOverlay(platformSettings),
+            ],
+          ),
         ),
-      ),
-      bottomNavigationBar: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [const MiniPlayerBar(), _buildBottomNavigationBar(context)],
+        bottomNavigationBar: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [const MiniPlayerBar(), _buildBottomNavigationBar(context)],
+        ),
       ),
     );
   }
@@ -967,8 +977,6 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage> {
     const blockSize = 4;
     const shortsPerShelf = 8;
 
-    final kidsVideos = videos.where((v) => v.audience == 'kids').toList();
-
     final blocks = <List<Video>>[];
     for (var i = 0; i < videos.length; i += blockSize) {
       blocks.add(
@@ -981,11 +989,6 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage> {
 
     int shelfCursor = 0;
     final widgets = <Widget>[];
-
-    if (kidsVideos.isNotEmpty) {
-      widgets.add(KidsRow(videos: kidsVideos));
-      widgets.add(const SizedBox(height: 12));
-    }
 
     for (var blockIndex = 0; blockIndex < blocks.length; blockIndex++) {
       widgets.add(_buildVideoGrid(blocks[blockIndex], feedbackMap));
@@ -1002,7 +1005,9 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage> {
         widgets.add(const SizedBox(height: 12));
       }
 
-      if (blockIndex.isOdd && shelfCursor < allShorts.length) {
+      // Show Raftaar Shorts shelf right after block 0 (immediately below first videos),
+      // and then repeat on alternate blocks so Raftaar is prominently visible
+      if ((blockIndex == 0 || blockIndex.isEven) && shelfCursor < allShorts.length) {
         final end = (shelfCursor + shortsPerShelf > allShorts.length)
             ? allShorts.length
             : shelfCursor + shortsPerShelf;

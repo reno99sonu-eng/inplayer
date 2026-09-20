@@ -81,6 +81,7 @@ export default function UploadPage() {
   const [aiType, setAiType] = useState<"title" | "description" | "tags" | null>(null);
   const [aiError, setAiError] = useState<string | null>(null);
   const [aiTitleAssistOpen, setAiTitleAssistOpen] = useState(false);
+  const [audienceModalOpen, setAudienceModalOpen] = useState(false);
 
   useEffect(() => {
     (() => {
@@ -322,7 +323,7 @@ export default function UploadPage() {
     }
   };
 
-  const handlePublish = async () => {
+  const handleStartPublish = () => {
     if (!file || publishing) return;
 
     if (!title.trim()) {
@@ -330,15 +331,23 @@ export default function UploadPage() {
       return;
     }
 
-    // Music has no video frame for Mux to build a thumbnail from, so the
-    // cover art is the only image this track will ever have — on its card,
-    // in search, in playlists and behind the player. The server enforces
-    // this too (app/api/upload/create); this is just the friendlier place
-    // to find out.
     if (contentType === "music" && musicSettings.covers.length === 0) {
       setError("Please add cover art — a music upload needs at least one image.");
       return;
     }
+
+    setError(null);
+    setAudienceModalOpen(true);
+  };
+
+  const handleConfirmAudienceAndUpload = async (chosenAudience: VideoAudience) => {
+    setAudience(chosenAudience);
+    setAudienceModalOpen(false);
+    await startUploadWithAudience(chosenAudience);
+  };
+
+  const startUploadWithAudience = async (chosenAudience: VideoAudience) => {
+    if (!file || publishing) return;
 
     setPublishing(true);
     setError(null);
@@ -374,8 +383,8 @@ export default function UploadPage() {
           contentType,
           spokenLanguage,
           visibility,
-          audience,
-          ...audienceFlags(audience),
+          audience: chosenAudience,
+          ...audienceFlags(chosenAudience),
           commentsEnabled,
           tags,
           // Longform, not literally "video" — a members-only track is an
@@ -476,6 +485,7 @@ export default function UploadPage() {
     setSpokenLanguage("auto");
     setVisibility("public");
     setAudience("everyone");
+    setAudienceModalOpen(false);
     setCommentsEnabled(true);
     setTags([]);
     setTagInput("");
@@ -566,7 +576,10 @@ export default function UploadPage() {
 
         <button
           type="button"
-          onClick={() => setContentType("music")}
+          onClick={() => {
+            setContentType("music");
+            setAudience("everyone");
+          }}
           className={`flex items-center gap-2.5 rounded-2xl px-6 py-3 text-sm font-bold transition-all duration-300 ${
             contentType === "music"
               ? "bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white shadow-[0_10px_25px_rgba(255,153,0,.35)] scale-105"
@@ -713,7 +726,7 @@ export default function UploadPage() {
             )}
 
             <button
-              onClick={handlePublish}
+              onClick={handleStartPublish}
               disabled={publishing}
               className="w-full rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] py-3.5 font-bold text-white shadow-[0_15px_35px_rgba(255,153,0,.3)] transition-all hover:-translate-y-0.5 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-y-0"
             >
@@ -835,6 +848,115 @@ export default function UploadPage() {
           setAiTitleAssistOpen(false);
         }}
       />
+
+      {/* Audience Selection Pop-Up Modal */}
+      {audienceModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md rounded-3xl border border-white/15 bg-[#0B1526] p-6 shadow-2xl text-white light:border-black/15 light:bg-white light:text-slate-900">
+            <button
+              type="button"
+              onClick={() => setAudienceModalOpen(false)}
+              className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-white/10 hover:text-white light:hover:bg-black/10 light:hover:text-slate-900"
+              aria-label="Close"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="mb-5">
+              <span className="inline-block rounded-full bg-orange-500/15 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-orange-400">
+                Audience Filter
+              </span>
+              <h3 className="mt-2 text-xl font-black">
+                Who can watch this content?
+              </h3>
+              <p className="mt-1 text-xs text-slate-400 light:text-slate-600">
+                Select the audience before uploading. Your choice applies safety filters across InPlayer.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <button
+                type="button"
+                onClick={() => handleConfirmAudienceAndUpload("everyone")}
+                className="group w-full flex items-start gap-3.5 rounded-2xl border border-sky-500/30 bg-sky-500/10 p-4 text-left transition-all hover:border-sky-400 hover:bg-sky-500/20 active:scale-[0.99]"
+              >
+                <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-sky-500/20 text-2xl">
+                  👥
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-bold text-white group-hover:text-sky-300 light:text-slate-900">
+                      Everyone
+                    </p>
+                    <span className="rounded-md bg-sky-500/20 px-2 py-0.5 text-[10px] font-bold text-sky-400">
+                      General Audience
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-slate-300 light:text-slate-600">
+                    Suitable for all audiences (music tracks, videos, podcasts, entertainment).
+                  </p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleConfirmAudienceAndUpload("kids")}
+                className="group w-full flex items-start gap-3.5 rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-left transition-all hover:border-emerald-400 hover:bg-emerald-500/20 active:scale-[0.99]"
+              >
+                <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-500/20 text-2xl">
+                  👶
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-bold text-white group-hover:text-emerald-300 light:text-slate-900">
+                      Kids
+                    </p>
+                    <span className="rounded-md bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-400">
+                      Family Friendly
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-slate-300 light:text-slate-600">
+                    Safe for children and family. Visible when viewers browse in Kids mode.
+                  </p>
+                </div>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleConfirmAudienceAndUpload("adult")}
+                className="group w-full flex items-start gap-3.5 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-left transition-all hover:border-amber-400 hover:bg-amber-500/20 active:scale-[0.99]"
+              >
+                <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-2xl">
+                  🔞
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-bold text-white group-hover:text-amber-300 light:text-slate-900">
+                      18+
+                    </p>
+                    <span className="rounded-md bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-400">
+                      Mature / Adults
+                    </span>
+                  </div>
+                  <p className="mt-0.5 text-xs text-slate-300 light:text-slate-600">
+                    Contains mature or adult themes. Filtered across the platform and only visible to viewers who unlocked 18+ mode.
+                  </p>
+                </div>
+              </button>
+            </div>
+
+            <div className="mt-5 border-t border-white/10 pt-4 light:border-black/10">
+              <button
+                type="button"
+                onClick={() => setAudienceModalOpen(false)}
+                className="w-full rounded-xl py-2 text-center text-xs font-semibold text-slate-400 hover:text-white light:text-slate-600 light:hover:text-slate-900"
+              >
+                Go Back & Review Details
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

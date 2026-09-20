@@ -24,6 +24,9 @@ class ApiConstants {
   static const String videoDetail = '/api/videos';
   static const String videoPlaybackToken = '/api/videos';
 
+  // Music
+  static const String music = '/api/music';
+
   // Shorts
   static const String shorts = '/api/shorts';
 
@@ -197,6 +200,7 @@ class ApiConstants {
   // 'adsense' response is treated the same as 'off'.
   // POST ads { adId, event: 'impression'|'click' } — fire-and-forget.
   static const String ads = '/api/ads';
+  static const String midrollAds = '/api/midroll-ads';
 
   // The real website — used only for the small set of actions this app
   // honestly can't complete natively yet (Razorpay checkout for Premium/

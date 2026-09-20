@@ -30,7 +30,7 @@ class _GenrePageState extends ConsumerState<GenrePage> {
   }
 
   Future<void> _load() async {
-    final all = await ref.read(videoServiceProvider).getVideos();
+    final all = await ref.read(videoServiceProvider).getMusicTracks();
     if (!mounted) return;
     setState(() {
       _tracks = all.where((v) {

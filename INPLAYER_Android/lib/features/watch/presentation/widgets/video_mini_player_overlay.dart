@@ -1,9 +1,9 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:video_player/video_player.dart';
 
+import '../../../../core/utils/image_utils.dart';
 import '../../../../services/video_mini_player_service.dart';
 
 /// The floating video window — the video equivalent of mini_player_bar.dart's
@@ -69,7 +69,7 @@ class _VideoMiniPlayerOverlayState
     // blank. artUrl is empty for everything else.
     final art = service.artUrl;
     if (art.isNotEmpty) {
-      return CachedNetworkImage(
+      return SafeAppImage(
         imageUrl: art,
         fit: BoxFit.cover,
         errorWidget: (context, url, error) =>

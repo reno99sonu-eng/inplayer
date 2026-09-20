@@ -105,16 +105,27 @@ export default function MusicPageClient({
             <div className="relative z-10 flex flex-col md:flex-row items-center gap-8 lg:gap-12">
               {/* Album Art with Vinyl Vibe */}
               <div className="relative group shrink-0">
-                <div className="relative h-60 w-60 sm:h-72 sm:w-72 rounded-3xl overflow-hidden shadow-2xl border border-white/15 light:border-black/15 bg-black">
+                <div className="relative h-60 w-60 sm:h-72 sm:w-72 rounded-3xl overflow-hidden shadow-2xl border border-white/15 light:border-black/15 bg-black/80">
+                  {/* Ambient blurred backdrop */}
+                  <Image
+                    src={spotlight.covers[0] || "/recommendations/thumbnails/1.jpg"}
+                    alt=""
+                    aria-hidden="true"
+                    fill
+                    priority
+                    sizes="(max-width: 768px) 240px, 288px"
+                    className="object-cover scale-125 blur-xl opacity-40 pointer-events-none"
+                  />
+                  {/* Preserved foreground artwork without cropping or distortion */}
                   <Image
                     src={spotlight.covers[0] || "/recommendations/thumbnails/1.jpg"}
                     alt={spotlight.title}
                     fill
                     priority
                     sizes="(max-width: 768px) 240px, 288px"
-                    className="object-cover group-hover:scale-105 transition duration-500"
+                    className="object-contain group-hover:scale-105 transition duration-500 relative z-[1]"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent" />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent pointer-events-none z-[2]" />
                 </div>
 
                 {/* Pulsing Disc Badge */}
@@ -260,13 +271,23 @@ export default function MusicPageClient({
                     }}
                   >
                     {/* Cover Art */}
-                    <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-black/40">
+                    <div className="relative aspect-square w-full rounded-xl overflow-hidden bg-black/60">
+                      {/* Blurred backdrop to fill letterboxing seamlessly */}
+                      <Image
+                        src={cover}
+                        alt=""
+                        aria-hidden="true"
+                        fill
+                        sizes="(max-width: 640px) 160px, 200px"
+                        className="object-cover scale-125 blur-lg opacity-40 pointer-events-none"
+                      />
+                      {/* Sharp foreground artwork without cropping or distortion */}
                       <Image
                         src={cover}
                         alt={track.title}
                         fill
                         sizes="(max-width: 640px) 160px, 200px"
-                        className="object-cover group-hover:scale-105 transition duration-300"
+                        className="object-cover group-hover:scale-105 transition duration-300 relative z-[1]"
                       />
 
                       {/* Play Button Overlay */}

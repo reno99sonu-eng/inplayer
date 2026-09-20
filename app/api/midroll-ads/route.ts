@@ -47,16 +47,9 @@ export async function GET() {
 
     const pick = items[Math.floor(Math.random() * items.length)];
 
-    docClient
-      .send(
-        new UpdateCommand({
-          TableName: MIDROLL_ADS_TABLE,
-          Key: { adId: pick.adId },
-          UpdateExpression: "ADD impressions :one",
-          ExpressionAttributeValues: { ":one": 1 },
-        })
-      )
-      .catch((err) => console.error("midroll-ads: impression counter failed:", err));
+    // Notice: impressions are counted when an ad actually starts playback
+    // via POST /api/midroll-ads { adId, kind: 'impression' } instead of
+    // blindly incrementing on fetch.
 
     return NextResponse.json({
       enabled: true,
@@ -81,21 +74,31 @@ export async function GET() {
   }
 }
 
-// Real click/skip tracking, fired by VideoPlayer's mid-roll overlay.
+// Real impression/click/skip tracking, fired by player ad overlays when an ad
+// actually plays, is clicked, or is skipped.
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const adId = body?.adId;
   const kind = body?.kind;
-  if (!adId || typeof adId !== "string" || (kind !== "click" && kind !== "skip")) {
-    return NextResponse.json({ error: "adId and a valid kind are required." }, { status: 400 });
+  if (
+    !adId ||
+    typeof adId !== "string" ||
+    (kind !== "click" && kind !== "skip" && kind !== "impression")
+  ) {
+    return NextResponse.json(
+      { error: "adId and a valid kind (impression, click, skip) are required." },
+      { status: 400 }
+    );
   }
 
   try {
+    const attribute =
+      kind === "impression" ? "impressions" : kind === "click" ? "clicks" : "skips";
     await docClient.send(
       new UpdateCommand({
         TableName: MIDROLL_ADS_TABLE,
         Key: { adId },
-        UpdateExpression: `ADD ${kind === "click" ? "clicks" : "skips"} :one`,
+        UpdateExpression: `ADD ${attribute} :one`,
         ExpressionAttributeValues: { ":one": 1 },
       })
     );

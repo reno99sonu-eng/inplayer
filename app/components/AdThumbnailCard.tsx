@@ -99,77 +99,7 @@ export default function AdThumbnailCard({
   // a whole batch instead of one pre-picked item), so this is the real
   // "was this shown to a visitor" signal, same spirit as the click POST
   // below.
-  const [adFilled, setAdFilled] = useState(false);
-  const insRef = useRef<HTMLModElement>(null);
 
-  useEffect(() => {
-    if (data && data.source === "adsense") {
-      try {
-        // @ts-expect-error window.adsbygoogle global
-        (window.adsbygoogle = window.adsbygoogle || []).push({});
-      } catch {
-        /* ignore */
-      }
-
-      // Check if Google AdSense filled the ad unit with an iframe
-      const checkAdFilled = () => {
-        const ins = insRef.current;
-        if (!ins) return;
-        const hasIframe = Boolean(ins.querySelector("iframe"));
-        const isUnfilled = ins.getAttribute("data-ad-status") === "unfilled";
-        if (hasIframe && !isUnfilled) {
-          setAdFilled(true);
-        }
-      };
-
-      const timer1 = setTimeout(checkAdFilled, 1500);
-      const timer2 = setTimeout(checkAdFilled, 3500);
-
-      // Mutation observer to detect when Google injects an ad iframe
-      let observer: MutationObserver | null = null;
-      if (insRef.current && typeof MutationObserver !== "undefined") {
-        observer = new MutationObserver(() => {
-          checkAdFilled();
-        });
-        observer.observe(insRef.current, { childList: true, attributes: true });
-      }
-
-      return () => {
-        clearTimeout(timer1);
-        clearTimeout(timer2);
-        observer?.disconnect();
-      };
-    }
-  }, [data]);
-
-  if (data && data.source === "adsense") {
-    const publisherId = data.adsensePublisherId || "pub-9015405021941451";
-    const client = publisherId.startsWith("ca-") ? publisherId : `ca-${publisherId}`;
-    return (
-      <article
-        className={`group flex flex-col justify-between overflow-hidden rounded-2xl bg-[#0e1626] border border-white/10 p-2 ${
-          adFilled ? "block" : "hidden"
-        }`}
-      >
-        <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black/40">
-          <ins
-            ref={insRef}
-            className="adsbygoogle block h-full w-full"
-            style={{ display: "block" }}
-            data-ad-client={client}
-            data-ad-format="auto"
-            data-full-width-responsive="true"
-          />
-        </div>
-        <div className="mt-2 flex items-center gap-2 px-1 text-[11px] text-slate-400">
-          <span className="rounded bg-orange-500/20 px-1.5 py-0.5 font-bold uppercase text-orange-400 text-[9px]">
-            Google Ad
-          </span>
-          <span>Sponsored</span>
-        </div>
-      </article>
-    );
-  }
 
   if (!creative || !creative.imageUrl || imageBroken) return null;
 

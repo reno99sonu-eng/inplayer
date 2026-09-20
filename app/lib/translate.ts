@@ -81,7 +81,23 @@ export async function translateVtt(
   targetLanguageName: string,
   targetLangCode?: string
 ): Promise<string | null> {
-  // Primary option: If Google Translate API key is configured, use Google Cloud Translation NMT
+  // Primary option for Indian Languages: Bhashini MeitY NMT Pipeline
+  if (
+    targetLangCode &&
+    (process.env.BHASHINI_INFERENCE_KEY || process.env.BHASHINI_API_KEY) &&
+    process.env.BHASHINI_USER_ID
+  ) {
+    try {
+      const bhashiniResult = await translateVttWithBhashini(vtt, targetLangCode);
+      if (bhashiniResult && bhashiniResult.startsWith("WEBVTT")) {
+        return bhashiniResult;
+      }
+    } catch (err) {
+      console.warn("[Translate] Bhashini Translate fallback:", err instanceof Error ? err.message : err);
+    }
+  }
+
+  // Secondary option: Google Cloud Translation NMT
   if (targetLangCode && (process.env.GOOGLE_TRANSLATE_API_KEY || process.env.NEXT_PUBLIC_MAPS_API_KEY)) {
     try {
       const googleResult = await translateVttWithGoogle(vtt, targetLangCode);
@@ -89,19 +105,7 @@ export async function translateVtt(
         return googleResult;
       }
     } catch (err) {
-      console.error("Google Translate failed — falling back to next provider:", err);
-    }
-  }
-
-  // Secondary option: Bhashini API for Indian languages
-  if (targetLangCode && (process.env.BHASHINI_API_KEY && process.env.BHASHINI_USER_ID)) {
-    try {
-      const bhashiniResult = await translateVttWithBhashini(vtt, targetLangCode);
-      if (bhashiniResult && bhashiniResult.startsWith("WEBVTT")) {
-        return bhashiniResult;
-      }
-    } catch (err) {
-      console.error("Bhashini Translate failed — falling back to OpenAI/Groq:", err);
+      console.warn("[Translate] Google Translate fallback:", err instanceof Error ? err.message : err);
     }
   }
 

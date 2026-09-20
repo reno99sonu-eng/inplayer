@@ -11,6 +11,7 @@ import {
   DEFAULT_AUDIENCE_MODE,
   PASSKEY_LENGTH,
   modeFromToggles,
+  modeRequiresPasskey,
   togglesFromMode,
   type AudienceMode,
 } from "@/app/lib/contentAccess";
@@ -132,6 +133,19 @@ export default function ContentAccessMenu() {
   const requestMode = async (next: AudienceMode) => {
     if (busy || loading) return;
     setError(null);
+
+    // Narrowing modes ("kids" or "family") require no passkey and no sign-in
+    if (!modeRequiresPasskey(next)) {
+      setBusy(true);
+      try {
+        await applyMode(next);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Couldn't update content settings.");
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
 
     if (!signedIn) {
       openSignIn();

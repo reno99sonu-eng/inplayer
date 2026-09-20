@@ -174,6 +174,10 @@ class _UploadPageState extends ConsumerState<UploadPage> {
   /// real lyric sheet.
   List<LyricLine> _syncedLyrics = const [];
 
+  /// Controls whether lyrics are included for music tracks.
+  /// Defaults to true (ON). When toggled off, lyrics payload is empty (instrumental).
+  bool _lyricsEnabled = true;
+
   /// Background soundtrack, clip length and Look filter. Same defaults as the
   /// website's own initial state (no track, 30s, "original").
   ShortSettings _shortSettings = const ShortSettings();
@@ -438,16 +442,18 @@ class _UploadPageState extends ConsumerState<UploadPage> {
       }
     }
 
-    // 3. Parse lyrics if provided
+    // 3. Parse lyrics if provided and lyrics are enabled (5A: Lyrics ON/OFF toggle)
     List<Map<String, dynamic>> parsedLyricsJson = [];
-    if (_isMusicUpload && _syncedLyrics.isNotEmpty) {
-      // The editor's output takes precedence — it carries real per-line
-      // timings, which the plain textarea can only express if the creator
-      // hand-wrote LRC tags.
-      parsedLyricsJson = _syncedLyrics.map((l) => l.toJson()).toList();
-    } else if (_isMusicUpload && _lyricsController.text.trim().isNotEmpty) {
-      final parsed = parseLyrics(_lyricsController.text);
-      parsedLyricsJson = parsed.map((l) => l.toJson()).toList();
+    if (_isMusicUpload && _lyricsEnabled) {
+      if (_syncedLyrics.isNotEmpty) {
+        // The editor's output takes precedence — it carries real per-line
+        // timings, which the plain textarea can only express if the creator
+        // hand-wrote LRC tags.
+        parsedLyricsJson = _syncedLyrics.map((l) => l.toJson()).toList();
+      } else if (_lyricsController.text.trim().isNotEmpty) {
+        final parsed = parseLyrics(_lyricsController.text);
+        parsedLyricsJson = parsed.map((l) => l.toJson()).toList();
+      }
     }
 
     // 4. Fingerprint the audio bytes for server-side duplicate-track
@@ -619,6 +625,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
       _savingThumbnail = false;
       _aiBusy = false;
       _syncedLyrics = const [];
+      _lyricsEnabled = true;
       _shortSettings = const ShortSettings();
       // These two were missing from the reset, so "Upload Another" after a
       // music track carried the previous genre and cover interval into the
@@ -1312,89 +1319,150 @@ class _UploadPageState extends ConsumerState<UploadPage> {
             onChanged: (v) => setState(() => _genre = v ?? _genre),
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              _label('Synchronized Lyrics (.lrc or plain text)'),
-              const Spacer(),
-              // Opens the tap-to-stamp editor. Kept alongside the plain
-              // textarea rather than replacing it: pasting an existing .lrc
-              // is still the fastest path when the creator already has one,
-              // and the editor is the answer when they don't.
-              Padding(
-                padding: const EdgeInsets.only(top: 14, bottom: 6),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(20),
-                  onTap: _openLyricsEditor,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.brandOrange.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: AppColors.brandOrange.withValues(alpha: 0.35),
+          // 5A: Lyrics ON/OFF Toggle (defaults to ON; if OFF, payload sends empty list for instrumental tracks)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: context.bgCard,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: _lyricsEnabled
+                    ? AppColors.brandOrange.withValues(alpha: 0.35)
+                    : context.borderSubtle,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  _lyricsEnabled ? Icons.lyrics_rounded : Icons.music_off_rounded,
+                  color: _lyricsEnabled ? AppColors.brandOrangeLight : context.textDim,
+                  size: 22,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Lyrics',
+                        style: TextStyle(
+                          color: context.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.graphic_eq_rounded,
-                          size: 13,
-                          color: AppColors.brandOrangeLight,
+                      const SizedBox(height: 2),
+                      Text(
+                        _lyricsEnabled
+                            ? 'Lyrics ON — Synchronized LRC or plain text included'
+                            : 'Lyrics OFF — Instrumental track (no lyrics)',
+                        style: TextStyle(
+                          color: _lyricsEnabled ? context.textDim : AppColors.brandOrangeLight,
+                          fontSize: 11,
                         ),
-                        SizedBox(width: 5),
-                        Text(
-                          'Sync to audio',
-                          style: TextStyle(
+                      ),
+                    ],
+                  ),
+                ),
+                Switch.adaptive(
+                  key: const Key('music_lyrics_toggle'),
+                  value: _lyricsEnabled,
+                  activeThumbColor: AppColors.brandOrange,
+                  onChanged: (val) {
+                    setState(() {
+                      _lyricsEnabled = val;
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+          if (_lyricsEnabled) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                _label('Synchronized Lyrics (.lrc or plain text)'),
+                const Spacer(),
+                // Opens the tap-to-stamp editor. Kept alongside the plain
+                // textarea rather than replacing it: pasting an existing .lrc
+                // is still the fastest path when the creator already has one,
+                // and the editor is the answer when they don't.
+                Padding(
+                  padding: const EdgeInsets.only(top: 14, bottom: 6),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: _openLyricsEditor,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.brandOrange.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: AppColors.brandOrange.withValues(alpha: 0.35),
+                        ),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.graphic_eq_rounded,
+                            size: 13,
                             color: AppColors.brandOrangeLight,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
                           ),
-                        ),
-                      ],
+                          SizedBox(width: 5),
+                          Text(
+                            'Sync to audio',
+                            style: TextStyle(
+                              color: AppColors.brandOrangeLight,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          TextField(
-            controller: _lyricsController,
-            maxLines: 4,
-            style: TextStyle(color: context.textPrimary, fontSize: 13),
-            decoration: _inputDecoration(
-              'Paste your lyrics or [.lrc] timestamps here...',
+              ],
             ),
-            // Typing here supersedes whatever the editor produced — the two
-            // must not silently disagree about which is the real lyric
-            // sheet. See _syncedLyrics.
-            onChanged: (_) => setState(() => _syncedLyrics = const []),
-          ),
-          if (_syncedLyrics.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.check_circle_rounded,
-                    size: 14,
-                    color: AppColors.success,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      '${_syncedLyrics.length} lines timed'
-                      '${_syncedLyrics.any((l) => l.time > 0) ? '' : ' (no timings yet)'}'
-                      ' — tap "Sync to audio" to adjust.',
-                      style: TextStyle(color: context.textDim, fontSize: 11),
+            TextField(
+              controller: _lyricsController,
+              maxLines: 4,
+              style: TextStyle(color: context.textPrimary, fontSize: 13),
+              decoration: _inputDecoration(
+                'Paste your lyrics or [.lrc] timestamps here...',
+              ),
+              // Typing here supersedes whatever the editor produced — the two
+              // must not silently disagree about which is the real lyric
+              // sheet. See _syncedLyrics.
+              onChanged: (_) => setState(() => _syncedLyrics = const []),
+            ),
+            if (_syncedLyrics.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.check_circle_rounded,
+                      size: 14,
+                      color: AppColors.success,
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '${_syncedLyrics.length} lines timed'
+                        '${_syncedLyrics.any((l) => l.time > 0) ? '' : ' (no timings yet)'}'
+                        ' — tap "Sync to audio" to adjust.',
+                        style: TextStyle(color: context.textDim, fontSize: 11),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
+          ],
         ],
 
         const SizedBox(height: 8),

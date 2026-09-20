@@ -778,7 +778,9 @@ export default function RecommendationFeed({
   return (
     <>
       {feedBatches.map((entries, index) => {
-        const wantsShelf = index % 2 === 1;
+        // Show Raftaar Shorts shelf right after block 0 (immediately below first videos),
+        // and then repeat on alternate blocks so Raftaar is prominently visible
+        const wantsShelf = index === 0 || index % 2 === 0;
         let shelfShorts: Short[] = [];
         let showShortsShelf = false;
 

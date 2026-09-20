@@ -181,8 +181,25 @@ function NavbarThemeManagerContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: trimmedPrompt }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "AI generation failed.");
+      let data: { error?: string; imageUrl?: string; title?: string } | null = null;
+      try {
+        data = await res.json();
+      } catch {
+        data = null;
+      }
+      if (!res.ok) {
+        const errorMsg =
+          data?.error ||
+          (res.status === 504
+            ? "Server timed out generating the AI theme (504 Gateway Timeout). Please try again."
+            : res.statusText
+            ? `AI generation failed (HTTP ${res.status}: ${res.statusText}).`
+            : `AI generation failed (HTTP ${res.status}).`);
+        throw new Error(errorMsg);
+      }
+      if (!data?.imageUrl) {
+        throw new Error("No image data returned from generator.");
+      }
       setPreviewImageUrl(data.imageUrl);
       setGeneratedTitle(data.title || trimmedPrompt);
       setSuccessMsg(`AI generated a new "${data.title || trimmedPrompt}" graphic!`);

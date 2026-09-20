@@ -4,6 +4,7 @@ import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { SettingsProvider } from "./components/settings/SettingsProvider";
+import { LanguageProvider } from "./context/LanguageContext";
 import AuthProvider from "./components/auth/AuthProvider";
 import SiteChrome from "./components/SiteChrome";
 import ChunkErrorRecovery from "./components/ChunkErrorRecovery";
@@ -185,13 +186,13 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <head>
-        {settings.adsenseEnabled && settings.adsensePublisherId ? (
+        {settings.adsenseEnabled ? (
           <script
             async
             src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${
-              settings.adsensePublisherId.startsWith("ca-")
-                ? settings.adsensePublisherId
-                : `ca-${settings.adsensePublisherId}`
+              (settings.adsensePublisherId || "pub-9015405021941451").startsWith("ca-")
+                ? (settings.adsensePublisherId || "pub-9015405021941451")
+                : `ca-${settings.adsensePublisherId || "pub-9015405021941451"}`
             }`}
             crossOrigin="anonymous"
           />
@@ -272,14 +273,16 @@ export default async function RootLayout({
 <ChunkErrorRecovery />
 <AuthProvider>
   <SettingsProvider>
-    <ThemeProvider>
-      <SiteChrome
-        initialMaintenance={initialMaintenance}
-        initialGeoAllowed={geoAllowed}
-      >
-        {children}
-      </SiteChrome>
-    </ThemeProvider>
+    <LanguageProvider>
+      <ThemeProvider>
+        <SiteChrome
+          initialMaintenance={initialMaintenance}
+          initialGeoAllowed={geoAllowed}
+        >
+          {children}
+        </SiteChrome>
+      </ThemeProvider>
+    </LanguageProvider>
   </SettingsProvider>
 </AuthProvider>
       </body>

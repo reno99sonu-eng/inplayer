@@ -63,6 +63,8 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
       return Icons.security_rounded;
     }
     switch (type) {
+      case 'video_upload':
+        return Icons.video_library_rounded;
       case 'subscribe':
         return Icons.person_add_alt_1;
       case 'like':
@@ -217,7 +219,10 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
         body: _loading
             ? const Center(
                 child: CircularProgressIndicator(color: AppColors.brandOrange))
-            : RefreshIndicator(
+            : Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 720),
+                  child: RefreshIndicator(
                 color: AppColors.brandOrange,
                 backgroundColor: context.bgCard,
                 onRefresh: _load,
@@ -294,6 +299,8 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
                         },
                       ),
               ),
+            ),
+          ),
       ),
     );
   }

@@ -782,7 +782,12 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage>
                     )
                   : Padding(
                       padding: const EdgeInsets.all(16.0),
-                      child: _buildActiveTabContent(user),
+                      child: Center(
+                        child: ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 960),
+                          child: _buildActiveTabContent(user),
+                        ),
+                      ),
                     ),
             ),
             const SliverToBoxAdapter(child: SizedBox(height: 60)),
@@ -821,10 +826,13 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage>
       },
     ];
 
-    return Container(
-      height: 48,
-      margin: const EdgeInsets.symmetric(vertical: 4),
-      child: ListView.builder(
+    return Center(
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 960),
+        child: Container(
+          height: 48,
+          margin: const EdgeInsets.symmetric(vertical: 4),
+          child: ListView.builder(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 14),
         itemCount: tabs.length,
@@ -893,8 +901,10 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage>
           );
         },
       ),
-    );
-  }
+    ),
+  ),
+);
+}
 
   Widget _buildActiveTabContent(dynamic user) {
     switch (_activeTab) {

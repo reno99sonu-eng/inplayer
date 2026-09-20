@@ -4,6 +4,7 @@ import { docClient } from "@/app/lib/dynamodb";
 import { requireAdmin } from "@/app/lib/isAdmin";
 import { getMuxThumbnailUrl } from "@/app/lib/muxThumbnail";
 import { normalizeContentType } from "@/app/lib/contentTypes";
+import { videoAudience, type VideoAudience } from "@/app/lib/contentAccess";
 
 const PAGE_SIZE = 25;
 // How many raw table items a title search is willing to walk through before
@@ -35,10 +36,14 @@ export interface AdminVideoRow {
   uploaderName: string | null;
   thumbnailUrl: string | null;
   uploadedAt: string | null;
+  audience: VideoAudience;
+  audienceDeclared: VideoAudience | null;
+  madeForKids: boolean;
+  ageRestricted: boolean;
 }
 
 const PROJECTION =
-  "videoId, title, contentType, #st, visibility, #v, uploaderId, uploaderName, thumbnailUrl, muxPlaybackId, uploadedAt";
+  "videoId, title, contentType, #st, visibility, #v, uploaderId, uploaderName, thumbnailUrl, muxPlaybackId, uploadedAt, audience, audienceDeclared, madeForKids, ageRestricted";
 const NAMES = { "#st": "status", "#v": "views" };
 
 function toRow(item: Record<string, unknown>): AdminVideoRow {
@@ -47,6 +52,12 @@ function toRow(item: Record<string, unknown>): AdminVideoRow {
     (typeof item.muxPlaybackId === "string"
       ? getMuxThumbnailUrl(item.muxPlaybackId, item.contentType === "short")
       : null);
+
+  const audience = videoAudience(item as { audience?: unknown; ageRestricted?: unknown; madeForKids?: unknown });
+  const rawDeclared = item.audienceDeclared || item.audience;
+  const audienceDeclared = rawDeclared === "kids" || rawDeclared === "adult" || rawDeclared === "everyone"
+    ? rawDeclared
+    : null;
 
   return {
     videoId: item.videoId as string,
@@ -59,6 +70,10 @@ function toRow(item: Record<string, unknown>): AdminVideoRow {
     uploaderName: (item.uploaderName as string) || null,
     thumbnailUrl,
     uploadedAt: (item.uploadedAt as string) || null,
+    audience,
+    audienceDeclared,
+    madeForKids: Boolean(item.madeForKids),
+    ageRestricted: Boolean(item.ageRestricted),
   };
 }
 

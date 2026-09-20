@@ -10,6 +10,7 @@ import React, {
   ReactNode,
 } from "react";
 import type { LyricLine } from "@/app/lib/musicTrack";
+import { usePremium } from "@/app/hooks/usePremium";
 
 export interface MusicTrack {
   videoId: string;
@@ -27,6 +28,16 @@ export interface MusicTrack {
   audioUrl?: string;
   views?: number | string;
   likeCount?: number | string;
+}
+
+export interface MusicAdCreative {
+  adId: string;
+  imageUrl: string;
+  linkUrl: string;
+  title: string;
+  sponsorName?: string;
+  creativeUrl?: string;
+  clickUrl?: string;
 }
 
 interface MusicPlayerContextType {
@@ -47,6 +58,13 @@ interface MusicPlayerContextType {
   activeCoverIndex: number;
   activeLyricIndex: number;
   audioRef: React.RefObject<HTMLAudioElement | null>;
+  isAdActive: boolean;
+  currentAd: MusicAdCreative | null;
+  adCountdown: number;
+  skipUnlocked: boolean;
+  skipAd: () => void;
+  trackAdClick: () => void;
+  sessionTrackCount: number;
   playTrack: (track: MusicTrack, newQueue?: MusicTrack[]) => void;
   togglePlay: () => void;
   pause: () => void;
@@ -73,6 +91,7 @@ const MusicPlayerContext = createContext<MusicPlayerContextType | undefined>(
 );
 
 export function MusicPlayerProvider({ children }: { children: ReactNode }) {
+  const premium = usePremium();
   const [currentTrack, setCurrentTrack] = useState<MusicTrack | null>(null);
   const [isPlaying, setIsPlaying] = useState<boolean>(false);
   const [currentTime, setCurrentTime] = useState<number>(0);
@@ -87,9 +106,27 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
   const [isExpanded, setExpanded] = useState<boolean>(false);
   const [isLyricDrawerOpen, setIsLyricDrawerOpen] = useState<boolean>(false);
   const [isQueueDrawerOpen, setIsQueueDrawerOpen] = useState<boolean>(false);
-  const [activeCoverIndex, setActiveCoverIndex] = useState<number>(0);
+
+  // Dedicated Music listening-session advertising state
+  const [sessionTrackCount, setSessionTrackCount] = useState(0);
+  const sessionTrackCountRef = useRef(0);
+  const [isAdActive, setIsAdActive] = useState(false);
+  const [currentAd, setCurrentAd] = useState<MusicAdCreative | null>(null);
+  const [adCountdown, setAdCountdown] = useState(10);
+  const skipUnlocked = adCountdown <= 0;
+  const pendingTrackRef = useRef<{ track: MusicTrack; newQueue?: MusicTrack[] } | null>(null);
+  const lastTrackIdRef = useRef<string | null>(null);
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
+
+  // 10-second unskippable ad countdown effect
+  useEffect(() => {
+    if (!isAdActive || adCountdown <= 0) return;
+    const timer = setTimeout(() => {
+      setAdCountdown((c) => c - 1);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [isAdActive, adCountdown]);
 
   // Initialize audio element
   useEffect(() => {
@@ -103,15 +140,8 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     };
 
     const onLoadedMetadata = () => {
-      setDuration(audio.duration || currentTrack?.duration || 0);
-    };
-
-    const onEnded = () => {
-      if (repeatMode === "one") {
-        audio.currentTime = 0;
-        audio.play().catch(() => {});
-      } else {
-        nextTrackRef.current();
+      if (audio.duration && !isNaN(audio.duration)) {
+        setDuration(audio.duration);
       }
     };
 
@@ -120,14 +150,12 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
 
     audio.addEventListener("timeupdate", onTimeUpdate);
     audio.addEventListener("loadedmetadata", onLoadedMetadata);
-    audio.addEventListener("ended", onEnded);
     audio.addEventListener("play", onPlay);
     audio.addEventListener("pause", onPause);
 
     return () => {
       audio.removeEventListener("timeupdate", onTimeUpdate);
       audio.removeEventListener("loadedmetadata", onLoadedMetadata);
-      audio.removeEventListener("ended", onEnded);
       audio.removeEventListener("play", onPlay);
       audio.removeEventListener("pause", onPause);
       audio.pause();
@@ -135,15 +163,13 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // Multi-cover cycling timer
-  useEffect(() => {
+  // Multi-cover cycling
+  const activeCoverIndex = React.useMemo(() => {
     if (!currentTrack || !currentTrack.covers || currentTrack.covers.length <= 1) {
-      setActiveCoverIndex(0);
-      return;
+      return 0;
     }
     const intervalSec = currentTrack.coverIntervalSeconds || 7;
-    const idx = Math.floor(currentTime / intervalSec) % currentTrack.covers.length;
-    setActiveCoverIndex(idx);
+    return Math.floor(currentTime / intervalSec) % currentTrack.covers.length;
   }, [currentTime, currentTrack]);
 
   // Compute active lyric index
@@ -151,16 +177,16 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     if (!currentTrack?.lyrics || currentTrack.lyrics.length === 0) return -1;
     const lyrics = currentTrack.lyrics;
     for (let i = lyrics.length - 1; i >= 0; i--) {
-      const lineTime = lyrics[i].time ?? (lyrics[i] as any).seconds ?? 0;
+      const lineTime = lyrics[i].time ?? 0;
       if (currentTime >= lineTime) {
         return i;
       }
     }
     return 0;
-  }, [currentTime, currentTrack?.lyrics]);
+  }, [currentTime, currentTrack]);
 
-  // Handle Play Track
-  const playTrack = useCallback(
+  // Actual audio playback routine
+  const startActualPlayback = useCallback(
     (track: MusicTrack, newQueue?: MusicTrack[]) => {
       setCurrentTrack(track);
       setCurrentTime(0);
@@ -178,10 +204,8 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
       }
 
       if (audioRef.current) {
-        // Resolve stream audio source
         let streamUrl = track.audioUrl;
         if (!streamUrl && track.muxPlaybackId) {
-          // Mux audio stream URL or fallback HLS
           streamUrl = `https://stream.mux.com/${track.muxPlaybackId}/audio.m4a`;
         }
         if (!streamUrl) {
@@ -204,6 +228,100 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
       }
     },
     [playbackRate, volume, isMuted]
+  );
+
+  // Trigger house ad for track 1, 5, 9, etc.
+  const triggerAdForTrack = useCallback(
+    async (track: MusicTrack, continuePlayback: () => void) => {
+      try {
+        const res = await fetch("/api/midroll-ads");
+        const data = await res.json().catch(() => ({ enabled: false }));
+        if (
+          data.enabled &&
+          (data.ad || (Array.isArray(data.ads) && data.ads.length > 0))
+        ) {
+          const pickedAd = data.ad || data.ads[0];
+          setCurrentAd(pickedAd);
+          setIsAdActive(true);
+          setAdCountdown(10);
+
+          if (audioRef.current) {
+            audioRef.current.pause();
+          }
+
+          // Track impression
+          fetch("/api/midroll-ads", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ adId: pickedAd.adId, kind: "impression" }),
+          }).catch(() => {});
+
+          return;
+        }
+      } catch (err) {
+        console.error("Music session ad fetch error:", err);
+      }
+      continuePlayback();
+    },
+    []
+  );
+
+  const skipAd = useCallback(() => {
+    if (!skipUnlocked && adCountdown > 0) return;
+    if (currentAd) {
+      fetch("/api/midroll-ads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adId: currentAd.adId, kind: "skip" }),
+      }).catch(() => {});
+    }
+    setIsAdActive(false);
+    setCurrentAd(null);
+    if (pendingTrackRef.current) {
+      const { track, newQueue } = pendingTrackRef.current;
+      pendingTrackRef.current = null;
+      startActualPlayback(track, newQueue);
+    } else if (audioRef.current && currentTrack) {
+      audioRef.current.play().catch(() => {});
+      setIsPlaying(true);
+    }
+  }, [skipUnlocked, adCountdown, currentAd, currentTrack, startActualPlayback]);
+
+  const trackAdClick = useCallback(() => {
+    if (currentAd) {
+      fetch("/api/midroll-ads", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ adId: currentAd.adId, kind: "click" }),
+      }).catch(() => {});
+    }
+  }, [currentAd]);
+
+  // Handle Play Track with listening-session ad counter
+  const playTrack = useCallback(
+    (track: MusicTrack, newQueue?: MusicTrack[]) => {
+      const isNewTrack = lastTrackIdRef.current !== track.videoId;
+      lastTrackIdRef.current = track.videoId;
+
+      if (isNewTrack) {
+        const nextCount = sessionTrackCountRef.current + 1;
+        sessionTrackCountRef.current = nextCount;
+        setSessionTrackCount(nextCount);
+
+        const isPrem = Boolean(premium.premium);
+        // Free user pattern: Track 1 has ad (unskippable 10s), then 3-4 ad-free, then Track 5 has ad (unskippable 10s), recurring
+        const shouldShowAd = !isPrem && (nextCount === 1 || (nextCount - 1) % 4 === 0);
+
+        if (shouldShowAd) {
+          pendingTrackRef.current = { track, newQueue };
+          triggerAdForTrack(track, () => startActualPlayback(track, newQueue));
+          return;
+        }
+      }
+
+      startActualPlayback(track, newQueue);
+    },
+    [premium.premium, triggerAdForTrack, startActualPlayback]
   );
 
   const togglePlay = useCallback(() => {
@@ -255,8 +373,23 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     playTrack(queue[nextIdx]);
   }, [queue, queueIndex, isShuffled, repeatMode, playTrack]);
 
-  const nextTrackRef = useRef(nextTrack);
-  nextTrackRef.current = nextTrack;
+  // Sync audio ended event with latest nextTrack and repeatMode
+  useEffect(() => {
+    const audio = audioRef.current;
+    if (!audio) return;
+    const onEnded = () => {
+      if (repeatMode === "one") {
+        audio.currentTime = 0;
+        audio.play().catch(() => {});
+      } else {
+        nextTrack();
+      }
+    };
+    audio.addEventListener("ended", onEnded);
+    return () => {
+      audio.removeEventListener("ended", onEnded);
+    };
+  }, [repeatMode, nextTrack]);
 
   const prevTrack = useCallback(() => {
     if (!audioRef.current || queue.length === 0) return;
@@ -328,7 +461,7 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const clearQueue = useCallback(() => {
-    setQueue((prev) => (currentTrack ? [currentTrack] : []));
+    setQueue(currentTrack ? [currentTrack] : []);
     setQueueIndex(0);
   }, [currentTrack]);
 
@@ -342,6 +475,9 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
     setExpanded(false);
     setIsLyricDrawerOpen(false);
     setIsQueueDrawerOpen(false);
+    setIsAdActive(false);
+    setCurrentAd(null);
+    pendingTrackRef.current = null;
   }, []);
 
   return (
@@ -364,6 +500,13 @@ export function MusicPlayerProvider({ children }: { children: ReactNode }) {
         activeCoverIndex,
         activeLyricIndex,
         audioRef,
+        isAdActive,
+        currentAd,
+        adCountdown,
+        skipUnlocked,
+        skipAd,
+        trackAdClick,
+        sessionTrackCount,
         playTrack,
         togglePlay,
         pause,

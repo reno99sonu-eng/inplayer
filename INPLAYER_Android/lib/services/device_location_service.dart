@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:geolocator/geolocator.dart';
 import 'package:logger/logger.dart';
 
@@ -15,9 +16,27 @@ final _logger = Logger();
 /// This ensures genuine users in India (on mobile data, Wi-Fi, or during server
 /// degradation) are never falsely locked out by geo-blocking.
 Future<GeoVerificationResult> requestDeviceLocation(GeoService service) async {
-  final ipResult = await service.verifyGeo();
+  // 1. Fast path: If device is in Indian Standard Time (UTC+5:30) or IN locale, grant access immediately
+  if (service.isLikelyIndiaDevice) {
+    _logger.i('Device is in IST / India locale; granting access fast path.');
+    // Refresh IP geo in background for telemetry without blocking startup
+    unawaited(service.verifyGeo());
+    return const GeoVerificationResult(
+      allowed: true,
+      country: 'IN',
+      isVpn: false,
+      isProxy: false,
+      isHosting: false,
+    );
+  }
 
-  // Try checking device GPS coordinates to verify physical presence in India
+  // 2. Server IP check (/api/geo/verify)
+  final ipResult = await service.verifyGeo();
+  if (ipResult.allowed) {
+    return ipResult;
+  }
+
+  // 3. Fallback: Try checking device GPS coordinates to verify physical presence in India
   try {
     if (await Geolocator.isLocationServiceEnabled()) {
       var permission = await Geolocator.checkPermission();
@@ -66,11 +85,6 @@ Future<GeoVerificationResult> requestDeviceLocation(GeoService service) async {
     }
   } catch (e) {
     _logger.d('Device GPS check skipped: $e');
-  }
-
-  // If IP check allowed access, accept it
-  if (ipResult.allowed) {
-    return ipResult;
   }
 
   // If IP check failed (e.g. rate limit, network timeout, carrier CGNAT proxy flag),

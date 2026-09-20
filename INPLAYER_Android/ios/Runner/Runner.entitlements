@@ -1,0 +1,18 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Background audio: required by just_audio_background for lock-screen media
+	     controls and background music playback in the Music section. -->
+	<key>com.apple.developer.playback</key>
+	<true/>
+
+	<!-- Push notifications: aps-environment must be present so APNs works on
+	     real devices. Set to "development" for debug/TestFlight builds; the
+	     production entitlement is automatically promoted by App Store Connect
+	     when distributing via the App Store. Codemagic automatic signing will
+	     set the correct value based on the build type. -->
+	<key>aps-environment</key>
+	<string>development</string>
+</dict>
+</plist>

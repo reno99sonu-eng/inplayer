@@ -34,7 +34,9 @@ export default async function MusicPage({ searchParams }: MusicPageProps) {
     const allVideos = await getVisibleVideos();
     const musicVideos = allVideos.filter(
       (v) =>
-        isMusicType(v.contentType) &&
+        (isMusicType(v.contentType) ||
+          (typeof v.category === "string" && v.category.toLowerCase() === "music") ||
+          (v.musicSettings != null && typeof v.musicSettings === "object")) &&
         (!v.visibility || v.visibility === "public")
     );
 

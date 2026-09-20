@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
   // hero between real Weekly Featured videos (OFF, default — see
   // app/page.tsx / FeaturedHero.tsx) and an admin-uploaded poster (ON).
   // There's no AdSense option for this slot, so ON always means "house".
-  const source =
+  const rawSource =
     placement === "homepage"
       ? settings.homepageBannerSource
       : placement === "watch"
@@ -44,15 +44,13 @@ export async function GET(request: NextRequest) {
       ? "house"
       : "off";
 
+  // Segment banner slots (homepage, watch, weekly_featured) are reserved for
+  // custom sponsor/house banners or off. Google AdSense runs globally via Auto-Ads.
+  // Legacy "adsense" values in DB gracefully fallback to "house".
+  const source = rawSource === "adsense" ? "house" : rawSource;
+
   if (source === "off") {
     return NextResponse.json({ source: "off" });
-  }
-
-  if (source === "adsense") {
-    if (!settings.adsenseEnabled || !settings.adsensePublisherId) {
-      return NextResponse.json({ source: "off" });
-    }
-    return NextResponse.json({ source: "adsense", adsensePublisherId: settings.adsensePublisherId });
   }
 
   // source === "house" — reads the shared 30-second cached scan (see

@@ -57,7 +57,7 @@ export default function FeaturedHeroVideo({
                 fill
                 priority={index === 0}
                 sizes="100vw"
-                className="object-contain"
+                className="object-cover"
               />
             </>
           )}

@@ -14,6 +14,11 @@ import {
   Eye,
   Film,
   Video as VideoIcon,
+  SlidersHorizontal,
+  X,
+  Baby,
+  ShieldAlert,
+  Users,
 } from "lucide-react";
 import { CONTENT_TYPE_LABEL, CONTENT_TYPE_WORD, normalizeContentType, watchHrefFor } from "@/app/lib/contentTypes";
 
@@ -28,6 +33,8 @@ interface AdminVideoRow {
   uploaderName: string | null;
   thumbnailUrl: string | null;
   uploadedAt: string | null;
+  audience?: "everyone" | "kids" | "adult";
+  audienceDeclared?: "everyone" | "kids" | "adult" | null;
 }
 
 type TypeFilter = "all" | "video" | "short" | "music";
@@ -74,6 +81,26 @@ function statusBadge(status: string | null) {
   );
 }
 
+function audienceBadge(row: AdminVideoRow) {
+  const aud = row.audience || "everyone";
+  const color =
+    aud === "kids"
+      ? "bg-emerald-500/15 text-emerald-300 light:bg-emerald-100 light:text-emerald-700"
+      : aud === "adult"
+      ? "bg-amber-500/15 text-amber-300 light:bg-amber-100 light:text-amber-700"
+      : "bg-sky-500/15 text-sky-300 light:bg-sky-100 light:text-sky-700";
+  const label = aud === "kids" ? "Kids" : aud === "adult" ? "18+" : "Everyone";
+
+  return (
+    <span className={`inline-flex items-center gap-1 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-wide ${color}`}>
+      {label}
+      {row.audienceDeclared && row.audienceDeclared !== aud && (
+        <span className="opacity-70 font-normal"> (Orig: {row.audienceDeclared})</span>
+      )}
+    </span>
+  );
+}
+
 export default function AdminVideosPage() {
   const searchParams = useSearchParams();
   const initialType = searchParams.get("type");
@@ -98,6 +125,34 @@ export default function AdminVideosPage() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [editingAudienceRow, setEditingAudienceRow] = useState<AdminVideoRow | null>(null);
+  const [savingAudience, setSavingAudience] = useState(false);
+
+  const updateAudience = async (targetAudience: "everyone" | "kids" | "adult") => {
+    if (!editingAudienceRow || savingAudience) return;
+    setSavingAudience(true);
+    try {
+      const res = await authedFetch(`/api/admin/videos/${editingAudienceRow.videoId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ audience: targetAudience }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || "Failed to update audience.");
+      }
+      setRows((prev) =>
+        prev.map((r) =>
+          r.videoId === editingAudienceRow.videoId ? { ...r, audience: targetAudience } : r
+        )
+      );
+      setEditingAudienceRow(null);
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Failed to update audience.");
+    } finally {
+      setSavingAudience(false);
+    }
+  };
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedQuery(query.trim()), 400);
@@ -291,11 +346,12 @@ export default function AdminVideosPage() {
                   )}
                 </div>
                 <div className="min-w-0">
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
                     <p className="truncate text-sm font-bold text-white light:text-slate-900">
                       {row.title}
                     </p>
                     {statusBadge(row.status)}
+                    {audienceBadge(row)}
                     {row.visibility && row.visibility !== "public" && (
                       <span className="shrink-0 rounded-full bg-white/10 light:bg-black/10 px-2 py-0.5 text-[10px] font-black uppercase tracking-wide text-slate-300 light:text-slate-700">
                         {row.visibility}
@@ -313,6 +369,15 @@ export default function AdminVideosPage() {
               </div>
 
               <div className="flex shrink-0 items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingAudienceRow(row)}
+                  className="flex items-center gap-1.5 rounded-xl border border-white/10 light:border-black/10 px-3 py-2 text-xs font-semibold text-slate-300 light:text-slate-700 hover:bg-white/5 light:hover:bg-black/5"
+                  title="Change & Sync Audience Channel"
+                >
+                  <SlidersHorizontal size={13} />
+                  Audience
+                </button>
                 <Link
                   href={watchHref(row)}
                   target="_blank"
@@ -355,6 +420,128 @@ export default function AdminVideosPage() {
             "Load more"
           )}
         </button>
+      )}
+
+      {/* Edit Audience Modal */}
+      {editingAudienceRow && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md rounded-3xl border border-white/15 bg-[#0B1526] p-6 shadow-2xl text-white light:border-black/15 light:bg-white light:text-slate-900">
+            <button
+              type="button"
+              onClick={() => setEditingAudienceRow(null)}
+              disabled={savingAudience}
+              className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-white/10 hover:text-white light:hover:bg-black/10 light:hover:text-slate-900"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="mb-4">
+              <span className="inline-block rounded-full bg-orange-500/15 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-orange-400">
+                Admin Content Studio
+              </span>
+              <h3 className="mt-2 text-xl font-black">
+                Channel / Sync Content Audience
+              </h3>
+              <p className="mt-1 text-xs text-slate-400 light:text-slate-600 truncate font-semibold">
+                &ldquo;{editingAudienceRow.title}&rdquo;
+              </p>
+              {editingAudienceRow.audienceDeclared && (
+                <p className="mt-1 text-xs text-amber-300 light:text-amber-700">
+                  Creator selected: <span className="font-bold uppercase">{editingAudienceRow.audienceDeclared}</span> at upload
+                </p>
+              )}
+            </div>
+
+            <p className="mb-4 text-xs text-slate-300 light:text-slate-600">
+              Select which audience segment this video should sync to across InPlayer platform feeds:
+            </p>
+
+            <div className="space-y-2.5">
+              <button
+                type="button"
+                disabled={savingAudience}
+                onClick={() => updateAudience("everyone")}
+                className={`w-full flex items-center justify-between rounded-2xl border p-3.5 text-left transition-all ${
+                  (editingAudienceRow.audience || "everyone") === "everyone"
+                    ? "border-sky-500 bg-sky-500/20 text-white"
+                    : "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/10 light:border-black/10 light:bg-black/[0.03] light:text-slate-800"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-xl">👥</span>
+                  <div>
+                    <div className="font-bold text-sm">Everyone (General)</div>
+                    <div className="text-[11px] text-slate-400 light:text-slate-600">Standard feed, music &amp; general audience</div>
+                  </div>
+                </div>
+                {(editingAudienceRow.audience || "everyone") === "everyone" && (
+                  <span className="text-xs font-bold text-sky-400">Current</span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                disabled={savingAudience}
+                onClick={() => updateAudience("kids")}
+                className={`w-full flex items-center justify-between rounded-2xl border p-3.5 text-left transition-all ${
+                  editingAudienceRow.audience === "kids"
+                    ? "border-emerald-500 bg-emerald-500/20 text-white"
+                    : "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/10 light:border-black/10 light:bg-black/[0.03] light:text-slate-800"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-xl">👶</span>
+                  <div>
+                    <div className="font-bold text-sm">Kids (Family Safe)</div>
+                    <div className="text-[11px] text-slate-400 light:text-slate-600">Shows in Kids mode &amp; normal feed</div>
+                  </div>
+                </div>
+                {editingAudienceRow.audience === "kids" && (
+                  <span className="text-xs font-bold text-emerald-400">Current</span>
+                )}
+              </button>
+
+              <button
+                type="button"
+                disabled={savingAudience}
+                onClick={() => updateAudience("adult")}
+                className={`w-full flex items-center justify-between rounded-2xl border p-3.5 text-left transition-all ${
+                  editingAudienceRow.audience === "adult"
+                    ? "border-amber-500 bg-amber-500/20 text-white"
+                    : "border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/10 light:border-black/10 light:bg-black/[0.03] light:text-slate-800"
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="text-xl">🔞</span>
+                  <div>
+                    <div className="font-bold text-sm">18+ (Adult Content)</div>
+                    <div className="text-[11px] text-slate-400 light:text-slate-600">Requires passkey to unlock in feeds</div>
+                  </div>
+                </div>
+                {editingAudienceRow.audience === "adult" && (
+                  <span className="text-xs font-bold text-amber-400">Current</span>
+                )}
+              </button>
+            </div>
+
+            {savingAudience && (
+              <div className="mt-4 flex items-center justify-center gap-2 text-xs font-bold text-orange-400">
+                <Loader2 size={16} className="animate-spin" /> Syncing with DynamoDB &amp; platform feeds…
+              </div>
+            )}
+
+            <div className="mt-5 border-t border-white/10 pt-3 light:border-black/10">
+              <button
+                type="button"
+                onClick={() => setEditingAudienceRow(null)}
+                disabled={savingAudience}
+                className="w-full rounded-xl py-2 text-center text-xs font-semibold text-slate-400 hover:text-white light:text-slate-600 light:hover:text-slate-900"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

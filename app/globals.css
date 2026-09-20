@@ -897,7 +897,7 @@ animation: aiGlassSweep 5.5s linear infinite;
   .premium-player:fullscreen mux-player,
   .premium-player:-webkit-full-screen mux-player,
   .premium-player.fake-fullscreen mux-player {
-    --media-object-fit: cover;
+    --media-object-fit: contain;
   }
 }
 

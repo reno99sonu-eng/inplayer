@@ -1,4 +1,5 @@
 import { getVisibleVideos } from "@/app/lib/contentAccessServer";
+import { isMusicType } from "@/app/lib/contentTypes";
 import { searchUsersByUsername } from "@/app/lib/userSearch";
 import Link from "next/link";
 import Image from "next/image";
@@ -35,9 +36,13 @@ export default async function VideosPage({ searchParams }: VideosPageProps) {
   // Shared 30-second cached list (see lib/videoStore) — no per-request
   // table Scan. Already sorted newest-first.
   let videos: VideoCard[] = (await getVisibleVideos())
-    // Only public videos appear in listings (unlisted stays link-only,
-    // private stays hidden from discovery).
-    .filter((v) => !v.visibility || v.visibility === "public")
+    // Strict separation: only public longform videos (NO music tracks, NO shorts)
+    .filter(
+      (v) =>
+        (!v.visibility || v.visibility === "public") &&
+        !isMusicType(v.contentType) &&
+        v.contentType !== "short"
+    )
     .map((v) => ({
       videoId: v.videoId as string,
       title: v.title as string,

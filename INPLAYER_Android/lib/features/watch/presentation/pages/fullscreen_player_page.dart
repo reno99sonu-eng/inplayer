@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:native_device_orientation/native_device_orientation.dart';
@@ -60,6 +61,8 @@ class FullscreenPlayerPage extends StatefulWidget {
   // 1.0; the callback keeps the two in step on the way back out.
   final double Function() getBrightness;
   final ValueChanged<double> onBrightnessChanged;
+  final Widget? Function()? getAdOverlay;
+  final ValueListenable<int>? adListenable;
 
   const FullscreenPlayerPage({
     super.key,
@@ -77,6 +80,8 @@ class FullscreenPlayerPage extends StatefulWidget {
     this.onPipTapped,
     required this.getBrightness,
     required this.onBrightnessChanged,
+    this.getAdOverlay,
+    this.adListenable,
   });
 
   @override
@@ -137,10 +142,7 @@ class _FullscreenPlayerPageState extends State<FullscreenPlayerPage> {
     // listener can all now race to call this within the same frame or two.
     if (_exiting) return;
     _exiting = true;
-    await SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
+    await SystemChrome.setPreferredOrientations([]);
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     if (mounted) Navigator.of(context).pop();
   }
@@ -150,12 +152,9 @@ class _FullscreenPlayerPageState extends State<FullscreenPlayerPage> {
     _orientationSub?.cancel();
     // Belt-and-braces restore in case the page is popped by something other
     // than the back button (e.g. a system back gesture) without _exit()
-    // running first — a fullscreen watch page must never leak a landscape
-    // lock or immersive mode onto the rest of the app.
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-    ]);
+    // running first — clear orientation lock so device auto-rotation works
+    // cleanly everywhere.
+    SystemChrome.setPreferredOrientations([]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
@@ -165,10 +164,7 @@ class _FullscreenPlayerPageState extends State<FullscreenPlayerPage> {
     return PopScope(
       onPopInvokedWithResult: (didPop, _) {
         if (!didPop) return;
-        SystemChrome.setPreferredOrientations([
-          DeviceOrientation.portraitUp,
-          DeviceOrientation.portraitDown,
-        ]);
+        SystemChrome.setPreferredOrientations([]);
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       },
       child: Scaffold(
@@ -204,6 +200,19 @@ class _FullscreenPlayerPageState extends State<FullscreenPlayerPage> {
                   },
                 ),
               ),
+              if (widget.getAdOverlay != null && widget.adListenable != null)
+                ValueListenableBuilder<int>(
+                  valueListenable: widget.adListenable!,
+                  builder: (context, _, child) {
+                    final overlay = widget.getAdOverlay!();
+                    if (overlay == null) return const SizedBox.shrink();
+                    return Positioned.fill(child: overlay);
+                  },
+                )
+              else if (widget.getAdOverlay != null && widget.getAdOverlay!() != null)
+                Positioned.fill(
+                  child: widget.getAdOverlay!()!,
+                ),
             ],
           ),
         ),

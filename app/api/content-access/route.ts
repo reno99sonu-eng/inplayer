@@ -9,6 +9,7 @@ import {
   DEFAULT_AUDIENCE_MODE,
   isValidPasskey,
   normalizeAudienceMode,
+  modeRequiresPasskey,
 } from "@/app/lib/contentAccess";
 
 // The 6-digit passkey that guards who can change what content is shown —
@@ -122,6 +123,17 @@ export async function POST(request: NextRequest) {
   // the hardest one to reach.
   //
   // Unlocking 18+ still falls through to the authenticated branch below.
+  if (action === "set_mode") {
+    const targetMode = normalizeAudienceMode((body as { mode?: unknown }).mode);
+    if (!modeRequiresPasskey(targetMode)) {
+      return audienceCookieResponse(targetMode);
+    }
+  }
+
+  if (action === "reset_mode") {
+    return audienceCookieResponse(DEFAULT_AUDIENCE_MODE);
+  }
+
   let user;
   try {
     user = await verifyAuth(request);

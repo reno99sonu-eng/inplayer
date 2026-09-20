@@ -46,11 +46,10 @@ export function isMusicType(raw: unknown): boolean {
   return normalizeContentType(raw) === "music";
 }
 
-/** True for the two longform types — i.e. everything the main feed, Up Next
- *  and the History "Videos" tab should contain. This is the positive way of
- *  writing the `!== "short"` test that is scattered through the codebase. */
+/** True strictly for normal longform video — excludes shorts AND music tracks.
+ *  Enforces the core product rule: MUSIC != NORMAL VIDEO. */
 export function isLongformType(raw: unknown): boolean {
-  return !isShortType(raw);
+  return normalizeContentType(raw) === "video";
 }
 
 /** Title-case label for admin tables, creator library chips and buttons. */

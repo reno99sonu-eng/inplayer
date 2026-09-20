@@ -78,8 +78,10 @@ class Video {
 
   bool get isShort =>
       contentType.toLowerCase() == 'short' ||
+      contentType.toLowerCase() == 'shorts' ||
       contentType.toLowerCase() == 'raftaar' ||
-      category.toLowerCase().contains('raftaar');
+      category.toLowerCase().contains('raftaar') ||
+      category.toLowerCase().contains('shorts');
 
   static String _resolveUrl(String url) {
     if (url.startsWith('/')) {
@@ -90,8 +92,14 @@ class Video {
 
   factory Video.fromJson(Map<String, dynamic> json) {
     final rawCategory = json['category']?.toString() ?? json['genre']?.toString() ?? 'Entertainment';
-    final rawContentType = json['contentType']?.toString() ?? 'video';
-    final isMusicTrack = rawContentType == 'music' || rawCategory.toLowerCase() == 'music' || json['isMusic'] == true;
+    final rawContentType = json['contentType']?.toString().toLowerCase() ?? 'video';
+    final isMusicTrack = rawContentType == 'music' ||
+        rawContentType == 'audio' ||
+        rawContentType == 'song' ||
+        rawContentType == 'track' ||
+        rawCategory.toLowerCase() == 'music' ||
+        json['isMusic'] == true ||
+        json['musicSettings'] != null;
 
     final rawCovers = json['covers'];
     List<String> parsedCovers = [];

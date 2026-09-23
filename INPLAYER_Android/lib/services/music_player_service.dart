@@ -709,7 +709,8 @@ final musicPlayerServiceProvider = ChangeNotifierProvider<MusicPlayerService>((r
     onTrackStarted: (videoId) => ref.read(historyServiceProvider).recordWatch(videoId),
     fetchMoreTracks: () async {
       final all = await ref.read(videoServiceProvider).getMusicTracks();
-      return all.where((v) => v.isMusic).toList(growable: false);
+      return all.where((v) => v.isStrictMusic).toList(growable: false);
+
     },
     adService: adService,
     premiumService: premiumService,

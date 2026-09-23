@@ -1,12 +1,63 @@
 import { NextRequest, NextResponse } from "next/server";
+import sharp from "sharp";
+import { THUMBNAIL_ASPECT_RATIO, CONTENT_TYPE_WORD, normalizeContentType } from "@/app/lib/contentTypes";
 
 const VISION_MODELS = ["gpt-4o-mini", "gpt-4o"];
 const MAX_FRAMES = 5;
 const PER_CALL_TIMEOUT_MS = 45_000;
 
+// Renders any source image (a remote URL or a data: URL) into a data: URL
+// cropped to exactly the target contentType's thumbnail ratio — the single
+// server-side crop path for AI-suggested thumbnails, so what the creator
+// sees in the picker is byte-for-byte what /api/upload/create stores.
+// Also fixes a real bug: DALL-E returns a square, non-data: URL that
+// /api/upload/create's thumbnailDataUrl validation used to reject outright.
+async function renderCroppedDataUrl(source: string, aspectRatio: number): Promise<string> {
+  let inputBuffer: Buffer;
+  if (source.startsWith("data:")) {
+    const base64 = source.split(",")[1] || "";
+    inputBuffer = Buffer.from(base64, "base64");
+  } else {
+    const res = await fetch(source);
+    if (!res.ok) throw new Error(`Couldn't fetch source image (${res.status}).`);
+    inputBuffer = Buffer.from(await res.arrayBuffer());
+  }
+
+  const image = sharp(inputBuffer);
+  const metadata = await image.metadata();
+  const srcWidth = metadata.width || 1024;
+  const srcHeight = metadata.height || 1024;
+
+  let cropWidth = srcWidth;
+  let cropHeight = srcHeight;
+  if (srcWidth / srcHeight > aspectRatio) {
+    cropWidth = Math.round(srcHeight * aspectRatio);
+  } else {
+    cropHeight = Math.round(srcWidth / aspectRatio);
+  }
+
+  const outWidth = Math.min(640, cropWidth);
+  const outHeight = Math.round(outWidth / aspectRatio);
+
+  const outBuffer = await image
+    .resize({
+      width: cropWidth,
+      height: cropHeight,
+      fit: "cover",
+      position: "centre",
+    })
+    .resize(outWidth, outHeight)
+    .jpeg({ quality: 82 })
+    .toBuffer();
+
+  return `data:image/jpeg;base64,${outBuffer.toString("base64")}`;
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const { frameUrls, title, category, prompt, generateNew } = await request.json();
+    const { frameUrls, title, category, prompt, generateNew, contentType: rawContentType } = await request.json();
+    const contentType = normalizeContentType(rawContentType);
+    const aspectRatio = THUMBNAIL_ASPECT_RATIO[contentType];
 
     const openAiKey = (process.env.OPENAI_API_KEY || "").trim().replace(/^["']|["']$/g, "");
     const apiKey = openAiKey || (process.env.GROQ_API_KEY || "").trim().replace(/^["']|["']$/g, "");
@@ -24,9 +75,10 @@ export async function POST(request: NextRequest) {
     // MODE A: Try DALL-E Image Generation if requested
     if (generateNew || (prompt && typeof prompt === "string" && !frameUrls?.length)) {
       if (openAiKey) {
-        const cleanTitle = (title || prompt || "Vibrant video thumbnail").trim();
-        const imagePrompt = `High quality, cinematic, vibrant video thumbnail for "${cleanTitle}". Category: ${category || "General"}. Professional studio lighting, ultra detailed, eye-catching composition, 16:9 ratio.`;
-        
+        const cleanTitle = (title || prompt || "Vibrant thumbnail").trim();
+        const ratioWord = contentType === "short" ? "9:16 vertical" : contentType === "music" ? "1:1 square" : "16:9";
+        const imagePrompt = `High quality, cinematic, vibrant ${CONTENT_TYPE_WORD[contentType]} thumbnail for "${cleanTitle}". Category: ${category || "General"}. Professional studio lighting, ultra detailed, eye-catching composition, ${ratioWord} ratio, with the main subject centered so it survives a center-crop to that ratio.`;
+
         const candidateImageModels = ["dall-e-3", "dall-e-2"];
         let lastDallEError = "AI Image Generation model access is restricted on your API key.";
 
@@ -34,11 +86,24 @@ export async function POST(request: NextRequest) {
           try {
             console.log(`Trying DALL-E model (${model}) with prompt:`, imagePrompt);
 
+            // dall-e-3 supports a couple of non-square sizes; dall-e-2 is
+            // square-only. Either way, renderCroppedDataUrl below performs
+            // the exact final crop, so this just picks the closest source
+            // to minimize how much gets thrown away.
+            const size =
+              model === "dall-e-3"
+                ? contentType === "short"
+                  ? "1024x1792"
+                  : contentType === "video"
+                  ? "1792x1024"
+                  : "1024x1024"
+                : "1024x1024";
+
             const payload: Record<string, unknown> = {
               model,
               prompt: imagePrompt,
               n: 1,
-              size: "1024x1024",
+              size,
             };
             if (model === "dall-e-3") {
               payload.quality = "standard";
@@ -58,11 +123,18 @@ export async function POST(request: NextRequest) {
             if (dallEResponse.ok) {
               const generatedUrl = dallEData?.data?.[0]?.url;
               if (generatedUrl) {
-                return NextResponse.json({
-                  thumbnailUrl: generatedUrl,
-                  generated: true,
-                  reason: `Custom AI video thumbnail generated using ${model.toUpperCase()}.`,
-                });
+                try {
+                  const croppedDataUrl = await renderCroppedDataUrl(generatedUrl, aspectRatio);
+                  return NextResponse.json({
+                    thumbnailUrl: croppedDataUrl,
+                    generated: true,
+                    reason: `Custom AI thumbnail generated using ${model.toUpperCase()}.`,
+                  });
+                } catch (cropErr) {
+                  console.error(`Failed to crop DALL-E output (${model}):`, cropErr);
+                  lastDallEError = "Generated image couldn't be processed.";
+                  continue;
+                }
               }
             } else {
               console.error(`DALL-E generation failed (${model}):`, dallEData);
@@ -157,8 +229,13 @@ export async function POST(request: NextRequest) {
                 const index = Number(parsed?.bestIndex);
 
                 if (Number.isInteger(index) && index >= 0 && index < httpCandidates.length) {
+                  const picked = httpCandidates[index];
+                  const croppedDataUrl = await renderCroppedDataUrl(picked, aspectRatio).catch((cropErr) => {
+                    console.error("Failed to crop selected frame, using original:", cropErr);
+                    return picked;
+                  });
                   return NextResponse.json({
-                    thumbnailUrl: httpCandidates[index],
+                    thumbnailUrl: croppedDataUrl,
                     index,
                     reason: typeof parsed?.reason === "string" ? parsed.reason : null,
                   });
@@ -176,10 +253,14 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    const fallbackCropped = await renderCroppedDataUrl(candidates[0], aspectRatio).catch((cropErr) => {
+      console.error("Failed to crop fallback frame, using original:", cropErr);
+      return candidates[0];
+    });
     return NextResponse.json({
-      thumbnailUrl: candidates[0],
+      thumbnailUrl: fallbackCropped,
       index: 0,
-      reason: "Selected sharp frame snapshot from video.",
+      reason: "Selected sharp frame snapshot.",
     });
   } catch (error) {
     console.error("AI thumbnail route error:", error);

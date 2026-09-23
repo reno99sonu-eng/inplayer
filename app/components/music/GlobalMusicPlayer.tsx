@@ -590,7 +590,7 @@ export default function GlobalMusicPlayer() {
         </div>
       )}
 
-      {/* ── DOCKED BOTTOM BAR (Spotify-beating compact bar) ──────────── */}
+      {/* ── DOCKED BOTTOM BAR (Compact docked player bar) ──────────── */}
       <div
         className={`fixed z-[90] transition-all duration-300 left-0 right-0 ${
           // On mobile, dock above the bottom navbar; on desktop, dock at the bottom edge
@@ -687,7 +687,7 @@ export default function GlobalMusicPlayer() {
                 />
                 {isPlaying && (
                   <div className="absolute inset-0 bg-black/30 flex items-center justify-center pointer-events-none">
-                    <span className="w-2 h-2 bg-[#1DB954] rounded-full animate-ping" />
+                    <span className="w-2 h-2 bg-orange-400 rounded-full animate-ping" />
                   </div>
                 )}
               </div>

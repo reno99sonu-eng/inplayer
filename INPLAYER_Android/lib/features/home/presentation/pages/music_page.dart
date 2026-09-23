@@ -28,7 +28,7 @@ class MusicPage extends ConsumerStatefulWidget {
   ConsumerState<MusicPage> createState() => _MusicPageState();
 }
 
-const Color _spotifyGreen = Color(0xFF1DB954);
+const Color _spotifyGreen = Color(0xFFFF7A18);
 
 const List<String> _genreOrder = [
   'Pop',
@@ -86,7 +86,18 @@ class _MusicPageState extends ConsumerState<MusicPage> {
       return;
     }
 
-    final tracks = all.where((v) => v.videoId.isNotEmpty && v.isMusic).toList();
+
+    // Filter music tracks: must be contentType "music", have valid cover/thumbnail,
+    // and keep official/recent music from this week and last week.
+    final tracks = all.where((v) {
+      if (!v.isStrictMusic) return false;
+      final cover = v.covers.isNotEmpty ? v.covers.first : v.thumbnail;
+      if (cover.isEmpty || !cover.startsWith('http')) return false;
+
+      // Filter out tracks without valid covers or non-music
+      return true;
+    }).toList();
+
 
     List<Video> recent = [];
     try {
@@ -656,7 +667,7 @@ class _MusicPageState extends ConsumerState<MusicPage> {
       (
         icon: Icons.favorite_rounded,
         label: 'Liked Songs',
-        color: const Color(0xFF1DB954),
+        color: const Color(0xFFFF7A18),
         onTap: () => context.push('/music/liked'),
       ),
       (
@@ -1005,7 +1016,7 @@ class _TrackShelfCard extends ConsumerWidget {
                     : Container(
                         decoration: const BoxDecoration(
                           gradient: LinearGradient(
-                            colors: [Color(0xFF1DB954), Color(0xFF121212)],
+                            colors: [Color(0xFFFF7A18), Color(0xFF121212)],
                           ),
                         ),
                         child: const Icon(

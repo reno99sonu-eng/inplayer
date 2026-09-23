@@ -5,7 +5,7 @@ import Link from "next/link";
 import { fetchAuthSession } from "aws-amplify/auth";
 import NavbarLogo from "./NavbarLogo";
 import NavbarLinks from "./NavbarLinks";
-import { Menu, X, Search, Home, PlaySquare, ChevronRight, ChevronDown, LogOut, Mail, Copy, Check, Gamepad2, Megaphone, Headset, Music2 } from "lucide-react";
+import { Menu, X, Search, Home, PlaySquare, ChevronRight, ChevronDown, LogOut, Mail, Copy, Check, Gamepad2, Megaphone, Headset, Music2, BadgeCheck } from "lucide-react";
 import { useAuthModal } from "./auth/AuthProvider";
 import NavbarSearch from "./NavbarSearch";
 import NavbarActions from "./NavbarActions";
@@ -27,13 +27,13 @@ export default function Navbar() {
   // hamburger "Support" entry below, which every panel except Hammart gets.
   const siteDomain = getSiteDomain(pathname);
 
-  const [subscribedChannels, setSubscribedChannels] = useState<
+  const [trendingCreators, setTrendingCreators] = useState<
     {
-      creatorId: string;
+      userId: string;
       username: string;
       name: string;
       avatarUrl: string | null;
-      notifyEnabled: boolean;
+      isVerified: boolean;
     }[]
   >([]);
 
@@ -124,7 +124,7 @@ export default function Navbar() {
     fetchTheme();
 
     const handleThemeUpdate = (e: Event) => {
-      const custom = e as CustomEvent<{ active?: boolean; theme?: any }>;
+      const custom = e as CustomEvent<{ active?: boolean; theme?: { imageUrl?: string; occasionId?: string; title?: string } }>;
       if (custom?.detail && typeof custom.detail.active === "boolean") {
         if (custom.detail.active && custom.detail.theme?.imageUrl) {
           setNavbarTheme({
@@ -159,38 +159,23 @@ export default function Navbar() {
   }, []);
 
   useEffect(() => {
+    // Public discovery data — no auth needed — so this loads regardless of
+    // signedIn, matching the same source as the homepage's signed-out
+    // fallback (TrendingNow) and the /creators page.
+    const controller = new AbortController();
     (async () => {
-      if (!signedIn) {
-        setSubscribedChannels([]);
-        return;
-      }
-
       try {
-        const session = await fetchAuthSession();
-        const idToken = session.tokens?.idToken?.toString();
-
-        if (!idToken) {
-          return;
-        }
-
-        const res = await fetch("/api/subscriptions/list", {
-          headers: {
-            Authorization: `Bearer ${idToken}`,
-          },
-        });
-
-        if (!res.ok) {
-          console.error(await res.text());
-          return;
-        }
-
+        const res = await fetch("/api/trending", { signal: controller.signal });
+        if (!res.ok) return;
         const data = await res.json();
-        setSubscribedChannels(data.subscriptions ?? []);
+        setTrendingCreators(data.creators ?? []);
       } catch (err) {
-        console.error("Failed to load subscriptions:", err);
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        console.error("Failed to load trending creators:", err);
       }
     })();
-  }, [signedIn]);
+    return () => controller.abort();
+  }, []);
 
   const copyEmail = async (address: string) => {
     try {
@@ -936,38 +921,99 @@ lg:right-auto
 
             <div className="my-3 border-t border-white/10 light:border-black/10" />
 
-                {/* Trending Creators — discovery link replaces the In-Family
-                    subscriptions panel. The In-Family strip now appears on
-                    the homepage for signed-in users instead. */}
+                {/* Trending Creators — public discovery, replaces the old
+                    In-Family (subscriptions) panel. The real subscribed-
+                    creators list now lives on the homepage (see
+                    InFamilyHome.tsx) and at /subscriptions. */}
                 <div>
-                  <p className="mb-2 px-3 text-xs font-bold uppercase tracking-[0.25em] text-orange-300/80 light:text-orange-600/90">
-                    Trending Creators
-                  </p>
-
                   <button
                     onClick={() => goTo("/creators")}
-                    className="flex w-full items-center gap-3 rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-4 text-left transition-all hover:bg-white/8 hover:border-orange-400/30"
-                  >
-                    <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-orange-500/15">
-                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-orange-400">
-                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                        <circle cx="9" cy="7" r="4" />
-                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                      </svg>
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-slate-100 light:text-slate-800">
-                        Browse Creators
-                      </p>
-                      <p className="mt-0.5 text-xs text-slate-400 light:text-slate-500">
-                        Discover trending InPlayer creators
-                      </p>
-                    </div>
-                    <ChevronRight size={15} className="text-slate-500" />
-                  </button>
-                </div>
+                    className="
+                      mb-1
+                      flex
+                  w-full
+                  items-center
+                  justify-between
+                  px-3
+                  text-xs
+                  font-bold
+                  uppercase
+                  tracking-[0.25em]
+                  text-orange-300/80
+                  light:text-orange-600/90
+                  transition
+                  hover:text-orange-300
+                  light:hover:text-orange-600
+                "
+              >
+                Trending Creators
+                <ChevronRight size={14} />
+              </button>
+
+              <div className="space-y-0.5">
+  {trendingCreators.length === 0 ? (
+    <div className="rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-4 text-center">
+      <p className="text-sm font-medium text-slate-200 light:text-slate-700">
+        No trending creators to show right now.
+      </p>
+
+      <button
+        onClick={() => goTo("/creators")}
+        className="mt-3 rounded-lg bg-orange-500 px-4 py-2 text-xs font-semibold text-white transition hover:bg-orange-600"
+      >
+        Browse Creators
+      </button>
+    </div>
+  ) : (
+    trendingCreators.slice(0, 8).map((creator) => (
+      <button
+  key={creator.userId}
+  onClick={() => goTo(`/u/${creator.username}`)}
+  className="
+    flex
+    w-full
+    cursor-pointer
+    items-center
+    gap-3
+    rounded-xl
+    px-3
+    py-1.5
+    text-left
+    transition-all
+    duration-300
+    hover:bg-white/5
+    light:hover:bg-black/5
+    hover:translate-x-1
+  "
+>
+        <div className="relative h-7 w-7 flex-shrink-0 overflow-hidden rounded-full">
+          {/* Plain <img>, not next/image — creator avatars can be base64
+              data URLs (see app/lib/imageCompress.ts) that next/image
+              can't optimize/serve. Same fallback pattern as HomeVideoCard
+              and NavbarProfile. */}
+          <img
+            src={creator.avatarUrl || "/avatars/avatar.png"}
+            alt={creator.name}
+            loading="lazy"
+            decoding="async"
+            className="h-full w-full object-cover"
+          />
+        </div>
+
+        <span className="flex-1 truncate text-sm text-slate-200 light:text-slate-700">
+          {creator.name}
+        </span>
+
+        {creator.isVerified && (
+          <BadgeCheck size={14} className="flex-shrink-0 fill-orange-400 text-[#101827] light:text-[#FBF6EA]" />
+        )}
+      </button>
+    ))
+  )}
+</div>
+             </div>
               </>
+            )}
 
             <div className="my-4 border-t border-white/10 light:border-black/10" />
 
@@ -1090,29 +1136,11 @@ lg:right-auto
                   </li>
                   <li>
                     <Link
-                      href="/privacy"
+                      href="/policies"
                       onClick={() => setMenuOpen(false)}
                       className="block text-xs text-slate-400 light:text-slate-600 transition hover:text-orange-300 light:hover:text-orange-600"
                     >
-                      Privacy Policy
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      href="/terms"
-                      onClick={() => setMenuOpen(false)}
-                      className="block text-xs text-slate-400 light:text-slate-600 transition hover:text-orange-300 light:hover:text-orange-600"
-                    >
-                      Terms of Service
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      href="/hammart-vendor-terms"
-                      onClick={() => setMenuOpen(false)}
-                      className="block text-xs text-slate-400 light:text-slate-600 transition hover:text-orange-300 light:hover:text-orange-600"
-                    >
-                      HamMart Vendor Terms
+                      InPlayer Policies
                     </Link>
                   </li>
                 </ul>

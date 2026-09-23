@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:inplayer_android/models/user.dart';
 import 'package:inplayer_android/services/ad_service.dart';
@@ -320,15 +321,19 @@ void main() {
 
     testWidgets('5B: MusicPage renders prominent Upload Music action and Settings in AppBar',
         (WidgetTester tester) async {
+      final router = GoRouter(
+        initialLocation: '/',
+        routes: [
+          GoRoute(path: '/', builder: (context, state) => const MusicPage()),
+        ],
+      );
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
             videoServiceProvider.overrideWithValue(_MockVideoService()),
             historyServiceProvider.overrideWithValue(_MockHistoryService()),
           ],
-          child: const MaterialApp(
-            home: MusicPage(),
-          ),
+          child: MaterialApp.router(routerConfig: router),
         ),
       );
       await tester.pumpAndSettle();

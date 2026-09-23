@@ -53,6 +53,7 @@ import '../../features/settings/presentation/pages/contact_us_page.dart';
 import '../../features/settings/presentation/pages/report_problem_page.dart';
 import '../../features/settings/presentation/pages/blocked_users_page.dart';
 import '../../features/settings/presentation/pages/app_legal_page.dart';
+import '../../features/settings/presentation/pages/policies_index_page.dart';
 import '../../features/creator/presentation/pages/creator_kyc_page.dart';
 import '../../features/creator/presentation/pages/creator_monetization_page.dart';
 import '../../features/sponsorship/presentation/pages/sponsorship_checkout_page.dart';
@@ -338,6 +339,7 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const BlockedUsersPage(),
       ),
       GoRoute(
+
         path: '/settings/terms',
         name: 'terms-of-service',
         builder: (context, state) => const AppLegalPage(
@@ -456,6 +458,15 @@ final routerProvider = Provider<GoRouter>((ref) {
           effectiveDate: 'September 5, 2026',
           externalUrl: 'https://inplayer.in/mart-seller-policy',
         ),
+
+      ),
+      GoRoute(
+        // Single "InPlayer Policies" index — replaces the Settings/drawer
+        // menu that used to list all 11 legal documents as separate rows.
+        // See policies_index_page.dart.
+        path: '/settings/policies',
+        name: 'inplayer-policies',
+        builder: (context, state) => const PoliciesIndexPage(),
       ),
       GoRoute(
         path: '/settings/help',

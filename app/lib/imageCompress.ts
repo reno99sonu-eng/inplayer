@@ -50,6 +50,55 @@ export function compressImage(
 
 export const THUMBNAIL_DATA_URL_MAX_LENGTH = 200_000;
 
+// Shared center-crop-to-ratio core used by both compressImageToThumbnail
+// (File input) and cropDataUrlToThumbnail (data/blob URL input) — the one
+// canonical place that decides how a source image becomes a thumbnail of a
+// given aspect ratio, so a manually uploaded image, an extracted video
+// frame and an AI-picked frame all get cropped identically.
+function cropImageElementToThumbnail(
+  img: HTMLImageElement,
+  aspectRatio: number,
+  maxWidth: number,
+  quality: number
+): string {
+  const srcRatio = img.width / img.height;
+
+  let cropWidth = img.width;
+  let cropHeight = img.height;
+  if (srcRatio > aspectRatio) {
+    cropWidth = img.height * aspectRatio;
+  } else {
+    cropHeight = img.width / aspectRatio;
+  }
+  const cropX = (img.width - cropWidth) / 2;
+  const cropY = (img.height - cropHeight) / 2;
+
+  const outWidth = Math.min(maxWidth, cropWidth);
+  const outHeight = outWidth / aspectRatio;
+
+  const canvas = document.createElement("canvas");
+  canvas.width = outWidth;
+  canvas.height = outHeight;
+
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("Canvas is not supported in this browser.");
+  }
+
+  ctx.drawImage(
+    img,
+    cropX,
+    cropY,
+    cropWidth,
+    cropHeight,
+    0,
+    0,
+    outWidth,
+    outHeight
+  );
+  return canvas.toDataURL("image/jpeg", quality);
+}
+
 export function compressImageToThumbnail(
   file: File,
   aspectRatio = 16 / 9,
@@ -63,43 +112,11 @@ export function compressImageToThumbnail(
       const img = new Image();
 
       img.onload = () => {
-        const srcRatio = img.width / img.height;
-
-        let cropWidth = img.width;
-        let cropHeight = img.height;
-        if (srcRatio > aspectRatio) {
-          cropWidth = img.height * aspectRatio;
-        } else {
-          cropHeight = img.width / aspectRatio;
+        try {
+          resolve(cropImageElementToThumbnail(img, aspectRatio, maxWidth, quality));
+        } catch (err) {
+          reject(err instanceof Error ? err : new Error("Couldn't process that image."));
         }
-        const cropX = (img.width - cropWidth) / 2;
-        const cropY = (img.height - cropHeight) / 2;
-
-        const outWidth = Math.min(maxWidth, cropWidth);
-        const outHeight = outWidth / aspectRatio;
-
-        const canvas = document.createElement("canvas");
-        canvas.width = outWidth;
-        canvas.height = outHeight;
-
-        const ctx = canvas.getContext("2d");
-        if (!ctx) {
-          reject(new Error("Canvas is not supported in this browser."));
-          return;
-        }
-
-        ctx.drawImage(
-          img,
-          cropX,
-          cropY,
-          cropWidth,
-          cropHeight,
-          0,
-          0,
-          outWidth,
-          outHeight
-        );
-        resolve(canvas.toDataURL("image/jpeg", quality));
       };
 
       img.onerror = () => reject(new Error("Couldn't read that image file."));
@@ -108,6 +125,36 @@ export function compressImageToThumbnail(
 
     reader.onerror = () => reject(new Error("Couldn't read that file."));
     reader.readAsDataURL(file);
+  });
+}
+
+// Same crop as compressImageToThumbnail, but for a source that's already a
+// data/blob/http URL (an extracted video frame, a Mux candidate, an AI
+// suggestion) rather than a File — so every thumbnail source, not just a
+// manual upload, goes through the identical center-crop before it's ever
+// shown as a "selected" preview or persisted.
+export function cropDataUrlToThumbnail(
+  sourceUrl: string,
+  aspectRatio = 16 / 9,
+  maxWidth = 640,
+  quality = 0.82
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    // Needed so a same-origin-CORS-enabled https source doesn't taint the
+    // canvas; a genuinely opaque cross-origin source will fail toDataURL
+    // below and the caller falls back to the uncropped URL (see call sites).
+    img.crossOrigin = "anonymous";
+
+    img.onload = () => {
+      try {
+        resolve(cropImageElementToThumbnail(img, aspectRatio, maxWidth, quality));
+      } catch (err) {
+        reject(err instanceof Error ? err : new Error("Couldn't process that image."));
+      }
+    };
+    img.onerror = () => reject(new Error("Couldn't load that image."));
+    img.src = sourceUrl;
   });
 }
 

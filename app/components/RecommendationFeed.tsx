@@ -23,7 +23,7 @@ import { shorts, type Short } from "../data/shorts";
 // Below-fold shelves: lazy-loaded so their JS isn't in the initial bundle.
 // They only render after the user scrolls past the hero and first video rows.
 const ShortsShelf = nextDynamic(() => import("./ShortsShelf"), { ssr: false });
-const TrendingNow = nextDynamic(() => import("./TrendingNow"), { ssr: false });
+const InFamilyHome = nextDynamic(() => import("./InFamilyHome"), { ssr: false });
 const PlayablesShelf = nextDynamic(() => import("./PlayablesShelf"), { ssr: false });
 import AdThumbnailCard from "./AdThumbnailCard";
 import { useSettings } from "./settings/SettingsProvider";
@@ -803,7 +803,7 @@ export default function RecommendationFeed({
               </div>
             </section>
 
-            {index === 0 && <TrendingNow />}
+            {index === 0 && <InFamilyHome />}
             {index === 1 && <PlayablesShelf />}
 
             {showShortsShelf && <ShortsShelf items={shelfShorts} />}

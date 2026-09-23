@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { UpdateCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { revalidateTag } from "next/cache";
 import { docClient } from "@/app/lib/dynamodb";
-import { requireAdmin } from "@/app/lib/isAdmin";
+import { requirePermission } from "@/app/lib/isAdmin";
 import { logAdminAction } from "@/app/lib/auditLog";
 import { MIDROLL_ADS_TABLE, MIDROLL_ADS_TAG } from "@/app/lib/videoAds";
 
@@ -12,7 +12,7 @@ export async function PATCH(
 ) {
   let admin;
   try {
-    admin = await requireAdmin(request);
+    admin = await requirePermission(request, "manage_ads");
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -73,7 +73,7 @@ export async function DELETE(
 ) {
   let admin;
   try {
-    admin = await requireAdmin(request);
+    admin = await requirePermission(request, "manage_ads");
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

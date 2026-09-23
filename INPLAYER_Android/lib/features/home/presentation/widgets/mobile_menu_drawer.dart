@@ -8,9 +8,9 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/app_logo.dart';
 import '../../../../core/theme/pattern_background.dart';
 import '../../../../core/widgets/about_app_dialog.dart';
-import '../../../../models/channel.dart';
+import '../../../../models/trending_creator.dart';
 import '../../../../providers/auth_provider.dart';
-import '../../../../services/channel_service.dart';
+import '../../../../services/video_service.dart';
 import '../../../auth/presentation/widgets/auth_modals.dart';
 import 'content_access_drawer_section.dart';
 
@@ -22,32 +22,33 @@ class MobileMenuDrawer extends ConsumerStatefulWidget {
 }
 
 class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
-  List<Channel> _subscribedChannels = [];
-  bool _loadingSubscriptions = false;
+  // The drawer's discovery panel — was "IN-FAMILY" (the signed-in user's
+  // subscriptions), now "TRENDING CREATORS" (public, no sign-in required).
+  // The real In-Family/subscriptions list still exists at /subscriptions
+  // and now also lives on the home feed itself (see InFamilyRow).
+  List<TrendingCreator> _trendingCreators = [];
+  bool _loadingTrending = false;
 
   @override
   void initState() {
     super.initState();
-    _loadSubscriptions();
+    _loadTrending();
   }
 
-  Future<void> _loadSubscriptions() async {
-    final authState = ref.read(authStateProvider);
-    if (authState is! AuthStateAuthenticated) return;
-
-    setState(() => _loadingSubscriptions = true);
+  Future<void> _loadTrending() async {
+    setState(() => _loadingTrending = true);
     try {
-      final subs = await ref
-          .read(channelServiceProvider)
-          .getSubscribedChannels();
+      final creators = await ref
+          .read(videoServiceProvider)
+          .getTrendingCreatorsData();
       if (mounted) {
         setState(() {
-          _subscribedChannels = subs;
-          _loadingSubscriptions = false;
+          _trendingCreators = creators;
+          _loadingTrending = false;
         });
       }
     } catch (_) {
-      if (mounted) setState(() => _loadingSubscriptions = false);
+      if (mounted) setState(() => _loadingTrending = false);
     }
   }
 
@@ -253,9 +254,9 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
 
                     _buildDivider(),
 
-                    // IN-FAMILY (Subscriptions) Section
+                    // TRENDING CREATORS (public discovery) Section
                     _buildSectionHeader(
-                      'IN-FAMILY',
+                      'TRENDING CREATORS',
                       trailing: const Icon(
                         Icons.chevron_right,
                         color: AppColors.brandOrange,
@@ -263,11 +264,11 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                       ),
                       onTap: () {
                         Navigator.pop(context);
-                        context.push('/subscriptions');
+                        context.push('/creators');
                       },
                     ),
 
-                    if (_loadingSubscriptions)
+                    if (_loadingTrending)
                       const Padding(
                         padding: EdgeInsets.symmetric(vertical: 12),
                         child: Center(
@@ -281,7 +282,7 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                           ),
                         ),
                       )
-                    else if (_subscribedChannels.isEmpty)
+                    else if (_trendingCreators.isEmpty)
                       Padding(
                         padding: const EdgeInsets.symmetric(
                           horizontal: 14,
@@ -300,19 +301,11 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                "You don't have any subscribed channels yet.",
+                                "No trending creators to show right now.",
                                 style: TextStyle(
                                   color: context.textPrimary,
                                   fontSize: 12,
                                   fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                "Subscribe to your favourite creators and they'll appear here.",
-                                style: TextStyle(
-                                  color: context.textDim,
-                                  fontSize: 10,
                                 ),
                               ),
                               const SizedBox(height: 8),
@@ -336,7 +329,7 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                                     borderRadius: BorderRadius.circular(8),
                                   ),
                                   child: const Text(
-                                    'Discover Creators',
+                                    'Browse Creators',
                                     style: TextStyle(
                                       color: Colors.white,
                                       fontSize: 11,
@@ -350,14 +343,14 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                         ),
                       )
                     else
-                      ..._subscribedChannels.take(8).map((channel) {
+                      ..._trendingCreators.take(8).map((creator) {
                         return Material(
                           color: Colors.transparent,
                           child: InkWell(
                             borderRadius: BorderRadius.circular(12),
                             onTap: () {
                               Navigator.pop(context);
-                              context.push('/channel/${channel.username}');
+                              context.push('/channel/${creator.username}');
                             },
                             child: Padding(
                               padding: const EdgeInsets.symmetric(
@@ -371,11 +364,9 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                                     child: SizedBox(
                                       width: 28,
                                       height: 28,
-                                      child:
-                                          channel.avatarUrl != null &&
-                                              channel.avatarUrl!.isNotEmpty
+                                      child: creator.avatarUrl.isNotEmpty
                                           ? CachedNetworkImage(
-                                              imageUrl: channel.avatarUrl!,
+                                              imageUrl: creator.avatarUrl,
                                               fit: BoxFit.cover,
                                               errorWidget:
                                                   (context, url, error) =>
@@ -390,7 +381,7 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Text(
-                                      channel.name,
+                                      creator.name,
                                       style: TextStyle(
                                         color: context.textPrimary,
                                         fontSize: 13,
@@ -400,14 +391,11 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                                       overflow: TextOverflow.ellipsis,
                                     ),
                                   ),
-                                  if (channel.notifyEnabled)
-                                    Container(
-                                      width: 6,
-                                      height: 6,
-                                      decoration: const BoxDecoration(
-                                        color: AppColors.brandOrange,
-                                        shape: BoxShape.circle,
-                                      ),
+                                  if (creator.isVerified)
+                                    const Icon(
+                                      Icons.verified,
+                                      color: AppColors.brandOrange,
+                                      size: 14,
                                     ),
                                 ],
                               ),
@@ -515,18 +503,10 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                     ),
                     _buildMenuItem(
                       icon: Icons.lock_outline,
-                      title: 'Privacy Policy',
+                      title: 'InPlayer Policies',
                       onTap: () {
                         Navigator.pop(context);
-                        context.push('/settings/privacy-policy');
-                      },
-                    ),
-                    _buildMenuItem(
-                      icon: Icons.description_outlined,
-                      title: 'Terms of Service',
-                      onTap: () {
-                        Navigator.pop(context);
-                        context.push('/settings/terms');
+                        context.push('/settings/policies');
                       },
                     ),
 

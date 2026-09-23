@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import sharp from "sharp";
-import { requireAdmin } from "@/app/lib/isAdmin";
+import { requirePermission } from "@/app/lib/isAdmin";
 
 // Real OpenAI-backed generator for the Navbar Theme Manager's "Custom
 // Occasion Prompt" field. Before this route existed, app/lib/
@@ -39,7 +39,7 @@ export const dynamic = "force-dynamic";
 
 export async function POST(request: NextRequest) {
   try {
-    await requireAdmin(request);
+    await requirePermission(request, "manage_navbar_theme");
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

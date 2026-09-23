@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/app/lib/isAdmin";
+import { requireAdmin, requirePermission } from "@/app/lib/isAdmin";
 import type { SiteDomain } from "@/app/lib/siteDomain";
 import {
   listSupportTickets,
@@ -18,12 +18,12 @@ const VALID_STATUSES: SupportTicketStatus[] = [
   "abandoned",
 ];
 
-// Admin-only view of the AI Support Desk, always scoped to ONE panel's
-// domain. Mirrors how /api/admin/* routes already work in this app:
-// requireAdmin() at the top, catch → 401.
+// Viewing the AI Support Desk is whitelisted for team members with
+// "view_support" (main admins always pass too); only status updates below
+// (PATCH) stay main-admin-only.
 export async function GET(request: NextRequest) {
   try {
-    await requireAdmin(request);
+    await requirePermission(request, "view_support");
   } catch {
     return NextResponse.json({ error: "Not authorized." }, { status: 401 });
   }

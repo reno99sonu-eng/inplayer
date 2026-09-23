@@ -97,6 +97,58 @@ export function sanitizeGenre(raw: unknown): MusicGenre {
   return "Other";
 }
 
+// ── Language ──────────────────────────────────────────────────────────
+//
+// This is deliberately a SEPARATE field from `spokenLanguage` (see
+// app/lib/contentTypes.ts / the upload form) — spokenLanguage drives
+// automatic captions/ASR and is not a reliable proxy for a song's actual
+// language (a Hindi song can have no captions requested at all). A track
+// uploaded before this field existed, or one whose creator didn't set it,
+// stores `language: null` rather than a guess — the language bar on the
+// Music page filters only on real, creator-confirmed metadata, and a track
+// with no language set simply doesn't match any specific language filter
+// (it still shows under "All").
+
+export const MUSIC_LANGUAGES = [
+  "Hindi",
+  "Tamil",
+  "Telugu",
+  "Bengali",
+  "Marathi",
+  "Gujarati",
+  "Punjabi",
+  "Kannada",
+  "Malayalam",
+  "Odia",
+  "Assamese",
+  "Bhojpuri",
+  "Rajasthani",
+  "English",
+  "Other",
+] as const;
+
+export type MusicLanguage = (typeof MUSIC_LANGUAGES)[number];
+
+/** Indian languages only, in display order — what the Music page's
+ *  horizontal language filter bar actually shows (see FEATURE 7: "Indian
+ *  languages only... DO NOT include arbitrary non-Indian language
+ *  categories"). Deliberately excludes "English" and "Other" from
+ *  MUSIC_LANGUAGES, which remain valid upload-time tags but aren't part of
+ *  this bar. */
+export const MUSIC_LANGUAGE_BAR = MUSIC_LANGUAGES.filter(
+  (l) => l !== "English" && l !== "Other"
+);
+
+/** Server-side sanitising of the creator-picked language. Anything outside
+ *  the fixed list is dropped to null (never fabricated) rather than stored
+ *  as uncontrolled free text — same posture as sanitizeGenre. */
+export function sanitizeMusicLanguage(raw: unknown): MusicLanguage | null {
+  if (typeof raw === "string" && (MUSIC_LANGUAGES as readonly string[]).includes(raw)) {
+    return raw as MusicLanguage;
+  }
+  return null;
+}
+
 // ── Lyrics ────────────────────────────────────────────────────────────
 
 /** One line, and the second of the track at which it becomes the active

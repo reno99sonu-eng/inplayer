@@ -14,6 +14,7 @@ import {
   sanitizeCovers,
   sanitizeGenre,
   sanitizeLyrics,
+  sanitizeMusicLanguage,
 } from "@/app/lib/musicTrack";
 import {
   COPYRIGHT_SCREEN_REPORTER,
@@ -135,6 +136,7 @@ export async function POST(request: NextRequest) {
       coverIntervalSeconds,
       lyrics,
       genre,
+      language,
       audioSha256,
       declaredOwnership,
     } = body;
@@ -199,6 +201,11 @@ export async function POST(request: NextRequest) {
     // Genres browse grid. Falls back to "Other" rather than being rejected,
     // same posture as the rest of this block.
     const musicGenre = isMusic ? sanitizeGenre(genre) : undefined;
+    // Closed-list language (e.g. "Hindi"/"Tamil") — separate from
+    // spokenLanguage (ASR/captions, see app/lib/contentTypes.ts). Null when
+    // the creator didn't set one; never guessed. Powers the Music page's
+    // Indian-language filter bar.
+    const musicLanguage = isMusic ? sanitizeMusicLanguage(language) : undefined;
     const musicHash =
       isMusic && typeof audioSha256 === "string" && /^[a-f0-9]{64}$/i.test(audioSha256)
         ? audioSha256.toLowerCase()
@@ -413,6 +420,7 @@ export async function POST(request: NextRequest) {
             coverIntervalSeconds: musicCoverInterval,
             lyrics: musicLyrics,
             genre: musicGenre,
+            ...(musicLanguage && { language: musicLanguage }),
             ...(musicHash && { audioSha256: musicHash }),
             // The ownership attestation, with evidence. This is what gives
             // InPlayer its safe harbour if a rights holder ever complains,

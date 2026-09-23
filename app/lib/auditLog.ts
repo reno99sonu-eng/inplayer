@@ -13,11 +13,12 @@ import { getRequestIp, getRequestLocation, getRequestDevice } from "@/app/lib/re
 // the admin as if their suspend/delete/approve click failed when it
 // actually went through.
 //
-// InPlayer only has one admin email (see app/lib/isAdmin.ts), so
-// adminEmail alone can't answer "was this really me?" — device/location
-// (see app/lib/requestInfo.ts) is the real signal: if the admin account's
-// credentials ever leaked, an entry from an unrecognized browser/city is
-// the tell.
+// Every authorized identity — the main admin (app/lib/isAdmin.ts) or an
+// invited team member (app/lib/adminMembers.ts) — writes rows here under
+// its own adminId/adminEmail, so "who did this" is always answerable.
+// device/location (see app/lib/requestInfo.ts) is the extra signal for "was
+// this really them?": if any admin account's credentials ever leaked, an
+// entry from an unrecognized browser/city is the tell.
 export const AUDIT_LOGS_TABLE = "InPlayer-Audit-Logs";
 
 export type AuditAction =
@@ -66,7 +67,12 @@ export type AuditAction =
   | "sponsorship.activate"
   | "sponsorship.cancel"
   | "premium.grant"
-  | "premium.revoke";
+  | "premium.revoke"
+  | "team_member.invite"
+  | "team_member.invite_revoke"
+  | "team_member.accept"
+  | "team_member.revoke"
+  | "video.delete_stuck_processing";
 
 export type AuditTargetType =
   | "user"
@@ -80,7 +86,9 @@ export type AuditTargetType =
   | "vendor"
   | "hammart_product"
   | "midroll_ad"
-  | "sponsorship";
+  | "sponsorship"
+  | "team_member"
+  | "invitation";
 
 // Which admin panel an action belongs to. Derived from the action name
 // rather than stored on the row, deliberately: every entry already written

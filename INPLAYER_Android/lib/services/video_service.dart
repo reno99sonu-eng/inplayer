@@ -135,7 +135,11 @@ class VideoService {
       final result = rawList
           .whereType<Map>()
           .map((json) => Video.fromJson(Map<String, dynamic>.from(json)))
-          .where((v) => v.isMusic)
+          // Strict check — contentType == 'music' only, never category ==
+          // 'Music' (see Video.isStrictMusic). The server already filters
+          // this way (see app/api/music/route.ts); this mirrors it rather
+          // than relying solely on server-side enforcement.
+          .where((v) => v.isStrictMusic)
           .toList();
 
       _cachedMusic = result;

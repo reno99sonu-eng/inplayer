@@ -136,30 +136,26 @@ async function searchUsers(query: string): Promise<AdminUserRow[]> {
   return byId ? [byId, ...usernameMatches] : usernameMatches;
 }
 
-// No query: plain browse, newest first — scan ALL users (no Limit on the
-// DynamoDB side so we don't cut mid-sort), collect every item in memory,
-// sort by createdAt descending, then page by numeric offset.  At InPlayer's
-// current scale a full scan of a few-thousand-row table takes well under
-// 100 ms and fits in a single Lambda invocation with room to spare — the
-// same in-memory sort tradeoff already used in app/lib/videoStore.ts.
-async function listUsers(cursor: string | null): Promise<{
-  rows: AdminUserRow[];
-  nextCursor: string | null;
-}> {
-  // Decode numeric offset from base64 cursor (or start at 0).
-  let offset = 0;
-  if (cursor) {
-    try {
-      const decoded = Buffer.from(cursor, "base64").toString("utf8");
-      const parsed = parseInt(decoded, 10);
-      if (!isNaN(parsed) && parsed >= 0) offset = parsed;
-    } catch {
-      offset = 0;
-    }
+// No query: plain browse, newest-registered-first. createdAt isn't
+// indexed (no GSI), so a true DynamoDB-side sort isn't possible without
+// adding one. Instead we Scan the whole table (bounded by SCAN_CAP as a
+// safety limit), sort in memory by createdAt desc, and paginate the sorted
+// array with a numeric offset cursor. This is the same
+// scan-and-sort-in-memory tradeoff already used elsewhere in this codebase
+// (see app/lib/videoStore.ts) — fine at InPlayer's current user count, but
+// it re-scans the full table on every uncached page 1 request, so if the
+// user base grows large enough for this to matter, replace it with a GSI
+// keyed on a constant partition + createdAt range sort key.
+const SCAN_CAP = 20000;
+const SORTED_CACHE_TTL_MS = 30_000;
+let sortedUsersCache: { rows: AdminUserRow[]; expiresAt: number } | null = null;
+
+async function scanAllUsersSortedByNewest(): Promise<AdminUserRow[]> {
+  if (sortedUsersCache && sortedUsersCache.expiresAt > Date.now()) {
+    return sortedUsersCache.rows;
   }
 
-  // Full table scan — no Limit so we get every user for in-memory sort.
-  const allItems: Record<string, unknown>[] = [];
+  const rows: AdminUserRow[] = [];
   let exclusiveStartKey: Record<string, unknown> | undefined;
   do {
     const result = await docClient.send(
@@ -170,27 +166,38 @@ async function listUsers(cursor: string | null): Promise<{
         ExclusiveStartKey: exclusiveStartKey,
       })
     );
-    allItems.push(...((result.Items || []) as Record<string, unknown>[]));
+    for (const item of result.Items || []) rows.push(toRow(item));
     exclusiveStartKey = result.LastEvaluatedKey;
-  } while (exclusiveStartKey);
+  } while (exclusiveStartKey && rows.length < SCAN_CAP);
 
-  // Sort newest accounts first (ISO-8601 strings sort lexicographically).
-  allItems.sort((a, b) => {
-    const aDate = (a.createdAt as string) || "";
-    const bDate = (b.createdAt as string) || "";
-    if (bDate > aDate) return 1;
-    if (bDate < aDate) return -1;
-    return 0;
+  rows.sort((a, b) => {
+    const at = a.createdAt ? Date.parse(a.createdAt) : 0;
+    const bt = b.createdAt ? Date.parse(b.createdAt) : 0;
+    return bt - at;
   });
 
-  const page = allItems.slice(offset, offset + PAGE_SIZE).map(toRow);
-  const nextOffset = offset + PAGE_SIZE;
-  const nextCursor =
-    nextOffset < allItems.length
-      ? Buffer.from(String(nextOffset)).toString("base64")
-      : null;
+  sortedUsersCache = { rows, expiresAt: Date.now() + SORTED_CACHE_TTL_MS };
+  return rows;
+}
 
-  return { rows: page, nextCursor };
+async function listUsers(cursor: string | null): Promise<{
+  rows: AdminUserRow[];
+  nextCursor: string | null;
+}> {
+  let offset = 0;
+  if (cursor) {
+    const parsed = parseInt(Buffer.from(cursor, "base64").toString("utf8"), 10);
+    if (Number.isFinite(parsed) && parsed >= 0) offset = parsed;
+  }
+
+  const all = await scanAllUsersSortedByNewest();
+  const rows = all.slice(offset, offset + PAGE_SIZE);
+  const nextOffset = offset + PAGE_SIZE;
+  const nextCursor = nextOffset < all.length
+    ? Buffer.from(String(nextOffset)).toString("base64")
+    : null;
+
+  return { rows, nextCursor };
 }
 
 export async function GET(request: NextRequest) {

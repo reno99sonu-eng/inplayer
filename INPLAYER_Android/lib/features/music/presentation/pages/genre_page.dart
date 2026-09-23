@@ -31,7 +31,7 @@ class _GenrePageState extends ConsumerState<GenrePage> {
     if (!mounted) return;
     setState(() {
       _tracks = all.where((v) {
-        if (!v.isMusic) return false;
+        if (!v.isStrictMusic) return false;
         final g = (v.genre?.isNotEmpty == true) ? v.genre! : 'Other';
         return g.toLowerCase() == widget.genre.toLowerCase();
       }).toList();
@@ -41,7 +41,7 @@ class _GenrePageState extends ConsumerState<GenrePage> {
   @override
   Widget build(BuildContext context) {
     final isDark = context.isDark;
-    const spotifyGreen = Color(0xFF1DB954);
+    const spotifyGreen = Color(0xFFFF7A18);
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : AppColors.surfaceLight,

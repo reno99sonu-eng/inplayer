@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { PutCommand } from "@aws-sdk/lib-dynamodb";
 import mux from "@/app/lib/mux";
 import { docClient } from "@/app/lib/dynamodb";
-import { requireAdmin } from "@/app/lib/isAdmin";
+import { requirePermission } from "@/app/lib/isAdmin";
 import { MIDROLL_ADS_TABLE } from "@/app/lib/videoAds";
 import { logAdminAction } from "@/app/lib/auditLog";
 import { getSponsorship } from "@/app/lib/sponsorships";
@@ -11,7 +11,7 @@ export async function POST(request: NextRequest) {
   let admin;
 
   try {
-    admin = await requireAdmin(request);
+    admin = await requirePermission(request, "manage_ads");
   } catch {
     return NextResponse.json(
       { error: "Please sign in as admin to upload." },

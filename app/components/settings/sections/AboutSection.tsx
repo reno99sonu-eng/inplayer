@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Info, HelpCircle, Mail, ShieldCheck, Sparkles, FileText, Lock } from "lucide-react";
+import { Info, HelpCircle, Mail, ShieldCheck, Sparkles, FileText } from "lucide-react";
 import SettingsCard from "../common/SettingsCard";
 import SettingsRow from "../common/SettingsRow";
 import ReportProblemCard from "./ReportProblemCard";
@@ -55,51 +55,9 @@ export default function AboutSection() {
 
           <SettingsRow
             icon={<FileText size={20} />}
-            title="Terms of Service"
-            description="Governs platform use, content licenses, and rights."
-            onClick={() => router.push("/terms")}
-          />
-
-          <SettingsRow
-            icon={<Lock size={20} />}
-            title="Privacy Policy"
-            description="How personal data is processed under DPDPA 2023."
-            onClick={() => router.push("/privacy")}
-          />
-
-          <SettingsRow
-            icon={<FileText size={20} />}
-            title="Copyright & IP Policy"
-            description="Copyright compliance, takedown complaints, and strikes."
-            onClick={() => router.push("/copyright")}
-          />
-
-          <SettingsRow
-            icon={<ShieldCheck size={20} />}
-            title="Child Safety Policy"
-            description="Child protection, age estimation, and safety standards."
-            onClick={() => router.push("/child-safety")}
-          />
-
-          <SettingsRow
-            icon={<Info size={20} />}
-            title="Community Guidelines"
-            description="Content rules, prohibited behaviors, and moderation standards."
-            onClick={() => router.push("/community-guidelines")}
-          />
-
-          <SettingsRow
-            icon={<Sparkles size={20} />}
-            title="Creator Monetization Policy"
-            description="Monetization eligibility (500 In-Family + 50k views), KYC, and earnings."
-            onClick={() => router.push("/creator-monetization")}
-          />
-
-          <SettingsRow
-            icon={<FileText size={20} />}
-            title="HamMart Vendor Terms"
-            description="Terms & Conditions for HamMart sellers and vendors."
-            onClick={() => router.push("/hammart-vendor-terms")}
+            title="InPlayer Policies"
+            description="Privacy, Terms of Service, and every other InPlayer legal document."
+            onClick={() => router.push("/policies")}
           />
 
           <ReportProblemCard />

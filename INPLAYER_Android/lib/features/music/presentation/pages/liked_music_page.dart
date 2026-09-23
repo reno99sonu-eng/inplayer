@@ -30,14 +30,14 @@ class _LikedMusicPageState extends ConsumerState<LikedMusicPage> {
     final liked = await ref.read(videoServiceProvider).getLikedVideos();
     if (!mounted) return;
     setState(() {
-      _tracks = liked.where((v) => v.isMusic).toList();
+      _tracks = liked.where((v) => v.isStrictMusic).toList();
     });
   }
 
   @override
   Widget build(BuildContext context) {
     final isDark = context.isDark;
-    const spotifyGreen = Color(0xFF1DB954);
+    const spotifyGreen = Color(0xFFFF7A18);
 
     return Scaffold(
       backgroundColor: isDark ? const Color(0xFF121212) : AppColors.surfaceLight,

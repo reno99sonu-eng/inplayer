@@ -615,59 +615,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             onTap: () => context.push('/settings/help'),
           ),
           _SettingTile(
-            icon: Icons.description_outlined,
-            title: 'Terms of Service',
-            onTap: () => context.push('/settings/terms'),
-          ),
-          _SettingTile(
+
             icon: Icons.privacy_tip_outlined,
-            title: 'Privacy Policy',
-            onTap: () => context.push('/settings/privacy-policy'),
-          ),
-          _SettingTile(
-            icon: Icons.copyright_outlined,
-            title: 'Copyright & IP Policy',
-            onTap: () => context.push('/settings/copyright-policy'),
-          ),
-          _SettingTile(
-            icon: Icons.child_care_outlined,
-            title: 'Child Safety Policy',
-            onTap: () => context.push('/settings/child-safety'),
-          ),
-          _SettingTile(
-            icon: Icons.groups_outlined,
-            title: 'Community Guidelines',
-            onTap: () => context.push('/settings/community-guidelines'),
-          ),
-          _SettingTile(
-            icon: Icons.monetization_on_outlined,
-            title: 'Creator Monetization Policy',
-            onTap: () => context.push('/settings/monetization-policy'),
-          ),
-          _SettingTile(
-            icon: Icons.forum_outlined,
-            title: 'Online Chat & Messaging Policy',
-            onTap: () => context.push('/settings/chat-messaging-policy'),
-          ),
-          _SettingTile(
-            icon: Icons.gavel_outlined,
-            title: 'Strike, Suspension & Appeals Policy',
-            onTap: () => context.push('/settings/strike-suspension-policy'),
-          ),
-          _SettingTile(
-            icon: Icons.feedback_outlined,
-            title: 'Report, Complaint & Grievance Policy',
-            onTap: () => context.push('/settings/report-grievance-policy'),
-          ),
-          _SettingTile(
-            icon: Icons.campaign_outlined,
-            title: 'Advertising & Sponsorship Policy',
-            onTap: () => context.push('/settings/advertising-sponsorship-policy'),
-          ),
-          _SettingTile(
-            icon: Icons.storefront_outlined,
-            title: 'InPlayer MART Shop & Seller Policy',
-            onTap: () => context.push('/settings/mart-seller-policy'),
+            title: 'InPlayer Policies',
+            onTap: () => context.push('/settings/policies'),
           ),
         ],
       ),

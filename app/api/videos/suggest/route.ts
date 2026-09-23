@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getVisibleVideos } from "@/app/lib/contentAccessServer";
+import { isMusicType } from "@/app/lib/contentTypes";
 
 // Live search-as-you-type suggestions, drawn from the exact same
 // 30-second-cached ready-videos list every other listing surface already
@@ -19,7 +20,11 @@ export async function GET(request: NextRequest) {
 
     const matches = videos.filter((video) => {
       const title = ((video.title as string) || "").toLowerCase();
-      return title.includes(q) && (!video.visibility || video.visibility === "public");
+      return (
+        title.includes(q) &&
+        !isMusicType(video.contentType) &&
+        (!video.visibility || video.visibility === "public")
+      );
     });
 
     const ranked = matches

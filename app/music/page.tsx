@@ -32,11 +32,11 @@ export default async function MusicPage({ searchParams }: MusicPageProps) {
 
   try {
     const allVideos = await getVisibleVideos();
+    // Strict Isolation: Only items uploaded explicitly as music (contentType === "music")
+    // Ordinary videos categorized under "Music" remain in the regular video feed.
     const musicVideos = allVideos.filter(
       (v) =>
-        (isMusicType(v.contentType) ||
-          (typeof v.category === "string" && v.category.toLowerCase() === "music") ||
-          (v.musicSettings != null && typeof v.musicSettings === "object")) &&
+        isMusicType(v.contentType) &&
         (!v.visibility || v.visibility === "public")
     );
 

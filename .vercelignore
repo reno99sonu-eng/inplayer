@@ -1,0 +1,9 @@
+INPLAYER_Android
+INPLAYER-Android-Release.apk
+INPLAYER-Android-Release.aab
+INPLAYER-PlayStore-Icon.png
+Claude outputs/
+*.apk
+*.aab
+.git
+

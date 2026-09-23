@@ -136,39 +136,61 @@ async function searchUsers(query: string): Promise<AdminUserRow[]> {
   return byId ? [byId, ...usernameMatches] : usernameMatches;
 }
 
-// No query: plain browse, newest first isn't possible without a table
-// scan + sort (createdAt isn't indexed) — at InPlayer's current scale a
-// single bounded Scan sorted in memory is fine, same tradeoff the rest of
-// this codebase already makes (see app/lib/videoStore.ts).
+// No query: plain browse, newest first — scan ALL users (no Limit on the
+// DynamoDB side so we don't cut mid-sort), collect every item in memory,
+// sort by createdAt descending, then page by numeric offset.  At InPlayer's
+// current scale a full scan of a few-thousand-row table takes well under
+// 100 ms and fits in a single Lambda invocation with room to spare — the
+// same in-memory sort tradeoff already used in app/lib/videoStore.ts.
 async function listUsers(cursor: string | null): Promise<{
   rows: AdminUserRow[];
   nextCursor: string | null;
 }> {
-  let exclusiveStartKey: Record<string, unknown> | undefined;
+  // Decode numeric offset from base64 cursor (or start at 0).
+  let offset = 0;
   if (cursor) {
     try {
-      exclusiveStartKey = JSON.parse(Buffer.from(cursor, "base64").toString("utf8"));
+      const decoded = Buffer.from(cursor, "base64").toString("utf8");
+      const parsed = parseInt(decoded, 10);
+      if (!isNaN(parsed) && parsed >= 0) offset = parsed;
     } catch {
-      exclusiveStartKey = undefined;
+      offset = 0;
     }
   }
 
-  const result = await docClient.send(
-    new ScanCommand({
-      TableName: "InPlayer-Users",
-      ProjectionExpression: USER_PROJECTION,
-      ExpressionAttributeNames: USER_PROJECTION_NAMES,
-      Limit: PAGE_SIZE,
-      ExclusiveStartKey: exclusiveStartKey,
-    })
-  );
+  // Full table scan — no Limit so we get every user for in-memory sort.
+  const allItems: Record<string, unknown>[] = [];
+  let exclusiveStartKey: Record<string, unknown> | undefined;
+  do {
+    const result = await docClient.send(
+      new ScanCommand({
+        TableName: "InPlayer-Users",
+        ProjectionExpression: USER_PROJECTION,
+        ExpressionAttributeNames: USER_PROJECTION_NAMES,
+        ExclusiveStartKey: exclusiveStartKey,
+      })
+    );
+    allItems.push(...((result.Items || []) as Record<string, unknown>[]));
+    exclusiveStartKey = result.LastEvaluatedKey;
+  } while (exclusiveStartKey);
 
-  const rows = (result.Items || []).map(toRow);
-  const nextCursor = result.LastEvaluatedKey
-    ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString("base64")
-    : null;
+  // Sort newest accounts first (ISO-8601 strings sort lexicographically).
+  allItems.sort((a, b) => {
+    const aDate = (a.createdAt as string) || "";
+    const bDate = (b.createdAt as string) || "";
+    if (bDate > aDate) return 1;
+    if (bDate < aDate) return -1;
+    return 0;
+  });
 
-  return { rows, nextCursor };
+  const page = allItems.slice(offset, offset + PAGE_SIZE).map(toRow);
+  const nextOffset = offset + PAGE_SIZE;
+  const nextCursor =
+    nextOffset < allItems.length
+      ? Buffer.from(String(nextOffset)).toString("base64")
+      : null;
+
+  return { rows: page, nextCursor };
 }
 
 export async function GET(request: NextRequest) {

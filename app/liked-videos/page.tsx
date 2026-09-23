@@ -8,6 +8,7 @@ import { HomeVideoCard } from "@/app/components/RecommendationFeed";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { formatTimeAgo, formatViews } from "@/app/lib/formatters";
 import type { Recommendation } from "@/app/data/recommendations";
+import { isMusicType } from "@/app/lib/contentTypes";
 
 interface LikedVideoItem {
   videoId: string;
@@ -20,6 +21,7 @@ interface LikedVideoItem {
   views?: number;
   uploadedAt: string;
   category?: string;
+  contentType?: string;
   likedAt?: string;
 }
 
@@ -51,7 +53,8 @@ export default function LikedVideosPage() {
 
         const data = await res.json();
         if (!cancelled) {
-          setVideos(data.videos || []);
+          const allLiked: LikedVideoItem[] = data.videos || [];
+          setVideos(allLiked.filter((v) => !isMusicType(v.contentType)));
         }
       } catch (err) {
         console.error("Failed to load liked videos:", err);

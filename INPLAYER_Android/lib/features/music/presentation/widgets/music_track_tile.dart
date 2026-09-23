@@ -1,4 +1,3 @@
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
@@ -66,28 +65,11 @@ class MusicTrackTile extends ConsumerWidget {
                     fit: StackFit.expand,
                     children: [
                       coverUrl.isNotEmpty
-                          ? Stack(
-                              fit: StackFit.expand,
-                              children: [
-                                SafeAppImage(
-                                  imageUrl: coverUrl,
-                                  fit: BoxFit.cover,
-                                  errorWidget: (context, url, error) =>
-                                      _fallbackArt(context),
-                                ),
-                                BackdropFilter(
-                                  filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                                  child: Container(
-                                    color: Colors.black.withValues(alpha: 0.28),
-                                  ),
-                                ),
-                                SafeAppImage(
-                                  imageUrl: coverUrl,
-                                  fit: BoxFit.contain,
-                                  errorWidget: (context, url, error) =>
-                                      const SizedBox.shrink(),
-                                ),
-                              ],
+                          ? SafeAppImage(
+                              imageUrl: coverUrl,
+                              fit: BoxFit.cover,
+                              errorWidget: (context, url, error) =>
+                                  _fallbackArt(context),
                             )
                           : _fallbackArt(context),
                       if (isCurrent)

@@ -640,24 +640,9 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
             fit: StackFit.expand,
             children: [
               displayUrl.isNotEmpty
-                  ? Stack(
-                      fit: StackFit.expand,
-                      children: [
-                        SafeAppImage(
-                          imageUrl: displayUrl,
-                          fit: BoxFit.cover,
-                        ),
-                        BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-                          child: Container(
-                            color: Colors.black.withValues(alpha: 0.35),
-                          ),
-                        ),
-                        SafeAppImage(
-                          imageUrl: displayUrl,
-                          fit: BoxFit.contain,
-                        ),
-                      ],
+                  ? SafeAppImage(
+                      imageUrl: displayUrl,
+                      fit: BoxFit.cover,
                     )
                   : Container(
                       decoration: const BoxDecoration(

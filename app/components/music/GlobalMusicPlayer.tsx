@@ -304,34 +304,23 @@ export default function GlobalMusicPlayer() {
               <>
                 {/* Left: Album Cover & Visualizer */}
                 <div className="flex flex-col items-center max-w-sm w-full">
-                  <div className="relative group w-64 h-64 sm:w-80 sm:h-80 rounded-3xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.6)] border border-white/10 light:border-black/10 bg-black/60">
-                    {/* Blurred background aura */}
-                    <Image
-                      src={currentCover}
-                      alt=""
-                      aria-hidden="true"
-                      fill
-                      sizes="(max-width: 768px) 320px, 400px"
-                      className="object-cover scale-125 blur-xl opacity-40 pointer-events-none"
-                    />
-                    {/* Sharp foreground album art without cropping or distortion */}
+                  <div className="relative group aspect-square w-64 sm:w-80 rounded-3xl overflow-hidden shadow-[0_20px_60px_rgba(0,0,0,0.6)] border border-white/10 light:border-black/10 bg-black">
                     <Image
                       src={currentCover}
                       alt={currentTrack.title}
                       fill
+                      priority
                       sizes="(max-width: 768px) 320px, 400px"
-                      className={`object-contain transition-transform duration-700 relative z-[1] ${
-                        isPlaying ? "scale-105" : "scale-100"
-                      }`}
+                      className="object-cover transition-transform duration-500"
                     />
                     {/* Visualizer overlay */}
                     {isPlaying && (
-                      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-end gap-1 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10">
-                        <span className="w-1 h-3.5 bg-orange-400 rounded-full animate-pulse" />
-                        <span className="w-1 h-5 bg-amber-400 rounded-full animate-pulse [animation-delay:150ms]" />
-                        <span className="w-1 h-2.5 bg-orange-500 rounded-full animate-pulse [animation-delay:300ms]" />
-                        <span className="w-1 h-4 bg-orange-300 rounded-full animate-pulse [animation-delay:450ms]" />
-                        <span className="w-1 h-6 bg-amber-300 rounded-full animate-pulse [animation-delay:200ms]" />
+                      <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-end gap-1 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 z-10">
+                        <span className="w-1 h-3.5 bg-emerald-400 rounded-full animate-pulse" />
+                        <span className="w-1 h-5 bg-emerald-300 rounded-full animate-pulse [animation-delay:150ms]" />
+                        <span className="w-1 h-2.5 bg-emerald-500 rounded-full animate-pulse [animation-delay:300ms]" />
+                        <span className="w-1 h-4 bg-emerald-400 rounded-full animate-pulse [animation-delay:450ms]" />
+                        <span className="w-1 h-6 bg-emerald-300 rounded-full animate-pulse [animation-delay:200ms]" />
                       </div>
                     )}
                   </div>
@@ -688,25 +677,17 @@ export default function GlobalMusicPlayer() {
               onClick={() => setExpanded(true)}
               className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer group"
             >
-              <div className="relative h-11 w-11 sm:h-13 sm:w-13 shrink-0 rounded-xl overflow-hidden shadow-md border border-white/10 bg-black/80">
-                <Image
-                  src={currentCover}
-                  alt=""
-                  aria-hidden="true"
-                  fill
-                  sizes="52px"
-                  className="object-cover scale-125 blur-sm opacity-40 pointer-events-none"
-                />
+              <div className="relative h-12 w-12 sm:h-14 sm:w-14 aspect-square shrink-0 rounded-xl overflow-hidden shadow-md border border-white/10 bg-black">
                 <Image
                   src={currentCover}
                   alt={currentTrack.title}
                   fill
-                  sizes="52px"
-                  className="object-contain group-hover:scale-105 transition-transform relative z-[1]"
+                  sizes="56px"
+                  className="object-cover group-hover:scale-105 transition-transform"
                 />
                 {isPlaying && (
-                  <div className="absolute inset-0 bg-black/40 flex items-center justify-center">
-                    <span className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-ping" />
+                  <div className="absolute inset-0 bg-black/30 flex items-center justify-center pointer-events-none">
+                    <span className="w-2 h-2 bg-[#1DB954] rounded-full animate-ping" />
                   </div>
                 )}
               </div>

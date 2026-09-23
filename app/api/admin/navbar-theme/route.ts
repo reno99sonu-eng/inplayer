@@ -106,11 +106,28 @@ export async function DELETE(request: NextRequest) {
         TableName: PLATFORM_SETTINGS_TABLE,
         Key: { settingsId: "navbar_theme" },
       })
-    ).catch(() => null);
+    );
 
-    return NextResponse.json({ success: true });
+    return NextResponse.json(
+      { success: true, active: false, theme: null },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          Pragma: "no-cache",
+        },
+      }
+    );
   } catch (err) {
     console.error("Admin navbar theme DELETE failed:", err);
-    return NextResponse.json({ error: "Failed to delete theme." }, { status: 500 });
+    return NextResponse.json(
+      { error: "Failed to delete theme." },
+      {
+        status: 500,
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          Pragma: "no-cache",
+        },
+      }
+    );
   }
 }

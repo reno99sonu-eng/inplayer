@@ -92,25 +92,69 @@ export default function Navbar() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+
+    const fetchTheme = async () => {
       try {
-        const res = await fetch("/api/navbar-theme");
-        if (!res.ok) return;
+        const res = await fetch(`/api/navbar-theme?t=${Date.now()}`, {
+          cache: "no-store",
+          headers: { Pragma: "no-cache" },
+        });
+        if (!res.ok) {
+          if (!cancelled) setNavbarTheme(null);
+          return;
+        }
         const data = await res.json().catch(() => ({ active: false }));
-        if (!cancelled && data?.active && data?.theme?.imageUrl) {
+        if (cancelled) return;
+        if (data?.active && data?.theme?.imageUrl) {
           setNavbarTheme({
             active: true,
             imageUrl: data.theme.imageUrl,
             occasionId: data.theme.occasionId,
             title: data.theme.title,
           });
+        } else {
+          setNavbarTheme(null);
         }
       } catch (err) {
         console.error("Navbar theme fetch error:", err);
+        if (!cancelled) setNavbarTheme(null);
       }
-    })();
+    };
+
+    fetchTheme();
+
+    const handleThemeUpdate = (e: Event) => {
+      const custom = e as CustomEvent<{ active?: boolean; theme?: any }>;
+      if (custom?.detail && typeof custom.detail.active === "boolean") {
+        if (custom.detail.active && custom.detail.theme?.imageUrl) {
+          setNavbarTheme({
+            active: true,
+            imageUrl: custom.detail.theme.imageUrl,
+            occasionId: custom.detail.theme.occasionId,
+            title: custom.detail.theme.title,
+          });
+          return;
+        } else {
+          setNavbarTheme(null);
+          return;
+        }
+      }
+      fetchTheme();
+    };
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "inplayer_navbar_theme_updated") {
+        fetchTheme();
+      }
+    };
+
+    window.addEventListener("navbar-theme-updated", handleThemeUpdate);
+    window.addEventListener("storage", handleStorage);
+
     return () => {
       cancelled = true;
+      window.removeEventListener("navbar-theme-updated", handleThemeUpdate);
+      window.removeEventListener("storage", handleStorage);
     };
   }, []);
 
@@ -892,104 +936,38 @@ lg:right-auto
 
             <div className="my-3 border-t border-white/10 light:border-black/10" />
 
-                {/* Subscriptions */}
+                {/* Trending Creators — discovery link replaces the In-Family
+                    subscriptions panel. The In-Family strip now appears on
+                    the homepage for signed-in users instead. */}
                 <div>
+                  <p className="mb-2 px-3 text-xs font-bold uppercase tracking-[0.25em] text-orange-300/80 light:text-orange-600/90">
+                    Trending Creators
+                  </p>
+
                   <button
-                    onClick={() => goTo("/subscriptions")}
-                    className="
-                      mb-1
-                      flex
-                  w-full
-                  items-center
-                  justify-between
-                  px-3
-                  text-xs
-                  font-bold
-                  uppercase
-                  tracking-[0.25em]
-                  text-orange-300/80
-                  light:text-orange-600/90
-                  transition
-                  hover:text-orange-300
-                  light:hover:text-orange-600
-                "
-              >
-                In-Family
-                <ChevronRight size={14} />
-              </button>
-
-              <div className="space-y-0.5">
-  {subscribedChannels.length === 0 ? (
-    <div className="rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-4 text-center">
-      <p className="text-sm font-medium text-slate-200 light:text-slate-700">
-        You don&apos;t have any subscribed channels yet.
-      </p>
-
-      <p className="mt-1 text-xs text-slate-400 light:text-slate-500">
-        Subscribe to your favourite creators and they&apos;ll appear here.
-      </p>
-
-      <button
-        onClick={() => goTo("/creators")}
-        className="mt-3 rounded-lg bg-orange-500 px-4 py-2 text-xs font-semibold text-white transition hover:bg-orange-600"
-      >
-        Discover Creators
-      </button>
-    </div>
-  ) : (
-    subscribedChannels.map((channel) => (
-      <button
-  key={channel.creatorId}
-  onClick={() => goTo(`/u/${channel.username}`)}
-  className="
-    flex
-    w-full
-    cursor-pointer
-    items-center
-    gap-3
-    rounded-xl
-    px-3
-    py-1.5
-    text-left
-    transition-all
-    duration-300
-    hover:bg-white/5
-    light:hover:bg-black/5
-    hover:translate-x-1
-  "
->
-        <div className="relative h-7 w-7 flex-shrink-0 overflow-hidden rounded-full">
-          {/* Plain <img>, not next/image — real subscribed-channel avatars
-              are base64 data URLs (see app/lib/imageCompress.ts) that
-              next/image can't optimize/serve, and "/recommendations/avatars/
-              default.jpg" below never existed as a real file, so both
-              together were exactly why every avatar in this list showed as
-              a broken image icon. Same pattern as HomeVideoCard's avatar
-              and NavbarProfile's own picture, which use a real existing
-              fallback (/avatars/avatar.png) the same way. */}
-          <img
-            src={channel.avatarUrl || "/avatars/avatar.png"}
-            alt={channel.name}
-            loading="lazy"
-            decoding="async"
-            className="h-full w-full object-cover"
-          />
-        </div>
-
-        <span className="flex-1 truncate text-sm text-slate-200 light:text-slate-700">
-          {channel.name}
-        </span>
-
-        {channel.notifyEnabled && (
-          <span className="h-2 w-2 flex-shrink-0 rounded-full bg-orange-400" />
-        )}
-      </button>
-    ))
-  )}
-</div>
-             </div>
+                    onClick={() => goTo("/creators")}
+                    className="flex w-full items-center gap-3 rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-4 text-left transition-all hover:bg-white/8 hover:border-orange-400/30"
+                  >
+                    <span className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-orange-500/15">
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="text-orange-400">
+                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                        <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                        <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                      </svg>
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-semibold text-slate-100 light:text-slate-800">
+                        Browse Creators
+                      </p>
+                      <p className="mt-0.5 text-xs text-slate-400 light:text-slate-500">
+                        Discover trending InPlayer creators
+                      </p>
+                    </div>
+                    <ChevronRight size={15} className="text-slate-500" />
+                  </button>
+                </div>
               </>
-            )}
 
             <div className="my-4 border-t border-white/10 light:border-black/10" />
 

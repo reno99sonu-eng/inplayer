@@ -12,11 +12,11 @@ export async function GET(request: Request) {
 
   try {
     const allVideos = await getVisibleVideos();
+    // Strict Isolation: Only items uploaded explicitly as music (contentType === "music")
+    // Regular videos that creators merely categorized under "Music" belong in the main video library.
     let musicVideos = allVideos.filter(
       (v) =>
-        (isMusicType(v.contentType) ||
-          (typeof v.category === "string" && v.category.toLowerCase() === "music") ||
-          (v.musicSettings != null && typeof v.musicSettings === "object")) &&
+        isMusicType(v.contentType) &&
         (!v.visibility || v.visibility === "public")
     );
 

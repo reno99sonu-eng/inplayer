@@ -104,6 +104,7 @@ async function getRelatedVideos(currentVideoId: string, category: string) {
     (v) =>
       v.videoId !== currentVideoId &&
       v.contentType !== "short" &&
+      !isMusicType(v.contentType) &&
       (!v.visibility || v.visibility === "public")
   );
 

@@ -135,6 +135,7 @@ class VideoService {
       final result = rawList
           .whereType<Map>()
           .map((json) => Video.fromJson(Map<String, dynamic>.from(json)))
+          .where((v) => v.isMusic)
           .toList();
 
       _cachedMusic = result;

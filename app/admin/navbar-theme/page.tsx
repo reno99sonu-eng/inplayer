@@ -245,6 +245,16 @@ function NavbarThemeManagerContent() {
         setActiveTheme(data.theme);
         setSuccessMsg("🎉 Navbar occasion theme published & applied live!");
         setTimeout(() => setSuccessMsg(null), 4000);
+
+        // Broadcast to live navbar immediately
+        try {
+          window.dispatchEvent(
+            new CustomEvent("navbar-theme-updated", {
+              detail: { active: true, theme: data.theme },
+            })
+          );
+          localStorage.setItem("inplayer_navbar_theme_updated", Date.now().toString());
+        } catch {}
       }
     } catch (err) {
       console.error("Theme publish error:", err);
@@ -268,8 +278,19 @@ function NavbarThemeManagerContent() {
 
       setActiveTheme(null);
       setPreviewImageUrl("");
-      setSuccessMsg("Reset navbar background theme to default.");
+      setCustomPrompt("");
+      setSuccessMsg("Navbar theme cleared. Default navbar restored live.");
       setTimeout(() => setSuccessMsg(null), 3000);
+
+      // Broadcast theme cleared to live navbar immediately
+      try {
+        window.dispatchEvent(
+          new CustomEvent("navbar-theme-updated", {
+            detail: { active: false, theme: null },
+          })
+        );
+        localStorage.setItem("inplayer_navbar_theme_updated", Date.now().toString());
+      } catch {}
     } catch (err) {
       console.error("Theme reset error:", err);
       setError(err instanceof Error ? err.message : "Failed to reset theme.");

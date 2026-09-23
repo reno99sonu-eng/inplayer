@@ -26,3 +26,5 @@ flutter:
       android:
         package: com.inplayer.ivsbroadcast
         pluginClass: IvsBroadcastPlugin
+      ios:
+        pluginClass: IvsBroadcastPlugin

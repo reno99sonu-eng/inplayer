@@ -9,6 +9,7 @@ import AdminSidebar from "@/app/components/admin/AdminSidebar";
 import AdminMobileNav from "@/app/components/admin/AdminMobileNav";
 import { AdminModeProvider } from "@/app/components/admin/AdminModeContext";
 import { AdminRefreshProvider } from "@/app/components/admin/AdminRefreshContext";
+import { AdminIdentityProvider } from "@/app/components/admin/AdminIdentityContext";
 
 // Gate for every /admin/* page (including the pre-existing
 // /admin/captions tool, which now sits inside this same shell). This is a
@@ -24,6 +25,8 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   const { signedIn, authLoading, openSignIn, user } = useAuthModal();
   const [checking, setChecking] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isMainAdmin, setIsMainAdmin] = useState(false);
+  const [permissions, setPermissions] = useState<string[]>([]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -76,12 +79,16 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
         if (!cancelled) {
           setIsAdmin(Boolean(data?.isAdmin));
+          setIsMainAdmin(Boolean(data?.isMainAdmin));
+          setPermissions(Array.isArray(data?.permissions) ? data.permissions : []);
           setChecking(false);
         }
       } catch (err) {
         console.error("Admin access check failed:", err);
         if (!cancelled) {
           setIsAdmin(false);
+          setIsMainAdmin(false);
+          setPermissions([]);
           setChecking(false);
         }
       }
@@ -137,21 +144,23 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AdminModeProvider>
-      <AdminRefreshProvider>
-        <div className="min-h-screen bg-[#06101D] light:bg-transparent text-white light:text-slate-900">
-          <AdminHeader email={user?.email || null} />
+    <AdminIdentityProvider isMainAdmin={isMainAdmin} permissions={permissions}>
+      <AdminModeProvider>
+        <AdminRefreshProvider>
+          <div className="min-h-screen bg-[#06101D] light:bg-transparent text-white light:text-slate-900">
+            <AdminHeader email={user?.email || null} />
 
-          <div className="mx-auto max-w-[1700px] px-5 py-8 lg:px-8">
-            <AdminMobileNav />
+            <div className="mx-auto max-w-[1700px] px-5 py-8 lg:px-8">
+              <AdminMobileNav />
 
-            <div className="lg:flex lg:items-start lg:gap-8">
-              <AdminSidebar />
-              <main className="min-w-0 flex-1">{children}</main>
+              <div className="lg:flex lg:items-start lg:gap-8">
+                <AdminSidebar />
+                <main className="min-w-0 flex-1">{children}</main>
+              </div>
             </div>
           </div>
-        </div>
-      </AdminRefreshProvider>
-    </AdminModeProvider>
+        </AdminRefreshProvider>
+      </AdminModeProvider>
+    </AdminIdentityProvider>
   );
 }

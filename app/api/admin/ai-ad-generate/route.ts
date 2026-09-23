@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/app/lib/isAdmin";
+import { requirePermission } from "@/app/lib/isAdmin";
 
 // Real OpenAI-backed replacement for the Advertising console's "AI" buttons.
 // The console previously imported from app/lib/aiAdGenerator.ts, which —
@@ -191,7 +191,7 @@ async function generateBannerImage(apiKey: string, placement: string, headline: 
 
 export async function POST(request: NextRequest) {
   try {
-    await requireAdmin(request);
+    await requirePermission(request, "manage_ads");
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

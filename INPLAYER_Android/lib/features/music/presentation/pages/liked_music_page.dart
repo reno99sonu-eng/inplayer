@@ -32,7 +32,7 @@ class _LikedMusicPageState extends ConsumerState<LikedMusicPage> {
     final liked = await ref.read(videoServiceProvider).getLikedVideos();
     if (!mounted) return;
     setState(() {
-      _tracks = liked.where((v) => v.isMusic).toList();
+      _tracks = liked.where((v) => v.isStrictMusic).toList();
     });
   }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useRef, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import {
@@ -13,6 +13,7 @@ import {
   Radio,
   Disc3,
   Mic2,
+  Mic,
   Heart,
   Share2,
   Volume2,
@@ -20,10 +21,38 @@ import {
   Check,
   ChevronRight,
   ListPlus,
+  Search,
+  X,
+  Languages,
 } from "lucide-react";
 import { useMusicPlayer, type MusicTrack } from "@/app/context/MusicPlayerContext";
 import LiveListeningToasts from "./LiveListeningToasts";
-import { MUSIC_GENRES, type MusicGenre } from "@/app/lib/musicTrack";
+import { MUSIC_GENRES, MUSIC_LANGUAGE_BAR, type MusicGenre } from "@/app/lib/musicTrack";
+
+// Minimal shape of the Web Speech API's SpeechRecognition — same pattern as
+// app/components/NavbarSearch.tsx (not part of TypeScript's DOM lib since
+// it's still vendor-prefixed/experimental).
+interface SpeechRecognitionResultLike {
+  transcript: string;
+}
+interface SpeechRecognitionEventLike {
+  results?: SpeechRecognitionResultLike[][];
+}
+interface SpeechRecognitionLike {
+  lang: string;
+  interimResults: boolean;
+  maxAlternatives: number;
+  onstart: (() => void) | null;
+  onend: (() => void) | null;
+  onerror: (() => void) | null;
+  onresult: ((event: SpeechRecognitionEventLike) => void) | null;
+  start: () => void;
+  stop: () => void;
+}
+interface WindowWithSpeechRecognition extends Window {
+  SpeechRecognition?: new () => SpeechRecognitionLike;
+  webkitSpeechRecognition?: new () => SpeechRecognitionLike;
+}
 
 const GENRE_GRADIENTS: Record<string, string> = {
   Pop: "from-pink-500/30 to-rose-600/30 border-pink-500/30",
@@ -58,17 +87,68 @@ export default function MusicPageClient({
   const { currentTrack, isPlaying, playTrack, togglePlay, addToQueue } =
     useMusicPlayer();
   const [selectedGenre, setSelectedGenre] = useState<string>("All");
+  const [selectedLanguage, setSelectedLanguage] = useState<string>("All");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [listening, setListening] = useState(false);
+  const [voiceUnsupported, setVoiceUnsupported] = useState(false);
+  const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [subscribedArtists, setSubscribedArtists] = useState<Set<string>>(
     new Set()
   );
 
+  useEffect(() => {
+    if (searchOpen) searchInputRef.current?.focus();
+  }, [searchOpen]);
+
+  useEffect(() => {
+    return () => {
+      recognitionRef.current?.stop();
+    };
+  }, []);
+
+  const startVoiceSearch = () => {
+    const win = window as WindowWithSpeechRecognition;
+    const SpeechRecognitionCtor = win.SpeechRecognition || win.webkitSpeechRecognition;
+    if (!SpeechRecognitionCtor) {
+      setVoiceUnsupported(true);
+      searchInputRef.current?.focus();
+      return;
+    }
+
+    const recognition = new SpeechRecognitionCtor();
+    recognition.lang = "en-IN";
+    recognition.interimResults = false;
+    recognition.maxAlternatives = 1;
+    recognitionRef.current = recognition;
+
+    recognition.onstart = () => setListening(true);
+    recognition.onend = () => setListening(false);
+    recognition.onerror = () => setListening(false);
+    recognition.onresult = (event) => {
+      const transcript = event.results?.[0]?.[0]?.transcript;
+      if (transcript) setSearchQuery(transcript);
+    };
+
+    try {
+      recognition.start();
+    } catch {
+      setListening(false);
+    }
+  };
+
   // Spotlight Track (First track or popular)
   const spotlight = tracks[0] || null;
 
-  // Filtered tracks based on Genre and Search Query
+  // Filtered tracks based on Language, Genre and Search Query — music-only
+  // by construction (this component only ever receives tracks the server
+  // already filtered to contentType === "music", see app/music/page.tsx).
   const filteredTracks = useMemo(() => {
     return tracks.filter((t) => {
+      const matchLanguage =
+        selectedLanguage === "All" ||
+        (t.language && t.language.toLowerCase() === selectedLanguage.toLowerCase());
       const matchGenre =
         selectedGenre === "All" ||
         (t.genre && t.genre.toLowerCase() === selectedGenre.toLowerCase());
@@ -76,9 +156,11 @@ export default function MusicPageClient({
         !searchQuery.trim() ||
         t.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         t.artist.toLowerCase().includes(searchQuery.toLowerCase());
-      return matchGenre && matchSearch;
+      return matchLanguage && matchGenre && matchSearch;
     });
-  }, [tracks, selectedGenre, searchQuery]);
+  }, [tracks, selectedGenre, selectedLanguage, searchQuery]);
+
+  const isSearching = searchQuery.trim().length > 0;
 
   const toggleArtistNotify = (artistId: string) => {
     setSubscribedArtists((prev) => {
@@ -94,7 +176,156 @@ export default function MusicPageClient({
       {/* Real-time Listening Toast Notification */}
       <LiveListeningToasts tracks={tracks} />
 
+      {/* ── SEARCH OVERLAY ──────────────────────────────────────────── */}
+      {searchOpen && (
+        <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 backdrop-blur-sm px-4 pt-20 sm:pt-28">
+          <div className="w-full max-w-xl rounded-3xl border border-white/10 bg-[#0b1526] light:border-black/10 light:bg-white shadow-[0_30px_90px_rgba(0,0,0,0.6)] overflow-hidden">
+            <div className="flex items-center gap-3 border-b border-white/10 light:border-black/10 px-4 py-3">
+              <Search size={18} className="text-orange-400 shrink-0" />
+              <input
+                ref={searchInputRef}
+                type="text"
+                value={searchQuery}
+                onChange={(e) => {
+                  setVoiceUnsupported(false);
+                  setSearchQuery(e.target.value);
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") setSearchOpen(false);
+                }}
+                placeholder="Search tracks or artists…"
+                className="flex-1 bg-transparent text-sm font-medium text-white light:text-slate-900 placeholder:text-slate-500 outline-none"
+              />
+              <button
+                type="button"
+                onClick={startVoiceSearch}
+                aria-label="Search by voice"
+                title="Search by voice"
+                className={`shrink-0 rounded-full p-1.5 transition ${
+                  listening
+                    ? "bg-orange-500 text-white animate-pulse"
+                    : "text-slate-400 hover:text-orange-400"
+                }`}
+              >
+                <Mic size={16} />
+              </button>
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  aria-label="Clear search"
+                  className="shrink-0 text-slate-500 hover:text-white light:hover:text-slate-900"
+                >
+                  <X size={16} />
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={() => setSearchOpen(false)}
+                aria-label="Close search"
+                className="shrink-0 rounded-full bg-white/5 light:bg-black/5 p-1.5 text-slate-400 hover:text-white light:hover:text-slate-900"
+              >
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className="max-h-[50vh] overflow-y-auto">
+              {listening && (
+                <div className="px-4 py-3 text-xs font-semibold text-orange-400 flex items-center gap-2">
+                  <span className="h-1.5 w-1.5 rounded-full bg-orange-400 animate-ping" />
+                  Listening…
+                </div>
+              )}
+              {voiceUnsupported && (
+                <div className="px-4 py-3 text-xs text-slate-400">
+                  Voice search isn&apos;t supported in this browser — type instead.
+                </div>
+              )}
+              {!isSearching ? (
+                <div className="px-4 py-8 text-center text-xs text-slate-500">
+                  Start typing, or tap the mic, to search InPlayer Music.
+                </div>
+              ) : filteredTracks.length === 0 ? (
+                <div className="px-4 py-8 text-center text-xs text-slate-500">
+                  No tracks match &ldquo;{searchQuery}&rdquo;.
+                </div>
+              ) : (
+                <ul className="divide-y divide-white/5 light:divide-black/5">
+                  {filteredTracks.slice(0, 8).map((track) => (
+                    <li key={track.videoId}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          playTrack(track, tracks);
+                          setSearchOpen(false);
+                        }}
+                        className="flex w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-white/5 light:hover:bg-black/5"
+                      >
+                        <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-lg bg-black/40">
+                          <Image
+                            src={track.covers[0] || "/recommendations/thumbnails/1.jpg"}
+                            alt={track.title}
+                            fill
+                            sizes="36px"
+                            className="object-cover"
+                          />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="truncate text-sm font-semibold text-white light:text-slate-900">
+                            {track.title}
+                          </p>
+                          <p className="truncate text-xs text-slate-400">{track.artist}</p>
+                        </div>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12">
+        {/* ── 0. INDIAN LANGUAGE BAR + SEARCH ─────────────────────────── */}
+        <section className="flex items-center gap-3 pt-1">
+          <div className="flex flex-1 items-center gap-2 overflow-x-auto pb-1 scrollbar-none">
+            <button
+              onClick={() => setSelectedLanguage("All")}
+              className={`shrink-0 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+                selectedLanguage === "All"
+                  ? "bg-orange-500 text-white shadow-[0_0_15px_rgba(249,115,22,0.4)]"
+                  : "bg-white/5 light:bg-black/5 text-slate-400 light:text-slate-600 hover:text-white light:hover:text-slate-900 border border-white/10 light:border-black/10"
+              }`}
+            >
+              <Languages size={12} />
+              All
+            </button>
+            {MUSIC_LANGUAGE_BAR.map((lang) => (
+              <button
+                key={lang}
+                onClick={() => setSelectedLanguage(lang)}
+                className={`shrink-0 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all ${
+                  selectedLanguage === lang
+                    ? "bg-orange-500 text-white shadow-[0_0_15px_rgba(249,115,22,0.4)]"
+                    : "bg-white/5 light:bg-black/5 text-slate-400 light:text-slate-600 hover:text-white light:hover:text-slate-900 border border-white/10 light:border-black/10"
+                }`}
+              >
+                {lang}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            onClick={() => setSearchOpen(true)}
+            aria-label="Search music"
+            className="shrink-0 flex items-center gap-2 rounded-full border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3.5 py-1.5 text-xs font-bold text-slate-300 light:text-slate-700 transition hover:border-orange-400/50 hover:text-orange-400"
+          >
+            <Search size={13} />
+            <span className="hidden sm:inline">Search</span>
+          </button>
+        </section>
+
         {/* ── 1. ULTRA-PREMIUM SPOTLIGHT HERO ───────────────────────── */}
         {spotlight && (
           <section className="relative overflow-hidden rounded-[32px] border border-white/10 light:border-black/10 bg-gradient-to-br from-[#0c182c] via-[#07101e] to-[#040810] light:from-[#FFF8EE] light:via-[#FAF1E4] light:to-[#F5E6D0] p-6 sm:p-10 shadow-[0_20px_70px_rgba(0,0,0,0.6)]">
@@ -235,10 +466,13 @@ export default function MusicPageClient({
             <div className="rounded-3xl border border-dashed border-white/15 light:border-black/15 p-12 text-center">
               <Music2 size={36} className="mx-auto text-slate-500 mb-3" />
               <p className="text-sm font-semibold text-slate-300 light:text-slate-700">
-                No tracks found in &ldquo;{selectedGenre}&rdquo;
+                No tracks match the current filters.
               </p>
               <button
-                onClick={() => setSelectedGenre("All")}
+                onClick={() => {
+                  setSelectedGenre("All");
+                  setSelectedLanguage("All");
+                }}
                 className="mt-4 px-4 py-2 rounded-xl bg-orange-500 text-xs font-bold text-white"
               >
                 Show All Tracks

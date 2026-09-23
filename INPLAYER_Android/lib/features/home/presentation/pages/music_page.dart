@@ -107,7 +107,7 @@ class _MusicPageState extends ConsumerState<MusicPage> {
     // Filter music tracks: must be contentType "music", have valid cover/thumbnail,
     // and keep official/recent music from this week and last week.
     final tracks = all.where((v) {
-      if (!v.isMusic) return false;
+      if (!v.isStrictMusic) return false;
       final cover = v.covers.isNotEmpty ? v.covers.first : v.thumbnail;
       if (cover.isEmpty || !cover.startsWith('http')) return false;
 

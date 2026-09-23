@@ -136,36 +136,65 @@ async function searchUsers(query: string): Promise<AdminUserRow[]> {
   return byId ? [byId, ...usernameMatches] : usernameMatches;
 }
 
-// No query: plain browse, newest first isn't possible without a table
-// scan + sort (createdAt isn't indexed) — at InPlayer's current scale a
-// single bounded Scan sorted in memory is fine, same tradeoff the rest of
-// this codebase already makes (see app/lib/videoStore.ts).
+// No query: plain browse, newest-registered-first. createdAt isn't
+// indexed (no GSI), so a true DynamoDB-side sort isn't possible without
+// adding one. Instead we Scan the whole table (bounded by SCAN_CAP as a
+// safety limit), sort in memory by createdAt desc, and paginate the sorted
+// array with a numeric offset cursor. This is the same
+// scan-and-sort-in-memory tradeoff already used elsewhere in this codebase
+// (see app/lib/videoStore.ts) — fine at InPlayer's current user count, but
+// it re-scans the full table on every uncached page 1 request, so if the
+// user base grows large enough for this to matter, replace it with a GSI
+// keyed on a constant partition + createdAt range sort key.
+const SCAN_CAP = 20000;
+const SORTED_CACHE_TTL_MS = 30_000;
+let sortedUsersCache: { rows: AdminUserRow[]; expiresAt: number } | null = null;
+
+async function scanAllUsersSortedByNewest(): Promise<AdminUserRow[]> {
+  if (sortedUsersCache && sortedUsersCache.expiresAt > Date.now()) {
+    return sortedUsersCache.rows;
+  }
+
+  const rows: AdminUserRow[] = [];
+  let exclusiveStartKey: Record<string, unknown> | undefined;
+  do {
+    const result = await docClient.send(
+      new ScanCommand({
+        TableName: "InPlayer-Users",
+        ProjectionExpression: USER_PROJECTION,
+        ExpressionAttributeNames: USER_PROJECTION_NAMES,
+        ExclusiveStartKey: exclusiveStartKey,
+      })
+    );
+    for (const item of result.Items || []) rows.push(toRow(item));
+    exclusiveStartKey = result.LastEvaluatedKey;
+  } while (exclusiveStartKey && rows.length < SCAN_CAP);
+
+  rows.sort((a, b) => {
+    const at = a.createdAt ? Date.parse(a.createdAt) : 0;
+    const bt = b.createdAt ? Date.parse(b.createdAt) : 0;
+    return bt - at;
+  });
+
+  sortedUsersCache = { rows, expiresAt: Date.now() + SORTED_CACHE_TTL_MS };
+  return rows;
+}
+
 async function listUsers(cursor: string | null): Promise<{
   rows: AdminUserRow[];
   nextCursor: string | null;
 }> {
-  let exclusiveStartKey: Record<string, unknown> | undefined;
+  let offset = 0;
   if (cursor) {
-    try {
-      exclusiveStartKey = JSON.parse(Buffer.from(cursor, "base64").toString("utf8"));
-    } catch {
-      exclusiveStartKey = undefined;
-    }
+    const parsed = parseInt(Buffer.from(cursor, "base64").toString("utf8"), 10);
+    if (Number.isFinite(parsed) && parsed >= 0) offset = parsed;
   }
 
-  const result = await docClient.send(
-    new ScanCommand({
-      TableName: "InPlayer-Users",
-      ProjectionExpression: USER_PROJECTION,
-      ExpressionAttributeNames: USER_PROJECTION_NAMES,
-      Limit: PAGE_SIZE,
-      ExclusiveStartKey: exclusiveStartKey,
-    })
-  );
-
-  const rows = (result.Items || []).map(toRow);
-  const nextCursor = result.LastEvaluatedKey
-    ? Buffer.from(JSON.stringify(result.LastEvaluatedKey)).toString("base64")
+  const all = await scanAllUsersSortedByNewest();
+  const rows = all.slice(offset, offset + PAGE_SIZE);
+  const nextOffset = offset + PAGE_SIZE;
+  const nextCursor = nextOffset < all.length
+    ? Buffer.from(String(nextOffset)).toString("base64")
     : null;
 
   return { rows, nextCursor };

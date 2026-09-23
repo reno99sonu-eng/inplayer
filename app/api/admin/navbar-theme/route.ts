@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/app/lib/isAdmin";
+import { requirePermission } from "@/app/lib/isAdmin";
 import { docClient } from "@/app/lib/dynamodb";
 import { GetCommand, PutCommand, DeleteCommand } from "@aws-sdk/lib-dynamodb";
 import { PLATFORM_SETTINGS_TABLE } from "@/app/lib/platformSettings";
 
 export async function GET(request: NextRequest) {
   try {
-    await requireAdmin(request);
+    await requirePermission(request, "manage_navbar_theme");
   } catch {
     return NextResponse.json({ error: "Unauthorized admin access." }, { status: 401 });
   }
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
-    await requireAdmin(request);
+    await requirePermission(request, "manage_navbar_theme");
   } catch {
     return NextResponse.json({ error: "Unauthorized admin access." }, { status: 401 });
   }
@@ -95,7 +95,7 @@ export async function POST(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    await requireAdmin(request);
+    await requirePermission(request, "manage_navbar_theme");
   } catch {
     return NextResponse.json({ error: "Unauthorized admin access." }, { status: 401 });
   }

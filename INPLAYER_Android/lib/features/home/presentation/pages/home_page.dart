@@ -16,7 +16,7 @@ import '../../../upload/presentation/pages/upload_page.dart';
 import '../widgets/video_card.dart';
 import '../widgets/featured_hero_carousel.dart';
 import '../widgets/floating_ai_button.dart';
-import '../widgets/trending_now_row.dart';
+import '../widgets/in_family_row.dart';
 import '../widgets/raftaar_shorts_row.dart';
 import '../widgets/kids_row.dart';
 import '../widgets/playables_shelf.dart';
@@ -937,7 +937,7 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage> {
       if (blockIndex == 0) {
         widgets.add(const HomeAdCard());
         widgets.add(const SizedBox(height: 12));
-        widgets.add(TrendingNowRow(refreshToken: _feedRefreshTick));
+        widgets.add(InFamilyRow(refreshToken: _feedRefreshTick));
         widgets.add(const SizedBox(height: 12));
       }
       if (blockIndex == 1) {

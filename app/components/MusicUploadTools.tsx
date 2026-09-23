@@ -28,14 +28,17 @@ import {
   MAX_COVER_BYTES,
   MAX_LYRIC_LINES,
   MUSIC_GENRES,
+  MUSIC_LANGUAGES,
   activeLyricIndex,
   parseLyrics,
   toLrc,
   type LyricLine,
   type MusicGenre,
+  type MusicLanguage,
 } from "@/app/lib/musicTrack";
 import { screenMusicMetadata } from "@/app/lib/musicCopyright";
 import { compressCoverImage, compressImageToThumbnail } from "@/app/lib/imageCompress";
+import { THUMBNAIL_ASPECT_RATIO } from "@/app/lib/contentTypes";
 
 // The creator's side of a music upload: cover art, the rotation timer, and
 // time-synced lyrics — plus the ownership declaration that the whole
@@ -54,6 +57,9 @@ export interface MusicSettings {
   lyrics: LyricLine[];
   /** Powers the Genres browse grid. Closed list — see MUSIC_GENRES. */
   genre: MusicGenre;
+  /** Powers the Music page's Indian-language filter bar. Closed list — see
+   *  MUSIC_LANGUAGES. Null means the creator hasn't set one (never guessed). */
+  language: MusicLanguage | null;
   audioSha256: string | null;
   declaredOwnership: boolean;
 }
@@ -64,6 +70,7 @@ export function emptyMusicSettings(): MusicSettings {
     coverIntervalSeconds: COVER_INTERVAL_DEFAULT,
     lyrics: [],
     genre: "Other",
+    language: null,
     audioSha256: null,
     declaredOwnership: false,
   };
@@ -71,10 +78,10 @@ export function emptyMusicSettings(): MusicSettings {
 
 interface CoverEntry {
   url: string;
-  /** A 16:9 data URL of this cover, kept so that reordering can hand the
-   *  parent a new poster instantly. Re-deriving it from the S3 URL would
-   *  mean drawing a cross-origin image to a canvas, which taints it and
-   *  makes toDataURL throw. */
+  /** A square (1:1) data URL of this cover, kept so that reordering can
+   *  hand the parent a new poster instantly. Re-deriving it from the S3 URL
+   *  would mean drawing a cross-origin image to a canvas, which taints it
+   *  and makes toDataURL throw. */
   poster: string;
 }
 
@@ -250,8 +257,13 @@ export default function MusicUploadTools({
           continue;
         }
 
+        // Music's site-wide card thumbnail must be the same square crop as
+        // the cover art itself — this used to default to 16:9, producing a
+        // second, different crop of the same image on every music card
+        // (see app/components/music/MusicPageClient.tsx, MusicRow.tsx).
         const poster = await compressImageToThumbnail(
-          new File([blob], "cover.jpg", { type: "image/jpeg" })
+          new File([blob], "cover.jpg", { type: "image/jpeg" }),
+          THUMBNAIL_ASPECT_RATIO.music
         );
         added.push({ url: data.url as string, poster });
       }
@@ -419,6 +431,31 @@ export default function MusicUploadTools({
         <p className="mt-2 text-[11px] leading-relaxed text-slate-400 light:text-slate-600">
           Lets listeners find this track by browsing a genre. Pick the closest fit — &quot;Other&quot;
           if none really apply.
+        </p>
+      </div>
+
+      {/* ── Language ────────────────────────────────────────────────── */}
+      <div className={card}>
+        <p className={label}>
+          <span className="inline-flex items-center gap-1.5">
+            <Music2 size={13} className="text-violet-400" /> Language
+          </span>
+        </p>
+        <select
+          value={value.language ?? ""}
+          onChange={(e) => emit({ language: (e.target.value || null) as MusicLanguage | null })}
+          className="w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm font-semibold text-white outline-none focus:border-violet-400/60 light:border-black/10 light:bg-white light:text-slate-900"
+        >
+          <option value="">Not set</option>
+          {MUSIC_LANGUAGES.map((l) => (
+            <option key={l} value={l}>
+              {l}
+            </option>
+          ))}
+        </select>
+        <p className="mt-2 text-[11px] leading-relaxed text-slate-400 light:text-slate-600">
+          Powers the Music page&apos;s language bar. Leave as &quot;Not set&quot; if you&apos;d rather
+          not tag it — it&apos;ll still show under &quot;All&quot;.
         </p>
       </div>
 

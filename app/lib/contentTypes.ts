@@ -83,3 +83,21 @@ export const UPLOAD_ACCEPT: Record<ContentType, string> = {
   short: "video/*",
   music: ".mp3,.m4a,.aac,.wav,.flac,.ogg,audio/*",
 };
+
+// The single source of truth for "what shape is this content's thumbnail".
+// Every thumbnail-producing path (manual crop, extracted video frame, AI
+// generation, the Mux webhook's auto-crop) reads from this map instead of
+// inlining its own 16/9, 9/16 or 1 — see app/lib/imageCompress.ts and
+// app/lib/muxThumbnail.ts.
+export const THUMBNAIL_ASPECT_RATIO: Record<ContentType, number> = {
+  video: 16 / 9,
+  short: 9 / 16,
+  music: 1,
+};
+
+/** Human-readable label for upload-form copy ("16:9 landscape thumbnail"). */
+export const THUMBNAIL_RATIO_LABEL: Record<ContentType, string> = {
+  video: "16:9",
+  short: "9:16",
+  music: "1:1",
+};

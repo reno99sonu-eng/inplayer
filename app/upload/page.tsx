@@ -13,9 +13,10 @@ import {
   CONTENT_TYPE_LABEL,
   CONTENT_TYPE_WORD,
   UPLOAD_ACCEPT,
+  THUMBNAIL_ASPECT_RATIO,
   type ContentType,
 } from "@/app/lib/contentTypes";
-import { compressImageToThumbnail } from "@/app/lib/imageCompress";
+import { compressImageToThumbnail, cropDataUrlToThumbnail } from "@/app/lib/imageCompress";
 import { buildAIGeneratePrompt, parseAITitleSuggestions } from "@/app/lib/aiPrompts";
 import VideoMetadataFields, {
   VideoMetadataValue,
@@ -110,7 +111,7 @@ export default function UploadPage() {
     setThumbnailError(null);
     setThumbnailBusy(true);
     try {
-      const dataUrl = await compressImageToThumbnail(selected);
+      const dataUrl = await compressImageToThumbnail(selected, THUMBNAIL_ASPECT_RATIO[contentType]);
       setThumbnailPreview(dataUrl);
     } catch (err) {
       console.error("Thumbnail processing failed:", err);
@@ -233,8 +234,22 @@ export default function UploadPage() {
     }
 
     try {
-      const frames = await extractLocalVideoThumbnails(selected, 4);
-      if (frames.length > 0) {
+      const rawFrames = await extractLocalVideoThumbnails(selected, 4);
+      if (rawFrames.length > 0) {
+        // Extracted frames come out at the source video's native aspect
+        // ratio, not necessarily the target ratio for this contentType
+        // (16:9 for video, 9:16 for a Short) — crop every candidate up
+        // front so what's shown in the picker, and whatever gets selected
+        // from it, is already exactly what will be stored. Uncropped, a
+        // Short's raw frame would also silently defeat Mux's own correct
+        // 9:16 auto-thumbnail (customThumbnailUrl wins over it — see the
+        // Mux webhook).
+        const ratio = THUMBNAIL_ASPECT_RATIO[contentType];
+        const frames = await Promise.all(
+          rawFrames.map((frame) =>
+            cropDataUrlToThumbnail(frame, ratio).catch(() => frame)
+          )
+        );
         setLocalVideoFrames(frames);
         setThumbnailPreview(frames[0]);
       }
@@ -256,6 +271,7 @@ export default function UploadPage() {
           prompt: title || description || "Video thumbnail",
           title,
           category,
+          contentType,
           generateNew: true,
           frameUrls: localVideoFrames,
         }),
@@ -392,6 +408,7 @@ export default function UploadPage() {
             coverIntervalSeconds: musicSettings.coverIntervalSeconds,
             lyrics: musicSettings.lyrics,
             genre: musicSettings.genre,
+            language: musicSettings.language,
             audioSha256: musicSettings.audioSha256,
             declaredOwnership: musicSettings.declaredOwnership,
           }),

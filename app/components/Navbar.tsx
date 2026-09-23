@@ -5,7 +5,7 @@ import Link from "next/link";
 import { fetchAuthSession } from "aws-amplify/auth";
 import NavbarLogo from "./NavbarLogo";
 import NavbarLinks from "./NavbarLinks";
-import { Menu, X, Search, Home, PlaySquare, ChevronRight, ChevronDown, LogOut, Mail, Copy, Check, Gamepad2, Megaphone, Headset, Music2 } from "lucide-react";
+import { Menu, X, Search, Home, PlaySquare, ChevronRight, ChevronDown, LogOut, Mail, Copy, Check, Gamepad2, Megaphone, Headset, Music2, BadgeCheck } from "lucide-react";
 import { useAuthModal } from "./auth/AuthProvider";
 import NavbarSearch from "./NavbarSearch";
 import NavbarActions from "./NavbarActions";
@@ -27,13 +27,13 @@ export default function Navbar() {
   // hamburger "Support" entry below, which every panel except Hammart gets.
   const siteDomain = getSiteDomain(pathname);
 
-  const [subscribedChannels, setSubscribedChannels] = useState<
+  const [trendingCreators, setTrendingCreators] = useState<
     {
-      creatorId: string;
+      userId: string;
       username: string;
       name: string;
       avatarUrl: string | null;
-      notifyEnabled: boolean;
+      isVerified: boolean;
     }[]
   >([]);
 
@@ -115,38 +115,23 @@ export default function Navbar() {
   }, []);
 
   useEffect(() => {
+    // Public discovery data — no auth needed — so this loads regardless of
+    // signedIn, matching the same source as the homepage's signed-out
+    // fallback (TrendingNow) and the /creators page.
+    const controller = new AbortController();
     (async () => {
-      if (!signedIn) {
-        setSubscribedChannels([]);
-        return;
-      }
-
       try {
-        const session = await fetchAuthSession();
-        const idToken = session.tokens?.idToken?.toString();
-
-        if (!idToken) {
-          return;
-        }
-
-        const res = await fetch("/api/subscriptions/list", {
-          headers: {
-            Authorization: `Bearer ${idToken}`,
-          },
-        });
-
-        if (!res.ok) {
-          console.error(await res.text());
-          return;
-        }
-
+        const res = await fetch("/api/trending", { signal: controller.signal });
+        if (!res.ok) return;
         const data = await res.json();
-        setSubscribedChannels(data.subscriptions ?? []);
+        setTrendingCreators(data.creators ?? []);
       } catch (err) {
-        console.error("Failed to load subscriptions:", err);
+        if (err instanceof DOMException && err.name === "AbortError") return;
+        console.error("Failed to load trending creators:", err);
       }
     })();
-  }, [signedIn]);
+    return () => controller.abort();
+  }, []);
 
   const copyEmail = async (address: string) => {
     try {
@@ -892,10 +877,13 @@ lg:right-auto
 
             <div className="my-3 border-t border-white/10 light:border-black/10" />
 
-                {/* Subscriptions */}
+                {/* Trending Creators — public discovery, replaces the old
+                    In-Family (subscriptions) panel. The real subscribed-
+                    creators list now lives on the homepage (see
+                    InFamilyHome.tsx) and at /subscriptions. */}
                 <div>
                   <button
-                    onClick={() => goTo("/subscriptions")}
+                    onClick={() => goTo("/creators")}
                     className="
                       mb-1
                       flex
@@ -914,33 +902,29 @@ lg:right-auto
                   light:hover:text-orange-600
                 "
               >
-                In-Family
+                Trending Creators
                 <ChevronRight size={14} />
               </button>
 
               <div className="space-y-0.5">
-  {subscribedChannels.length === 0 ? (
+  {trendingCreators.length === 0 ? (
     <div className="rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-4 text-center">
       <p className="text-sm font-medium text-slate-200 light:text-slate-700">
-        You don&apos;t have any subscribed channels yet.
-      </p>
-
-      <p className="mt-1 text-xs text-slate-400 light:text-slate-500">
-        Subscribe to your favourite creators and they&apos;ll appear here.
+        No trending creators to show right now.
       </p>
 
       <button
         onClick={() => goTo("/creators")}
         className="mt-3 rounded-lg bg-orange-500 px-4 py-2 text-xs font-semibold text-white transition hover:bg-orange-600"
       >
-        Discover Creators
+        Browse Creators
       </button>
     </div>
   ) : (
-    subscribedChannels.map((channel) => (
+    trendingCreators.slice(0, 8).map((creator) => (
       <button
-  key={channel.creatorId}
-  onClick={() => goTo(`/u/${channel.username}`)}
+  key={creator.userId}
+  onClick={() => goTo(`/u/${creator.username}`)}
   className="
     flex
     w-full
@@ -959,17 +943,13 @@ lg:right-auto
   "
 >
         <div className="relative h-7 w-7 flex-shrink-0 overflow-hidden rounded-full">
-          {/* Plain <img>, not next/image — real subscribed-channel avatars
-              are base64 data URLs (see app/lib/imageCompress.ts) that
-              next/image can't optimize/serve, and "/recommendations/avatars/
-              default.jpg" below never existed as a real file, so both
-              together were exactly why every avatar in this list showed as
-              a broken image icon. Same pattern as HomeVideoCard's avatar
-              and NavbarProfile's own picture, which use a real existing
-              fallback (/avatars/avatar.png) the same way. */}
+          {/* Plain <img>, not next/image — creator avatars can be base64
+              data URLs (see app/lib/imageCompress.ts) that next/image
+              can't optimize/serve. Same fallback pattern as HomeVideoCard
+              and NavbarProfile. */}
           <img
-            src={channel.avatarUrl || "/avatars/avatar.png"}
-            alt={channel.name}
+            src={creator.avatarUrl || "/avatars/avatar.png"}
+            alt={creator.name}
             loading="lazy"
             decoding="async"
             className="h-full w-full object-cover"
@@ -977,11 +957,11 @@ lg:right-auto
         </div>
 
         <span className="flex-1 truncate text-sm text-slate-200 light:text-slate-700">
-          {channel.name}
+          {creator.name}
         </span>
 
-        {channel.notifyEnabled && (
-          <span className="h-2 w-2 flex-shrink-0 rounded-full bg-orange-400" />
+        {creator.isVerified && (
+          <BadgeCheck size={14} className="flex-shrink-0 fill-orange-400 text-[#101827] light:text-[#FBF6EA]" />
         )}
       </button>
     ))

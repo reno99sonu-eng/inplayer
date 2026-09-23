@@ -81,6 +81,16 @@ class Video {
       contentType.toLowerCase() == 'raftaar' ||
       category.toLowerCase().contains('raftaar');
 
+  /// The canonical music check: strictly `contentType == "music"`, matching
+  /// app/lib/contentTypes.ts's isMusicType() on the website. Use this (not
+  /// [isMusic]) anywhere content is being INCLUDED into a music-only surface
+  /// (the Music hub catalogue, the music player's autoplay queue, music
+  /// search) — [isMusic] also flips true from `category == "Music"`, which
+  /// is fine for EXCLUDING music from general video surfaces (a superset
+  /// exclusion is safe) but wrongly lets a video merely categorized "Music"
+  /// leak into music-only surfaces if used the other way around.
+  bool get isStrictMusic => contentType.toLowerCase() == 'music';
+
   static String _resolveUrl(String url) {
     if (url.startsWith('/')) {
       return '${AppConfig.apiBaseUrl}$url';

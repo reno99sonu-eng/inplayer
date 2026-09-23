@@ -3,7 +3,7 @@ import { ScanCommand, PutCommand } from "@aws-sdk/lib-dynamodb";
 import { randomUUID } from "crypto";
 import { revalidateTag } from "next/cache";
 import { docClient } from "@/app/lib/dynamodb";
-import { requireAdmin } from "@/app/lib/isAdmin";
+import { requirePermission } from "@/app/lib/isAdmin";
 import { logAdminAction } from "@/app/lib/auditLog";
 import { selfHealMidrollAdsBatch } from "@/app/lib/videoAdsHealer";
 import {
@@ -15,7 +15,7 @@ import {
 
 export async function GET(request: NextRequest) {
   try {
-    await requireAdmin(request);
+    await requirePermission(request, "manage_ads");
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
 export async function POST(request: NextRequest) {
   let admin;
   try {
-    admin = await requireAdmin(request);
+    admin = await requirePermission(request, "manage_ads");
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

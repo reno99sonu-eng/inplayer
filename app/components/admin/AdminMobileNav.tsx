@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useAdminMode } from "@/app/components/admin/AdminModeContext";
+import { useAdminIdentity } from "@/app/components/admin/AdminIdentityContext";
+import type { TeamPermission } from "@/app/lib/isAdmin";
 
 // Same three section lists as AdminSidebar (see that file's comment),
 // condensed into a horizontally scrollable strip for phones (that sidebar
@@ -17,21 +19,22 @@ const inplayerItems = [
   { id: "dashboard", label: "Dashboard", href: "/admin/dashboard" },
   { id: "users", label: "Users", href: "/admin/users" },
   { id: "creators", label: "Creators", href: "/admin/creators" },
-  { id: "support", label: "Support Desk", href: "/admin/support" },
-  { id: "bug-reports", label: "Bug Reports", href: "/admin/bug-reports" },
-  { id: "error-logs", label: "Error Logs", href: "/admin/error-logs" },
+  { id: "support", label: "Support Desk", href: "/admin/support", permission: "view_support" },
+  { id: "bug-reports", label: "Bug Reports", href: "/admin/bug-reports", permission: "view_bugs" },
+  { id: "error-logs", label: "Error Logs", href: "/admin/error-logs", permission: "view_errors" },
   { id: "videos", label: "Videos", href: "/admin/videos" },
   { id: "shorts", label: "Shorts", href: "/admin/videos?type=short" },
   { id: "reports", label: "Reports", href: "/admin/moderation" },
   { id: "copyright", label: "Copyright", href: "/admin/copyright" },
   { id: "revenue", label: "Revenue", href: "/admin/revenue" },
-  { id: "navbar-theme", label: "Navbar Theme", href: "/admin/navbar-theme" },
+  { id: "navbar-theme", label: "Navbar Theme", href: "/admin/navbar-theme", permission: "manage_navbar_theme" },
   { id: "analytics", label: "Analytics", href: "/admin/analytics" },
   { id: "ai-moderation", label: "AI Moderation", href: "/admin/ai-moderation" },
   { id: "notifications", label: "Notifications", href: "/admin/notifications" },
   { id: "settings", label: "Settings", href: "/admin/settings" },
   { id: "audit-logs", label: "Audit Logs", href: "/admin/audit-logs" },
   { id: "captions", label: "Maintenance", href: "/admin/captions" },
+  { id: "team", label: "Team Members", href: "/admin/team" },
 ] as const;
 
 const hammartItems = [
@@ -39,18 +42,18 @@ const hammartItems = [
   { id: "hammart-products", label: "Products", href: "/admin/hammart-products" },
   { id: "hammart-orders", label: "Orders", href: "/admin/hammart-orders" },
   { id: "ai-moderation", label: "AI Moderation", href: "/admin/ai-moderation" },
-  { id: "support", label: "Support Desk", href: "/admin/support" },
-  { id: "bug-reports", label: "Bug Reports", href: "/admin/bug-reports" },
-  { id: "error-logs", label: "Error Logs", href: "/admin/error-logs" },
+  { id: "support", label: "Support Desk", href: "/admin/support", permission: "view_support" },
+  { id: "bug-reports", label: "Bug Reports", href: "/admin/bug-reports", permission: "view_bugs" },
+  { id: "error-logs", label: "Error Logs", href: "/admin/error-logs", permission: "view_errors" },
   { id: "settings", label: "Settings", href: "/admin/settings" },
   { id: "audit-logs", label: "Audit Logs", href: "/admin/audit-logs" },
 ] as const;
 
 const sponsorshipItems = [
   { id: "sponsorships", label: "Sponsorships", href: "/admin/sponsorships" },
-  { id: "ads", label: "House Ads & AdSense", href: "/admin/advertising" },
-  { id: "bug-reports", label: "Bug Reports", href: "/admin/bug-reports" },
-  { id: "error-logs", label: "Error Logs", href: "/admin/error-logs" },
+  { id: "ads", label: "House Ads & AdSense", href: "/admin/advertising", permission: "manage_ads" },
+  { id: "bug-reports", label: "Bug Reports", href: "/admin/bug-reports", permission: "view_bugs" },
+  { id: "error-logs", label: "Error Logs", href: "/admin/error-logs", permission: "view_errors" },
   { id: "settings", label: "Settings", href: "/admin/settings" },
   { id: "audit-logs", label: "Audit Logs", href: "/admin/audit-logs" },
 ] as const;
@@ -59,7 +62,16 @@ export default function AdminMobileNav() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { mode } = useAdminMode();
-  const items = mode === "hammart" ? hammartItems : mode === "sponsorship" ? sponsorshipItems : inplayerItems;
+  const { isMainAdmin, permissions } = useAdminIdentity();
+  const modeItems = mode === "hammart" ? hammartItems : mode === "sponsorship" ? sponsorshipItems : inplayerItems;
+  const items = isMainAdmin
+    ? modeItems
+    : modeItems.filter(
+        (item) =>
+          item.id !== "team" &&
+          "permission" in item &&
+          permissions.has(item.permission as TeamPermission)
+      );
   const query = searchParams.toString();
   const currentPath = query ? `${pathname}?${query}` : pathname;
 

@@ -34,7 +34,7 @@ class _GenrePageState extends ConsumerState<GenrePage> {
     if (!mounted) return;
     setState(() {
       _tracks = all.where((v) {
-        if (!v.isMusic) return false;
+        if (!v.isStrictMusic) return false;
         final g = (v.genre?.isNotEmpty == true) ? v.genre! : 'Other';
         return g == widget.genre;
       }).toList();

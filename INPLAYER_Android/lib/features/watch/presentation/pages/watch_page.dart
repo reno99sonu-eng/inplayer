@@ -1349,7 +1349,7 @@ class _WatchPageState extends ConsumerState<WatchPage>
     final video = _video;
     final controller = _videoController;
     if (video == null || controller == null) return const SizedBox();
-    if (video.isMusic) {
+    if (video.isStrictMusic) {
       return MusicStage(
         covers: video.covers,
         coverIntervalSeconds: video.coverIntervalSeconds,

@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/app/lib/isAdmin";
+import { requireAdmin, requirePermission } from "@/app/lib/isAdmin";
 import { listErrorLogs, deleteErrorLog, clearErrorLogs } from "@/app/lib/errorLogs";
 
 export async function GET(request: NextRequest) {
   try {
-    await requireAdmin(request);
+    await requirePermission(request, "view_errors");
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }

@@ -131,37 +131,9 @@ export default function VideoMetadataFields({
 }: VideoMetadataFieldsProps) {
   const thumbInputRef = useRef<HTMLInputElement>(null);
   const muxFrames = thumbnail?.muxFrames ?? [];
-  const [aiThumbBusy, setAiThumbBusy] = useState(false);
-  const [aiThumbError, setAiThumbError] = useState<string | null>(null);
 
   // Mobile Segmented Tab State for ultra-compact 1-screen editing on mobile
   const [mobileTab, setMobileTab] = useState<"details" | "settings">("details");
-
-  const runAIThumbnail = async () => {
-    if (muxFrames.length === 0 || aiThumbBusy) return;
-    setAiThumbBusy(true);
-    setAiThumbError(null);
-    try {
-      const res = await fetch("/api/ai-thumbnail", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          frameUrls: muxFrames,
-          title: value.title,
-          category: value.category,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "AI couldn't pick a thumbnail.");
-      if (data.thumbnailUrl) {
-        thumbnail?.onMuxThumbnailSelected?.(data.thumbnailUrl);
-      }
-    } catch (err) {
-      setAiThumbError(err instanceof Error ? err.message : "AI couldn't pick a thumbnail.");
-    } finally {
-      setAiThumbBusy(false);
-    }
-  };
 
   const addTag = () => {
     const t = tagInput.trim().replace(/^#/, "");
@@ -271,14 +243,33 @@ export default function VideoMetadataFields({
                 <label className="block text-xs font-bold text-slate-300 light:text-slate-700">
                   Thumbnail
                 </label>
+                <span className="rounded-full border border-white/10 px-2 py-0.5 text-[10px] font-semibold text-slate-400 light:border-black/10 light:text-slate-500">
+                  16:9 landscape
+                </span>
               </div>
               <div className="flex gap-4">
                 <div className="flex-1">
                   <p className="mb-2 text-[11px] leading-relaxed text-slate-400 light:text-slate-600">
-                    Pick a frame from your video, or upload a custom image (max 5MB).
+                    Pick a frame from your video, upload a custom image (max 5MB), or let AI suggest one — every
+                    option is shown exactly as it will be cropped and stored.
                   </p>
                 </div>
               </div>
+              {thumbnail.onGenerateAIThumbnail && (
+                <button
+                  type="button"
+                  onClick={thumbnail.onGenerateAIThumbnail}
+                  disabled={thumbnail.aiThumbnailBusy}
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-orange-500/15 px-2.5 py-1.5 text-[11px] font-bold text-orange-400 transition hover:bg-orange-500 hover:text-white disabled:opacity-50"
+                >
+                  {thumbnail.aiThumbnailBusy ? (
+                    <Loader2 size={12} className="animate-spin" />
+                  ) : (
+                    <Sparkles size={12} />
+                  )}
+                  {thumbnail.aiThumbnailBusy ? "Generating..." : "✨ AI Thumbnail"}
+                </button>
+              )}
 
               {muxFrames && muxFrames.length > 0 && (
                 <div>

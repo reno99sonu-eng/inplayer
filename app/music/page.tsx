@@ -65,6 +65,7 @@ export default async function MusicPage({ searchParams }: MusicPageProps) {
         coverIntervalSeconds: musicSettings.coverIntervalSeconds || 7,
         lyrics: Array.isArray(musicSettings.lyrics) ? musicSettings.lyrics : [],
         genre: (musicSettings.genre as string) || (v.category as string) || "Pop",
+        language: (musicSettings.language as string) || undefined,
         muxPlaybackId: v.muxPlaybackId as string | undefined,
         duration: (v.duration as number) || 0,
         views: (v.views as number) || 0,

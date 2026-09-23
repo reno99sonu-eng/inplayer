@@ -22,6 +22,9 @@ export interface MusicTrack {
   coverIntervalSeconds?: number;
   lyrics?: LyricLine[];
   genre?: string;
+  /** Closed list (see MUSIC_LANGUAGES) — real creator-set metadata only,
+   *  never guessed. Undefined means not set. */
+  language?: string;
   muxPlaybackId?: string;
   duration?: number;
   audioUrl?: string;

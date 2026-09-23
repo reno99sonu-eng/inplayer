@@ -1083,29 +1083,11 @@ lg:right-auto
                   </li>
                   <li>
                     <Link
-                      href="/privacy"
+                      href="/policies"
                       onClick={() => setMenuOpen(false)}
                       className="block text-xs text-slate-400 light:text-slate-600 transition hover:text-orange-300 light:hover:text-orange-600"
                     >
-                      Privacy Policy
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      href="/terms"
-                      onClick={() => setMenuOpen(false)}
-                      className="block text-xs text-slate-400 light:text-slate-600 transition hover:text-orange-300 light:hover:text-orange-600"
-                    >
-                      Terms of Service
-                    </Link>
-                  </li>
-                  <li>
-                    <Link
-                      href="/hammart-vendor-terms"
-                      onClick={() => setMenuOpen(false)}
-                      className="block text-xs text-slate-400 light:text-slate-600 transition hover:text-orange-300 light:hover:text-orange-600"
-                    >
-                      HamMart Vendor Terms
+                      InPlayer Policies
                     </Link>
                   </li>
                 </ul>

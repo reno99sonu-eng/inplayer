@@ -1,7 +1,7 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { Info, HelpCircle, Mail, ShieldCheck, Sparkles, FileText, Lock } from "lucide-react";
+import { Info, HelpCircle, Mail, ShieldCheck, Sparkles, FileText } from "lucide-react";
 import SettingsCard from "../common/SettingsCard";
 import SettingsRow from "../common/SettingsRow";
 import ReportProblemCard from "./ReportProblemCard";
@@ -55,23 +55,9 @@ export default function AboutSection() {
 
           <SettingsRow
             icon={<FileText size={20} />}
-            title="Terms of Service"
-            description="Includes our IT Rules Grievance Officer contact."
-            onClick={() => router.push("/terms")}
-          />
-
-          <SettingsRow
-            icon={<FileText size={20} />}
-            title="HamMart Vendor Terms"
-            description="Terms & Conditions for HamMart sellers and vendors."
-            onClick={() => router.push("/hammart-vendor-terms")}
-          />
-
-          <SettingsRow
-            icon={<Lock size={20} />}
-            title="Privacy Policy"
-            description="What data we collect and your rights over it."
-            onClick={() => router.push("/privacy")}
+            title="InPlayer Policies"
+            description="Privacy, Terms of Service, and HamMart Vendor Terms."
+            onClick={() => router.push("/policies")}
           />
 
           <ReportProblemCard />

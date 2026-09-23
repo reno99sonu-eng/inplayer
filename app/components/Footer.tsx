@@ -18,9 +18,7 @@ const browse = [
 
 const company = [
   { label: "About", href: "/settings?tab=about" },
-  { label: "Privacy Policy", href: "/privacy" },
-  { label: "Terms of Service", href: "/terms" },
-  { label: "HamMart Vendor Terms", href: "/hammart-vendor-terms" },
+  { label: "InPlayer Policies", href: "/policies" },
   { label: "Help & Support", href: "/help" },
 ];
 

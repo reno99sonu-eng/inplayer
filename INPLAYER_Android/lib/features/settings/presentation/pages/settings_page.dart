@@ -582,19 +582,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             onTap: () => context.push('/settings/help'),
           ),
           _SettingTile(
-            icon: Icons.description_outlined,
-            title: 'Terms of Service',
-            onTap: () => context.push('/settings/terms'),
-          ),
-          _SettingTile(
-            icon: Icons.storefront_outlined,
-            title: 'HamMart Vendor Terms',
-            onTap: () => context.push('/settings/vendor-terms'),
-          ),
-          _SettingTile(
             icon: Icons.privacy_tip_outlined,
-            title: 'Privacy Policy',
-            onTap: () => context.push('/settings/privacy-policy'),
+            title: 'InPlayer Policies',
+            onTap: () => context.push('/settings/policies'),
           ),
         ],
       ),

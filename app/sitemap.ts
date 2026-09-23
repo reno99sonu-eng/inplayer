@@ -20,9 +20,11 @@ const STATIC_ROUTES: Array<{ path: string; priority: number }> = [
   { path: "/shop", priority: 0.7 },
   { path: "/creators", priority: 0.6 },
   { path: "/help", priority: 0.4 },
-  { path: "/terms", priority: 0.3 },
-  { path: "/privacy", priority: 0.3 },
-  { path: "/hammart-vendor-terms", priority: 0.3 },
+  // /terms, /privacy, /hammart-vendor-terms now redirect into this single
+  // hub (see app/policies/page.tsx) — listing the old paths here would be
+  // exactly the "Page with redirect" Search Console issue this file's own
+  // comment above warns against.
+  { path: "/policies", priority: 0.3 },
 ];
 
 // Rebuild at most once an hour — a sitemap doesn't need to be

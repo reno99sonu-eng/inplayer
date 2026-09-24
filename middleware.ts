@@ -91,6 +91,15 @@ function attachNoIndexIfNeeded(
 //   and could never verify the links — this is what was causing Razorpay's
 //   compliance check to keep failing even after the correct URLs were
 //   entered.
+// - /api/ai-generate and /api/ai-thumbnail — same class of bug as the
+//   webhook exemptions above. These are stateless AI utility calls with no
+//   India-specific content to protect, but without this exemption any
+//   request Vercel's edge doesn't classify as x-vercel-ip-country: "IN"
+//   (a misclassified IP, a VPN/proxy on the device, a non-India tester)
+//   gets silently rewritten to /geo-blocked — HTML, not JSON — which reads
+//   to the app/website as every AI button (title, description, tags,
+//   thumbnail) failing identically, since they all go through this same
+//   gate.
 // - Static files (favicon, images, etc.)
 const BYPASS_PREFIXES = [
   "/geo-blocked",
@@ -101,6 +110,8 @@ const BYPASS_PREFIXES = [
   "/api/webhooks",
   "/terms",
   "/privacy",
+  "/api/ai-generate",
+  "/api/ai-thumbnail",
 ] as const;
 
 const BYPASS_EXACT = new Set([

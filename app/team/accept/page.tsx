@@ -13,12 +13,66 @@ import { authedFetch } from "@/app/lib/apiFetch";
 function AcceptInvitationContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { signedIn, authLoading, openSignIn, user } = useAuthModal();
+  const { signedIn, authLoading, openSignIn, openSignUp, user } = useAuthModal();
   const [status, setStatus] = useState<"idle" | "accepting" | "success" | "error">("idle");
   const [message, setMessage] = useState<string | null>(null);
 
+  // Whether the invited email already has an InPlayer account — decides
+  // which modal to auto-open (checked once, before sign-in, via a
+  // dedicated unauthenticated endpoint scoped to this exact invitation —
+  // see app/api/admin/team/invitations/check-account). "unknown" means the
+  // check hasn't resolved yet (or failed); the manual button below falls
+  // back to a generic Sign In in that case rather than blocking.
+  const [accountCheck, setAccountCheck] = useState<"checking" | "has-account" | "no-account" | "unknown">("checking");
+  const [inviteEmail, setInviteEmail] = useState<string | undefined>(undefined);
+  const [autoOpened, setAutoOpened] = useState(false);
+
   const invitationId = searchParams.get("id") || "";
   const token = searchParams.get("token") || "";
+
+  useEffect(() => {
+    if (!invitationId || !token) {
+      setAccountCheck("unknown");
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/admin/team/invitations/check-account?id=${encodeURIComponent(invitationId)}&token=${encodeURIComponent(token)}`
+        );
+        const data = await res.json().catch(() => null);
+        if (cancelled) return;
+        if (res.ok && data && typeof data.hasAccount === "boolean") {
+          setAccountCheck(data.hasAccount ? "has-account" : "no-account");
+          if (typeof data.email === "string") setInviteEmail(data.email);
+        } else {
+          setAccountCheck("unknown");
+        }
+      } catch {
+        if (!cancelled) setAccountCheck("unknown");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [invitationId, token]);
+
+  // Auto-opens the right modal the moment we know which one that is —
+  // sign-in (pre-filled) for an email that already has an account, sign-up
+  // (pre-filled) for one that doesn't — so accepting an invite never
+  // requires guessing which button to click first. Only fires once; if the
+  // invitee closes the modal, the manual button below still works.
+  useEffect(() => {
+    if (authLoading || signedIn || autoOpened) return;
+    if (accountCheck === "has-account") {
+      setAutoOpened(true);
+      openSignIn(inviteEmail);
+    } else if (accountCheck === "no-account") {
+      setAutoOpened(true);
+      openSignUp(inviteEmail);
+    }
+  }, [authLoading, signedIn, accountCheck, autoOpened, openSignIn, openSignUp, inviteEmail]);
 
   useEffect(() => {
     if (authLoading || !signedIn || !invitationId || !token || status !== "idle") return;
@@ -71,13 +125,15 @@ function AcceptInvitationContent() {
       <Centered>
         <ShieldCheck size={28} className="text-indigo-400" />
         <p className="mt-3 text-sm font-semibold text-slate-300 light:text-slate-700">
-          Sign in with the email address this invitation was sent to, to accept it.
+          {accountCheck === "no-account"
+            ? "Create your InPlayer account with the email this invitation was sent to, to accept it."
+            : "Sign in with the email address this invitation was sent to, to accept it."}
         </p>
         <button
-          onClick={openSignIn}
+          onClick={() => (accountCheck === "no-account" ? openSignUp(inviteEmail) : openSignIn(inviteEmail))}
           className="mt-5 rounded-2xl bg-gradient-to-r from-[#6366F1] via-[#8B5CF6] to-[#A855F7] px-8 py-3 font-bold text-white shadow-[0_15px_35px_rgba(139,92,246,.3)]"
         >
-          Sign In
+          {accountCheck === "no-account" ? "Create Account" : "Sign In"}
         </button>
       </Centered>
     );

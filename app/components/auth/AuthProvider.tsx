@@ -118,8 +118,8 @@ interface AuthContextType {
   activeModal: AuthModal;
   pendingEmail: string;
 
-  openSignIn: () => void;
-  openSignUp: () => void;
+  openSignIn: (email?: string) => void;
+  openSignUp: (email?: string) => void;
   openForgotPassword: () => void;
   openVerifyEmail: (email?: string) => void;
 
@@ -563,11 +563,16 @@ export default function AuthProvider({
     }
   }
 
-  function openSignIn() {
+  function openSignIn(email?: string) {
+    // Always set (clearing when omitted) — otherwise a stale email left
+    // over from a different flow (e.g. openVerifyEmail) would silently
+    // leak into an unrelated sign-in/sign-up open.
+    setPendingEmail(email || "");
     setActiveModal("signin");
   }
 
-  function openSignUp() {
+  function openSignUp(email?: string) {
+    setPendingEmail(email || "");
     setActiveModal("signup");
   }
 
@@ -610,11 +615,13 @@ export default function AuthProvider({
         open={activeModal === "signin"}
         onClose={closeAuth}
         onSuccess={() => refreshUser({ isFreshSignIn: true })}
+        initialEmail={pendingEmail}
       />
 
       <SignUpModal
         open={activeModal === "signup"}
         onClose={closeAuth}
+        initialEmail={pendingEmail}
       />
 
       <ForgotPasswordModal

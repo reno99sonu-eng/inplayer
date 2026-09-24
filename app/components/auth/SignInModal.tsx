@@ -16,6 +16,9 @@ interface SignInModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess?: () => void;
+  // Prefills the email field — used by app/team/accept/page.tsx so a team
+  // invitee whose email already has an account never has to retype it.
+  initialEmail?: string;
 }
 
 // Google sign-in reaches all the way through Google's own consent screen
@@ -37,6 +40,7 @@ export default function SignInModal({
   open,
   onClose,
   onSuccess,
+  initialEmail,
 }: SignInModalProps) {
   const router = useRouter();
   const { openSignUp, openForgotPassword, refreshUser } = useAuthModal();
@@ -53,18 +57,22 @@ export default function SignInModal({
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    const resetForm = () => {
-      setEmail("");
-      setPassword("");
-      setRememberMe(true);
-      setShowPassword(false);
-      setLoading(false);
-      setError(null);
-      setShake(false);
-      setSuccess(false);
-    };
-    if (!open) resetForm();
-  }, [open]);
+    if (open) {
+      // Prefilled rather than left for the reset branch below, so a
+      // caller-supplied email (e.g. from a team invitation) survives the
+      // open transition instead of being wiped straight back to "".
+      setEmail(initialEmail || "");
+      return;
+    }
+    setEmail("");
+    setPassword("");
+    setRememberMe(true);
+    setShowPassword(false);
+    setLoading(false);
+    setError(null);
+    setShake(false);
+    setSuccess(false);
+  }, [open, initialEmail]);
 
   useEffect(() => {
     if (!open) return;

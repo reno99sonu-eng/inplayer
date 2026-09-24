@@ -65,6 +65,33 @@ export async function resolveCognitoEmails(
   return result;
 }
 
+// Whether an account with this exact email already exists in Cognito —
+// used only by the invitation-acceptance flow (app/team/accept/page.tsx via
+// app/api/admin/team/invitations/check-account) to decide whether to open
+// the sign-in or sign-up modal automatically. Deliberately NOT a
+// general-purpose "does this email exist" endpoint: the caller must first
+// present a valid, unexpired invitation token for this exact email (see
+// validateInvitation), so this can't be used to enumerate arbitrary
+// accounts on the site.
+export async function emailHasCognitoAccount(email: string): Promise<boolean> {
+  try {
+    const res = await cognitoClient.send(
+      new ListUsersCommand({
+        UserPoolId: COGNITO_USER_POOL_ID,
+        Filter: `email = "${email.toLowerCase()}"`,
+        Limit: 1,
+      })
+    );
+    return (res.Users?.length || 0) > 0;
+  } catch (err) {
+    console.error(`emailHasCognitoAccount: lookup failed for ${email}:`, err);
+    // Fail toward "assume an account exists" — the sign-in modal handles
+    // "no account found" gracefully with a link to sign up either way, so
+    // this only ever costs an extra click rather than a dead end.
+    return true;
+  }
+}
+
 // Cognito's own Username value for a given sub/userId — needed for any
 // Admin* API (AdminUserGlobalSignOut, AdminDeleteUser, ...), since those
 // all key off Username, not the sub. For a Google-linked account this is a

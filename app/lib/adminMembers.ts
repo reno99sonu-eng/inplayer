@@ -26,8 +26,13 @@ export interface AdminMember {
 
 export async function getActiveTeamMember(userId: string): Promise<AdminMember | null> {
   if (!userId) return null;
+  // Strongly consistent: called right after accepting an invitation writes
+  // this exact row (see app/api/admin/team/accept), and DynamoDB's default
+  // eventually-consistent read can briefly miss a write that just happened
+  // a moment earlier — this is the one read where that gap would show up
+  // as "you're not actually an admin yet" straight after accepting.
   const result = await docClient
-    .send(new GetCommand({ TableName: ADMIN_MEMBERS_TABLE, Key: { userId } }))
+    .send(new GetCommand({ TableName: ADMIN_MEMBERS_TABLE, Key: { userId }, ConsistentRead: true }))
     .catch(() => null);
   const item = result?.Item as AdminMember | undefined;
   if (!item || item.status !== "active") return null;

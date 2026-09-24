@@ -10,6 +10,9 @@ import { usePlatformSettings } from "@/app/hooks/usePlatformSettings";
 interface SignUpModalProps {
   open: boolean;
   onClose: () => void;
+  // Prefills the email field — used by app/team/accept/page.tsx so a team
+  // invitee whose email has no account yet never has to retype it.
+  initialEmail?: string;
 }
 
 // See the matching flag + comment in SignInModal.tsx — same unresolved
@@ -35,7 +38,7 @@ function getPasswordStrength(password: string) {
 
 const isValidEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 
-export default function SignUpModal({ open, onClose }: SignUpModalProps) {
+export default function SignUpModal({ open, onClose, initialEmail }: SignUpModalProps) {
   const { openSignIn, openVerifyEmail } = useAuthModal();
   // Real Platform Settings toggle (Admin Panel -> Platform Settings). A
   // still-loading or unreachable settings fetch (settings === null) fails
@@ -76,24 +79,28 @@ export default function SignUpModal({ open, onClose }: SignUpModalProps) {
   const passwordsMismatch = confirmPassword.length > 0 && confirmPassword !== password;
 
   useEffect(() => {
-    const resetForm = () => {
-      setName("");
-      setEmail("");
-      setAge("");
-      setPassword("");
-      setConfirmPassword("");
-      setLoading(false);
-      setError(null);
-      setShake(false);
-      setSuccess(false);
-      setAccountType("user");
-      setBusinessType("individual");
-      setVendorId("");
-      setBusinessName("");
-      setVendorIdCheck({ status: "idle" });
-    };
-    if (!open) resetForm();
-  }, [open]);
+    if (open) {
+      // Prefilled rather than left for the reset branch below, so a
+      // caller-supplied email (e.g. from a team invitation) survives the
+      // open transition instead of being wiped straight back to "".
+      setEmail(initialEmail || "");
+      return;
+    }
+    setName("");
+    setEmail("");
+    setAge("");
+    setPassword("");
+    setConfirmPassword("");
+    setLoading(false);
+    setError(null);
+    setShake(false);
+    setSuccess(false);
+    setAccountType("user");
+    setBusinessType("individual");
+    setVendorId("");
+    setBusinessName("");
+    setVendorIdCheck({ status: "idle" });
+  }, [open, initialEmail]);
 
   // Live vendor-ID availability check, debounced — mirrors the same
   // pattern already used for @handle checking on the profile page.

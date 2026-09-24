@@ -87,15 +87,13 @@ class _MusicPageState extends ConsumerState<MusicPage> {
     }
 
 
-    // Filter music tracks: must be contentType "music", have valid cover/thumbnail,
-    // and keep official/recent music from this week and last week.
+    // Music covers are uploaded as inline `data:image/...` URIs, not http
+    // URLs, so an http-only check here hid every track. Accept anything
+    // SafeAppImage can actually render.
     final tracks = all.where((v) {
       if (!v.isStrictMusic) return false;
       final cover = v.covers.isNotEmpty ? v.covers.first : v.thumbnail;
-      if (cover.isEmpty || !cover.startsWith('http')) return false;
-
-      // Filter out tracks without valid covers or non-music
-      return true;
+      return smartImageProvider(cover) != null;
     }).toList();
 
 

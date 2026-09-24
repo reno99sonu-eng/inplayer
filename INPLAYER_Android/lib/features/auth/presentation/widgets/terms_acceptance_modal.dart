@@ -136,58 +136,8 @@ class _TermsAcceptanceModalOverlayState
                   const SizedBox(height: 16),
                   _buildPolicyLink(
                     context,
-                    title: 'Terms of Service',
-                    path: '/settings/terms',
-                  ),
-                  _buildPolicyLink(
-                    context,
-                    title: 'Privacy Policy',
-                    path: '/settings/privacy-policy',
-                  ),
-                  _buildPolicyLink(
-                    context,
-                    title: 'Copyright & Intellectual Property Policy',
-                    path: '/settings/copyright-policy',
-                  ),
-                  _buildPolicyLink(
-                    context,
-                    title: 'Child Safety Policy',
-                    path: '/settings/child-safety',
-                  ),
-                  _buildPolicyLink(
-                    context,
-                    title: 'Community Guidelines',
-                    path: '/settings/community-guidelines',
-                  ),
-                  _buildPolicyLink(
-                    context,
-                    title: 'Creator Monetization Policy',
-                    path: '/settings/monetization-policy',
-                  ),
-                  _buildPolicyLink(
-                    context,
-                    title: 'Online Chat & Messaging Policy',
-                    path: '/settings/chat-messaging-policy',
-                  ),
-                  _buildPolicyLink(
-                    context,
-                    title: 'Strike, Suspension & Appeals Policy',
-                    path: '/settings/strike-suspension-policy',
-                  ),
-                  _buildPolicyLink(
-                    context,
-                    title: 'Report, Complaint & Grievance Policy',
-                    path: '/settings/report-grievance-policy',
-                  ),
-                  _buildPolicyLink(
-                    context,
-                    title: 'Advertising & Sponsorship Policy',
-                    path: '/settings/advertising-sponsorship-policy',
-                  ),
-                  _buildPolicyLink(
-                    context,
-                    title: 'InPlayer MART Shop & Seller Policy',
-                    path: '/settings/mart-seller-policy',
+                    title: 'InPlayer Policies',
+                    path: '/settings/policies',
                   ),
                   if (_error != null) ...[
                     const SizedBox(height: 12),

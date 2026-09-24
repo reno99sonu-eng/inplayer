@@ -133,12 +133,6 @@ export async function POST(request: NextRequest) {
           },
         })
       );
-
-      // Trigger automatic welcome email to subscriber via AWS SES
-      const { sendSubscriptionWelcomeEmail } = await import("@/app/lib/subscriptionBroadcast");
-      void sendSubscriptionWelcomeEmail(user.userId, creatorId).catch((err) =>
-        console.error("Failed to send subscription welcome email:", err)
-      );
     } catch (err) {
       console.error("Failed to write subscribe notification:", err);
     }

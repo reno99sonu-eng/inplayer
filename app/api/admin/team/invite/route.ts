@@ -45,7 +45,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://inplayer.app";
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://inplayer.in";
   const acceptUrl = baseUrl + "/team/accept?id=" + encodeURIComponent(invitation.invitationId) + "&token=" + encodeURIComponent(token);
 
   const permissionList = permissions.map((p) => "\u2022 " + p.replace(/_/g, " ")).join("\n");

@@ -32,10 +32,11 @@ import {
 //   Kids ON     → "kids"    ONLY videos tagged Kids, nothing else
 //   Kids OFF    → "family"
 //
-// PASSKEY RULE: only turning 18+ ON asks for one, because that is the only
-// direction that reveals something previously hidden. Kids — on or off —
-// never asks. Both of its directions show strictly less than "all", so a
-// code there would protect nothing and just get in the way. See
+// PASSKEY RULE: turning 18+ ON, and LEAVING Kids mode (in either
+// direction), both ask for one — 18+ ON reveals something previously
+// hidden, and Kids mode only works as a real lock if the person it's
+// restricting can't just switch it back off themselves. Kids ON, and
+// dropping to family from anything other than Kids, stay free. See
 // modeRequiresPasskey() for the same rule enforced server-side; this
 // component asking is a courtesy, the route refusing is the actual lock.
 //
@@ -134,8 +135,8 @@ export default function ContentAccessMenu() {
     if (busy || loading) return;
     setError(null);
 
-    // Narrowing modes ("kids" or "family") require no passkey and no sign-in
-    if (!modeRequiresPasskey(next)) {
+    // Free transitions (see modeRequiresPasskey) require no passkey and no sign-in
+    if (!modeRequiresPasskey(next, mode)) {
       setBusy(true);
       try {
         await applyMode(next);

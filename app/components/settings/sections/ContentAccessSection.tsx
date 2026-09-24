@@ -14,6 +14,7 @@ import {
   PASSKEY_LENGTH,
   audienceModeLabel,
   modeFromToggles,
+  modeRequiresPasskey,
   togglesFromMode,
   type AudienceMode,
 } from "@/app/lib/contentAccess";
@@ -92,7 +93,37 @@ export default function ContentAccessSection() {
     setError(null);
   };
 
+  // Applies a free transition directly, no dialog and no account needed —
+  // mirrors resetToSafeDefault's own no-passkey POST below.
+  const applyFreeMode = async (next: AudienceMode) => {
+    if (busy) return;
+    setError(null);
+    setBusy(true);
+    try {
+      const res = await fetch("/api/content-access", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "set_mode", mode: next }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data?.error || "Couldn't update content settings.");
+      setMode(next);
+      router.refresh();
+    } catch (err) {
+      setResetError(err instanceof Error ? err.message : "Couldn't update content settings.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
   const requestMode = (next: AudienceMode) => {
+    if (!modeRequiresPasskey(next, mode)) {
+      // Mirrors the server: a free transition needs no account at all, on
+      // purpose — the person most likely to want the Kids switch, a parent
+      // handing over an unlocked phone, is often not signed in either.
+      void applyFreeMode(next);
+      return;
+    }
     if (!signedIn) {
       openSignIn();
       return;
@@ -270,7 +301,7 @@ export default function ContentAccessSection() {
             it drops the browser back to the safe default (18+ hidden) and
             doesn't reveal, clear or change the passkey itself. Anyone who
             wants a different mode afterwards still needs the real code. */}
-        {signedIn && hasPasskey && mode !== DEFAULT_AUDIENCE_MODE && (
+        {signedIn && hasPasskey && mode === "all" && (
           <div className="px-5 pb-1">
             <button
               type="button"

@@ -136,14 +136,33 @@ void main() {
     await tester.pumpAndSettle();
   }
 
-  testWidgets('turning 18+ on asks for the passkey and unlocks with it', (
+  testWidgets('turning Kids mode on never asks for the passkey', (
     tester,
   ) async {
     final service = _FakeContentAccessService(hasPasskey: true);
     await tester.pumpWidget(_drawerHarness(service));
     await openDrawer(tester);
 
-    await tester.tap(find.byKey(ContentAccessDrawerSection.adultToggleKey));
+    await tester.tap(find.byKey(ContentAccessDrawerSection.kidsToggleKey));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(ContentAccessDrawerSection.passkeyFieldKey), findsNothing);
+    expect(service.requestedMode, AudienceMode.kids);
+    expect(service.unlockPasskey, isNull);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('turning Kids mode off asks for the passkey and unlocks with it', (
+    tester,
+  ) async {
+    final service = _FakeContentAccessService(
+      initialMode: AudienceMode.kids,
+      hasPasskey: true,
+    );
+    await tester.pumpWidget(_drawerHarness(service));
+    await openDrawer(tester);
+
+    await tester.tap(find.byKey(ContentAccessDrawerSection.kidsToggleKey));
     await tester.pumpAndSettle();
     expect(find.byKey(ContentAccessDrawerSection.passkeyFieldKey), findsOneWidget);
 
@@ -154,25 +173,8 @@ void main() {
     await tester.tap(find.byKey(ContentAccessDrawerSection.continueKey));
     await tester.pumpAndSettle();
 
-    expect(service.requestedMode, AudienceMode.all);
-    expect(service.unlockPasskey, '135790');
-    expect(tester.takeException(), isNull);
-  });
-
-  testWidgets('turning 18+ off never asks for the passkey', (tester) async {
-    final service = _FakeContentAccessService(
-      initialMode: AudienceMode.all,
-      hasPasskey: true,
-    );
-    await tester.pumpWidget(_drawerHarness(service));
-    await openDrawer(tester);
-
-    await tester.tap(find.byKey(ContentAccessDrawerSection.adultToggleKey));
-    await tester.pumpAndSettle();
-
-    expect(find.byKey(ContentAccessDrawerSection.passkeyFieldKey), findsNothing);
     expect(service.requestedMode, AudienceMode.family);
-    expect(service.unlockPasskey, isNull);
+    expect(service.unlockPasskey, '135790');
     expect(tester.takeException(), isNull);
   });
 }

@@ -18,10 +18,9 @@ import { audienceModeFromValue, issueAdultAudienceValue } from "@/app/lib/audien
 // the lock behind the 18+ switch in the hamburger drawer
 // (app/components/ContentAccessMenu.tsx).
 //
-// WHAT IS AND ISN'T LOCKED: only turning 18+ ON. Switching to "kids" or
-// back to "family" needs no passkey and no account at all, because both
-// show strictly LESS than "all" — a code there would protect nothing while
-// making the safest setting the most awkward to reach. modeRequiresPasskey()
+// WHAT IS AND ISN'T LOCKED: turning 18+ ON, and leaving Kids mode (in
+// either direction it's exited to). Switching family -> kids, or any other
+// mode -> family, needs no passkey and no account at all. modeRequiresPasskey()
 // in app/lib/contentAccess.ts is the single definition of that line, shared
 // by this route and the UI.
 //
@@ -121,24 +120,37 @@ export async function POST(request: NextRequest) {
 
   const { action } = body as { action?: string };
 
+  // The mode the caller was already in — needed to tell "family -> kids"
+  // (free) apart from "kids -> family" (locked, see modeRequiresPasskey).
+  const currentRaw =
+    request.cookies.get(AUDIENCE_COOKIE)?.value ||
+    request.headers.get(AUDIENCE_COOKIE) ||
+    request.headers.get("x-audience-mode");
+  const currentMode = audienceModeFromValue(currentRaw);
+
   // ── Narrowing a mode needs no account and no passkey ───────────────
   //
-  // Handled BEFORE the sign-in check on purpose. "family" and "kids" both
-  // show strictly less than the browser could see a moment ago (see
+  // Handled BEFORE the sign-in check on purpose. Most free transitions show
+  // strictly less than the browser could see a moment ago (see
   // modeRequiresPasskey), and the person most likely to want the Kids
   // switch — a parent handing over an unlocked phone — is often not signed
   // in at all. Gating it behind an account would make the safest setting
   // the hardest one to reach.
   //
-  // Unlocking 18+ still falls through to the authenticated branch below.
+  // Unlocking 18+, and leaving Kids mode, still fall through to the
+  // authenticated branch below.
   if (action === "set_mode") {
     const targetMode = normalizeAudienceMode((body as { mode?: unknown }).mode);
-    if (!modeRequiresPasskey(targetMode)) {
+    if (!modeRequiresPasskey(targetMode, currentMode)) {
       return audienceCookieResponse(targetMode);
     }
   }
 
-  if (action === "reset_mode") {
+  // Free UNLESS the caller is currently in "kids" — the whole point of
+  // locking that exit is defeated if a no-passkey-needed "I forgot it"
+  // button just walks around the lock. Falls through to the authenticated
+  // branch below in that case, same as any other locked transition.
+  if (action === "reset_mode" && currentMode !== "kids") {
     return audienceCookieResponse(DEFAULT_AUDIENCE_MODE);
   }
 
@@ -201,9 +213,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, hasPasskey: true });
   }
 
-  // ── Unlock 18+ ─────────────────────────────────────────────────────
-  // Only reached for modes modeRequiresPasskey() says are loosening —
-  // every narrowing mode already returned above.
+  // ── Verify the passkey ─────────────────────────────────────────────
+  // Only reached for a transition modeRequiresPasskey() says is locked —
+  // every free transition already returned above.
   if (action === "set_mode" || action === "reset_mode") {
     const { passkey } = body as { passkey?: unknown };
     const mode = action === "reset_mode"

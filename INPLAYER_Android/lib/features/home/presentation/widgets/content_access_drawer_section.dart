@@ -12,10 +12,10 @@ import '../../../../services/content_access_service.dart';
 import '../../../../services/video_service.dart';
 import '../../../auth/presentation/widgets/auth_modals.dart';
 
-/// The single source of truth for 18+ and Kids content controls in the
-/// hamburger drawer.
+/// The single source of truth for the Kids-only content control in the
+/// hamburger drawer. 18+ access is controlled from Settings on the website
+/// only now — see app/components/settings/sections/ContentAccessSection.tsx.
 class ContentAccessDrawerSection extends ConsumerStatefulWidget {
-  static const adultToggleKey = ValueKey<String>('content-access-adult-toggle');
   static const kidsToggleKey = ValueKey<String>('content-access-kids-toggle');
   static const passkeyFieldKey = ValueKey<String>('content-access-passkey');
   static const confirmPasskeyFieldKey = ValueKey<String>(
@@ -45,13 +45,13 @@ Future<({String passkey, bool createPasskey})?> showContentAccessPasskeyDialog(
   BuildContext context, {
   required bool needsNewPasskey,
 }) async {
-  final route = RawDialogRoute<_AdultUnlockRequest>(
+  final route = RawDialogRoute<_PasskeyUnlockRequest>(
     barrierDismissible: false,
     barrierLabel: 'Content access passkey',
     barrierColor: Colors.black.withValues(alpha: .68),
     transitionDuration: const Duration(milliseconds: 180),
     pageBuilder: (context, animation, secondaryAnimation) =>
-        _AdultPasskeySheet(needsNewPasskey: needsNewPasskey),
+        _PasskeySheet(needsNewPasskey: needsNewPasskey),
     transitionBuilder: (context, animation, secondaryAnimation, child) {
       final curve = CurvedAnimation(
         parent: animation,
@@ -112,22 +112,17 @@ class _ContentAccessDrawerSectionState
     );
   }
 
-  // Turning 18+ off and leaving Kids mode both drop to "family", which is
-  // always free: anyone must be able to make the app safer without a code.
-  Future<void> _setFamilyMode() async {
-    _applyAudienceChange(AudienceMode.family);
-    unawaited(ref.read(contentAccessServiceProvider).setMode(AudienceMode.family));
-  }
-
   Future<void> _enableKidsMode() async {
     _applyAudienceChange(AudienceMode.kids);
     unawaited(ref.read(contentAccessServiceProvider).setMode(AudienceMode.kids));
   }
 
-  // The only locked transition: turning 18+ on needs the account passkey
-  // (created here on first use). The mode only changes after the server
-  // accepts it.
-  Future<void> _enableAdultMode() async {
+  // The only locked transition: leaving Kids mode needs the account
+  // passkey (created here on first use if there isn't one yet) — that's the
+  // whole point of Kids mode as a parental control, a child using the
+  // device can't just tap their way back out of it. The mode only changes
+  // after the server accepts it.
+  Future<void> _exitKidsMode() async {
     if (_loading || _busy) return;
     if (!ref.read(contentAccessSignedInProvider)) {
       showSignInModal(context);
@@ -159,7 +154,7 @@ class _ContentAccessDrawerSectionState
       setState(() => _hasPasskey = true);
     }
 
-    final unlocked = await service.setMode(AudienceMode.all, passkey: request.passkey);
+    final unlocked = await service.setMode(AudienceMode.family, passkey: request.passkey);
     if (!mounted) return;
     setState(() {
       _busy = false;
@@ -168,15 +163,14 @@ class _ContentAccessDrawerSectionState
       } else {
         // The server's 409 is authoritative: offer to create a passkey next time.
         if (unlocked.needsPasskey) _hasPasskey = false;
-        _error = unlocked.error ?? 'Could not turn on 18+ content.';
+        _error = unlocked.error ?? 'Could not turn off Kids mode.';
       }
     });
-    if (unlocked.success) _applyAudienceChange(AudienceMode.all);
+    if (unlocked.success) _applyAudienceChange(AudienceMode.family);
   }
 
   @override
   Widget build(BuildContext context) {
-    final adultOn = _mode == AudienceMode.all;
     final kidsOn = _mode == AudienceMode.kids;
     final disabled = _loading || _busy;
 
@@ -196,19 +190,6 @@ class _ContentAccessDrawerSectionState
           ),
         ),
         _DrawerToggleRow(
-          key: ContentAccessDrawerSection.adultToggleKey,
-          icon: Icons.eighteen_up_rating_rounded,
-          label: '18+ content',
-          hint: _loading
-              ? 'Checking...'
-              : adultOn
-              ? 'Showing everything, 18+ included'
-              : '18+ hidden - passkey to unlock',
-          value: adultOn,
-          disabled: disabled,
-          onChanged: (enabled) => enabled ? _enableAdultMode() : _setFamilyMode(),
-        ),
-        _DrawerToggleRow(
           key: ContentAccessDrawerSection.kidsToggleKey,
           icon: Icons.child_care_rounded,
           label: 'Kids only',
@@ -216,10 +197,10 @@ class _ContentAccessDrawerSectionState
               ? 'Checking...'
               : kidsOn
               ? 'Only Kids videos, everywhere'
-              : 'Limit InPlayer to Kids videos',
+              : 'Limit InPlayer to Kids videos - passkey to turn off',
           value: kidsOn,
           disabled: disabled,
-          onChanged: (enabled) => enabled ? _enableKidsMode() : _setFamilyMode(),
+          onChanged: (enabled) => enabled ? _enableKidsMode() : _exitKidsMode(),
         ),
         if (_error != null)
           Padding(
@@ -234,11 +215,11 @@ class _ContentAccessDrawerSectionState
   }
 }
 
-class _AdultUnlockRequest {
+class _PasskeyUnlockRequest {
   final String passkey;
   final bool createPasskey;
 
-  const _AdultUnlockRequest({
+  const _PasskeyUnlockRequest({
     required this.passkey,
     required this.createPasskey,
   });
@@ -247,16 +228,16 @@ class _AdultUnlockRequest {
 /// Kept outside the drawer's state tree on purpose. It owns and disposes its
 /// text controllers, returns only a plain value, and never reads a provider
 /// or updates the drawer while its route is being removed.
-class _AdultPasskeySheet extends StatefulWidget {
+class _PasskeySheet extends StatefulWidget {
   final bool needsNewPasskey;
 
-  const _AdultPasskeySheet({required this.needsNewPasskey});
+  const _PasskeySheet({required this.needsNewPasskey});
 
   @override
-  State<_AdultPasskeySheet> createState() => _AdultPasskeySheetState();
+  State<_PasskeySheet> createState() => _PasskeySheetState();
 }
 
-class _AdultPasskeySheetState extends State<_AdultPasskeySheet> {
+class _PasskeySheetState extends State<_PasskeySheet> {
   final _passkey = TextEditingController();
   final _confirmation = TextEditingController();
   String? _validationError;
@@ -279,7 +260,7 @@ class _AdultPasskeySheetState extends State<_AdultPasskeySheet> {
       return;
     }
     Navigator.of(context, rootNavigator: true).pop(
-      _AdultUnlockRequest(
+      _PasskeyUnlockRequest(
         passkey: passkey,
         createPasskey: widget.needsNewPasskey,
       ),

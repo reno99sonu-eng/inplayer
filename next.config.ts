@@ -5,7 +5,18 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["sharp"],
 
   outputFileTracingIncludes: {
+    // Every route that imports "sharp" needs its own entry here — Vercel's
+    // automatic file tracing doesn't reliably pick up sharp's native Linux
+    // binaries otherwise, so the function throws at import time and Vercel
+    // serves its own HTML error page instead of this route's JSON (the
+    // client then fails on res.json() with "Unexpected token '<'").
     "/api/admin/ai-navbar-theme-generate": [
+      "./node_modules/@img/sharp-libvips-linux-x64/**/*",
+      "./node_modules/@img/sharp-linux-x64/**/*",
+      "./node_modules/@img/**/*",
+      "./node_modules/sharp/**/*",
+    ],
+    "/api/ai-thumbnail": [
       "./node_modules/@img/sharp-libvips-linux-x64/**/*",
       "./node_modules/@img/sharp-linux-x64/**/*",
       "./node_modules/@img/**/*",

@@ -101,7 +101,7 @@ export default function MobileBottomNav() {
       </Link>
 
       {/* + Create Button */}
-      <div className="flex flex-col items-center justify-center px-1 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-0.5">
+      <div className="flex flex-col items-center justify-center px-1 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-1">
         <MobileCreateButton />
       </div>
 

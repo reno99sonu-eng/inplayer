@@ -308,6 +308,10 @@ export default function VideoMetadataFields({
                   />
                 </div>
               </div>
+              <p className="text-[10px] text-slate-500">
+                {THUMBNAIL_RATIO_LABEL[value.contentType]} recommended — uploads outside this shape get
+                center-cropped to fit.
+              </p>
               {thumbnail.error && <p className="mt-1 text-xs text-red-400">{thumbnail.error}</p>}
             </div>
           )}

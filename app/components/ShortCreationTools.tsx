@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { fetchAuthSession } from "aws-amplify/auth";
-import { Link2, Loader2, Music2, Pause, Play, ShieldCheck, SlidersHorizontal, Upload, Wand2 } from "lucide-react";
+import { Link2, Loader2, Music2, Pause, Play, ShieldCheck, Upload, Wand2 } from "lucide-react";
 import {
   searchSoundtracks,
   toResolvedSoundtrack,
@@ -16,7 +16,7 @@ export interface ShortSettings {
   filter: "original" | "warm" | "vivid" | "mono";
 }
 
-// Soundtrack picker, clip length, and look filter — originally Shorts-only,
+// Soundtrack picker and clip length — originally Shorts-only,
 // now offered for Video uploads too (see app/upload/page.tsx and
 // VideoPlayer.tsx). Two catalogs feed the same picker: InPlayer's own local
 // instrumentals (app/data/soundtracks.ts — 100% synthesized, no licensing
@@ -305,8 +305,8 @@ export default function ShortCreationTools({
         </p>
         <p className="mt-1 text-xs leading-5 text-slate-400 light:text-slate-600">
           {contentType === "short"
-            ? "Choose an optional soundtrack clip and a look for your Short."
-            : "Choose an optional background soundtrack and a look for your video — both are entirely optional and off by default."}
+            ? "Choose an optional soundtrack clip for your Short."
+            : "Choose an optional background soundtrack for your video — entirely optional and off by default."}
         </p>
       </div>
 
@@ -583,34 +583,11 @@ export default function ShortCreationTools({
         )
       )}
 
-      <div className="mt-4">
-        <p className="flex items-center gap-2 text-xs font-bold uppercase tracking-[.16em] text-slate-400 light:text-slate-600">
-          <SlidersHorizontal size={14} />
-          Look
-        </p>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {(["original", "warm", "vivid", "mono"] as const).map((filter) => (
-            <button
-              key={filter}
-              type="button"
-              onClick={() => onChange({ ...value, filter })}
-              className={`rounded-full px-3 py-1.5 text-xs font-bold capitalize transition ${
-                value.filter === filter
-                  ? "bg-white text-slate-900 light:bg-slate-900 light:text-white"
-                  : "bg-white/5 text-slate-400 hover:bg-white/10 light:bg-black/5"
-              }`}
-            >
-              {filter}
-            </button>
-          ))}
-        </div>
-      </div>
-
       <div className="mt-4 flex items-center gap-2 rounded-2xl border border-white/10 bg-black/10 p-3 text-xs text-slate-400 light:border-black/10 light:bg-white/40 light:text-slate-600">
         <Wand2 size={15} className="shrink-0 text-orange-400" />
         {contentType === "short"
-          ? "Soundtrack and look selections are saved with the Short and play back automatically in the Shorts feed."
-          : "Soundtrack and look selections are saved with the video and play back automatically wherever it's watched."}
+          ? "Your soundtrack choice is saved with the Short and plays back automatically in the Shorts feed."
+          : "Your soundtrack choice is saved with the video and plays back automatically wherever it's watched."}
       </div>
     </section>
   );

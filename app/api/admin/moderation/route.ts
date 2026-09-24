@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { ScanCommand, GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
-import { requireAdmin } from "@/app/lib/isAdmin";
+import { requireAdmin, getAdminIdentity } from "@/app/lib/isAdmin";
 import { resolveUsernames } from "@/app/lib/resolveUsernames";
 import { logAdminAction } from "@/app/lib/auditLog";
 
@@ -83,15 +83,29 @@ async function hydrateReportSnippet(r: Record<string, unknown>): Promise<string 
   }
 }
 
+// GET is reachable by the main admin (every tab) and by a team member
+// holding "view_reports" (the "reports" tab only, read-only — the
+// simplified UI at app/admin/moderation/page.tsx never requests the other
+// two tabs for such a caller, but this still has to be enforced here too,
+// since the client-side view is not itself an authorization boundary).
+// Every mutation below (POST here, plus DELETE/PATCH on reports, comments,
+// messages, and videos elsewhere) stays requireAdmin-only, so this
+// permission can never become more than read access no matter what the
+// client sends.
 export async function GET(request: NextRequest) {
+  let identity;
   try {
-    await requireAdmin(request);
+    identity = await getAdminIdentity(request);
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const tabParam = request.nextUrl.searchParams.get("tab");
   const tab = tabParam === "autoflagged" ? "autoflagged" : tabParam === "strikes" ? "strikes" : "reports";
+
+  if (!identity.isMainAdmin && (tab !== "reports" || !identity.permissions.has("view_reports"))) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
 
   if (tab === "strikes") {
     try {

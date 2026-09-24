@@ -16,6 +16,8 @@ const FIRST_ACCESSIBLE_ROUTE: { permission: TeamPermission; href: string }[] = [
   { permission: "view_support", href: "/admin/support" },
   { permission: "view_bugs", href: "/admin/bug-reports" },
   { permission: "view_errors", href: "/admin/error-logs" },
+  { permission: "delete_stuck_processing_videos", href: "/admin/stuck-processing" },
+  { permission: "view_reports", href: "/admin/moderation" },
   { permission: "manage_navbar_theme", href: "/admin/navbar-theme" },
   { permission: "manage_ads", href: "/admin/advertising" },
 ];

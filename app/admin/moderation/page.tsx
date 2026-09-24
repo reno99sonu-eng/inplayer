@@ -17,6 +17,7 @@ import {
   Ban,
   RotateCcw,
 } from "lucide-react";
+import { useAdminIdentity } from "@/app/components/admin/AdminIdentityContext";
 
 type Tab = "reports" | "autoflagged" | "strikes";
 type ContentType = "video" | "comment" | "message";
@@ -100,6 +101,14 @@ function reasonLabel(reason: string): string {
 }
 
 export default function AdminModerationPage() {
+  // A team member holding only "view_reports" (not main admin) can reach
+  // this page but the API behind it (app/api/admin/moderation/route.ts)
+  // only serves them the "reports" tab, read-only — auto-flagged content
+  // and strike review both stay main-admin-only, since restoring/removing
+  // content and deciding a ban are real moderation powers, not just
+  // visibility. So a non-main-admin never leaves the reports tab and never
+  // sees the actions that mutate anything.
+  const { isMainAdmin } = useAdminIdentity();
   const [tab, setTab] = useState<Tab>("reports");
   const [reports, setReports] = useState<ReportItem[]>([]);
   const [autoFlagged, setAutoFlagged] = useState<AutoFlagItem[]>([]);
@@ -285,47 +294,49 @@ export default function AdminModerationPage() {
           Reports & Moderation
         </h2>
         <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
-          Real reports from viewers, anything InPlayer&apos;s AI moderation held back automatically
-          before a human ever saw it, and every account the automated 3-strike system has suspended
-          on a third violation, waiting on your review.
+          {isMainAdmin
+            ? "Real reports from viewers, anything InPlayer's AI moderation held back automatically before a human ever saw it, and every account the automated 3-strike system has suspended on a third violation, waiting on your review."
+            : "Real reports from viewers, read-only. Resolving a report or removing reported content is a main-admin action."}
         </p>
       </div>
 
-      <div className="mt-4 flex items-center gap-2">
-        <button
-          type="button"
-          onClick={() => setTab("reports")}
-          className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${
-            tab === "reports"
-              ? "bg-indigo-500 text-white"
-              : "bg-white/5 text-slate-400 light:text-slate-700 hover:bg-white/10 light:bg-black/5"
-          }`}
-        >
-          <Flag size={12} /> Reports
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab("autoflagged")}
-          className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${
-            tab === "autoflagged"
-              ? "bg-indigo-500 text-white"
-              : "bg-white/5 text-slate-400 light:text-slate-700 hover:bg-white/10 light:bg-black/5"
-          }`}
-        >
-          <Bot size={12} /> Auto-flagged by AI
-        </button>
-        <button
-          type="button"
-          onClick={() => setTab("strikes")}
-          className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${
-            tab === "strikes"
-              ? "bg-indigo-500 text-white"
-              : "bg-white/5 text-slate-400 light:text-slate-700 hover:bg-white/10 light:bg-black/5"
-          }`}
-        >
-          <Gavel size={12} /> Strikes
-        </button>
-      </div>
+      {isMainAdmin && (
+        <div className="mt-4 flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setTab("reports")}
+            className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${
+              tab === "reports"
+                ? "bg-indigo-500 text-white"
+                : "bg-white/5 text-slate-400 light:text-slate-700 hover:bg-white/10 light:bg-black/5"
+            }`}
+          >
+            <Flag size={12} /> Reports
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("autoflagged")}
+            className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${
+              tab === "autoflagged"
+                ? "bg-indigo-500 text-white"
+                : "bg-white/5 text-slate-400 light:text-slate-700 hover:bg-white/10 light:bg-black/5"
+            }`}
+          >
+            <Bot size={12} /> Auto-flagged by AI
+          </button>
+          <button
+            type="button"
+            onClick={() => setTab("strikes")}
+            className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${
+              tab === "strikes"
+                ? "bg-indigo-500 text-white"
+                : "bg-white/5 text-slate-400 light:text-slate-700 hover:bg-white/10 light:bg-black/5"
+            }`}
+          >
+            <Gavel size={12} /> Strikes
+          </button>
+        </div>
+      )}
 
       <div className="mt-3 flex items-center gap-2 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] px-4 py-3">
         <Search size={16} className="text-slate-500" />
@@ -453,6 +464,7 @@ export default function AdminModerationPage() {
                   <p className="mt-1 text-xs text-slate-500">&ldquo;{r.details}&rdquo;</p>
                 )}
 
+                {isMainAdmin && (
                 <div className="mt-3 flex items-center gap-2">
                   <button
                     type="button"
@@ -476,6 +488,7 @@ export default function AdminModerationPage() {
                     Remove content
                   </button>
                 </div>
+                )}
               </div>
             ))}
           </div>

@@ -3,14 +3,12 @@
 import { ShieldQuestion } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 
-// Landing page for a team member whose granted permissions don't map to
-// any sidebar destination — right now that's "view_reports" and
-// "delete_stuck_processing_videos", offered in the invite form
-// (app/admin/team/page.tsx) but with no dedicated page built for either
-// one yet. Without this, /admin/page.tsx's redirect would have nowhere
-// safe to send them and would 404. Not a dead end forever — once those
-// two permissions get a real page, add them to FIRST_ACCESSIBLE_ROUTE in
-// app/admin/page.tsx and this page stops being anyone's landing spot.
+// Landing page for a team member with no granted permissions at all (or
+// whose account was revoked down to nothing) — every permission the invite
+// form (app/admin/team/page.tsx) offers now maps to a real sidebar
+// destination, so the only way to land here is to have none of them.
+// Without this, /admin/page.tsx's redirect would have nowhere safe to send
+// them and would 404.
 export default function TeamMemberHomePage() {
   const { user } = useAuthModal();
 
@@ -25,7 +23,7 @@ export default function TeamMemberHomePage() {
       <p className="mt-2 max-w-md text-sm text-slate-400 light:text-slate-600">
         {user?.email || "This account"} doesn&apos;t have any permissions with their own
         admin page yet. Ask the main admin to grant you access to a section like Support,
-        Bug Reports, Error Logs, Navbar Theme, or Advertising.
+        Bug Reports, Error Logs, Reports, Stuck Uploads, Navbar Theme, or Advertising.
       </p>
     </div>
   );

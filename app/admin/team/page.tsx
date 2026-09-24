@@ -42,6 +42,7 @@ export default function AdminTeamPage() {
   const [invitations, setInvitations] = useState<InvitationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [tableMissing, setTableMissing] = useState(false);
 
   const [email, setEmail] = useState("");
   const [selected, setSelected] = useState<Set<TeamPermission>>(new Set());
@@ -57,11 +58,12 @@ export default function AdminTeamPage() {
         authedFetch("/api/admin/team/members"),
         authedFetch("/api/admin/team/invitations"),
       ]);
-      if (!membersRes.ok || !invitesRes.ok) throw new Error("Couldn't load team data.");
+      if (!membersRes.ok || !invitesRes.ok) throw new Error("Could not load team data.");
       const membersData = await membersRes.json();
       const invitesData = await invitesRes.json();
       setMembers(membersData.members || []);
       setInvitations(invitesData.invitations || []);
+      setTableMissing(Boolean(membersData.tableMissing || invitesData.tableMissing));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -70,9 +72,6 @@ export default function AdminTeamPage() {
   };
 
   useEffect(() => {
-    // Deferred rather than called synchronously in the effect body — same
-    // pattern/reasoning as app/components/NavbarSearch.tsx and
-    // app/components/InFamilyHome.tsx.
     const timer = setTimeout(() => {
       if (isMainAdmin) load();
       else setLoading(false);
@@ -100,30 +99,30 @@ export default function AdminTeamPage() {
         body: JSON.stringify({ email: email.trim(), permissions: Array.from(selected) }),
       });
       const data = await res.json();
-      if (!res.ok) throw new Error(data.error || "Couldn't send that invitation.");
+      if (!res.ok) throw new Error(data.error || "Could not send that invitation.");
       setInviteMessage(
         data.emailSent
-          ? `Invitation emailed to ${email.trim()}.`
-          : `Invitation created, but the email couldn't be sent — check SES configuration. Share the acceptance the invitee needs another way, or fix SES and re-invite.`
+          ? "Invitation emailed to " + email.trim() + "."
+          : "Invitation created, but the email could not be sent - check SES configuration. Share the acceptance the invitee needs another way, or fix SES and re-invite."
       );
       setEmail("");
       setSelected(new Set());
       load();
     } catch (err) {
-      setInviteMessage(err instanceof Error ? err.message : "Couldn't send that invitation.");
+      setInviteMessage(err instanceof Error ? err.message : "Could not send that invitation.");
     } finally {
       setInviting(false);
     }
   };
 
   const revokeMember = async (userId: string) => {
-    if (!confirm("Revoke this team member's admin access?")) return;
+    if (!confirm("Revoke this team members admin access?")) return;
     setBusyId(userId);
     try {
-      const res = await authedFetch(`/api/admin/team/members/${userId}`, { method: "DELETE" });
+      const res = await authedFetch("/api/admin/team/members/" + userId, { method: "DELETE" });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Couldn't revoke that team member.");
+        throw new Error(data.error || "Could not revoke that team member.");
       }
       load();
     } catch (err) {
@@ -136,10 +135,10 @@ export default function AdminTeamPage() {
   const revokeInvitation = async (invitationId: string) => {
     setBusyId(invitationId);
     try {
-      const res = await authedFetch(`/api/admin/team/invitations/${invitationId}`, { method: "DELETE" });
+      const res = await authedFetch("/api/admin/team/invitations/" + invitationId, { method: "DELETE" });
       if (!res.ok) {
         const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || "Couldn't revoke that invitation.");
+        throw new Error(data.error || "Could not revoke that invitation.");
       }
       load();
     } catch (err) {
@@ -169,11 +168,10 @@ export default function AdminTeamPage() {
         </h1>
         <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
           Invite trusted people by email with strictly limited, whitelisted permissions. Invitations are the ONLY
-          way to become a team member — there is no self-enrollment and no share link.
+          way to become a team member - there is no self-enrollment and no share link.
         </p>
       </div>
 
-      {/* Invite form */}
       <div className="rounded-3xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.03] p-5 space-y-4">
         <div className="flex items-center gap-2 text-sm font-bold text-white light:text-slate-900">
           <Mail size={16} className="text-indigo-400" />
@@ -192,11 +190,7 @@ export default function AdminTeamPage() {
               key={p}
               type="button"
               onClick={() => togglePermission(p)}
-              className={`rounded-full border px-3 py-1.5 text-xs font-semibold transition ${
-                selected.has(p)
-                  ? "border-indigo-400 bg-indigo-500/20 text-indigo-300"
-                  : "border-white/10 light:border-black/10 text-slate-400 light:text-slate-600 hover:border-indigo-400/40"
-              }`}
+              className={"rounded-full border px-3 py-1.5 text-xs font-semibold transition " + (selected.has(p) ? "border-indigo-400 bg-indigo-500/20 text-indigo-300" : "border-white/10 light:border-black/10 text-slate-400 light:text-slate-600 hover:border-indigo-400/40")}
             >
               {PERMISSION_LABELS[p]}
             </button>
@@ -214,6 +208,17 @@ export default function AdminTeamPage() {
         {inviteMessage && <p className="text-xs text-slate-300 light:text-slate-700">{inviteMessage}</p>}
       </div>
 
+      {tableMissing && (
+        <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs leading-5 text-amber-300 light:text-amber-700">
+          The admin team tables have not been created in AWS yet - create two DynamoDB tables:{" "}
+          <code className="rounded bg-black/20 px-1">InPlayer-Admin-Members</code> (partition key{" "}
+          <code className="rounded bg-black/20 px-1">userId</code>, String) and{" "}
+          <code className="rounded bg-black/20 px-1">InPlayer-Admin-Invitations</code> (partition key{" "}
+          <code className="rounded bg-black/20 px-1">invitationId</code>, String). Once both exist, this page
+          works automatically - no code change needed.
+        </div>
+      )}
+
       {error && <p className="text-sm text-red-400">{error}</p>}
 
       {loading ? (
@@ -222,7 +227,6 @@ export default function AdminTeamPage() {
         </div>
       ) : (
         <>
-          {/* Active team members */}
           <div className="space-y-3">
             <h2 className="text-sm font-bold text-slate-300 light:text-slate-700">
               Active team members ({members.filter((m) => m.status === "active").length})
@@ -243,7 +247,7 @@ export default function AdminTeamPage() {
                         {m.permissions.map((p) => PERMISSION_LABELS[p]).join(", ")}
                       </p>
                       <p className="mt-0.5 text-[11px] text-slate-500">
-                        Invited by {m.invitedByEmail} · {new Date(m.addedAt).toLocaleDateString()}
+                        Invited by {m.invitedByEmail} - {new Date(m.addedAt).toLocaleDateString()}
                       </p>
                     </div>
                     <button
@@ -259,7 +263,6 @@ export default function AdminTeamPage() {
             )}
           </div>
 
-          {/* Pending invitations */}
           <div className="space-y-3">
             <h2 className="text-sm font-bold text-slate-300 light:text-slate-700">
               Pending invitations ({invitations.filter((i) => i.status === "pending").length})

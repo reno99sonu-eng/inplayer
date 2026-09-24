@@ -9,10 +9,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized admin access." }, { status: 401 });
   }
 
-  const invitations = await listInvitations();
-  // Never return tokenHash — nothing outside adminInvitations.ts needs it,
-  // and there's no reason to put even a hash of a security token over the
-  // wire to the browser.
+  const { invitations, tableMissing } = await listInvitations();
   const safe = invitations.map((inv) => ({
     invitationId: inv.invitationId,
     email: inv.email,
@@ -25,5 +22,5 @@ export async function GET(request: NextRequest) {
     acceptedAt: inv.acceptedAt,
     acceptedUserId: inv.acceptedUserId,
   }));
-  return NextResponse.json({ invitations: safe });
+  return NextResponse.json({ invitations: safe, tableMissing });
 }

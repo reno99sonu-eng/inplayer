@@ -9,6 +9,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Unauthorized admin access." }, { status: 401 });
   }
 
-  const members = await listTeamMembers();
-  return NextResponse.json({ members });
+  const { members, tableMissing } = await listTeamMembers();
+  return NextResponse.json({ members, tableMissing });
 }

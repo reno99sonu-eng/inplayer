@@ -26,7 +26,6 @@ import {
   Languages,
 } from "lucide-react";
 import { useMusicPlayer, type MusicTrack } from "@/app/context/MusicPlayerContext";
-import LiveListeningToasts from "./LiveListeningToasts";
 import { MUSIC_GENRES, MUSIC_LANGUAGE_BAR, type MusicGenre } from "@/app/lib/musicTrack";
 
 // Minimal shape of the Web Speech API's SpeechRecognition — same pattern as
@@ -173,8 +172,6 @@ export default function MusicPageClient({
 
   return (
     <div className="min-h-screen pb-36 pt-4 text-white light:text-slate-900">
-      {/* Real-time Listening Toast Notification */}
-      <LiveListeningToasts tracks={tracks} />
 
       {/* ── SEARCH OVERLAY ──────────────────────────────────────────── */}
       {searchOpen && (

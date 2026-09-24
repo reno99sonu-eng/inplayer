@@ -129,7 +129,11 @@ class ContentAccessService {
     String? passkey,
   }) async {
     final cleanedPasskey = passkey?.trim();
-    await _cacheMode(mode);
+    // Narrowing to family/kids takes effect immediately, even offline. "all"
+    // must wait for the server to accept the passkey: the cached mode is
+    // what the app sends as its audience cookie, so caching it up front let
+    // a wrong passkey unlock 18+ anyway.
+    if (mode != AudienceMode.all) await _cacheMode(mode);
     try {
       final response = await _dio.post(
         ApiConstants.contentAccess,

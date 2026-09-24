@@ -5,6 +5,13 @@ import 'package:inplayer_android/features/home/presentation/widgets/content_acce
 import 'package:inplayer_android/services/content_access_service.dart';
 
 class _FakeContentAccessService extends ContentAccessService {
+  _FakeContentAccessService({
+    this.initialMode = AudienceMode.family,
+    this.hasPasskey = false,
+  });
+
+  final AudienceMode initialMode;
+  final bool hasPasskey;
   int setPasskeyCalls = 0;
   int setModeCalls = 0;
   String? savedPasskey;
@@ -13,11 +20,11 @@ class _FakeContentAccessService extends ContentAccessService {
 
   @override
   Future<ContentAccessState?> getState() async {
-    return const ContentAccessState(
-      mode: AudienceMode.family,
-      hasPasskey: false,
-    );
+    return ContentAccessState(mode: initialMode, hasPasskey: hasPasskey);
   }
+
+  @override
+  Future<void> setModeLocally(AudienceMode mode) async {}
 
   @override
   Future<ContentAccessResult> setPasskey(
@@ -121,6 +128,51 @@ void main() {
 
     expect(dialogResult?.passkey, '246810');
     expect(dialogResult?.createPasskey, true);
+    expect(tester.takeException(), isNull);
+  });
+
+  Future<void> openDrawer(WidgetTester tester) async {
+    await tester.tap(find.byKey(const ValueKey<String>('open-drawer')));
+    await tester.pumpAndSettle();
+  }
+
+  testWidgets('turning 18+ on asks for the passkey and unlocks with it', (
+    tester,
+  ) async {
+    final service = _FakeContentAccessService(hasPasskey: true);
+    await tester.pumpWidget(_drawerHarness(service));
+    await openDrawer(tester);
+
+    await tester.tap(find.byKey(ContentAccessDrawerSection.adultToggleKey));
+    await tester.pumpAndSettle();
+    expect(find.byKey(ContentAccessDrawerSection.passkeyFieldKey), findsOneWidget);
+
+    await tester.enterText(
+      find.byKey(ContentAccessDrawerSection.passkeyFieldKey),
+      '135790',
+    );
+    await tester.tap(find.byKey(ContentAccessDrawerSection.continueKey));
+    await tester.pumpAndSettle();
+
+    expect(service.requestedMode, AudienceMode.all);
+    expect(service.unlockPasskey, '135790');
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('turning 18+ off never asks for the passkey', (tester) async {
+    final service = _FakeContentAccessService(
+      initialMode: AudienceMode.all,
+      hasPasskey: true,
+    );
+    await tester.pumpWidget(_drawerHarness(service));
+    await openDrawer(tester);
+
+    await tester.tap(find.byKey(ContentAccessDrawerSection.adultToggleKey));
+    await tester.pumpAndSettle();
+
+    expect(find.byKey(ContentAccessDrawerSection.passkeyFieldKey), findsNothing);
+    expect(service.requestedMode, AudienceMode.family);
+    expect(service.unlockPasskey, isNull);
     expect(tester.takeException(), isNull);
   });
 }

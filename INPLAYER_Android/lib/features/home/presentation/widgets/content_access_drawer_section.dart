@@ -10,6 +10,7 @@ import '../../../../providers/auth_provider.dart';
 import '../../../../providers/kid_mode_provider.dart';
 import '../../../../services/content_access_service.dart';
 import '../../../../services/video_service.dart';
+import '../../../auth/presentation/widgets/auth_modals.dart';
 
 /// The single source of truth for 18+ and Kids content controls in the
 /// hamburger drawer.
@@ -75,8 +76,9 @@ Future<({String passkey, bool createPasskey})?> showContentAccessPasskeyDialog(
 class _ContentAccessDrawerSectionState
     extends ConsumerState<ContentAccessDrawerSection> {
   AudienceMode _mode = AudienceMode.family;
+  bool _hasPasskey = false;
   bool _loading = true;
-  final bool _busy = false;
+  bool _busy = false;
   String? _error;
 
   @override
@@ -92,6 +94,7 @@ class _ContentAccessDrawerSectionState
     setState(() {
       if (access != null) {
         _mode = access.mode;
+        _hasPasskey = access.hasPasskey;
       } else if (isKid) {
         _mode = AudienceMode.kids;
       }
@@ -109,7 +112,9 @@ class _ContentAccessDrawerSectionState
     );
   }
 
-  Future<void> _exitKidsMode() async {
+  // Turning 18+ off and leaving Kids mode both drop to "family", which is
+  // always free: anyone must be able to make the app safer without a code.
+  Future<void> _setFamilyMode() async {
     _applyAudienceChange(AudienceMode.family);
     unawaited(ref.read(contentAccessServiceProvider).setMode(AudienceMode.family));
   }
@@ -119,8 +124,59 @@ class _ContentAccessDrawerSectionState
     unawaited(ref.read(contentAccessServiceProvider).setMode(AudienceMode.kids));
   }
 
+  // The only locked transition: turning 18+ on needs the account passkey
+  // (created here on first use). The mode only changes after the server
+  // accepts it.
+  Future<void> _enableAdultMode() async {
+    if (_loading || _busy) return;
+    if (!ref.read(contentAccessSignedInProvider)) {
+      showSignInModal(context);
+      return;
+    }
+
+    final request = await showContentAccessPasskeyDialog(
+      context,
+      needsNewPasskey: !_hasPasskey,
+    );
+    if (!mounted || request == null) return;
+
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    final service = ref.read(contentAccessServiceProvider);
+
+    if (request.createPasskey) {
+      final created = await service.setPasskey(request.passkey);
+      if (!mounted) return;
+      if (!created.success) {
+        setState(() {
+          _busy = false;
+          _error = created.error ?? 'Could not save the passkey.';
+        });
+        return;
+      }
+      setState(() => _hasPasskey = true);
+    }
+
+    final unlocked = await service.setMode(AudienceMode.all, passkey: request.passkey);
+    if (!mounted) return;
+    setState(() {
+      _busy = false;
+      if (unlocked.success) {
+        _hasPasskey = true;
+      } else {
+        // The server's 409 is authoritative: offer to create a passkey next time.
+        if (unlocked.needsPasskey) _hasPasskey = false;
+        _error = unlocked.error ?? 'Could not turn on 18+ content.';
+      }
+    });
+    if (unlocked.success) _applyAudienceChange(AudienceMode.all);
+  }
+
   @override
   Widget build(BuildContext context) {
+    final adultOn = _mode == AudienceMode.all;
     final kidsOn = _mode == AudienceMode.kids;
     final disabled = _loading || _busy;
 
@@ -140,6 +196,19 @@ class _ContentAccessDrawerSectionState
           ),
         ),
         _DrawerToggleRow(
+          key: ContentAccessDrawerSection.adultToggleKey,
+          icon: Icons.eighteen_up_rating_rounded,
+          label: '18+ content',
+          hint: _loading
+              ? 'Checking...'
+              : adultOn
+              ? 'Showing everything, 18+ included'
+              : '18+ hidden - passkey to unlock',
+          value: adultOn,
+          disabled: disabled,
+          onChanged: (enabled) => enabled ? _enableAdultMode() : _setFamilyMode(),
+        ),
+        _DrawerToggleRow(
           key: ContentAccessDrawerSection.kidsToggleKey,
           icon: Icons.child_care_rounded,
           label: 'Kids only',
@@ -150,7 +219,7 @@ class _ContentAccessDrawerSectionState
               : 'Limit InPlayer to Kids videos',
           value: kidsOn,
           disabled: disabled,
-          onChanged: (enabled) => enabled ? _enableKidsMode() : _exitKidsMode(),
+          onChanged: (enabled) => enabled ? _enableKidsMode() : _setFamilyMode(),
         ),
         if (_error != null)
           Padding(

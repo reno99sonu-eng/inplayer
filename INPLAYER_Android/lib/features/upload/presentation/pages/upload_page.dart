@@ -8,6 +8,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/pattern_background.dart';
@@ -731,6 +733,55 @@ class _UploadPageState extends ConsumerState<UploadPage> {
     }
   }
 
+  /// Asks the AI thumbnail endpoint (POST /api/ai-thumbnail, same one the
+  /// website's "Generate AI Thumbnail" button calls) for a brand-new cover
+  /// image built from the title and category, then downloads it into a
+  /// local temp file and treats it exactly like a manually-picked
+  /// thumbnail — every later step (compressImageToThumbnailDataUrl, the
+  /// upload payload) only ever looks at _thumbnailFile's path, so nothing
+  /// else needs to know the image came from AI instead of the gallery.
+  Future<void> _generateAIThumbnail() async {
+    if (_aiBusy) return;
+    final title = _titleController.text.trim();
+    if (title.isEmpty) {
+      _showSnack('Add a title first — the AI thumbnail is built from it.');
+      return;
+    }
+    setState(() => _aiBusy = true);
+    try {
+      final result = await ref.read(aiAssistServiceProvider).pickThumbnail(
+        title: title,
+        category: _category,
+        generateNew: true,
+      );
+      final response = await Dio().get<List<int>>(
+        result.thumbnailUrl,
+        options: Options(responseType: ResponseType.bytes),
+      );
+      final bytes = response.data;
+      if (bytes == null || bytes.isEmpty) {
+        throw const AIAssistException('The AI thumbnail came back empty.');
+      }
+      final dir = await getTemporaryDirectory();
+      final filePath =
+          '${dir.path}/ai_thumbnail_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      await File(filePath).writeAsBytes(bytes);
+      if (!mounted) return;
+      setState(() {
+        _thumbnailFile = XFile(filePath);
+        _aiBusy = false;
+      });
+    } on AIAssistException catch (e) {
+      if (!mounted) return;
+      setState(() => _aiBusy = false);
+      _showSnack(e.message);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _aiBusy = false);
+      _showSnack("Couldn't generate an AI thumbnail. Please try again.");
+    }
+  }
+
   /// Persists the frame picked on the done screen.
   ///
   /// Non-fatal by design, exactly like the website's own version: the video
@@ -1019,7 +1070,22 @@ class _UploadPageState extends ConsumerState<UploadPage> {
 
         // Custom Cover / Thumbnail selector
         if (!_isMusicUpload) ...[
-          _label('Thumbnail / Cover Image'),
+          Row(
+            children: [
+              _label('Thumbnail / Cover Image'),
+              const Spacer(),
+              _aiChip('AI thumbnail', _generateAIThumbnail),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Text(
+              _contentType == 'short'
+                  ? 'Recommended: 9:16 portrait'
+                  : 'Recommended: 16:9 landscape',
+              style: TextStyle(color: context.textSecondary, fontSize: 11),
+            ),
+          ),
           GestureDetector(
             onTap: _pickThumbnail,
             child: Container(

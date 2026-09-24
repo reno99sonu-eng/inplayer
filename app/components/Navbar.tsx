@@ -1140,7 +1140,7 @@ lg:right-auto
                       onClick={() => setMenuOpen(false)}
                       className="block text-xs text-slate-400 light:text-slate-600 transition hover:text-orange-300 light:hover:text-orange-600"
                     >
-                      InPlayer Policies
+                      Privacy Policies
                     </Link>
                   </li>
                 </ul>

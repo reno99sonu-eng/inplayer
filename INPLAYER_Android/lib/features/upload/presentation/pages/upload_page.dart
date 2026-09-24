@@ -115,13 +115,20 @@ class _UploadPageState extends ConsumerState<UploadPage> {
 
   XFile? _file;
   XFile? _thumbnailFile;
-  // Only set while _autoCaptureLocalThumbnail() below is mid-capture — a
+  // Candidate frames captured locally from the picked video (see
+  // _captureLocalFrameCandidates) plus anything the AI thumbnail button
+  // generates — the creator taps one to actually select it as
+  // _thumbnailFile. Nothing here is ever auto-applied.
+  final List<XFile> _localFrameCandidates = [];
+  bool _capturingFrameCandidates = false;
+  // Only set while _captureLocalFrameCandidates() below is mid-capture — a
   // VideoPlayer for this controller is briefly mounted off-layout (see
   // _buildDetails()) purely so its RepaintBoundary has something real to
   // screenshot, then torn back down.
   VideoPlayerController? _captureController;
   GlobalKey? _captureBoundaryKey;
   final List<XFile> _musicCovers = [];
+  bool _aiCoverBusy = false;
   int _coverIntervalSeconds = 12;
   int? _fileSizeBytes;
   String _contentType = 'video';
@@ -234,6 +241,8 @@ class _UploadPageState extends ConsumerState<UploadPage> {
 
       setState(() {
         _file = picked;
+        _thumbnailFile = null;
+        _localFrameCandidates.clear();
         _fileSizeBytes = size;
         _contentType = contentType;
         if (contentType == 'short') {
@@ -244,7 +253,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
       });
 
       if (contentType != 'music') {
-        unawaited(_autoCaptureLocalThumbnail(picked.path));
+        unawaited(_captureLocalFrameCandidates(picked.path));
       }
     } catch (e) {
       if (!mounted) return;
@@ -252,35 +261,27 @@ class _UploadPageState extends ConsumerState<UploadPage> {
     }
   }
 
-  /// Grabs a real frame out of the picked video file itself and drops it
-  /// straight into _thumbnailFile — the "it used to show a preview right
-  /// after I picked the file" the manual/AI pickers alone never delivered,
-  /// since those only ever start from an explicit tap. Runs entirely with
-  /// packages already in this app (video_player + the same RepaintBoundary
-  /// screenshot technique Flutter itself recommends for "no thumbnail
-  /// plugin installed") — no new native dependency.
+  /// Grabs several real frames out of the picked video file itself and
+  /// offers them as tappable candidates — the "it used to show thumbnails
+  /// to pick from right after I picked the file" the manual/AI pickers
+  /// alone never delivered, since those only ever start from an explicit
+  /// tap. Runs entirely with packages already in this app (video_player +
+  /// the same RepaintBoundary screenshot technique Flutter itself
+  /// recommends for "no thumbnail plugin installed") — no new native
+  /// dependency. Nothing here is ever auto-applied as the thumbnail; the
+  /// creator always taps one to actually choose it (see the grid in
+  /// _buildDetails()).
   ///
   /// Best-effort: any failure here (an exotic codec, a huge file, a device
-  /// quirk) just leaves the thumbnail box empty, exactly like before this
+  /// quirk) just leaves the candidate list empty, exactly like before this
   /// existed — the manual picker and the AI thumbnail button are still
   /// right there.
-  Future<void> _autoCaptureLocalThumbnail(String videoPath) async {
+  Future<void> _captureLocalFrameCandidates(String videoPath) async {
     VideoPlayerController? controller;
+    setState(() => _capturingFrameCandidates = true);
     try {
       controller = VideoPlayerController.file(File(videoPath));
       await controller.initialize();
-      if (!mounted) return;
-
-      // A pure-black first frame (a fade-in, a title card) is common — a
-      // few percent into the clip is far more likely to be a real frame.
-      // Duration.zero is used unmodified for anything short enough that
-      // "10%" would be sub-second.
-      final durationMs = controller.value.duration.inMilliseconds;
-      final seekMs = durationMs > 3000 ? (durationMs * 0.05).round() : 0;
-      await controller.seekTo(Duration(milliseconds: seekMs));
-      // The texture needs a beat to actually present the seeked frame
-      // before a screenshot of it means anything.
-      await Future.delayed(const Duration(milliseconds: 250));
       if (!mounted) return;
 
       final boundaryKey = GlobalKey();
@@ -289,32 +290,45 @@ class _UploadPageState extends ConsumerState<UploadPage> {
         _captureBoundaryKey = boundaryKey;
       });
 
-      // Let the newly-mounted (off-layout but painted) VideoPlayer widget
-      // actually go through a paint pass before reading its boundary.
-      await WidgetsBinding.instance.endOfFrame;
-      await Future.delayed(const Duration(milliseconds: 120));
-      if (!mounted) return;
+      final durationMs = controller.value.duration.inMilliseconds;
+      // Spread across the clip, skipping the very first/last instants —
+      // disproportionately likely to be black frames, title cards or
+      // motion blur from a cut. Falls back to just the start for a clip
+      // too short for "spread out" to mean anything.
+      final fractions = durationMs > 3000
+          ? const [0.1, 0.35, 0.6, 0.85]
+          : const [0.0];
 
-      final renderObject = boundaryKey.currentContext?.findRenderObject();
-      if (renderObject is! RenderRepaintBoundary) {
-        throw StateError('Capture boundary was never painted.');
-      }
+      for (final fraction in fractions) {
+        if (!mounted) return;
+        await controller.seekTo(Duration(milliseconds: (durationMs * fraction).round()));
+        // The texture needs a beat to actually present the seeked frame
+        // before a screenshot of it means anything.
+        await Future.delayed(const Duration(milliseconds: 220));
+        if (!mounted) return;
+        // One extra frame so the just-seeked texture is definitely what
+        // gets painted into the boundary this pass.
+        await WidgetsBinding.instance.endOfFrame;
+        if (!mounted) return;
 
-      final image = await renderObject.toImage(pixelRatio: 1.0);
-      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
-      image.dispose();
-      if (byteData == null) throw StateError('Could not encode the captured frame.');
+        final renderObject = boundaryKey.currentContext?.findRenderObject();
+        if (renderObject is! RenderRepaintBoundary) continue;
 
-      final dir = await getTemporaryDirectory();
-      final outPath =
-          '${dir.path}/local_frame_${DateTime.now().millisecondsSinceEpoch}.png';
-      await File(outPath).writeAsBytes(byteData.buffer.asUint8List());
-      if (!mounted) return;
+        try {
+          final image = await renderObject.toImage(pixelRatio: 1.0);
+          final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+          image.dispose();
+          if (byteData == null) continue;
 
-      // Never clobber something the creator (or the AI thumbnail button)
-      // already picked while this was still running in the background.
-      if (_thumbnailFile == null) {
-        setState(() => _thumbnailFile = XFile(outPath));
+          final dir = await getTemporaryDirectory();
+          final outPath =
+              '${dir.path}/local_frame_${DateTime.now().millisecondsSinceEpoch}_${fractions.indexOf(fraction)}.png';
+          await File(outPath).writeAsBytes(byteData.buffer.asUint8List());
+          if (!mounted) return;
+          setState(() => _localFrameCandidates.add(XFile(outPath)));
+        } catch (_) {
+          // Skip this one candidate, keep going for the rest.
+        }
       }
     } catch (_) {
       // Silent by design — see the doc comment above.
@@ -324,6 +338,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
         setState(() {
           _captureController = null;
           _captureBoundaryKey = null;
+          _capturingFrameCandidates = false;
         });
       }
     }
@@ -367,6 +382,56 @@ class _UploadPageState extends ConsumerState<UploadPage> {
     } catch (e) {
       if (!mounted) return;
       _showSnack("Couldn't pick cover image.");
+    }
+  }
+
+  /// AI-generated cover art — same POST /api/ai-thumbnail the video/Short
+  /// "AI thumbnail" button uses, with contentType: 'music' so the server
+  /// crops it 1:1 instead of the 16:9 default. Otherwise behaves exactly
+  /// like a manually-picked cover: added to _musicCovers, and becomes the
+  /// track's poster if it's the first one.
+  Future<void> _generateAiMusicCover() async {
+    if (_aiCoverBusy || _musicCovers.length >= 5) return;
+    final title = _titleController.text.trim();
+    if (title.isEmpty) {
+      _showSnack('Add a title first — the AI cover is built from it.');
+      return;
+    }
+    setState(() => _aiCoverBusy = true);
+    try {
+      final result = await ref.read(aiAssistServiceProvider).pickThumbnail(
+        title: title,
+        category: 'Music',
+        contentType: 'music',
+        generateNew: true,
+      );
+      final response = await Dio().get<List<int>>(
+        result.thumbnailUrl,
+        options: Options(responseType: ResponseType.bytes),
+      );
+      final bytes = response.data;
+      if (bytes == null || bytes.isEmpty) {
+        throw const AIAssistException('The AI cover came back empty.');
+      }
+      final dir = await getTemporaryDirectory();
+      final filePath =
+          '${dir.path}/ai_cover_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      await File(filePath).writeAsBytes(bytes);
+      if (!mounted) return;
+      final cover = XFile(filePath);
+      setState(() {
+        _musicCovers.add(cover);
+        _thumbnailFile ??= cover;
+        _aiCoverBusy = false;
+      });
+    } on AIAssistException catch (e) {
+      if (!mounted) return;
+      setState(() => _aiCoverBusy = false);
+      _showSnack(e.message);
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _aiCoverBusy = false);
+      _showSnack("Couldn't generate an AI cover. Please try again.");
     }
   }
 
@@ -702,6 +767,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
       _stage = _Stage.picking;
       _file = null;
       _thumbnailFile = null;
+      _localFrameCandidates.clear();
       _musicCovers.clear();
       _fileSizeBytes = null;
       _contentType = 'video';
@@ -851,6 +917,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
       final result = await ref.read(aiAssistServiceProvider).pickThumbnail(
         title: title,
         category: _category,
+        contentType: _contentType,
         generateNew: true,
       );
       final response = await Dio().get<List<int>>(
@@ -866,8 +933,11 @@ class _UploadPageState extends ConsumerState<UploadPage> {
           '${dir.path}/ai_thumbnail_${DateTime.now().millisecondsSinceEpoch}.jpg';
       await File(filePath).writeAsBytes(bytes);
       if (!mounted) return;
+      // Added as one more candidate to tap, same as a locally-captured
+      // frame — never auto-applied as the thumbnail. See the grid in
+      // _buildDetails().
       setState(() {
-        _thumbnailFile = XFile(filePath);
+        _localFrameCandidates.insert(0, XFile(filePath));
         _aiBusy = false;
       });
     } on AIAssistException catch (e) {
@@ -1258,6 +1328,70 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                     ),
             ),
           ),
+          if (_capturingFrameCandidates || _localFrameCandidates.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              _capturingFrameCandidates
+                  ? 'Finding frames from your video…'
+                  : 'Or choose one of these:',
+              style: TextStyle(color: context.textSecondary, fontSize: 11, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 72,
+              child: _capturingFrameCandidates && _localFrameCandidates.isEmpty
+                  ? Center(
+                      child: SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.brandOrange,
+                        ),
+                      ),
+                    )
+                  : ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _localFrameCandidates.length,
+                      separatorBuilder: (_, _) => const SizedBox(width: 8),
+                      itemBuilder: (context, index) {
+                        final candidate = _localFrameCandidates[index];
+                        final selected = _thumbnailFile?.path == candidate.path;
+                        return GestureDetector(
+                          onTap: () => setState(() => _thumbnailFile = candidate),
+                          child: Container(
+                            width: 96,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: selected ? AppColors.brandOrange : context.borderSubtle,
+                                width: selected ? 2 : 1,
+                              ),
+                              image: DecorationImage(
+                                image: FileImage(File(candidate.path)),
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                            child: selected
+                                ? Align(
+                                    alignment: Alignment.topRight,
+                                    child: Container(
+                                      margin: const EdgeInsets.all(4),
+                                      decoration: const BoxDecoration(
+                                        color: AppColors.brandOrange,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      padding: const EdgeInsets.all(2),
+                                      child: const Icon(Icons.check, size: 12, color: Colors.white),
+                                    ),
+                                  )
+                                : null,
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
         ] else ...[
           // Music Cover Carousel Editor (up to 5 covers)
           _label('Music Artwork & Covers (up to 5 rotating covers)'),
@@ -1363,6 +1497,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                     child: Container(
                       width: 100,
                       height: 100,
+                      margin: const EdgeInsets.only(right: 12),
                       decoration: BoxDecoration(
                         color: context.bgCard,
                         borderRadius: BorderRadius.circular(14),
@@ -1386,6 +1521,52 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                               style: TextStyle(
                                 color: context.textDim,
                                 fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                if (_musicCovers.length < 5)
+                  GestureDetector(
+                    onTap: _aiCoverBusy ? null : _generateAiMusicCover,
+                    child: Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        color: context.bgCard,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: AppColors.brandOrange.withValues(alpha: 0.4),
+                          style: BorderStyle.solid,
+                        ),
+                      ),
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            _aiCoverBusy
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppColors.brandOrange,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.auto_awesome_rounded,
+                                    color: AppColors.brandOrange,
+                                    size: 28,
+                                  ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _aiCoverBusy ? 'Generating' : 'AI Cover',
+                              style: const TextStyle(
+                                color: AppColors.brandOrange,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ],

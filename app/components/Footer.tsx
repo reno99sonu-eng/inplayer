@@ -19,7 +19,7 @@ const browse = [
 const company = [
   { label: "About Us", href: "/about" },
   { label: "Contact Us", href: "/contact" },
-  { label: "InPlayer Policies", href: "/policies" },
+  { label: "Privacy Policies", href: "/policies" },
   { label: "Help & Support", href: "/help" },
 ];
 

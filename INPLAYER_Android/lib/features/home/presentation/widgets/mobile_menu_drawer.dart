@@ -503,7 +503,7 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                     ),
                     _buildMenuItem(
                       icon: Icons.lock_outline,
-                      title: 'InPlayer Policies',
+                      title: 'Privacy Policies',
                       onTap: () {
                         Navigator.pop(context);
                         context.push('/settings/policies');

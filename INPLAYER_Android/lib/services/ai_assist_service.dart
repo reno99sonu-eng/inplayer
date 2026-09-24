@@ -251,6 +251,11 @@ class AIAssistService {
   Future<AIThumbnailResult> pickThumbnail({
     required String title,
     required String category,
+    // 'video' | 'short' | 'music' — decides the crop the server applies
+    // (16:9 / 9:16 / 1:1, see app/lib/contentTypes.ts). Omitted, the route
+    // defaults to 'video', which is why a Raftaar/Short AI thumbnail used
+    // to come back landscape-cropped instead of portrait.
+    String contentType = 'video',
     List<String> frameUrls = const [],
     bool generateNew = false,
     String? prompt,
@@ -261,6 +266,7 @@ class AIAssistService {
         data: {
           'title': title,
           'category': category,
+          'contentType': contentType,
           if (frameUrls.isNotEmpty) 'frameUrls': frameUrls,
           if (generateNew) 'generateNew': true,
           if (prompt != null && prompt.isNotEmpty) 'prompt': prompt,

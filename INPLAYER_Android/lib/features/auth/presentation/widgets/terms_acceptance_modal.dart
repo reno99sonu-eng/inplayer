@@ -136,7 +136,7 @@ class _TermsAcceptanceModalOverlayState
                   const SizedBox(height: 16),
                   _buildPolicyLink(
                     context,
-                    title: 'InPlayer Policies',
+                    title: 'Privacy Policies',
                     path: '/settings/policies',
                   ),
                   if (_error != null) ...[

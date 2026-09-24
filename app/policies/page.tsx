@@ -10,8 +10,11 @@ import LegalBackButton from "../components/LegalBackButton";
 // pages — each of which already cross-links to every other one via
 // LegalNav. Keep this list in sync with app/components/LegalNav.tsx.
 export const metadata = {
-  title: "InPlayer Policies",
+  title: "Privacy Policies",
   description: "Privacy Policy, Terms & Conditions, and every other InPlayer legal document, in one place.",
+  alternates: {
+    canonical: "https://inplayer.in/policies",
+  },
 };
 
 const POLICIES = [
@@ -31,7 +34,7 @@ export default function PoliciesPage() {
       <LegalBackButton />
 
       <h1 className="mt-6 text-3xl font-black text-white light:text-slate-900">
-        InPlayer Policies
+        Privacy Policies
       </h1>
       <p className="mt-2 text-sm leading-6 text-slate-400 light:text-slate-600">
         Every InPlayer legal document, in one place — pick one below. Each page also has quick links

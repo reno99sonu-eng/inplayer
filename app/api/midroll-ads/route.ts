@@ -28,16 +28,16 @@ export async function GET() {
         (!item.expiresAt || new Date(item.expiresAt as string).getTime() > now)
     );
 
-    // If no ready ads yet, but there are processing video ads, attempt
-    // an immediate self-heal check with Mux so newly-uploaded ads become
-    // live without waiting for a webhook.
+    // If no ready ads yet, but there are processing video ads, kick off a
+    // self-heal check with Mux in the background so newly-uploaded ads
+    // become live without waiting for a webhook — fire-and-forget rather
+    // than awaited, so a slow/hung Mux status check can never make THIS
+    // request (which every single video load blocks on to learn its ad
+    // config) hang or time out. The very next video load picks up whatever
+    // this run heals, same as before, just never on the critical path.
     if (items.length === 0 && allAds.some((a) => a.status === "processing")) {
-      const healed = await selfHealMidrollAdsBatch(allAds);
-      items = healed.filter(
-        (item) =>
-          item.active === true &&
-          (item.status === undefined || item.status === "ready") &&
-          (!item.expiresAt || new Date(item.expiresAt as string).getTime() > now)
+      void selfHealMidrollAdsBatch(allAds).catch((err) =>
+        console.error("Background midroll ad self-heal failed:", err)
       );
     }
 

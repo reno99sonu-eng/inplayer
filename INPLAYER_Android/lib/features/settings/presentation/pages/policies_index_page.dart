@@ -5,7 +5,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/pattern_background.dart';
 import '../../data/legal_policies_data.dart' show LegalPolicyDoc, LegalPolicyRepository;
 
-/// The single "InPlayer Policies" screen — every one of InPlayer's 11 legal
+/// The single "Privacy Policies" screen — every one of InPlayer's 11 legal
 /// documents lives on THIS one page now, each expandable in place, rather
 /// than navigating out to 11 separate full-screen routes. Replaces the
 /// earlier version of this page, which was itself already a consolidation
@@ -41,7 +41,7 @@ class PoliciesIndexPage extends StatelessWidget {
           elevation: 0,
           iconTheme: IconThemeData(color: context.textPrimary),
           title: Text(
-            'InPlayer Policies',
+            'Privacy Policies',
             style: TextStyle(
               fontWeight: FontWeight.w800,
               color: context.textPrimary,
@@ -80,39 +80,6 @@ class PoliciesIndexPage extends StatelessWidget {
                               fontWeight: FontWeight.w700,
                             ),
                           ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 16),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: context.bgCard,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: context.borderSubtle),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'HOMOX PRIME PRIVATE LIMITED',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            fontSize: 13,
-                            letterSpacing: 0.5,
-                            color: AppColors.brandOrange,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '6th Floor, 615, Shivanta Highstreet, Panchavati Canal Road, Near Shivanta Iris,\nGorwa, Vadodara, Gujarat – 390016, India\nGSTIN: 24AAICH1282J1ZK',
-                          style: TextStyle(fontSize: 11, color: context.textSecondary, height: 1.4),
-                        ),
-                        const SizedBox(height: 6),
-                        Text(
-                          'Support: support@inplayer.in • Platform: www.inplayer.in',
-                          style: TextStyle(fontSize: 11, color: context.textPrimary, fontWeight: FontWeight.w600),
                         ),
                       ],
                     ),

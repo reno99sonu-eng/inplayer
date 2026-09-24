@@ -180,12 +180,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const httpCandidates = candidates.filter((u) => u.startsWith("https://"));
-
-    if (httpCandidates.length > 0) {
+    // OpenAI's (and Groq's OpenAI-compatible) vision endpoint accepts a
+    // base64 data: URI in image_url.url exactly like a real https:// one —
+    // this used to filter candidates down to https:// only, which silently
+    // threw away every locally-extracted frame (they're all data: URLs) and
+    // fell straight through to the "just crop frame 0, no AI involved"
+    // fallback below without ever telling the caller AI selection didn't
+    // actually happen.
+    if (candidates.length > 0) {
       const instructions =
-        `You are picking the single best video thumbnail out of ${httpCandidates.length} candidate frames, ` +
-        `numbered 0 to ${httpCandidates.length - 1} in the order shown. This is for a ${category || "general"} video` +
+        `You are picking the single best video thumbnail out of ${candidates.length} candidate frames, ` +
+        `numbered 0 to ${candidates.length - 1} in the order shown. This is for a ${category || "general"} video` +
         `${title ? ` titled "${title}"` : ""}. Prefer the frame that is sharp (not blurry or motion-blurred), ` +
         `well-lit, and has a clear subject (a face or the main action) — avoid black frames, transition ` +
         `artifacts, or on-screen loading/buffering indicators. ` +
@@ -193,7 +198,7 @@ export async function POST(request: NextRequest) {
 
       const content = [
         { type: "text", text: instructions },
-        ...httpCandidates.map((url) => ({ type: "image_url", image_url: { url } })),
+        ...candidates.map((url) => ({ type: "image_url", image_url: { url } })),
       ];
 
       for (const model of VISION_MODELS) {
@@ -228,8 +233,8 @@ export async function POST(request: NextRequest) {
                 const parsed = JSON.parse(raw);
                 const index = Number(parsed?.bestIndex);
 
-                if (Number.isInteger(index) && index >= 0 && index < httpCandidates.length) {
-                  const picked = httpCandidates[index];
+                if (Number.isInteger(index) && index >= 0 && index < candidates.length) {
+                  const picked = candidates[index];
                   const croppedDataUrl = await renderCroppedDataUrl(picked, aspectRatio).catch((cropErr) => {
                     console.error("Failed to crop selected frame, using original:", cropErr);
                     return picked;

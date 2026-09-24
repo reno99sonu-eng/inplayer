@@ -617,7 +617,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           _SettingTile(
 
             icon: Icons.privacy_tip_outlined,
-            title: 'InPlayer Policies',
+            title: 'Privacy Policies',
             onTap: () => context.push('/settings/policies'),
           ),
         ],

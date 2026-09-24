@@ -251,8 +251,11 @@ export default function UploadPage() {
             cropDataUrlToThumbnail(frame, ratio).catch(() => frame)
           )
         );
+        // Not auto-selected — shown as a grid of candidates in
+        // VideoMetadataFields for the creator to actually tap one, same as
+        // the AI thumbnail result below. Nothing here silently picks for
+        // them.
         setLocalVideoFrames(frames);
-        setThumbnailPreview(frames[0]);
       }
     } catch (err) {
       console.error("Failed to extract video frame thumbnails:", err);
@@ -280,7 +283,15 @@ export default function UploadPage() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "AI thumbnail generation failed.");
       if (data.thumbnailUrl) {
-        setThumbnailPreview(data.thumbnailUrl);
+        let cropped = data.thumbnailUrl;
+        try {
+          cropped = await cropDataUrlToThumbnail(data.thumbnailUrl, THUMBNAIL_ASPECT_RATIO[contentType]);
+        } catch {
+          // Use the uncropped result rather than dropping it entirely.
+        }
+        // Added as one more candidate to tap in the same grid as the
+        // locally-extracted frames — never auto-applied as the thumbnail.
+        setLocalVideoFrames((prev) => [cropped, ...prev]);
       }
     } catch (err) {
       setThumbnailError(err instanceof Error ? err.message : "Couldn't generate AI thumbnail.");
@@ -699,16 +710,21 @@ export default function UploadPage() {
               aiSuggestions={aiType === "title" ? aiSuggestions : []}
               // Music gets no thumbnail picker here: its artwork is the
               // cover art in MusicUploadTools below, and cover 1 becomes
-              // the thumbnail automatically. Two separate image pickers
-              // for one track is how a creator ends up with a card that
-              // doesn't match the sleeve behind the player.
-              thumbnail={contentType === "short" || contentType === "music" ? undefined : {
+              // the thumbnail automatically.
+              thumbnail={contentType === "music" ? undefined : {
                 previewUrl: thumbnailPreview,
                 onFileSelected: handleThumbnailSelected,
                 busy: thumbnailBusy,
                 error: thumbnailError,
                 muxFrames: localVideoFrames,
-                onMuxThumbnailSelected: (url) => setThumbnailPreview(url),
+                onMuxThumbnailSelected: async (url) => {
+                  try {
+                    const cropped = await cropDataUrlToThumbnail(url, THUMBNAIL_ASPECT_RATIO[contentType]);
+                    setThumbnailPreview(cropped);
+                  } catch {
+                    setThumbnailPreview(url);
+                  }
+                },
                 onGenerateAIThumbnail: handleGenerateAIThumbnail,
                 aiThumbnailBusy: aiThumbnailBusy,
               }}

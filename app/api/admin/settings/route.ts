@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireAdmin } from "@/app/lib/isAdmin";
+import { requirePermission } from "@/app/lib/isAdmin";
 import { getPlatformSettings, updatePlatformSettings, PlatformSettings } from "@/app/lib/platformSettings";
 import { logAdminAction } from "@/app/lib/auditLog";
 import { docClient, MONETIZATION_CONFIG_HISTORY_TABLE } from "@/app/lib/dynamodb";
@@ -8,21 +8,42 @@ import { randomUUID } from "crypto";
 
 const AD_SLOT_SOURCES = ["house", "adsense", "off"];
 
+// The only settings a "manage_ads" team member may read or write — exactly
+// what app/admin/advertising/page.tsx edits. Everything else here
+// (maintenance mode, signups, moderation toggles, monetization, contact
+// emails) stays main-admin-only.
+const AD_SETTING_KEYS = [
+  "adsenseEnabled",
+  "adsensePublisherId",
+  "homepageBannerSource",
+  "watchPageBannerSource",
+  "weeklyFeaturedEnabled",
+  "midrollEnabled",
+  "midrollIntervalSeconds",
+] as const satisfies readonly (keyof PlatformSettings)[];
+
 export async function GET(request: NextRequest) {
+  let identity;
   try {
-    await requireAdmin(request);
+    identity = await requirePermission(request, "manage_ads");
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
   const settings = await getPlatformSettings();
-  return NextResponse.json({ settings });
+  if (identity.isMainAdmin) return NextResponse.json({ settings });
+
+  const adSettings: Partial<PlatformSettings> = {};
+  for (const key of AD_SETTING_KEYS) {
+    (adSettings as Record<string, unknown>)[key] = settings[key];
+  }
+  return NextResponse.json({ settings: adSettings });
 }
 
 export async function PATCH(request: NextRequest) {
   let admin;
   try {
-    admin = await requireAdmin(request);
+    admin = await requirePermission(request, "manage_ads");
   } catch {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -119,6 +140,16 @@ export async function PATCH(request: NextRequest) {
 
   if (Object.keys(partial).length === 0) {
     return NextResponse.json({ error: "No valid settings provided." }, { status: 400 });
+  }
+
+  if (
+    !admin.isMainAdmin &&
+    Object.keys(partial).some((key) => !(AD_SETTING_KEYS as readonly string[]).includes(key))
+  ) {
+    return NextResponse.json(
+      { error: "Only advertising settings can be changed with your permissions." },
+      { status: 403 }
+    );
   }
 
   // Load old settings to compare

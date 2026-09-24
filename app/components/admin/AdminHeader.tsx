@@ -8,6 +8,8 @@ import { useTheme } from "@/app/components/ThemeProvider";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { useAdminMode, AdminMode } from "@/app/components/admin/AdminModeContext";
 import { useAdminRefresh } from "@/app/components/admin/AdminRefreshContext";
+import { useAdminIdentity } from "@/app/components/admin/AdminIdentityContext";
+import { teamMemberHomeHref } from "@/app/components/admin/AdminSidebar";
 
 // The Admin Panel's own dedicated header — deliberately NOT the public
 // site's Navbar (no search bar, no category bar, no "Your Channel"/
@@ -22,7 +24,13 @@ export default function AdminHeader({ email }: { email: string | null }) {
   const { signOut } = useAuthModal();
   const { mode, setMode } = useAdminMode();
   const { triggerRefresh, isRefreshing, lastUpdated } = useAdminRefresh();
+  const { isMainAdmin, permissions } = useAdminIdentity();
   const router = useRouter();
+
+  const modeHomeHref = (target: AdminMode) => {
+    if (!isMainAdmin) return teamMemberHomeHref(target, permissions);
+    return target === "hammart" ? "/admin/hammart-vendors" : target === "sponsorship" ? "/admin/sponsorships" : "/admin/dashboard";
+  };
   const [isDark, setIsDark] = useState(true);
   const [navbarTheme, setNavbarTheme] = useState<{ active: boolean; imageUrl: string; occasionId?: string; title?: string } | null>(null);
 
@@ -33,9 +41,7 @@ export default function AdminHeader({ email }: { email: string | null }) {
   const switchMode = (next: AdminMode) => {
     if (next === mode) return;
     setMode(next);
-    router.push(
-      next === "hammart" ? "/admin/hammart-vendors" : next === "sponsorship" ? "/admin/sponsorships" : "/admin/dashboard"
-    );
+    router.push(modeHomeHref(next));
   };
 
   useEffect(() => {
@@ -152,8 +158,8 @@ export default function AdminHeader({ email }: { email: string | null }) {
       <div className="relative z-10 flex flex-col gap-4 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5 sm:py-6">
         <div className="flex items-center justify-between gap-3 sm:justify-start sm:gap-4">
           <Link
-            href="/admin/dashboard"
-            aria-label="Admin Panel — Dashboard"
+            href={modeHomeHref(mode)}
+            aria-label="Admin Panel — Home"
             className="flex-shrink-0 transition-transform duration-300 hover:scale-[1.03] active:scale-95"
           >
             <img

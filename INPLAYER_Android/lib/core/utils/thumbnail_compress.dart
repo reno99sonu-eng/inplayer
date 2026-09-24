@@ -12,7 +12,7 @@ import 'package:image/image.dart' as img;
 /// invalid", which fails the whole request.
 const int kThumbnailDataUrlMaxLength = 200000;
 
-const double _aspectRatio = 16 / 9;
+const double _defaultAspectRatio = 16 / 9;
 const int _maxWidth = 640;
 
 /// Quality ladder. 82 is the website's value and is what virtually every
@@ -25,16 +25,24 @@ const List<int> _qualityLadder = [82, 70, 60, 50, 40];
 /// enough for the API to accept.
 ///
 /// A direct port of the website's `compressImageToThumbnail()`: centre-crop
-/// to 16:9, scale the crop to at most 640px wide, encode as JPEG at quality
-/// 0.82. The app previously skipped this entirely and base64-encoded the
-/// picked file as-is, which is why uploads with a custom thumbnail were
-/// rejected — see the note at the call site in upload_page.dart.
+/// to [aspectRatio] (16:9 by default — pass 9/16 for a Raftaar/Short or 1
+/// for a music cover, matching THUMBNAIL_ASPECT_RATIO in the website's
+/// app/lib/contentTypes.ts), scale the crop to at most 640px wide, encode
+/// as JPEG at quality 0.82. The app previously skipped this entirely and
+/// base64-encoded the picked file as-is, which is why uploads with a
+/// custom thumbnail were rejected — see the note at the call site in
+/// upload_page.dart. It also used to hardcode 16:9 regardless of content
+/// type, which centre-cropped a Short's portrait cover or a music track's
+/// square cover into the wrong shape.
 ///
 /// Returns null if the file can't be read or decoded, or if even the lowest
 /// quality still exceeds the cap. Callers decide whether that is fatal: it
 /// is for music (the server requires a thumbnail, because audio has no
 /// video frame to make one from) and not for video (Mux generates one).
-Future<String?> compressImageToThumbnailDataUrl(String path) async {
+Future<String?> compressImageToThumbnailDataUrl(
+  String path, {
+  double aspectRatio = _defaultAspectRatio,
+}) async {
   try {
     final bytes = await File(path).readAsBytes();
     if (bytes.isEmpty) return null;
@@ -45,13 +53,13 @@ Future<String?> compressImageToThumbnailDataUrl(String path) async {
     // Isolate.run rather than Flutter's compute() deliberately: compute
     // would drag package:flutter/foundation.dart into an otherwise
     // Flutter-free utility purely for one helper.
-    return await Isolate.run(() => _encodeThumbnail(bytes));
+    return await Isolate.run(() => _encodeThumbnail(bytes, aspectRatio));
   } catch (_) {
     return null;
   }
 }
 
-String? _encodeThumbnail(Uint8List bytes) {
+String? _encodeThumbnail(Uint8List bytes, double aspectRatio) {
   final decoded = img.decodeImage(bytes);
   if (decoded == null) return null;
 
@@ -63,10 +71,10 @@ String? _encodeThumbnail(Uint8List bytes) {
   final srcRatio = oriented.width / oriented.height;
   var cropWidth = oriented.width;
   var cropHeight = oriented.height;
-  if (srcRatio > _aspectRatio) {
-    cropWidth = (oriented.height * _aspectRatio).round();
+  if (srcRatio > aspectRatio) {
+    cropWidth = (oriented.height * aspectRatio).round();
   } else {
-    cropHeight = (oriented.width / _aspectRatio).round();
+    cropHeight = (oriented.width / aspectRatio).round();
   }
   if (cropWidth < 1 || cropHeight < 1) return null;
 
@@ -81,7 +89,7 @@ String? _encodeThumbnail(Uint8List bytes) {
   );
 
   final outWidth = cropWidth < _maxWidth ? cropWidth : _maxWidth;
-  final rawHeight = (outWidth / _aspectRatio).round();
+  final rawHeight = (outWidth / aspectRatio).round();
   final resized = img.copyResize(
     cropped,
     width: outWidth,

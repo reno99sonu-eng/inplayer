@@ -1,15 +1,18 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:video_player/video_player.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/pattern_background.dart';
@@ -112,6 +115,12 @@ class _UploadPageState extends ConsumerState<UploadPage> {
 
   XFile? _file;
   XFile? _thumbnailFile;
+  // Only set while _autoCaptureLocalThumbnail() below is mid-capture — a
+  // VideoPlayer for this controller is briefly mounted off-layout (see
+  // _buildDetails()) purely so its RepaintBoundary has something real to
+  // screenshot, then torn back down.
+  VideoPlayerController? _captureController;
+  GlobalKey? _captureBoundaryKey;
   final List<XFile> _musicCovers = [];
   int _coverIntervalSeconds = 12;
   int? _fileSizeBytes;
@@ -233,13 +242,94 @@ class _UploadPageState extends ConsumerState<UploadPage> {
         _titleController.text = nameWithoutExt;
         _stage = _Stage.details;
       });
+
+      if (contentType != 'music') {
+        unawaited(_autoCaptureLocalThumbnail(picked.path));
+      }
     } catch (e) {
       if (!mounted) return;
       _showSnack("Couldn't open your gallery. Please try again.");
     }
   }
 
-  Future<void> _pickThumbnail() async {
+  /// Grabs a real frame out of the picked video file itself and drops it
+  /// straight into _thumbnailFile — the "it used to show a preview right
+  /// after I picked the file" the manual/AI pickers alone never delivered,
+  /// since those only ever start from an explicit tap. Runs entirely with
+  /// packages already in this app (video_player + the same RepaintBoundary
+  /// screenshot technique Flutter itself recommends for "no thumbnail
+  /// plugin installed") — no new native dependency.
+  ///
+  /// Best-effort: any failure here (an exotic codec, a huge file, a device
+  /// quirk) just leaves the thumbnail box empty, exactly like before this
+  /// existed — the manual picker and the AI thumbnail button are still
+  /// right there.
+  Future<void> _autoCaptureLocalThumbnail(String videoPath) async {
+    VideoPlayerController? controller;
+    try {
+      controller = VideoPlayerController.file(File(videoPath));
+      await controller.initialize();
+      if (!mounted) return;
+
+      // A pure-black first frame (a fade-in, a title card) is common — a
+      // few percent into the clip is far more likely to be a real frame.
+      // Duration.zero is used unmodified for anything short enough that
+      // "10%" would be sub-second.
+      final durationMs = controller.value.duration.inMilliseconds;
+      final seekMs = durationMs > 3000 ? (durationMs * 0.05).round() : 0;
+      await controller.seekTo(Duration(milliseconds: seekMs));
+      // The texture needs a beat to actually present the seeked frame
+      // before a screenshot of it means anything.
+      await Future.delayed(const Duration(milliseconds: 250));
+      if (!mounted) return;
+
+      final boundaryKey = GlobalKey();
+      setState(() {
+        _captureController = controller;
+        _captureBoundaryKey = boundaryKey;
+      });
+
+      // Let the newly-mounted (off-layout but painted) VideoPlayer widget
+      // actually go through a paint pass before reading its boundary.
+      await WidgetsBinding.instance.endOfFrame;
+      await Future.delayed(const Duration(milliseconds: 120));
+      if (!mounted) return;
+
+      final renderObject = boundaryKey.currentContext?.findRenderObject();
+      if (renderObject is! RenderRepaintBoundary) {
+        throw StateError('Capture boundary was never painted.');
+      }
+
+      final image = await renderObject.toImage(pixelRatio: 1.0);
+      final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+      image.dispose();
+      if (byteData == null) throw StateError('Could not encode the captured frame.');
+
+      final dir = await getTemporaryDirectory();
+      final outPath =
+          '${dir.path}/local_frame_${DateTime.now().millisecondsSinceEpoch}.png';
+      await File(outPath).writeAsBytes(byteData.buffer.asUint8List());
+      if (!mounted) return;
+
+      // Never clobber something the creator (or the AI thumbnail button)
+      // already picked while this was still running in the background.
+      if (_thumbnailFile == null) {
+        setState(() => _thumbnailFile = XFile(outPath));
+      }
+    } catch (_) {
+      // Silent by design — see the doc comment above.
+    } finally {
+      await controller?.dispose();
+      if (mounted) {
+        setState(() {
+          _captureController = null;
+          _captureBoundaryKey = null;
+        });
+      }
+    }
+  }
+
+    Future<void> _pickThumbnail() async {
     try {
       final picked = await ImagePicker().pickImage(
         source: ImageSource.gallery,
@@ -407,8 +497,17 @@ class _UploadPageState extends ConsumerState<UploadPage> {
     // JPEG quality 82 — the exact output this endpoint was written against.
     String? thumbnailDataUrl;
     if (_thumbnailFile != null) {
-      thumbnailDataUrl =
-          await compressImageToThumbnailDataUrl(_thumbnailFile!.path);
+      // Music covers are square, Raftaar/Shorts are portrait — everything
+      // else (including the local frame this screen may have auto-captured
+      // via video_player) is landscape. Matches THUMBNAIL_ASPECT_RATIO in
+      // the website's app/lib/contentTypes.ts.
+      final aspectRatio = _isMusicUpload
+          ? 1.0
+          : (_contentType == 'short' ? 9 / 16 : 16 / 9);
+      thumbnailDataUrl = await compressImageToThumbnailDataUrl(
+        _thumbnailFile!.path,
+        aspectRatio: aspectRatio,
+      );
       if (!mounted) return;
       if (thumbnailDataUrl == null) {
         if (_isMusicUpload) {
@@ -1006,6 +1105,24 @@ class _UploadPageState extends ConsumerState<UploadPage> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        if (_captureController != null && _captureController!.value.isInitialized)
+          SizedBox(
+            width: 0,
+            height: 0,
+            child: OverflowBox(
+              maxWidth: _captureController!.value.size.width,
+              maxHeight: _captureController!.value.size.height,
+              alignment: Alignment.topLeft,
+              child: RepaintBoundary(
+                key: _captureBoundaryKey,
+                child: SizedBox(
+                  width: _captureController!.value.size.width,
+                  height: _captureController!.value.size.height,
+                  child: VideoPlayer(_captureController!),
+                ),
+              ),
+            ),
+          ),
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(

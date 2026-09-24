@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { fetchAuthSession } from "aws-amplify/auth";
 import { CheckCircle2 } from "lucide-react";
 import { getMuxThumbnailCandidates } from "@/app/lib/muxThumbnail";
+import { THUMBNAIL_RATIO_LABEL } from "@/app/lib/contentTypes";
 
 interface UploadThumbnailStepProps {
   videoId: string;
@@ -23,7 +24,10 @@ export default function UploadThumbnailStep({
   onDone,
 }: UploadThumbnailStepProps) {
   const candidates = useMemo(
-    () => (muxPlaybackId && contentType !== "music" ? getMuxThumbnailCandidates(muxPlaybackId, duration, 5) : []),
+    () =>
+      muxPlaybackId && contentType !== "music"
+        ? getMuxThumbnailCandidates(muxPlaybackId, duration, 5, contentType === "short")
+        : [],
     [muxPlaybackId, duration, contentType]
   );
   const [selected, setSelected] = useState<string | null>(defaultThumbnailUrl);
@@ -79,6 +83,9 @@ export default function UploadThumbnailStep({
 
       {candidates.length > 0 && contentType !== "music" && (
         <div className="w-full max-w-md space-y-3 text-left">
+          <p className="text-xs font-semibold text-slate-400 light:text-slate-600">
+            Recommended: {THUMBNAIL_RATIO_LABEL[contentType ?? "video"]}
+          </p>
           <div className="grid grid-cols-3 gap-2.5 sm:grid-cols-5">
             {candidates.map((url) => (
               <button
@@ -92,7 +99,11 @@ export default function UploadThumbnailStep({
                 }`}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element -- external Mux image host, next/image isn't worth configuring for a transient picker. */}
-                <img src={url} alt="Thumbnail option" className="aspect-video w-full object-contain bg-black/20" />
+                <img
+                  src={url}
+                  alt="Thumbnail option"
+                  className={`w-full object-contain bg-black/20 ${contentType === "short" ? "aspect-[9/16]" : "aspect-video"}`}
+                />
               </button>
             ))}
           </div>

@@ -1,8 +1,16 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { UploadCloud, X, Globe, Link2, Lock, Film, PlaySquare, Loader2, Sparkles } from "lucide-react";
 import { AUDIENCE_OPTIONS, type VideoAudience } from "@/app/lib/contentAccess";
+import { THUMBNAIL_RATIO_LABEL } from "@/app/lib/contentTypes";
+
+// Matches THUMBNAIL_RATIO_LABEL 1:1 — the plain-English word for each shape.
+const THUMBNAIL_ORIENTATION_WORD: Record<"video" | "short" | "music", string> = {
+  video: "landscape",
+  short: "portrait",
+  music: "square",
+};
 
 export const CONTENT_TYPES = [
   { value: "video", label: "Video" },
@@ -132,8 +140,6 @@ export default function VideoMetadataFields({
   const thumbInputRef = useRef<HTMLInputElement>(null);
   const muxFrames = thumbnail?.muxFrames ?? [];
 
-  // Mobile Segmented Tab State for ultra-compact 1-screen editing on mobile
-  const [mobileTab, setMobileTab] = useState<"details" | "settings">("details");
 
   const addTag = () => {
     const t = tagInput.trim().replace(/^#/, "");
@@ -149,35 +155,12 @@ export default function VideoMetadataFields({
 
   return (
     <div className="space-y-3">
-      {/* Mobile Segmented Tab Control (Shown on Mobile, Hidden on Desktop) */}
-      <div className="flex rounded-xl border border-white/10 bg-black/20 p-1 light:border-black/10 light:bg-black/5 lg:hidden">
-        <button
-          type="button"
-          onClick={() => setMobileTab("details")}
-          className={`flex-1 py-1.5 text-center text-xs font-bold rounded-lg transition-all ${
-            mobileTab === "details"
-              ? "bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white shadow"
-              : "text-slate-400 hover:text-white light:text-slate-600 light:hover:text-slate-900"
-          }`}
-        >
-          1. Details & Thumbnail
-        </button>
-        <button
-          type="button"
-          onClick={() => setMobileTab("settings")}
-          className={`flex-1 py-1.5 text-center text-xs font-bold rounded-lg transition-all ${
-            mobileTab === "settings"
-              ? "bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white shadow"
-              : "text-slate-400 hover:text-white light:text-slate-600 light:hover:text-slate-900"
-          }`}
-        >
-          2. Visibility & Settings
-        </button>
-      </div>
-
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6">
-        {/* SECTION 1: Details & Thumbnail (Visible on Desktop OR Mobile Tab 1) */}
-        <div className={`space-y-3.5 ${mobileTab === "details" ? "block" : "hidden lg:block"}`}>
+        {/* SECTION 1: Details & Thumbnail — always visible, no tab to switch */}
+        <div className="space-y-3.5">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500 light:text-slate-400">
+            Details & Thumbnail
+          </p>
           {/* Title Field + AI Assist */}
           <div>
             <div className="mb-1 flex items-center justify-between">
@@ -244,7 +227,7 @@ export default function VideoMetadataFields({
                   Thumbnail
                 </label>
                 <span className="rounded-full border border-white/10 px-2 py-0.5 text-[10px] font-semibold text-slate-400 light:border-black/10 light:text-slate-500">
-                  16:9 landscape
+                  {THUMBNAIL_RATIO_LABEL[value.contentType]} {THUMBNAIL_ORIENTATION_WORD[value.contentType]}
                 </span>
               </div>
               <div className="flex gap-4">
@@ -330,8 +313,11 @@ export default function VideoMetadataFields({
           )}
         </div>
 
-        {/* SECTION 2: Visibility & Settings (Visible on Desktop OR Mobile Tab 2) */}
-        <div className={`space-y-3.5 ${mobileTab === "settings" ? "block" : "hidden lg:block"}`}>
+        {/* SECTION 2: Visibility & Settings — always visible, no tab to switch */}
+        <div className="space-y-3.5">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500 light:text-slate-400">
+            Visibility & Settings
+          </p>
           {/* Category & Spoken Language */}
           <div className="grid grid-cols-2 gap-2">
             <div>

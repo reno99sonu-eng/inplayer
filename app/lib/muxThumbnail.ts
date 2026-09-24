@@ -46,7 +46,8 @@ export function getMuxThumbnailUrl(
 export function getMuxThumbnailCandidates(
   playbackId: string,
   durationSeconds?: number | null,
-  count = 5
+  count = 5,
+  isPortrait = false
 ): string[] {
   const id = playbackId.trim();
   if (!id) return [];
@@ -65,8 +66,14 @@ export function getMuxThumbnailCandidates(
         })
       : [1, 2, 5, 10, 15].slice(0, count);
 
+  // Same landscape/portrait split as getMuxThumbnailUrl above — a Short is
+  // portrait (9:16) source video, so its candidate frames need the same
+  // 640x1138 smartcrop, not the 640x360 landscape crop every other content
+  // type gets.
+  const dims = isPortrait ? "width=640&height=1138" : "width=640&height=360";
+
   return Array.from(new Set(times)).map(
     (t) =>
-      `https://image.mux.com/${encodeURIComponent(id)}/thumbnail.jpg?width=640&height=360&fit_mode=smartcrop&time=${t}`
+      `https://image.mux.com/${encodeURIComponent(id)}/thumbnail.jpg?${dims}&fit_mode=smartcrop&time=${t}`
   );
 }

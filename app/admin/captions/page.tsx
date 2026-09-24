@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { fetchAuthSession } from "aws-amplify/auth";
-import { Loader2, Wand2, CheckCircle2, AlertTriangle, ImageIcon, RefreshCw } from "lucide-react";
+import { Loader2, Wand2, CheckCircle2, AlertTriangle, ImageIcon, RefreshCw, Music } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 
 // One-time maintenance screen (admin only — the API behind it checks the
@@ -62,6 +62,19 @@ export default function AdminCaptionsPage() {
   } | null>(null);
   const [healFailed, setHealFailed] = useState<string | null>(null);
 
+  // Fourth, independent maintenance job — backfills contentType:"music" on
+  // tracks uploaded before that field existed (see
+  // app/api/admin/backfill-music-content-type). Those rows only ever got
+  // category:"Music", so the strict isolation the Music page/player now
+  // rely on correctly excludes them until this runs once.
+  const [musicRunning, setMusicRunning] = useState(false);
+  const [musicResult, setMusicResult] = useState<{
+    totalFound: number;
+    healed: number;
+    errors: string[];
+  } | null>(null);
+  const [musicFailed, setMusicFailed] = useState<string | null>(null);
+
   const runSelfHeal = async () => {
     setHealRunning(true);
     setHealFailed(null);
@@ -101,6 +114,46 @@ export default function AdminCaptionsPage() {
       setHealFailed(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setHealRunning(false);
+    }
+  };
+
+  const runMusicBackfill = async () => {
+    setMusicRunning(true);
+    setMusicFailed(null);
+    setMusicResult(null);
+
+    try {
+      const session = await fetchAuthSession();
+      const idToken = session.tokens?.idToken?.toString();
+      if (!idToken) {
+        setMusicFailed("Your session expired — please sign in again.");
+        return;
+      }
+
+      const res = await fetch("/api/admin/backfill-music-content-type", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+
+      if (res.status === 401) {
+        setMusicFailed("This account isn't authorized to run this repair.");
+        return;
+      }
+      if (!res.ok) {
+        setMusicFailed(`The repair call failed (HTTP ${res.status}).`);
+        return;
+      }
+
+      const data = await res.json();
+      setMusicResult({
+        totalFound: data?.totalFound || 0,
+        healed: data?.healed || 0,
+        errors: Array.isArray(data?.errors) ? data.errors : [],
+      });
+    } catch (err) {
+      setMusicFailed(err instanceof Error ? err.message : "Something went wrong.");
+    } finally {
+      setMusicRunning(false);
     }
   };
 
@@ -460,6 +513,74 @@ export default function AdminCaptionsPage() {
           <div className="mt-4 flex items-start gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300 light:text-red-700">
             <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
             <span>{healFailed}</span>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-10 border-t border-white/10 light:border-black/10 pt-8">
+        <h1 className="text-2xl sm:text-3xl font-black text-white light:text-slate-900">
+          Fix legacy music tracks
+        </h1>
+        <p className="mt-2 text-sm leading-relaxed text-slate-400 light:text-slate-600">
+          Tracks uploaded before contentType:"music" existed only ever got
+          category:"Music" — the Music page and player now strictly require
+          contentType:"music" so they can never leak into video/short feeds,
+          which correctly hides those older tracks until they're tagged.
+          This finds every video categorized "Music" without
+          contentType:"music" and sets it once. Safe to run more than once.
+        </p>
+
+        <button
+          onClick={runMusicBackfill}
+          disabled={musicRunning}
+          className="mt-7 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-[#F97316] via-[#FB923C] to-[#FBBF24] py-3.5 font-bold text-slate-950 shadow-[0_15px_35px_rgba(249,115,22,.3)] transition-all hover:-translate-y-0.5 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {musicRunning ? (
+            <>
+              <Loader2 size={18} className="animate-spin" />
+              Fixing legacy tracks…
+            </>
+          ) : (
+            <>
+              <Music size={18} />
+              Fix legacy music tracks
+            </>
+          )}
+        </button>
+
+        {musicResult && (
+          <div className="mt-4 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4">
+            <div className="flex items-center gap-2 text-sm font-semibold text-white light:text-slate-900">
+              {!musicRunning && !musicFailed && (
+                <CheckCircle2 size={16} className="text-emerald-400" />
+              )}
+              <span>
+                {musicResult.totalFound === 0
+                  ? "Nothing to fix — every music-categorized video already has contentType:\"music\"."
+                  : `${musicResult.healed} of ${musicResult.totalFound} legacy track(s) fixed`}
+              </span>
+            </div>
+            {musicResult.errors.length > 0 && (
+              <details className="mt-3">
+                <summary className="cursor-pointer text-xs font-semibold text-amber-400">
+                  {musicResult.errors.length} item(s) reported an issue
+                </summary>
+                <ul className="mt-2 space-y-1 text-xs text-slate-400 light:text-slate-600">
+                  {musicResult.errors.slice(0, 40).map((e, i) => (
+                    <li key={i} className="break-words">
+                      {e}
+                    </li>
+                  ))}
+                </ul>
+              </details>
+            )}
+          </div>
+        )}
+
+        {musicFailed && (
+          <div className="mt-4 flex items-start gap-2 rounded-2xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-300 light:text-red-700">
+            <AlertTriangle size={16} className="mt-0.5 flex-shrink-0" />
+            <span>{musicFailed}</span>
           </div>
         )}
       </div>

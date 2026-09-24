@@ -2,8 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { IvsClient, CreateChannelCommand } from "@aws-sdk/client-ivs";
 import { verifyAuth } from "@/app/lib/verifyAuth";
 import { docClient } from "@/app/lib/dynamodb";
-import { PutCommand, GetCommand, QueryCommand } from "@aws-sdk/lib-dynamodb";
-import { createNotification } from "@/app/lib/notifications";
+import { PutCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
 import { broadcastLiveStreamToSubscribers } from "@/app/lib/subscriptionBroadcast";
 import { moderateText, UNCHECKED } from "@/app/lib/moderation";
 import { getPlatformSettings } from "@/app/lib/platformSettings";
@@ -124,33 +123,6 @@ export async function POST(request: NextRequest) {
         uploaderName,
         uploaderAvatarUrl,
       });
-
-      // Send in-app notifications to subscribers
-      try {
-        const subsResult = await docClient.send(
-          new QueryCommand({
-            TableName: "InPlayer-Subscriptions",
-            IndexName: "creatorId-index",
-            KeyConditionExpression: "creatorId = :creatorId",
-            ExpressionAttributeValues: {
-              ":creatorId": user.userId,
-            },
-          })
-        );
-        const subscribers = subsResult.Items || [];
-        for (const sub of subscribers) {
-          if (sub.notifyEnabled !== false) {
-            void createNotification({
-              userId: sub.subscriberId,
-              type: "live_stream",
-              message: `${uploaderName} is live: ${title}`,
-              videoId,
-            });
-          }
-        }
-      } catch (e) {
-        console.error("Failed to send in-app notifications:", e);
-      }
     }
 
     return NextResponse.json({

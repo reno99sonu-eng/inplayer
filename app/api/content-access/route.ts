@@ -10,7 +10,9 @@ import {
   isValidPasskey,
   normalizeAudienceMode,
   modeRequiresPasskey,
+  type AudienceMode,
 } from "@/app/lib/contentAccess";
+import { audienceModeFromValue, issueAdultAudienceValue } from "@/app/lib/audienceToken";
 
 // The 6-digit passkey that guards who can change what content is shown —
 // the lock behind the 18+ switch in the hamburger drawer
@@ -30,11 +32,12 @@ import {
 // drops the cookie, which returns the browser to the SAFE default
 // ("family", 18+ hidden). Failing that direction is the whole point.
 //
-// The mode itself rides in an HttpOnly cookie set here, only after the
-// passkey has been verified server-side. Client JavaScript can't write an
-// HttpOnly cookie, so the toggle can't be flipped from the browser console
-// or by a script — the only way to unlock 18+ is a correct passkey through
-// this route.
+// The mode rides in an HttpOnly cookie set here. HttpOnly only stops
+// browser JavaScript — the Android app and any script can send whatever
+// cookie or header they like — so "all" is written as a value signed by
+// app/lib/audienceToken.ts, issued only after the passkey is verified. A
+// bare "all" from any client resolves to the safe default. The app reads
+// the value from `audienceValue` in these responses and sends it back.
 //
 // Hashing: scrypt with a per-user random salt, compared with
 // timingSafeEqual. A 6-digit code is only a million possibilities, so a
@@ -77,7 +80,12 @@ async function readPasskeyRecord(userId: string) {
 // Deliberately does NOT require auth: a signed-out visitor still has a mode
 // (the safe default), and the page needs to show it.
 export async function GET(request: NextRequest) {
-  const mode = normalizeAudienceMode(request.cookies.get(AUDIENCE_COOKIE)?.value);
+  const raw =
+    request.cookies.get(AUDIENCE_COOKIE)?.value ||
+    request.headers.get(AUDIENCE_COOKIE) ||
+    request.headers.get("x-audience-mode");
+  const mode = audienceModeFromValue(raw);
+  const audienceValue = mode === "all" ? (raw as string) : mode;
 
   let hasPasskey = false;
   try {
@@ -88,14 +96,14 @@ export async function GET(request: NextRequest) {
     // UI reads as "you'll need to create one first".
   }
 
-  return NextResponse.json({ mode, hasPasskey });
+  return NextResponse.json({ mode, hasPasskey, audienceValue });
 }
 
-function audienceCookieResponse(mode: string) {
-  const response = NextResponse.json({ ok: true, mode });
+function audienceCookieResponse(mode: AudienceMode, audienceValue: string = mode) {
+  const response = NextResponse.json({ ok: true, mode, audienceValue });
   response.cookies.set({
     name: AUDIENCE_COOKIE,
-    value: mode,
+    value: audienceValue,
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
@@ -213,7 +221,17 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "That passkey is incorrect." }, { status: 403 });
     }
 
-    return audienceCookieResponse(mode);
+    if (mode !== "all") return audienceCookieResponse(mode);
+
+    const adultValue = issueAdultAudienceValue(user.userId);
+    if (!adultValue) {
+      console.error("content-access: no signing secret configured (CONTENT_ACCESS_SECRET / AWS_SECRET_ACCESS_KEY)");
+      return NextResponse.json(
+        { error: "18+ content can't be turned on right now." },
+        { status: 503 }
+      );
+    }
+    return audienceCookieResponse(mode, adultValue);
   }
 
   return NextResponse.json({ error: "Unknown action." }, { status: 400 });

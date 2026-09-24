@@ -25,9 +25,10 @@
 export type VideoAudience = "everyone" | "kids" | "adult";
 export type AudienceMode = "all" | "family" | "kids";
 
-/** Cookie holding the viewer's chosen mode. Set HttpOnly by the server
- *  (see app/api/content-access/route.ts) once the passkey is verified, so
- *  it can't be forged from the browser console or by a script. */
+/** Cookie holding the viewer's chosen mode, set HttpOnly by
+ *  app/api/content-access/route.ts. "all" is stored as a signed value (see
+ *  app/lib/audienceToken.ts) because non-browser clients can send any
+ *  cookie they like. */
 export const AUDIENCE_COOKIE = "inplayer-audience";
 
 /** One year — this is a deliberate, passkey-protected choice, not a

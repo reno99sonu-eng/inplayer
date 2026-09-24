@@ -85,11 +85,29 @@ class ContentAccessService {
   final _dio = DioClient().dio;
   final _logger = Logger();
 
-  Future<void> _cacheMode(AudienceMode mode) async {
+  /// Stores the value dio_client.dart sends back as the inplayer-audience
+  /// cookie: "family"/"kids", or the signed value the server issues for 18+.
+  Future<void> _cacheAudienceValue(String value) async {
     final prefs = await SharedPreferences.getInstance();
-    final modeStr = audienceModeToString(mode);
-    await prefs.setString('audience', modeStr);
-    DioClient().setCachedAudience(modeStr);
+    await prefs.setString('audience', value);
+    DioClient().setCachedAudience(value);
+  }
+
+  /// Only narrowing modes can be cached from a mode alone. "all" is only
+  /// ever stored as the server's signed value (see [_cacheServerAudience]),
+  /// so this never overwrites it with a plain "all" the server would reject.
+  Future<void> _cacheMode(AudienceMode mode) async {
+    if (mode == AudienceMode.all) return;
+    await _cacheAudienceValue(audienceModeToString(mode));
+  }
+
+  Future<void> _cacheServerAudience(Object? data, AudienceMode mode) async {
+    final value = data is Map ? data['audienceValue']?.toString() : null;
+    if (value != null && value.isNotEmpty) {
+      await _cacheAudienceValue(value);
+    } else {
+      await _cacheMode(mode);
+    }
   }
 
   /// Sets audience mode locally without prompting for passcodes.
@@ -110,7 +128,7 @@ class ContentAccessService {
       // Keep the local cache in sync with the server's answer, not just
       // with our own successful writes — e.g. after signing in on a device
       // that already had a mode set on a different one.
-      await _cacheMode(mode);
+      await _cacheServerAudience(data, mode);
       return ContentAccessState(
         mode: mode,
         hasPasskey: data['hasPasskey'] == true,
@@ -130,10 +148,9 @@ class ContentAccessService {
   }) async {
     final cleanedPasskey = passkey?.trim();
     // Narrowing to family/kids takes effect immediately, even offline. "all"
-    // must wait for the server to accept the passkey: the cached mode is
-    // what the app sends as its audience cookie, so caching it up front let
-    // a wrong passkey unlock 18+ anyway.
-    if (mode != AudienceMode.all) await _cacheMode(mode);
+    // is cached only from the server's signed value after it accepts the
+    // passkey (_cacheMode skips it).
+    await _cacheMode(mode);
     try {
       final response = await _dio.post(
         ApiConstants.contentAccess,
@@ -150,7 +167,7 @@ class ContentAccessService {
         final serverMode = data is Map
             ? audienceModeFromString(data['mode']?.toString())
             : mode;
-        await _cacheMode(serverMode);
+        await _cacheServerAudience(data, serverMode);
         return const ContentAccessResult(success: true);
       }
 

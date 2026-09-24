@@ -86,11 +86,9 @@ class DioClient {
             // "inplayer-audience") call would never match, so every request
             // silently landed on the safe "family" default no matter what
             // was stored locally. ContentAccessService is the only writer
-            // of this 'audience' pref key, and it only ever stores the real
-            // AudienceMode values ("all" | "family" | "kids") returned by a
-            // verified /api/content-access call — never a value the app
-            // invented locally, since the server is the source of truth for
-            // whether a mode is actually unlocked.
+            // of this 'audience' pref key: "family"/"kids", or for 18+ the
+            // signed value /api/content-access issues after the passkey is
+            // verified. The server ignores a plain "all".
             final now = DateTime.now();
             if (_audienceCacheTime == null ||
                 now.difference(_audienceCacheTime!).inSeconds >= 5) {

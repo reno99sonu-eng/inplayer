@@ -77,7 +77,7 @@ export default function NavbarProfile() {
   if (!signedIn) {
     return (
       <button
-        onClick={openSignIn}
+        onClick={() => openSignIn()}
         className="
           rounded-full
           border

@@ -42,7 +42,7 @@ export default function DeleteAccountClientSection() {
           <div className="mt-4 flex flex-col sm:flex-row items-start sm:items-center gap-3">
             <button
               type="button"
-              onClick={openSignIn}
+              onClick={() => openSignIn()}
               className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-orange-500 to-amber-500 px-4 py-2.5 text-sm font-bold text-slate-950 transition hover:brightness-105"
             >
               <LogIn size={16} /> Sign In to Delete Account

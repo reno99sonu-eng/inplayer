@@ -276,7 +276,7 @@ export default function VendorDashboardPage() {
         <Store size={32} className="text-orange-400" />
         <h1 className="mt-4 text-2xl font-black text-white light:text-slate-900">Vendor Dashboard</h1>
         <p className="mt-2 text-sm text-slate-400 light:text-slate-600">Sign in to set up or manage your Hammart vendor account.</p>
-        <button onClick={openSignIn} className="mt-5 rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-6 py-2.5 text-sm font-bold text-white">
+        <button onClick={() => openSignIn()} className="mt-5 rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-6 py-2.5 text-sm font-bold text-white">
           Sign In
         </button>
       </div>

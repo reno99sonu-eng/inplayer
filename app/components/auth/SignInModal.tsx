@@ -450,7 +450,7 @@ export default function SignInModal({
                   Don&apos;t have an account?{" "}
                   <button
                     type="button"
-                    onClick={openSignUp}
+                    onClick={() => openSignUp()}
                     className="font-semibold text-orange-300 light:text-orange-600 transition hover:text-orange-200 light:hover:text-orange-700"
                   >
                     Create Account

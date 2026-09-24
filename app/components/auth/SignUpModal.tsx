@@ -318,7 +318,7 @@ export default function SignUpModal({ open, onClose, initialEmail }: SignUpModal
           </p>
           <button
             type="button"
-            onClick={openSignIn}
+            onClick={() => openSignIn()}
             className="mt-5 text-sm font-semibold text-orange-300 transition hover:text-orange-200 light:text-orange-600"
           >
             Already have an account? Sign In
@@ -777,7 +777,7 @@ export default function SignUpModal({ open, onClose, initialEmail }: SignUpModal
               Already have an account?{" "}
               <button
                 type="button"
-                onClick={openSignIn}
+                onClick={() => openSignIn()}
                 className="font-semibold text-orange-300 light:text-orange-600 transition hover:text-orange-200 light:hover:text-orange-700"
               >
                 Sign In

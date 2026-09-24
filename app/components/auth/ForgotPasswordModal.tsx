@@ -208,7 +208,7 @@ export default function ForgotPasswordModal({
 
               <button
                 type="button"
-                onClick={openSignIn}
+                onClick={() => openSignIn()}
                 className="
                   mt-6 w-full rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A]
                   py-3.5 font-bold text-white
@@ -286,7 +286,7 @@ export default function ForgotPasswordModal({
                   Remembered your password?{" "}
                   <button
                     type="button"
-                    onClick={openSignIn}
+                    onClick={() => openSignIn()}
                     className="font-semibold text-orange-300 light:text-orange-600 transition hover:text-orange-200 light:hover:text-orange-700"
                   >
                     Sign In

@@ -141,7 +141,7 @@ export default function MembersOnlyVideoPlayer({
       </div>
       {!signedIn ? (
         <button
-          onClick={openSignIn}
+          onClick={() => openSignIn()}
           className="rounded-full bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-6 py-2.5 text-sm font-bold text-white shadow-[0_10px_25px_rgba(255,153,0,.3)] transition hover:-translate-y-0.5"
         >
           Sign in

@@ -82,7 +82,7 @@ export default function LikedVideosPage() {
             Save videos you love by clicking the like button on any creator&apos;s video.
           </p>
           <button
-            onClick={openSignIn}
+            onClick={() => openSignIn()}
             className="mt-6 rounded-full bg-gradient-to-r from-orange-500 to-amber-400 px-6 py-2.5 text-sm font-bold text-slate-900 shadow-lg hover:scale-105 transition"
           >
             Sign In

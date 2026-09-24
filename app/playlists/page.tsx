@@ -108,7 +108,7 @@ export default function PlaylistsPage() {
             Create custom playlists and save your favorite videos in one organized place.
           </p>
           <button
-            onClick={openSignIn}
+            onClick={() => openSignIn()}
             className="mt-6 rounded-full bg-gradient-to-r from-orange-500 to-amber-400 px-6 py-2.5 text-sm font-bold text-slate-900 shadow-lg hover:scale-105 transition"
           >
             Sign In

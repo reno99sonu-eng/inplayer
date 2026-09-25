@@ -12,6 +12,7 @@ import { getPlatformSettings } from "./lib/platformSettings";
 import type { DomainMaintenanceFields } from "./lib/siteDomain";
 import { headers } from "next/headers";
 import { isSearchCrawler } from "@/app/lib/searchCrawlers";
+import AppOpenBanner from "./components/AppOpenBanner";
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -183,6 +184,13 @@ export default async function RootLayout({
     isAdsensePreview ||
     isSearchCrawler(hdrs.get("user-agent"));
 
+  // Real Android UA only — iPhone Safari's UA also happens to contain
+  // neither "Android" nor "Mobile" in a way that would match this, and
+  // there is no iOS app to offer anyone anyway. Decided here, server-side,
+  // off the real request header, so there's no hydration flash of "no
+  // banner" before a client-side check could run.
+  const isAndroidMobile = /Android/i.test(hdrs.get("user-agent") || "");
+
   return (
     <html lang="en">
       <head>
@@ -271,6 +279,7 @@ export default async function RootLayout({
   }}
 />
 <ChunkErrorRecovery />
+<AppOpenBanner isAndroidMobile={isAndroidMobile} />
 <AuthProvider>
   <SettingsProvider>
     <LanguageProvider>

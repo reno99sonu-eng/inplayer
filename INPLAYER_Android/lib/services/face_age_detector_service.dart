@@ -25,6 +25,11 @@ class FaceScanResult {
   /// from the captured still, never from a streamed preview frame.
   final bool readyForCapture;
 
+  /// Mean luminance (0-255) of the frame this result came from, when known.
+  /// Lets the caller react to sustained low light (screen brightness boost,
+  /// exposure compensation) instead of only ever showing "find better light".
+  final double? brightness;
+
   const FaceScanResult({
     required this.category,
     required this.confidence,
@@ -32,6 +37,7 @@ class FaceScanResult {
     this.boundingBox,
     this.headEulerAngleY,
     this.readyForCapture = false,
+    this.brightness,
   });
 
   bool get isChild => category == AgeCategory.child;
@@ -127,10 +133,11 @@ class FaceAgeDetectorService {
   }) async {
     try {
       if (frameBrightness != null && frameBrightness < minUsableBrightness) {
-        return const FaceScanResult(
+        return FaceScanResult(
           category: AgeCategory.unknown,
           confidence: 0.0,
-          description: 'Too dark — find better light',
+          description: 'Too dark — brightening up…',
+          brightness: frameBrightness,
         );
       }
 

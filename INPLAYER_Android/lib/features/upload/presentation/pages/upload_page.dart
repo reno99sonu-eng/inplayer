@@ -925,6 +925,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
     final picked = await showAITitleAssistSheet(
       context,
       initialDescription: _descriptionController.text.trim(),
+      seesFrames: _groundingImages.isNotEmpty,
       buildContext: (userDescription) =>
           _aiContext(userDescription: userDescription),
     );

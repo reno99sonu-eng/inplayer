@@ -437,7 +437,14 @@ class _ShortsPageState extends ConsumerState<ShortsPage> {
           short: short,
           isActive: widget.isActive && isCurrent,
           bottomInset: widget.bottomInset,
-          onFirstFrame: _warmNextShort,
+          onFirstFrame: () {
+            _warmNextShort();
+            // Fires exactly once per real play (see _revealVideoLayer's
+            // _isFirstFrameRendered guard), the same moment the poster
+            // crossfades to real video — a fair "this was actually
+            // watched" signal, not just "scrolled past."
+            unawaited(ref.read(videoServiceProvider).recordView(short.videoId));
+          },
           onMinimized: _handleBack,
         );
       },

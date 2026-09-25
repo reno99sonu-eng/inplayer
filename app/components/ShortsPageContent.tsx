@@ -224,6 +224,20 @@ export default function ShortsPageContent({
     return () => player.removeEventListener("timeupdate", handleTimeUpdate);
   }, [activeIndex]);
 
+  // Record a view the moment a Short becomes the active one. This feed is
+  // one continuous page — unlike /watch/[videoId], which records its own
+  // view server-side on every fresh page load — so without this, every
+  // Short's view count stayed frozen at 0 forever regardless of how many
+  // times it was actually watched. Demo/placeholder Shorts have no
+  // videoId and are silently skipped (nothing real to record against).
+  useEffect(() => {
+    const videoId = shorts[activeIndex]?.videoId;
+    if (!videoId) return;
+    fetch(`/api/videos/${videoId}/view`, { method: "POST" }).catch(() => {
+      // Best-effort — a failed view count must never interrupt playback.
+    });
+  }, [activeIndex, shorts]);
+
   // Keeps the speaker icon truthful. autoPlay="any" tries unmuted
   // playback first and silently falls back to muted if the browser
   // blocks it (common on mobile) — without this, the icon could keep

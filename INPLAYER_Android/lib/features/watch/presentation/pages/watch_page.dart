@@ -524,6 +524,7 @@ class _WatchPageState extends ConsumerState<WatchPage>
           _hasPlayerError = false;
         });
         _loadEngagementState(video);
+        unawaited(videoService.recordView(video.videoId));
         _midrollBreaksShown.clear();
         _prerollShown = false;
         _postrollShown = false;

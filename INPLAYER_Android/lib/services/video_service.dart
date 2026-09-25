@@ -312,6 +312,23 @@ class VideoService {
     }
   }
 
+  /// Records one view — POST /api/videos/{videoId}/view. Fire-and-forget:
+  /// callers should NOT await this — a failed view count must never delay
+  /// or interrupt playback. Mirrors the website's own /watch/[videoId]
+  /// page, which records a view server-side the moment it loads; the app
+  /// never loads that page, so without this every video/short/music
+  /// watched from the app left its view count frozen at 0 forever, even
+  /// though likes (a separate, already-working endpoint reachable from
+  /// anywhere) kept counting fine — the "0 views, 1 like" that never
+  /// should have been possible.
+  Future<void> recordView(String videoId) async {
+    try {
+      await _dio.post('/api/videos/$videoId/view');
+    } catch (e) {
+      _logger.w('Failed to record view for $videoId: $e');
+    }
+  }
+
   Future<String?> getPlaybackToken(String videoId) async {
     try {
       final response = await _dio.get(

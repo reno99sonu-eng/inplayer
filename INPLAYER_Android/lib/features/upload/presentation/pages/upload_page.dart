@@ -1013,7 +1013,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
       final result = await ref.read(aiAssistServiceProvider).pickThumbnail(
         title: title,
         category: _category,
-        contentType: _contentType,
+        contentType: _isMusicUpload ? 'music' : _contentType,
         description: _descriptionController.text.trim(),
         frameUrls: frames,
         generateNew: true,

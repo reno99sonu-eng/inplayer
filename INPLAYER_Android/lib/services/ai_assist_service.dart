@@ -88,12 +88,15 @@ class AIAssistService {
   }
 
   static String buildPrompt(AIGenerateType type, AIPromptContext ctx) {
-    final format = ctx.contentType == 'short'
+    final isMusic = ctx.contentType == 'music' || ctx.category.toLowerCase() == 'music';
+    final isShort = ctx.contentType == 'short' ||
+        ctx.category.toLowerCase().contains('short') ||
+        ctx.category.toLowerCase().contains('raftaar');
+
+    final format = isShort
         ? 'vertical short-form video (like a Reel/Short)'
-        // Naming the format matters: without it the model writes video copy
-        // ("watch", "in this video") for something nobody watches.
-        : ctx.contentType == 'music'
-            ? 'music track / song (audio only — the listener sees cover art, not footage)'
+        : isMusic
+            ? 'music track / song (audio track with cover art, not a video)'
             : 'video';
 
     final titleLine = _looksLikeAutoFilename(ctx.title)
@@ -105,7 +108,7 @@ class AIAssistService {
         : 'No description written yet.';
 
     final creatorContextLine = (ctx.userDescription?.trim().isNotEmpty ?? false)
-        ? "What this video is actually about, in the creator's own words: ${ctx.userDescription!.trim()}"
+        ? "What this content is actually about, in the creator's own words: ${ctx.userDescription!.trim()}"
         : null;
 
     final context = [
@@ -117,20 +120,67 @@ class AIAssistService {
 
     switch (type) {
       case AIGenerateType.title:
-        return '$context\n\n'
-            'Generate five title options appropriate for the ${ctx.category} category'
-            '${ctx.contentType == 'short' ? ' and short-form format (short, punchy, under 60 characters).' : '.'}'
-            ' Each of the five must be written in a genuinely different TONE, not just a different structure — use exactly these five tones, one per title, in this order: '
-            '(1) high-CTR/clickbait — bold, urgent, makes a big promise; '
-            '(2) funny/playful — a light, witty, or self-aware title; '
-            '(3) dramatic/urgent — intense, high-stakes phrasing; '
-            '(4) minimal/understated — plain, quiet, confident, no hype at all; '
-            '(5) a genuine, curious question a real viewer would ask themselves. '
-            'They should read like five different creators wrote them, not one voice restyled five times. Return ONLY the five titles, one per line, no numbering, no quotation marks, no labels identifying the tone.';
+        if (isMusic) {
+          return '$context\n\n'
+              'Generate five artistic, radio-ready song title options for this music track/song in the ${ctx.category} genre. '
+              'The five titles must each follow these distinct creative styles:\n'
+              '(1) Poetic / emotional — heartfelt, soulful title that captures the feeling;\n'
+              '(2) Catchy / radio hook — memorable, melodic, radio-ready phrase;\n'
+              '(3) Rhythm / beat-driven — stylish groove, upbeat, or atmospheric vibe;\n'
+              '(4) Modern Indian / Desi flavor — culturally resonant, bilingual (Hindi/English mix) or evocative Desi touch;\n'
+              '(5) Minimalist aesthetic — one or two iconic words, clean and timeless.\n'
+              'Return ONLY the five song titles, one per line, no numbering, no quotation marks, no labels identifying the style.';
+        } else if (isShort) {
+          return '$context\n\n'
+              'Generate five viral, scroll-stopping title hooks for this short-form vertical video (Raftaar/Short). '
+              'Each title MUST be under 50 characters, punchy, and follow these 5 viral hook styles:\n'
+              '(1) Curiosity hook — irresistible scroll-stopper;\n'
+              '(2) Relatable POV hook — relatable viewer perspective (e.g. "POV:", "When you...");\n'
+              '(3) Trend / challenge hook — high-energy trending style;\n'
+              '(4) Question / mystery hook — compels the viewer to watch till the end;\n'
+              '(5) Bold & punchy phrase — short, striking statement.\n'
+              'Return ONLY the five titles, one per line, strictly under 50 characters each, no numbering, no quotation marks, no labels.';
+        } else {
+          return '$context\n\n'
+              'Generate five title options appropriate for the ${ctx.category} category. '
+              'Each of the five must be written in a genuinely different TONE, not just a different structure — use exactly these five tones, one per title, in this order: '
+              '(1) high-CTR/clickbait — bold, urgent, makes a big promise; '
+              '(2) funny/playful — a light, witty, or self-aware title; '
+              '(3) dramatic/urgent — intense, high-stakes phrasing; '
+              '(4) minimal/understated — plain, quiet, confident, no hype at all; '
+              '(5) a genuine, curious question a real viewer would ask themselves. '
+              'They should read like five different creators wrote them, not one voice restyled five times. Return ONLY the five titles, one per line, no numbering, no quotation marks, no labels identifying the tone.';
+        }
+
       case AIGenerateType.description:
-        return '$context\n\nWrite a professional, engaging $format description a viewer would actually want to read, appropriate for the ${ctx.category} category. Return ONLY the description.';
+        if (isMusic) {
+          return '$context\n\n'
+              'Write an engaging music track release description for streaming listeners. '
+              'Highlight the musical vibe, mood, rhythm/beats, emotional tone, and artist message for this ${ctx.category} track. '
+              'Include a welcoming invitation to stream, save to playlists, and share. Return ONLY the description.';
+        } else if (isShort) {
+          return '$context\n\n'
+              'Write a snappy, viral caption (2 to 3 sentences maximum) for a short-form vertical video. '
+              'Include a quick engagement hook, an invite to comment/share, and 3-4 trending hashtags like #Raftaar #Shorts #Trending. Return ONLY the description.';
+        } else {
+          return '$context\n\n'
+              'Write a professional, engaging video description a viewer would actually want to read, appropriate for the ${ctx.category} category. '
+              'Include a clear summary, what viewers will discover, and an invitation to subscribe and comment. Return ONLY the description.';
+        }
+
       case AIGenerateType.tags:
-        return '$context\n\nGenerate 15 SEO-friendly, relevant tags for this ${ctx.category} $format. Return ONLY comma-separated tags, no hashtags, no numbering.';
+        if (isMusic) {
+          return '$context\n\n'
+              'Generate 15 high-ranking music discovery tags for this ${ctx.category} track (including genre, subgenre, mood, vibe, tempo, instrument style, and playlist keywords). '
+              'Return ONLY comma-separated tags, no hashtags, no numbering.';
+        } else if (isShort) {
+          return '$context\n\n'
+              'Generate 15 viral, trending discoverability tags for this ${ctx.category} short-form vertical video (like Raftaar/Shorts/Reels). '
+              'Return ONLY comma-separated tags, no hashtags, no numbering.';
+        } else {
+          return '$context\n\n'
+              'Generate 15 SEO-friendly, relevant search tags for this ${ctx.category} video. Return ONLY comma-separated tags, no hashtags, no numbering.';
+        }
     }
   }
 
@@ -261,7 +311,7 @@ class AIAssistService {
   ///
   /// The route has two modes. With [frameUrls] it asks a vision model to
   /// pick the strongest frame out of candidates already extracted from the
-  /// asset; with [generateNew] it asks DALL-E for an entirely new image.
+  /// asset; with [generateNew] it asks DALL-E/GPT-Image for an entirely new image.
   /// Both return the same `{thumbnailUrl, reason}` shape, so callers do not
   /// have to care which ran.
   Future<AIThumbnailResult> pickThumbnail({

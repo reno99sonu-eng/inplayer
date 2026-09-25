@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,9 +24,23 @@ import 'services/face_age_detector_service.dart';
 import 'providers/theme_provider.dart';
 import 'providers/app_language_provider.dart';
 import 'features/auth/presentation/widgets/terms_acceptance_modal.dart';
+import 'services/push_notification_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Push notifications. Best-effort and non-blocking: a missing/broken
+  // google-services.json must never take down app startup for something
+  // that is, at worst, "notifications don't arrive" rather than "the app
+  // doesn't open". The background handler is registered here — it must
+  // happen exactly once, this early, for Android to reliably deliver
+  // messages while the app is backgrounded or fully closed.
+  try {
+    await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  } catch (e) {
+    debugPrint('Firebase init warning: $e');
+  }
 
   // Must be initialized before any AudioPlayer used by MusicPlayerService
   // is created — sets up the background audio service/notification channel
@@ -94,6 +110,7 @@ class _InplayerAppState extends ConsumerState<InplayerApp> {
       _startupPermissionsFuture = _requestStartupPermissions();
       unawaited(_startupPermissionsFuture!);
     });
+    unawaited(ref.read(pushNotificationServiceProvider).initialize());
   }
 
   Future<void> _requestStartupPermissions() async {
@@ -231,6 +248,20 @@ class _InplayerAppState extends ConsumerState<InplayerApp> {
     final appLanguage = ref.watch(appLanguageProvider);
     // Keep one process-wide AppSync subscription alive above the router.
     ref.watch(platformUpdateServiceProvider);
+
+    // Registers/clears this device's push token whenever sign-in state
+    // actually changes — covers every way a person ends up signed in
+    // (email/password, Google, or a session already restored from a
+    // previous launch) from the one place all three converge, rather than
+    // repeating this call in each sign-in method individually.
+    ref.listen<AuthState>(authStateProvider, (previous, next) {
+      final pushService = ref.read(pushNotificationServiceProvider);
+      if (next is AuthStateAuthenticated) {
+        unawaited(pushService.registerToken());
+      } else if (previous is AuthStateAuthenticated) {
+        unawaited(pushService.unregisterToken());
+      }
+    });
 
     return MaterialApp.router(
       title: 'INPLAYER',

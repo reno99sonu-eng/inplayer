@@ -113,6 +113,20 @@
             android:name="flutterEmbedding"
             android:value="2" />
 
+        <!-- Push notifications: the channel a background/terminated-app FCM
+             message is posted to when the payload carries a "notification"
+             block (Android does this itself, no app code involved) — must
+             match the channel PushNotificationService creates for
+             foreground messages, so both paths land in the one channel a
+             person can find and control under Settings > Apps > InPlayer >
+             Notifications, rather than two different-looking ones. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="in.inplayer.app.channel.push" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@mipmap/ic_launcher" />
+
         <!-- just_audio_background — powers MusicPlayerService's real
              background playback + lock-screen/notification media controls
              for the new dedicated Music section. Standard manifest entries

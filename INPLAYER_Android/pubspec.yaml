@@ -194,6 +194,16 @@ dependencies:
   # breaks the day an unrelated package drops it.
   image: ^4.9.1
   camera: ^0.11.3
+
+  # Push notifications: firebase_core bootstraps the connection to the
+  # Firebase project (android/app/google-services.json); firebase_messaging
+  # is Firebase Cloud Messaging itself (device token, foreground/background
+  # message delivery); flutter_local_notifications displays an actual
+  # system notification while the app is in the FOREGROUND — FCM only ever
+  # auto-shows one itself for background/terminated app state, by design.
+  firebase_core: ^4.15.0
+  firebase_messaging: ^16.7.0
+  flutter_local_notifications: ^22.3.1
   google_mlkit_face_detection: ^0.13.0
   geolocator: ^13.0.2
   permission_handler: ^12.0.1

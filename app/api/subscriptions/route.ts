@@ -8,6 +8,7 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import { randomUUID } from "crypto";
 import { docClient } from "@/app/lib/dynamodb";
+import { sendPushToUser } from "@/app/lib/push";
 import { verifyAuth } from "@/app/lib/verifyAuth";
 
 export async function GET(request: NextRequest) {
@@ -120,6 +121,7 @@ export async function POST(request: NextRequest) {
     );
 
     try {
+      const subscribeMessage = `${user.name || "Someone"} subscribed to your channel`;
       await docClient.send(
         new PutCommand({
           TableName: "InPlayer-Notifications",
@@ -127,12 +129,13 @@ export async function POST(request: NextRequest) {
             userId: creatorId,
             notificationId: randomUUID(),
             type: "subscribe",
-            message: `${user.name || "Someone"} subscribed to your channel`,
+            message: subscribeMessage,
             read: false,
             createdAt: new Date().toISOString(),
           },
         })
       );
+      void sendPushToUser({ userId: creatorId, title: "INPLAYER", body: subscribeMessage });
     } catch (err) {
       console.error("Failed to write subscribe notification:", err);
     }

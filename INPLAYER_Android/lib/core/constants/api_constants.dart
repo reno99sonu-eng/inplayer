@@ -95,6 +95,10 @@ class ApiConstants {
   // Notifications
   static const String notifications = '/api/notifications';
 
+  // Push notification device tokens (POST to register, DELETE to remove —
+  // see app/api/push/register-token/route.ts).
+  static const String pushRegisterToken = '/api/push/register-token';
+
   // Playlists
   static const String playlists = '/api/playlists';
 

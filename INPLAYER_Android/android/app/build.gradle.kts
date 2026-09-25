@@ -4,6 +4,9 @@ plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+    // Push notifications (firebase_messaging) — reads google-services.json
+    // in this same directory.
+    id("com.google.gms.google-services")
 }
 
 // Release signing credentials live in android/key.properties, which is

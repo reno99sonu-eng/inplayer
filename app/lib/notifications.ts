@@ -2,6 +2,7 @@ import { PutCommand, ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { randomUUID } from "crypto";
 import { docClient } from "@/app/lib/dynamodb";
 import { isAdminEmail } from "@/app/lib/isAdmin";
+import { sendPushToUser } from "@/app/lib/push";
 
 // The "like"/"comment"/"subscribe" writers each hand-roll this same
 // PutCommand inline (see app/api/likes, app/api/comments,
@@ -56,6 +57,11 @@ export async function createNotification(input: CreateNotificationInput): Promis
   } catch (err) {
     console.error(`Failed to write "${input.type}" notification:`, err);
   }
+
+  // Independent of the write above — a person still sees this in the bell
+  // icon even on a device with no push token registered, or if Firebase
+  // isn't configured at all yet (sendPushToUser no-ops in that case).
+  void sendPushToUser({ userId: input.userId, title: "INPLAYER", body: input.message });
 }
 
 /**

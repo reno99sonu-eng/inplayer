@@ -78,7 +78,9 @@ export async function POST(request: NextRequest) {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
-        model: "gpt-image-1",
+        // Sunburst: OpenAI's highest-quality image model. This is a rare,
+        // admin-only, one-off generation, so quality wins over speed.
+        model: "gpt-image-2.5-sunburst",
         prompt,
         size: "1024x1024",
         quality: "medium",

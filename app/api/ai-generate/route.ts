@@ -2,9 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const maxDuration = 60;
 
-// Text generation for titles / descriptions / tags. gpt-4.1-mini first (better
-// writing, and it can see images), gpt-4o-mini as the fallback.
-const CANDIDATE_MODELS = ["gpt-4.1-mini", "gpt-4o-mini"];
+// Text generation for titles / descriptions / tags. gpt-6-sol first — a
+// genuinely capable model for grounded creative writing from images — with
+// gpt-6-luna (fast, cost-efficient) as the fallback. reasoning_effort stays
+// "none": this is a short, single-turn writing task, and "none" is also the
+// only effort level that lets the request keep using `temperature` for
+// creative variety (any other level rejects a non-default temperature).
+const CANDIDATE_MODELS = ["gpt-6-sol", "gpt-6-luna"];
 const PER_CALL_TIMEOUT_MS = 45_000;
 const MAX_IMAGES = 4;
 
@@ -41,17 +45,15 @@ export async function POST(request: NextRequest) {
     }
 
     const openAiKey = (process.env.OPENAI_API_KEY || "").trim().replace(/^["']|["']$/g, "");
-    const groqKey = (process.env.GROQ_API_KEY || "").trim().replace(/^["']|["']$/g, "");
 
-    if (!openAiKey && !groqKey) {
+    if (!openAiKey) {
       return NextResponse.json(
         { error: "AI is not configured yet. Please contact the site admin.", debug: "OPENAI_API_KEY is missing" },
         { status: 500 }
       );
     }
 
-    // Images only go to OpenAI; the Groq fallback stays text-only.
-    const images = openAiKey ? sanitizeImages(body?.images) : [];
+    const images = sanitizeImages(body?.images);
     const userContent =
       images.length > 0
         ? [
@@ -60,11 +62,7 @@ export async function POST(request: NextRequest) {
           ]
         : prompt;
 
-    const endpoint = openAiKey
-      ? "https://api.openai.com/v1/chat/completions"
-      : "https://api.groq.com/openai/v1/chat/completions";
-    const apiKey = openAiKey || groqKey;
-    const models = openAiKey ? CANDIDATE_MODELS : ["llama-3.3-70b-versatile"];
+    const endpoint = "https://api.openai.com/v1/chat/completions";
 
     let lastErrorStatus = 502;
 
@@ -73,7 +71,7 @@ export async function POST(request: NextRequest) {
     const attempts: Array<typeof userContent> = images.length > 0 ? [userContent, prompt] : [prompt];
 
     for (const content of attempts) {
-      for (const model of models) {
+      for (const model of CANDIDATE_MODELS) {
         const controller = new AbortController();
         const timer = setTimeout(() => controller.abort(), PER_CALL_TIMEOUT_MS);
 
@@ -82,12 +80,13 @@ export async function POST(request: NextRequest) {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${apiKey}`,
+              Authorization: `Bearer ${openAiKey}`,
             },
             body: JSON.stringify({
               model,
               messages: [{ role: "user", content }],
               temperature: 0.8,
+              reasoning_effort: "none",
             }),
             signal: controller.signal,
           });

@@ -4,12 +4,14 @@ import { THUMBNAIL_ASPECT_RATIO, CONTENT_TYPE_WORD, normalizeContentType } from 
 
 export const maxDuration = 120;
 
-const VISION_MODELS = ["gpt-4.1-mini", "gpt-4o-mini", "gpt-4o"];
+const VISION_MODELS = ["gpt-6-sol", "gpt-6-luna"];
 // OpenAI retired dall-e-2/dall-e-3 — requests for them now fail with "The
 // model ... does not exist", which is why every "AI thumbnail"/"AI cover"
 // tap errored out. The gpt-image family returns base64 (b64_json) rather
-// than a URL, and takes its own size/quality values.
-const IMAGE_MODELS = ["gpt-image-1.5", "gpt-image-1-mini", "gpt-image-1"];
+// than a URL, and takes its own size/quality values. Flare is the fast,
+// everyday-quality tier (primary, for speed); Sunburst is OpenAI's highest-
+// quality image model, used as the fallback if Flare is unavailable.
+const IMAGE_MODELS = ["gpt-image-2.5-flare", "gpt-image-2.5-sunburst"];
 const MAX_FRAMES = 5;
 const PER_CALL_TIMEOUT_MS = 45_000;
 
@@ -67,9 +69,8 @@ export async function POST(request: NextRequest) {
     const aspectRatio = THUMBNAIL_ASPECT_RATIO[contentType];
 
     const openAiKey = (process.env.OPENAI_API_KEY || "").trim().replace(/^["']|["']$/g, "");
-    const apiKey = openAiKey || (process.env.GROQ_API_KEY || "").trim().replace(/^["']|["']$/g, "");
 
-    if (!apiKey) {
+    if (!openAiKey) {
       return NextResponse.json(
         {
           error: "AI is not configured yet. Please contact the site admin.",
@@ -81,7 +82,7 @@ export async function POST(request: NextRequest) {
 
     // MODE A: generate a brand-new image with OpenAI's gpt-image models.
     if (generateNew || (prompt && typeof prompt === "string" && !frameUrls?.length)) {
-      if (openAiKey) {
+      {
         const cleanTitle = String(title || prompt || "Untitled").trim().slice(0, 200);
         const cleanDescription = typeof description === "string" ? description.trim().slice(0, 400) : "";
         const shape =
@@ -164,7 +165,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // MODE B: OpenAI GPT-4o-mini Vision Frame Selection or Direct Pick
+    // MODE B: OpenAI Vision Frame Selection or Direct Pick
     if (!Array.isArray(frameUrls) || frameUrls.length === 0) {
       return NextResponse.json(
         { error: "No candidate thumbnail frames provided." },
@@ -183,8 +184,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // OpenAI's (and Groq's OpenAI-compatible) vision endpoint accepts a
-    // base64 data: URI in image_url.url exactly like a real https:// one —
+    // OpenAI's vision endpoint accepts a base64 data: URI in image_url.url
+    // exactly like a real https:// one —
     // this used to filter candidates down to https:// only, which silently
     // threw away every locally-extracted frame (they're all data: URLs) and
     // fell straight through to the "just crop frame 0, no AI involved"
@@ -209,20 +210,17 @@ export async function POST(request: NextRequest) {
         const timer = setTimeout(() => controller.abort(), PER_CALL_TIMEOUT_MS);
 
         try {
-          const endpoint = openAiKey
-            ? "https://api.openai.com/v1/chat/completions"
-            : "https://api.groq.com/openai/v1/chat/completions";
-
-          const response = await fetch(endpoint, {
+          const response = await fetch("https://api.openai.com/v1/chat/completions", {
             method: "POST",
             headers: {
               "Content-Type": "application/json",
-              Authorization: `Bearer ${apiKey}`,
+              Authorization: `Bearer ${openAiKey}`,
             },
             body: JSON.stringify({
-              model: openAiKey ? model : "qwen/qwen3.6-27b",
+              model,
               messages: [{ role: "user", content }],
               response_format: { type: "json_object" },
+              reasoning_effort: "none",
             }),
             signal: controller.signal,
           });

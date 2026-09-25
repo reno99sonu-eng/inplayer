@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAuth } from "@/app/lib/verifyAuth";
 
-// gpt-image-1 always returns base64 (no url/response_format option for
-// this model — see OpenAI's Images API reference), which is actually
+// gpt-image-2.5-flare always returns base64 (no url/response_format
+// option for this model — see OpenAI's Images API reference), which is actually
 // convenient here: the client crops/recompresses it down to the cover
 // photo's byte budget the exact same way it would a photo picked from
 // disk (see compressDataUrlToBanner in app/lib/imageCompress.ts), so
@@ -62,7 +62,8 @@ export async function POST(request: NextRequest) {
         Authorization: `Bearer ${apiKey}`,
       },
       body: JSON.stringify({
-        model: "gpt-image-1",
+        // Flare: fast, high-quality — a person is waiting on this synchronously.
+        model: "gpt-image-2.5-flare",
         prompt: buildPrompt(name, handle),
         size: "1536x1024",
         quality: "medium",
@@ -75,9 +76,9 @@ export async function POST(request: NextRequest) {
       const errorBody = await response.text();
       console.error("OpenAI image generation error:", response.status, errorBody);
 
-      // gpt-image-1 specifically requires "Organization Verification" on
-      // the OpenAI account (separate from just adding billing/an API
-      // key) — a valid key with no verification fails every call with
+      // OpenAI's gpt-image models specifically require "Organization
+      // Verification" on the account (separate from just adding billing/an
+      // API key) — a valid key with no verification fails every call with
       // exactly this 403, which reads as "misconfigured" without this
       // hint. See platform.openai.com/settings/organization/general.
       if (response.status === 403 && errorBody.toLowerCase().includes("verif")) {

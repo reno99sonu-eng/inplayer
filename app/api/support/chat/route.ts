@@ -17,11 +17,21 @@ import {
 
 export const dynamic = "force-dynamic";
 
-// Same provider setup and fallback ladder the existing /api/ai-generate
-// route already uses (OpenAI first, Groq as the drop-in OpenAI-compatible
-// alternative), so this needs no new key and no new dependency — it reuses
-// whichever of the two is already configured in the environment.
-const CANDIDATE_MODELS = ["gpt-4o-mini", "gpt-4o"];
+// gpt-6-astra first — this is the one AI feature where getting an answer
+// wrong has real consequences (policy, billing, account questions), and
+// it's naturally low-volume compared to per-upload AI, so paying for the
+// flagship model here is the right tradeoff. gpt-6-sol is the fallback if
+// Astra is unavailable or rate-limited.
+//
+// The two tiers need different request bodies: Astra has no
+// reasoning_effort "none" (its floor is "low"), and once reasoning_effort
+// is anything other than "none" the API rejects a non-default temperature
+// outright — so Astra runs at low effort with no temperature override,
+// while Sol runs at "none" effort with the usual low, factual temperature.
+const MODEL_ATTEMPTS: Array<{ model: string; extra: Record<string, unknown> }> = [
+  { model: "gpt-6-astra", extra: { reasoning_effort: "low" } },
+  { model: "gpt-6-sol", extra: { reasoning_effort: "none", temperature: 0.3 } },
+];
 const PER_CALL_TIMEOUT_MS = 45_000;
 
 // A support conversation doesn't need unbounded history, and an unbounded
@@ -92,7 +102,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const apiKey = process.env.OPENAI_API_KEY || process.env.GROQ_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
       {
@@ -120,15 +130,11 @@ export async function POST(request: NextRequest) {
   let replyText: string | null = null;
   let lastErrorStatus = 502;
 
-  for (const model of CANDIDATE_MODELS) {
+  for (const { model, extra } of MODEL_ATTEMPTS) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), PER_CALL_TIMEOUT_MS);
     try {
-      const endpoint = process.env.OPENAI_API_KEY
-        ? "https://api.openai.com/v1/chat/completions"
-        : "https://api.groq.com/openai/v1/chat/completions";
-
-      const response = await fetch(endpoint, {
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -137,10 +143,8 @@ export async function POST(request: NextRequest) {
         body: JSON.stringify({
           model,
           messages: modelMessages,
-          // Low but not zero: support answers should be consistent and
-          // factual, not creative.
-          temperature: 0.3,
-          max_tokens: 500,
+          max_completion_tokens: 500,
+          ...extra,
         }),
         signal: controller.signal,
       });

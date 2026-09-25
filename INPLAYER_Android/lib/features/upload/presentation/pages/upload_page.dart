@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:ui' as ui;
 
@@ -182,6 +183,16 @@ class _UploadPageState extends ConsumerState<UploadPage> {
   /// True while an AI assist request is in flight for the description or
   /// tags field (titles run inside their own sheet and track it there).
   bool _aiBusy = false;
+  // Which text-AI button is running, so only that one shows a spinner
+  // (previously every AI chip spun at once), and a separate lock for the AI
+  // thumbnail — it takes ~10-15s, and sharing _aiBusy with it made every
+  // other AI button silently do nothing for that whole time.
+  String? _aiBusyField;
+  bool _aiThumbnailBusy = false;
+  // Small JPEG data URLs of what's actually being uploaded (see
+  // _ensureGroundingImages), cached by source paths.
+  List<String> _groundingImages = const [];
+  String _groundingKey = '';
 
   /// Lines produced by the tap-to-stamp editor.
   ///
@@ -403,35 +414,22 @@ class _UploadPageState extends ConsumerState<UploadPage> {
         title: title,
         category: 'Music',
         contentType: 'music',
+        description: _descriptionController.text.trim(),
         generateNew: true,
       );
-      final response = await Dio().get<List<int>>(
-        result.thumbnailUrl,
-        options: Options(responseType: ResponseType.bytes),
-      );
-      final bytes = response.data;
-      if (bytes == null || bytes.isEmpty) {
-        throw const AIAssistException('The AI cover came back empty.');
-      }
-      final dir = await getTemporaryDirectory();
-      final filePath =
-          '${dir.path}/ai_cover_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      await File(filePath).writeAsBytes(bytes);
+      final filePath = await _saveAiImage(result.thumbnailUrl, 'ai_cover');
       if (!mounted) return;
       final cover = XFile(filePath);
       setState(() {
         _musicCovers.add(cover);
         _thumbnailFile ??= cover;
-        _aiCoverBusy = false;
       });
     } on AIAssistException catch (e) {
-      if (!mounted) return;
-      setState(() => _aiCoverBusy = false);
-      _showSnack(e.message);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _aiCoverBusy = false);
-      _showSnack("Couldn't generate an AI cover. Please try again.");
+      if (mounted) _showSnack(e.message);
+    } catch (_) {
+      if (mounted) _showSnack("Couldn't generate an AI cover. Please try again.");
+    } finally {
+      if (mounted) setState(() => _aiCoverBusy = false);
     }
   }
 
@@ -768,6 +766,10 @@ class _UploadPageState extends ConsumerState<UploadPage> {
       _file = null;
       _thumbnailFile = null;
       _localFrameCandidates.clear();
+      _groundingImages = const [];
+      _groundingKey = '';
+      _aiBusyField = null;
+      _aiThumbnailBusy = false;
       _musicCovers.clear();
       _fileSizeBytes = null;
       _contentType = 'video';
@@ -812,7 +814,69 @@ class _UploadPageState extends ConsumerState<UploadPage> {
     category: _category,
     contentType: _isMusicUpload ? 'music' : _contentType,
     userDescription: userDescription,
+    images: _groundingImages,
   );
+
+  /// Up to 3 real frames from the picked video (or 2 music covers), shrunk
+  /// to small JPEG data URLs, so the AI writes about what is actually in the
+  /// upload instead of guessing from a category and a camera filename.
+  /// AI-generated thumbnails are excluded — only frames from the file itself.
+  Future<List<String>> _ensureGroundingImages() async {
+    final isMusic = _isMusicUpload;
+    final sources = isMusic
+        ? _musicCovers.take(2).toList()
+        : _localFrameCandidates
+              .where((f) => f.path.contains('local_frame_'))
+              .take(3)
+              .toList();
+    final key = sources.map((f) => f.path).join('|');
+    if (key == _groundingKey) return _groundingImages;
+
+    final ratio = isMusic ? 1.0 : (_contentType == 'short' ? 9 / 16 : 16 / 9);
+    final out = <String>[];
+    for (final f in sources) {
+      // Best-effort: a frame that can't be read is just skipped — the AI
+      // call still goes ahead with whatever frames did work (or none).
+      try {
+        final dataUrl = await compressImageToThumbnailDataUrl(
+          f.path,
+          aspectRatio: ratio,
+        );
+        if (dataUrl != null) out.add(dataUrl);
+      } catch (_) {}
+    }
+    _groundingKey = key;
+    _groundingImages = out;
+    return out;
+  }
+
+  /// The AI routes return the finished image as a data: URL. Dio can't GET a
+  /// data: URL, so the old download step threw every time and the AI
+  /// thumbnail/cover buttons always failed on the app — decode it locally.
+  Future<String> _saveAiImage(String url, String prefix) async {
+    List<int> bytes;
+    if (url.startsWith('data:')) {
+      final comma = url.indexOf(',');
+      if (comma < 0) {
+        throw const AIAssistException('The AI image came back malformed.');
+      }
+      bytes = base64Decode(url.substring(comma + 1));
+    } else {
+      final response = await Dio().get<List<int>>(
+        url,
+        options: Options(responseType: ResponseType.bytes),
+      );
+      bytes = response.data ?? const <int>[];
+    }
+    if (bytes.isEmpty) {
+      throw const AIAssistException('The AI image came back empty.');
+    }
+    final dir = await getTemporaryDirectory();
+    final filePath =
+        '${dir.path}/${prefix}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    await File(filePath).writeAsBytes(bytes);
+    return filePath;
+  }
 
   /// Opens the tap-to-stamp lyrics editor against the picked audio file.
   ///
@@ -845,6 +909,19 @@ class _UploadPageState extends ConsumerState<UploadPage> {
   }
 
   Future<void> _openTitleAssist() async {
+    if (_aiBusy) return;
+    // Shrinking the frames takes a moment on first use — show the chip's
+    // spinner meanwhile so the tap doesn't look like it did nothing.
+    setState(() {
+      _aiBusy = true;
+      _aiBusyField = 'title';
+    });
+    await _ensureGroundingImages();
+    if (!mounted) return;
+    setState(() {
+      _aiBusy = false;
+      _aiBusyField = null;
+    });
     final picked = await showAITitleAssistSheet(
       context,
       initialDescription: _descriptionController.text.trim(),
@@ -857,97 +934,101 @@ class _UploadPageState extends ConsumerState<UploadPage> {
 
   Future<void> _generateDescription() async {
     if (_aiBusy) return;
-    setState(() => _aiBusy = true);
+    setState(() {
+      _aiBusy = true;
+      _aiBusyField = 'description';
+    });
     try {
+      await _ensureGroundingImages();
       final text = await ref
           .read(aiAssistServiceProvider)
           .suggestDescription(_aiContext());
       if (!mounted) return;
-      setState(() {
-        _descriptionController.text = text;
-        _aiBusy = false;
-      });
+      setState(() => _descriptionController.text = text);
     } on AIAssistException catch (e) {
-      if (!mounted) return;
-      setState(() => _aiBusy = false);
-      _showSnack(e.message);
+      if (mounted) _showSnack(e.message);
+    } catch (_) {
+      if (mounted) {
+        _showSnack("Couldn't write a description right now. Please try again.");
+      }
+    } finally {
+      // Always released — if this stayed stuck, every AI button on the
+      // screen went dead until the page was reopened.
+      if (mounted) {
+        setState(() {
+          _aiBusy = false;
+          _aiBusyField = null;
+        });
+      }
     }
   }
 
   Future<void> _generateTags() async {
     if (_aiBusy) return;
-    setState(() => _aiBusy = true);
+    setState(() {
+      _aiBusy = true;
+      _aiBusyField = 'tags';
+    });
     try {
+      await _ensureGroundingImages();
       final tags = await ref
           .read(aiAssistServiceProvider)
           .suggestTags(_aiContext());
       if (!mounted) return;
-      // Routed through _addTag rather than assigned straight into _tags so
-      // the AI's output goes through exactly the same dedup, '#'-stripping
-      // and 15-tag limit as anything typed by hand. Deliberately NOT wrapped
-      // in an outer setState — _addTag calls setState itself, and nesting
-      // the two is a mistake even where Flutter tolerates it.
+      // Routed through _addTag so the AI's output goes through the same
+      // dedup, '#'-stripping and 15-tag limit as anything typed by hand.
       for (final t in tags) {
         _addTag(t);
       }
-      setState(() => _aiBusy = false);
     } on AIAssistException catch (e) {
-      if (!mounted) return;
-      setState(() => _aiBusy = false);
-      _showSnack(e.message);
+      if (mounted) _showSnack(e.message);
+    } catch (_) {
+      if (mounted) _showSnack("Couldn't suggest tags right now. Please try again.");
+    } finally {
+      if (mounted) {
+        setState(() {
+          _aiBusy = false;
+          _aiBusyField = null;
+        });
+      }
     }
   }
 
-  /// Asks the AI thumbnail endpoint (POST /api/ai-thumbnail, same one the
-  /// website's "Generate AI Thumbnail" button calls) for a brand-new cover
-  /// image built from the title and category, then downloads it into a
-  /// local temp file and treats it exactly like a manually-picked
-  /// thumbnail — every later step (compressImageToThumbnailDataUrl, the
-  /// upload payload) only ever looks at _thumbnailFile's path, so nothing
-  /// else needs to know the image came from AI instead of the gallery.
+  /// Asks POST /api/ai-thumbnail (same route as the website's button) for a
+  /// brand-new image built from the title, description and category, with
+  /// the real frames attached so the server can fall back to picking the
+  /// best actual frame if generation fails. The result joins the candidate
+  /// grid below the thumbnail box — the creator taps it to use it.
   Future<void> _generateAIThumbnail() async {
-    if (_aiBusy) return;
+    if (_aiThumbnailBusy) return;
     final title = _titleController.text.trim();
     if (title.isEmpty) {
       _showSnack('Add a title first — the AI thumbnail is built from it.');
       return;
     }
-    setState(() => _aiBusy = true);
+    setState(() => _aiThumbnailBusy = true);
     try {
+      final frames = await _ensureGroundingImages();
       final result = await ref.read(aiAssistServiceProvider).pickThumbnail(
         title: title,
         category: _category,
         contentType: _contentType,
+        description: _descriptionController.text.trim(),
+        frameUrls: frames,
         generateNew: true,
       );
-      final response = await Dio().get<List<int>>(
-        result.thumbnailUrl,
-        options: Options(responseType: ResponseType.bytes),
-      );
-      final bytes = response.data;
-      if (bytes == null || bytes.isEmpty) {
-        throw const AIAssistException('The AI thumbnail came back empty.');
-      }
-      final dir = await getTemporaryDirectory();
-      final filePath =
-          '${dir.path}/ai_thumbnail_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      await File(filePath).writeAsBytes(bytes);
+      final filePath = await _saveAiImage(result.thumbnailUrl, 'ai_thumbnail');
       if (!mounted) return;
-      // Added as one more candidate to tap, same as a locally-captured
-      // frame — never auto-applied as the thumbnail. See the grid in
-      // _buildDetails().
-      setState(() {
-        _localFrameCandidates.insert(0, XFile(filePath));
-        _aiBusy = false;
-      });
+      setState(() => _localFrameCandidates.insert(0, XFile(filePath)));
+      _showSnack('AI thumbnail ready — tap it below to use it.');
     } on AIAssistException catch (e) {
-      if (!mounted) return;
-      setState(() => _aiBusy = false);
-      _showSnack(e.message);
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _aiBusy = false);
-      _showSnack("Couldn't generate an AI thumbnail. Please try again.");
+      if (mounted) _showSnack(e.message);
+    } catch (_) {
+      if (mounted) {
+        _showSnack("Couldn't generate an AI thumbnail. Please try again.");
+      }
+    } finally {
+      if (mounted) setState(() => _aiThumbnailBusy = false);
     }
   }
 
@@ -1261,7 +1342,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
             children: [
               _label('Thumbnail / Cover Image'),
               const Spacer(),
-              _aiChip('AI thumbnail', _generateAIThumbnail),
+              _aiChip('AI thumbnail', _generateAIThumbnail, field: 'thumbnail'),
             ],
           ),
           Padding(
@@ -1834,7 +1915,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
           children: [
             _label('Title'),
             const Spacer(),
-            _aiChip('AI title', _openTitleAssist),
+            _aiChip('AI title', _openTitleAssist, field: 'title'),
           ],
         ),
         TextField(
@@ -1852,7 +1933,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
           children: [
             _label('Description'),
             const Spacer(),
-            _aiChip('AI write', _generateDescription),
+            _aiChip('AI write', _generateDescription, field: 'description'),
           ],
         ),
         TextField(
@@ -1935,7 +2016,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
           children: [
             _label('Tags'),
             const Spacer(),
-            _aiChip('AI tags', _generateTags),
+            _aiChip('AI tags', _generateTags, field: 'tags'),
           ],
         ),
         TextField(
@@ -2615,29 +2696,32 @@ class _UploadPageState extends ConsumerState<UploadPage> {
   /// label. Deliberately a quiet outlined chip rather than a filled button:
   /// these are optional helpers, and on the website they sit beside the
   /// field rather than competing with the primary Publish action.
-  Widget _aiChip(String text, VoidCallback onTap) {
+  Widget _aiChip(String text, VoidCallback onTap, {required String field}) {
+    final isThumbnail = field == 'thumbnail';
+    final busy = isThumbnail ? _aiThumbnailBusy : (_aiBusy && _aiBusyField == field);
+    final disabled = isThumbnail ? _aiThumbnailBusy : _aiBusy;
     return Padding(
       padding: const EdgeInsets.only(top: 14, bottom: 6),
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
-        onTap: _aiBusy ? null : onTap,
+        onTap: disabled ? null : onTap,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
             color: AppColors.brandOrange.withValues(
-              alpha: _aiBusy ? 0.05 : 0.12,
+              alpha: disabled ? 0.05 : 0.12,
             ),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: AppColors.brandOrange.withValues(
-                alpha: _aiBusy ? 0.15 : 0.35,
+                alpha: disabled ? 0.15 : 0.35,
               ),
             ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _aiBusy
+              busy
                   ? const SizedBox(
                       width: 12,
                       height: 12,
@@ -2656,7 +2740,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                 text,
                 style: TextStyle(
                   color: AppColors.brandOrangeLight.withValues(
-                    alpha: _aiBusy ? 0.5 : 1.0,
+                    alpha: disabled ? 0.5 : 1.0,
                   ),
                   fontSize: 11,
                   fontWeight: FontWeight.w800,

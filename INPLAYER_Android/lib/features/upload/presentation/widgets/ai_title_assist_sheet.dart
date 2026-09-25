@@ -61,8 +61,11 @@ class _AITitleAssistSheetState extends ConsumerState<_AITitleAssistSheet> {
   }
 
   Future<void> _generate() async {
+    // The typed description is optional now: the upload page attaches real
+    // frames (or cover art) to the context, so the model has something to go
+    // on even when this box is empty. Typing still makes titles sharper.
     final text = _ctrl.text.trim();
-    if (text.isEmpty || _generating) return;
+    if (_generating) return;
 
     setState(() {
       _generating = true;
@@ -82,6 +85,12 @@ class _AITitleAssistSheetState extends ConsumerState<_AITitleAssistSheet> {
       if (!mounted) return;
       setState(() {
         _error = e.message;
+        _generating = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = "Couldn't generate titles right now. Please try again.";
         _generating = false;
       });
     }
@@ -170,8 +179,8 @@ class _AITitleAssistSheetState extends ConsumerState<_AITitleAssistSheet> {
                 style: TextStyle(color: context.textPrimary, fontSize: 14),
                 decoration: InputDecoration(
                   hintText:
-                      'e.g. A 3-minute tutorial showing how to fix a leaking '
-                      'kitchen tap with basic tools',
+                      'Optional — e.g. A 3-minute tutorial showing how to fix '
+                      'a leaking kitchen tap with basic tools',
                   hintStyle: TextStyle(
                     color: context.textSecondary.withValues(alpha: 0.7),
                     fontSize: 13,
@@ -200,7 +209,7 @@ class _AITitleAssistSheetState extends ConsumerState<_AITitleAssistSheet> {
                 width: double.infinity,
                 child: ElevatedButton.icon(
                   onPressed:
-                      _generating || _ctrl.text.trim().isEmpty ? null : _generate,
+                      _generating ? null : _generate,
                   icon: _generating
                       ? const SizedBox(
                           width: 16,

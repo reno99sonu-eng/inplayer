@@ -2,7 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import sharp from "sharp";
 import { THUMBNAIL_ASPECT_RATIO, CONTENT_TYPE_WORD, normalizeContentType } from "@/app/lib/contentTypes";
 
-const VISION_MODELS = ["gpt-4o-mini", "gpt-4o"];
+export const maxDuration = 120;
+
+const VISION_MODELS = ["gpt-4.1-mini", "gpt-4o-mini", "gpt-4o"];
+// OpenAI retired dall-e-2/dall-e-3 — requests for them now fail with "The
+// model ... does not exist", which is why every "AI thumbnail"/"AI cover"
+// tap errored out. The gpt-image family returns base64 (b64_json) rather
+// than a URL, and takes its own size/quality values.
+const IMAGE_MODELS = ["gpt-image-1.5", "gpt-image-1-mini", "gpt-image-1"];
 const MAX_FRAMES = 5;
 const PER_CALL_TIMEOUT_MS = 45_000;
 
@@ -55,7 +62,7 @@ async function renderCroppedDataUrl(source: string, aspectRatio: number): Promis
 
 export async function POST(request: NextRequest) {
   try {
-    const { frameUrls, title, category, prompt, generateNew, contentType: rawContentType } = await request.json();
+    const { frameUrls, title, description, category, prompt, generateNew, contentType: rawContentType } = await request.json();
     const contentType = normalizeContentType(rawContentType);
     const aspectRatio = THUMBNAIL_ASPECT_RATIO[contentType];
 
@@ -72,90 +79,86 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // MODE A: Try DALL-E Image Generation if requested
+    // MODE A: generate a brand-new image with OpenAI's gpt-image models.
     if (generateNew || (prompt && typeof prompt === "string" && !frameUrls?.length)) {
       if (openAiKey) {
-        const cleanTitle = (title || prompt || "Vibrant thumbnail").trim();
-        const ratioWord = contentType === "short" ? "9:16 vertical" : contentType === "music" ? "1:1 square" : "16:9";
-        const imagePrompt = `High quality, cinematic, vibrant ${CONTENT_TYPE_WORD[contentType]} thumbnail for "${cleanTitle}". Category: ${category || "General"}. Professional studio lighting, ultra detailed, eye-catching composition, ${ratioWord} ratio, with the main subject centered so it survives a center-crop to that ratio.`;
+        const cleanTitle = String(title || prompt || "Untitled").trim().slice(0, 200);
+        const cleanDescription = typeof description === "string" ? description.trim().slice(0, 400) : "";
+        const shape =
+          contentType === "short"
+            ? "tall vertical 9:16 composition"
+            : contentType === "music"
+              ? "square 1:1 album-cover composition"
+              : "wide 16:9 landscape composition";
+        const subject =
+          contentType === "music"
+            ? `album / single cover art for a song titled "${cleanTitle}"`
+            : `a ${CONTENT_TYPE_WORD[contentType]} thumbnail for "${cleanTitle}"`;
+        const imagePrompt =
+          `Create ${subject}. Category: ${category || "General"}.` +
+          (cleanDescription ? ` What it's about: ${cleanDescription}.` : "") +
+          ` Eye-catching, high-contrast, professional lighting, one clear focal subject, ${shape}, ` +
+          `main subject centered so it survives a centre-crop. No text, no letters, no logos, no watermarks.`;
 
-        const candidateImageModels = ["dall-e-3", "dall-e-2"];
-        let lastDallEError = "AI Image Generation model access is restricted on your API key.";
+        const size = contentType === "short" ? "1024x1536" : contentType === "music" ? "1024x1024" : "1536x1024";
+        const errors: string[] = [];
 
-        for (const model of candidateImageModels) {
+        for (const model of IMAGE_MODELS) {
+          const controller = new AbortController();
+          // low quality: ~12s instead of ~45s at medium, and the result is shrunk
+          // to 640px anyway, so the extra detail would never be visible.
+          const timer = setTimeout(() => controller.abort(), 45_000);
           try {
-            console.log(`Trying DALL-E model (${model}) with prompt:`, imagePrompt);
-
-            // dall-e-3 supports a couple of non-square sizes; dall-e-2 is
-            // square-only. Either way, renderCroppedDataUrl below performs
-            // the exact final crop, so this just picks the closest source
-            // to minimize how much gets thrown away.
-            const size =
-              model === "dall-e-3"
-                ? contentType === "short"
-                  ? "1024x1792"
-                  : contentType === "video"
-                  ? "1792x1024"
-                  : "1024x1024"
-                : "1024x1024";
-
-            const payload: Record<string, unknown> = {
-              model,
-              prompt: imagePrompt,
-              n: 1,
-              size,
-            };
-            if (model === "dall-e-3") {
-              payload.quality = "standard";
-            }
-
-            const dallEResponse = await fetch("https://api.openai.com/v1/images/generations", {
+            const imageResponse = await fetch("https://api.openai.com/v1/images/generations", {
               method: "POST",
               headers: {
                 "Content-Type": "application/json",
                 Authorization: `Bearer ${openAiKey}`,
               },
-              body: JSON.stringify(payload),
+              body: JSON.stringify({ model, prompt: imagePrompt, n: 1, size, quality: "low" }),
+              signal: controller.signal,
             });
+            const imageData = await imageResponse.json().catch(() => null);
 
-            const dallEData = await dallEResponse.json();
-
-            if (dallEResponse.ok) {
-              const generatedUrl = dallEData?.data?.[0]?.url;
-              if (generatedUrl) {
-                try {
-                  const croppedDataUrl = await renderCroppedDataUrl(generatedUrl, aspectRatio);
-                  return NextResponse.json({
-                    thumbnailUrl: croppedDataUrl,
-                    generated: true,
-                    reason: `Custom AI thumbnail generated using ${model.toUpperCase()}.`,
-                  });
-                } catch (cropErr) {
-                  console.error(`Failed to crop DALL-E output (${model}):`, cropErr);
-                  lastDallEError = "Generated image couldn't be processed.";
-                  continue;
-                }
-              }
-            } else {
-              console.error(`DALL-E generation failed (${model}):`, dallEData);
-              lastDallEError = dallEData?.error?.message || `${model} access restricted.`;
+            if (!imageResponse.ok) {
+              const message = imageData?.error?.message || `HTTP ${imageResponse.status}`;
+              console.error(`AI image generation failed (${model}):`, message);
+              errors.push(`${model}: ${message}`);
               continue;
             }
+
+            const b64 = imageData?.data?.[0]?.b64_json;
+            const url = imageData?.data?.[0]?.url;
+            const source = typeof b64 === "string" && b64 ? `data:image/png;base64,${b64}` : typeof url === "string" ? url : null;
+            if (!source) {
+              errors.push(`${model}: empty response`);
+              continue;
+            }
+
+            const croppedDataUrl = await renderCroppedDataUrl(source, aspectRatio);
+            return NextResponse.json({
+              thumbnailUrl: croppedDataUrl,
+              generated: true,
+              reason: `AI image generated with ${model}.`,
+            });
           } catch (genErr) {
-            console.error(`DALL-E thumbnail exception (${model}):`, genErr);
-            continue;
+            console.error(`AI image generation exception (${model}):`, genErr);
+            errors.push(`${model}: ${genErr instanceof Error ? genErr.message : String(genErr)}`);
+          } finally {
+            clearTimeout(timer);
           }
         }
 
-        // If DALL-E models fail, and candidate video frames exist, fallback seamlessly to Frame Selection
-        if (Array.isArray(frameUrls) && frameUrls.length > 0) {
-          console.log("DALL-E unavailable — falling back to video frame selection.");
-        } else {
+        // Generation failed on every model — if we have real frames from the
+        // video, fall through and let the vision model pick the best one
+        // instead of failing outright.
+        if (!Array.isArray(frameUrls) || frameUrls.length === 0) {
+          // Provider messages stay in the server log only — they can echo a
+          // masked piece of the API key or billing details.
+          console.error("AI thumbnail: every image model failed:", errors.join(" | "));
           return NextResponse.json(
-            {
-              error: `AI Image Generator error: ${lastDallEError}`,
-            },
-            { status: 400 }
+            { error: "Couldn't generate an AI image right now. Please try again in a moment." },
+            { status: 502 }
           );
         }
       }

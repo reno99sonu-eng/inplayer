@@ -311,6 +311,7 @@ export default function MusicUploadTools({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: trimmedTitle,
+          description: description.trim(),
           category: "Music",
           contentType: "music",
           generateNew: true,

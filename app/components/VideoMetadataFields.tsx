@@ -83,6 +83,38 @@ interface VideoMetadataFieldsProps {
   onOpenAITitleAssist?: () => void;
   aiError?: string | null;
   aiSuggestions?: string[];
+  // Optional — only the upload page passes these, so the edit/live forms
+  // that reuse this component don't grow buttons they have no handler for.
+  onGenerateAIDescription?: () => void;
+  onGenerateAITags?: () => void;
+  /** Which AI field is currently generating, for its spinner. */
+  aiBusyField?: "title" | "description" | "tags" | null;
+  aiDescriptionError?: string | null;
+  aiTagsError?: string | null;
+}
+
+function AIFieldButton({
+  label,
+  busy,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  busy: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="inline-flex items-center gap-1 rounded-lg bg-orange-500/15 px-2.5 py-1 text-[11px] font-bold text-orange-400 transition hover:bg-orange-500 hover:text-white disabled:opacity-50"
+    >
+      {busy ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+      {busy ? "Generating..." : label}
+    </button>
+  );
 }
 
 function ToggleRow({
@@ -136,6 +168,11 @@ export default function VideoMetadataFields({
   onOpenAITitleAssist,
   aiError = null,
   aiSuggestions = [],
+  onGenerateAIDescription,
+  onGenerateAITags,
+  aiBusyField = null,
+  aiDescriptionError = null,
+  aiTagsError = null,
 }: VideoMetadataFieldsProps) {
   const thumbInputRef = useRef<HTMLInputElement>(null);
   const muxFrames = thumbnail?.muxFrames ?? [];
@@ -207,9 +244,20 @@ export default function VideoMetadataFields({
 
           {/* Description Field */}
           <div>
-            <label className="mb-1 block text-xs font-bold text-slate-300 light:text-slate-700">
-              Description
-            </label>
+            <div className="mb-1 flex items-center justify-between">
+              <label className="block text-xs font-bold text-slate-300 light:text-slate-700">
+                Description
+              </label>
+              {onGenerateAIDescription && (
+                <AIFieldButton
+                  label="✨ AI Write"
+                  busy={aiBusyField === "description"}
+                  disabled={aiGenerating}
+                  onClick={onGenerateAIDescription}
+                />
+              )}
+            </div>
+            {aiDescriptionError && <p className="mb-1 text-xs text-red-400">{aiDescriptionError}</p>}
             <textarea
               rows={2}
               value={value.description}
@@ -257,7 +305,7 @@ export default function VideoMetadataFields({
               {muxFrames && muxFrames.length > 0 && (
                 <div>
                   <p className="mb-1.5 text-[11px] font-semibold text-slate-400 light:text-slate-600">
-                    🎬 Pick from Video Frames
+                    🎬 Pick a thumbnail
                   </p>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                     {muxFrames.map((frameUrl, idx) => {
@@ -436,9 +484,20 @@ export default function VideoMetadataFields({
 
           {/* Tags */}
           <div>
-            <label className="mb-1 block text-xs font-bold text-slate-300 light:text-slate-700">
-              Tags <span className="text-slate-500">(up to 15)</span>
-            </label>
+            <div className="mb-1 flex items-center justify-between">
+              <label className="block text-xs font-bold text-slate-300 light:text-slate-700">
+                Tags <span className="text-slate-500">(up to 15)</span>
+              </label>
+              {onGenerateAITags && (
+                <AIFieldButton
+                  label="✨ AI Tags"
+                  busy={aiBusyField === "tags"}
+                  disabled={aiGenerating}
+                  onClick={onGenerateAITags}
+                />
+              )}
+            </div>
+            {aiTagsError && <p className="mb-1 text-xs text-red-400">{aiTagsError}</p>}
             <div className="flex flex-wrap gap-1 rounded-xl border border-white/10 bg-[#060D18] p-1.5 light:border-black/10 light:bg-white">
               {value.tags.map((t) => (
                 <span

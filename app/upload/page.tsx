@@ -73,6 +73,9 @@ export default function UploadPage() {
 
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
   const [localVideoFrames, setLocalVideoFrames] = useState<string[]>([]);
+  // Only the frames actually extracted from the picked file — what the AI
+  // text buttons are shown so they describe the real upload.
+  const [groundingFrames, setGroundingFrames] = useState<string[]>([]);
   const [thumbnailBusy, setThumbnailBusy] = useState(false);
   const [thumbnailError, setThumbnailError] = useState<string | null>(null);
   const [aiGenerating, setAiGenerating] = useState(false);
@@ -211,6 +214,9 @@ export default function UploadPage() {
 
     setError(null);
     setFile(selected);
+    setLocalVideoFrames([]);
+    setGroundingFrames([]);
+    setThumbnailPreview(null);
 
     const nameWithoutExt = selected.name.replace(/\.[^/.]+$/, "");
     setTitle(nameWithoutExt);
@@ -256,6 +262,7 @@ export default function UploadPage() {
         // the AI thumbnail result below. Nothing here silently picks for
         // them.
         setLocalVideoFrames(frames);
+        setGroundingFrames(frames);
       }
     } catch (err) {
       console.error("Failed to extract video frame thumbnails:", err);
@@ -274,10 +281,11 @@ export default function UploadPage() {
         body: JSON.stringify({
           prompt: title || description || "Video thumbnail",
           title,
+          description,
           category,
           contentType,
           generateNew: true,
-          frameUrls: localVideoFrames,
+          frameUrls: groundingFrames,
         }),
       });
       const data = await res.json();
@@ -329,6 +337,10 @@ export default function UploadPage() {
             contentType,
             userDescription,
           }),
+          images:
+            contentType === "music"
+              ? musicSettings.covers.slice(0, 2)
+              : groundingFrames.slice(0, 3),
         }),
       });
 
@@ -341,6 +353,26 @@ export default function UploadPage() {
       if (type === "title") {
         const suggestions = parseAITitleSuggestions(data.text);
         setAiSuggestions(suggestions);
+      } else if (type === "description") {
+        const text = String(data.text || "").trim();
+        if (!text) throw new Error("The AI returned an empty description.");
+        setDescription(text.slice(0, 5000));
+      } else if (type === "tags") {
+        const incoming = String(data.text || "")
+          .split(/[,\n]/)
+          .map((t: string) => t.replace(/#/g, "").trim())
+          .filter(Boolean);
+        setTags((prev) => {
+          const seen = new Set(prev.map((t) => t.toLowerCase()));
+          const merged = [...prev];
+          for (const t of incoming) {
+            if (merged.length >= 15) break;
+            if (seen.has(t.toLowerCase())) continue;
+            seen.add(t.toLowerCase());
+            merged.push(t);
+          }
+          return merged;
+        });
       }
     } catch (err) {
       console.error(err);
@@ -518,6 +550,8 @@ export default function UploadPage() {
     setTags([]);
     setTagInput("");
     setThumbnailPreview(null);
+    setLocalVideoFrames([]);
+    setGroundingFrames([]);
     setThumbnailBusy(false);
     setThumbnailError(null);
     setStage("picking");
@@ -708,6 +742,11 @@ export default function UploadPage() {
               onOpenAITitleAssist={() => setAiTitleAssistOpen(true)}
               aiError={aiType === "title" ? aiError : null}
               aiSuggestions={aiType === "title" ? aiSuggestions : []}
+              onGenerateAIDescription={() => handleGenerateAI("description")}
+              onGenerateAITags={() => handleGenerateAI("tags")}
+              aiBusyField={aiGenerating ? aiType : null}
+              aiDescriptionError={aiType === "description" ? aiError : null}
+              aiTagsError={aiType === "tags" ? aiError : null}
               // Music gets no thumbnail picker here: its artwork is the
               // cover art in MusicUploadTools below, and cover 1 becomes
               // the thumbnail automatically.
@@ -876,6 +915,7 @@ export default function UploadPage() {
         error={aiType === "title" ? aiError : null}
         suggestions={aiType === "title" ? aiSuggestions : []}
         onGenerate={(userDescription) => handleGenerateAI("title", userDescription)}
+        seesFrames={contentType === "music" ? musicSettings.covers.length > 0 : groundingFrames.length > 0}
         onPick={(pickedTitle) => {
           setTitle(pickedTitle);
           setAiTitleAssistOpen(false);

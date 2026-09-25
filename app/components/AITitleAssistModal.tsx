@@ -15,6 +15,11 @@ interface AITitleAssistModalProps {
   suggestions: string[];
   onGenerate: (description: string) => void;
   onPick: (title: string) => void;
+  /** True when the caller attaches real frames (or cover art) to the
+      request, so the typed description becomes optional instead of
+      required — the button used to stay greyed out until something was
+      typed, which read as "the AI button does nothing". */
+  seesFrames?: boolean;
 }
 
 // The AI can't watch the uploaded video — the only signal it ever had
@@ -33,6 +38,7 @@ export default function AITitleAssistModal({
   suggestions,
   onGenerate,
   onPick,
+  seesFrames = false,
 }: AITitleAssistModalProps) {
   const [description, setDescription] = useState(initialDescription);
 
@@ -68,9 +74,9 @@ export default function AITitleAssistModal({
           Generate a title with AI
         </h2>
         <p className="mt-2 text-sm leading-6 text-slate-400 light:text-slate-600">
-          The AI can&apos;t watch your video, so tell it what happens in a
-          sentence or two — the more specific you are, the better the title
-          options.
+          {seesFrames
+            ? "The AI looks at frames from your upload. Add a sentence about what happens for even sharper titles — or leave it blank."
+            : "The AI can't watch your video, so tell it what happens in a sentence or two — the more specific you are, the better the title options."}
         </p>
 
         <textarea
@@ -83,7 +89,7 @@ export default function AITitleAssistModal({
 
         <button
           type="button"
-          disabled={generating || !description.trim()}
+          disabled={generating || (!seesFrames && !description.trim())}
           onClick={() => onGenerate(description)}
           className="mt-3 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-orange-500 via-amber-400 to-yellow-300 py-3 text-sm font-bold text-slate-900 transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
         >

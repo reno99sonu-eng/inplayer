@@ -25,12 +25,19 @@ class AIPromptContext {
   /// but a filename and a category to work from.
   final String? userDescription;
 
+  /// A few real frames from the picked video (or a music track's cover
+  /// art) as small JPEG data URLs. Without these the model only ever sees a
+  /// category and a camera filename, which is why every description and tag
+  /// set came back as the same generic filler regardless of the upload.
+  final List<String> images;
+
   const AIPromptContext({
     required this.title,
     required this.description,
     required this.category,
     required this.contentType,
     this.userDescription,
+    this.images = const [],
   });
 }
 
@@ -186,11 +193,14 @@ class AIAssistService {
 
   /// POST /api/ai-generate — returns the raw `text` the model produced, or
   /// throws [AIAssistException] carrying a message worth showing a person.
-  Future<String> generate(String prompt) async {
+  Future<String> generate(String prompt, {List<String> images = const []}) async {
     try {
       final response = await _dio.post(
         '/api/ai-generate',
-        data: {'prompt': prompt},
+        data: {
+          'prompt': prompt,
+          if (images.isNotEmpty) 'images': images,
+        },
         options: _aiOptions,
       );
 
@@ -225,7 +235,10 @@ class AIAssistService {
 
   /// Five title options for the upload in progress.
   Future<List<String>> suggestTitles(AIPromptContext ctx) async {
-    final raw = await generate(buildPrompt(AIGenerateType.title, ctx));
+    final raw = await generate(
+      buildPrompt(AIGenerateType.title, ctx),
+      images: ctx.images,
+    );
     final suggestions = parseTitleSuggestions(raw);
     if (suggestions.isEmpty) {
       throw const AIAssistException('The AI did not return any usable titles.');
@@ -234,10 +247,13 @@ class AIAssistService {
   }
 
   Future<String> suggestDescription(AIPromptContext ctx) =>
-      generate(buildPrompt(AIGenerateType.description, ctx));
+      generate(buildPrompt(AIGenerateType.description, ctx), images: ctx.images);
 
   Future<List<String>> suggestTags(AIPromptContext ctx) async {
-    final raw = await generate(buildPrompt(AIGenerateType.tags, ctx));
+    final raw = await generate(
+      buildPrompt(AIGenerateType.tags, ctx),
+      images: ctx.images,
+    );
     return parseTags(raw);
   }
 
@@ -256,6 +272,7 @@ class AIAssistService {
     // defaults to 'video', which is why a Raftaar/Short AI thumbnail used
     // to come back landscape-cropped instead of portrait.
     String contentType = 'video',
+    String? description,
     List<String> frameUrls = const [],
     bool generateNew = false,
     String? prompt,
@@ -267,6 +284,7 @@ class AIAssistService {
           'title': title,
           'category': category,
           'contentType': contentType,
+          if (description != null && description.isNotEmpty) 'description': description,
           if (frameUrls.isNotEmpty) 'frameUrls': frameUrls,
           if (generateNew) 'generateNew': true,
           if (prompt != null && prompt.isNotEmpty) 'prompt': prompt,

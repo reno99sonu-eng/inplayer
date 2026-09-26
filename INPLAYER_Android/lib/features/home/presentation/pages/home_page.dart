@@ -29,7 +29,7 @@ import '../../../../models/admin_navbar_theme.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../services/content_access_service.dart';
 import '../../../../services/platform_update_service.dart';
-import '../../../watch/presentation/widgets/video_mini_player_overlay.dart';
+import '../../../../core/router/pageless_route_observer.dart';
 import '../../../../models/short.dart';
 import '../../../../services/video_interaction_service.dart';
 import '../widgets/mobile_menu_drawer.dart';
@@ -173,6 +173,9 @@ class _HomePageState extends ConsumerState<HomePage> {
         extendBody: true,
         backgroundColor: Colors.transparent,
         drawer: const MobileMenuDrawer(),
+        // The app-level floating video window hides while the drawer is open
+        // (it floats above the Navigator, so it would cover the menu rows).
+        onDrawerChanged: (open) => pagelessRouteObserver.drawerOpen.value = open,
         body: PatternBackground(
           child: Stack(
             children: [
@@ -189,7 +192,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                 FloatingAIButton(
                   bottomInset: 88 + (musicLoaded ? _miniPlayerInset : 0.0),
                 ),
-              const VideoMiniPlayerOverlay(),
+              // The floating video window (VideoMiniPlayerOverlay) is mounted
+              // app-wide in main.dart so it survives pages pushed over Home.
               if (platformSettings.announcementEnabled &&
                   platformSettings.announcementText.isNotEmpty &&
                   !_announcementDismissed &&

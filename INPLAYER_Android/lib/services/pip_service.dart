@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/services.dart';
 
 /// Real Android system Picture-in-Picture, via a hand-written platform
@@ -56,18 +58,68 @@ class PipService {
     }
   }
 
-  /// Fires whenever the native Activity actually enters/exits PiP, so the
-  /// app can switch to (or back from) a minimal, chrome-free layout — the
-  /// floating PiP window is far too small for the normal player controls,
-  /// and Android itself overlays its own play/pause/close buttons on top of
-  /// whatever the app renders while floating. Only one listener is active
-  /// at a time (registering a new one replaces the previous), matching how
-  /// this is used — only the currently-visible watch page needs it.
-  static void setPipModeChangedListener(void Function(bool isInPip) onChanged) {
+  // Several watch pages can be alive at once (one pushed over another), so
+  // PiP state is tracked per page instead of in one global slot. The old
+  // single "last one registered wins" handler was never cleared on dispose:
+  // after a stacked watch page was popped, the native "entered PiP" event
+  // went to that dead page, the visible one never switched to its bare-video
+  // layout, and its full player chrome rendered inside the PiP window —
+  // overlapping, and untappable because PiP never delivers touches to app
+  // content. Likewise a page's dispose used to force the auto-PiP flag off
+  // even while the page underneath was still playing.
+  static final List<_PipOwner> _owners = [];
+  static bool _handlerInstalled = false;
+  static bool? _lastSentActive;
+
+  /// Registers a watch page. Only the most recently registered live page
+  /// (the top-most one) is told when the Activity enters/exits PiP, since
+  /// that is the page actually on screen. Pair with [unregister] in dispose.
+  static void register(Object owner, void Function(bool isInPip) onModeChanged) {
+    _installHandler();
+    _owners.removeWhere((o) => identical(o.owner, owner));
+    _owners.add(_PipOwner(owner, onModeChanged));
+  }
+
+  /// Removes a disposed page and re-reports auto-PiP from the pages that
+  /// remain (false when none do, so a closed page never leaves a stale
+  /// "playing" flag that could trigger a phantom PiP later).
+  static void unregister(Object owner) {
+    _owners.removeWhere((o) => identical(o.owner, owner));
+    _pushActive();
+  }
+
+  /// Whether [owner] currently wants Home/app-switch to auto-enter PiP. The
+  /// native flag is the OR across all registered pages.
+  static void setActive(Object owner, bool active) {
+    for (final o in _owners) {
+      if (identical(o.owner, owner)) o.active = active;
+    }
+    _pushActive();
+  }
+
+  static void _pushActive() {
+    final any = _owners.any((o) => o.active);
+    if (any == _lastSentActive) return;
+    _lastSentActive = any;
+    unawaited(setPlaybackActive(any));
+  }
+
+  static void _installHandler() {
+    if (_handlerInstalled) return;
+    _handlerInstalled = true;
     _channel.setMethodCallHandler((call) async {
       if (call.method == 'onPipModeChanged') {
-        onChanged(call.arguments as bool? ?? false);
+        final isInPip = call.arguments as bool? ?? false;
+        if (_owners.isNotEmpty) _owners.last.onModeChanged(isInPip);
       }
     });
   }
+}
+
+class _PipOwner {
+  _PipOwner(this.owner, this.onModeChanged);
+
+  final Object owner;
+  final void Function(bool isInPip) onModeChanged;
+  bool active = false;
 }

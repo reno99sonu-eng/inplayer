@@ -121,6 +121,11 @@ class _WatchPageState extends ConsumerState<WatchPage>
   bool _midrollWasPlaying = false;
   Timer? _midrollTimer;
   VideoPlayerController? _adVideoController;
+  // Pre-warmed ad video controller so a Mux mid-roll doesn't cold-start
+  // (network fetch + HLS init) only at break time. Keyed by the ad's
+  // "mux:" imageUrl so it is only reused for the exact same creative.
+  VideoPlayerController? _preloadedAdController;
+  String? _preloadedAdKey;
 
   // Player chrome: quality (Mux `max_resolution`, capped by the viewer's
   // real Premium tier), and throttled "remember playback position" saves —
@@ -216,6 +221,10 @@ class _WatchPageState extends ConsumerState<WatchPage>
       adCtrl.removeListener(_onAdVideoTick);
       adCtrl.dispose();
     }
+    final preAdCtrl = _preloadedAdController;
+    _preloadedAdController = null;
+    _preloadedAdKey = null;
+    preAdCtrl?.dispose();
     _videoController?.removeListener(_onPlayerTick);
     _videoController?.dispose();
     _commentController.dispose();
@@ -1486,7 +1495,25 @@ class _WatchPageState extends ConsumerState<WatchPage>
               curve: Curves.easeOut,
               builder: (context, opacity, child) =>
                   Opacity(opacity: opacity, child: child),
-              child: VideoPlayer(controller),
+              // VideoPlayer has no intrinsic size — dropped bare into the
+              // filling Stack inside the fixed 16:9 AspectRatio above it
+              // gets scaled non-uniformly, so any clip that isn't exactly
+              // 16:9 looks stretched. Give it its native frame size and let
+              // FittedBox scale that uniformly (crop-to-fill), matching
+              // short_player_widget.dart and video_card.dart.
+              child: FittedBox(
+                fit: BoxFit.cover,
+                clipBehavior: Clip.hardEdge,
+                child: SizedBox(
+                  width: controller.value.size.width > 0
+                      ? controller.value.size.width
+                      : 1280,
+                  height: controller.value.size.height > 0
+                      ? controller.value.size.height
+                      : 720,
+                  child: VideoPlayer(controller),
+                ),
+              ),
             ),
           ),
       ],
@@ -1609,6 +1636,7 @@ class _WatchPageState extends ConsumerState<WatchPage>
           _midrollConfig = config;
           _currentMidrollAd = config.ad ?? (config.ads.isNotEmpty ? config.ads.first : null);
         });
+        _preloadAdVideo(_currentMidrollAd);
         _maybeTriggerPreroll();
       }
     } catch (e) {
@@ -1758,11 +1786,55 @@ class _WatchPageState extends ConsumerState<WatchPage>
     });
   }
 
+  // Pre-warm a Mux ad video so the break doesn't pay the full network +
+  // HLS cold-start cost on the critical path. Fire-and-forget: any failure
+  // just falls back to the on-demand init in _initAdVideoIfNeeded.
+  Future<void> _preloadAdVideo(MidrollAd? ad) async {
+    if (ad == null || !ad.imageUrl.startsWith('mux:')) return;
+    if (_preloadedAdKey == ad.imageUrl && _preloadedAdController != null) return;
+    final prev = _preloadedAdController;
+    _preloadedAdController = null;
+    _preloadedAdKey = null;
+    prev?.dispose();
+    final playbackId = ad.imageUrl.replaceFirst('mux:', '');
+    final streamUrl = 'https://stream.mux.com/$playbackId.m3u8';
+    try {
+      final ctrl = VideoPlayerController.networkUrl(Uri.parse(streamUrl));
+      await ctrl.initialize();
+      if (!mounted) {
+        await ctrl.dispose();
+        return;
+      }
+      _preloadedAdController = ctrl;
+      _preloadedAdKey = ad.imageUrl;
+    } catch (e) {
+      _logger.w('WatchPage: Failed to preload ad video: $e');
+    }
+  }
+
   Future<void> _initAdVideoIfNeeded() async {
     final ad = _currentMidrollAd;
     if (ad == null) return;
 
     if (ad.imageUrl.startsWith('mux:')) {
+      // Reuse a pre-warmed controller for the exact same creative if one is
+      // ready — this is what removes the cold-start stall on mid-roll breaks.
+      if (_preloadedAdKey == ad.imageUrl && _preloadedAdController != null) {
+        final ctrl = _preloadedAdController!;
+        _preloadedAdController = null;
+        _preloadedAdKey = null;
+        if (!mounted || !_midrollBreakActive) {
+          await ctrl.dispose();
+          return;
+        }
+        _adVideoController = ctrl;
+        await ctrl.setVolume(1.0);
+        ctrl.addListener(_onAdVideoTick);
+        await ctrl.play();
+        _adStateRevision.value++;
+        if (mounted) setState(() {});
+        return;
+      }
       final playbackId = ad.imageUrl.replaceFirst('mux:', '');
       final streamUrl = 'https://stream.mux.com/$playbackId.m3u8';
       try {

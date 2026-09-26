@@ -604,10 +604,41 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal>
     }
   }
 
+  /// Fully releases the camera hardware — stops any live image stream and
+  /// AWAITS the controller's own dispose(), so the platform camera session
+  /// is actually closed before this returns rather than left for
+  /// State.dispose() to close unawaited after the modal has already popped.
+  /// The startup gate pops straight into the home feed, whose video decoder
+  /// spins up immediately (see main.dart._runStartupAgeScan); a camera
+  /// session still held open contends with that decoder and is what makes
+  /// the first video slow to load after the scan. Idempotent: the reference
+  /// is cleared so the dispose() call in State.dispose() becomes a no-op,
+  /// and CameraController.dispose() itself guards against a double dispose.
+  Future<void> _releaseCamera() async {
+    final controller = _cameraController;
+    _cameraController = null;
+    if (controller == null) return;
+    try {
+      if (controller.value.isStreamingImages) {
+        await controller.stopImageStream();
+      }
+    } catch (_) {}
+    try {
+      await controller.dispose();
+    } catch (_) {}
+  }
+
   Future<void> _onScanComplete(FaceScanResult result) async {
     _startupTimeout?.cancel();
     HapticFeedback.heavyImpact();
     await Future.delayed(const Duration(milliseconds: 600));
+    if (!mounted) return;
+
+    // Release the camera hardware BEFORE popping, and await it, so the home
+    // feed's video decoder starts against a free camera device instead of
+    // racing an image-stream session that State.dispose() would otherwise
+    // tear down unawaited a beat later.
+    await _releaseCamera();
     if (!mounted) return;
 
     Navigator.of(context, rootNavigator: true).pop(result);
@@ -626,11 +657,11 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal>
   }
 
   Future<void> _finishStartupFallback() async {
-    try {
-      if (_cameraController?.value.isStreamingImages == true) {
-        await _cameraController!.stopImageStream();
-      }
-    } catch (_) {}
+    // Same rationale as _onScanComplete: fully release the camera (stream +
+    // controller.dispose()) and await it before popping, so the video
+    // decoder that starts right after the pop isn't contending with a still
+    // open camera session.
+    await _releaseCamera();
     if (mounted) Navigator.of(context, rootNavigator: true).pop();
   }
 

@@ -101,6 +101,13 @@ class _FullscreenPlayerPageState extends State<FullscreenPlayerPage> {
   // bidirectional rotation trigger.
   StreamSubscription<NativeDeviceOrientation>? _orientationSub;
   bool _exiting = false;
+  // Rotate-to-exit must be a genuine "rotate back" gesture and must never
+  // fire on entry. When fullscreen is opened by TAPPING the button while the
+  // phone is physically upright, the raw sensor stream reports portraitUp
+  // immediately (on subscribe / on the first tick), which would otherwise pop
+  // straight back out to portrait. So only arm the portrait->exit trigger
+  // after we've actually observed a physical landscape reading first.
+  bool _seenLandscape = false;
 
   @override
   void initState() {
@@ -117,6 +124,15 @@ class _FullscreenPlayerPageState extends State<FullscreenPlayerPage> {
 
   void _handlePhysicalOrientationChanged(NativeDeviceOrientation orientation) {
     if (!mounted) return;
+    // Arm the exit trigger only once the phone has physically been in
+    // landscape. Until then, ignore portrait readings so tapping the
+    // fullscreen button while upright doesn't immediately bounce back out.
+    if (orientation == NativeDeviceOrientation.landscapeLeft ||
+        orientation == NativeDeviceOrientation.landscapeRight) {
+      _seenLandscape = true;
+      return;
+    }
+    if (!_seenLandscape) return;
     if (orientation == NativeDeviceOrientation.portraitUp ||
         orientation == NativeDeviceOrientation.portraitDown) {
       _exit();

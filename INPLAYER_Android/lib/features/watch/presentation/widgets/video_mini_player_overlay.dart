@@ -141,204 +141,212 @@ class _VideoMiniPlayerOverlayState
     // max() guards the portrait window on a short screen, where the window
     // can be taller than the space between the two clamps — without it the
     // lower bound would fall below the upper one and clamp() throws.
-    final topMax =
-        (screenSize.height - height - 24.0).clamp(40.0, double.infinity);
+    final topMax = (screenSize.height - height - 24.0).clamp(
+      40.0,
+      double.infinity,
+    );
     final top = raw.dy.clamp(40.0, topMax);
 
     return Positioned(
       left: left,
       top: top,
-      child: GestureDetector(
-        // Drag anywhere on the window to reposition it.
-        onPanUpdate: (details) {
-          setState(
-            () => _dragOffset = (_dragOffset ?? defaultOffset) + details.delta,
-          );
-        },
-        child: Container(
-          width: width,
-          height: height,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.5),
-                blurRadius: 24,
-                offset: const Offset(0, 10),
+      child: Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.5),
+              blurRadius: 24,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: MediaQuery.withNoTextScaling(
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: GestureDetector(
+                  // Drag anywhere on the background surface to reposition the
+                  // window. Living here — a sibling of the corner and centre
+                  // buttons, not their ancestor — keeps the pan recognizer
+                  // out of the buttons' gesture arena, so a fingertip's tiny
+                  // movement on a button can no longer let the drag win and
+                  // swallow the tap.
+                  onPanUpdate: (details) {
+                    setState(
+                      () => _dragOffset =
+                          (_dragOffset ?? defaultOffset) + details.delta,
+                    );
+                  },
+                  onTap: () => _restore(context, service),
+                  behavior: HitTestBehavior.opaque,
+                  child: _buildSurface(service),
+                ),
               ),
-            ],
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: MediaQuery.withNoTextScaling(
-            child: Stack(
-              children: [
-                Positioned.fill(
-                  child: GestureDetector(
-                    onTap: () => _restore(context, service),
-                    behavior: HitTestBehavior.opaque,
-                    child: _buildSurface(service),
-                  ),
-                ),
 
-                // Scrims so the controls stay legible over any frame.
-                const Positioned(
-                  top: 0,
-                  left: 0,
-                  right: 0,
-                  height: 44,
-                  child: IgnorePointer(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [Colors.black54, Colors.transparent],
-                        ),
+              // Scrims so the controls stay legible over any frame.
+              const Positioned(
+                top: 0,
+                left: 0,
+                right: 0,
+                height: 44,
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [Colors.black54, Colors.transparent],
                       ),
                     ),
                   ),
                 ),
-                const Positioned(
-                  bottom: 0,
-                  left: 0,
-                  right: 0,
-                  height: 48,
-                  child: IgnorePointer(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.bottomCenter,
-                          end: Alignment.topCenter,
-                          colors: [Colors.black87, Colors.transparent],
-                        ),
+              ),
+              const Positioned(
+                bottom: 0,
+                left: 0,
+                right: 0,
+                height: 48,
+                child: IgnorePointer(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.bottomCenter,
+                        end: Alignment.topCenter,
+                        colors: [Colors.black87, Colors.transparent],
                       ),
                     ),
                   ),
                 ),
+              ),
 
-                // Expand back to the full player — top-left.
-                Positioned(
-                  top: 6,
-                  left: 6,
-                  child: _cornerButton(
-                    icon: Icons.open_in_full_rounded,
-                    tooltip: 'Expand',
-                    size: 28,
-                    iconSize: 15,
-                    onTap: () => _restore(context, service),
-                  ),
+              // Expand back to the full player — top-left.
+              Positioned(
+                top: 6,
+                left: 6,
+                child: _cornerButton(
+                  icon: Icons.open_in_full_rounded,
+                  tooltip: 'Expand',
+                  size: 28,
+                  iconSize: 15,
+                  onTap: () => _restore(context, service),
                 ),
+              ),
 
-                // Close — top-right.
-                Positioned(
-                  top: 6,
-                  right: 6,
-                  child: _cornerButton(
-                    icon: Icons.close_rounded,
-                    tooltip: 'Close',
-                    size: 28,
-                    iconSize: 16,
-                    onTap: () =>
-                        ref.read(videoMiniPlayerServiceProvider).close(),
-                  ),
+              // Close — top-right.
+              Positioned(
+                top: 6,
+                right: 6,
+                child: _cornerButton(
+                  icon: Icons.close_rounded,
+                  tooltip: 'Close',
+                  size: 28,
+                  iconSize: 16,
+                  onTap: () => ref.read(videoMiniPlayerServiceProvider).close(),
                 ),
+              ),
 
-                // Centre play/pause. Sized neatly (36x36) so it NEVER overlaps
-                // with top corner buttons or bottom title bar in any aspect ratio.
-                Center(
-                  child: AnimatedBuilder(
-                    animation: controller,
-                    builder: (context, _) {
-                      final playing = controller.value.isPlaying;
-                      return GestureDetector(
-                        onTap: () => ref
-                            .read(videoMiniPlayerServiceProvider)
-                            .togglePlayPause(),
-                        behavior: HitTestBehavior.opaque,
-                        child: Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.65),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.35),
-                              width: 1.2,
+              // Centre play/pause. Sized neatly (36x36) so it NEVER overlaps
+              // with top corner buttons or bottom title bar in any aspect ratio.
+              Center(
+                child: AnimatedBuilder(
+                  animation: controller,
+                  builder: (context, _) {
+                    final playing = controller.value.isPlaying;
+                    return GestureDetector(
+                      onTap: () => ref
+                          .read(videoMiniPlayerServiceProvider)
+                          .togglePlayPause(),
+                      behavior: HitTestBehavior.opaque,
+                      child: Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.65),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.35),
+                            width: 1.2,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.4),
+                              blurRadius: 8,
                             ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.4),
-                                blurRadius: 8,
-                              ),
-                            ],
-                          ),
-                          child: Icon(
-                            playing
-                                ? Icons.pause_rounded
-                                : Icons.play_arrow_rounded,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-
-                // Title + progress along the bottom.
-                Positioned(
-                  left: 10,
-                  right: 10,
-                  bottom: 6,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: [
-                      Text(
-                        service.title,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 10.5,
-                          fontWeight: FontWeight.w700,
-                          height: 1.2,
-                          shadows: [
-                            Shadow(color: Colors.black, blurRadius: 4),
-                            Shadow(color: Colors.black, blurRadius: 8),
                           ],
                         ),
+                        child: Icon(
+                          playing
+                              ? Icons.pause_rounded
+                              : Icons.play_arrow_rounded,
+                          color: Colors.white,
+                          size: 20,
+                        ),
                       ),
-                      const SizedBox(height: 4),
-                      AnimatedBuilder(
-                        animation: controller,
-                        builder: (context, _) {
-                          final value = controller.value;
-                          final total = value.duration.inMilliseconds;
-                          final progress = total > 0
-                              ? (value.position.inMilliseconds / total)
-                                  .clamp(0.0, 1.0)
-                              : 0.0;
-                          return ClipRRect(
-                            borderRadius: BorderRadius.circular(2),
-                            child: LinearProgressIndicator(
-                              value: progress,
-                              minHeight: 2.5,
-                              backgroundColor:
-                                  Colors.white.withValues(alpha: 0.25),
-                              valueColor: const AlwaysStoppedAnimation<Color>(
-                                Colors.white,
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
+                    );
+                  },
                 ),
-              ],
-            ),
+              ),
+
+              // Title + progress along the bottom.
+              Positioned(
+                left: 10,
+                right: 10,
+                bottom: 6,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      service.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w700,
+                        height: 1.2,
+                        shadows: [
+                          Shadow(color: Colors.black, blurRadius: 4),
+                          Shadow(color: Colors.black, blurRadius: 8),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    AnimatedBuilder(
+                      animation: controller,
+                      builder: (context, _) {
+                        final value = controller.value;
+                        final total = value.duration.inMilliseconds;
+                        final progress = total > 0
+                            ? (value.position.inMilliseconds / total).clamp(
+                                0.0,
+                                1.0,
+                              )
+                            : 0.0;
+                        return ClipRRect(
+                          borderRadius: BorderRadius.circular(2),
+                          child: LinearProgressIndicator(
+                            value: progress,
+                            minHeight: 2.5,
+                            backgroundColor: Colors.white.withValues(
+                              alpha: 0.25,
+                            ),
+                            valueColor: const AlwaysStoppedAnimation<Color>(
+                              Colors.white,
+                            ),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
       ),

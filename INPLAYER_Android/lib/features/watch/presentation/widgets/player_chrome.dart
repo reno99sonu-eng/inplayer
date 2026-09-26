@@ -145,6 +145,12 @@ class _PlayerChromeState extends State<PlayerChrome> {
   bool _controlsVisible = true;
   Timer? _hideControlsTimer;
 
+  // Tracks the controller's isPlaying across ticks so we can detect the
+  // paused/buffering -> playing transition and arm the auto-hide timer then.
+  // (initState runs while the video is still buffering, so scheduling the
+  // hide there is a no-op; without this the controls never fade on their own.)
+  bool _wasPlaying = false;
+
   double _brightness = 1.0;
   double _playbackSpeed = 1.0;
 
@@ -187,7 +193,17 @@ class _PlayerChromeState extends State<PlayerChrome> {
   }
 
   void _onControllerTick() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    final isPlaying = widget.controller.value.isPlaying;
+    // Playback just started (e.g. after the initial buffering that was still
+    // in progress when initState ran). Arm the auto-hide timer now, on the
+    // rising edge only -- calling it every tick would perpetually reset the
+    // 4s timer and the controls would never hide.
+    if (isPlaying && !_wasPlaying && _controlsVisible) {
+      _scheduleAutoHide();
+    }
+    _wasPlaying = isPlaying;
+    setState(() {});
   }
 
   void _scheduleAutoHide() {

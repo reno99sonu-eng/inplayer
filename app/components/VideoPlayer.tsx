@@ -1531,29 +1531,6 @@ export default function VideoPlayer({
           no soundtrack attached. */}
       <audio ref={backgroundAudioRef} className="hidden" />
 
-      {/* Hidden mid-roll preloader — warms up the NEXT ad break's Mux
-          stream (manifest + first segments) for the whole inter-break
-          interval, rather than the visible ad player below cold-starting
-          an HLS session at the exact moment playback pauses for it. Same
-          playbackId, so the real player mounted below reuses whatever the
-          browser already buffered for this URL. preload="auto" without
-          autoPlay: it fetches without ever decoding/rendering a frame, so
-          nothing is audible or visible. Skipped for data:/image creatives —
-          those load fast enough already that preloading buys nothing. */}
-      {midrollConfig?.enabled &&
-        !midrollBreakActive &&
-        midrollAd?.imageUrl.startsWith("mux:") && (
-          <div className="absolute h-0 w-0 overflow-hidden opacity-0" aria-hidden="true">
-            <MuxPlayer
-              playbackId={midrollAd.imageUrl.replace("mux:", "")}
-              preload="auto"
-              muted
-              playsInline
-              style={{ width: "1px", height: "1px" } as MuxCSSProperties}
-            />
-          </div>
-        )}
-
       {/* Mid-roll ad break — a real interruption, not a stub: the
           underlying player is genuinely paused (see
           handleMidrollTimeUpdate) while this is shown. z-40 so it sits

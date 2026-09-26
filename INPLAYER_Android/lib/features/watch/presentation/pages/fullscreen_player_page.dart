@@ -102,16 +102,6 @@ class _FullscreenPlayerPageState extends State<FullscreenPlayerPage> {
   StreamSubscription<NativeDeviceOrientation>? _orientationSub;
   bool _exiting = false;
 
-  // Fullscreen can also be entered by tapping PlayerChrome's button while
-  // still physically holding the phone upright — the sensor never reports
-  // landscape at all for that viewer. Without this guard, the very first
-  // reading after this page locks the rendered orientation to landscape
-  // (still genuinely portraitUp/Down, since the phone itself never moved)
-  // fired _exit() almost the instant fullscreen opened. Requiring an actual
-  // physical landscape reading FIRST makes the sensor-driven exit strictly
-  // a "rotate back" gesture, matching how the viewer got in.
-  bool _wasPhysicallyLandscape = false;
-
   @override
   void initState() {
     super.initState();
@@ -127,12 +117,6 @@ class _FullscreenPlayerPageState extends State<FullscreenPlayerPage> {
 
   void _handlePhysicalOrientationChanged(NativeDeviceOrientation orientation) {
     if (!mounted) return;
-    if (orientation == NativeDeviceOrientation.landscapeLeft ||
-        orientation == NativeDeviceOrientation.landscapeRight) {
-      _wasPhysicallyLandscape = true;
-      return;
-    }
-    if (!_wasPhysicallyLandscape) return;
     if (orientation == NativeDeviceOrientation.portraitUp ||
         orientation == NativeDeviceOrientation.portraitDown) {
       _exit();

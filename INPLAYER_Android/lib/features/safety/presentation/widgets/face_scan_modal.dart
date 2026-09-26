@@ -608,29 +608,8 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal>
     _startupTimeout?.cancel();
     HapticFeedback.heavyImpact();
     await Future.delayed(const Duration(milliseconds: 600));
-
-    // Tear the camera down BEFORE popping, not after. Popping resolves the
-    // caller's `await FaceScanModal.show(...)` almost immediately — well
-    // before this route's own exit transition finishes, which is when
-    // State.dispose() (and its unawaited _cameraController?.dispose())
-    // would otherwise run. On the startup path, that caller proceeds
-    // straight into loading the home feed's videos, so a camera hardware
-    // session still mid-teardown at that exact moment visibly contends with
-    // the video decoder for the same underlying resources — the first
-    // videos take noticeably longer to appear. Awaiting the full release
-    // here first removes that race.
-    final controller = _cameraController;
-    _cameraController = null;
-    if (controller != null) {
-      try {
-        if (controller.value.isStreamingImages) {
-          await controller.stopImageStream();
-        }
-        await controller.dispose();
-      } catch (_) {}
-    }
-
     if (!mounted) return;
+
     Navigator.of(context, rootNavigator: true).pop(result);
   }
 
@@ -647,16 +626,10 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal>
   }
 
   Future<void> _finishStartupFallback() async {
-    // Same reasoning as _onScanComplete: release the camera hardware fully
-    // before popping, since this path also leads straight into the home
-    // feed's video loading on the startup gate.
-    final controller = _cameraController;
-    _cameraController = null;
     try {
-      if (controller?.value.isStreamingImages == true) {
-        await controller!.stopImageStream();
+      if (_cameraController?.value.isStreamingImages == true) {
+        await _cameraController!.stopImageStream();
       }
-      await controller?.dispose();
     } catch (_) {}
     if (mounted) Navigator.of(context, rootNavigator: true).pop();
   }

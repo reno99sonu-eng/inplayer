@@ -42,6 +42,7 @@ export default function AdminTeamPage() {
   const [invitations, setInvitations] = useState<InvitationRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [tableMissing, setTableMissing] = useState(false);
 
   const [email, setEmail] = useState("");
   const [selected, setSelected] = useState<Set<TeamPermission>>(new Set());
@@ -62,6 +63,7 @@ export default function AdminTeamPage() {
       const invitesData = await invitesRes.json();
       setMembers(membersData.members || []);
       setInvitations(invitesData.invitations || []);
+      setTableMissing(Boolean(membersData.tableMissing || invitesData.tableMissing));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
@@ -213,6 +215,17 @@ export default function AdminTeamPage() {
         </button>
         {inviteMessage && <p className="text-xs text-slate-300 light:text-slate-700">{inviteMessage}</p>}
       </div>
+
+      {tableMissing && (
+        <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-xs leading-5 text-amber-300 light:text-amber-700">
+          The admin team tables haven&apos;t been created in AWS yet — create two DynamoDB tables:{" "}
+          <code className="rounded bg-black/20 px-1">InPlayer-Admin-Members</code> (partition key{" "}
+          <code className="rounded bg-black/20 px-1">userId</code>, String) and{" "}
+          <code className="rounded bg-black/20 px-1">InPlayer-Admin-Invitations</code> (partition key{" "}
+          <code className="rounded bg-black/20 px-1">invitationId</code>, String). Once both exist, this page
+          works automatically — no code change needed.
+        </div>
+      )}
 
       {error && <p className="text-sm text-red-400">{error}</p>}
 

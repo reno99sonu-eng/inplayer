@@ -33,12 +33,20 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const { invitation, token } = await createInvitation({
-    email,
-    permissions,
-    inviterUserId: admin.userId,
-    inviterEmail: admin.email,
-  });
+  let invitation, token;
+  try {
+    ({ invitation, token } = await createInvitation({
+      email,
+      permissions,
+      inviterUserId: admin.userId,
+      inviterEmail: admin.email,
+    }));
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Couldn't create that invitation." },
+      { status: 500 }
+    );
+  }
 
   const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://inplayer.app";
   // Deliberately NOT under /admin/* — that whole segment is gated by

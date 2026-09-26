@@ -60,7 +60,14 @@ export async function createInvitation(input: {
     acceptedUserId: null,
   };
 
-  await docClient.send(new PutCommand({ TableName: ADMIN_INVITATIONS_TABLE, Item: invitation }));
+  try {
+    await docClient.send(new PutCommand({ TableName: ADMIN_INVITATIONS_TABLE, Item: invitation }));
+  } catch (err) {
+    console.error("createInvitation: write failed (table may not exist yet):", err);
+    throw new Error(
+      `${ADMIN_INVITATIONS_TABLE} hasn't been created in AWS yet — create a DynamoDB table with that name (partition key "invitationId", String) before sending invitations.`
+    );
+  }
   return { invitation, token };
 }
 
@@ -72,11 +79,18 @@ export async function getInvitation(invitationId: string): Promise<AdminInvitati
   return (result?.Item as AdminInvitation | undefined) || null;
 }
 
-export async function listInvitations(): Promise<AdminInvitation[]> {
-  const result = await docClient.send(new ScanCommand({ TableName: ADMIN_INVITATIONS_TABLE }));
-  return ((result.Items || []) as AdminInvitation[]).sort(
-    (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-  );
+// Same tableMissing convention as app/lib/errorLogs.ts.
+export async function listInvitations(): Promise<{ invitations: AdminInvitation[]; tableMissing: boolean }> {
+  try {
+    const result = await docClient.send(new ScanCommand({ TableName: ADMIN_INVITATIONS_TABLE }));
+    const invitations = ((result.Items || []) as AdminInvitation[]).sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+    );
+    return { invitations, tableMissing: false };
+  } catch (err) {
+    console.error("listInvitations: scan failed (table may not exist yet):", err);
+    return { invitations: [], tableMissing: true };
+  }
 }
 
 export type InvitationValidationError =

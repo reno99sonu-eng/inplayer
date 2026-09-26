@@ -42,14 +42,24 @@ export async function getTeamMember(userId: string): Promise<AdminMember | null>
   return (result?.Item as AdminMember | undefined) || null;
 }
 
-export async function listTeamMembers(): Promise<AdminMember[]> {
-  // A small, operator-managed table (a handful of team members at most) —
-  // a single bounded Scan is fine, same tradeoff already used elsewhere in
-  // this codebase (see app/api/admin/users/route.ts).
-  const result = await docClient.send(new ScanCommand({ TableName: ADMIN_MEMBERS_TABLE }));
-  return ((result.Items || []) as AdminMember[]).sort(
-    (a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime()
-  );
+// Same tableMissing convention as everywhere else in this codebase (see
+// app/lib/errorLogs.ts) — Reno creates this table by hand in AWS; until
+// then the Team page shows an amber banner with the exact name/key to use
+// instead of a raw crash.
+export async function listTeamMembers(): Promise<{ members: AdminMember[]; tableMissing: boolean }> {
+  try {
+    // A small, operator-managed table (a handful of team members at most) —
+    // a single bounded Scan is fine, same tradeoff already used elsewhere in
+    // this codebase (see app/api/admin/users/route.ts).
+    const result = await docClient.send(new ScanCommand({ TableName: ADMIN_MEMBERS_TABLE }));
+    const members = ((result.Items || []) as AdminMember[]).sort(
+      (a, b) => new Date(b.addedAt).getTime() - new Date(a.addedAt).getTime()
+    );
+    return { members, tableMissing: false };
+  } catch (err) {
+    console.error("listTeamMembers: scan failed (table may not exist yet):", err);
+    return { members: [], tableMissing: true };
+  }
 }
 
 export async function addTeamMember(input: {
@@ -74,7 +84,14 @@ export async function addTeamMember(input: {
     revokedAt: null,
     revokedByUserId: null,
   };
-  await docClient.send(new PutCommand({ TableName: ADMIN_MEMBERS_TABLE, Item: member }));
+  try {
+    await docClient.send(new PutCommand({ TableName: ADMIN_MEMBERS_TABLE, Item: member }));
+  } catch (err) {
+    console.error("addTeamMember: write failed (table may not exist yet):", err);
+    throw new Error(
+      `${ADMIN_MEMBERS_TABLE} hasn't been created in AWS yet — ask the main admin to create it (partition key "userId", String) before invitations can be accepted.`
+    );
+  }
   return member;
 }
 
@@ -83,17 +100,22 @@ export async function addTeamMember(input: {
  *  disappearing. A revoked member's userId can be re-invited later, which
  *  simply overwrites this row via addTeamMember on acceptance. */
 export async function revokeTeamMember(userId: string, revokedByUserId: string): Promise<void> {
-  await docClient.send(
-    new UpdateCommand({
-      TableName: ADMIN_MEMBERS_TABLE,
-      Key: { userId },
-      UpdateExpression: "SET #status = :revoked, revokedAt = :now, revokedByUserId = :by",
-      ExpressionAttributeNames: { "#status": "status" },
-      ExpressionAttributeValues: {
-        ":revoked": "revoked",
-        ":now": new Date().toISOString(),
-        ":by": revokedByUserId,
-      },
-    })
-  );
+  try {
+    await docClient.send(
+      new UpdateCommand({
+        TableName: ADMIN_MEMBERS_TABLE,
+        Key: { userId },
+        UpdateExpression: "SET #status = :revoked, revokedAt = :now, revokedByUserId = :by",
+        ExpressionAttributeNames: { "#status": "status" },
+        ExpressionAttributeValues: {
+          ":revoked": "revoked",
+          ":now": new Date().toISOString(),
+          ":by": revokedByUserId,
+        },
+      })
+    );
+  } catch (err) {
+    console.error("revokeTeamMember: update failed (table may not exist yet):", err);
+    throw new Error(`${ADMIN_MEMBERS_TABLE} hasn't been created in AWS yet.`);
+  }
 }

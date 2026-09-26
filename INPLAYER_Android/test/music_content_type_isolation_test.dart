@@ -9,6 +9,14 @@ import 'package:inplayer_android/models/video.dart';
 // Video.isStrictMusic and its call sites in music_page.dart,
 // music_player_service.dart, genre_page.dart, liked_music_page.dart,
 // watch_page.dart).
+//
+// Video.isMusic itself used to also flip true from category == "Music"
+// (the exact leak this file guards against) — fixed independently at the
+// field-computation level in Video.fromJson (isMusicTrack no longer
+// checks rawCategory at all, only contentType/isMusic-flag aliases), so
+// isMusic is now strict on this axis too. isStrictMusic remains the
+// narrower, single-source-of-truth check (contentType == "music" only,
+// no aliases) and is what every music-only surface should keep using.
 void main() {
   group('Video.isStrictMusic', () {
     test('is true only for contentType == "music"', () {

@@ -1395,7 +1395,20 @@ class _WatchPageState extends ConsumerState<WatchPage>
               curve: Curves.easeOut,
               builder: (context, opacity, child) =>
                   Opacity(opacity: opacity, child: child),
-              child: VideoPlayer(controller),
+              // VideoPlayer has no `fit` of its own — bare inside
+              // Positioned.fill it stretches non-uniformly to whatever box
+              // it's handed. Sizing it to the video's own native pixels and
+              // letting FittedBox cover-scale that box crops instead of
+              // distorting, matching the thumbnail's BoxFit.cover above so
+              // there's no visible jump when playback starts.
+              child: FittedBox(
+                fit: BoxFit.cover,
+                child: SizedBox(
+                  width: controller.value.size.width,
+                  height: controller.value.size.height,
+                  child: VideoPlayer(controller),
+                ),
+              ),
             ),
           ),
       ],

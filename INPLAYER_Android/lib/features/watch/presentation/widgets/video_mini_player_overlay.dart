@@ -144,175 +144,193 @@ class _VideoMiniPlayerOverlayState
     return Positioned(
       left: left,
       top: top,
-      child: GestureDetector(
-        // Drag anywhere on the window to reposition it.
-        onPanUpdate: (details) {
-          setState(
-            () => _dragOffset = (_dragOffset ?? defaultOffset) + details.delta,
-          );
-        },
-        child: Container(
-          width: width,
-          height: height,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.5),
-                blurRadius: 24,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Stack(
-            children: [
-              Positioned.fill(child: _buildSurface(service)),
-
-              // Scrims so the controls stay legible over any frame.
-              const Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                height: 46,
-                child: IgnorePointer(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [Colors.black54, Colors.transparent],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                height: 52,
-                child: IgnorePointer(
-                  child: DecoratedBox(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.bottomCenter,
-                        end: Alignment.topCenter,
-                        colors: [Colors.black87, Colors.transparent],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-              // Expand back to the full player — top-left.
-              Positioned(
-                top: 5,
-                left: 5,
-                child: _cornerButton(
-                  icon: Icons.open_in_full_rounded,
-                  tooltip: 'Expand',
-                  onTap: () => _restore(context, service),
-                ),
-              ),
-
-              // Close — top-right.
-              Positioned(
-                top: 5,
-                right: 5,
-                child: _cornerButton(
-                  icon: Icons.close_rounded,
-                  tooltip: 'Close',
-                  onTap: () =>
-                      ref.read(videoMiniPlayerServiceProvider).close(),
-                ),
-              ),
-
-              // Centre play/pause. Rebuilt off the controller itself so the
-              // icon stays truthful when playback ends, stalls, or loops.
-              Center(
-                child: AnimatedBuilder(
-                  animation: controller,
-                  builder: (context, _) {
-                    final playing = controller.value.isPlaying;
-                    return GestureDetector(
-                      onTap: () => ref
-                          .read(videoMiniPlayerServiceProvider)
-                          .togglePlayPause(),
-                      behavior: HitTestBehavior.opaque,
-                      child: Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha: 0.5),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: Colors.white.withValues(alpha: 0.25),
-                          ),
-                        ),
-                        child: Icon(
-                          playing
-                              ? Icons.pause_rounded
-                              : Icons.play_arrow_rounded,
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-
-              // Title + progress along the bottom.
-              Positioned(
-                left: 8,
-                right: 8,
-                bottom: 6,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+      child: Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.5),
+              blurRadius: 24,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.antiAlias,
+        child: Stack(
+          children: [
+            // Draggable region: just the surface + its scrims, deliberately
+            // NOT wrapping the buttons below. A GestureDetector that wraps
+            // the whole window is an ANCESTOR of every button's own tap
+            // recognizer, so every tap — even one dead-centre on a button —
+            // entered the same gesture arena as this pan recognizer. A real
+            // fingertip's unavoidable sub-pixel drift (never happens with a
+            // precise mouse click) could then resolve that arena in favour
+            // of the drag, eating the tap. Scoping the pan detector to a
+            // sibling branch the buttons aren't descendants of removes it
+            // from their arena entirely — dragging the background still
+            // repositions the window exactly as before.
+            Positioned.fill(
+              child: GestureDetector(
+                onPanUpdate: (details) {
+                  setState(
+                    () => _dragOffset =
+                        (_dragOffset ?? defaultOffset) + details.delta,
+                  );
+                },
+                child: Stack(
+                  fit: StackFit.expand,
                   children: [
-                    Text(
-                      service.title,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w700,
-                        shadows: [Shadow(color: Colors.black, blurRadius: 4)],
-                      ),
-                    ),
-                    const SizedBox(height: 5),
-                    AnimatedBuilder(
-                      animation: controller,
-                      builder: (context, _) {
-                        final value = controller.value;
-                        final total = value.duration.inMilliseconds;
-                        final progress = total > 0
-                            ? (value.position.inMilliseconds / total)
-                                .clamp(0.0, 1.0)
-                            : 0.0;
-                        return ClipRRect(
-                          borderRadius: BorderRadius.circular(2),
-                          child: LinearProgressIndicator(
-                            value: progress,
-                            minHeight: 3,
-                            backgroundColor:
-                                Colors.white.withValues(alpha: 0.25),
-                            valueColor: const AlwaysStoppedAnimation<Color>(
-                              Colors.white,
+                    _buildSurface(service),
+
+                    // Scrims so the controls stay legible over any frame.
+                    const Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      height: 46,
+                      child: IgnorePointer(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.topCenter,
+                              end: Alignment.bottomCenter,
+                              colors: [Colors.black54, Colors.transparent],
                             ),
                           ),
-                        );
-                      },
+                        ),
+                      ),
+                    ),
+                    const Positioned(
+                      bottom: 0,
+                      left: 0,
+                      right: 0,
+                      height: 52,
+                      child: IgnorePointer(
+                        child: DecoratedBox(
+                          decoration: BoxDecoration(
+                            gradient: LinearGradient(
+                              begin: Alignment.bottomCenter,
+                              end: Alignment.topCenter,
+                              colors: [Colors.black87, Colors.transparent],
+                            ),
+                          ),
+                        ),
+                      ),
                     ),
                   ],
                 ),
               ),
-            ],
-          ),
+            ),
+
+            // Expand back to the full player — top-left.
+            Positioned(
+              top: 5,
+              left: 5,
+              child: _cornerButton(
+                icon: Icons.open_in_full_rounded,
+                tooltip: 'Expand',
+                onTap: () => _restore(context, service),
+              ),
+            ),
+
+            // Close — top-right.
+            Positioned(
+              top: 5,
+              right: 5,
+              child: _cornerButton(
+                icon: Icons.close_rounded,
+                tooltip: 'Close',
+                onTap: () => ref.read(videoMiniPlayerServiceProvider).close(),
+              ),
+            ),
+
+            // Centre play/pause. Rebuilt off the controller itself so the
+            // icon stays truthful when playback ends, stalls, or loops.
+            Center(
+              child: AnimatedBuilder(
+                animation: controller,
+                builder: (context, _) {
+                  final playing = controller.value.isPlaying;
+                  return GestureDetector(
+                    onTap: () => ref
+                        .read(videoMiniPlayerServiceProvider)
+                        .togglePlayPause(),
+                    behavior: HitTestBehavior.opaque,
+                    child: Container(
+                      width: 42,
+                      height: 42,
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.5),
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.25),
+                        ),
+                      ),
+                      child: Icon(
+                        playing
+                            ? Icons.pause_rounded
+                            : Icons.play_arrow_rounded,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+
+            // Title + progress along the bottom.
+            Positioned(
+              left: 8,
+              right: 8,
+              bottom: 6,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  Text(
+                    service.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
+                      shadows: [Shadow(color: Colors.black, blurRadius: 4)],
+                    ),
+                  ),
+                  const SizedBox(height: 5),
+                  AnimatedBuilder(
+                    animation: controller,
+                    builder: (context, _) {
+                      final value = controller.value;
+                      final total = value.duration.inMilliseconds;
+                      final progress = total > 0
+                          ? (value.position.inMilliseconds / total).clamp(
+                              0.0,
+                              1.0,
+                            )
+                          : 0.0;
+                      return ClipRRect(
+                        borderRadius: BorderRadius.circular(2),
+                        child: LinearProgressIndicator(
+                          value: progress,
+                          minHeight: 3,
+                          backgroundColor: Colors.white.withValues(alpha: 0.25),
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                            Colors.white,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
       ),
     );

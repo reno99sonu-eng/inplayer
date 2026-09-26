@@ -144,6 +144,7 @@ class _PlayerChromeState extends State<PlayerChrome> {
 
   bool _controlsVisible = true;
   Timer? _hideControlsTimer;
+  bool _wasPlaying = false;
 
   double _brightness = 1.0;
   double _playbackSpeed = 1.0;
@@ -187,7 +188,18 @@ class _PlayerChromeState extends State<PlayerChrome> {
   }
 
   void _onControllerTick() {
-    if (mounted) setState(() {});
+    if (!mounted) return;
+    // initState's _scheduleAutoHide() only sees isPlaying at that exact
+    // instant, which is usually still false (video still buffering). Once
+    // playback actually starts, nothing else re-armed the timer, so the
+    // controls stuck around forever until the viewer tapped. Re-arm on every
+    // paused/stopped -> playing transition, not just at mount.
+    final isPlaying = widget.controller.value.isPlaying;
+    if (isPlaying && !_wasPlaying) {
+      _scheduleAutoHide();
+    }
+    _wasPlaying = isPlaying;
+    setState(() {});
   }
 
   void _scheduleAutoHide() {

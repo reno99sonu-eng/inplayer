@@ -348,12 +348,8 @@ export default function VideoPlayer({
 
     if (!shouldTrigger) return;
 
-    // Rotate creative if multiple house ads exist
-    if (midrollAdsPool.length > 1) {
-      const nextIndex = midrollBreaksShownRef.current.size % midrollAdsPool.length;
-      setMidrollAd(midrollAdsPool[nextIndex]);
-    }
-
+    // Creative rotation happens in skipMidroll (as each break ENDS), not
+    // here — see the hidden preloader note there for why.
     midrollBreaksShownRef.current.add(triggerKey);
     midrollWasPlayingRef.current = !player.paused;
     player.pause();
@@ -400,6 +396,17 @@ export default function VideoPlayer({
     setMidrollBreakActive(false);
     const player = playerRef.current;
     if (player && midrollWasPlayingRef.current) player.play();
+
+    // Rotate to whatever plays at the NEXT break now, right as this one
+    // ends, rather than waiting for that break to actually trigger. That
+    // gives the hidden preloader below the full inter-break interval to
+    // warm up the upcoming creative's manifest/first segments, instead of
+    // the visible ad player cold-starting an HLS stream at the exact moment
+    // playback pauses for it — which is what made mid-roll ads feel slow.
+    if (midrollAdsPool.length > 1) {
+      const nextIndex = midrollBreaksShownRef.current.size % midrollAdsPool.length;
+      setMidrollAd(midrollAdsPool[nextIndex]);
+    }
   };
   // --- End mid-roll ad breaks ---------------------------------------------
 
@@ -1372,6 +1379,29 @@ export default function VideoPlayer({
           controls-less; entirely silent (paused, no src) when the video has
           no soundtrack attached. */}
       <audio ref={backgroundAudioRef} className="hidden" />
+
+      {/* Hidden mid-roll preloader — warms up the NEXT ad break's Mux
+          stream (manifest + first segments) for the whole inter-break
+          interval, rather than the visible ad player below cold-starting
+          an HLS session at the exact moment playback pauses for it. Same
+          playbackId, so the real player mounted below reuses whatever the
+          browser already buffered for this URL. preload="auto" without
+          autoPlay: it fetches without ever decoding/rendering a frame, so
+          nothing is audible or visible. Skipped for data:/image creatives —
+          those load fast enough already that preloading buys nothing. */}
+      {midrollConfig?.enabled &&
+        !midrollBreakActive &&
+        midrollAd?.imageUrl.startsWith("mux:") && (
+          <div className="absolute h-0 w-0 overflow-hidden opacity-0" aria-hidden="true">
+            <MuxPlayer
+              playbackId={midrollAd.imageUrl.replace("mux:", "")}
+              preload="auto"
+              muted
+              playsInline
+              style={{ width: "1px", height: "1px" } as MuxCSSProperties}
+            />
+          </div>
+        )}
 
       {/* Mid-roll ad break — a real interruption, not a stub: the
           underlying player is genuinely paused (see

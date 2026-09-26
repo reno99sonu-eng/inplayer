@@ -1,13 +1,16 @@
-// Server-side AI helper for caption translation using OpenAI / Groq
+// Server-side AI helper for caption translation using OpenAI. Luna first
+// (this runs per caption line, per language, per video — high volume and
+// mechanical enough that the fast/cheap tier is the right default), Sol as
+// the fallback if Luna is unavailable.
 const CANDIDATE_MODELS = [
-  "gpt-4o-mini",
-  "gpt-4o",
+  "gpt-6-luna",
+  "gpt-6-sol",
 ];
 
 const PER_CALL_TIMEOUT_MS = 60_000;
 
 async function aiGenerateText(userPrompt: string, systemPrompt?: string): Promise<string | null> {
-  const apiKey = process.env.OPENAI_API_KEY || process.env.GROQ_API_KEY;
+  const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return null;
 
   const messages: Array<{ role: string; content: string }> = [];
@@ -20,19 +23,16 @@ async function aiGenerateText(userPrompt: string, systemPrompt?: string): Promis
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), PER_CALL_TIMEOUT_MS);
     try {
-      const endpoint = process.env.OPENAI_API_KEY
-        ? "https://api.openai.com/v1/chat/completions"
-        : "https://api.groq.com/openai/v1/chat/completions";
-
-      const response = await fetch(endpoint, {
+      const response = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
           Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify({
-          model: process.env.OPENAI_API_KEY ? model : "llama-3.3-70b-versatile",
+          model,
           temperature: 0.3,
+          reasoning_effort: "none",
           messages,
         }),
         signal: controller.signal,
@@ -81,7 +81,23 @@ export async function translateVtt(
   targetLanguageName: string,
   targetLangCode?: string
 ): Promise<string | null> {
-  // Primary option: If Google Translate API key is configured, use Google Cloud Translation NMT
+  // Primary option for Indian Languages: Bhashini MeitY NMT Pipeline
+  if (
+    targetLangCode &&
+    (process.env.BHASHINI_INFERENCE_KEY || process.env.BHASHINI_API_KEY) &&
+    process.env.BHASHINI_USER_ID
+  ) {
+    try {
+      const bhashiniResult = await translateVttWithBhashini(vtt, targetLangCode);
+      if (bhashiniResult && bhashiniResult.startsWith("WEBVTT")) {
+        return bhashiniResult;
+      }
+    } catch (err) {
+      console.warn("[Translate] Bhashini Translate fallback:", err instanceof Error ? err.message : err);
+    }
+  }
+
+  // Secondary option: Google Cloud Translation NMT
   if (targetLangCode && (process.env.GOOGLE_TRANSLATE_API_KEY || process.env.NEXT_PUBLIC_MAPS_API_KEY)) {
     try {
       const googleResult = await translateVttWithGoogle(vtt, targetLangCode);
@@ -89,23 +105,11 @@ export async function translateVtt(
         return googleResult;
       }
     } catch (err) {
-      console.error("Google Translate failed — falling back to next provider:", err);
+      console.warn("[Translate] Google Translate fallback:", err instanceof Error ? err.message : err);
     }
   }
 
-  // Secondary option: Bhashini API for Indian languages
-  if (targetLangCode && (process.env.BHASHINI_API_KEY && process.env.BHASHINI_USER_ID)) {
-    try {
-      const bhashiniResult = await translateVttWithBhashini(vtt, targetLangCode);
-      if (bhashiniResult && bhashiniResult.startsWith("WEBVTT")) {
-        return bhashiniResult;
-      }
-    } catch (err) {
-      console.error("Bhashini Translate failed — falling back to OpenAI/Groq:", err);
-    }
-  }
-
-  // Fallback option: High-grade OpenAI / Groq LLM Localization Engine
+  // Fallback option: High-grade OpenAI LLM Localization Engine
   const systemPrompt = `You are an expert native translator and localization specialist for Indian regional languages (Tamil, Telugu, Marathi, Gujarati, Kannada, Malayalam, Punjabi, Odia, Hindi, Bengali).
 Your mission is to translate video subtitles into natural, accurate, and contextually rich ${targetLanguageName}.
 

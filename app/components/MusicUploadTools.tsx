@@ -18,6 +18,7 @@ import {
   Crosshair,
   RotateCcw,
   Star,
+  Sparkles,
 } from "lucide-react";
 import {
   COVER_INTERVAL_DEFAULT,
@@ -140,6 +141,7 @@ export default function MusicUploadTools({
   // ── Cover art ────────────────────────────────────────────────────────
   const [entries, setEntries] = useState<CoverEntry[]>([]);
   const [coverBusy, setCoverBusy] = useState(false);
+  const [aiCoverBusy, setAiCoverBusy] = useState(false);
   const [coverError, setCoverError] = useState<string | null>(null);
   const coverInputRef = useRef<HTMLInputElement>(null);
 
@@ -275,6 +277,76 @@ export default function MusicUploadTools({
     } finally {
       setCoverBusy(false);
       if (coverInputRef.current) coverInputRef.current.value = "";
+    }
+  };
+
+  // AI-generated cover art — same 1:1 crop the manual picker (and every
+  // other music surface) expects, from the same /api/ai-thumbnail route
+  // the video/Short "AI thumbnail" button already uses. The generated
+  // image still has to go through /api/music/cover like any other cover
+  // (covers are real S3 URLs, not data: URLs — see MusicSettings.covers),
+  // so this reuses that exact upload step rather than inventing a second
+  // one.
+  const handleAiCover = async () => {
+    if (aiCoverBusy || coverBusy) return;
+    if (entries.length >= MAX_COVERS) return;
+    const trimmedTitle = title.trim();
+    if (!trimmedTitle) {
+      setCoverError("Add a title first — the AI cover is built from it.");
+      return;
+    }
+
+    setCoverError(null);
+    setAiCoverBusy(true);
+    try {
+      const session = await fetchAuthSession();
+      const idToken = session.tokens?.idToken?.toString();
+      if (!idToken) {
+        setCoverError("Your session expired. Please sign in again.");
+        return;
+      }
+
+      const res = await fetch("/api/ai-thumbnail", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: trimmedTitle,
+          description: description.trim(),
+          category: "Music",
+          contentType: "music",
+          generateNew: true,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || typeof data?.thumbnailUrl !== "string") {
+        throw new Error(data?.error || "Couldn't generate an AI cover right now.");
+      }
+
+      const generated = await fetch(data.thumbnailUrl);
+      const blob = await generated.blob();
+
+      const form = new FormData();
+      form.append("file", new File([blob], "ai-cover.jpg", { type: "image/jpeg" }));
+      const uploadRes = await fetch("/api/music/cover", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${idToken}` },
+        body: form,
+      });
+      const uploadData = await uploadRes.json().catch(() => ({}));
+      if (!uploadRes.ok) {
+        throw new Error(uploadData.error || "Couldn't upload the AI cover. Please try again.");
+      }
+
+      const poster = await compressImageToThumbnail(
+        new File([blob], "ai-cover.jpg", { type: "image/jpeg" }),
+        THUMBNAIL_ASPECT_RATIO.music
+      );
+      pushCovers([...entries, { url: uploadData.url as string, poster }]);
+    } catch (err) {
+      console.error("AI cover generation failed:", err);
+      setCoverError(err instanceof Error ? err.message : "Couldn't generate an AI cover.");
+    } finally {
+      setAiCoverBusy(false);
     }
   };
 
@@ -541,6 +613,18 @@ export default function MusicUploadTools({
             >
               {coverBusy ? <Loader2 size={18} className="animate-spin" /> : <ImagePlus size={18} />}
               <span className="text-[10px] font-bold">{coverBusy ? "Uploading" : "Add"}</span>
+            </button>
+          )}
+
+          {entries.length < MAX_COVERS && (
+            <button
+              type="button"
+              onClick={() => void handleAiCover()}
+              disabled={aiCoverBusy || coverBusy}
+              className="flex aspect-square flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-orange-400/30 bg-orange-500/[0.03] text-orange-300 transition hover:border-orange-400/60 hover:text-orange-200 disabled:opacity-50"
+            >
+              {aiCoverBusy ? <Loader2 size={18} className="animate-spin" /> : <Sparkles size={18} />}
+              <span className="text-[10px] font-bold">{aiCoverBusy ? "Generating" : "AI Cover"}</span>
             </button>
           )}
         </div>

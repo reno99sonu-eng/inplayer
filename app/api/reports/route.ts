@@ -108,6 +108,8 @@ export async function POST(request: NextRequest) {
           reason,
           details: (details || "").toString().trim().slice(0, 1000),
           status: "open",
+          priority: reason === "child_safety" ? "urgent" : "normal",
+          isChildSafety: reason === "child_safety",
           createdAt: new Date().toISOString(),
         },
       })

@@ -1,17 +1,19 @@
 import 'dart:ui';
 
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:just_audio/just_audio.dart' show LoopMode;
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/image_utils.dart';
 import '../../../../core/utils/music_track_utils.dart';
 import '../../../../core/utils/share_utils.dart';
 import '../../../../core/widgets/user_avatar.dart';
 import '../../../../models/video.dart';
+import '../../../../services/ad_service.dart';
 import '../../../../services/download_manager.dart';
 import '../../../../services/download_service.dart';
 import '../../../../services/like_service.dart';
@@ -339,7 +341,7 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
                                           ? t.covers.first
                                           : t.thumbnail)
                                       .isNotEmpty
-                                  ? CachedNetworkImage(
+                                  ? SafeAppImage(
                                       imageUrl: t.covers.isNotEmpty
                                           ? t.covers.first
                                           : t.thumbnail,
@@ -452,7 +454,7 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
             Positioned.fill(
               child: AnimatedSwitcher(
                 duration: const Duration(milliseconds: 900),
-                child: CachedNetworkImage(
+                child: SafeAppImage(
                   key: ValueKey(coverUrl),
                   imageUrl: coverUrl,
                   fit: BoxFit.cover,
@@ -501,7 +503,7 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
                     child: Column(
                       children: [
                         const SizedBox(height: 8),
-                        _buildSleeve(context, coverUrl),
+                        _buildSleeve(context, coverUrl, player),
                         const SizedBox(height: 16),
                         _buildTitleRow(context, track),
                         const SizedBox(height: 16),
@@ -598,7 +600,11 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
     );
   }
 
-  Widget _buildSleeve(BuildContext context, String coverUrl) {
+  Widget _buildSleeve(BuildContext context, String coverUrl, MusicPlayerService player) {
+    final isAd = player.isAdActive && player.currentAd != null;
+    final ad = player.currentAd;
+    final displayUrl = isAd ? ad!.imageUrl : coverUrl;
+
     return AnimatedBuilder(
       animation: _glowController,
       builder: (context, child) {
@@ -608,7 +614,9 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
             borderRadius: BorderRadius.circular(24),
             boxShadow: [
               BoxShadow(
-                color: AppColors.brandOrange.withValues(alpha: glow),
+                color: isAd
+                    ? Colors.amber.withValues(alpha: glow)
+                    : AppColors.brandOrange.withValues(alpha: glow),
                 blurRadius: 46,
                 spreadRadius: 2,
               ),
@@ -628,22 +636,126 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
         borderRadius: BorderRadius.circular(24),
         child: AspectRatio(
           aspectRatio: 1,
-          child: coverUrl.isNotEmpty
-              ? CachedNetworkImage(imageUrl: coverUrl, fit: BoxFit.cover)
-              : Container(
-                  decoration: const BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [Color(0xFFE8590C), Color(0xFF1E1E1E)],
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              displayUrl.isNotEmpty
+                  ? SafeAppImage(
+                      imageUrl: displayUrl,
+                      fit: BoxFit.cover,
+                    )
+                  : Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(
+                          colors: [Color(0xFFE8590C), Color(0xFF1E1E1E)],
+                        ),
+                      ),
+                      child: const Center(
+                        child: Icon(
+                          Icons.music_note_rounded,
+                          color: Colors.white70,
+                          size: 64,
+                        ),
+                      ),
                     ),
-                  ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.music_note_rounded,
-                      color: Colors.white70,
-                      size: 64,
+              if (isAd && ad != null) ...[
+                // Dark shade overlay for ad content
+                Container(color: Colors.black.withValues(alpha: 0.25)),
+                // Top-Left Header Pill
+                Positioned(
+                  top: 14,
+                  left: 14,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.75),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: Colors.amber.withValues(alpha: 0.6)),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text(
+                          'SPONSORED BREAK',
+                          style: TextStyle(
+                            color: Colors.amber,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w900,
+                            letterSpacing: 1,
+                          ),
+                        ),
+                        if (ad.title.isNotEmpty) ...[
+                          const SizedBox(width: 6),
+                          ConstrainedBox(
+                            constraints: const BoxConstraints(maxWidth: 130),
+                            child: Text(
+                              ad.title,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(color: Colors.white, fontSize: 10),
+                            ),
+                          ),
+                        ],
+                      ],
                     ),
                   ),
                 ),
+                // Bottom-Left Skip Ad Button
+                Positioned(
+                  bottom: 14,
+                  left: 14,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: player.skipUnlocked ? Colors.white : Colors.black.withValues(alpha: 0.75),
+                      foregroundColor: player.skipUnlocked ? Colors.black : Colors.white70,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                        side: BorderSide(
+                          color: player.skipUnlocked ? Colors.white : Colors.white24,
+                        ),
+                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    ),
+                    onPressed: player.skipUnlocked ? () => player.skipAd() : null,
+                    child: Text(
+                      player.skipUnlocked ? 'Skip Ad →' : 'Skip in ${player.adCountdown}s',
+                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                    ),
+                  ),
+                ),
+                // Bottom-Right Visit Sponsor Button
+                if (ad.linkUrl.isNotEmpty)
+                  Positioned(
+                    bottom: 14,
+                    right: 14,
+                    child: OutlinedButton(
+                      style: OutlinedButton.styleFrom(
+                        backgroundColor: Colors.black.withValues(alpha: 0.75),
+                        foregroundColor: Colors.white,
+                        side: const BorderSide(color: Colors.white38),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      ),
+                      onPressed: () async {
+                        final uri = Uri.tryParse(ad.linkUrl);
+                        if (uri != null && await canLaunchUrl(uri)) {
+                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                        }
+                        ref.read(adServiceProvider).trackMidrollEvent(ad.adId, kind: 'click');
+                      },
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('Visit Sponsor', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                          SizedBox(width: 4),
+                          Icon(Icons.open_in_new_rounded, size: 12),
+                        ],
+                      ),
+                    ),
+                  ),
+              ],
+            ],
+          ),
         ),
       ),
     );

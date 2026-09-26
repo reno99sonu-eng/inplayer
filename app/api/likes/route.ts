@@ -8,6 +8,7 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import { randomUUID } from "crypto";
 import { docClient } from "@/app/lib/dynamodb";
+import { sendPushToUser } from "@/app/lib/push";
 import { verifyAuth } from "@/app/lib/verifyAuth";
 
 export async function GET(request: NextRequest) {
@@ -108,6 +109,7 @@ export async function POST(request: NextRequest) {
         const video = videoResult.Item;
 
         if (video && video.uploaderId !== user.userId) {
+          const likeMessage = `${user.name || "Someone"} liked your video "${video.title}"`;
           await docClient.send(
             new PutCommand({
               TableName: "InPlayer-Notifications",
@@ -115,13 +117,14 @@ export async function POST(request: NextRequest) {
                 userId: video.uploaderId,
                 notificationId: randomUUID(),
                 type: "like",
-                message: `${user.name || "Someone"} liked your video "${video.title}"`,
+                message: likeMessage,
                 videoId,
                 read: false,
                 createdAt: new Date().toISOString(),
               },
             })
           );
+          void sendPushToUser({ userId: video.uploaderId as string, title: "INPLAYER", body: likeMessage });
         }
       } catch (err) {
         // A notification failing to write shouldn't break the like itself

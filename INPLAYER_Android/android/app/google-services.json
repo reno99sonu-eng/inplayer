@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "775833771066",
+    "project_id": "inplayer-d27b9",
+    "storage_bucket": "inplayer-d27b9.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:775833771066:android:137ed13186d79506256903",
+        "android_client_info": {
+          "package_name": "com.inplayer.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDu21rjl50z3Dy6OilUTmmar39-yi35dyU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

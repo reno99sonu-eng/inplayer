@@ -181,8 +181,25 @@ function NavbarThemeManagerContent() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ prompt: trimmedPrompt }),
       });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || "AI generation failed.");
+      let data: { error?: string; imageUrl?: string; title?: string } | null = null;
+      try {
+        data = await res.json();
+      } catch {
+        data = null;
+      }
+      if (!res.ok) {
+        const errorMsg =
+          data?.error ||
+          (res.status === 504
+            ? "Server timed out generating the AI theme (504 Gateway Timeout). Please try again."
+            : res.statusText
+            ? `AI generation failed (HTTP ${res.status}: ${res.statusText}).`
+            : `AI generation failed (HTTP ${res.status}).`);
+        throw new Error(errorMsg);
+      }
+      if (!data?.imageUrl) {
+        throw new Error("No image data returned from generator.");
+      }
       setPreviewImageUrl(data.imageUrl);
       setGeneratedTitle(data.title || trimmedPrompt);
       setSuccessMsg(`AI generated a new "${data.title || trimmedPrompt}" graphic!`);
@@ -228,6 +245,16 @@ function NavbarThemeManagerContent() {
         setActiveTheme(data.theme);
         setSuccessMsg("🎉 Navbar occasion theme published & applied live!");
         setTimeout(() => setSuccessMsg(null), 4000);
+
+        // Broadcast to live navbar immediately
+        try {
+          window.dispatchEvent(
+            new CustomEvent("navbar-theme-updated", {
+              detail: { active: true, theme: data.theme },
+            })
+          );
+          localStorage.setItem("inplayer_navbar_theme_updated", Date.now().toString());
+        } catch {}
       }
     } catch (err) {
       console.error("Theme publish error:", err);
@@ -251,8 +278,19 @@ function NavbarThemeManagerContent() {
 
       setActiveTheme(null);
       setPreviewImageUrl("");
-      setSuccessMsg("Reset navbar background theme to default.");
+      setCustomPrompt("");
+      setSuccessMsg("Navbar theme cleared. Default navbar restored live.");
       setTimeout(() => setSuccessMsg(null), 3000);
+
+      // Broadcast theme cleared to live navbar immediately
+      try {
+        window.dispatchEvent(
+          new CustomEvent("navbar-theme-updated", {
+            detail: { active: false, theme: null },
+          })
+        );
+        localStorage.setItem("inplayer_navbar_theme_updated", Date.now().toString());
+      } catch {}
     } catch (err) {
       console.error("Theme reset error:", err);
       setError(err instanceof Error ? err.message : "Failed to reset theme.");

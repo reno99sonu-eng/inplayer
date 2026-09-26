@@ -5,11 +5,13 @@ import { requireAdmin } from "@/app/lib/isAdmin";
 import { deleteVideoCascade } from "@/app/lib/cascadeDelete";
 import { logAdminAction } from "@/app/lib/auditLog";
 import { audienceFlags, normalizeVideoAudience } from "@/app/lib/contentAccess";
+import { revalidateTag } from "next/cache";
+import { READY_VIDEOS_TAG } from "@/app/lib/videoStore";
 
 // Restores a video/Short auto-flagged at upload (app/lib/moderation.ts via
 // app/api/upload/create) — clears moderationHidden so it reappears in
 // public listings and at its direct watch link (see app/lib/videoStore.ts
-// and app/watch/[videoId]/page.tsx), for when the AI got it wrong.
+// and app/watch/[videoId]/page.tsx), or updates its audience setting.
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ videoId: string }> }
@@ -22,6 +24,46 @@ export async function PATCH(
   }
 
   const { videoId } = await params;
+  const body = await request.json().catch(() => null);
+
+  // If the admin is updating the audience classification:
+  const targetAudience = body?.audience ? normalizeVideoAudience(body.audience) : null;
+  if (targetAudience) {
+    const flags = audienceFlags(targetAudience);
+    await docClient.send(
+      new UpdateCommand({
+        TableName: "InPlayer-Videos",
+        Key: { videoId },
+        UpdateExpression:
+          "SET #audience = :audience, madeForKids = :madeForKids, ageRestricted = :ageRestricted, audienceMismatch = :f",
+        ExpressionAttributeNames: { "#audience": "audience" },
+        ExpressionAttributeValues: {
+          ":audience": targetAudience,
+          ":madeForKids": flags.madeForKids,
+          ":ageRestricted": flags.ageRestricted,
+          ":f": false,
+        },
+      })
+    );
+
+    try {
+      revalidateTag(READY_VIDEOS_TAG, "max");
+    } catch {
+      // Best-effort cache invalidation
+    }
+
+    await logAdminAction({
+      request,
+      adminId: admin.userId,
+      adminEmail: admin.email,
+      action: "video.update_audience",
+      targetType: "video",
+      targetId: videoId,
+      details: `Updated audience to ${targetAudience}`,
+    });
+
+    return NextResponse.json({ success: true, audience: targetAudience });
+  }
 
   // An audience mismatch (app/lib/audienceClassifier.ts) also lands in the
   // moderation queue, and restoring one means "the AI read the audience

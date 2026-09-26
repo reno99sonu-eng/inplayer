@@ -120,7 +120,7 @@ export default function SponsorshipDashboardPanel() {
         </div>
       ) : rows.length === 0 ? (
         <div className="mt-4 flex flex-col items-center gap-2 py-10 text-center">
-          <p className="text-sm text-slate-500">You haven't sponsored an ad yet.</p>
+          <p className="text-sm text-slate-500">You haven&apos;t sponsored an ad yet.</p>
           <Link href="/sponsorships" className="mt-2 rounded-xl bg-orange-500 px-4 py-2 text-xs font-bold text-white">
             View packages
           </Link>

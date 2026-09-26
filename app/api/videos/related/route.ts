@@ -5,8 +5,10 @@ import { verifyAuth } from "@/app/lib/verifyAuth";
 import { getVisibleVideos } from "@/app/lib/contentAccessServer";
 import { isMusicType } from "@/app/lib/contentTypes";
 
+
 // "Up Next" for the video watch page — Videos only (Shorts and Music are
 // excluded entirely; they live in their own feeds) and, for signed-in
+
 // viewers, ranked toward the categories they actually watch most (real
 // signal from InPlayer-WatchHistory), not just a static "same category"
 // match. Falls back to the plain same-category-then-recency ordering for

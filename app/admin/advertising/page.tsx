@@ -1165,15 +1165,11 @@ function AdvertisingPage() {
   const isHomepageLive =
     settings.homepageBannerSource === "off"
       ? false
-      : settings.homepageBannerSource === "adsense"
-      ? settings.adsenseEnabled && Boolean(settings.adsensePublisherId.trim())
       : safeCreatives.some((c) => c.placement === "homepage" && c.active);
 
   const isWatchLive =
     settings.watchPageBannerSource === "off"
       ? false
-      : settings.watchPageBannerSource === "adsense"
-      ? settings.adsenseEnabled && Boolean(settings.adsensePublisherId.trim())
       : safeCreatives.some((c) => c.placement === "watch" && c.active);
 
   const isWeeklyFeaturedLive =
@@ -1334,11 +1330,15 @@ function AdvertisingPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs">
                 <div className="flex justify-between p-2 rounded-xl bg-white/5 light:bg-black/5">
                   <span className="text-slate-400 light:text-slate-700">Homepage Banner:</span>
-                  <span className="font-bold text-white light:text-slate-900 uppercase">{settings.homepageBannerSource}</span>
+                  <span className="font-bold text-white light:text-slate-900 uppercase">
+                    {settings.homepageBannerSource === "off" ? "OFF" : "HOUSE ADS"}
+                  </span>
                 </div>
                 <div className="flex justify-between p-2 rounded-xl bg-white/5 light:bg-black/5">
                   <span className="text-slate-400 light:text-slate-700">Watch Page Banner:</span>
-                  <span className="font-bold text-white light:text-slate-900 uppercase">{settings.watchPageBannerSource}</span>
+                  <span className="font-bold text-white light:text-slate-900 uppercase">
+                    {settings.watchPageBannerSource === "off" ? "OFF" : "HOUSE ADS"}
+                  </span>
                 </div>
                 <div className="flex justify-between p-2 rounded-xl bg-white/5 light:bg-black/5">
                   <span className="text-slate-400 light:text-slate-700">Weekly Featured Carousel:</span>
@@ -1400,7 +1400,7 @@ function AdvertisingPage() {
                 </button>
               ) : (
                 <div className="flex items-center gap-1.5">
-                  {(["off", "house", "adsense"] as AdSlotSource[]).map((src) => (
+                  {(["off", "house"] as AdSlotSource[]).map((src) => (
                     <button
                       key={src}
                       type="button"
@@ -1415,14 +1415,14 @@ function AdvertisingPage() {
                         setSaved(false);
                         saveSettings(next);
                       }}
-                      className={`rounded-full px-3 py-1 text-xs font-bold transition capitalize ${
-                        (activePanel === "homepage" && settings.homepageBannerSource === src) ||
-                        (activePanel === "watch" && settings.watchPageBannerSource === src)
+                      className={`rounded-full px-3.5 py-1 text-xs font-bold transition ${
+                        (activePanel === "homepage" && (settings.homepageBannerSource === src || (src === "house" && settings.homepageBannerSource === "adsense"))) ||
+                        (activePanel === "watch" && (settings.watchPageBannerSource === src || (src === "house" && settings.watchPageBannerSource === "adsense")))
                           ? "bg-indigo-600 text-white"
                           : "bg-white/5 text-slate-400 light:bg-black/5 light:text-slate-700"
                       }`}
                     >
-                      {src}
+                      {src === "house" ? "House / Sponsor Ads" : "Off"}
                     </button>
                   ))}
                 </div>
@@ -2045,30 +2045,78 @@ function AdvertisingPage() {
 
         {/* 7. GOOGLE ADSENSE SUB-PANEL */}
         {activePanel === "adsense" && (
-          <div className="space-y-3 max-w-2xl">
-            <div className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4 space-y-3">
-              <h3 className="text-xs font-bold text-white light:text-slate-900">Google AdSense Integration</h3>
-              <p className="text-xs text-slate-400 light:text-slate-600">
-                Enter your official Google AdSense Publisher ID to enable AdSense banner units.
-              </p>
-              <input
-                type="text"
-                value={settings.adsensePublisherId}
-                onChange={(e) => {
-                  updateSettings("adsensePublisherId", e.target.value.trim());
-                  updateSettings("adsenseEnabled", e.target.value.trim().length > 0);
-                }}
-                placeholder="pub-1234567890123456"
-                className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-xs text-white light:text-slate-900 outline-none focus:border-indigo-400"
-              />
-              <button
-                type="button"
-                onClick={() => saveSettings()}
-                disabled={saving}
-                className="flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-50 cursor-pointer"
-              >
-                {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save AdSense Config
-              </button>
+          <div className="space-y-4 max-w-2xl">
+            <div className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-5 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 light:border-black/10 pb-4">
+                <div>
+                  <h3 className="text-sm font-bold text-white light:text-slate-900 flex items-center gap-2">
+                    <Globe size={16} className="text-indigo-400" />
+                    Google AdSense Integration
+                  </h3>
+                  <p className="text-xs text-slate-400 light:text-slate-600 mt-0.5">
+                    Master configuration for site-wide Google AdSense and Auto-Ads.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextEnabled = !settings.adsenseEnabled;
+                    const next = { ...settings, adsenseEnabled: nextEnabled };
+                    setSettings(next);
+                    setSaved(false);
+                  }}
+                  className={`rounded-full px-4 py-1.5 text-xs font-bold transition flex items-center gap-1.5 ${
+                    settings.adsenseEnabled
+                      ? "bg-emerald-500/20 text-emerald-300 light:bg-emerald-100 light:text-emerald-800"
+                      : "bg-white/5 text-slate-400 light:text-slate-700 light:bg-black/5"
+                  }`}
+                >
+                  <span className={`h-2 w-2 rounded-full ${settings.adsenseEnabled ? "bg-emerald-400 animate-pulse" : "bg-slate-500"}`} />
+                  {settings.adsenseEnabled ? "Google AdSense: ENABLED" : "Google AdSense: DISABLED"}
+                </button>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-slate-300 light:text-slate-700 block">
+                  Publisher ID (Client ID)
+                </label>
+                <input
+                  type="text"
+                  value={settings.adsensePublisherId}
+                  onChange={(e) => {
+                    const val = e.target.value.trim();
+                    updateSettings("adsensePublisherId", val);
+                  }}
+                  placeholder="pub-9015405021941451"
+                  className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3.5 py-2.5 text-xs text-white light:text-slate-900 outline-none focus:border-indigo-400"
+                />
+                <p className="text-[11px] text-slate-400 light:text-slate-600">
+                  Must match your account publisher ID from Google AdSense (e.g., <code className="text-orange-300">pub-9015405021941451</code>) and your <code className="text-indigo-300">public/ads.txt</code>.
+                </p>
+              </div>
+
+              <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/10 p-3 text-[11px] text-slate-300 light:text-slate-700 space-y-1">
+                <p className="font-semibold text-indigo-300 light:text-indigo-900">
+                  How Google AdSense operates on InPlayer:
+                </p>
+                <p>
+                  When enabled and saved, the official AdSense script (<code className="text-xs text-indigo-200">pagead2.googlesyndication.com/pagead/js/adsbygoogle.js</code>) is automatically injected into the HTML <code className="text-xs text-indigo-200">&lt;head&gt;</code> of every page. Google Auto-Ads will crawl and display ads in non-intrusive zones across the site, leaving your custom Homepage, Watch, and Weekly Featured banner sections dedicated entirely to your direct sponsor creatives.
+                </p>
+              </div>
+
+              <div className="pt-2 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => saveSettings()}
+                  disabled={saving}
+                  className="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-50 cursor-pointer"
+                >
+                  {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save AdSense Config
+                </button>
+                {saved && (
+                  <span className="text-xs font-bold text-emerald-400">Settings saved successfully!</span>
+                )}
+              </div>
             </div>
           </div>
         )}

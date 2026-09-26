@@ -38,7 +38,7 @@ class _CategoryVideosPageState extends ConsumerState<CategoryVideosPage> {
       if (widget.category.toLowerCase().contains('raftaar')) {
         _videos = all.where((v) => v.isShort || v.category == widget.category).toList();
       } else {
-        _videos = all.where((v) => v.category == widget.category && !v.isShort).toList();
+        _videos = all.where((v) => v.category == widget.category && !v.isShort && !v.isMusic).toList();
       }
     });
   }

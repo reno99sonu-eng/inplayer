@@ -25,9 +25,10 @@
 export type VideoAudience = "everyone" | "kids" | "adult";
 export type AudienceMode = "all" | "family" | "kids";
 
-/** Cookie holding the viewer's chosen mode. Set HttpOnly by the server
- *  (see app/api/content-access/route.ts) once the passkey is verified, so
- *  it can't be forged from the browser console or by a script. */
+/** Cookie holding the viewer's chosen mode, set HttpOnly by
+ *  app/api/content-access/route.ts. "all" is stored as a signed value (see
+ *  app/lib/audienceToken.ts) because non-browser clients can send any
+ *  cookie they like. */
 export const AUDIENCE_COOKIE = "inplayer-audience";
 
 /** One year — this is a deliberate, passkey-protected choice, not a
@@ -62,14 +63,16 @@ export function normalizeVideoAudience(raw: unknown): VideoAudience | null {
 // live changes classification: an existing 18+ video stays 18+, and
 // everything else becomes "everyone" (which is what it effectively was).
 export function videoAudience(
-  video: { audience?: unknown; ageRestricted?: unknown } | null | undefined
+  video: { audience?: unknown; ageRestricted?: unknown; madeForKids?: unknown } | null | undefined
 ): VideoAudience {
   if (!video) return "everyone";
 
   const explicit = normalizeVideoAudience(video.audience);
   if (explicit) return explicit;
 
-  return video.ageRestricted === true ? "adult" : "everyone";
+  if (video.ageRestricted === true) return "adult";
+  if (video.madeForKids === true) return "kids";
+  return "everyone";
 }
 
 // The single rule every surface in the app shares.
@@ -115,18 +118,23 @@ export function togglesFromMode(mode: AudienceMode): { showAdult: boolean; kidsO
 
 // Which mode changes actually need the 6-digit passkey.
 //
-// Only "all" does. It is the single mode that REVEALS something previously
-// hidden (18+), so it is the only one worth locking. "family" and "kids"
-// both narrow what is shown — a child flipping either of them can only ever
-// see less than they could a moment ago, so demanding a code there buys no
-// safety and just makes the control annoying to use.
+// Two cases:
+//   1. Switching TO "all" — the single mode that REVEALS something
+//      previously hidden (18+).
+//   2. Switching AWAY FROM "kids" — Kids mode exists to lock a device down
+//      for a child, so the child being able to switch it back off by
+//      themselves (with no code at all) would defeat the entire point of
+//      the control. Turning Kids ON stays free and needs no account, same
+//      reasoning as ever: the parent handing over the phone is often not
+//      signed in, and locking the SAFEST setting behind a code just makes
+//      it harder to reach.
 //
-// This is why the Kids switch in the hamburger has no passcode at all: both
-// of its directions ("kids" on, "family" off) are non-loosening. Turning
-// 18+ ON is the one action that stops and asks.
-export function modeRequiresPasskey(mode: AudienceMode): boolean {
-  void mode;
-  return true;
+// Every other transition (family -> kids, any mode -> family when it
+// wasn't kids) stays free.
+export function modeRequiresPasskey(targetMode: AudienceMode, currentMode: AudienceMode): boolean {
+  if (targetMode === "all") return true;
+  if (currentMode === "kids" && targetMode !== "kids") return true;
+  return false;
 }
 
 // ── Backwards compatibility with the two older per-video flags ────────

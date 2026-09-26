@@ -16,11 +16,17 @@ import '../../../../services/ai_assist_service.dart';
 /// sends the same prompt (see AIAssistService.buildPrompt), so the two
 /// surfaces cannot drift into suggesting differently.
 ///
+/// Pass [seesFrames] when the context carries real frames (or cover art):
+/// the typed description then becomes optional, same as the website's modal.
+/// Without them (e.g. Go Live) it stays required — a filename and a category
+/// alone only ever produced generic titles.
+///
 /// Returns the picked title, or null if dismissed.
 Future<String?> showAITitleAssistSheet(
   BuildContext context, {
   required AIPromptContext Function(String userDescription) buildContext,
   String initialDescription = '',
+  bool seesFrames = false,
 }) {
   return showModalBottomSheet<String>(
     context: context,
@@ -29,6 +35,7 @@ Future<String?> showAITitleAssistSheet(
     builder: (_) => _AITitleAssistSheet(
       buildContext: buildContext,
       initialDescription: initialDescription,
+      seesFrames: seesFrames,
     ),
   );
 }
@@ -36,10 +43,12 @@ Future<String?> showAITitleAssistSheet(
 class _AITitleAssistSheet extends ConsumerStatefulWidget {
   final AIPromptContext Function(String userDescription) buildContext;
   final String initialDescription;
+  final bool seesFrames;
 
   const _AITitleAssistSheet({
     required this.buildContext,
     required this.initialDescription,
+    required this.seesFrames,
   });
 
   @override
@@ -60,9 +69,14 @@ class _AITitleAssistSheetState extends ConsumerState<_AITitleAssistSheet> {
     super.dispose();
   }
 
+  /// Always allowed when real frames are attached (typing just sharpens the
+  /// titles); otherwise only once something has been typed.
+  bool get _canGenerate =>
+      !_generating && (widget.seesFrames || _ctrl.text.trim().isNotEmpty);
+
   Future<void> _generate() async {
+    if (!_canGenerate) return;
     final text = _ctrl.text.trim();
-    if (text.isEmpty || _generating) return;
 
     setState(() {
       _generating = true;
@@ -82,6 +96,12 @@ class _AITitleAssistSheetState extends ConsumerState<_AITitleAssistSheet> {
       if (!mounted) return;
       setState(() {
         _error = e.message;
+        _generating = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _error = "Couldn't generate titles right now. Please try again.";
         _generating = false;
       });
     }
@@ -152,9 +172,13 @@ class _AITitleAssistSheetState extends ConsumerState<_AITitleAssistSheet> {
               ),
               const SizedBox(height: 8),
               Text(
-                "The AI can't watch your video, so tell it what happens in a "
-                'sentence or two — the more specific you are, the better the '
-                'title options.',
+                widget.seesFrames
+                    ? 'The AI looks at frames from your upload. Add a sentence '
+                        'about what happens for even sharper titles — or leave '
+                        'it blank.'
+                    : "The AI can't watch your video, so tell it what happens "
+                        'in a sentence or two — the more specific you are, the '
+                        'better the title options.',
                 style: TextStyle(
                   color: context.textSecondary,
                   fontSize: 13,
@@ -169,9 +193,11 @@ class _AITitleAssistSheetState extends ConsumerState<_AITitleAssistSheet> {
                 textCapitalization: TextCapitalization.sentences,
                 style: TextStyle(color: context.textPrimary, fontSize: 14),
                 decoration: InputDecoration(
-                  hintText:
-                      'e.g. A 3-minute tutorial showing how to fix a leaking '
-                      'kitchen tap with basic tools',
+                  hintText: widget.seesFrames
+                      ? 'Optional — e.g. A 3-minute tutorial showing how to '
+                          'fix a leaking kitchen tap with basic tools'
+                      : 'e.g. A 3-minute tutorial showing how to fix a leaking '
+                          'kitchen tap with basic tools',
                   hintStyle: TextStyle(
                     color: context.textSecondary.withValues(alpha: 0.7),
                     fontSize: 13,
@@ -199,8 +225,7 @@ class _AITitleAssistSheetState extends ConsumerState<_AITitleAssistSheet> {
               SizedBox(
                 width: double.infinity,
                 child: ElevatedButton.icon(
-                  onPressed:
-                      _generating || _ctrl.text.trim().isEmpty ? null : _generate,
+                  onPressed: _canGenerate ? _generate : null,
                   icon: _generating
                       ? const SizedBox(
                           width: 16,

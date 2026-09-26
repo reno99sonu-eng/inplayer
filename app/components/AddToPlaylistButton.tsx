@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { fetchAuthSession } from "aws-amplify/auth";
-import { ListPlus, Check, Plus, Loader2, X, Lock } from "lucide-react";
+import { ListPlus, Check, Plus, Loader2, X } from "lucide-react";
 import { useAuthModal } from "./auth/AuthProvider";
 
 interface PlaylistItem {

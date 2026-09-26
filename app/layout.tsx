@@ -4,6 +4,7 @@ import { Plus_Jakarta_Sans } from "next/font/google";
 import "./globals.css";
 import { ThemeProvider } from "./components/ThemeProvider";
 import { SettingsProvider } from "./components/settings/SettingsProvider";
+import { LanguageProvider } from "./context/LanguageContext";
 import AuthProvider from "./components/auth/AuthProvider";
 import SiteChrome from "./components/SiteChrome";
 import ChunkErrorRecovery from "./components/ChunkErrorRecovery";
@@ -11,6 +12,7 @@ import { getPlatformSettings } from "./lib/platformSettings";
 import type { DomainMaintenanceFields } from "./lib/siteDomain";
 import { headers } from "next/headers";
 import { isSearchCrawler } from "@/app/lib/searchCrawlers";
+import AppOpenBanner from "./components/AppOpenBanner";
 
 const jakarta = Plus_Jakarta_Sans({
   subsets: ["latin"],
@@ -182,14 +184,27 @@ export default async function RootLayout({
     isAdsensePreview ||
     isSearchCrawler(hdrs.get("user-agent"));
 
+  // Real Android UA only — iPhone Safari's UA also happens to contain
+  // neither "Android" nor "Mobile" in a way that would match this, and
+  // there is no iOS app to offer anyone anyway. Decided here, server-side,
+  // off the real request header, so there's no hydration flash of "no
+  // banner" before a client-side check could run.
+  const isAndroidMobile = /Android/i.test(hdrs.get("user-agent") || "");
+
   return (
     <html lang="en">
       <head>
-        <script
-          async
-          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9015405021941451"
-          crossOrigin="anonymous"
-        />
+        {settings.adsenseEnabled ? (
+          <script
+            async
+            src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${
+              (settings.adsensePublisherId || "pub-9015405021941451").startsWith("ca-")
+                ? (settings.adsensePublisherId || "pub-9015405021941451")
+                : `ca-${settings.adsensePublisherId || "pub-9015405021941451"}`
+            }`}
+            crossOrigin="anonymous"
+          />
+        ) : null}
       </head>
       <body
   className={`
@@ -264,16 +279,19 @@ export default async function RootLayout({
   }}
 />
 <ChunkErrorRecovery />
+<AppOpenBanner isAndroidMobile={isAndroidMobile} />
 <AuthProvider>
   <SettingsProvider>
-    <ThemeProvider>
-      <SiteChrome
-        initialMaintenance={initialMaintenance}
-        initialGeoAllowed={geoAllowed}
-      >
-        {children}
-      </SiteChrome>
-    </ThemeProvider>
+    <LanguageProvider>
+      <ThemeProvider>
+        <SiteChrome
+          initialMaintenance={initialMaintenance}
+          initialGeoAllowed={geoAllowed}
+        >
+          {children}
+        </SiteChrome>
+      </ThemeProvider>
+    </LanguageProvider>
   </SettingsProvider>
 </AuthProvider>
       </body>

@@ -1,0 +1,176 @@
+﻿workflows:
+  # ─── 1. iOS CI Validation ─────────────────────────────────────────────────
+  # Runs on every push to main / homepage-phase-2 and on every pull request.
+  # Validates the Flutter project compiles for iOS without producing a release
+  # artifact. Free-tier friendly — no signing required.
+  ios-ci:
+    name: iOS CI (analyze + test + build check)
+    max_build_duration: 60
+    instance_type: mac_mini_m2
+    environment:
+      flutter: 3.44.4
+      xcode: latest
+      cocoapods: default
+    triggering:
+      events:
+        - push
+        - pull_request
+      branch_patterns:
+        - pattern: main
+          include: true
+        - pattern: homepage-phase-2
+          include: true
+    scripts:
+      - name: Flutter pub get
+        script: flutter pub get
+      - name: Flutter analyze
+        script: flutter analyze --no-pub
+      - name: Flutter test
+        script: flutter test --no-pub
+      - name: iOS build (no-codesign validation)
+        script: |
+          flutter build ios --release --no-codesign --no-pub
+    artifacts:
+      - flutter_build/ios/*.app
+    cache:
+      cache_paths:
+        - $HOME/.pub-cache
+        - ios/Pods
+
+  # ─── 2. iOS TestFlight Build ──────────────────────────────────────────────
+  # Triggered manually or on a vX.Y.Z-ios tag. Produces a signed IPA and
+  # uploads it to TestFlight. Requires Apple credentials stored as Codemagic
+  # encrypted environment variables (see CODEMAGIC_SECRETS below).
+  ios-testflight:
+    name: iOS TestFlight Build
+    max_build_duration: 90
+    instance_type: mac_mini_m2
+    environment:
+      flutter: 3.44.4
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.inplayer.app
+      vars:
+        # All secrets set in Codemagic UI → Environment variables (encrypted).
+        # NEVER commit actual values here.
+        APP_STORE_CONNECT_ISSUER_ID: $APP_STORE_CONNECT_ISSUER_ID
+        APP_STORE_CONNECT_KEY_IDENTIFIER: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        APP_STORE_CONNECT_PRIVATE_KEY: $APP_STORE_CONNECT_PRIVATE_KEY
+        CERTIFICATE_PRIVATE_KEY: $CERTIFICATE_PRIVATE_KEY
+    triggering:
+      events:
+        - tag
+      tag_patterns:
+        - pattern: 'v*-ios'
+          include: true
+    scripts:
+      - name: Flutter pub get
+        script: flutter pub get
+      - name: Flutter analyze
+        script: flutter analyze --no-pub
+      - name: Flutter test
+        script: flutter test --no-pub
+      - name: iOS release build
+        script: |
+          flutter build ipa \
+            --release \
+            --no-pub \
+            --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+      - flutter_build/ios/*.dSYM.zip
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        # NEVER set submit_to_app_store: true here.
+        # App Store submission is a separate, explicitly human-triggered action.
+        submit_to_app_store: false
+    cache:
+      cache_paths:
+        - $HOME/.pub-cache
+        - ios/Pods
+
+  # ─── 3. App Store Production Release ─────────────────────────────────────
+  # HUMAN APPROVAL REQUIRED — never triggered automatically.
+  # Trigger ONLY via Codemagic UI "Start build" on a verified, TestFlight-
+  # validated build. This workflow is intentionally not wired to any tag or
+  # branch trigger.
+  ios-production:
+    name: iOS App Store Release (MANUAL ONLY)
+    max_build_duration: 90
+    instance_type: mac_mini_m2
+    environment:
+      flutter: 3.44.4
+      xcode: latest
+      cocoapods: default
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.inplayer.app
+      vars:
+        APP_STORE_CONNECT_ISSUER_ID: $APP_STORE_CONNECT_ISSUER_ID
+        APP_STORE_CONNECT_KEY_IDENTIFIER: $APP_STORE_CONNECT_KEY_IDENTIFIER
+        APP_STORE_CONNECT_PRIVATE_KEY: $APP_STORE_CONNECT_PRIVATE_KEY
+        CERTIFICATE_PRIVATE_KEY: $CERTIFICATE_PRIVATE_KEY
+    # No triggering section — this workflow starts only from the Codemagic UI.
+    scripts:
+      - name: Flutter pub get
+        script: flutter pub get
+      - name: Flutter analyze (gate)
+        script: flutter analyze --no-pub
+      - name: Flutter test (gate)
+        script: flutter test --no-pub
+      - name: iOS production build
+        script: |
+          flutter build ipa \
+            --release \
+            --no-pub \
+            --export-options-plist=/Users/builder/export_options.plist
+    artifacts:
+      - build/ios/ipa/*.ipa
+      - flutter_build/ios/*.dSYM.zip
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
+        # submit_to_app_store: true is the ONLY difference from the TestFlight
+        # workflow and is the reason this workflow must never be triggered
+        # automatically.
+        submit_to_app_store: true
+    cache:
+      cache_paths:
+        - $HOME/.pub-cache
+        - ios/Pods
+
+  # ─── 4. Android CI ────────────────────────────────────────────────────────
+  # Validates the Android project on every push. Does NOT build release
+  # artifacts (those are built locally and on the dedicated release workflow).
+  android-ci:
+    name: Android CI (analyze + test)
+    max_build_duration: 30
+    instance_type: linux_x2
+    environment:
+      flutter: 3.44.4
+      java: 17
+    triggering:
+      events:
+        - push
+        - pull_request
+      branch_patterns:
+        - pattern: main
+          include: true
+        - pattern: homepage-phase-2
+          include: true
+    scripts:
+      - name: Flutter pub get
+        script: flutter pub get
+      - name: Flutter analyze
+        script: flutter analyze --no-pub
+      - name: Flutter test
+        script: flutter test --no-pub
+    cache:
+      cache_paths:
+        - $HOME/.pub-cache

@@ -176,7 +176,7 @@ class _SignUpModalState extends ConsumerState<SignUpModal>
             _success = true;
             _loading = false;
           });
-          await Future.delayed(const Duration(milliseconds: 500));
+          await Future.delayed(const Duration(milliseconds: 200));
           if (mounted) {
             if (widget.onNeedsVerification != null) {
               widget.onNeedsVerification!(email);
@@ -191,7 +191,7 @@ class _SignUpModalState extends ConsumerState<SignUpModal>
             _success = true;
             _loading = false;
           });
-          await Future.delayed(const Duration(milliseconds: 500));
+          await Future.delayed(const Duration(milliseconds: 200));
           if (mounted) {
             _handleSuccess();
           }
@@ -217,7 +217,7 @@ class _SignUpModalState extends ConsumerState<SignUpModal>
           _success = true;
           _googleLoading = false;
         });
-        await Future.delayed(const Duration(milliseconds: 500));
+        await Future.delayed(const Duration(milliseconds: 200));
         if (mounted) {
           _handleSuccess();
         }

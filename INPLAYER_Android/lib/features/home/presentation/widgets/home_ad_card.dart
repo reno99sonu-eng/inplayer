@@ -56,8 +56,11 @@ class _HomeAdCardState extends ConsumerState<HomeAdCard> {
 
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: GestureDetector(
-        onTap: _onTap,
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 840),
+          child: GestureDetector(
+            onTap: _onTap,
         child: Container(
           clipBehavior: Clip.hardEdge,
           decoration: BoxDecoration(
@@ -117,6 +120,8 @@ class _HomeAdCardState extends ConsumerState<HomeAdCard> {
           ),
         ),
       ),
-    );
-  }
+    ),
+  ),
+);
+}
 }

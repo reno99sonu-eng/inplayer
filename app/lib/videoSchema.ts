@@ -136,10 +136,15 @@ export function buildVideoJsonLd(
       ? video.muxPlaybackId.trim()
       : null;
 
-  const storedThumbnail =
-    typeof video.thumbnailUrl === "string" && video.thumbnailUrl.trim()
-      ? video.thumbnailUrl.trim()
-      : null;
+function isValidHttpUrl(url: unknown): url is string {
+  if (typeof url !== "string") return false;
+  const s = url.trim();
+  return s.startsWith("https://") || s.startsWith("http://");
+}
+
+  const storedThumbnail = isValidHttpUrl(video.thumbnailUrl)
+    ? video.thumbnailUrl.trim()
+    : null;
 
   // Prefer the generated set (bigger, and in the ratios Google asks for).
   // Fall back to whatever single thumbnail is stored — which, for a video
@@ -148,7 +153,7 @@ export function buildVideoJsonLd(
     ? muxThumbnailSet(playbackId, isPortrait)
     : storedThumbnail
       ? [storedThumbnail]
-      : [];
+      : [`${SITE_URL}/logos/inplayer-full.png`];
 
   // A creator's custom thumbnail is what viewers actually see on the card,
   // so it leads the list when there is one. Anything Mux generated is
@@ -167,7 +172,9 @@ export function buildVideoJsonLd(
     thumbnails.unshift(storedThumbnail);
   }
 
-  if (thumbnails.length === 0) return null;
+  // Filter out any potential non-HTTP(S) entries or data: URIs (Google Search Console strictly rejects them)
+  const validThumbnails = thumbnails.filter((t) => isValidHttpUrl(t));
+  const finalThumbnails = validThumbnails.length > 0 ? validThumbnails : [`${SITE_URL}/logos/inplayer-full.png`];
 
   const description =
     typeof video.description === "string" && video.description.trim()
@@ -195,9 +202,11 @@ export function buildVideoJsonLd(
     "@type": "VideoObject",
     "@id": canonical,
     url: canonical,
+    embedUrl: canonical,
+    ...(playbackId ? { contentUrl: `https://stream.mux.com/${playbackId}.m3u8` } : {}),
     name,
     description,
-    thumbnailUrl: thumbnails,
+    thumbnailUrl: finalThumbnails,
     uploadDate,
     ...(duration ? { duration } : {}),
     // Honest, and genuinely useful to Google: the whole platform is

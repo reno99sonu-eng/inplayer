@@ -117,7 +117,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
           Sign in with the admin account to open the Admin Panel.
         </p>
         <button
-          onClick={openSignIn}
+          onClick={() => openSignIn()}
           className="mt-6 rounded-2xl bg-gradient-to-r from-[#6366F1] via-[#8B5CF6] to-[#A855F7] px-8 py-3 font-bold text-white shadow-[0_15px_35px_rgba(139,92,246,.3)] transition-all hover:-translate-y-0.5"
         >
           Sign In

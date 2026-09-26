@@ -55,9 +55,21 @@ export default function ForgotPasswordModal({
       const name = (err as { name?: string })?.name;
       const message =
         err instanceof Error ? err.message : "Something went wrong. Please try again.";
+      const lower = message.toLowerCase();
 
       if (name === "UserNotFoundException") {
         setError("No account found with that email address.");
+      } else if (lower.includes("verified email") || lower.includes("no registered/verified")) {
+        // A Google-signed-up account has no password (and no verified
+        // email attribute) for Cognito to reset — this used to surface
+        // Cognito's raw technical exception message verbatim here, which
+        // is exactly what the Android app's own equivalent screen already
+        // avoids (see forgot_password_modal.dart's _friendlyAuthError).
+        setError(
+          "That account has no confirmed email address, so a code can't be sent to it. If you signed up with Google, use the Google button on the sign-in screen instead."
+        );
+      } else if (lower.includes("limit exceeded") || lower.includes("too many")) {
+        setError("Too many attempts. Wait a few minutes before trying again.");
       } else {
         setError(message);
       }
@@ -94,10 +106,18 @@ export default function ForgotPasswordModal({
       const message =
         err instanceof Error ? err.message : "Something went wrong. Please try again.";
 
+      const lower = message.toLowerCase();
+
       if (name === "CodeMismatchException") {
         setError("That code doesn't match. Please check and try again.");
       } else if (name === "ExpiredCodeException") {
         setError("That code has expired. Please request a new one.");
+      } else if (lower.includes("password") && (lower.includes("policy") || lower.includes("length"))) {
+        setError(
+          "That password doesn't meet the requirements — use at least 8 characters with a mix of letters and numbers."
+        );
+      } else if (lower.includes("network") || lower.includes("connection")) {
+        setError("No connection. Check your internet and try again.");
       } else {
         setError(message);
       }
@@ -188,7 +208,7 @@ export default function ForgotPasswordModal({
 
               <button
                 type="button"
-                onClick={openSignIn}
+                onClick={() => openSignIn()}
                 className="
                   mt-6 w-full rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A]
                   py-3.5 font-bold text-white
@@ -266,7 +286,7 @@ export default function ForgotPasswordModal({
                   Remembered your password?{" "}
                   <button
                     type="button"
-                    onClick={openSignIn}
+                    onClick={() => openSignIn()}
                     className="font-semibold text-orange-300 light:text-orange-600 transition hover:text-orange-200 light:hover:text-orange-700"
                   >
                     Sign In

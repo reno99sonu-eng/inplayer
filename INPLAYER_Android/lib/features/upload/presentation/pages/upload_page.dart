@@ -1,13 +1,19 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
+import 'dart:ui' as ui;
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:dio/dio.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:video_player/video_player.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/pattern_background.dart';
@@ -110,7 +116,20 @@ class _UploadPageState extends ConsumerState<UploadPage> {
 
   XFile? _file;
   XFile? _thumbnailFile;
+  // Candidate frames captured locally from the picked video (see
+  // _captureLocalFrameCandidates) plus anything the AI thumbnail button
+  // generates — the creator taps one to actually select it as
+  // _thumbnailFile. Nothing here is ever auto-applied.
+  final List<XFile> _localFrameCandidates = [];
+  bool _capturingFrameCandidates = false;
+  // Only set while _captureLocalFrameCandidates() below is mid-capture — a
+  // VideoPlayer for this controller is briefly mounted off-layout (see
+  // _buildDetails()) purely so its RepaintBoundary has something real to
+  // screenshot, then torn back down.
+  VideoPlayerController? _captureController;
+  GlobalKey? _captureBoundaryKey;
   final List<XFile> _musicCovers = [];
+  bool _aiCoverBusy = false;
   int _coverIntervalSeconds = 12;
   int? _fileSizeBytes;
   String _contentType = 'video';
@@ -164,6 +183,16 @@ class _UploadPageState extends ConsumerState<UploadPage> {
   /// True while an AI assist request is in flight for the description or
   /// tags field (titles run inside their own sheet and track it there).
   bool _aiBusy = false;
+  // Which text-AI button is running, so only that one shows a spinner
+  // (previously every AI chip spun at once), and a separate lock for the AI
+  // thumbnail — it takes ~10-15s, and sharing _aiBusy with it made every
+  // other AI button silently do nothing for that whole time.
+  String? _aiBusyField;
+  bool _aiThumbnailBusy = false;
+  // Small JPEG data URLs of what's actually being uploaded (see
+  // _ensureGroundingImages), cached by source paths.
+  List<String> _groundingImages = const [];
+  String _groundingKey = '';
 
   /// Lines produced by the tap-to-stamp editor.
   ///
@@ -173,6 +202,10 @@ class _UploadPageState extends ConsumerState<UploadPage> {
   /// it again, so the two can never silently disagree about which is the
   /// real lyric sheet.
   List<LyricLine> _syncedLyrics = const [];
+
+  /// Controls whether lyrics are included for music tracks.
+  /// Defaults to true (ON). When toggled off, lyrics payload is empty (instrumental).
+  bool _lyricsEnabled = true;
 
   /// Background soundtrack, clip length and Look filter. Same defaults as the
   /// website's own initial state (no track, 30s, "original").
@@ -219,6 +252,8 @@ class _UploadPageState extends ConsumerState<UploadPage> {
 
       setState(() {
         _file = picked;
+        _thumbnailFile = null;
+        _localFrameCandidates.clear();
         _fileSizeBytes = size;
         _contentType = contentType;
         if (contentType == 'short') {
@@ -227,13 +262,100 @@ class _UploadPageState extends ConsumerState<UploadPage> {
         _titleController.text = nameWithoutExt;
         _stage = _Stage.details;
       });
+
+      if (contentType != 'music') {
+        unawaited(_captureLocalFrameCandidates(picked.path));
+      }
     } catch (e) {
       if (!mounted) return;
       _showSnack("Couldn't open your gallery. Please try again.");
     }
   }
 
-  Future<void> _pickThumbnail() async {
+  /// Grabs several real frames out of the picked video file itself and
+  /// offers them as tappable candidates — the "it used to show thumbnails
+  /// to pick from right after I picked the file" the manual/AI pickers
+  /// alone never delivered, since those only ever start from an explicit
+  /// tap. Runs entirely with packages already in this app (video_player +
+  /// the same RepaintBoundary screenshot technique Flutter itself
+  /// recommends for "no thumbnail plugin installed") — no new native
+  /// dependency. Nothing here is ever auto-applied as the thumbnail; the
+  /// creator always taps one to actually choose it (see the grid in
+  /// _buildDetails()).
+  ///
+  /// Best-effort: any failure here (an exotic codec, a huge file, a device
+  /// quirk) just leaves the candidate list empty, exactly like before this
+  /// existed — the manual picker and the AI thumbnail button are still
+  /// right there.
+  Future<void> _captureLocalFrameCandidates(String videoPath) async {
+    VideoPlayerController? controller;
+    setState(() => _capturingFrameCandidates = true);
+    try {
+      controller = VideoPlayerController.file(File(videoPath));
+      await controller.initialize();
+      if (!mounted) return;
+
+      final boundaryKey = GlobalKey();
+      setState(() {
+        _captureController = controller;
+        _captureBoundaryKey = boundaryKey;
+      });
+
+      final durationMs = controller.value.duration.inMilliseconds;
+      // Spread across the clip, skipping the very first/last instants —
+      // disproportionately likely to be black frames, title cards or
+      // motion blur from a cut. Falls back to just the start for a clip
+      // too short for "spread out" to mean anything.
+      final fractions = durationMs > 3000
+          ? const [0.1, 0.35, 0.6, 0.85]
+          : const [0.0];
+
+      for (final fraction in fractions) {
+        if (!mounted) return;
+        await controller.seekTo(Duration(milliseconds: (durationMs * fraction).round()));
+        // The texture needs a beat to actually present the seeked frame
+        // before a screenshot of it means anything.
+        await Future.delayed(const Duration(milliseconds: 220));
+        if (!mounted) return;
+        // One extra frame so the just-seeked texture is definitely what
+        // gets painted into the boundary this pass.
+        await WidgetsBinding.instance.endOfFrame;
+        if (!mounted) return;
+
+        final renderObject = boundaryKey.currentContext?.findRenderObject();
+        if (renderObject is! RenderRepaintBoundary) continue;
+
+        try {
+          final image = await renderObject.toImage(pixelRatio: 1.0);
+          final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+          image.dispose();
+          if (byteData == null) continue;
+
+          final dir = await getTemporaryDirectory();
+          final outPath =
+              '${dir.path}/local_frame_${DateTime.now().millisecondsSinceEpoch}_${fractions.indexOf(fraction)}.png';
+          await File(outPath).writeAsBytes(byteData.buffer.asUint8List());
+          if (!mounted) return;
+          setState(() => _localFrameCandidates.add(XFile(outPath)));
+        } catch (_) {
+          // Skip this one candidate, keep going for the rest.
+        }
+      }
+    } catch (_) {
+      // Silent by design — see the doc comment above.
+    } finally {
+      await controller?.dispose();
+      if (mounted) {
+        setState(() {
+          _captureController = null;
+          _captureBoundaryKey = null;
+          _capturingFrameCandidates = false;
+        });
+      }
+    }
+  }
+
+    Future<void> _pickThumbnail() async {
     try {
       final picked = await ImagePicker().pickImage(
         source: ImageSource.gallery,
@@ -271,6 +393,43 @@ class _UploadPageState extends ConsumerState<UploadPage> {
     } catch (e) {
       if (!mounted) return;
       _showSnack("Couldn't pick cover image.");
+    }
+  }
+
+  /// AI-generated cover art — same POST /api/ai-thumbnail the video/Short
+  /// "AI thumbnail" button uses, with contentType: 'music' so the server
+  /// crops it 1:1 instead of the 16:9 default. Otherwise behaves exactly
+  /// like a manually-picked cover: added to _musicCovers, and becomes the
+  /// track's poster if it's the first one.
+  Future<void> _generateAiMusicCover() async {
+    if (_aiCoverBusy || _musicCovers.length >= 5) return;
+    final title = _titleController.text.trim();
+    if (title.isEmpty) {
+      _showSnack('Add a title first — the AI cover is built from it.');
+      return;
+    }
+    setState(() => _aiCoverBusy = true);
+    try {
+      final result = await ref.read(aiAssistServiceProvider).pickThumbnail(
+        title: title,
+        category: 'Music',
+        contentType: 'music',
+        description: _descriptionController.text.trim(),
+        generateNew: true,
+      );
+      final filePath = await _saveAiImage(result.thumbnailUrl, 'ai_cover');
+      if (!mounted) return;
+      final cover = XFile(filePath);
+      setState(() {
+        _musicCovers.add(cover);
+        _thumbnailFile ??= cover;
+      });
+    } on AIAssistException catch (e) {
+      if (mounted) _showSnack(e.message);
+    } catch (_) {
+      if (mounted) _showSnack("Couldn't generate an AI cover. Please try again.");
+    } finally {
+      if (mounted) setState(() => _aiCoverBusy = false);
     }
   }
 
@@ -401,8 +560,17 @@ class _UploadPageState extends ConsumerState<UploadPage> {
     // JPEG quality 82 — the exact output this endpoint was written against.
     String? thumbnailDataUrl;
     if (_thumbnailFile != null) {
-      thumbnailDataUrl =
-          await compressImageToThumbnailDataUrl(_thumbnailFile!.path);
+      // Music covers are square, Raftaar/Shorts are portrait — everything
+      // else (including the local frame this screen may have auto-captured
+      // via video_player) is landscape. Matches THUMBNAIL_ASPECT_RATIO in
+      // the website's app/lib/contentTypes.ts.
+      final aspectRatio = _isMusicUpload
+          ? 1.0
+          : (_contentType == 'short' ? 9 / 16 : 16 / 9);
+      thumbnailDataUrl = await compressImageToThumbnailDataUrl(
+        _thumbnailFile!.path,
+        aspectRatio: aspectRatio,
+      );
       if (!mounted) return;
       if (thumbnailDataUrl == null) {
         if (_isMusicUpload) {
@@ -438,16 +606,18 @@ class _UploadPageState extends ConsumerState<UploadPage> {
       }
     }
 
-    // 3. Parse lyrics if provided
+    // 3. Parse lyrics if provided and lyrics are enabled (5A: Lyrics ON/OFF toggle)
     List<Map<String, dynamic>> parsedLyricsJson = [];
-    if (_isMusicUpload && _syncedLyrics.isNotEmpty) {
-      // The editor's output takes precedence — it carries real per-line
-      // timings, which the plain textarea can only express if the creator
-      // hand-wrote LRC tags.
-      parsedLyricsJson = _syncedLyrics.map((l) => l.toJson()).toList();
-    } else if (_isMusicUpload && _lyricsController.text.trim().isNotEmpty) {
-      final parsed = parseLyrics(_lyricsController.text);
-      parsedLyricsJson = parsed.map((l) => l.toJson()).toList();
+    if (_isMusicUpload && _lyricsEnabled) {
+      if (_syncedLyrics.isNotEmpty) {
+        // The editor's output takes precedence — it carries real per-line
+        // timings, which the plain textarea can only express if the creator
+        // hand-wrote LRC tags.
+        parsedLyricsJson = _syncedLyrics.map((l) => l.toJson()).toList();
+      } else if (_lyricsController.text.trim().isNotEmpty) {
+        final parsed = parseLyrics(_lyricsController.text);
+        parsedLyricsJson = parsed.map((l) => l.toJson()).toList();
+      }
     }
 
     // 4. Fingerprint the audio bytes for server-side duplicate-track
@@ -595,6 +765,11 @@ class _UploadPageState extends ConsumerState<UploadPage> {
       _stage = _Stage.picking;
       _file = null;
       _thumbnailFile = null;
+      _localFrameCandidates.clear();
+      _groundingImages = const [];
+      _groundingKey = '';
+      _aiBusyField = null;
+      _aiThumbnailBusy = false;
       _musicCovers.clear();
       _fileSizeBytes = null;
       _contentType = 'video';
@@ -619,6 +794,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
       _savingThumbnail = false;
       _aiBusy = false;
       _syncedLyrics = const [];
+      _lyricsEnabled = true;
       _shortSettings = const ShortSettings();
       // These two were missing from the reset, so "Upload Another" after a
       // music track carried the previous genre and cover interval into the
@@ -638,7 +814,69 @@ class _UploadPageState extends ConsumerState<UploadPage> {
     category: _category,
     contentType: _isMusicUpload ? 'music' : _contentType,
     userDescription: userDescription,
+    images: _groundingImages,
   );
+
+  /// Up to 3 real frames from the picked video (or 2 music covers), shrunk
+  /// to small JPEG data URLs, so the AI writes about what is actually in the
+  /// upload instead of guessing from a category and a camera filename.
+  /// AI-generated thumbnails are excluded — only frames from the file itself.
+  Future<List<String>> _ensureGroundingImages() async {
+    final isMusic = _isMusicUpload;
+    final sources = isMusic
+        ? _musicCovers.take(2).toList()
+        : _localFrameCandidates
+              .where((f) => f.path.contains('local_frame_'))
+              .take(3)
+              .toList();
+    final key = sources.map((f) => f.path).join('|');
+    if (key == _groundingKey) return _groundingImages;
+
+    final ratio = isMusic ? 1.0 : (_contentType == 'short' ? 9 / 16 : 16 / 9);
+    final out = <String>[];
+    for (final f in sources) {
+      // Best-effort: a frame that can't be read is just skipped — the AI
+      // call still goes ahead with whatever frames did work (or none).
+      try {
+        final dataUrl = await compressImageToThumbnailDataUrl(
+          f.path,
+          aspectRatio: ratio,
+        );
+        if (dataUrl != null) out.add(dataUrl);
+      } catch (_) {}
+    }
+    _groundingKey = key;
+    _groundingImages = out;
+    return out;
+  }
+
+  /// The AI routes return the finished image as a data: URL. Dio can't GET a
+  /// data: URL, so the old download step threw every time and the AI
+  /// thumbnail/cover buttons always failed on the app — decode it locally.
+  Future<String> _saveAiImage(String url, String prefix) async {
+    List<int> bytes;
+    if (url.startsWith('data:')) {
+      final comma = url.indexOf(',');
+      if (comma < 0) {
+        throw const AIAssistException('The AI image came back malformed.');
+      }
+      bytes = base64Decode(url.substring(comma + 1));
+    } else {
+      final response = await Dio().get<List<int>>(
+        url,
+        options: Options(responseType: ResponseType.bytes),
+      );
+      bytes = response.data ?? const <int>[];
+    }
+    if (bytes.isEmpty) {
+      throw const AIAssistException('The AI image came back empty.');
+    }
+    final dir = await getTemporaryDirectory();
+    final filePath =
+        '${dir.path}/${prefix}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+    await File(filePath).writeAsBytes(bytes);
+    return filePath;
+  }
 
   /// Opens the tap-to-stamp lyrics editor against the picked audio file.
   ///
@@ -671,9 +909,23 @@ class _UploadPageState extends ConsumerState<UploadPage> {
   }
 
   Future<void> _openTitleAssist() async {
+    if (_aiBusy) return;
+    // Shrinking the frames takes a moment on first use — show the chip's
+    // spinner meanwhile so the tap doesn't look like it did nothing.
+    setState(() {
+      _aiBusy = true;
+      _aiBusyField = 'title';
+    });
+    await _ensureGroundingImages();
+    if (!mounted) return;
+    setState(() {
+      _aiBusy = false;
+      _aiBusyField = null;
+    });
     final picked = await showAITitleAssistSheet(
       context,
       initialDescription: _descriptionController.text.trim(),
+      seesFrames: _groundingImages.isNotEmpty,
       buildContext: (userDescription) =>
           _aiContext(userDescription: userDescription),
     );
@@ -683,44 +935,101 @@ class _UploadPageState extends ConsumerState<UploadPage> {
 
   Future<void> _generateDescription() async {
     if (_aiBusy) return;
-    setState(() => _aiBusy = true);
+    setState(() {
+      _aiBusy = true;
+      _aiBusyField = 'description';
+    });
     try {
+      await _ensureGroundingImages();
       final text = await ref
           .read(aiAssistServiceProvider)
           .suggestDescription(_aiContext());
       if (!mounted) return;
-      setState(() {
-        _descriptionController.text = text;
-        _aiBusy = false;
-      });
+      setState(() => _descriptionController.text = text);
     } on AIAssistException catch (e) {
-      if (!mounted) return;
-      setState(() => _aiBusy = false);
-      _showSnack(e.message);
+      if (mounted) _showSnack(e.message);
+    } catch (_) {
+      if (mounted) {
+        _showSnack("Couldn't write a description right now. Please try again.");
+      }
+    } finally {
+      // Always released — if this stayed stuck, every AI button on the
+      // screen went dead until the page was reopened.
+      if (mounted) {
+        setState(() {
+          _aiBusy = false;
+          _aiBusyField = null;
+        });
+      }
     }
   }
 
   Future<void> _generateTags() async {
     if (_aiBusy) return;
-    setState(() => _aiBusy = true);
+    setState(() {
+      _aiBusy = true;
+      _aiBusyField = 'tags';
+    });
     try {
+      await _ensureGroundingImages();
       final tags = await ref
           .read(aiAssistServiceProvider)
           .suggestTags(_aiContext());
       if (!mounted) return;
-      // Routed through _addTag rather than assigned straight into _tags so
-      // the AI's output goes through exactly the same dedup, '#'-stripping
-      // and 15-tag limit as anything typed by hand. Deliberately NOT wrapped
-      // in an outer setState — _addTag calls setState itself, and nesting
-      // the two is a mistake even where Flutter tolerates it.
+      // Routed through _addTag so the AI's output goes through the same
+      // dedup, '#'-stripping and 15-tag limit as anything typed by hand.
       for (final t in tags) {
         _addTag(t);
       }
-      setState(() => _aiBusy = false);
     } on AIAssistException catch (e) {
+      if (mounted) _showSnack(e.message);
+    } catch (_) {
+      if (mounted) _showSnack("Couldn't suggest tags right now. Please try again.");
+    } finally {
+      if (mounted) {
+        setState(() {
+          _aiBusy = false;
+          _aiBusyField = null;
+        });
+      }
+    }
+  }
+
+  /// Asks POST /api/ai-thumbnail (same route as the website's button) for a
+  /// brand-new image built from the title, description and category, with
+  /// the real frames attached so the server can fall back to picking the
+  /// best actual frame if generation fails. The result joins the candidate
+  /// grid below the thumbnail box — the creator taps it to use it.
+  Future<void> _generateAIThumbnail() async {
+    if (_aiThumbnailBusy) return;
+    final title = _titleController.text.trim();
+    if (title.isEmpty) {
+      _showSnack('Add a title first — the AI thumbnail is built from it.');
+      return;
+    }
+    setState(() => _aiThumbnailBusy = true);
+    try {
+      final frames = await _ensureGroundingImages();
+      final result = await ref.read(aiAssistServiceProvider).pickThumbnail(
+        title: title,
+        category: _category,
+        contentType: _isMusicUpload ? 'music' : _contentType,
+        description: _descriptionController.text.trim(),
+        frameUrls: frames,
+        generateNew: true,
+      );
+      final filePath = await _saveAiImage(result.thumbnailUrl, 'ai_thumbnail');
       if (!mounted) return;
-      setState(() => _aiBusy = false);
-      _showSnack(e.message);
+      setState(() => _localFrameCandidates.insert(0, XFile(filePath)));
+      _showSnack('AI thumbnail ready — tap it below to use it.');
+    } on AIAssistException catch (e) {
+      if (mounted) _showSnack(e.message);
+    } catch (_) {
+      if (mounted) {
+        _showSnack("Couldn't generate an AI thumbnail. Please try again.");
+      }
+    } finally {
+      if (mounted) setState(() => _aiThumbnailBusy = false);
     }
   }
 
@@ -948,6 +1257,24 @@ class _UploadPageState extends ConsumerState<UploadPage> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
+        if (_captureController != null && _captureController!.value.isInitialized)
+          SizedBox(
+            width: 0,
+            height: 0,
+            child: OverflowBox(
+              maxWidth: _captureController!.value.size.width,
+              maxHeight: _captureController!.value.size.height,
+              alignment: Alignment.topLeft,
+              child: RepaintBoundary(
+                key: _captureBoundaryKey,
+                child: SizedBox(
+                  width: _captureController!.value.size.width,
+                  height: _captureController!.value.size.height,
+                  child: VideoPlayer(_captureController!),
+                ),
+              ),
+            ),
+          ),
         Container(
           padding: const EdgeInsets.all(14),
           decoration: BoxDecoration(
@@ -1012,7 +1339,22 @@ class _UploadPageState extends ConsumerState<UploadPage> {
 
         // Custom Cover / Thumbnail selector
         if (!_isMusicUpload) ...[
-          _label('Thumbnail / Cover Image'),
+          Row(
+            children: [
+              _label('Thumbnail / Cover Image'),
+              const Spacer(),
+              _aiChip('AI thumbnail', _generateAIThumbnail, field: 'thumbnail'),
+            ],
+          ),
+          Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Text(
+              _contentType == 'short'
+                  ? 'Recommended: 9:16 portrait'
+                  : 'Recommended: 16:9 landscape',
+              style: TextStyle(color: context.textSecondary, fontSize: 11),
+            ),
+          ),
           GestureDetector(
             onTap: _pickThumbnail,
             child: Container(
@@ -1068,6 +1410,70 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                     ),
             ),
           ),
+          if (_capturingFrameCandidates || _localFrameCandidates.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text(
+              _capturingFrameCandidates
+                  ? 'Finding frames from your video…'
+                  : 'Or choose one of these:',
+              style: TextStyle(color: context.textSecondary, fontSize: 11, fontWeight: FontWeight.w600),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 72,
+              child: _capturingFrameCandidates && _localFrameCandidates.isEmpty
+                  ? Center(
+                      child: SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: AppColors.brandOrange,
+                        ),
+                      ),
+                    )
+                  : ListView.separated(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _localFrameCandidates.length,
+                      separatorBuilder: (_, _) => const SizedBox(width: 8),
+                      itemBuilder: (context, index) {
+                        final candidate = _localFrameCandidates[index];
+                        final selected = _thumbnailFile?.path == candidate.path;
+                        return GestureDetector(
+                          onTap: () => setState(() => _thumbnailFile = candidate),
+                          child: Container(
+                            width: 96,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(
+                                color: selected ? AppColors.brandOrange : context.borderSubtle,
+                                width: selected ? 2 : 1,
+                              ),
+                              image: DecorationImage(
+                                image: FileImage(File(candidate.path)),
+                                fit: BoxFit.cover,
+                              ),
+                            ),
+                            child: selected
+                                ? Align(
+                                    alignment: Alignment.topRight,
+                                    child: Container(
+                                      margin: const EdgeInsets.all(4),
+                                      decoration: const BoxDecoration(
+                                        color: AppColors.brandOrange,
+                                        shape: BoxShape.circle,
+                                      ),
+                                      padding: const EdgeInsets.all(2),
+                                      child: const Icon(Icons.check, size: 12, color: Colors.white),
+                                    ),
+                                  )
+                                : null,
+                          ),
+                        );
+                      },
+                    ),
+            ),
+          ],
         ] else ...[
           // Music Cover Carousel Editor (up to 5 covers)
           _label('Music Artwork & Covers (up to 5 rotating covers)'),
@@ -1173,6 +1579,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                     child: Container(
                       width: 100,
                       height: 100,
+                      margin: const EdgeInsets.only(right: 12),
                       decoration: BoxDecoration(
                         color: context.bgCard,
                         borderRadius: BorderRadius.circular(14),
@@ -1196,6 +1603,52 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                               style: TextStyle(
                                 color: context.textDim,
                                 fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+                if (_musicCovers.length < 5)
+                  GestureDetector(
+                    onTap: _aiCoverBusy ? null : _generateAiMusicCover,
+                    child: Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        color: context.bgCard,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: AppColors.brandOrange.withValues(alpha: 0.4),
+                          style: BorderStyle.solid,
+                        ),
+                      ),
+                      child: Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            _aiCoverBusy
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: AppColors.brandOrange,
+                                    ),
+                                  )
+                                : const Icon(
+                                    Icons.auto_awesome_rounded,
+                                    color: AppColors.brandOrange,
+                                    size: 28,
+                                  ),
+                            const SizedBox(height: 4),
+                            Text(
+                              _aiCoverBusy ? 'Generating' : 'AI Cover',
+                              style: const TextStyle(
+                                color: AppColors.brandOrange,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ],
@@ -1312,89 +1765,150 @@ class _UploadPageState extends ConsumerState<UploadPage> {
             onChanged: (v) => setState(() => _genre = v ?? _genre),
           ),
           const SizedBox(height: 12),
-          Row(
-            children: [
-              _label('Synchronized Lyrics (.lrc or plain text)'),
-              const Spacer(),
-              // Opens the tap-to-stamp editor. Kept alongside the plain
-              // textarea rather than replacing it: pasting an existing .lrc
-              // is still the fastest path when the creator already has one,
-              // and the editor is the answer when they don't.
-              Padding(
-                padding: const EdgeInsets.only(top: 14, bottom: 6),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(20),
-                  onTap: _openLyricsEditor,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 5,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppColors.brandOrange.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: AppColors.brandOrange.withValues(alpha: 0.35),
+          // 5A: Lyrics ON/OFF Toggle (defaults to ON; if OFF, payload sends empty list for instrumental tracks)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: context.bgCard,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(
+                color: _lyricsEnabled
+                    ? AppColors.brandOrange.withValues(alpha: 0.35)
+                    : context.borderSubtle,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  _lyricsEnabled ? Icons.lyrics_rounded : Icons.music_off_rounded,
+                  color: _lyricsEnabled ? AppColors.brandOrangeLight : context.textDim,
+                  size: 22,
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Lyrics',
+                        style: TextStyle(
+                          color: context.textPrimary,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    ),
-                    child: const Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.graphic_eq_rounded,
-                          size: 13,
-                          color: AppColors.brandOrangeLight,
+                      const SizedBox(height: 2),
+                      Text(
+                        _lyricsEnabled
+                            ? 'Lyrics ON — Synchronized LRC or plain text included'
+                            : 'Lyrics OFF — Instrumental track (no lyrics)',
+                        style: TextStyle(
+                          color: _lyricsEnabled ? context.textDim : AppColors.brandOrangeLight,
+                          fontSize: 11,
                         ),
-                        SizedBox(width: 5),
-                        Text(
-                          'Sync to audio',
-                          style: TextStyle(
+                      ),
+                    ],
+                  ),
+                ),
+                Switch.adaptive(
+                  key: const Key('music_lyrics_toggle'),
+                  value: _lyricsEnabled,
+                  activeThumbColor: AppColors.brandOrange,
+                  onChanged: (val) {
+                    setState(() {
+                      _lyricsEnabled = val;
+                    });
+                  },
+                ),
+              ],
+            ),
+          ),
+          if (_lyricsEnabled) ...[
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                _label('Synchronized Lyrics (.lrc or plain text)'),
+                const Spacer(),
+                // Opens the tap-to-stamp editor. Kept alongside the plain
+                // textarea rather than replacing it: pasting an existing .lrc
+                // is still the fastest path when the creator already has one,
+                // and the editor is the answer when they don't.
+                Padding(
+                  padding: const EdgeInsets.only(top: 14, bottom: 6),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(20),
+                    onTap: _openLyricsEditor,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 5,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppColors.brandOrange.withValues(alpha: 0.12),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: AppColors.brandOrange.withValues(alpha: 0.35),
+                        ),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            Icons.graphic_eq_rounded,
+                            size: 13,
                             color: AppColors.brandOrangeLight,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w800,
                           ),
-                        ),
-                      ],
+                          SizedBox(width: 5),
+                          Text(
+                            'Sync to audio',
+                            style: TextStyle(
+                              color: AppColors.brandOrangeLight,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          TextField(
-            controller: _lyricsController,
-            maxLines: 4,
-            style: TextStyle(color: context.textPrimary, fontSize: 13),
-            decoration: _inputDecoration(
-              'Paste your lyrics or [.lrc] timestamps here...',
+              ],
             ),
-            // Typing here supersedes whatever the editor produced — the two
-            // must not silently disagree about which is the real lyric
-            // sheet. See _syncedLyrics.
-            onChanged: (_) => setState(() => _syncedLyrics = const []),
-          ),
-          if (_syncedLyrics.isNotEmpty)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Row(
-                children: [
-                  const Icon(
-                    Icons.check_circle_rounded,
-                    size: 14,
-                    color: AppColors.success,
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: Text(
-                      '${_syncedLyrics.length} lines timed'
-                      '${_syncedLyrics.any((l) => l.time > 0) ? '' : ' (no timings yet)'}'
-                      ' — tap "Sync to audio" to adjust.',
-                      style: TextStyle(color: context.textDim, fontSize: 11),
+            TextField(
+              controller: _lyricsController,
+              maxLines: 4,
+              style: TextStyle(color: context.textPrimary, fontSize: 13),
+              decoration: _inputDecoration(
+                'Paste your lyrics or [.lrc] timestamps here...',
+              ),
+              // Typing here supersedes whatever the editor produced — the two
+              // must not silently disagree about which is the real lyric
+              // sheet. See _syncedLyrics.
+              onChanged: (_) => setState(() => _syncedLyrics = const []),
+            ),
+            if (_syncedLyrics.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Row(
+                  children: [
+                    const Icon(
+                      Icons.check_circle_rounded,
+                      size: 14,
+                      color: AppColors.success,
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        '${_syncedLyrics.length} lines timed'
+                        '${_syncedLyrics.any((l) => l.time > 0) ? '' : ' (no timings yet)'}'
+                        ' — tap "Sync to audio" to adjust.',
+                        style: TextStyle(color: context.textDim, fontSize: 11),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
+          ],
         ],
 
         const SizedBox(height: 8),
@@ -1402,7 +1916,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
           children: [
             _label('Title'),
             const Spacer(),
-            _aiChip('AI title', _openTitleAssist),
+            _aiChip('AI title', _openTitleAssist, field: 'title'),
           ],
         ),
         TextField(
@@ -1420,7 +1934,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
           children: [
             _label('Description'),
             const Spacer(),
-            _aiChip('AI write', _generateDescription),
+            _aiChip('AI write', _generateDescription, field: 'description'),
           ],
         ),
         TextField(
@@ -1503,7 +2017,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
           children: [
             _label('Tags'),
             const Spacer(),
-            _aiChip('AI tags', _generateTags),
+            _aiChip('AI tags', _generateTags, field: 'tags'),
           ],
         ),
         TextField(
@@ -2183,29 +2697,32 @@ class _UploadPageState extends ConsumerState<UploadPage> {
   /// label. Deliberately a quiet outlined chip rather than a filled button:
   /// these are optional helpers, and on the website they sit beside the
   /// field rather than competing with the primary Publish action.
-  Widget _aiChip(String text, VoidCallback onTap) {
+  Widget _aiChip(String text, VoidCallback onTap, {required String field}) {
+    final isThumbnail = field == 'thumbnail';
+    final busy = isThumbnail ? _aiThumbnailBusy : (_aiBusy && _aiBusyField == field);
+    final disabled = isThumbnail ? _aiThumbnailBusy : _aiBusy;
     return Padding(
       padding: const EdgeInsets.only(top: 14, bottom: 6),
       child: InkWell(
         borderRadius: BorderRadius.circular(20),
-        onTap: _aiBusy ? null : onTap,
+        onTap: disabled ? null : onTap,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
             color: AppColors.brandOrange.withValues(
-              alpha: _aiBusy ? 0.05 : 0.12,
+              alpha: disabled ? 0.05 : 0.12,
             ),
             borderRadius: BorderRadius.circular(20),
             border: Border.all(
               color: AppColors.brandOrange.withValues(
-                alpha: _aiBusy ? 0.15 : 0.35,
+                alpha: disabled ? 0.15 : 0.35,
               ),
             ),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _aiBusy
+              busy
                   ? const SizedBox(
                       width: 12,
                       height: 12,
@@ -2224,7 +2741,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                 text,
                 style: TextStyle(
                   color: AppColors.brandOrangeLight.withValues(
-                    alpha: _aiBusy ? 0.5 : 1.0,
+                    alpha: disabled ? 0.5 : 1.0,
                   ),
                   fontSize: 11,
                   fontWeight: FontWeight.w800,

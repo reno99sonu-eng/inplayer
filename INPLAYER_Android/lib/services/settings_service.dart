@@ -197,9 +197,15 @@ class SettingsService {
       final response = await _dio.delete(ApiConstants.accountDelete);
       if (response.statusCode == 200 && response.data is Map) {
         final data = response.data as Map;
+        // The backend now runs the same full cascade the admin panel uses
+        // (app/lib/cascadeDelete.ts) — its response field is `warnings`,
+        // not the old narrower route's `errors`.
         final warnings =
-            (data['errors'] as List?)?.whereType<String>().toList() ?? [];
-        return AccountDeleteResult(success: true, warnings: warnings);
+            (data['warnings'] as List?)?.whereType<String>().toList() ?? [];
+        return AccountDeleteResult(
+          success: data['success'] == true,
+          warnings: warnings,
+        );
       }
       return AccountDeleteResult(success: false);
     } catch (e) {

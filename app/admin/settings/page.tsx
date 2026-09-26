@@ -389,7 +389,7 @@ export default function AdminSettingsPage() {
               <div>
                 <h3 className="font-bold text-white light:text-slate-900">App Contact Emails</h3>
                 <p className="mt-0.5 text-xs text-slate-400 light:text-slate-600">
-                  Manage the emails shown in the mobile app's Contact Us screen.
+                  Manage the emails shown in the mobile app&apos;s Contact Us screen.
                 </p>
               </div>
             </div>

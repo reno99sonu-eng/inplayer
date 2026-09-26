@@ -70,7 +70,7 @@ async function generateTitleFromImage(apiKey: string, imageDataUrl: string, plac
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: "gpt-6-sol",
         messages: [
           {
             role: "user",
@@ -81,7 +81,8 @@ async function generateTitleFromImage(apiKey: string, imageDataUrl: string, plac
           },
         ],
         response_format: { type: "json_object" },
-        max_tokens: 200,
+        reasoning_effort: "none",
+        max_completion_tokens: 200,
       }),
       signal: controller.signal,
     });
@@ -119,10 +120,11 @@ async function generateHeadlineText(apiKey: string, placement: string): Promise<
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: "gpt-6-sol",
         messages: [{ role: "user", content: prompt }],
         response_format: { type: "json_object" },
-        max_tokens: 100,
+        reasoning_effort: "none",
+        max_completion_tokens: 100,
       }),
       signal: controller.signal,
     });
@@ -162,7 +164,9 @@ async function generateBannerImage(apiKey: string, placement: string, headline: 
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
-        model: "gpt-image-1",
+        // Sunburst: precise text rendering matters here (the headline is
+        // baked directly into the image), which is Sunburst's strength.
+        model: "gpt-image-2.5-sunburst",
         prompt,
         size: "1536x1024",
         quality: "medium",

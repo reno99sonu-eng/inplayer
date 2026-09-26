@@ -9,6 +9,7 @@ import '../../../../providers/auth_provider.dart';
 import '../../../../providers/theme_provider.dart';
 import '../../../../services/auth_service.dart';
 import '../../../../services/settings_service.dart';
+import '../../../../providers/app_language_provider.dart';
 
 const _pushNotificationsPrefKey = 'push_notifications_enabled';
 
@@ -250,8 +251,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           style: TextStyle(color: ctx.textPrimary, fontWeight: FontWeight.bold),
         ),
         content: Text(
-          'This permanently deletes your videos, profile, and username reservation, and '
-          "signs you out for good. This can't be undone. Are you sure?",
+          'This permanently deletes your videos, profile, username reservation, likes, '
+          'watch history, watchlist, and playlists — and cancels any active paid '
+          "membership so you won't keep being charged. It signs you out for good and "
+          "can't be undone. Are you sure?",
           style: TextStyle(color: ctx.textSecondary),
         ),
         actions: [
@@ -286,26 +289,30 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       return;
     }
 
-    final authResult = await ref.read(authServiceProvider).deleteUser();
+    // The backend cascade (app/lib/cascadeDelete.ts, same one the admin
+    // panel uses) already deleted the actual Cognito sign-in account
+    // server-side as its last step — calling Amplify.Auth.deleteUser()
+    // from here now would just fail against a user that's already gone.
+    // This only clears this device's own local session; the account being
+    // deleted no longer depends on it succeeding.
+    try {
+      await ref.read(authServiceProvider).signOut();
+    } catch (e) {
+      // Best-effort — the account is deleted either way; a failure here
+      // just means Amplify's local token cache didn't clear cleanly.
+    }
 
     if (!mounted) return;
     setState(() => _deletingAccount = false);
-
-    if (authResult.success) {
-      ref.read(authStateProvider.notifier).setUnauthenticated();
-    } else {
-      _showSnack(
-        authResult.error ??
-            "Your data was deleted, but signing you out failed.",
-      );
-    }
+    ref.read(authStateProvider.notifier).setUnauthenticated();
   }
 
   @override
   Widget build(BuildContext context) {
     final currentTheme = ref.watch(themeChoiceProvider);
+    final currentLanguage = ref.watch(appLanguageProvider);
 
-    final sections = _buildSections(currentTheme);
+    final sections = _buildSections(currentTheme, currentLanguage);
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -332,7 +339,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ),
       ),
       body: SafeArea(
-        child: Column(
+        child: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 720),
+            child: Column(
           children: [
             Container(
               width: double.infinity,
@@ -445,10 +455,15 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           ],
         ),
       ),
-    );
-  }
+    ),
+  ),
+);
+}
 
-  List<_SettingsSection> _buildSections(ThemeChoice currentTheme) {
+  List<_SettingsSection> _buildSections(
+    ThemeChoice currentTheme,
+    AppLanguageItem currentLanguage,
+  ) {
     return [
       _SettingsSection(
         title: 'Profile',
@@ -542,6 +557,24 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         ],
       ),
       _SettingsSection(
+        title: 'Language',
+        items: [
+          _SettingTile(
+            icon: Icons.language_rounded,
+            title: 'App Language',
+            trailing: Text(
+              currentLanguage.nativeName,
+              style: const TextStyle(
+                color: AppColors.brandOrange,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+            onTap: () => context.push('/settings/language'),
+          ),
+        ],
+      ),
+      _SettingsSection(
         title: 'Appearance',
         items: [
           _SettingTile(
@@ -582,8 +615,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             onTap: () => context.push('/settings/help'),
           ),
           _SettingTile(
+
             icon: Icons.privacy_tip_outlined,
-            title: 'InPlayer Policies',
+            title: 'Privacy Policies',
             onTap: () => context.push('/settings/policies'),
           ),
         ],

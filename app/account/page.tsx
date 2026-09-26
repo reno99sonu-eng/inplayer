@@ -64,7 +64,7 @@ export default function AccountPage() {
           Access your channel, MilonBook, history, and more.
           </p>
           <button
-            onClick={openSignIn}
+            onClick={() => openSignIn()}
             className="mt-6 rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-8 py-3 font-bold text-white shadow-[0_15px_35px_rgba(255,153,0,.3)] transition-all hover:-translate-y-0.5"
           >
             Sign In

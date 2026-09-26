@@ -1,8 +1,16 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { UploadCloud, X, Globe, Link2, Lock, Film, PlaySquare, Loader2, Sparkles } from "lucide-react";
 import { AUDIENCE_OPTIONS, type VideoAudience } from "@/app/lib/contentAccess";
+import { THUMBNAIL_RATIO_LABEL } from "@/app/lib/contentTypes";
+
+// Matches THUMBNAIL_RATIO_LABEL 1:1 — the plain-English word for each shape.
+const THUMBNAIL_ORIENTATION_WORD: Record<"video" | "short" | "music", string> = {
+  video: "landscape",
+  short: "portrait",
+  music: "square",
+};
 
 export const CONTENT_TYPES = [
   { value: "video", label: "Video" },
@@ -75,6 +83,38 @@ interface VideoMetadataFieldsProps {
   onOpenAITitleAssist?: () => void;
   aiError?: string | null;
   aiSuggestions?: string[];
+  // Optional — only the upload page passes these, so the edit/live forms
+  // that reuse this component don't grow buttons they have no handler for.
+  onGenerateAIDescription?: () => void;
+  onGenerateAITags?: () => void;
+  /** Which AI field is currently generating, for its spinner. */
+  aiBusyField?: "title" | "description" | "tags" | null;
+  aiDescriptionError?: string | null;
+  aiTagsError?: string | null;
+}
+
+function AIFieldButton({
+  label,
+  busy,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  busy: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled}
+      className="inline-flex items-center gap-1 rounded-lg bg-orange-500/15 px-2.5 py-1 text-[11px] font-bold text-orange-400 transition hover:bg-orange-500 hover:text-white disabled:opacity-50"
+    >
+      {busy ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
+      {busy ? "Generating..." : label}
+    </button>
+  );
 }
 
 function ToggleRow({
@@ -128,12 +168,15 @@ export default function VideoMetadataFields({
   onOpenAITitleAssist,
   aiError = null,
   aiSuggestions = [],
+  onGenerateAIDescription,
+  onGenerateAITags,
+  aiBusyField = null,
+  aiDescriptionError = null,
+  aiTagsError = null,
 }: VideoMetadataFieldsProps) {
   const thumbInputRef = useRef<HTMLInputElement>(null);
   const muxFrames = thumbnail?.muxFrames ?? [];
 
-  // Mobile Segmented Tab State for ultra-compact 1-screen editing on mobile
-  const [mobileTab, setMobileTab] = useState<"details" | "settings">("details");
 
   const addTag = () => {
     const t = tagInput.trim().replace(/^#/, "");
@@ -149,35 +192,12 @@ export default function VideoMetadataFields({
 
   return (
     <div className="space-y-3">
-      {/* Mobile Segmented Tab Control (Shown on Mobile, Hidden on Desktop) */}
-      <div className="flex rounded-xl border border-white/10 bg-black/20 p-1 light:border-black/10 light:bg-black/5 lg:hidden">
-        <button
-          type="button"
-          onClick={() => setMobileTab("details")}
-          className={`flex-1 py-1.5 text-center text-xs font-bold rounded-lg transition-all ${
-            mobileTab === "details"
-              ? "bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white shadow"
-              : "text-slate-400 hover:text-white light:text-slate-600 light:hover:text-slate-900"
-          }`}
-        >
-          1. Details & Thumbnail
-        </button>
-        <button
-          type="button"
-          onClick={() => setMobileTab("settings")}
-          className={`flex-1 py-1.5 text-center text-xs font-bold rounded-lg transition-all ${
-            mobileTab === "settings"
-              ? "bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white shadow"
-              : "text-slate-400 hover:text-white light:text-slate-600 light:hover:text-slate-900"
-          }`}
-        >
-          2. Visibility & Settings
-        </button>
-      </div>
-
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6">
-        {/* SECTION 1: Details & Thumbnail (Visible on Desktop OR Mobile Tab 1) */}
-        <div className={`space-y-3.5 ${mobileTab === "details" ? "block" : "hidden lg:block"}`}>
+        {/* SECTION 1: Details & Thumbnail — always visible, no tab to switch */}
+        <div className="space-y-3.5">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500 light:text-slate-400">
+            Details & Thumbnail
+          </p>
           {/* Title Field + AI Assist */}
           <div>
             <div className="mb-1 flex items-center justify-between">
@@ -224,9 +244,20 @@ export default function VideoMetadataFields({
 
           {/* Description Field */}
           <div>
-            <label className="mb-1 block text-xs font-bold text-slate-300 light:text-slate-700">
-              Description
-            </label>
+            <div className="mb-1 flex items-center justify-between">
+              <label className="block text-xs font-bold text-slate-300 light:text-slate-700">
+                Description
+              </label>
+              {onGenerateAIDescription && (
+                <AIFieldButton
+                  label="✨ AI Write"
+                  busy={aiBusyField === "description"}
+                  disabled={aiGenerating}
+                  onClick={onGenerateAIDescription}
+                />
+              )}
+            </div>
+            {aiDescriptionError && <p className="mb-1 text-xs text-red-400">{aiDescriptionError}</p>}
             <textarea
               rows={2}
               value={value.description}
@@ -244,7 +275,7 @@ export default function VideoMetadataFields({
                   Thumbnail
                 </label>
                 <span className="rounded-full border border-white/10 px-2 py-0.5 text-[10px] font-semibold text-slate-400 light:border-black/10 light:text-slate-500">
-                  16:9 landscape
+                  {THUMBNAIL_RATIO_LABEL[value.contentType]} {THUMBNAIL_ORIENTATION_WORD[value.contentType]}
                 </span>
               </div>
               <div className="flex gap-4">
@@ -274,7 +305,7 @@ export default function VideoMetadataFields({
               {muxFrames && muxFrames.length > 0 && (
                 <div>
                   <p className="mb-1.5 text-[11px] font-semibold text-slate-400 light:text-slate-600">
-                    🎬 Pick from Video Frames
+                    🎬 Pick a thumbnail
                   </p>
                   <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
                     {muxFrames.map((frameUrl, idx) => {
@@ -325,13 +356,20 @@ export default function VideoMetadataFields({
                   />
                 </div>
               </div>
+              <p className="text-[10px] text-slate-500">
+                {THUMBNAIL_RATIO_LABEL[value.contentType]} recommended — uploads outside this shape get
+                center-cropped to fit.
+              </p>
               {thumbnail.error && <p className="mt-1 text-xs text-red-400">{thumbnail.error}</p>}
             </div>
           )}
         </div>
 
-        {/* SECTION 2: Visibility & Settings (Visible on Desktop OR Mobile Tab 2) */}
-        <div className={`space-y-3.5 ${mobileTab === "settings" ? "block" : "hidden lg:block"}`}>
+        {/* SECTION 2: Visibility & Settings — always visible, no tab to switch */}
+        <div className="space-y-3.5">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500 light:text-slate-400">
+            Visibility & Settings
+          </p>
           {/* Category & Spoken Language */}
           <div className="grid grid-cols-2 gap-2">
             <div>
@@ -446,9 +484,20 @@ export default function VideoMetadataFields({
 
           {/* Tags */}
           <div>
-            <label className="mb-1 block text-xs font-bold text-slate-300 light:text-slate-700">
-              Tags <span className="text-slate-500">(up to 15)</span>
-            </label>
+            <div className="mb-1 flex items-center justify-between">
+              <label className="block text-xs font-bold text-slate-300 light:text-slate-700">
+                Tags <span className="text-slate-500">(up to 15)</span>
+              </label>
+              {onGenerateAITags && (
+                <AIFieldButton
+                  label="✨ AI Tags"
+                  busy={aiBusyField === "tags"}
+                  disabled={aiGenerating}
+                  onClick={onGenerateAITags}
+                />
+              )}
+            </div>
+            {aiTagsError && <p className="mb-1 text-xs text-red-400">{aiTagsError}</p>}
             <div className="flex flex-wrap gap-1 rounded-xl border border-white/10 bg-[#060D18] p-1.5 light:border-black/10 light:bg-white">
               {value.tags.map((t) => (
                 <span

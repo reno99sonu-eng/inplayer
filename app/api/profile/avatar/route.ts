@@ -3,6 +3,7 @@ import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
 import { ensureUsername } from "@/app/lib/ensureUsername";
+import { isCurrentPolicyAccepted } from "@/app/lib/termsVersion";
 
 const DEFAULT_SOCIAL_LINKS = { social: {}, other: [] };
 
@@ -21,14 +22,23 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: "Please sign in." }, { status: 401 });
   }
 
-  await ensureUsername(user.userId);
+  // Single read, handed to ensureUsername() instead of letting it do its
+  // own separate GetCommand on this exact same item — this endpoint is hit
+  // on every login and every passive session-restore (AuthProvider's
+  // refreshUser()), so the old "ensureUsername fetches the row, then this
+  // route fetches the identical row again a moment later" pattern meant a
+  // fully redundant DynamoDB round trip on every single one of those.
+  // ensureUsername only ever touches username/usernameLower/updatedAt/
+  // createdAt — none of the other fields read below — so its returned
+  // username is merged into this one fetch rather than re-reading.
+  const result = await docClient.send(
+    new GetCommand({
+      TableName: "InPlayer-Users",
+      Key: { userId: user.userId },
+    })
+  );
 
-const result = await docClient.send(
-  new GetCommand({
-    TableName: "InPlayer-Users",
-    Key: { userId: user.userId },
-  })
-);
+  const resolvedUsername = await ensureUsername(user.userId, result.Item);
 
   return NextResponse.json({
     // Sourced from verifyAuth(), which already resolves this app's own
@@ -39,7 +49,7 @@ const result = await docClient.send(
     name: user.name || null,
     avatarUrl: result.Item?.avatarUrl || null,
     coverPhotoUrl: result.Item?.coverPhotoUrl || null,
-    username: result.Item?.username || null,
+    username: resolvedUsername || result.Item?.username || null,
     usernamePrivacy: result.Item?.usernamePrivacy || "public",
     // Real channel bio/description — saved via POST /api/profile/settings
     // (action: "update_bio") and shown publicly on the channel page
@@ -49,7 +59,12 @@ const result = await docClient.send(
     description: result.Item?.description || result.Item?.bio || "",
     socialLinks: result.Item?.socialLinks || DEFAULT_SOCIAL_LINKS,
     age: typeof result.Item?.age === "number" ? result.Item.age : null,
-    termsAccepted: Boolean(result.Item?.termsAcceptedAt),
+    termsAccepted: isCurrentPolicyAccepted(
+      result.Item?.termsAcceptedAt,
+      result.Item?.termsPolicyVersion
+    ),
+    termsAcceptedAt: result.Item?.termsAcceptedAt || null,
+    termsPolicyVersion: result.Item?.termsPolicyVersion || null,
   });
 }
 

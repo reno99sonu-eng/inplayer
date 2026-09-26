@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/image_utils.dart';
 import '../../../../models/video.dart';
 
 /// Horizontal "Music" shelf — square album-art style cards for videos
@@ -67,9 +67,9 @@ class MusicRow extends StatelessWidget {
               borderRadius: BorderRadius.circular(10),
               child: AspectRatio(
                 aspectRatio: 1,
-                child: video.thumbnail.isNotEmpty
-                    ? CachedNetworkImage(
-                        imageUrl: video.thumbnail,
+                child: (video.covers.isNotEmpty ? video.covers.first : video.thumbnail).isNotEmpty
+                    ? SafeAppImage(
+                        imageUrl: video.covers.isNotEmpty ? video.covers.first : video.thumbnail,
                         fit: BoxFit.cover,
                         errorWidget: (context, url, error) => _fallback(),
                       )

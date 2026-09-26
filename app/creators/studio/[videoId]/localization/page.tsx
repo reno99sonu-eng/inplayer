@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { fetchAuthSession } from "aws-amplify/auth";
-import { ArrowLeft, Save, Loader2, RefreshCw } from "lucide-react";
+import { ArrowLeft, Save, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { CAPTION_TARGETS } from "@/app/lib/captions";

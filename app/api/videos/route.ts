@@ -2,18 +2,35 @@ import { NextResponse } from "next/server";
 import { getVisibleVideos } from "@/app/lib/contentAccessServer";
 import { resolveUsernames } from "@/app/lib/resolveUsernames";
 
+import { isMusicType } from "@/app/lib/contentTypes";
+
 export const dynamic = "force-dynamic";
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const channelId = searchParams.get("channelId");
-  
+  const contentType = searchParams.get("contentType");
+
   try {
     const allReady = await getVisibleVideos();
     let items = allReady.filter(
       (v) => !v.visibility || v.visibility === "public"
     );
-    
+
+    // Strict content separation:
+    // By default, /api/videos returns standard longform videos (NO music, NO shorts).
+    // An explicit ?contentType= query allows querying music or shorts specifically.
+    if (contentType === "music") {
+      items = items.filter((v) => isMusicType(v.contentType));
+    } else if (contentType === "short" || contentType === "raftaar") {
+      items = items.filter((v) => v.contentType === "short");
+    } else if (contentType !== "all") {
+      // Default: pure longform videos only
+      items = items.filter(
+        (v) => !isMusicType(v.contentType) && v.contentType !== "short"
+      );
+    }
+
     if (channelId) {
       items = items.filter((v) => v.uploaderId === channelId);
     }

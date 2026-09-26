@@ -189,7 +189,7 @@ function FeaturedHeroAdImage({
         src={src}
         alt={title || "Featured"}
         onError={() => setBroken(true)}
-        className="relative h-full w-full object-contain transition duration-500 group-hover:scale-[1.01]"
+        className="relative h-full w-full object-cover transition duration-500 group-hover:scale-[1.01]"
       />
     </div>
   );

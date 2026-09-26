@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -109,11 +109,16 @@ class _MessagesPageState extends ConsumerState<MessagesPage> {
           ),
           body: _loading
               ? const Center(child: CircularProgressIndicator(color: AppColors.brandOrange))
-              : TabBarView(
-                  children: [
-                    _buildList(_conversations, isRequests: false),
-                    _buildList(_requests, isRequests: true),
-                  ],
+              : Center(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 720),
+                    child: TabBarView(
+                      children: [
+                        _buildList(_conversations, isRequests: false),
+                        _buildList(_requests, isRequests: true),
+                      ],
+                    ),
+                  ),
                 ),
         ),
       ),

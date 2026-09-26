@@ -431,10 +431,10 @@ export default function RevenueSection({
       ) : monetizeData?.state?.status === "ELIGIBLE" ? (
         <div className="mt-4 rounded-xl border border-orange-400/20 bg-orange-500/[0.06] px-3 py-3">
           <p className="flex items-center gap-1.5 text-sm font-bold text-orange-300 light:text-orange-700">
-            <CheckCircle2 size={16} /> You're Eligible for Monetization!
+            <CheckCircle2 size={16} /> Eligible to Apply for Monetization
           </p>
           <p className="mt-1 text-xs leading-relaxed text-slate-400 light:text-slate-600">
-            You've reached the required milestones. Activate monetization to start earning your {Math.round((monetizeData?.eligibility?.thresholds?.revenueShare || 0.8) * 100)}% share of membership fees.
+            You&apos;ve reached the minimum platform thresholds! In accordance with Section 3 of the Creator Monetization Policy, you may now activate monetization and submit your KYC details for review.
           </p>
           <button
             onClick={handleActivateMonetization}
@@ -447,8 +447,9 @@ export default function RevenueSection({
       ) : (
         <div className="mt-4 space-y-4">
           <p className="text-xs text-slate-500 light:text-slate-600">
-            Monetization unlocks automatically when you reach {monetizeData?.eligibility?.thresholds?.subscribers?.toLocaleString() || 500} In-Family members
-            AND either {monetizeData?.eligibility?.thresholds?.videoViews?.toLocaleString() || 50000} video views or {(monetizeData?.eligibility?.thresholds?.shortViews || 1000000).toLocaleString()} Raftaar reels views!
+            You become eligible to apply for KYC verification and monetization upon reaching {monetizeData?.eligibility?.thresholds?.subscribers?.toLocaleString() || 500} In-Family members
+            AND either {monetizeData?.eligibility?.thresholds?.videoViews?.toLocaleString() || 50000} video views or {(monetizeData?.eligibility?.thresholds?.shortViews || 1000000).toLocaleString()} Raftaar reels views.
+            In accordance with Section 3 of the Creator Monetization Policy, meeting minimum thresholds allows application for verification; approval is subject to account review and policy compliance.
             {" "}Plays of your music count toward the video-views target — same
             milestone, whichever way you publish.
           </p>

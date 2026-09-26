@@ -28,16 +28,16 @@ export async function GET() {
         (!item.expiresAt || new Date(item.expiresAt as string).getTime() > now)
     );
 
-    // If no ready ads yet, but there are processing video ads, attempt
-    // an immediate self-heal check with Mux so newly-uploaded ads become
-    // live without waiting for a webhook.
+    // If no ready ads yet, but there are processing video ads, kick off a
+    // self-heal check with Mux in the background so newly-uploaded ads
+    // become live without waiting for a webhook — fire-and-forget rather
+    // than awaited, so a slow/hung Mux status check can never make THIS
+    // request (which every single video load blocks on to learn its ad
+    // config) hang or time out. The very next video load picks up whatever
+    // this run heals, same as before, just never on the critical path.
     if (items.length === 0 && allAds.some((a) => a.status === "processing")) {
-      const healed = await selfHealMidrollAdsBatch(allAds);
-      items = healed.filter(
-        (item) =>
-          item.active === true &&
-          (item.status === undefined || item.status === "ready") &&
-          (!item.expiresAt || new Date(item.expiresAt as string).getTime() > now)
+      void selfHealMidrollAdsBatch(allAds).catch((err) =>
+        console.error("Background midroll ad self-heal failed:", err)
       );
     }
 
@@ -47,16 +47,9 @@ export async function GET() {
 
     const pick = items[Math.floor(Math.random() * items.length)];
 
-    docClient
-      .send(
-        new UpdateCommand({
-          TableName: MIDROLL_ADS_TABLE,
-          Key: { adId: pick.adId },
-          UpdateExpression: "ADD impressions :one",
-          ExpressionAttributeValues: { ":one": 1 },
-        })
-      )
-      .catch((err) => console.error("midroll-ads: impression counter failed:", err));
+    // Notice: impressions are counted when an ad actually starts playback
+    // via POST /api/midroll-ads { adId, kind: 'impression' } instead of
+    // blindly incrementing on fetch.
 
     return NextResponse.json({
       enabled: true,
@@ -81,21 +74,31 @@ export async function GET() {
   }
 }
 
-// Real click/skip tracking, fired by VideoPlayer's mid-roll overlay.
+// Real impression/click/skip tracking, fired by player ad overlays when an ad
+// actually plays, is clicked, or is skipped.
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => null);
   const adId = body?.adId;
   const kind = body?.kind;
-  if (!adId || typeof adId !== "string" || (kind !== "click" && kind !== "skip")) {
-    return NextResponse.json({ error: "adId and a valid kind are required." }, { status: 400 });
+  if (
+    !adId ||
+    typeof adId !== "string" ||
+    (kind !== "click" && kind !== "skip" && kind !== "impression")
+  ) {
+    return NextResponse.json(
+      { error: "adId and a valid kind (impression, click, skip) are required." },
+      { status: 400 }
+    );
   }
 
   try {
+    const attribute =
+      kind === "impression" ? "impressions" : kind === "click" ? "clicks" : "skips";
     await docClient.send(
       new UpdateCommand({
         TableName: MIDROLL_ADS_TABLE,
         Key: { adId },
-        UpdateExpression: `ADD ${kind === "click" ? "clicks" : "skips"} :one`,
+        UpdateExpression: `ADD ${attribute} :one`,
         ExpressionAttributeValues: { ":one": 1 },
       })
     );

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/pattern_background.dart';
+import '../../../../core/utils/text_utils.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../services/auth_service.dart';
 
@@ -123,8 +124,14 @@ class _ChangeEmailPageState extends ConsumerState<ChangeEmailPage> {
                 decoration: _fieldDecoration('you@example.com'),
               ),
             ] else ...[
-              Text(
-                'We sent a verification code to ${_emailController.text.trim()}. Enter it below to confirm the change.',
+              Text.rich(
+                TextSpan(
+                  children: [
+                    const TextSpan(text: 'We sent a verification code to '),
+                    TextSpan(text: breakableEmail(_emailController.text.trim())),
+                    const TextSpan(text: '. Enter it below to confirm the change.'),
+                  ],
+                ),
                 style: TextStyle(color: context.textSecondary, fontSize: 13),
               ),
               const SizedBox(height: 16),

@@ -2,9 +2,7 @@ import { Suspense } from "react";
 import FeaturedHero from "./components/featuredHero/FeaturedHero";
 import FeaturedHeroAd from "./components/featuredHero/FeaturedHeroAd";
 import RecommendationFeed from "./components/RecommendationFeed";
-import { getVisibleVideos, getAudienceMode } from "./lib/contentAccessServer";
-import { videoAudience } from "./lib/contentAccess";
-import KidsRow, { type KidsRowItem } from "./components/KidsRow";
+import { getVisibleVideos } from "./lib/contentAccessServer";
 import { isMusicType } from "./lib/contentTypes";
 import { getFeaturedThisWeek } from "./lib/trendingStore";
 import { getPlatformSettings } from "./lib/platformSettings";
@@ -40,9 +38,6 @@ function formatTimeAgo(isoString: string): string {
 interface RealContent {
   realVideos: Recommendation[];
   realShorts: Short[];
-  // Videos a creator tagged as Kids in the upload Audience picker. These
-  // ALSO appear in realVideos — this is an extra shelf, not a partition.
-  kidsVideos: KidsRowItem[];
 }
 
 async function getRealContent(): Promise<RealContent> {
@@ -118,28 +113,12 @@ async function getRealContent(): Promise<RealContent> {
         };
       });
 
-    // Kids shelf — longform only, same source list, just narrowed to items
-    // whose creator tagged them for kids. Built off `items` (already
-    // audience-filtered and public-only) so it can never surface something
-    // the rest of the page is hiding.
-    const kidsVideos: KidsRowItem[] = items
-      .filter((video) => video.contentType !== "short" && !isMusicType(video.contentType) && videoAudience(video) === "kids")
-      .slice(0, 20)
-      .map((video) => ({
-        videoId: video.videoId as string,
-        title: video.title as string,
-        creator: (video.uploaderName as string) || "Unknown",
-        thumbnail:
-          (video.thumbnailUrl as string) || "/recommendations/thumbnails/1.jpg",
-        views: `${(video.views as number) || 0} views`,
-      }));
-
-    return { realVideos, realShorts, kidsVideos };
+    return { realVideos, realShorts };
   } catch (err) {
     // If DynamoDB is briefly unreachable, fail gracefully rather than
     // breaking the whole homepage — just show the example data instead.
     console.error("Failed to fetch real content for homepage:", err);
-    return { realVideos: [], realShorts: [], kidsVideos: [] };
+    return { realVideos: [], realShorts: [] };
   }
 }
 
@@ -282,19 +261,13 @@ async function HomeContent({ activeView, isVertical }: { activeView: "horizontal
   // The hero only renders in horizontal view, so only fetch its data then —
   // no point paying for the extra query on the Shorts feed. Both fetches
   // run in parallel rather than sequentially.
-  const [{ realVideos, realShorts, kidsVideos }, heroContent, audienceMode] =
+  const [{ realVideos, realShorts }, heroContent] =
     await Promise.all([
       getRealContent(),
       isVertical
         ? Promise.resolve<HeroContent>({ kind: "videos", slides: [] })
         : getHeroContent(),
-      getAudienceMode(),
     ]);
-
-  // The Kids shelf is a horizontal-view thing (Vertical is a pure Shorts
-  // feed), and it's pointless in Kids-only mode where the entire page is
-  // already this content and the row would just duplicate the grid below.
-  const showKidsRow = !isVertical && audienceMode !== "kids" && kidsVideos.length > 0;
 
   return (
         <div className="space-y-1 lg:space-y-2">
@@ -317,8 +290,6 @@ async function HomeContent({ activeView, isVertical }: { activeView: "horizontal
               <div className="mx-auto h-px w-[92%] bg-gradient-to-r from-transparent via-white/10 to-transparent light:via-black/10" />
             </>
           )}
-
-          {showKidsRow && <KidsRow items={kidsVideos} />}
 
           <RecommendationFeed
             realVideos={realVideos}

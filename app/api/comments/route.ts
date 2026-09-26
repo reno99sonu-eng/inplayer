@@ -9,6 +9,7 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import { randomUUID } from "crypto";
 import { docClient } from "@/app/lib/dynamodb";
+import { sendPushToUser } from "@/app/lib/push";
 import { verifyAuth } from "@/app/lib/verifyAuth";
 import { resolveUsernames } from "@/app/lib/resolveUsernames";
 import { resolveActiveMemberIds } from "@/app/lib/memberships";
@@ -250,6 +251,7 @@ export async function POST(request: NextRequest) {
     const preview = text.trim().length > 60 ? text.trim().slice(0, 60) + "..." : text.trim();
 
     if (parentUserId && parentUserId !== user.userId) {
+      const replyMessage = `${user.name || "Someone"} replied to your comment on "${video?.title || "video"}": "${preview}"`;
       await docClient.send(
         new PutCommand({
           TableName: "InPlayer-Notifications",
@@ -257,14 +259,16 @@ export async function POST(request: NextRequest) {
             userId: parentUserId,
             notificationId: randomUUID(),
             type: "comment_reply",
-            message: `${user.name || "Someone"} replied to your comment on "${video?.title || "video"}": "${preview}"`,
+            message: replyMessage,
             videoId,
             read: false,
             createdAt: new Date().toISOString(),
           },
         })
       );
+      void sendPushToUser({ userId: parentUserId, title: "INPLAYER", body: replyMessage });
     } else if (video && video.uploaderId !== user.userId) {
+      const commentMessage = `${user.name || "Someone"} commented on your video "${video.title}": "${preview}"`;
       await docClient.send(
         new PutCommand({
           TableName: "InPlayer-Notifications",
@@ -272,13 +276,14 @@ export async function POST(request: NextRequest) {
             userId: video.uploaderId,
             notificationId: randomUUID(),
             type: "comment",
-            message: `${user.name || "Someone"} commented on your video "${video.title}": "${preview}"`,
+            message: commentMessage,
             videoId,
             read: false,
             createdAt: new Date().toISOString(),
           },
         })
       );
+      void sendPushToUser({ userId: video.uploaderId as string, title: "INPLAYER", body: commentMessage });
     }
   } catch (err) {
     console.error("Failed to write comment notification:", err);

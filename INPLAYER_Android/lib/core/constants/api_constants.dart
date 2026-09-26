@@ -24,6 +24,9 @@ class ApiConstants {
   static const String videoDetail = '/api/videos';
   static const String videoPlaybackToken = '/api/videos';
 
+  // Music
+  static const String music = '/api/music';
+
   // Shorts
   static const String shorts = '/api/shorts';
 
@@ -91,6 +94,10 @@ class ApiConstants {
 
   // Notifications
   static const String notifications = '/api/notifications';
+
+  // Push notification device tokens (POST to register, DELETE to remove —
+  // see app/api/push/register-token/route.ts).
+  static const String pushRegisterToken = '/api/push/register-token';
 
   // Playlists
   static const String playlists = '/api/playlists';
@@ -197,6 +204,7 @@ class ApiConstants {
   // 'adsense' response is treated the same as 'off'.
   // POST ads { adId, event: 'impression'|'click' } — fire-and-forget.
   static const String ads = '/api/ads';
+  static const String midrollAds = '/api/midroll-ads';
 
   // The real website — used only for the small set of actions this app
   // honestly can't complete natively yet (Razorpay checkout for Premium/

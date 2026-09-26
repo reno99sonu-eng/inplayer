@@ -16,9 +16,6 @@ export const INVITATION_TTL_MS = 7 * 24 * 60 * 60 * 1000; // 7 days
 export interface AdminInvitation {
   invitationId: string;
   email: string;
-  /** SHA-256 of the raw token — the raw token itself is NEVER stored,
-   *  logged, or retrievable after creation; it only ever exists in the one
-   *  email sent to the invitee. */
   tokenHash: string;
   permissions: TeamPermission[];
   inviterUserId: string;
@@ -34,10 +31,6 @@ function hashToken(token: string): string {
   return createHash("sha256").update(token).digest("hex");
 }
 
-/** Creates a pending invitation and returns the ONE-TIME raw token to embed
- *  in the invite email's link — the caller must send it immediately and
- *  never persist it anywhere else; it cannot be recovered from the stored
- *  row afterward. */
 export async function createInvitation(input: {
   email: string;
   permissions: TeamPermission[];
@@ -65,7 +58,7 @@ export async function createInvitation(input: {
   } catch (err) {
     console.error("createInvitation: write failed (table may not exist yet):", err);
     throw new Error(
-      `${ADMIN_INVITATIONS_TABLE} hasn't been created in AWS yet — create a DynamoDB table with that name (partition key "invitationId", String) before sending invitations.`
+      ADMIN_INVITATIONS_TABLE + " hasn't been created in AWS yet — create a DynamoDB table with that name (partition key \"invitationId\", String) before sending invitations."
     );
   }
   return { invitation, token };
@@ -79,7 +72,6 @@ export async function getInvitation(invitationId: string): Promise<AdminInvitati
   return (result?.Item as AdminInvitation | undefined) || null;
 }
 
-// Same tableMissing convention as app/lib/errorLogs.ts.
 export async function listInvitations(): Promise<{ invitations: AdminInvitation[]; tableMissing: boolean }> {
   try {
     const result = await docClient.send(new ScanCommand({ TableName: ADMIN_INVITATIONS_TABLE }));
@@ -100,11 +92,6 @@ export type InvitationValidationError =
   | "already_used"
   | "email_mismatch";
 
-/** Validates a presented (invitationId, token) pair against the stored
- *  row without mutating anything — checks existence, a timing-safe token
- *  match, expiry, single-use status, and (if provided) that it matches the
- *  signed-in user's own email, so one person can never redeem an
- *  invitation addressed to someone else. */
 export async function validateInvitation(
   invitationId: string,
   token: string,
@@ -129,12 +116,6 @@ export async function validateInvitation(
   return { ok: true, invitation };
 }
 
-/** Atomically flips a pending invitation to "accepted" — the
- *  ConditionExpression makes this single-use even under a race (two
- *  concurrent accept requests, or a replayed link): only the first
- *  succeeds, every subsequent attempt gets ConditionalCheckFailedException
- *  and must be treated as "already used". Call this BEFORE creating the
- *  team member row, and only proceed to create the row if this succeeds. */
 export async function markInvitationAccepted(
   invitationId: string,
   acceptedUserId: string

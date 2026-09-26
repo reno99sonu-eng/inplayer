@@ -18,22 +18,46 @@ export async function GET() {
     ).catch(() => null);
 
     if (result?.Item && result.Item.active !== false && result.Item.imageUrl) {
-      return NextResponse.json({
-        active: true,
-        theme: {
-          themeId: String(result.Item.themeId || "active_theme"),
-          occasionId: String(result.Item.occasionId || "independence_day"),
-          occasionName: String(result.Item.occasionName || "Occasion Theme"),
-          title: String(result.Item.title || "Occasion Theme"),
-          imageUrl: String(result.Item.imageUrl || ""),
-          updatedAt: String(result.Item.updatedAt || new Date().toISOString()),
+      return NextResponse.json(
+        {
+          active: true,
+          theme: {
+            themeId: String(result.Item.themeId || "active_theme"),
+            occasionId: String(result.Item.occasionId || "independence_day"),
+            occasionName: String(result.Item.occasionName || "Occasion Theme"),
+            title: String(result.Item.title || "Occasion Theme"),
+            imageUrl: String(result.Item.imageUrl || ""),
+            updatedAt: String(result.Item.updatedAt || new Date().toISOString()),
+          },
         },
-      });
+        {
+          headers: {
+            "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+            Pragma: "no-cache",
+          },
+        }
+      );
     }
 
-    return NextResponse.json({ active: false, theme: null });
+    return NextResponse.json(
+      { active: false, theme: null },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          Pragma: "no-cache",
+        },
+      }
+    );
   } catch (err) {
     console.error("Failed to fetch active navbar theme:", err);
-    return NextResponse.json({ active: false, theme: null });
+    return NextResponse.json(
+      { active: false, theme: null },
+      {
+        headers: {
+          "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+          Pragma: "no-cache",
+        },
+      }
+    );
   }
 }

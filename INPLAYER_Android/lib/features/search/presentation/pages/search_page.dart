@@ -3,11 +3,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/pattern_background.dart';
+import '../../../../core/utils/image_utils.dart';
 import '../../../../models/channel.dart';
 import '../../../../models/video.dart';
 import '../../../../models/video_suggestion.dart';
@@ -309,15 +309,14 @@ class _SearchPageState extends ConsumerState<SearchPage> {
 
   Widget _buildSuggestionThumbnail(VideoSuggestion suggestion) {
     final url = (suggestion.thumbnailUrl ?? '').trim();
-    final isHttp = url.startsWith('http://') || url.startsWith('https://');
 
     return ClipRRect(
       borderRadius: BorderRadius.circular(6),
       child: SizedBox(
         width: 44,
         height: 44,
-        child: isHttp
-            ? CachedNetworkImage(
+        child: url.isNotEmpty
+            ? SafeAppImage(
                 imageUrl: url,
                 fit: BoxFit.cover,
                 errorWidget: (context, url, error) => _suggestionThumbnailFallback(),
@@ -469,8 +468,8 @@ class _SearchPageState extends ConsumerState<SearchPage> {
           SliverPadding(
             padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             sliver: SliverGrid(
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
+              gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                maxCrossAxisExtent: 240,
                 mainAxisSpacing: 20,
                 crossAxisSpacing: 12,
                 // VideoCard carries more content (thumbnail + 2-line title +
@@ -528,8 +527,8 @@ class _SearchPageState extends ConsumerState<SearchPage> {
                         child: SizedBox(
                           width: 32,
                           height: 32,
-                          child: (creator.avatarUrl ?? '').startsWith('http')
-                              ? CachedNetworkImage(
+                          child: (creator.avatarUrl ?? '').isNotEmpty
+                              ? SafeAppImage(
                                   imageUrl: creator.avatarUrl!,
                                   fit: BoxFit.cover,
                                   errorWidget: (context, url, error) => Container(

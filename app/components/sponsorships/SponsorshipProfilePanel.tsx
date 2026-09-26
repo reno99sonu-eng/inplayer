@@ -127,7 +127,7 @@ export default function SponsorshipProfilePanel() {
           <UserCog size={16} className="text-orange-300 light:text-orange-700" />
         </div>
         <p className="text-xs leading-5 text-slate-400 light:text-slate-600">
-          Saved here once, reused to prefill every future sponsorship you buy — you'll never have to
+          Saved here once, reused to prefill every future sponsorship you buy — you&apos;ll never have to
           retype your company/contact/KYC details again.
         </p>
       </div>

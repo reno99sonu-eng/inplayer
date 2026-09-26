@@ -6,9 +6,11 @@ import { Home, PlaySquare, Music2 } from "lucide-react";
 
 import MobileCreateButton from "./MobileCreateButton";
 import MobileProfileMenu from "./MobileProfileMenu";
+import { useLanguage } from "@/app/context/LanguageContext";
 
 export default function MobileBottomNav() {
   const pathname = usePathname() || "";
+  const { t } = useLanguage();
 
   const isHomeActive = pathname === "/";
   const isRaftaarActive = pathname.startsWith("/shorts");
@@ -68,7 +70,7 @@ export default function MobileBottomNav() {
       >
         <Home size={21} className={isHomeActive ? "text-orange-400 drop-shadow-[0_0_12px_rgba(249,115,22,0.85)] filter" : ""} />
         <span className={`text-[10px] ${isHomeActive ? "font-black text-orange-400 drop-shadow-[0_0_8px_rgba(249,115,22,0.7)]" : "font-medium"}`}>
-          Home
+          {t("nav_home")}
         </span>
       </Link>
 
@@ -94,12 +96,12 @@ export default function MobileBottomNav() {
       >
         <PlaySquare size={21} className={isRaftaarActive ? "text-orange-400 drop-shadow-[0_0_12px_rgba(249,115,22,0.85)] filter" : ""} />
         <span className={`text-[10px] ${isRaftaarActive ? "font-black text-orange-400 drop-shadow-[0_0_8px_rgba(249,115,22,0.7)]" : "font-medium"}`}>
-          Raftaar
+          {t("nav_shorts")}
         </span>
       </Link>
 
       {/* + Create Button */}
-      <div className="flex flex-col items-center justify-center px-1 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-0.5">
+      <div className="flex flex-col items-center justify-center px-1 pb-[calc(0.5rem+env(safe-area-inset-bottom))] pt-1">
         <MobileCreateButton />
       </div>
 
@@ -125,7 +127,7 @@ export default function MobileBottomNav() {
       >
         <Music2 size={21} className={isMusicActive ? "text-orange-400 drop-shadow-[0_0_12px_rgba(249,115,22,0.85)] filter" : ""} />
         <span className={`text-[10px] ${isMusicActive ? "font-black text-orange-400 drop-shadow-[0_0_8px_rgba(249,115,22,0.7)]" : "font-medium"}`}>
-          Music
+          {t("nav_music")}
         </span>
       </Link>
 

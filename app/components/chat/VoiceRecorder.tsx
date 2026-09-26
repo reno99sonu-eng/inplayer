@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Mic, Trash2, Send, Loader2, Square } from "lucide-react";
+import { Trash2, Send, Loader2 } from "lucide-react";
 
 interface VoiceRecorderProps {
   onSend: (audioDataUrl: string, durationSec: number) => void;

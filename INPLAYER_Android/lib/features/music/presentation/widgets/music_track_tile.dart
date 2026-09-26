@@ -1,9 +1,9 @@
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/image_utils.dart';
 import '../../../../core/utils/share_utils.dart';
 import '../../../../models/video.dart';
 import '../../../../services/music_player_service.dart';
@@ -65,7 +65,7 @@ class MusicTrackTile extends ConsumerWidget {
                     fit: StackFit.expand,
                     children: [
                       coverUrl.isNotEmpty
-                          ? CachedNetworkImage(
+                          ? SafeAppImage(
                               imageUrl: coverUrl,
                               fit: BoxFit.cover,
                               errorWidget: (context, url, error) =>
@@ -303,7 +303,7 @@ void showMusicTrackQuickActions(
                                   ? track.covers.first
                                   : track.thumbnail)
                               .isNotEmpty
-                          ? CachedNetworkImage(
+                          ? SafeAppImage(
                               imageUrl: track.covers.isNotEmpty
                                   ? track.covers.first
                                   : track.thumbnail,

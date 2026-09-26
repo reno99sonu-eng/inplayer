@@ -10,9 +10,6 @@ export async function GET(request: NextRequest) {
   }
 
   const { invitations, tableMissing } = await listInvitations();
-  // Never return tokenHash — nothing outside adminInvitations.ts needs it,
-  // and there's no reason to put even a hash of a security token over the
-  // wire to the browser.
   const safe = invitations.map((inv) => ({
     invitationId: inv.invitationId,
     email: inv.email,

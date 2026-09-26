@@ -1,13 +1,13 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { getReadyVideos } from "./videoStore";
 import {
   AUDIENCE_COOKIE,
   DEFAULT_AUDIENCE_MODE,
   filterByAudience,
   isVideoVisible,
-  normalizeAudienceMode,
   type AudienceMode,
 } from "./contentAccess";
+import { audienceModeFromValue } from "./audienceToken";
 
 // Server-side half of the content-access system (the pure rules live in
 // contentAccess.ts, which this re-exports nothing from on purpose — import
@@ -16,17 +16,27 @@ import {
 // Why the cookie rather than localStorage: every listing surface in this
 // app is server-rendered, so the filtering has to happen on the server for
 // 18+ content to never reach the browser at all. A Server Component can
-// read a cookie; it cannot read localStorage. The cookie is set HttpOnly by
-// app/api/content-access/route.ts only after the 6-digit passkey has been
-// verified against the account, so it can't be forged client-side either.
+// read a cookie; it cannot read localStorage.
+//
+// The cookie (or the Android app's matching header) is NOT trusted as a
+// plain string: any non-browser client can send whatever it likes. "all"
+// is only honored as the signed value app/api/content-access/route.ts
+// issues after verifying the passkey — see audienceModeFromValue().
 
 export async function getAudienceMode(): Promise<AudienceMode> {
   try {
-    const store = await cookies();
-    return normalizeAudienceMode(store.get(AUDIENCE_COOKIE)?.value);
+    const [store, reqHeaders] = await Promise.all([cookies(), headers()]);
+    const cookieVal = store.get(AUDIENCE_COOKIE)?.value;
+    if (cookieVal) {
+      return audienceModeFromValue(cookieVal);
+    }
+    const headerVal = reqHeaders.get(AUDIENCE_COOKIE) || reqHeaders.get("x-audience-mode");
+    if (headerVal) {
+      return audienceModeFromValue(headerVal);
+    }
+    return DEFAULT_AUDIENCE_MODE;
   } catch {
-    // cookies() throws in any genuinely static rendering context. Falling
-    // back to the default is the safe direction: hide 18+, never reveal it.
+    // cookies() or headers() throws in any genuinely static rendering context.
     return DEFAULT_AUDIENCE_MODE;
   }
 }

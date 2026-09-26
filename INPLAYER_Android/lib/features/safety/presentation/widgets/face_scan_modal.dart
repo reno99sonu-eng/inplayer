@@ -82,6 +82,22 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal>
   /// good enough to be worth capturing a still from.
   int _candidateFrames = 0;
 
+  /// Consecutive dark frames — debounced the same way [_unknownFrameCount]
+  /// is, so one noisy reading doesn't flip the boost on and off.
+  int _darkFrameCount = 0;
+
+  /// True while the screen-brightness + exposure boost is active. This is
+  /// the front camera's stand-in for a flash: there is no physical front
+  /// flash on almost any phone, so the phone's own screen lighting up
+  /// bright white is the real light source, same trick every selfie camera
+  /// app uses for "front flash".
+  bool _lowLightBoostActive = false;
+
+  /// This device's usable exposure range, read once the camera initializes.
+  /// null on a camera that doesn't support exposure compensation at all —
+  /// the screen-brightness boost still works regardless.
+  double? _maxExposureOffset;
+
   /// True while the still capture and model run are in flight, so the image
   /// stream can't fire a second capture underneath the first.
   bool _capturing = false;
@@ -168,6 +184,8 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal>
         _permissionDenied = false;
         _noCameraHardware = false;
         _scanTimedOut = false;
+        _lowLightBoostActive = false;
+        _darkFrameCount = 0;
         _statusText = 'Align your face';
         _subtitleText = 'Hold steady';
       });
@@ -290,6 +308,12 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal>
       await _cameraController!.initialize();
       if (!mounted) return;
 
+      try {
+        _maxExposureOffset = await _cameraController!.getMaxExposureOffset();
+      } catch (_) {
+        _maxExposureOffset = null;
+      }
+
       setState(() {
         _isInitializing = false;
         _hasPermissionError = false;
@@ -326,6 +350,22 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal>
             // whether the shot is good enough to capture.
             if (result == null || !result.readyForCapture) {
               _unknownFrameCount++;
+
+              // brightness is only ever populated on the "too dark" path
+              // (see checkFrame) — anything else (no face, bad angle, eyes
+              // closed) means there's plainly enough light to see all that,
+              // so the boost is never kept on for a well-lit frame that
+              // simply failed a different gate.
+              if (result?.brightness != null) {
+                _darkFrameCount++;
+                if (_darkFrameCount > 2 && !_lowLightBoostActive) {
+                  unawaited(_setLowLightBoost(true));
+                }
+              } else if (_darkFrameCount > 0 || _lowLightBoostActive) {
+                _darkFrameCount = 0;
+                unawaited(_setLowLightBoost(false));
+              }
+
               if (_unknownFrameCount > 2) {
                 _candidateFrames = 0;
                 final hint = result?.description ?? 'Align your face';
@@ -342,6 +382,8 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal>
             }
 
             _unknownFrameCount = 0;
+            _darkFrameCount = 0;
+            if (_lowLightBoostActive) unawaited(_setLowLightBoost(false));
             _candidateFrames++;
 
             if (_candidateFrames < 5) {
@@ -444,6 +486,24 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal>
           await File(shotPath).delete();
         } catch (_) {}
       }
+    }
+  }
+
+  /// Turns the screen-brightness + exposure boost on or off. Exposure
+  /// compensation is best-effort — some devices/cameras don't support it,
+  /// or briefly throw while a capture is in flight — the screen brightening
+  /// (see _buildPremiumBackground) is what actually does most of the work
+  /// and always works regardless of camera capability.
+  Future<void> _setLowLightBoost(bool on) async {
+    if (!mounted || _lowLightBoostActive == on) return;
+    setState(() => _lowLightBoostActive = on);
+    final controller = _cameraController;
+    final maxOffset = _maxExposureOffset;
+    if (controller == null || maxOffset == null || maxOffset <= 0) return;
+    try {
+      await controller.setExposureOffset(on ? maxOffset : 0.0);
+    } catch (e) {
+      debugPrint('[FaceScanModal] setExposureOffset failed: $e');
     }
   }
 
@@ -661,15 +721,26 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal>
     return Stack(
       fit: StackFit.expand,
       children: [
-        Container(
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 280),
           decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: context.isDark
-                  ? [const Color(0xFF06070C), context.bgSurface]
-                  : [context.bgSurface, context.bgCard],
-            ),
+            // The actual "front flash": a near-full-white screen is a real,
+            // sizeable light source a few inches from the face, which is
+            // the only kind of brightening a front camera can ever get —
+            // there's no physical flash pointing the right way to use.
+            gradient: _lowLightBoostActive
+                ? const LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [Colors.white, Color(0xFFF5F5F5)],
+                  )
+                : LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: context.isDark
+                        ? [const Color(0xFF06070C), context.bgSurface]
+                        : [context.bgSurface, context.bgCard],
+                  ),
           ),
         ),
         Positioned(

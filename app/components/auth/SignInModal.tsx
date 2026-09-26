@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { Mail, Lock, X, Loader2, Check } from "lucide-react";
 import { signIn, signOut } from "@/app/lib/auth";
-import { fetchAuthSession, signInWithRedirect } from "aws-amplify/auth";
+import { signInWithRedirect } from "aws-amplify/auth";
 import { useRouter } from "next/navigation";
 import { cognitoUserPoolsTokenProvider } from "aws-amplify/auth/cognito";
 import {
@@ -16,6 +16,9 @@ interface SignInModalProps {
   open: boolean;
   onClose: () => void;
   onSuccess?: () => void;
+  // Prefills the email field — used by app/team/accept/page.tsx so a team
+  // invitee whose email already has an account never has to retype it.
+  initialEmail?: string;
 }
 
 // Google sign-in reaches all the way through Google's own consent screen
@@ -37,6 +40,7 @@ export default function SignInModal({
   open,
   onClose,
   onSuccess,
+  initialEmail,
 }: SignInModalProps) {
   const router = useRouter();
   const { openSignUp, openForgotPassword, refreshUser } = useAuthModal();
@@ -53,18 +57,22 @@ export default function SignInModal({
   const [success, setSuccess] = useState(false);
 
   useEffect(() => {
-    const resetForm = () => {
-      setEmail("");
-      setPassword("");
-      setRememberMe(true);
-      setShowPassword(false);
-      setLoading(false);
-      setError(null);
-      setShake(false);
-      setSuccess(false);
-    };
-    if (!open) resetForm();
-  }, [open]);
+    if (open) {
+      // Prefilled rather than left for the reset branch below, so a
+      // caller-supplied email (e.g. from a team invitation) survives the
+      // open transition instead of being wiped straight back to "".
+      setEmail(initialEmail || "");
+      return;
+    }
+    setEmail("");
+    setPassword("");
+    setRememberMe(true);
+    setShowPassword(false);
+    setLoading(false);
+    setError(null);
+    setShake(false);
+    setSuccess(false);
+  }, [open, initialEmail]);
 
   useEffect(() => {
     if (!open) return;
@@ -147,9 +155,11 @@ export default function SignInModal({
       if (result.isSignedIn) {
         setSuccess(true);
         onSuccess?.();
+        // Trimmed from 700ms — long enough to register the checkmark
+        // without making a successful sign-in feel slow to close.
         setTimeout(() => {
           onClose();
-        }, 700);
+        }, 250);
       } else {
         const step = result.nextStep?.signInStep;
 
@@ -440,7 +450,7 @@ export default function SignInModal({
                   Don&apos;t have an account?{" "}
                   <button
                     type="button"
-                    onClick={openSignUp}
+                    onClick={() => openSignUp()}
                     className="font-semibold text-orange-300 light:text-orange-600 transition hover:text-orange-200 light:hover:text-orange-700"
                   >
                     Create Account

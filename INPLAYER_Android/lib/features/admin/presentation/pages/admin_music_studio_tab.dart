@@ -1,11 +1,11 @@
 import 'dart:async';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:just_audio/just_audio.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/image_utils.dart';
 import '../../../../models/admin_video_row.dart';
 import '../../../../services/admin_service.dart';
 
@@ -521,7 +521,7 @@ class _AdminMusicStudioTabState extends ConsumerState<AdminMusicStudioTab> {
                   fit: StackFit.expand,
                   children: [
                     if (cover.isNotEmpty)
-                      CachedNetworkImage(imageUrl: cover, fit: BoxFit.cover)
+                      SafeAppImage(imageUrl: cover, fit: BoxFit.cover)
                     else
                       Container(color: AppColors.music.withValues(alpha: 0.3)),
                     Container(

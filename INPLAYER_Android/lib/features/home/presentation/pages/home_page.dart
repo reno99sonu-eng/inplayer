@@ -18,12 +18,14 @@ import '../widgets/featured_hero_carousel.dart';
 import '../widgets/floating_ai_button.dart';
 import '../widgets/in_family_row.dart';
 import '../widgets/raftaar_shorts_row.dart';
-import '../widgets/kids_row.dart';
 import '../widgets/playables_shelf.dart';
 import '../widgets/home_ad_card.dart';
 import '../../../music/presentation/widgets/mini_player_bar.dart';
 import '../../../../services/music_player_service.dart';
 import '../../../../services/platform_settings_service.dart';
+import '../../../../services/navbar_theme_service.dart';
+import '../../../../core/utils/image_utils.dart';
+import '../../../../models/admin_navbar_theme.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../services/content_access_service.dart';
 import '../../../../services/platform_update_service.dart';
@@ -38,6 +40,7 @@ import '../../../../core/widgets/notification_permission_helper.dart';
 import '../../../../core/widgets/pattern_background.dart';
 import '../../../../core/widgets/user_avatar.dart';
 import '../../../../models/user.dart';
+import '../../../../core/utils/responsive.dart';
 
 class HomePage extends ConsumerStatefulWidget {
   const HomePage({super.key});
@@ -156,44 +159,55 @@ class _HomePageState extends ConsumerState<HomePage> {
         ref.watch(publicPlatformSettingsProvider).value ??
         PublicPlatformSettings.normal;
 
-    return Scaffold(
-      extendBody: true,
-      backgroundColor: Colors.transparent,
-      drawer: const MobileMenuDrawer(),
-      body: PatternBackground(
-        child: Stack(
-          children: [
-            IndexedStack(
-              index: _currentIndex,
-              children: _buildPages(
-                shortsBottomInset: shortsBottomInset,
-                feedRevision: feedRevision,
+    return PopScope(
+      canPop: _currentIndex == 0,
+      onPopInvokedWithResult: (didPop, result) {
+        if (didPop) return;
+        if (_currentIndex != 0) {
+          setState(() {
+            _currentIndex = 0;
+          });
+        }
+      },
+      child: Scaffold(
+        extendBody: true,
+        backgroundColor: Colors.transparent,
+        drawer: const MobileMenuDrawer(),
+        body: PatternBackground(
+          child: Stack(
+            children: [
+              IndexedStack(
+                index: _currentIndex,
+                children: _buildPages(
+                  shortsBottomInset: shortsBottomInset,
+                  feedRevision: feedRevision,
+                ),
               ),
-            ),
-            // Home tab only. Previously mounted above the router in
-            // main.dart, which put it over every screen in the app.
-            if (_currentIndex == 0)
-              FloatingAIButton(
-                bottomInset: 88 + (musicLoaded ? _miniPlayerInset : 0.0),
-              ),
-            const VideoMiniPlayerOverlay(),
-            if (platformSettings.announcementEnabled &&
-                platformSettings.announcementText.isNotEmpty &&
-                !_announcementDismissed &&
-                !platformSettings.maintenanceMode)
-              _buildAnnouncementBanner(platformSettings, musicLoaded),
-            // Last in the Stack so it covers everything above, including the
-            // nav shell. Note this covers the TAB shell — a screen pushed on
-            // top of it (a watch page opened from a deep link) sits above
-            // this and is not blocked.
-            if (platformSettings.maintenanceMode)
-              _buildMaintenanceOverlay(platformSettings),
-          ],
+              // Home tab only. Previously mounted above the router in
+              // main.dart, which put it over every screen in the app.
+              if (_currentIndex == 0)
+                FloatingAIButton(
+                  bottomInset: 88 + (musicLoaded ? _miniPlayerInset : 0.0),
+                ),
+              const VideoMiniPlayerOverlay(),
+              if (platformSettings.announcementEnabled &&
+                  platformSettings.announcementText.isNotEmpty &&
+                  !_announcementDismissed &&
+                  !platformSettings.maintenanceMode)
+                _buildAnnouncementBanner(platformSettings, musicLoaded),
+              // Last in the Stack so it covers everything above, including the
+              // nav shell. Note this covers the TAB shell — a screen pushed on
+              // top of it (a watch page opened from a deep link) sits above
+              // this and is not blocked.
+              if (platformSettings.maintenanceMode)
+                _buildMaintenanceOverlay(platformSettings),
+            ],
+          ),
         ),
-      ),
-      bottomNavigationBar: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [const MiniPlayerBar(), _buildBottomNavigationBar(context)],
+        bottomNavigationBar: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [const MiniPlayerBar(), _buildBottomNavigationBar(context)],
+        ),
       ),
     );
   }
@@ -414,17 +428,22 @@ class _HomePageState extends ConsumerState<HomePage> {
                 ],
         ),
         child: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: [
-                _buildNavItem(0, Icons.home_outlined, 'Home', context),
-                _buildNavItem(1, Icons.play_circle_outline, 'Raftaar', context),
-                _buildCreateButton(context),
-                _buildNavItem(3, Icons.music_note_outlined, 'Music', context),
-                _buildYouNavItem(4, 'You', context, user),
-              ],
+          child: Center(
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 600),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildNavItem(0, Icons.home_outlined, 'Home', context),
+                    _buildNavItem(1, Icons.play_circle_outline, 'Raftaar', context),
+                    _buildCreateButton(context),
+                    _buildNavItem(3, Icons.music_note_outlined, 'Music', context),
+                    _buildYouNavItem(4, 'You', context, user),
+                  ],
+                ),
+              ),
             ),
           ),
         ),
@@ -691,6 +710,13 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage> {
   Widget build(BuildContext context) {
     final isDark = context.isDark;
 
+    // The occasion navbar theme an admin can turn on from the admin panel
+    // (Diwali, Independence Day, etc.) — see navbar_theme_service.dart.
+    // `.value` on a still-loading/failed FutureProvider is just null,
+    // which already means "show nothing," so no separate fallback is
+    // needed.
+    final navbarTheme = ref.watch(publicNavbarThemeProvider).value;
+
     return RefreshIndicator(
       color: AppColors.brandOrange,
       backgroundColor: context.bgCard,
@@ -765,6 +791,7 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage> {
                     }
                   },
                 ),
+                _buildNavbarThemeBadge(navbarTheme),
                 const Spacer(),
                 _buildHeaderIcon(Icons.search, () => context.push('/search')),
                 _buildHeaderIcon(
@@ -827,6 +854,46 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage> {
               ),
             ),
         ],
+      ),
+    );
+  }
+
+  /// Site-wide occasion navbar theme (e.g. a Diwali/Independence Day
+  /// graphic an admin turned on from the admin panel or the website).
+  /// Mirrors what Navbar.tsx shows next to the logo on the website — before
+  /// this, an admin could set a theme from the app's own admin screen, and
+  /// it would show on the website, but a regular app user would never see
+  /// it because nothing ever rendered it here.
+  ///
+  /// Deliberately image-only, no accompanying text: the app bar's Row has
+  /// far less horizontal room than the website's desktop navbar, and this
+  /// same screen already had a real mobile-overflow bug (see the email/ID
+  /// text-wrapping fixes elsewhere in this session) — adding a second
+  /// stacked-text block here would risk reintroducing exactly that. A
+  /// small height-capped image can never push the search/notification
+  /// icons off-screen the way unbounded text could.
+  Widget _buildNavbarThemeBadge(AdminNavbarTheme? theme) {
+    if (theme == null || !theme.active || theme.imageUrl.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    final provider = smartImageProvider(theme.imageUrl);
+    if (provider == null) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(left: 8),
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(maxWidth: 60, maxHeight: 32),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(6),
+          child: Image(
+            image: provider,
+            height: 32,
+            fit: BoxFit.contain,
+            errorBuilder: (context, error, stackTrace) =>
+                const SizedBox.shrink(),
+          ),
+        ),
       ),
     );
   }
@@ -910,8 +977,6 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage> {
     const blockSize = 4;
     const shortsPerShelf = 8;
 
-    final kidsVideos = videos.where((v) => v.audience == 'kids').toList();
-
     final blocks = <List<Video>>[];
     for (var i = 0; i < videos.length; i += blockSize) {
       blocks.add(
@@ -924,11 +989,6 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage> {
 
     int shelfCursor = 0;
     final widgets = <Widget>[];
-
-    if (kidsVideos.isNotEmpty) {
-      widgets.add(KidsRow(videos: kidsVideos));
-      widgets.add(const SizedBox(height: 12));
-    }
 
     for (var blockIndex = 0; blockIndex < blocks.length; blockIndex++) {
       widgets.add(_buildVideoGrid(blocks[blockIndex], feedbackMap));
@@ -945,7 +1005,9 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage> {
         widgets.add(const SizedBox(height: 12));
       }
 
-      if (blockIndex.isOdd && shelfCursor < allShorts.length) {
+      // Show Raftaar Shorts shelf right after block 0 (immediately below first videos),
+      // and then repeat on alternate blocks so Raftaar is prominently visible
+      if ((blockIndex == 0 || blockIndex.isEven) && shelfCursor < allShorts.length) {
         final end = (shelfCursor + shortsPerShelf > allShorts.length)
             ? allShorts.length
             : shelfCursor + shortsPerShelf;
@@ -1094,12 +1156,36 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage> {
     List<Video> videos, [
     Map<String, String> feedbackMap = const {},
   ]) {
-    return ListView.separated(
+    final columns = context.responsiveVideoColumns;
+    if (columns <= 1) {
+      return ListView.separated(
+        shrinkWrap: true,
+        physics: const NeverScrollableScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: videos.length,
+        separatorBuilder: (context, index) => const SizedBox(height: 12),
+        itemBuilder: (context, index) {
+          final video = videos[index];
+          return VideoCard(
+            key: ValueKey(video.videoId),
+            video: video,
+            initialFeedback: feedbackMap[video.videoId],
+          );
+        },
+      );
+    }
+
+    return GridView.builder(
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.symmetric(horizontal: 16),
+      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+        crossAxisCount: columns,
+        crossAxisSpacing: 16,
+        mainAxisSpacing: 16,
+        childAspectRatio: 1.12,
+      ),
       itemCount: videos.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 12),
       itemBuilder: (context, index) {
         final video = videos[index];
         return VideoCard(

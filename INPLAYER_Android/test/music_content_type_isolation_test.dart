@@ -16,7 +16,8 @@ import 'package:inplayer_android/models/video.dart';
 // checks rawCategory at all, only contentType/isMusic-flag aliases), so
 // isMusic is now strict on this axis too. isStrictMusic remains the
 // narrower, single-source-of-truth check (contentType == "music" only,
-// no aliases) and is what every music-only surface should keep using.
+// no aliases like "audio"/"song"/"track") and is what every music-only
+// surface should keep using.
 void main() {
   group('Video.isStrictMusic', () {
     test('is true only for contentType == "music"', () {
@@ -50,9 +51,9 @@ void main() {
     });
 
     test(
-      'isMusic (the lenient getter) stays true for category == "Music" — '
-      'intentional for EXCLUDING music from general video surfaces, never '
-      'for INCLUDING content into a music-only surface',
+      'isMusic no longer flips true for category == "Music" either — '
+      'the leak was fixed at the field-computation level, not just via '
+      'isStrictMusic',
       () {
         final categorizedAsMusic = Video.fromJson({
           'videoId': 'v4',
@@ -60,7 +61,7 @@ void main() {
           'contentType': 'video',
           'category': 'Music',
         });
-        expect(categorizedAsMusic.isMusic, isTrue);
+        expect(categorizedAsMusic.isMusic, isFalse);
         expect(categorizedAsMusic.isStrictMusic, isFalse);
       },
     );

@@ -38,6 +38,7 @@ import '../../features/settings/presentation/pages/music_equalizer_page.dart';
 import '../../features/settings/presentation/pages/music_quality_page.dart';
 import '../../features/settings/presentation/pages/music_settings_page.dart';
 import '../../features/settings/presentation/pages/playback_settings_page.dart';
+import '../../features/settings/presentation/pages/language_settings_page.dart';
 import '../../features/admin/presentation/pages/admin_page.dart';
 import '../../features/live/presentation/pages/go_live_page.dart';
 import '../../features/downloads/presentation/pages/downloads_page.dart';
@@ -52,7 +53,7 @@ import '../../features/settings/presentation/pages/contact_us_page.dart';
 import '../../features/settings/presentation/pages/report_problem_page.dart';
 import '../../features/settings/presentation/pages/blocked_users_page.dart';
 import '../../features/settings/presentation/pages/app_legal_page.dart';
-import '../../features/settings/presentation/pages/app_policies_page.dart';
+import '../../features/settings/presentation/pages/policies_index_page.dart';
 import '../../features/creator/presentation/pages/creator_kyc_page.dart';
 import '../../features/creator/presentation/pages/creator_monetization_page.dart';
 import '../../features/sponsorship/presentation/pages/sponsorship_checkout_page.dart';
@@ -257,6 +258,11 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const SettingsPage(),
       ),
       GoRoute(
+        path: '/settings/language',
+        name: 'language-settings',
+        builder: (context, state) => const LanguageSettingsPage(),
+      ),
+      GoRoute(
         path: '/settings/edit-profile',
         name: 'edit-profile',
         builder: (context, state) => const EditProfilePage(),
@@ -333,19 +339,134 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const BlockedUsersPage(),
       ),
       GoRoute(
-        // Single merged "InPlayer Policies" screen — replaces the three
-        // separate routes this used to be (terms-of-service,
-        // privacy-policy, vendor-terms), each of which opened its own
-        // AppLegalPage with a short, independently-drifting paraphrase.
-        // See app_policies_page.dart / policies_content.dart, which mirror
-        // the website's single /policies hub. `extra` (an int 0/1/2) picks
-        // which tab opens first; defaults to Privacy.
+
+        path: '/settings/terms',
+        name: 'terms-of-service',
+        builder: (context, state) => const AppLegalPage(
+          title: 'Terms & Conditions',
+          policyId: 'terms',
+          effectiveDate: 'September 5, 2026',
+          externalUrl: 'https://inplayer.in/terms',
+        ),
+      ),
+      GoRoute(
+        path: '/settings/privacy-policy',
+        name: 'privacy-policy',
+        builder: (context, state) => const AppLegalPage(
+          title: 'Privacy Policy',
+          policyId: 'privacy',
+          effectiveDate: 'September 5, 2026',
+          externalUrl: 'https://inplayer.in/privacy',
+        ),
+      ),
+      GoRoute(
+        path: '/settings/copyright-policy',
+        name: 'copyright-policy',
+        builder: (context, state) => const AppLegalPage(
+          title: 'Copyright & Intellectual Property Policy',
+          policyId: 'copyright',
+          effectiveDate: 'September 5, 2026',
+          externalUrl: 'https://inplayer.in/copyright',
+        ),
+      ),
+      GoRoute(
+        path: '/settings/child-safety',
+        name: 'child-safety',
+        builder: (context, state) => const AppLegalPage(
+          title: 'Child Safety Policy',
+          policyId: 'child-safety',
+          effectiveDate: 'September 5, 2026',
+          externalUrl: 'https://inplayer.in/child-safety',
+        ),
+      ),
+      GoRoute(
+        path: '/settings/community-guidelines',
+        name: 'community-guidelines',
+        builder: (context, state) => const AppLegalPage(
+          title: 'Community Guidelines',
+          policyId: 'community-guidelines',
+          effectiveDate: 'September 5, 2026',
+          externalUrl: 'https://inplayer.in/community-guidelines',
+        ),
+      ),
+      GoRoute(
+        path: '/settings/monetization-policy',
+        name: 'monetization-policy',
+        builder: (context, state) => const AppLegalPage(
+          title: 'Creator Monetization Policy',
+          policyId: 'creator-monetization',
+          effectiveDate: 'September 5, 2026',
+          externalUrl: 'https://inplayer.in/monetization-policy',
+        ),
+      ),
+      GoRoute(
+        path: '/settings/chat-messaging-policy',
+        name: 'chat-messaging-policy',
+        builder: (context, state) => const AppLegalPage(
+          title: 'Online Chat & Messaging Policy',
+          policyId: 'chat-messaging',
+          effectiveDate: 'September 5, 2026',
+          externalUrl: 'https://inplayer.in/chat-messaging-policy',
+        ),
+      ),
+      GoRoute(
+        path: '/settings/strike-suspension-policy',
+        name: 'strike-suspension-policy',
+        builder: (context, state) => const AppLegalPage(
+          title: 'Strike, Suspension & Appeals Policy',
+          policyId: 'strikes-appeals',
+          effectiveDate: 'September 5, 2026',
+          externalUrl: 'https://inplayer.in/strike-suspension-policy',
+        ),
+      ),
+      GoRoute(
+        path: '/settings/report-grievance-policy',
+        name: 'report-grievance-policy',
+        builder: (context, state) => const AppLegalPage(
+          title: 'Report, Complaint & Grievance Policy',
+          policyId: 'report-grievance',
+          effectiveDate: 'September 5, 2026',
+          externalUrl: 'https://inplayer.in/report-grievance-policy',
+        ),
+      ),
+      GoRoute(
+        path: '/settings/advertising-sponsorship-policy',
+        name: 'advertising-sponsorship-policy',
+        builder: (context, state) => const AppLegalPage(
+          title: 'Advertising & Sponsorship Policy',
+          policyId: 'advertising-sponsorship',
+          effectiveDate: 'September 5, 2026',
+          externalUrl: 'https://inplayer.in/advertising-sponsorship-policy',
+        ),
+      ),
+      GoRoute(
+        path: '/settings/mart-seller-policy',
+        name: 'mart-seller-policy',
+        builder: (context, state) => const AppLegalPage(
+          title: 'InPlayer MART Shop & Seller Policy',
+          policyId: 'mart-seller',
+          effectiveDate: 'September 5, 2026',
+          externalUrl: 'https://inplayer.in/mart-seller-policy',
+        ),
+      ),
+      GoRoute(
+        path: '/settings/vendor-terms',
+        name: 'vendor-terms',
+        builder: (context, state) => const AppLegalPage(
+          title: 'InPlayer MART Shop & Seller Policy',
+          policyId: 'mart-seller',
+          effectiveDate: 'September 5, 2026',
+          externalUrl: 'https://inplayer.in/mart-seller-policy',
+        ),
+
+      ),
+      GoRoute(
+        // Single "InPlayer Policies" index — replaces the Settings/drawer
+        // menu that used to list all 11 legal documents as separate rows.
+        // See policies_index_page.dart.
         path: '/settings/policies',
         name: 'inplayer-policies',
-        builder: (context, state) {
-          final initialTab = state.extra is int ? state.extra as int : 0;
-          return AppPoliciesPage(initialTab: initialTab);
-        },
+        builder: (context, state) => const PoliciesIndexPage(),
       ),
       GoRoute(
         path: '/settings/help',

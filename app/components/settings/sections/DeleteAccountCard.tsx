@@ -2,15 +2,21 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { fetchAuthSession, deleteUser } from "aws-amplify/auth";
+import { fetchAuthSession } from "aws-amplify/auth";
 import { AlertTriangle, Loader2, Trash2, X } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 
-// Real account deletion — see app/api/account/delete/route.ts for exactly
-// what gets removed server-side. Order matters here: the API call (which
-// needs a valid Cognito session to authenticate as this account) has to
-// finish BEFORE deleteUser() ends that same session — reversing the order
-// would leave the data cleanup unable to authenticate.
+// Real account deletion — see app/api/account/delete/route.ts and
+// app/lib/cascadeDelete.ts for exactly what gets removed server-side
+// (videos, memberships — cancelled at Razorpay, not just deleted — likes,
+// watch history, watchlist, playlists, notifications, everything). That
+// route's own last step deletes the actual Cognito sign-in account
+// server-side with admin credentials, so — unlike this component's older
+// version — nothing here calls deleteUser() from aws-amplify/auth itself:
+// by the time this fetch resolves, Cognito no longer has this account at
+// all, and calling deleteUser() against a session whose underlying user
+// was already removed server-side would just throw. signOut() below only
+// clears this browser's now-stale local tokens.
 export default function DeleteAccountCard() {
   const router = useRouter();
   const { signOut } = useAuthModal();
@@ -35,23 +41,20 @@ export default function DeleteAccountCard() {
         headers: idToken ? { Authorization: `Bearer ${idToken}` } : {},
       });
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
+      const data = await res.json().catch(() => ({}));
+
+      if (!res.ok || data?.success !== true) {
         throw new Error(data.error || "Couldn't delete your account. Please try again.");
       }
 
-      // Data is gone — now end the actual login. deleteUser() also signs
-      // the session out as part of removing it, but this calls signOut()
-      // too as a defensive fallback (same pattern AuthProvider's own
-      // handleRejectTerms uses) in case deleteUser() throws after already
-      // partially succeeding.
-      try {
-        await deleteUser();
-      } catch (err) {
-        console.error("deleteUser() failed after data cleanup succeeded:", err);
-        await signOut().catch(() => {});
+      if (Array.isArray(data.warnings) && data.warnings.length > 0) {
+        console.warn("Account deletion completed with warnings:", data.warnings);
       }
 
+      // The account (including its Cognito sign-in) is already gone
+      // server-side at this point — this just clears this browser's now-
+      // stale local session tokens, it doesn't delete anything itself.
+      await signOut().catch(() => {});
       router.push("/");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Something went wrong.");
@@ -66,10 +69,11 @@ export default function DeleteAccountCard() {
         <p className="font-bold text-white light:text-slate-900">Delete Account</p>
       </div>
       <p className="mt-2 text-sm leading-6 text-slate-400 light:text-slate-600">
-        Permanently deletes your InPlayer account, your profile, and every video/Short
-        you&apos;ve uploaded. This can&apos;t be undone. Comments and messages you&apos;ve
-        sent stay as-is (removing them would also erase other people&apos;s conversations and
-        comment threads).
+        Permanently deletes your InPlayer account, your profile, every video/Short
+        you&apos;ve uploaded, your likes, watch history, watchlist, and playlists — and
+        cancels any active paid membership so you won&apos;t keep being charged. This
+        can&apos;t be undone. Comments and messages you&apos;ve sent stay as-is (removing
+        them would also erase other people&apos;s conversations and comment threads).
       </p>
 
       <button

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Loader2, Plus, Upload, Trash2, Eye, EyeOff, AlertTriangle, IndianRupee } from "lucide-react";
+import { Loader2, Plus, Trash2, Eye, EyeOff, AlertTriangle, IndianRupee } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { authedFetch } from "@/app/lib/apiFetch";
 import { compressImageToThumbnail } from "@/app/lib/imageCompress";

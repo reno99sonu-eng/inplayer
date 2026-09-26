@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { UpdateCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
+import { CURRENT_POLICY_VERSION } from "@/app/lib/termsVersion";
 
 const PRIVACY_VALUES = ["public", "private", "connections"];
 // Fixed section — the profile's first "dedicated section for social media
@@ -116,23 +117,31 @@ export async function POST(request: NextRequest) {
     if (!Number.isInteger(age) || age < 13 || age > 120) {
       return NextResponse.json({ error: "You must be at least 13 years old to use InPlayer." }, { status: 400 });
     }
+    const now = new Date().toISOString();
     await docClient.send(new UpdateCommand({
       TableName: "InPlayer-Users",
       Key: { userId: user.userId },
-      UpdateExpression: "SET age = :age, termsAcceptedAt = :terms, updatedAt = :updatedAt",
-      ExpressionAttributeValues: { ":age": age, ":terms": new Date().toISOString(), ":updatedAt": new Date().toISOString() },
+      UpdateExpression: "SET age = :age, termsAcceptedAt = :terms, termsPolicyVersion = :version, updatedAt = :updatedAt",
+      ExpressionAttributeValues: {
+        ":age": age,
+        ":terms": now,
+        ":version": CURRENT_POLICY_VERSION,
+        ":updatedAt": now,
+      },
     }));
     return NextResponse.json({ success: true });
   }
 
   if (action === "accept_terms") {
+    const now = new Date().toISOString();
     await docClient.send(new UpdateCommand({
       TableName: "InPlayer-Users",
       Key: { userId: user.userId },
-      UpdateExpression: "SET termsAcceptedAt = :terms, updatedAt = :updatedAt",
+      UpdateExpression: "SET termsAcceptedAt = :terms, termsPolicyVersion = :version, updatedAt = :updatedAt",
       ExpressionAttributeValues: {
-        ":terms": new Date().toISOString(),
-        ":updatedAt": new Date().toISOString(),
+        ":terms": now,
+        ":version": CURRENT_POLICY_VERSION,
+        ":updatedAt": now,
       },
     }));
     return NextResponse.json({ success: true });

@@ -92,25 +92,69 @@ export default function Navbar() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+
+    const fetchTheme = async () => {
       try {
-        const res = await fetch("/api/navbar-theme");
-        if (!res.ok) return;
+        const res = await fetch(`/api/navbar-theme?t=${Date.now()}`, {
+          cache: "no-store",
+          headers: { Pragma: "no-cache" },
+        });
+        if (!res.ok) {
+          if (!cancelled) setNavbarTheme(null);
+          return;
+        }
         const data = await res.json().catch(() => ({ active: false }));
-        if (!cancelled && data?.active && data?.theme?.imageUrl) {
+        if (cancelled) return;
+        if (data?.active && data?.theme?.imageUrl) {
           setNavbarTheme({
             active: true,
             imageUrl: data.theme.imageUrl,
             occasionId: data.theme.occasionId,
             title: data.theme.title,
           });
+        } else {
+          setNavbarTheme(null);
         }
       } catch (err) {
         console.error("Navbar theme fetch error:", err);
+        if (!cancelled) setNavbarTheme(null);
       }
-    })();
+    };
+
+    fetchTheme();
+
+    const handleThemeUpdate = (e: Event) => {
+      const custom = e as CustomEvent<{ active?: boolean; theme?: { imageUrl?: string; occasionId?: string; title?: string } }>;
+      if (custom?.detail && typeof custom.detail.active === "boolean") {
+        if (custom.detail.active && custom.detail.theme?.imageUrl) {
+          setNavbarTheme({
+            active: true,
+            imageUrl: custom.detail.theme.imageUrl,
+            occasionId: custom.detail.theme.occasionId,
+            title: custom.detail.theme.title,
+          });
+          return;
+        } else {
+          setNavbarTheme(null);
+          return;
+        }
+      }
+      fetchTheme();
+    };
+
+    const handleStorage = (e: StorageEvent) => {
+      if (e.key === "inplayer_navbar_theme_updated") {
+        fetchTheme();
+      }
+    };
+
+    window.addEventListener("navbar-theme-updated", handleThemeUpdate);
+    window.addEventListener("storage", handleStorage);
+
     return () => {
       cancelled = true;
+      window.removeEventListener("navbar-theme-updated", handleThemeUpdate);
+      window.removeEventListener("storage", handleStorage);
     };
   }, []);
 
@@ -1074,11 +1118,20 @@ lg:right-auto
                 <ul className="mt-2 space-y-1.5">
                   <li>
                     <Link
-                      href="/settings?tab=about"
+                      href="/about"
                       onClick={() => setMenuOpen(false)}
                       className="block text-xs text-slate-400 light:text-slate-600 transition hover:text-orange-300 light:hover:text-orange-600"
                     >
-                      About
+                      About Us
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      href="/contact"
+                      onClick={() => setMenuOpen(false)}
+                      className="block text-xs text-slate-400 light:text-slate-600 transition hover:text-orange-300 light:hover:text-orange-600"
+                    >
+                      Contact Us
                     </Link>
                   </li>
                   <li>
@@ -1087,7 +1140,7 @@ lg:right-auto
                       onClick={() => setMenuOpen(false)}
                       className="block text-xs text-slate-400 light:text-slate-600 transition hover:text-orange-300 light:hover:text-orange-600"
                     >
-                      InPlayer Policies
+                      Privacy Policies
                     </Link>
                   </li>
                 </ul>

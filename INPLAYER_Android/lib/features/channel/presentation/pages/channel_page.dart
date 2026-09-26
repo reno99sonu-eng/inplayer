@@ -9,6 +9,7 @@ import '../../../../core/theme/app_logo.dart';
 import '../../../../core/theme/pattern_background.dart';
 import '../../../../core/utils/image_utils.dart';
 import '../../../../core/widgets/user_avatar.dart';
+import '../../../../core/utils/responsive.dart';
 import '../../../../services/channel_service.dart';
 import '../../../../services/notification_badge_service.dart';
 import '../../../../services/platform_update_service.dart';
@@ -750,24 +751,54 @@ class _ChannelPageState extends ConsumerState<ChannelPage>
                       ),
                     );
                   }
+                  final columns = context.responsiveVideoColumns;
+                  if (columns <= 1) {
+                    return SliverPadding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      sliver: SliverList.separated(
+                        itemCount: visible.length,
+                        separatorBuilder: (context, index) =>
+                            const SizedBox(height: 14),
+                        itemBuilder: (context, index) {
+                          final v = visible[index];
+                          return VideoCard(
+                            video: v.toVideo(
+                              creatorName: channel.name,
+                              creatorAvatar: channel.avatarUrl,
+                              uploaderUsername: channel.username,
+                              uploaderId: channel.creatorId,
+                            ),
+                            isChannelProfile: true,
+                          );
+                        },
+                      ),
+                    );
+                  }
+
                   return SliverPadding(
                     padding: const EdgeInsets.symmetric(horizontal: 16),
-                    sliver: SliverList.separated(
-                      itemCount: visible.length,
-                      separatorBuilder: (context, index) =>
-                          const SizedBox(height: 14),
-                      itemBuilder: (context, index) {
-                        final v = visible[index];
-                        return VideoCard(
-                          video: v.toVideo(
-                            creatorName: channel.name,
-                            creatorAvatar: channel.avatarUrl,
-                            uploaderUsername: channel.username,
-                            uploaderId: channel.creatorId,
-                          ),
-                          isChannelProfile: true,
-                        );
-                      },
+                    sliver: SliverGrid(
+                      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                        crossAxisCount: columns,
+                        crossAxisSpacing: 16,
+                        mainAxisSpacing: 16,
+                        childAspectRatio: 1.08,
+                      ),
+                      delegate: SliverChildBuilderDelegate(
+                        (context, index) {
+                          final v = visible[index];
+                          return VideoCard(
+                            video: v.toVideo(
+                              creatorName: channel.name,
+                              creatorAvatar: channel.avatarUrl,
+                              uploaderUsername: channel.username,
+                              uploaderId: channel.creatorId,
+                            ),
+                            isChannelProfile: true,
+                          );
+                        },
+                        childCount: visible.length,
+                      ),
                     ),
                   );
                 },

@@ -55,8 +55,8 @@ export default function AboutSection() {
 
           <SettingsRow
             icon={<FileText size={20} />}
-            title="InPlayer Policies"
-            description="Privacy, Terms of Service, and HamMart Vendor Terms."
+            title="Privacy Policies"
+            description="Privacy, Terms of Service, and every other InPlayer legal document."
             onClick={() => router.push("/policies")}
           />
 

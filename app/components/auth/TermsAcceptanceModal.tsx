@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FileCheck2, Loader2 } from "lucide-react";
+import { FileCheck2, Loader2, ExternalLink } from "lucide-react";
 
 interface TermsAcceptanceModalProps {
   open: boolean;
@@ -67,34 +67,67 @@ export default function TermsAcceptanceModal({
         <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-orange-500/15 text-orange-300">
           <FileCheck2 size={22} />
         </div>
-        <p className="mt-4 text-[10px] font-black uppercase tracking-[.25em] text-orange-300 light:text-orange-700">Welcome to InPlayer</p>
-        <h2 className="mt-2 text-2xl font-black text-white light:text-slate-900">Accept the terms to continue</h2>
-        <p className="mt-3 text-sm leading-6 text-slate-400 light:text-slate-600">
-          Before you use InPlayer, please read and accept our{" "}
-          <a
-            href="/terms"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-semibold text-orange-300 light:text-orange-600 hover:underline"
-          >
-            Terms of Service
-          </a>{" "}
-          and{" "}
-          <a
-            href="/privacy"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-semibold text-orange-300 light:text-orange-600 hover:underline"
-          >
-            Privacy Policy
-          </a>
-          .
+        <div className="mt-4 flex items-center gap-2">
+          <span className="rounded-full bg-orange-500/15 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-wider text-orange-400">
+            Policy Update • Sept 5, 2026
+          </span>
+        </div>
+        <h2 className="mt-2 text-2xl font-black text-white light:text-slate-900">Terms & Policies Update</h2>
+        <p className="mt-3 text-sm leading-6 text-slate-300 light:text-slate-700">
+          To continue using InPlayer, please review and accept our updated platform terms and policies (Version 2026-09-05):
         </p>
+
+        <ul className="mt-3 space-y-1.5 text-xs text-slate-400 light:text-slate-600">
+          <li className="flex items-center gap-2">
+            <span className="h-1.5 w-1.5 rounded-full bg-orange-400" />
+            <a
+              href="/terms"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-orange-300 light:text-orange-600 hover:underline inline-flex items-center gap-1"
+            >
+              Terms & Conditions <ExternalLink size={11} />
+            </a>
+          </li>
+          <li className="flex items-center gap-2">
+            <span className="h-1.5 w-1.5 rounded-full bg-orange-400" />
+            <a
+              href="/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-orange-300 light:text-orange-600 hover:underline inline-flex items-center gap-1"
+            >
+              Privacy Policy (DPDPA 2023) <ExternalLink size={11} />
+            </a>
+          </li>
+          <li className="flex items-center gap-2">
+            <span className="h-1.5 w-1.5 rounded-full bg-orange-400" />
+            <a
+              href="/community-guidelines"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-medium text-orange-300 light:text-orange-600 hover:underline inline-flex items-center gap-1"
+            >
+              Community Guidelines <ExternalLink size={11} />
+            </a>
+          </li>
+        </ul>
+
         <div className="mt-6 grid grid-cols-2 gap-3">
-          <button type="button" disabled={pending !== null} onClick={() => void run("reject")} className="rounded-2xl border border-white/10 px-4 py-3 text-sm font-bold text-slate-200 transition hover:border-red-400/40 hover:bg-red-500/10 hover:text-red-200 disabled:opacity-60 light:border-black/10 light:text-slate-700">
-            Reject
+          <button
+            type="button"
+            disabled={pending !== null}
+            onClick={() => void run("reject")}
+            className="rounded-2xl border border-white/10 px-4 py-3 text-sm font-bold text-slate-200 transition hover:border-red-400/40 hover:bg-red-500/10 hover:text-red-200 disabled:opacity-60 light:border-black/10 light:text-slate-700"
+          >
+            Decline
           </button>
-          <button type="button" disabled={pending !== null} onClick={() => void run("accept")} className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-orange-500 via-amber-400 to-yellow-300 px-4 py-3 text-sm font-bold text-slate-900 transition hover:brightness-105 disabled:opacity-60">
+          <button
+            type="button"
+            disabled={pending !== null}
+            onClick={() => void run("accept")}
+            className="flex items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-orange-500 via-amber-400 to-yellow-300 px-4 py-3 text-sm font-bold text-slate-900 transition hover:brightness-105 disabled:opacity-60"
+          >
             {pending === "accept" ? <Loader2 size={16} className="animate-spin" /> : <FileCheck2 size={16} />} Accept
           </button>
         </div>

@@ -41,6 +41,9 @@ class VideoService {
   static List<Video>? _cachedFeatured;
   static DateTime? _featuredCacheTime;
 
+  static List<Video>? _cachedMusic;
+  static DateTime? _musicCacheTime;
+
   /// The audience cookie is part of the server response contract. Clear both
   /// in-memory shelves whenever a viewer changes 18+/Kids mode so existing
   /// cached cards cannot briefly bypass the newly selected filter.
@@ -51,9 +54,12 @@ class VideoService {
     _featuredCacheTime = null;
     _cachedShorts = null;
     _shortsCacheTime = null;
+    _cachedMusic = null;
+    _musicCacheTime = null;
   }
 
   /// Loads the real video feed from the InPlayer website backend with instant in-memory caching.
+  /// Strict separation: returns only longform videos (NO music tracks, NO shorts).
   Future<List<Video>> getVideos({bool forceRefresh = false}) async {
     if (!forceRefresh &&
         _cachedVideos != null &&
@@ -83,6 +89,7 @@ class VideoService {
       final result = videosJson
           .whereType<Map>()
           .map((json) => Video.fromJson(Map<String, dynamic>.from(json)))
+          .where((v) => !v.isMusic && !v.isShort)
           .toList();
 
       _cachedVideos = result;
@@ -95,6 +102,56 @@ class VideoService {
         stackTrace: stackTrace,
       );
       return _cachedVideos ?? [];
+    }
+  }
+
+  /// Loads real music tracks from dedicated GET /api/music endpoint with instant in-memory caching.
+  Future<List<Video>> getMusicTracks({bool forceRefresh = false}) async {
+    if (!forceRefresh &&
+        _cachedMusic != null &&
+        _musicCacheTime != null &&
+        DateTime.now().difference(_musicCacheTime!).inSeconds < 45) {
+      return _cachedMusic!;
+    }
+
+    try {
+      final response = await _dio.get(ApiConstants.music);
+
+      if (response.statusCode != 200) {
+        _logger.w('getMusicTracks returned HTTP ${response.statusCode}');
+        return _cachedMusic ?? [];
+      }
+
+      final data = response.data;
+      if (data is! Map) {
+        return _cachedMusic ?? [];
+      }
+
+      final rawList = data['tracks'] ?? data['videos'];
+      if (rawList is! List) {
+        return _cachedMusic ?? [];
+      }
+
+      final result = rawList
+          .whereType<Map>()
+          .map((json) => Video.fromJson(Map<String, dynamic>.from(json)))
+          // Strict check — contentType == 'music' only, never category ==
+          // 'Music' (see Video.isStrictMusic). The server already filters
+          // this way (see app/api/music/route.ts); this mirrors it rather
+          // than relying solely on server-side enforcement.
+          .where((v) => v.isStrictMusic)
+          .toList();
+
+      _cachedMusic = result;
+      _musicCacheTime = DateTime.now();
+      return result;
+    } catch (e, stackTrace) {
+      _logger.e(
+        'Error fetching real InPlayer music tracks',
+        error: e,
+        stackTrace: stackTrace,
+      );
+      return _cachedMusic ?? [];
     }
   }
 
@@ -255,6 +312,23 @@ class VideoService {
     }
   }
 
+  /// Records one view — POST /api/videos/{videoId}/view. Fire-and-forget:
+  /// callers should NOT await this — a failed view count must never delay
+  /// or interrupt playback. Mirrors the website's own /watch/[videoId]
+  /// page, which records a view server-side the moment it loads; the app
+  /// never loads that page, so without this every video/short/music
+  /// watched from the app left its view count frozen at 0 forever, even
+  /// though likes (a separate, already-working endpoint reachable from
+  /// anywhere) kept counting fine — the "0 views, 1 like" that never
+  /// should have been possible.
+  Future<void> recordView(String videoId) async {
+    try {
+      await _dio.post('/api/videos/$videoId/view');
+    } catch (e) {
+      _logger.w('Failed to record view for $videoId: $e');
+    }
+  }
+
   Future<String?> getPlaybackToken(String videoId) async {
     try {
       final response = await _dio.get(
@@ -328,7 +402,10 @@ class VideoService {
         }
       }
 
-      final response = await _dio.get(ApiConstants.videos);
+      final response = await _dio.get(
+        ApiConstants.videos,
+        queryParameters: {'contentType': 'short'},
+      );
 
       if (response.statusCode != 200) {
         _logger.w('getShorts returned HTTP ${response.statusCode}');
@@ -344,17 +421,24 @@ class VideoService {
 
       final videosJson = data['videos'] as List;
 
-      final result = videosJson
+      final parsed = videosJson
           .whereType<Map>()
           .map((json) => Map<String, dynamic>.from(json))
+          .toList();
+
+      final filtered = parsed
           .where((json) {
             final type = json['contentType']?.toString().toLowerCase() ?? '';
             final cat = json['category']?.toString().toLowerCase() ?? '';
             final isShortFlag = json['isShort'] == true;
-            return type == 'short' || type == 'raftaar' || cat.contains('raftaar') || cat.contains('vertical') || isShortFlag;
+            return type == 'short' || type == 'shorts' || type == 'raftaar' || cat.contains('raftaar') || cat.contains('shorts') || cat.contains('vertical') || isShortFlag;
           })
           .map((json) => Short.fromJson(json))
           .toList();
+
+      final result = filtered.isNotEmpty
+          ? filtered
+          : parsed.map((json) => Short.fromJson(json)).toList();
 
       _cachedShorts = result;
       _shortsCacheTime = DateTime.now();

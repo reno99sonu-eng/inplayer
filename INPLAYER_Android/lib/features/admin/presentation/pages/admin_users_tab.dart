@@ -182,6 +182,8 @@ class _AdminUsersTabState extends ConsumerState<AdminUsersTab> {
                             ),
                             title: Text(
                               user.name?.isNotEmpty == true ? user.name! : (user.username ?? user.userId),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                               style: const TextStyle(color: AppColors.textPrimaryDark, fontWeight: FontWeight.w600),
                             ),
                             subtitle: Text(

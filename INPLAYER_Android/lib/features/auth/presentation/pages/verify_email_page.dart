@@ -5,6 +5,7 @@ import '../../../../providers/auth_provider.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/app_logo.dart';
+import '../../../../core/utils/text_utils.dart';
 
 class VerifyEmailPage extends ConsumerStatefulWidget {
   final String email;
@@ -82,11 +83,13 @@ class _VerifyEmailPageState extends ConsumerState<VerifyEmailPage> {
 
                   // Instructions
                   Text(
-                    'We sent a verification code to\n${widget.email}',
+                    'We sent a verification code to\n${breakableEmail(widget.email)}',
                     style: TextStyle(
                       color: context.textSecondary,
                     ),
                     textAlign: TextAlign.center,
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 3,
                   ),
                   const SizedBox(height: 32),
 

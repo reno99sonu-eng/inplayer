@@ -34,6 +34,9 @@ function describeOpenAIError(status: number, body: string): { message: string; h
   return { message: "Couldn't reach OpenAI right now. Please try again shortly.", httpStatus: 502 };
 }
 
+export const maxDuration = 60;
+export const dynamic = "force-dynamic";
+
 export async function POST(request: NextRequest) {
   try {
     await requirePermission(request, "manage_navbar_theme");
@@ -75,7 +78,9 @@ export async function POST(request: NextRequest) {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
-        model: "gpt-image-1",
+        // Sunburst: OpenAI's highest-quality image model. This is a rare,
+        // admin-only, one-off generation, so quality wins over speed.
+        model: "gpt-image-2.5-sunburst",
         prompt,
         size: "1024x1024",
         quality: "medium",

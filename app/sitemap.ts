@@ -15,16 +15,22 @@ const SITE_URL = "https://inplayer.in";
 // helps address).
 const STATIC_ROUTES: Array<{ path: string; priority: number }> = [
   { path: "", priority: 1 },
+  { path: "/about", priority: 0.8 },
+  { path: "/contact", priority: 0.7 },
   { path: "/videos", priority: 0.8 },
   { path: "/shorts", priority: 0.7 },
   { path: "/shop", priority: 0.7 },
   { path: "/creators", priority: 0.6 },
-  { path: "/help", priority: 0.4 },
-  // /terms, /privacy, /hammart-vendor-terms now redirect into this single
-  // hub (see app/policies/page.tsx) — listing the old paths here would be
-  // exactly the "Page with redirect" Search Console issue this file's own
-  // comment above warns against.
-  { path: "/policies", priority: 0.3 },
+  { path: "/help", priority: 0.5 },
+  { path: "/policies", priority: 0.4 },
+  { path: "/terms", priority: 0.4 },
+  { path: "/privacy", priority: 0.4 },
+  { path: "/copyright", priority: 0.3 },
+  { path: "/child-safety", priority: 0.3 },
+  { path: "/community-guidelines", priority: 0.3 },
+  { path: "/creator-monetization", priority: 0.3 },
+  { path: "/hammart-vendor-terms", priority: 0.3 },
+  { path: "/delete-account", priority: 0.3 },
 ];
 
 // Rebuild at most once an hour — a sitemap doesn't need to be

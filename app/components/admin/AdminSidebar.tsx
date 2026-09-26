@@ -24,12 +24,13 @@ import {
   Bug,
   ShoppingBag,
   AlertTriangle,
+  AlertOctagon,
   Receipt,
   LifeBuoy,
   Music2,
   UserCog,
 } from "lucide-react";
-import { useAdminMode } from "@/app/components/admin/AdminModeContext";
+import { useAdminMode, type AdminMode } from "@/app/components/admin/AdminModeContext";
 import { useAdminIdentity } from "@/app/components/admin/AdminIdentityContext";
 import type { TeamPermission } from "@/app/lib/isAdmin";
 
@@ -57,7 +58,8 @@ const inplayerItems = [
   { id: "videos", label: "Videos", icon: Video, href: "/admin/videos" },
   { id: "shorts", label: "Shorts", icon: Film, href: "/admin/videos?type=short" },
   { id: "music", label: "Music Studio", icon: Music2, href: "/admin/music" },
-  { id: "reports", label: "Reports & Moderation", icon: Flag, href: "/admin/moderation" },
+  { id: "stuck-processing", label: "Stuck Uploads", icon: AlertOctagon, href: "/admin/stuck-processing", permission: "delete_stuck_processing_videos" },
+  { id: "reports", label: "Reports & Moderation", icon: Flag, href: "/admin/moderation", permission: "view_reports" },
   { id: "copyright", label: "Copyright Center", icon: Copyright, href: "/admin/copyright" },
   { id: "revenue", label: "Revenue", icon: DollarSign, href: "/admin/revenue" },
   { id: "navbar-theme", label: "Navbar Theme", icon: Palette, href: "/admin/navbar-theme", permission: "manage_navbar_theme" },
@@ -91,6 +93,17 @@ const sponsorshipItems = [
   { id: "settings", label: "Platform Settings", icon: Settings, href: "/admin/settings" },
   { id: "audit-logs", label: "Audit Logs", icon: ScrollText, href: "/admin/audit-logs" },
 ] as const;
+
+// Where a team member lands when entering a mode: the first item that mode's
+// sidebar would actually show them. The main admin's per-mode home pages
+// (dashboard, vendor KYC, sponsorship orders) are all main-admin-only, so
+// sending a team member there only produces a 401.
+export function teamMemberHomeHref(mode: AdminMode, permissions: Set<string>): string {
+  const modeItems: readonly { href: string; permission?: string }[] =
+    mode === "hammart" ? hammartItems : mode === "sponsorship" ? sponsorshipItems : inplayerItems;
+  const first = modeItems.find((item) => item.permission && permissions.has(item.permission));
+  return first?.href ?? "/admin/team-member-home";
+}
 
 export default function AdminSidebar() {
   const pathname = usePathname();

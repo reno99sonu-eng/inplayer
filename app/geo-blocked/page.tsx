@@ -15,10 +15,10 @@ export default function GeoBlockedPage() {
         <Globe size={28} className="text-orange-300" />
       </div>
       <h1 className="mt-5 text-2xl font-black text-white light:text-slate-900">
-        Sorry, we're not available in your region yet
+        Sorry, we&apos;re not available in your region yet
       </h1>
       <p className="mt-2 max-w-sm text-sm text-slate-400 light:text-slate-600">
-        InPlayer is currently available only in India. We're working hard to expand to more regions soon.
+        InPlayer is currently available only in India. We&apos;re working hard to expand to more regions soon.
       </p>
       <p className="mt-8 text-xs text-slate-500 light:text-slate-500">
         If you believe this is an error, please contact support.

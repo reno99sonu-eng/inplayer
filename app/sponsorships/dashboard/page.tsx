@@ -20,7 +20,7 @@ export default function SponsorshipDashboardPage() {
 
       <h1 className="text-xl font-black text-white light:text-slate-900 sm:text-2xl">My Sponsorships</h1>
       <p className="mt-1 text-xs text-slate-400 light:text-slate-600 sm:text-sm">
-        Every ad campaign you've purchased on InPlayer, with real views and clicks once it's live.
+        Every ad campaign you&apos;ve purchased on InPlayer, with real views and clicks once it&apos;s live.
       </p>
 
       <div className="mt-5">

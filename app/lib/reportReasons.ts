@@ -4,6 +4,7 @@
 // there to avoid touching working code, but every new report UI should
 // import from here instead of redefining its own copy.
 export const REPORT_REASONS: { value: string; label: string }[] = [
+  { value: "child_safety", label: "Child exploitation or safety concern (Urgent)" },
   { value: "spam", label: "Spam or misleading" },
   { value: "harassment", label: "Harassment or bullying" },
   { value: "sexual_content", label: "Sexual content" },

@@ -105,7 +105,7 @@ export default function AdminSponsorshipsPage() {
         <Megaphone size={20} className="text-indigo-400" /> Sponsorships
       </h2>
       <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
-        Every ad-sponsorship order — upload a sponsor's emailed assets and activate their 7-day run here.
+        Every ad-sponsorship order — upload a sponsor&apos;s emailed assets and activate their 7-day run here.
       </p>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">

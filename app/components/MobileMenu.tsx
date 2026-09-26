@@ -13,7 +13,9 @@ import {
   Sparkles,
   ShoppingBag,
   History,
+  Globe,
 } from "lucide-react";
+import { useLanguage } from "@/app/context/LanguageContext";
 
 const links = [
   { icon: Home, title: "Home", href: "/" },
@@ -30,6 +32,7 @@ const links = [
 
 export default function MobileMenu() {
   const [open, setOpen] = useState(false);
+  const { t, currentLanguageInfo } = useLanguage();
 
   return (
     <div className="xl:hidden">
@@ -137,6 +140,41 @@ export default function MobileMenu() {
                 </Link>
               );
             })}
+
+            {/* Language Link */}
+            <Link
+              href="/settings/language"
+              onClick={() => setOpen(false)}
+              className="
+                flex
+                w-full
+                items-center
+                justify-between
+                gap-4
+                rounded-2xl
+                border
+                border-orange-500/30
+                bg-orange-500/10
+                backdrop-blur-xl
+                px-5
+                py-4
+                text-left
+                text-white
+                transition-all
+                duration-300
+                hover:bg-orange-500/20
+              "
+            >
+              <div className="flex items-center gap-4">
+                <Globe size={22} className="text-orange-400" />
+                <span className="text-lg font-medium">
+                  {t("settings_language")}
+                </span>
+              </div>
+              <span className="text-xs px-2.5 py-1 rounded-full bg-orange-500/30 text-orange-200 font-semibold">
+                {currentLanguageInfo.nativeName}
+              </span>
+            </Link>
 
             <div className="space-y-3 pt-8">
 

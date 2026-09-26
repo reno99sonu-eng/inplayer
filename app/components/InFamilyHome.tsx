@@ -155,7 +155,7 @@ export default function InFamilyHome() {
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-2 py-1 lg:gap-3">
+      <div className="scrollbar-hide-mobile flex gap-2 overflow-x-auto py-1 lg:gap-3">
         {creators.map((creator) => (
           <Link
             key={creator.creatorId}

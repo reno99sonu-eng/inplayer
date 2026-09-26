@@ -2,7 +2,7 @@
 
 import CreatePopup from "./CreatePopup";
 import AIStudioModal from "./AIStudioModal";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { fetchAuthSession } from "aws-amplify/auth";
 import { useAuthModal } from "./auth/AuthProvider";
@@ -17,11 +17,27 @@ import {
   MessageSquare,
   MessageSquarePlus,
   Megaphone,
+  Heart,
+  MessageCircle,
+  UserPlus,
+  ShieldAlert,
 } from "lucide-react";
 
 interface Notification {
   notificationId: string;
-  type: "like" | "comment" | "subscribe" | "message" | "message_request" | "admin_announcement";
+  type:
+    | "like"
+    | "comment"
+    | "comment_reply"
+    | "subscribe"
+    | "share"
+    | "message"
+    | "message_request"
+    | "admin_announcement"
+    | "live_stream"
+    | "video_upload"
+    | "ai_flag"
+    | "copyright";
   message: string;
   read: boolean;
   createdAt: string;
@@ -40,30 +56,57 @@ export default function NavbarActions() {
 
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const [refreshNonce, setRefreshNonce] = useState(0);
+
+  const refreshNotifications = useCallback(() => {
+    setRefreshNonce((n) => n + 1);
+  }, []);
 
   useEffect(() => {
     if (!signedIn) return;
+    let canceled = false;
 
-    async function loadNotifications() {
+    async function fetchNotifications() {
       try {
         const session = await fetchAuthSession();
         const idToken = session.tokens?.idToken?.toString();
+        if (!idToken || canceled) return;
 
         const res = await fetch("/api/notifications", {
           headers: { Authorization: `Bearer ${idToken}` },
         });
+        if (!res.ok || canceled) return;
         const data = await res.json();
         const list: Notification[] = data.notifications || [];
 
-        setNotifications(list);
-        setUnreadCount(list.filter((n) => !n.read).length);
+        if (!canceled) {
+          setNotifications(list);
+          setUnreadCount(list.filter((n) => !n.read).length);
+        }
       } catch (err) {
         console.error("Failed to load notifications:", err);
       }
     }
 
-    loadNotifications();
-  }, [signedIn]);
+    void fetchNotifications();
+
+    // 30-second live polling so bell updates automatically
+    const interval = setInterval(() => {
+      void fetchNotifications();
+    }, 30000);
+
+    // Refresh immediately when user returns to window/tab
+    const handleFocus = () => {
+      void fetchNotifications();
+    };
+    window.addEventListener("focus", handleFocus);
+
+    return () => {
+      canceled = true;
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+    };
+  }, [signedIn, refreshNonce]);
 
   // Mark everything as read the moment the panel is opened
   useEffect(() => {
@@ -208,7 +251,13 @@ export default function NavbarActions() {
 
       <div ref={notifRef} className="relative">
         <button
-          onClick={() => setNotifOpen(!notifOpen)}
+          onClick={() => {
+            const next = !notifOpen;
+            setNotifOpen(next);
+            if (next) {
+              refreshNotifications();
+            }
+          }}
           className="
             relative
             flex
@@ -235,7 +284,9 @@ export default function NavbarActions() {
           <Bell size={17} />
 
           {unreadCount > 0 && (
-            <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500" />
+            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white shadow-md">
+              {unreadCount > 9 ? "9+" : unreadCount}
+            </span>
           )}
         </button>
 
@@ -244,7 +295,7 @@ export default function NavbarActions() {
             absolute
             right-0
             mt-3
-            w-[300px]
+            w-[320px]
             overflow-hidden
             rounded-3xl
             border
@@ -266,11 +317,16 @@ export default function NavbarActions() {
             }
           `}
         >
-          <div className="border-b border-white/10 light:border-black/10 px-5 py-4">
+          <div className="flex items-center justify-between border-b border-white/10 light:border-black/10 px-5 py-4">
             <h3 className="text-sm font-black text-white light:text-slate-900">Notifications</h3>
+            {unreadCount > 0 && (
+              <span className="rounded-full bg-orange-500/20 px-2 py-0.5 text-[10px] font-bold text-orange-400 border border-orange-500/30">
+                {unreadCount} new
+              </span>
+            )}
           </div>
 
-          <div className="max-h-80 overflow-y-auto p-4">
+          <div className="max-h-80 overflow-y-auto p-3">
             {notifications.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-8 text-center">
                 <Bell size={28} className="mb-3 text-slate-500" />
@@ -282,27 +338,44 @@ export default function NavbarActions() {
                 </p>
               </div>
             ) : (
-              <div className="space-y-2">
+              <div className="space-y-1.5">
                 {notifications.map((n) => {
                   const isMessageType = n.type === "message" || n.type === "message_request";
-                  const isAnnouncement = n.type === "admin_announcement";
-                  const hasIcon = isMessageType || isAnnouncement;
+
+                  const renderIcon = () => {
+                    switch (n.type) {
+                      case "video_upload":
+                        return <Video size={14} className="mt-0.5 flex-shrink-0 text-orange-400" />;
+                      case "live_stream":
+                        return <Radio size={14} className="mt-0.5 flex-shrink-0 text-red-500 animate-pulse" />;
+                      case "like":
+                        return <Heart size={14} className="mt-0.5 flex-shrink-0 text-rose-400" />;
+                      case "comment":
+                      case "comment_reply":
+                        return <MessageCircle size={14} className="mt-0.5 flex-shrink-0 text-amber-400" />;
+                      case "subscribe":
+                        return <UserPlus size={14} className="mt-0.5 flex-shrink-0 text-emerald-400" />;
+                      case "message_request":
+                        return <MessageSquarePlus size={14} className="mt-0.5 flex-shrink-0 text-orange-400" />;
+                      case "message":
+                        return <MessageSquare size={14} className="mt-0.5 flex-shrink-0 text-orange-400" />;
+                      case "admin_announcement":
+                        return <Megaphone size={14} className="mt-0.5 flex-shrink-0 text-sky-400" />;
+                      case "ai_flag":
+                      case "copyright":
+                        return <ShieldAlert size={14} className="mt-0.5 flex-shrink-0 text-amber-500" />;
+                      default:
+                        return <Bell size={14} className="mt-0.5 flex-shrink-0 text-orange-400" />;
+                    }
+                  };
+
                   const content = (
                     <>
                       <div className="flex items-start gap-2">
-                        {isAnnouncement ? (
-                          <Megaphone size={14} className="mt-0.5 flex-shrink-0 text-orange-400" />
-                        ) : (
-                          isMessageType &&
-                          (n.type === "message_request" ? (
-                            <MessageSquarePlus size={14} className="mt-0.5 flex-shrink-0 text-orange-400" />
-                          ) : (
-                            <MessageSquare size={14} className="mt-0.5 flex-shrink-0 text-orange-400" />
-                          ))
-                        )}
-                        <p className="text-sm text-white light:text-slate-900">{n.message}</p>
+                        {renderIcon()}
+                        <p className="text-xs sm:text-sm text-white light:text-slate-900 leading-snug">{n.message}</p>
                       </div>
-                      <p className={hasIcon ? "mt-0.5 pl-[22px] text-xs text-slate-500" : "text-xs text-slate-500"}>
+                      <p className="mt-1 pl-[22px] text-[11px] text-slate-500">
                         {formatTimeAgo(n.createdAt)}
                       </p>
                     </>
@@ -321,8 +394,12 @@ export default function NavbarActions() {
                         setNotifOpen(false);
                         if (isMessageType && n.conversationId) {
                           router.push(`/messages/${n.conversationId}`);
+                        } else if (n.type === "live_stream" && n.videoId) {
+                          router.push(`/live/${n.videoId}`);
                         } else if (n.videoId) {
                           router.push(`/watch/${n.videoId}`);
+                        } else if (n.type === "subscribe") {
+                          router.push("/studio");
                         }
                       }}
                       className={className}
@@ -333,6 +410,18 @@ export default function NavbarActions() {
                 })}
               </div>
             )}
+          </div>
+
+          <div className="border-t border-white/10 light:border-black/10 p-2 text-center bg-black/20">
+            <button
+              onClick={() => {
+                setNotifOpen(false);
+                router.push("/notifications");
+              }}
+              className="w-full py-1.5 text-xs font-bold text-orange-400 hover:text-orange-300 transition"
+            >
+              View all notifications →
+            </button>
           </div>
         </div>
       </div>

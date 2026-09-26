@@ -78,8 +78,10 @@ class Video {
 
   bool get isShort =>
       contentType.toLowerCase() == 'short' ||
+      contentType.toLowerCase() == 'shorts' ||
       contentType.toLowerCase() == 'raftaar' ||
-      category.toLowerCase().contains('raftaar');
+      category.toLowerCase().contains('raftaar') ||
+      category.toLowerCase().contains('shorts');
 
   /// The canonical music check: strictly `contentType == "music"`, matching
   /// app/lib/contentTypes.ts's isMusicType() on the website. Use this (not
@@ -100,8 +102,15 @@ class Video {
 
   factory Video.fromJson(Map<String, dynamic> json) {
     final rawCategory = json['category']?.toString() ?? json['genre']?.toString() ?? 'Entertainment';
-    final rawContentType = json['contentType']?.toString() ?? 'video';
-    final isMusicTrack = rawContentType == 'music' || rawCategory.toLowerCase() == 'music' || json['isMusic'] == true;
+    final rawContentType = json['contentType']?.toString().toLowerCase() ?? 'video';
+    // Strict isolation: only items uploaded explicitly as music (contentType == 'music')
+    // Ordinary videos categorized under "Music" belong in the main video library.
+    final isMusicTrack = rawContentType == 'music' ||
+        rawContentType == 'audio' ||
+        rawContentType == 'song' ||
+        rawContentType == 'track' ||
+        json['contentType']?.toString().toLowerCase() == 'music' ||
+        json['isMusic'] == true;
 
     final rawCovers = json['covers'];
     List<String> parsedCovers = [];

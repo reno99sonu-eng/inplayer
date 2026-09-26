@@ -56,9 +56,10 @@ export async function checkBannedProduct(params: {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({
-        model: "gpt-4o-mini",
+        model: "gpt-6-sol",
         response_format: { type: "json_object" },
         temperature: 0,
+        reasoning_effort: "none",
         messages: [
           { role: "system", content: SYSTEM_PROMPT },
           {

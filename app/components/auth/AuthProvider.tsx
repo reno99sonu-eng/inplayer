@@ -118,8 +118,8 @@ interface AuthContextType {
   activeModal: AuthModal;
   pendingEmail: string;
 
-  openSignIn: () => void;
-  openSignUp: () => void;
+  openSignIn: (email?: string) => void;
+  openSignUp: (email?: string) => void;
   openForgotPassword: () => void;
   openVerifyEmail: (email?: string) => void;
 
@@ -159,10 +159,15 @@ export default function AuthProvider({
   // session-restore check that runs once on first page load. That
   // distinction is what stops an already-signed-in admin from being
   // yanked back to /admin every time they navigate or refresh a page.
-  async function refreshUser(options?: { isFreshSignIn?: boolean }) {
+  async function refreshUser(options?: { isFreshSignIn?: boolean; isRetry?: boolean }) {
     try {
-      const currentUser = await getCurrentUser();
-      const attributes = await fetchUserAttributes();
+      // Independent calls (neither's result feeds the other) — running
+      // them in parallel instead of one after another shaves a full
+      // network round trip off every page load and every fresh sign-in.
+      const [currentUser, attributes] = await Promise.all([
+        getCurrentUser(),
+        fetchUserAttributes(),
+      ]);
 
       let avatarUrl: string | null = null;
       let coverPhotoUrl: string | null = null;
@@ -231,29 +236,63 @@ export default function AuthProvider({
       // being revoked later actually takes effect. Only on a real fresh
       // sign-in, same gate as the admin-redirect check right below, so a
       // page refresh never registers a duplicate row for the same login.
+      // Both of these only need idToken — neither depends on the other's
+      // result — so they run concurrently instead of one after another.
+      // This pair only runs on a genuine fresh sign-in, so it's the extra
+      // latency someone actually feels right after submitting the sign-in
+      // form.
       if (options?.isFreshSignIn && idToken) {
-        await registerCurrentSession(idToken);
-      }
-
-      // Send an admin straight to the Admin Panel the moment they actually
-      // sign in, instead of leaving them on the normal site. Uses the same
-      // /api/admin/me check app/admin/layout.tsx already relies on — the
-      // real admin-email list is server-only, so this is the one place a
-      // client component can safely ask "is this account an admin."
-      if (options?.isFreshSignIn && idToken && !pathname?.startsWith("/admin")) {
-        try {
-          const adminRes = await fetch("/api/admin/me", {
-            headers: { Authorization: `Bearer ${idToken}` },
-          });
-          const adminData = await adminRes.json();
-          if (adminData.isAdmin) {
-            router.push("/admin");
-          }
-        } catch (err) {
-          console.error("Post-sign-in admin check failed:", err);
-        }
+        const wantsAdminCheck = !pathname?.startsWith("/admin");
+        await Promise.all([
+          registerCurrentSession(idToken),
+          wantsAdminCheck
+            ? (async () => {
+                // Send an admin straight to the Admin Panel the moment they
+                // actually sign in, instead of leaving them on the normal
+                // site. Uses the same /api/admin/me check app/admin/layout.tsx
+                // already relies on — the real admin-email list is
+                // server-only, so this is the one place a client component
+                // can safely ask "is this account an admin."
+                try {
+                  const adminRes = await fetch("/api/admin/me", {
+                    headers: { Authorization: `Bearer ${idToken}` },
+                  });
+                  const adminData = await adminRes.json();
+                  if (adminData.isAdmin) {
+                    router.push("/admin");
+                  }
+                } catch (err) {
+                  console.error("Post-sign-in admin check failed:", err);
+                }
+              })()
+            : Promise.resolve(),
+        ]);
       }
     } catch (err) {
+      // getCurrentUser()/fetchUserAttributes() throw
+      // UserUnAuthenticatedException when there's genuinely no session —
+      // that's real, trustworthy "signed out." Anything else (a network
+      // blip, a momentary Cognito hiccup) is NOT the same fact, and used to
+      // be treated identically: a returning visitor with a perfectly valid
+      // session could load the page, hit a transient failure here, and get
+      // shown fully signed-out with no indication anything went wrong. For
+      // the passive first-load check (never for a fresh sign-in, which
+      // should surface its own real failure immediately), retry once
+      // before concluding the visitor isn't signed in.
+      const errorName = (err as { name?: string } | null)?.name;
+      const isGenuinelyUnauthenticated = errorName === "UserUnAuthenticatedException";
+
+      if (!isGenuinelyUnauthenticated && !options?.isFreshSignIn && !options?.isRetry) {
+        console.warn("refreshUser(): transient failure, retrying once:", err);
+        await new Promise((resolve) => setTimeout(resolve, 1500));
+        // `return await`, not just `return` — this is still inside the
+        // outer call's try/catch/finally, and the outer `finally` below
+        // would otherwise fire (setAuthLoading(false)) the instant this
+        // retry is *kicked off* rather than once it actually resolves,
+        // flashing a signed-out UI for the ~1.5s the retry is in flight.
+        return await refreshUser({ ...options, isRetry: true });
+      }
+
       // This used to be silent — which is exactly why "Google sign-in
       // succeeds but the site still shows Sign In" has been so hard to
       // pin down: whatever throws here is what decides that outcome, and
@@ -500,32 +539,40 @@ export default function AuthProvider({
 
   async function handleRejectTerms() {
     setUser(null);
-    setActiveModal("signup");
+    const pendingAgeRaw = localStorage.getItem("inplayer-pending-age");
     localStorage.removeItem("inplayer-pending-age");
     try {
-      // deleteUser() removes the Cognito account entirely (and ends the
-      // session as part of that) — a plain signOut would leave the
-      // account behind, so trying to sign up again with the same email
-      // would fail with "an account already exists," which breaks the
-      // whole point of "reject sends you back to sign up again."
-      await deleteUser();
+      // If this was during fresh registration (pendingAge exists), deleting the newly
+      // created cognito account allows the user to re-register cleanly.
+      // If this is an existing user declining updated terms, sign them out safely
+      // instead of deleting their account.
+      if (pendingAgeRaw) {
+        setActiveModal("signup");
+        await deleteUser();
+      } else {
+        setActiveModal(null);
+        await amplifySignOut();
+      }
     } catch (error) {
-      console.error("Failed to delete account after rejecting terms:", error);
-      // Best-effort fallback so the session doesn't linger even if the
-      // delete itself failed for some reason (e.g. a network blip).
+      console.error("Failed to process terms decline:", error);
       try {
         await amplifySignOut();
       } catch (signOutError) {
-        console.error("Fallback sign-out after failed account deletion also failed:", signOutError);
+        console.error("Fallback sign-out after failed terms decline:", signOutError);
       }
     }
   }
 
-  function openSignIn() {
+  function openSignIn(email?: string) {
+    // Always set (clearing when omitted) — otherwise a stale email left
+    // over from a different flow (e.g. openVerifyEmail) would silently
+    // leak into an unrelated sign-in/sign-up open.
+    setPendingEmail(email || "");
     setActiveModal("signin");
   }
 
-  function openSignUp() {
+  function openSignUp(email?: string) {
+    setPendingEmail(email || "");
     setActiveModal("signup");
   }
 
@@ -568,11 +615,13 @@ export default function AuthProvider({
         open={activeModal === "signin"}
         onClose={closeAuth}
         onSuccess={() => refreshUser({ isFreshSignIn: true })}
+        initialEmail={pendingEmail}
       />
 
       <SignUpModal
         open={activeModal === "signup"}
         onClose={closeAuth}
+        initialEmail={pendingEmail}
       />
 
       <ForgotPasswordModal

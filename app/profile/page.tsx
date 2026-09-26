@@ -488,7 +488,7 @@ export default function ProfilePage() {
       <div className="flex min-h-screen flex-col items-center justify-center bg-[#06101D] light:bg-[#FAF5E9] px-6 text-center text-white light:text-slate-900">
         <h2 className="text-2xl font-black">Sign in to view your profile</h2>
         <button
-          onClick={openSignIn}
+          onClick={() => openSignIn()}
           className="mt-6 rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-8 py-3 font-bold text-white shadow-[0_15px_35px_rgba(255,153,0,.3)] transition-all hover:-translate-y-0.5"
         >
           Sign In
@@ -680,7 +680,7 @@ export default function ProfilePage() {
             <label className="mb-2 block text-xs font-bold uppercase tracking-[0.2em] text-orange-300/80 light:text-orange-600/90">
               Email
             </label>
-            <p className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.02] light:bg-black/[0.02] px-4 py-3 text-slate-400 light:text-slate-600">
+            <p className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.02] light:bg-black/[0.02] px-4 py-3 text-slate-400 light:text-slate-600 break-all">
               {user?.email}
             </p>
           </div>

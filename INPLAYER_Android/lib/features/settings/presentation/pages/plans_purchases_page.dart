@@ -37,6 +37,20 @@ class _PlansPurchasesPageState extends ConsumerState<PlansPurchasesPage> {
   List<PremiumPlan> _plans = [];
   bool _loading = true;
 
+  /// Google Play's Payments policy requires purchases of in-app digital
+  /// content (a Premium subscription unlocking higher resolution and premium
+  /// titles inside this app) to go through Google Play's billing system.
+  /// The Razorpay checkout below predates that and is therefore disabled on
+  /// the Android build until Play Billing is integrated. Premium status is
+  /// still read and shown; only the in-app purchase path is closed.
+  ///
+  /// NOTE: the Razorpay SDK itself must stay in the app — the HamMart shop
+  /// sells physical goods, which Play explicitly exempts from Play Billing.
+  ///
+  /// Intentionally a plain field rather than a `const`: a compile-time false
+  /// makes the analyzer flag every guarded branch as dead_code.
+  final bool _inAppPurchaseEnabled = false;
+
   _Stage _stage = _Stage.browse;
   PremiumPlan? _chosen;
   String? _error;
@@ -424,11 +438,15 @@ class _PlansPurchasesPageState extends ConsumerState<PlansPurchasesPage> {
                             ),
                           ),
                           const SizedBox(height: 16),
-                          if (_stage == _Stage.browse)
+                          if (_inAppPurchaseEnabled &&
+                              _stage == _Stage.browse)
                             _buildPlanGrid(label: 'Add more time'),
-                          if (_stage != _Stage.browse) _buildCheckoutPanel(),
+                          if (_inAppPurchaseEnabled &&
+                              _stage != _Stage.browse)
+                            _buildCheckoutPanel(),
                         ] else ...[
-                          if (_stage == _Stage.browse) ...[
+                          if (_inAppPurchaseEnabled &&
+                              _stage == _Stage.browse) ...[
                             _buildPlanGrid(
                               label:
                                   ref.read(authStateProvider)
@@ -446,7 +464,18 @@ class _PlansPurchasesPageState extends ConsumerState<PlansPurchasesPage> {
                               ),
                             ),
                           ],
-                          if (_stage != _Stage.browse) _buildCheckoutPanel(),
+                          if (!_inAppPurchaseEnabled)
+                            const Text(
+                              'You are on the free plan.',
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 13,
+                              ),
+                            ),
+                          if (_inAppPurchaseEnabled &&
+                              _stage != _Stage.browse)
+                            _buildCheckoutPanel(),
                         ],
                       ],
                     ),

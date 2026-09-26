@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getVisibleVideos } from "@/app/lib/contentAccessServer";
 import { isMusicType } from "@/app/lib/contentTypes";
+import { sanitizeGenre, sanitizeMusicLanguage } from "@/app/lib/musicTrack";
 import { resolveUsernames } from "@/app/lib/resolveUsernames";
 import type { MusicTrack } from "@/app/context/MusicPlayerContext";
 import MusicPageClient from "@/app/components/music/MusicPageClient";
@@ -49,7 +50,16 @@ export default async function MusicPage({ searchParams }: MusicPageProps) {
       const uploaderId = v.uploaderId as string | undefined;
 
       // Extract music settings
-      const musicSettings = (v.musicSettings as any) || {};
+      const musicSettings =
+        v.musicSettings && typeof v.musicSettings === "object"
+          ? (v.musicSettings as {
+              covers?: unknown;
+              coverIntervalSeconds?: unknown;
+              lyrics?: unknown;
+              genre?: unknown;
+              language?: unknown;
+            })
+          : {};
       const covers = Array.isArray(musicSettings.covers) && musicSettings.covers.length > 0
         ? musicSettings.covers
         : v.thumbnailUrl
@@ -64,10 +74,13 @@ export default async function MusicPage({ searchParams }: MusicPageProps) {
         uploaderUsername: uploaderId ? usernames.get(uploaderId) : undefined,
         uploaderAvatarUrl: v.uploaderAvatarUrl as string | undefined,
         covers,
-        coverIntervalSeconds: musicSettings.coverIntervalSeconds || 7,
+        coverIntervalSeconds:
+          typeof musicSettings.coverIntervalSeconds === "number"
+            ? musicSettings.coverIntervalSeconds
+            : 7,
         lyrics: Array.isArray(musicSettings.lyrics) ? musicSettings.lyrics : [],
-        genre: (musicSettings.genre as string) || (v.category as string) || "Pop",
-        language: (musicSettings.language as string) || undefined,
+        genre: sanitizeGenre(v.genre ?? musicSettings.genre),
+        language: sanitizeMusicLanguage(v.language ?? musicSettings.language) ?? undefined,
         muxPlaybackId: v.muxPlaybackId as string | undefined,
         duration: (v.duration as number) || 0,
         views: (v.views as number) || 0,

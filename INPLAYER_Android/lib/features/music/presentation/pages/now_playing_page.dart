@@ -241,185 +241,188 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
           builder: (ctx, ref, _) {
             final player = ref.watch(musicPlayerServiceProvider);
             return DraggableScrollableSheet(
-          initialChildSize: 0.6,
-          maxChildSize: 0.9,
-          minChildSize: 0.4,
-          expand: false,
-          builder: (context, scrollController) {
-            return Container(
-              decoration: BoxDecoration(
-                color: context.bgModal,
-                borderRadius: const BorderRadius.vertical(
-                  top: Radius.circular(24),
-                ),
-                border: Border.all(color: context.borderSubtle),
-              ),
-              child: Column(
-                children: [
-                  const SizedBox(height: 12),
-                  Container(
-                    width: 40,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: context.textDim.withValues(alpha: 0.4),
-                      borderRadius: BorderRadius.circular(2),
+              initialChildSize: 0.6,
+              maxChildSize: 0.9,
+              minChildSize: 0.4,
+              expand: false,
+              builder: (context, scrollController) {
+                return Container(
+                  decoration: BoxDecoration(
+                    color: context.bgModal,
+                    borderRadius: const BorderRadius.vertical(
+                      top: Radius.circular(24),
                     ),
+                    border: Border.all(color: context.borderSubtle),
                   ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
-                    child: Row(
-                      children: [
-                        Text(
-                          'Up Next',
-                          style: TextStyle(
-                            color: context.textPrimary,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w800,
-                          ),
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 12),
+                      Container(
+                        width: 40,
+                        height: 4,
+                        decoration: BoxDecoration(
+                          color: context.textDim.withValues(alpha: 0.4),
+                          borderRadius: BorderRadius.circular(2),
                         ),
-                        const Spacer(),
-                        Text(
-                          '${player.queue.length} tracks',
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 14, 20, 8),
+                        child: Row(
+                          children: [
+                            Text(
+                              'Up Next',
+                              style: TextStyle(
+                                color: context.textPrimary,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              '${player.queue.length} tracks',
+                              style: TextStyle(
+                                color: context.textDim,
+                                fontSize: 12,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
+                        child: Text(
+                          'Drag to reorder — the track playing now stays pinned in place.',
                           style: TextStyle(
                             color: context.textDim,
-                            fontSize: 12,
+                            fontSize: 11,
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(20, 0, 20, 6),
-                    child: Text(
-                      'Drag to reorder — the track playing now stays pinned in place.',
-                      style: TextStyle(color: context.textDim, fontSize: 11),
-                    ),
-                  ),
-                  Expanded(
-                    child: ReorderableListView.builder(
-                      scrollController: scrollController,
-                      buildDefaultDragHandles: false,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 4,
                       ),
-                      itemCount: player.queue.length,
-                      // onReorder is deprecated as of Flutter 3.41 in
-                      // favour of onReorderItem, which hands back a newIndex
-                      // that has ALREADY been corrected for the item lifted
-                      // out at oldIndex. Exactly one of the two may be given.
-                      //
-                      // MusicPlayerService.reorderQueue still speaks the old
-                      // raw convention — it does that correction itself, and
-                      // it is shared — so the correction is undone here
-                      // rather than changing a service contract for one call
-                      // site. Dragging down: raw = new + 1; dragging up: raw
-                      // = new; equal is a no-op either way.
-                      onReorderItem: (oldIndex, newIndex) {
-                        final rawIndex = oldIndex < newIndex
-                            ? newIndex + 1
-                            : newIndex;
-                        ref
-                            .read(musicPlayerServiceProvider)
-                            .reorderQueue(oldIndex, rawIndex);
-                      },
-                      itemBuilder: (context, i) {
-                        final t = player.queue[i];
-                        final isCurrent = i == player.currentIndex;
-                        return ListTile(
-                          key: ValueKey('queue_${i}_${t.videoId}'),
-                          onTap: () {
-                            ref.read(musicPlayerServiceProvider).jumpTo(i);
+                      Expanded(
+                        child: ReorderableListView.builder(
+                          scrollController: scrollController,
+                          buildDefaultDragHandles: false,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 12,
+                            vertical: 4,
+                          ),
+                          itemCount: player.queue.length,
+                          // onReorder is deprecated as of Flutter 3.41 in
+                          // favour of onReorderItem, which hands back a newIndex
+                          // that has ALREADY been corrected for the item lifted
+                          // out at oldIndex. Exactly one of the two may be given.
+                          //
+                          // MusicPlayerService.reorderQueue still speaks the old
+                          // raw convention — it does that correction itself, and
+                          // it is shared — so the correction is undone here
+                          // rather than changing a service contract for one call
+                          // site. Dragging down: raw = new + 1; dragging up: raw
+                          // = new; equal is a no-op either way.
+                          onReorderItem: (oldIndex, newIndex) {
+                            final rawIndex = oldIndex < newIndex
+                                ? newIndex + 1
+                                : newIndex;
+                            ref
+                                .read(musicPlayerServiceProvider)
+                                .reorderQueue(oldIndex, rawIndex);
                           },
-                          leading: ClipRRect(
-                            borderRadius: BorderRadius.circular(8),
-                            child: SizedBox(
-                              width: 40,
-                              height: 40,
-                              child:
-                                  (t.covers.isNotEmpty
-                                          ? t.covers.first
-                                          : t.thumbnail)
-                                      .isNotEmpty
-                                  ? SafeAppImage(
-                                      imageUrl: t.covers.isNotEmpty
-                                          ? t.covers.first
-                                          : t.thumbnail,
-                                      fit: BoxFit.cover,
-                                    )
-                                  : Container(
-                                      color: AppColors.music.withValues(
-                                        alpha: 0.25,
-                                      ),
-                                    ),
-                            ),
-                          ),
-                          title: Text(
-                            t.title,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: isCurrent
-                                  ? AppColors.brandOrangeLight
-                                  : context.textPrimary,
-                              fontWeight: isCurrent
-                                  ? FontWeight.w800
-                                  : FontWeight.w600,
-                              fontSize: 13,
-                            ),
-                          ),
-                          subtitle: Text(
-                            t.artist?.isNotEmpty == true
-                                ? t.artist!
-                                : t.creator,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: context.textSecondary,
-                              fontSize: 11,
-                            ),
-                          ),
-                          trailing: isCurrent
-                              ? MiniEqualizer(
-                                  playing: player.isPlaying,
-                                  height: 18,
-                                )
-                              : Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    IconButton(
-                                      padding: EdgeInsets.zero,
-                                      constraints: const BoxConstraints(
-                                        minWidth: 30,
-                                        minHeight: 30,
-                                      ),
-                                      icon: Icon(
-                                        Icons.close_rounded,
-                                        color: context.textDim,
-                                        size: 18,
-                                      ),
-                                      onPressed: () => ref
-                                          .read(musicPlayerServiceProvider)
-                                          .removeFromQueue(i),
-                                    ),
-                                    ReorderableDragStartListener(
-                                      index: i,
-                                      child: Icon(
-                                        Icons.drag_handle_rounded,
-                                        color: context.textDim,
-                                        size: 20,
-                                      ),
-                                    ),
-                                  ],
+                          itemBuilder: (context, i) {
+                            final t = player.queue[i];
+                            final isCurrent = i == player.currentIndex;
+                            return ListTile(
+                              key: ValueKey('queue_${i}_${t.videoId}'),
+                              onTap: () {
+                                ref.read(musicPlayerServiceProvider).jumpTo(i);
+                              },
+                              leading: ClipRRect(
+                                borderRadius: BorderRadius.circular(8),
+                                child: SizedBox(
+                                  width: 40,
+                                  height: 40,
+                                  child:
+                                      (t.covers.isNotEmpty
+                                              ? t.covers.first
+                                              : t.thumbnail)
+                                          .isNotEmpty
+                                      ? SafeAppImage(
+                                          imageUrl: t.covers.isNotEmpty
+                                              ? t.covers.first
+                                              : t.thumbnail,
+                                          fit: BoxFit.cover,
+                                        )
+                                      : Container(
+                                          color: AppColors.music.withValues(
+                                            alpha: 0.25,
+                                          ),
+                                        ),
                                 ),
-                        );
-                      },
-                    ),
+                              ),
+                              title: Text(
+                                t.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: isCurrent
+                                      ? AppColors.brandOrangeLight
+                                      : context.textPrimary,
+                                  fontWeight: isCurrent
+                                      ? FontWeight.w800
+                                      : FontWeight.w600,
+                                  fontSize: 13,
+                                ),
+                              ),
+                              subtitle: Text(
+                                t.artist?.isNotEmpty == true
+                                    ? t.artist!
+                                    : t.creator,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  color: context.textSecondary,
+                                  fontSize: 11,
+                                ),
+                              ),
+                              trailing: isCurrent
+                                  ? MiniEqualizer(
+                                      playing: player.isPlaying,
+                                      height: 18,
+                                    )
+                                  : Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        IconButton(
+                                          padding: EdgeInsets.zero,
+                                          constraints: const BoxConstraints(
+                                            minWidth: 30,
+                                            minHeight: 30,
+                                          ),
+                                          icon: Icon(
+                                            Icons.close_rounded,
+                                            color: context.textDim,
+                                            size: 18,
+                                          ),
+                                          onPressed: () => ref
+                                              .read(musicPlayerServiceProvider)
+                                              .removeFromQueue(i),
+                                        ),
+                                        ReorderableDragStartListener(
+                                          index: i,
+                                          child: Icon(
+                                            Icons.drag_handle_rounded,
+                                            color: context.textDim,
+                                            size: 20,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            );
-          },
+                );
+              },
             );
           },
         );
@@ -600,7 +603,11 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
     );
   }
 
-  Widget _buildSleeve(BuildContext context, String coverUrl, MusicPlayerService player) {
+  Widget _buildSleeve(
+    BuildContext context,
+    String coverUrl,
+    MusicPlayerService player,
+  ) {
     final isAd = player.isAdActive && player.currentAd != null;
     final ad = player.currentAd;
     final displayUrl = isAd ? ad!.imageUrl : coverUrl;
@@ -640,10 +647,7 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
             fit: StackFit.expand,
             children: [
               displayUrl.isNotEmpty
-                  ? SafeAppImage(
-                      imageUrl: displayUrl,
-                      fit: BoxFit.cover,
-                    )
+                  ? SafeAppImage(imageUrl: displayUrl, fit: BoxFit.cover)
                   : Container(
                       decoration: const BoxDecoration(
                         gradient: LinearGradient(
@@ -666,11 +670,16 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
                   top: 14,
                   left: 14,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.black.withValues(alpha: 0.75),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.amber.withValues(alpha: 0.6)),
+                      border: Border.all(
+                        color: Colors.amber.withValues(alpha: 0.6),
+                      ),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -692,7 +701,10 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
                               ad.title,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(color: Colors.white, fontSize: 10),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 10,
+                              ),
                             ),
                           ),
                         ],
@@ -706,20 +718,36 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
                   left: 14,
                   child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: player.skipUnlocked ? Colors.white : Colors.black.withValues(alpha: 0.75),
-                      foregroundColor: player.skipUnlocked ? Colors.black : Colors.white70,
+                      backgroundColor: player.skipUnlocked
+                          ? Colors.white
+                          : Colors.black.withValues(alpha: 0.75),
+                      foregroundColor: player.skipUnlocked
+                          ? Colors.black
+                          : Colors.white70,
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(20),
                         side: BorderSide(
-                          color: player.skipUnlocked ? Colors.white : Colors.white24,
+                          color: player.skipUnlocked
+                              ? Colors.white
+                              : Colors.white24,
                         ),
                       ),
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 8,
+                      ),
                     ),
-                    onPressed: player.skipUnlocked ? () => player.skipAd() : null,
+                    onPressed: player.skipUnlocked
+                        ? () => player.skipAd()
+                        : null,
                     child: Text(
-                      player.skipUnlocked ? 'Skip Ad →' : 'Skip in ${player.adCountdown}s',
-                      style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
+                      player.skipUnlocked
+                          ? 'Skip Ad →'
+                          : 'Skip in ${player.adCountdown}s',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
                     ),
                   ),
                 ),
@@ -733,20 +761,36 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
                         backgroundColor: Colors.black.withValues(alpha: 0.75),
                         foregroundColor: Colors.white,
                         side: const BorderSide(color: Colors.white38),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
                       ),
                       onPressed: () async {
                         final uri = Uri.tryParse(ad.linkUrl);
                         if (uri != null && await canLaunchUrl(uri)) {
-                          await launchUrl(uri, mode: LaunchMode.externalApplication);
+                          await launchUrl(
+                            uri,
+                            mode: LaunchMode.externalApplication,
+                          );
                         }
-                        ref.read(adServiceProvider).trackMidrollEvent(ad.adId, kind: 'click');
+                        ref
+                            .read(adServiceProvider)
+                            .trackMidrollEvent(ad.adId, kind: 'click');
                       },
                       child: const Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text('Visit Sponsor', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w600)),
+                          Text(
+                            'Visit Sponsor',
+                            style: TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                           SizedBox(width: 4),
                           Icon(Icons.open_in_new_rounded, size: 12),
                         ],
@@ -772,7 +816,8 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
               : track.creator,
           size: 40,
           isVerified: track.verified,
-          onTap: track.uploaderUsername != null &&
+          onTap:
+              track.uploaderUsername != null &&
                   track.uploaderUsername!.isNotEmpty
               ? () {
                   Navigator.of(context, rootNavigator: true).maybePop();
@@ -823,6 +868,23 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
                   ),
                 ),
               ),
+              if (track.genre?.isNotEmpty == true ||
+                  track.language?.isNotEmpty == true) ...[
+                const SizedBox(height: 3),
+                Text(
+                  [track.genre, track.language]
+                      .whereType<String>()
+                      .where((value) => value.isNotEmpty)
+                      .join(' • '),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: context.textDim,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -851,88 +913,95 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
         return StreamBuilder<Duration>(
           stream: player.positionStream,
           builder: (context, snapshot) {
-        final pos = snapshot.data ?? Duration.zero;
-        final dur = durSnapshot.data ?? player.duration ?? Duration.zero;
-        final hasDuration = dur.inMilliseconds > 0;
-        final maxMs = hasDuration ? dur.inMilliseconds.toDouble() : 1.0;
-        // While a drag is in progress the thumb follows the finger, NOT the
-        // position stream. Letting the stream drive it mid-drag is what made
-        // the thumb rubber-band back under your finger.
-        //
-        // The `hasDuration` guard on the fallback is load-bearing and was
-        // missing: with no duration yet, maxMs is 1.0, so clamping the
-        // position into 0..1 gave 1 for any playhead past a single
-        // millisecond — against a slider whose max is also 1. The bar
-        // therefore rendered COMPLETELY FULL for the whole window before
-        // duration resolved, and stayed full forever on any stream that
-        // never reported one. Showing nothing is the honest answer while
-        // the length is unknown.
-        final value = _dragMs ??
-            (hasDuration
-                ? pos.inMilliseconds.clamp(0, maxMs.toInt()).toDouble()
-                : 0.0);
+            final pos = snapshot.data ?? Duration.zero;
+            final dur = durSnapshot.data ?? player.duration ?? Duration.zero;
+            final hasDuration = dur.inMilliseconds > 0;
+            final maxMs = hasDuration ? dur.inMilliseconds.toDouble() : 1.0;
+            // While a drag is in progress the thumb follows the finger, NOT the
+            // position stream. Letting the stream drive it mid-drag is what made
+            // the thumb rubber-band back under your finger.
+            //
+            // The `hasDuration` guard on the fallback is load-bearing and was
+            // missing: with no duration yet, maxMs is 1.0, so clamping the
+            // position into 0..1 gave 1 for any playhead past a single
+            // millisecond — against a slider whose max is also 1. The bar
+            // therefore rendered COMPLETELY FULL for the whole window before
+            // duration resolved, and stayed full forever on any stream that
+            // never reported one. Showing nothing is the honest answer while
+            // the length is unknown.
+            final value =
+                _dragMs ??
+                (hasDuration
+                    ? pos.inMilliseconds.clamp(0, maxMs.toInt()).toDouble()
+                    : 0.0);
 
-        return Column(
-          children: [
-            SliderTheme(
-              data: SliderTheme.of(context).copyWith(
-                trackHeight: 3,
-                activeTrackColor: AppColors.brandOrange,
-                inactiveTrackColor: context.borderMedium,
-                thumbColor: Colors.white,
-                thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
-                overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
-              ),
-              child: Slider(
-                min: 0,
-                max: maxMs,
-                value: value.clamp(0.0, maxMs),
-                // Seek ONCE, on release. This used to call seek() on every
-                // drag update, firing a storm of seeks at the audio backend
-                // and stuttering playback while scrubbing.
-                onChanged: hasDuration
-                    ? (v) => setState(() => _dragMs = v)
-                    : null,
-                onChangeStart: hasDuration
-                    ? (v) => setState(() => _dragMs = v)
-                    : null,
-                onChangeEnd: hasDuration
-                    ? (v) {
-                        player.seek(Duration(milliseconds: v.round()));
-                        setState(() => _dragMs = null);
-                      }
-                    : null,
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    // Show where the finger is while scrubbing.
-                    _fmt(_dragMs != null
-                        ? Duration(milliseconds: _dragMs!.round())
-                        : pos),
-                    style: TextStyle(
-                      color: context.textDim,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
+            return Column(
+              children: [
+                SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    trackHeight: 3,
+                    activeTrackColor: AppColors.brandOrange,
+                    inactiveTrackColor: context.borderMedium,
+                    thumbColor: Colors.white,
+                    thumbShape: const RoundSliderThumbShape(
+                      enabledThumbRadius: 6,
+                    ),
+                    overlayShape: const RoundSliderOverlayShape(
+                      overlayRadius: 14,
                     ),
                   ),
-                  Text(
-                    _fmt(dur),
-                    style: TextStyle(
-                      color: context.textDim,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
-                    ),
+                  child: Slider(
+                    min: 0,
+                    max: maxMs,
+                    value: value.clamp(0.0, maxMs),
+                    // Seek ONCE, on release. This used to call seek() on every
+                    // drag update, firing a storm of seeks at the audio backend
+                    // and stuttering playback while scrubbing.
+                    onChanged: hasDuration
+                        ? (v) => setState(() => _dragMs = v)
+                        : null,
+                    onChangeStart: hasDuration
+                        ? (v) => setState(() => _dragMs = v)
+                        : null,
+                    onChangeEnd: hasDuration
+                        ? (v) {
+                            player.seek(Duration(milliseconds: v.round()));
+                            setState(() => _dragMs = null);
+                          }
+                        : null,
                   ),
-                ],
-              ),
-            ),
-          ],
-        );
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        // Show where the finger is while scrubbing.
+                        _fmt(
+                          _dragMs != null
+                              ? Duration(milliseconds: _dragMs!.round())
+                              : pos,
+                        ),
+                        style: TextStyle(
+                          color: context.textDim,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        _fmt(dur),
+                        style: TextStyle(
+                          color: context.textDim,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            );
           },
         );
       },

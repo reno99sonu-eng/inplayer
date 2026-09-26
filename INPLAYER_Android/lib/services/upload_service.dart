@@ -61,9 +61,11 @@ class UploadService {
           return 'Upload cancelled.';
         case DioExceptionType.badResponse:
           final code = e.response?.statusCode;
-          final serverMessage =
-              e.response?.data is Map ? e.response?.data['error'] as String? : null;
-          if (serverMessage != null && serverMessage.isNotEmpty) return serverMessage;
+          final serverMessage = e.response?.data is Map
+              ? e.response?.data['error'] as String?
+              : null;
+          if (serverMessage != null && serverMessage.isNotEmpty)
+            return serverMessage;
           if (code == 401 || code == 403) {
             return 'You are signed out. Sign in again and retry the upload.';
           }
@@ -107,8 +109,10 @@ class UploadService {
     int coverIntervalSeconds = 12,
     List<Map<String, dynamic>> lyrics = const [],
     String? genre,
+    String? language,
     String? audioSha256,
     bool declaredOwnership = false,
+
     /// Already-serialized `shortSettings` map (soundtrack + clip length +
     /// Look filter) — see ShortSettings.toJson(). Null omits the key
     /// entirely, which is what the server treats as "nothing was picked".
@@ -137,7 +141,8 @@ class UploadService {
           // Website gates this for everything except Shorts (contentType
           // !== "short"), i.e. video AND music. This used to be video-only
           // here, so a music upload could never be set members-only.
-          if (contentType == 'video' || contentType == 'music') 'membersOnly': membersOnly,
+          if (contentType == 'video' || contentType == 'music')
+            'membersOnly': membersOnly,
           if (thumbnailDataUrl != null && thumbnailDataUrl.isNotEmpty)
             'thumbnailDataUrl': thumbnailDataUrl,
           if (contentType == 'music') ...{
@@ -149,7 +154,9 @@ class UploadService {
             // whether the uploader actually owned the recording.
             'declaredOwnership': declaredOwnership,
             'genre': genre ?? 'Other',
-            if (audioSha256 != null && audioSha256.isNotEmpty) 'audioSha256': audioSha256,
+            if (language != null && language.isNotEmpty) 'language': language,
+            if (audioSha256 != null && audioSha256.isNotEmpty)
+              'audioSha256': audioSha256,
           },
           // Kept under the `shortSettings` name for video AND short
           // deliberately, matching the server: renaming it would mean

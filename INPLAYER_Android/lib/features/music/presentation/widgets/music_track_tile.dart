@@ -113,6 +113,22 @@ class MusicTrackTile extends ConsumerWidget {
                         fontSize: 12,
                       ),
                     ),
+                    if (track.genre?.isNotEmpty == true ||
+                        track.language?.isNotEmpty == true) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        [track.genre, track.language]
+                            .whereType<String>()
+                            .where((value) => value.isNotEmpty)
+                            .join(' • '),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: context.textDim,
+                          fontSize: 10.5,
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

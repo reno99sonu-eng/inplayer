@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { isSearchCrawler } from "@/app/lib/searchCrawlers";
 
 // ──────────────────────────────────────────────────────────────────────
-// CANONICAL DOMAIN ENFORCEMENT — EDGE MIDDLEWARE (Layer 0, runs first)
+// CANONICAL DOMAIN ENFORCEMENT — PROXY (Layer 0, runs before routes)
 // ──────────────────────────────────────────────────────────────────────
 // Vercel also serves this exact same production build on a couple of its
 // own always-on project domains (see Vercel dashboard → Settings →
@@ -49,19 +49,18 @@ function attachNoIndexIfNeeded(
 }
 
 // ──────────────────────────────────────────────────────────────────────
-// INDIA-ONLY GEO-RESTRICTION — EDGE MIDDLEWARE (Layer 1)
+// INDIA-ONLY GEO-RESTRICTION — PROXY (Layer 1)
 // ──────────────────────────────────────────────────────────────────────
-// Runs at Vercel's CDN edge BEFORE any page is served. Vercel attaches
-// the `x-vercel-ip-country` header to every request based on the real
-// connecting IP — this can't be spoofed from the client side. A VPN that
-// routes through a non-Indian server gets blocked here instantly, before
-// any JS/HTML is even sent.
+// Runs before the route is rendered. Vercel attaches the
+// `x-vercel-ip-country` header based on the connecting IP — this can't be
+// spoofed from the client side. A VPN that routes through a non-Indian
+// server is redirected before the page is rendered.
 //
-// This is the first and most efficient defense layer: ~0ms overhead,
-// zero external API calls, zero JS execution on the client.
+// This is the first request-handling defense layer: no external API calls
+// and no client-side JavaScript are needed for the decision.
 //
 // Local dev: the header doesn't exist when running `npm run dev`, so the
-// middleware defaults to ALLOWING the request (you can't test geo-
+// Proxy defaults to ALLOWING the request (you can't test geo-
 // restriction locally, only on Vercel preview/production deployments).
 // ──────────────────────────────────────────────────────────────────────
 
@@ -141,7 +140,7 @@ function shouldBypass(pathname: string): boolean {
   return false;
 }
 
-export function middleware(request: NextRequest) {
+export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const hostname = request.nextUrl.hostname;
 
@@ -193,7 +192,7 @@ export function middleware(request: NextRequest) {
   return attachNoIndexIfNeeded(NextResponse.rewrite(blockedUrl), hostname);
 }
 
-// Only run the middleware on page navigations and API routes, not on
+// Only run the proxy on page navigations and API routes, not on
 // every single static asset request (Next.js config-level optimization).
 export const config = {
   matcher: [

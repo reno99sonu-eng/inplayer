@@ -27,11 +27,13 @@ class Video {
   final String? visibility;
   final String? copyrightRisk;
   final String? artist;
+
   /// 'everyone' | 'kids' | 'adult' — mirrors the website's videoAudience()
   /// fallback: the real `audience` field when present, else derived from
   /// `ageRestricted`. Lets the Android home feed build a real Kids row for
   /// the first time instead of just filtering nothing.
   final String audience;
+
   /// Music-only. One of MUSIC_GENRES on the website (app/lib/musicTrack.ts)
   /// — e.g. 'Pop', 'Hip-Hop', 'Devotional' — or null for a track uploaded
   /// before this field existed / a non-music row. Powers the Music hub's
@@ -39,6 +41,10 @@ class Video {
   /// topical content category vs. 'Pop' the actual genre — two different
   /// taxonomies that happen to both live on a music row).
   final String? genre;
+
+  /// Music-only creator-confirmed language. Kept separate from the upload's
+  /// spokenLanguage field, which is used for captions and speech recognition.
+  final String? language;
   final int likeCount;
   final int commentCount;
   final bool commentsEnabled;
@@ -71,6 +77,7 @@ class Video {
     this.artist,
     this.audience = 'everyone',
     this.genre,
+    this.language,
     this.likeCount = 0,
     this.commentCount = 0,
     this.commentsEnabled = true,
@@ -101,11 +108,16 @@ class Video {
   }
 
   factory Video.fromJson(Map<String, dynamic> json) {
-    final rawCategory = json['category']?.toString() ?? json['genre']?.toString() ?? 'Entertainment';
-    final rawContentType = json['contentType']?.toString().toLowerCase() ?? 'video';
+    final rawCategory =
+        json['category']?.toString() ??
+        json['genre']?.toString() ??
+        'Entertainment';
+    final rawContentType =
+        json['contentType']?.toString().toLowerCase() ?? 'video';
     // Strict isolation: only items uploaded explicitly as music (contentType == 'music')
     // Ordinary videos categorized under "Music" belong in the main video library.
-    final isMusicTrack = rawContentType == 'music' ||
+    final isMusicTrack =
+        rawContentType == 'music' ||
         rawContentType == 'audio' ||
         rawContentType == 'song' ||
         rawContentType == 'track' ||
@@ -115,7 +127,10 @@ class Video {
     final rawCovers = json['covers'];
     List<String> parsedCovers = [];
     if (rawCovers is List) {
-      parsedCovers = rawCovers.whereType<String>().map((u) => _resolveUrl(u)).toList();
+      parsedCovers = rawCovers
+          .whereType<String>()
+          .map((u) => _resolveUrl(u))
+          .toList();
     }
     if (parsedCovers.isEmpty && json['thumbnail'] != null) {
       parsedCovers = [_resolveUrl(json['thumbnail'].toString())];
@@ -135,14 +150,20 @@ class Video {
     // Mirrors the website's videoAudience(): a real 'everyone'/'kids'/'adult'
     // field takes precedence; otherwise fall back to ageRestricted.
     final rawAudience = json['audience']?.toString();
-    final resolvedAudience = (rawAudience == 'everyone' || rawAudience == 'kids' || rawAudience == 'adult')
+    final resolvedAudience =
+        (rawAudience == 'everyone' ||
+            rawAudience == 'kids' ||
+            rawAudience == 'adult')
         ? rawAudience!
         : (json['ageRestricted'] == true ? 'adult' : 'everyone');
 
     final playbackId = json['muxPlaybackId']?.toString();
     final isShort = rawContentType == 'short';
-    String rawThumb = json['thumbnail']?.toString() ?? json['thumbnailUrl']?.toString() ?? '';
-    if (rawThumb.trim().isEmpty && playbackId != null && playbackId.isNotEmpty) {
+    String rawThumb =
+        json['thumbnail']?.toString() ?? json['thumbnailUrl']?.toString() ?? '';
+    if (rawThumb.trim().isEmpty &&
+        playbackId != null &&
+        playbackId.isNotEmpty) {
       rawThumb = isShort
           ? 'https://image.mux.com/$playbackId/thumbnail.webp?width=640&height=1138&fit_mode=smartcrop&time=1'
           : 'https://image.mux.com/$playbackId/thumbnail.webp?width=640&height=360&fit_mode=smartcrop&time=1';
@@ -155,7 +176,12 @@ class Video {
       creator: json['creator'] ?? json['uploaderName'] ?? 'Unknown',
       uploaderUsername: json['uploaderUsername'],
       avatar: () {
-        for (final key in ['avatar', 'avatarUrl', 'uploaderAvatarUrl', 'creatorAvatarUrl']) {
+        for (final key in [
+          'avatar',
+          'avatarUrl',
+          'uploaderAvatarUrl',
+          'creatorAvatarUrl',
+        ]) {
           final val = json[key]?.toString().trim();
           if (val != null && val.isNotEmpty) {
             return _resolveUrl(val);
@@ -176,16 +202,28 @@ class Video {
       contentType: rawContentType,
       isMusic: isMusicTrack,
       covers: parsedCovers,
-      coverIntervalSeconds: (json['coverIntervalSeconds'] as num?)?.toInt() ?? 12,
+      coverIntervalSeconds:
+          (json['coverIntervalSeconds'] as num?)?.toInt() ?? 12,
       lyrics: parsedLyrics,
       moderationHidden: json['moderationHidden'] == true,
       visibility: json['visibility']?.toString(),
       copyrightRisk: json['copyrightRisk']?.toString(),
       artist: json['artist']?.toString() ?? json['creator']?.toString(),
       audience: resolvedAudience,
-      genre: json['genre']?.toString().trim().isNotEmpty == true ? json['genre'].toString().trim() : null,
-      likeCount: (json['likeCount'] as num?)?.toInt() ?? (json['likes'] as num?)?.toInt() ?? 0,
-      commentCount: (json['commentCount'] as num?)?.toInt() ?? (json['comments'] as num?)?.toInt() ?? 0,
+      genre: json['genre']?.toString().trim().isNotEmpty == true
+          ? json['genre'].toString().trim()
+          : null,
+      language: json['language']?.toString().trim().isNotEmpty == true
+          ? json['language'].toString().trim()
+          : null,
+      likeCount:
+          (json['likeCount'] as num?)?.toInt() ??
+          (json['likes'] as num?)?.toInt() ??
+          0,
+      commentCount:
+          (json['commentCount'] as num?)?.toInt() ??
+          (json['comments'] as num?)?.toInt() ??
+          0,
       commentsEnabled: json['commentsEnabled'] != false,
     );
   }
@@ -272,6 +310,7 @@ class Video {
       'artist': artist,
       'audience': audience,
       'genre': genre,
+      'language': language,
       'likeCount': likeCount,
       'commentCount': commentCount,
       'commentsEnabled': commentsEnabled,

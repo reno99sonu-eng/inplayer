@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../../core/theme/app_colors.dart';
@@ -32,6 +35,7 @@ import '../../../../services/platform_update_service.dart';
 import '../../../../core/router/pageless_route_observer.dart';
 import '../../../../models/short.dart';
 import '../../../../services/video_interaction_service.dart';
+import '../../../../services/video_mini_player_service.dart';
 import '../widgets/mobile_menu_drawer.dart';
 import '../widgets/profile_menu_modal.dart';
 import '../widgets/create_menu_popup.dart';
@@ -54,8 +58,31 @@ class _HomePageState extends ConsumerState<HomePage> {
   /// not persisted: if an admin puts a notice up, it should come back on the
   /// next launch until they take it down.
   bool _announcementDismissed = false;
+  bool _exitingApp = false;
   int _currentIndex = 0;
   final Set<int> _builtTabs = <int>{0};
+
+  Future<void> _exitApp() async {
+    if (_exitingApp) return;
+    _exitingApp = true;
+
+    // The app-wide video window and JustAudioBackground intentionally keep
+    // playback alive while the viewer moves between screens or backgrounds
+    // the app. A deliberate Back press from the root Home tab is the exit
+    // path, so release both playback sessions before finishing the Activity.
+    try {
+      await Future.wait([
+        ref.read(videoMiniPlayerServiceProvider).closeAndWait(),
+        ref.read(musicPlayerServiceProvider).stop(),
+      ]);
+    } catch (error, stackTrace) {
+      debugPrint(
+        'Playback cleanup before app exit failed: $error\n$stackTrace',
+      );
+    } finally {
+      if (mounted) await SystemNavigator.pop();
+    }
+  }
 
   void _selectTab(int index) {
     if (_currentIndex == index && _builtTabs.contains(index)) return;
@@ -160,13 +187,17 @@ class _HomePageState extends ConsumerState<HomePage> {
         PublicPlatformSettings.normal;
 
     return PopScope(
-      canPop: _currentIndex == 0,
+      // Intercept Back even on the Home tab so active audio/video sessions are
+      // stopped before the Android Activity is finished.
+      canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
         if (_currentIndex != 0) {
           setState(() {
             _currentIndex = 0;
           });
+        } else {
+          unawaited(_exitApp());
         }
       },
       child: Scaffold(
@@ -175,7 +206,8 @@ class _HomePageState extends ConsumerState<HomePage> {
         drawer: const MobileMenuDrawer(),
         // The app-level floating video window hides while the drawer is open
         // (it floats above the Navigator, so it would cover the menu rows).
-        onDrawerChanged: (open) => pagelessRouteObserver.drawerOpen.value = open,
+        onDrawerChanged: (open) =>
+            pagelessRouteObserver.drawerOpen.value = open,
         body: PatternBackground(
           child: Stack(
             children: [
@@ -441,9 +473,19 @@ class _HomePageState extends ConsumerState<HomePage> {
                   mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
                     _buildNavItem(0, Icons.home_outlined, 'Home', context),
-                    _buildNavItem(1, Icons.play_circle_outline, 'Raftaar', context),
+                    _buildNavItem(
+                      1,
+                      Icons.play_circle_outline,
+                      'Raftaar',
+                      context,
+                    ),
                     _buildCreateButton(context),
-                    _buildNavItem(3, Icons.music_note_outlined, 'Music', context),
+                    _buildNavItem(
+                      3,
+                      Icons.music_note_outlined,
+                      'Music',
+                      context,
+                    ),
                     _buildYouNavItem(4, 'You', context, user),
                   ],
                 ),
@@ -651,22 +693,14 @@ class HomeFeedPage extends ConsumerStatefulWidget {
   ConsumerState<HomeFeedPage> createState() => _HomeFeedPageState();
 }
 
-class _HomeFeedData {
-  final List<Video> videos;
-  final List<Video> featured;
-  final List<Short> shorts;
-  final Map<String, String> feedback;
-
-  const _HomeFeedData({
-    required this.videos,
-    required this.featured,
-    required this.shorts,
-    required this.feedback,
-  });
-}
-
 class _HomeFeedPageState extends ConsumerState<HomeFeedPage> {
-  late Future<_HomeFeedData> _feedDataFuture;
+  List<Video>? _videos;
+  List<Video> _featured = const [];
+  List<Short> _shorts = const [];
+  Map<String, String> _feedback = const {};
+  bool _feedLoading = true;
+  bool _feedFailed = false;
+  int _feedRequestId = 0;
 
   /// Incremented on every pull-to-refresh and handed to child shelves that
   /// own their own fetch rather than reading one of the futures above.
@@ -675,39 +709,88 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage> {
   @override
   void initState() {
     super.initState();
-    _feedDataFuture = _fetchFeedData(forceRefresh: false);
+    unawaited(_loadFeedData());
   }
 
-  Future<_HomeFeedData> _fetchFeedData({bool forceRefresh = false}) async {
+  Future<void> _loadFeedData({bool forceRefresh = false}) async {
+    final requestId = ++_feedRequestId;
     final videoService = ref.read(videoServiceProvider);
     final feedbackService = ref.read(videoInteractionServiceProvider);
 
     final videosFuture = videoService.getVideos(forceRefresh: forceRefresh);
-    final featuredFuture = videoService.getFeaturedWeekly(forceRefresh: forceRefresh);
-    final shortsFuture = videoService.getShorts(forceRefresh: forceRefresh);
+    final featuredFuture = videoService.getFeaturedWeekly(
+      forceRefresh: forceRefresh,
+    );
     final feedbackFuture = feedbackService.getFeedbackMap();
 
-    final results = await Future.wait([
-      videosFuture,
-      featuredFuture,
-      shortsFuture,
-      feedbackFuture,
-    ]);
+    // These shelves decorate the feed; they should never hold the main video
+    // grid behind their network requests.
+    unawaited(_loadFeatured(featuredFuture, requestId));
+    unawaited(_loadFeedback(feedbackFuture, requestId));
 
-    return _HomeFeedData(
-      videos: results[0] as List<Video>,
-      featured: results[1] as List<Video>,
-      shorts: results[2] as List<Short>,
-      feedback: results[3] as Map<String, String>,
-    );
+    try {
+      final videos = await videosFuture;
+      if (!mounted || requestId != _feedRequestId) return;
+      setState(() {
+        _videos = videos;
+        _feedLoading = false;
+        _feedFailed = false;
+      });
+
+      // getShorts can reuse the freshly-populated video cache when one is
+      // available. Start it only after the main request completes, and let it
+      // populate its shelf independently of the already-visible feed.
+      unawaited(
+        _loadShorts(
+          videoService.getShorts(forceRefresh: forceRefresh),
+          requestId,
+        ),
+      );
+    } catch (_) {
+      if (!mounted || requestId != _feedRequestId) return;
+      setState(() {
+        _feedLoading = false;
+        _feedFailed = true;
+      });
+    }
+  }
+
+  Future<void> _loadFeatured(Future<List<Video>> future, int requestId) async {
+    try {
+      final featured = await future;
+      if (!mounted || requestId != _feedRequestId) return;
+      setState(() => _featured = featured);
+    } catch (_) {
+      // Featured content is optional; the core video grid remains available.
+    }
+  }
+
+  Future<void> _loadShorts(Future<List<Short>> future, int requestId) async {
+    try {
+      final shorts = await future;
+      if (!mounted || requestId != _feedRequestId) return;
+      setState(() => _shorts = shorts);
+    } catch (_) {
+      // The horizontal Shorts shelf is optional to the main feed.
+    }
+  }
+
+  Future<void> _loadFeedback(
+    Future<Map<String, String>> future,
+    int requestId,
+  ) async {
+    try {
+      final feedback = await future;
+      if (!mounted || requestId != _feedRequestId) return;
+      setState(() => _feedback = feedback);
+    } catch (_) {
+      // Video feedback badges can load later or remain at their defaults.
+    }
   }
 
   Future<void> _refreshContent() async {
-    setState(() {
-      _feedDataFuture = _fetchFeedData(forceRefresh: true);
-      _feedRefreshTick++;
-    });
-    await _feedDataFuture;
+    setState(() => _feedRefreshTick++);
+    await _loadFeedData(forceRefresh: true);
   }
 
   @override
@@ -922,50 +1005,41 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage> {
       videos.where((v) => !v.isMusic && !v.isShort).toList();
 
   Widget _buildHomeContent() {
-    return FutureBuilder<_HomeFeedData>(
-      future: _feedDataFuture,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 80),
-            child: Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const CircularProgressIndicator(color: AppColors.brandOrange),
-                  const SizedBox(height: 16),
-                  Text(
-                    'Loading videos...',
-                    style: TextStyle(color: context.textSecondary),
-                  ),
-                ],
+    if (_videos == null && _feedLoading) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 80),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const CircularProgressIndicator(color: AppColors.brandOrange),
+              const SizedBox(height: 16),
+              Text(
+                'Loading videos...',
+                style: TextStyle(color: context.textSecondary),
               ),
-            ),
-          );
-        }
+            ],
+          ),
+        ),
+      );
+    }
 
-        if (snapshot.hasError || !snapshot.hasData) {
-          return _buildErrorState();
-        }
+    if (_feedFailed || _videos == null) return _buildErrorState();
 
-        final data = snapshot.data!;
-        final videos = _onlyLongformVideos(data.videos);
-        final featured = _onlyLongformVideos(data.featured);
+    final videos = _onlyLongformVideos(_videos!);
+    final featured = _onlyLongformVideos(_featured);
 
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildCategoryChips(),
-            if (featured.isNotEmpty)
-              FeaturedHeroCarousel(featuredVideos: featured),
-            const SizedBox(height: 16),
-            if (videos.isEmpty)
-              _buildEmptyState()
-            else
-              _buildRhythmFeed(videos, data.shorts, data.feedback),
-          ],
-        );
-      },
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildCategoryChips(),
+        if (featured.isNotEmpty) FeaturedHeroCarousel(featuredVideos: featured),
+        const SizedBox(height: 16),
+        if (videos.isEmpty)
+          _buildEmptyState()
+        else
+          _buildRhythmFeed(videos, _shorts, _feedback),
+      ],
     );
   }
 
@@ -1011,7 +1085,8 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage> {
 
       // Show Raftaar Shorts shelf right after block 0 (immediately below first videos),
       // and then repeat on alternate blocks so Raftaar is prominently visible
-      if ((blockIndex == 0 || blockIndex.isEven) && shelfCursor < allShorts.length) {
+      if ((blockIndex == 0 || blockIndex.isEven) &&
+          shelfCursor < allShorts.length) {
         final end = (shelfCursor + shortsPerShelf > allShorts.length)
             ? allShorts.length
             : shelfCursor + shortsPerShelf;
@@ -1092,7 +1167,9 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage> {
       // this chip is just a link back to "/".
       return;
     }
-    if (cat == 'Verticals' || cat == 'Raftaar (Vertical Videos)' || cat.toLowerCase().contains('raftaar')) {
+    if (cat == 'Verticals' ||
+        cat == 'Raftaar (Vertical Videos)' ||
+        cat.toLowerCase().contains('raftaar')) {
       context.go('/shorts');
       return;
     }

@@ -102,6 +102,27 @@ const _musicGenres = [
   'Other',
 ];
 
+// Kept in sync with MUSIC_LANGUAGES in app/lib/musicTrack.ts. This is the
+// actual track language used for Music browsing, separate from
+// `spokenLanguage`, which controls captions and speech recognition.
+const _musicLanguages = [
+  'Hindi',
+  'Tamil',
+  'Telugu',
+  'Bengali',
+  'Marathi',
+  'Gujarati',
+  'Punjabi',
+  'Kannada',
+  'Malayalam',
+  'Odia',
+  'Assamese',
+  'Bhojpuri',
+  'Rajasthani',
+  'English',
+  'Other',
+];
+
 enum _Stage { picking, details, uploading, processing, done, timedOut, error }
 
 class UploadPage extends ConsumerStatefulWidget {
@@ -143,6 +164,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
   String _visibility = 'public';
   String _spokenLanguage = 'auto';
   String _genre = 'Other';
+  String _musicLanguage = '';
   final List<String> _tags = [];
   // One 3-way choice (Everyone / Kids / 18+) — matches the website's
   // `VideoAudience` (app/lib/contentAccess.ts), replacing what used to be
@@ -312,7 +334,9 @@ class _UploadPageState extends ConsumerState<UploadPage> {
 
       for (final fraction in fractions) {
         if (!mounted) return;
-        await controller.seekTo(Duration(milliseconds: (durationMs * fraction).round()));
+        await controller.seekTo(
+          Duration(milliseconds: (durationMs * fraction).round()),
+        );
         // The texture needs a beat to actually present the seeked frame
         // before a screenshot of it means anything.
         await Future.delayed(const Duration(milliseconds: 220));
@@ -327,7 +351,9 @@ class _UploadPageState extends ConsumerState<UploadPage> {
 
         try {
           final image = await renderObject.toImage(pixelRatio: 1.0);
-          final byteData = await image.toByteData(format: ui.ImageByteFormat.png);
+          final byteData = await image.toByteData(
+            format: ui.ImageByteFormat.png,
+          );
           image.dispose();
           if (byteData == null) continue;
 
@@ -355,7 +381,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
     }
   }
 
-    Future<void> _pickThumbnail() async {
+  Future<void> _pickThumbnail() async {
     try {
       final picked = await ImagePicker().pickImage(
         source: ImageSource.gallery,
@@ -410,13 +436,15 @@ class _UploadPageState extends ConsumerState<UploadPage> {
     }
     setState(() => _aiCoverBusy = true);
     try {
-      final result = await ref.read(aiAssistServiceProvider).pickThumbnail(
-        title: title,
-        category: 'Music',
-        contentType: 'music',
-        description: _descriptionController.text.trim(),
-        generateNew: true,
-      );
+      final result = await ref
+          .read(aiAssistServiceProvider)
+          .pickThumbnail(
+            title: title,
+            category: 'Music',
+            contentType: 'music',
+            description: _descriptionController.text.trim(),
+            generateNew: true,
+          );
       final filePath = await _saveAiImage(result.thumbnailUrl, 'ai_cover');
       if (!mounted) return;
       final cover = XFile(filePath);
@@ -427,7 +455,8 @@ class _UploadPageState extends ConsumerState<UploadPage> {
     } on AIAssistException catch (e) {
       if (mounted) _showSnack(e.message);
     } catch (_) {
-      if (mounted) _showSnack("Couldn't generate an AI cover. Please try again.");
+      if (mounted)
+        _showSnack("Couldn't generate an AI cover. Please try again.");
     } finally {
       if (mounted) setState(() => _aiCoverBusy = false);
     }
@@ -577,7 +606,8 @@ class _UploadPageState extends ConsumerState<UploadPage> {
           // Fatal here: the server rejects a music upload with no cover, so
           // carrying on would only trade this message for a worse one.
           setState(() {
-            _errorMessage = "Couldn't process that cover image. Please try a "
+            _errorMessage =
+                "Couldn't process that cover image. Please try a "
                 'different one.';
             _stage = _Stage.error;
             _publishing = false;
@@ -654,6 +684,9 @@ class _UploadPageState extends ConsumerState<UploadPage> {
           coverIntervalSeconds: _coverIntervalSeconds,
           lyrics: parsedLyricsJson,
           genre: _isMusicUpload ? _genre : null,
+          language: _isMusicUpload && _musicLanguage.isNotEmpty
+              ? _musicLanguage
+              : null,
           audioSha256: _isMusicUpload ? audioSha256 : null,
           declaredOwnership: _isMusicUpload ? _declaredOwnership : false,
           // Soundtrack + Look. Sent for video and short, not music — a music
@@ -800,6 +833,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
       // music track carried the previous genre and cover interval into the
       // next upload.
       _genre = 'Other';
+      _musicLanguage = '';
       _coverIntervalSeconds = 12;
     });
   }
@@ -984,7 +1018,8 @@ class _UploadPageState extends ConsumerState<UploadPage> {
     } on AIAssistException catch (e) {
       if (mounted) _showSnack(e.message);
     } catch (_) {
-      if (mounted) _showSnack("Couldn't suggest tags right now. Please try again.");
+      if (mounted)
+        _showSnack("Couldn't suggest tags right now. Please try again.");
     } finally {
       if (mounted) {
         setState(() {
@@ -1010,14 +1045,16 @@ class _UploadPageState extends ConsumerState<UploadPage> {
     setState(() => _aiThumbnailBusy = true);
     try {
       final frames = await _ensureGroundingImages();
-      final result = await ref.read(aiAssistServiceProvider).pickThumbnail(
-        title: title,
-        category: _category,
-        contentType: _isMusicUpload ? 'music' : _contentType,
-        description: _descriptionController.text.trim(),
-        frameUrls: frames,
-        generateNew: true,
-      );
+      final result = await ref
+          .read(aiAssistServiceProvider)
+          .pickThumbnail(
+            title: title,
+            category: _category,
+            contentType: _isMusicUpload ? 'music' : _contentType,
+            description: _descriptionController.text.trim(),
+            frameUrls: frames,
+            generateNew: true,
+          );
       final filePath = await _saveAiImage(result.thumbnailUrl, 'ai_thumbnail');
       if (!mounted) return;
       setState(() => _localFrameCandidates.insert(0, XFile(filePath)));
@@ -1257,7 +1294,8 @@ class _UploadPageState extends ConsumerState<UploadPage> {
     return ListView(
       padding: const EdgeInsets.all(16),
       children: [
-        if (_captureController != null && _captureController!.value.isInitialized)
+        if (_captureController != null &&
+            _captureController!.value.isInitialized)
           SizedBox(
             width: 0,
             height: 0,
@@ -1410,13 +1448,18 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                     ),
             ),
           ),
-          if (_capturingFrameCandidates || _localFrameCandidates.isNotEmpty) ...[
+          if (_capturingFrameCandidates ||
+              _localFrameCandidates.isNotEmpty) ...[
             const SizedBox(height: 10),
             Text(
               _capturingFrameCandidates
                   ? 'Finding frames from your video…'
                   : 'Or choose one of these:',
-              style: TextStyle(color: context.textSecondary, fontSize: 11, fontWeight: FontWeight.w600),
+              style: TextStyle(
+                color: context.textSecondary,
+                fontSize: 11,
+                fontWeight: FontWeight.w600,
+              ),
             ),
             const SizedBox(height: 8),
             SizedBox(
@@ -1440,13 +1483,16 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                         final candidate = _localFrameCandidates[index];
                         final selected = _thumbnailFile?.path == candidate.path;
                         return GestureDetector(
-                          onTap: () => setState(() => _thumbnailFile = candidate),
+                          onTap: () =>
+                              setState(() => _thumbnailFile = candidate),
                           child: Container(
                             width: 96,
                             decoration: BoxDecoration(
                               borderRadius: BorderRadius.circular(10),
                               border: Border.all(
-                                color: selected ? AppColors.brandOrange : context.borderSubtle,
+                                color: selected
+                                    ? AppColors.brandOrange
+                                    : context.borderSubtle,
                                 width: selected ? 2 : 1,
                               ),
                               image: DecorationImage(
@@ -1464,7 +1510,11 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                                         shape: BoxShape.circle,
                                       ),
                                       padding: const EdgeInsets.all(2),
-                                      child: const Icon(Icons.check, size: 12, color: Colors.white),
+                                      child: const Icon(
+                                        Icons.check,
+                                        size: 12,
+                                        color: Colors.white,
+                                      ),
                                     ),
                                   )
                                 : null,
@@ -1765,6 +1815,24 @@ class _UploadPageState extends ConsumerState<UploadPage> {
             onChanged: (v) => setState(() => _genre = v ?? _genre),
           ),
           const SizedBox(height: 12),
+          _label('Track Language'),
+          DropdownButtonFormField<String>(
+            initialValue: _musicLanguage,
+            dropdownColor: context.bgCard,
+            style: TextStyle(color: context.textPrimary),
+            decoration: _inputDecoration(null),
+            items: [
+              const DropdownMenuItem(value: '', child: Text('Not set')),
+              ..._musicLanguages.map(
+                (language) => DropdownMenuItem(
+                  value: language,
+                  child: Text(language, overflow: TextOverflow.ellipsis),
+                ),
+              ),
+            ],
+            onChanged: (value) => setState(() => _musicLanguage = value ?? ''),
+          ),
+          const SizedBox(height: 12),
           // 5A: Lyrics ON/OFF Toggle (defaults to ON; if OFF, payload sends empty list for instrumental tracks)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
@@ -1780,8 +1848,12 @@ class _UploadPageState extends ConsumerState<UploadPage> {
             child: Row(
               children: [
                 Icon(
-                  _lyricsEnabled ? Icons.lyrics_rounded : Icons.music_off_rounded,
-                  color: _lyricsEnabled ? AppColors.brandOrangeLight : context.textDim,
+                  _lyricsEnabled
+                      ? Icons.lyrics_rounded
+                      : Icons.music_off_rounded,
+                  color: _lyricsEnabled
+                      ? AppColors.brandOrangeLight
+                      : context.textDim,
                   size: 22,
                 ),
                 const SizedBox(width: 12),
@@ -1803,7 +1875,9 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                             ? 'Lyrics ON — Synchronized LRC or plain text included'
                             : 'Lyrics OFF — Instrumental track (no lyrics)',
                         style: TextStyle(
-                          color: _lyricsEnabled ? context.textDim : AppColors.brandOrangeLight,
+                          color: _lyricsEnabled
+                              ? context.textDim
+                              : AppColors.brandOrangeLight,
                           fontSize: 11,
                         ),
                       ),
@@ -2699,7 +2773,9 @@ class _UploadPageState extends ConsumerState<UploadPage> {
   /// field rather than competing with the primary Publish action.
   Widget _aiChip(String text, VoidCallback onTap, {required String field}) {
     final isThumbnail = field == 'thumbnail';
-    final busy = isThumbnail ? _aiThumbnailBusy : (_aiBusy && _aiBusyField == field);
+    final busy = isThumbnail
+        ? _aiThumbnailBusy
+        : (_aiBusy && _aiBusyField == field);
     final disabled = isThumbnail ? _aiThumbnailBusy : _aiBusy;
     return Padding(
       padding: const EdgeInsets.only(top: 14, bottom: 6),

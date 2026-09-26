@@ -383,7 +383,6 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal>
 
             _unknownFrameCount = 0;
             _darkFrameCount = 0;
-            if (_lowLightBoostActive) unawaited(_setLowLightBoost(false));
             _candidateFrames++;
 
             if (_candidateFrames < 5) {
@@ -481,6 +480,11 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal>
       });
     } finally {
       _capturing = false;
+      // Keep the front-screen flash and exposure compensation enabled for
+      // the still capture and age-model read. Turning it off as soon as a
+      // preview frame passed the light gate made the captured photo dark
+      // again on low-light devices.
+      if (_lowLightBoostActive) await _setLowLightBoost(false);
       if (shotPath != null) {
         try {
           await File(shotPath).delete();
@@ -544,7 +548,8 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal>
         final vPlane = image.planes[2];
 
         final int chromaWidth = (image.width / 2).ceil();
-        final int pixelStride = uPlane.bytesPerPixel ??
+        final int pixelStride =
+            uPlane.bytesPerPixel ??
             (uPlane.bytesPerRow >= chromaWidth * 2 ? 2 : 1);
 
         if (pixelStride == 2) {
@@ -686,7 +691,9 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal>
 
   IconData get _statusIcon {
     if (_scanResult != null) {
-      return _scanResult!.isChild ? Icons.shield_rounded : Icons.verified_rounded;
+      return _scanResult!.isChild
+          ? Icons.shield_rounded
+          : Icons.verified_rounded;
     }
     if (_hasPermissionError) return Icons.videocam_off_rounded;
     return Icons.face_retouching_natural_rounded;
@@ -752,7 +759,9 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal>
           right: -50,
           child: _GlowBlob(
             size: 220,
-            color: AppColors.brandOrange.withValues(alpha: context.isDark ? 0.10 : 0.06),
+            color: AppColors.brandOrange.withValues(
+              alpha: context.isDark ? 0.10 : 0.06,
+            ),
           ),
         ),
         Positioned(
@@ -780,18 +789,27 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal>
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 7,
+                ),
                 decoration: BoxDecoration(
                   color: context.isDark
                       ? Colors.white.withValues(alpha: 0.07)
                       : Colors.black.withValues(alpha: 0.045),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: AppColors.brandOrange.withValues(alpha: 0.25)),
+                  border: Border.all(
+                    color: AppColors.brandOrange.withValues(alpha: 0.25),
+                  ),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    const Icon(Icons.shield_rounded, color: AppColors.brandOrange, size: 14),
+                    const Icon(
+                      Icons.shield_rounded,
+                      color: AppColors.brandOrange,
+                      size: 14,
+                    ),
                     const SizedBox(width: 6),
                     Text(
                       'Face Verification',
@@ -950,13 +968,13 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal>
                             _PermissionActionButton(
                               label: 'Continue in Kids Mode',
                               filled: false,
-                              onTap: () =>
-                                  unawaited(_finishStartupFallback()),
+                              onTap: () => unawaited(_finishStartupFallback()),
                             ),
                           ],
                         ),
                       ],
-                      if (_hasPermissionError) _buildPermissionErrorSection(context),
+                      if (_hasPermissionError)
+                        _buildPermissionErrorSection(context),
                     ],
                   ),
                 ),
@@ -975,7 +993,8 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal>
   Widget _buildScannerFrame(BuildContext context, Color accentColor) {
     const boxSize = 176.0;
     const frameSize = boxSize + 20;
-    final idleOrAnalyzing = _scanResult == null && !_hasPermissionError && !_isInitializing;
+    final idleOrAnalyzing =
+        _scanResult == null && !_hasPermissionError && !_isInitializing;
 
     return SizedBox(
       width: frameSize,
@@ -1024,7 +1043,9 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal>
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: accentColor.withValues(alpha: 0.22 + _pulseAnim.value * 0.14),
+                      color: accentColor.withValues(
+                        alpha: 0.22 + _pulseAnim.value * 0.14,
+                      ),
                       blurRadius: 22,
                       spreadRadius: 1 + _pulseAnim.value * 3,
                     ),
@@ -1067,7 +1088,10 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal>
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           color: Colors.red.withValues(alpha: 0.15),
-                          border: Border.all(color: Colors.redAccent, width: 1.6),
+                          border: Border.all(
+                            color: Colors.redAccent,
+                            width: 1.6,
+                          ),
                         ),
                         child: const Icon(
                           Icons.videocam_off_rounded,
@@ -1135,7 +1159,9 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal>
                                 ],
                               ),
                               child: Icon(
-                                _scanResult!.isChild ? Icons.shield_rounded : Icons.check_rounded,
+                                _scanResult!.isChild
+                                    ? Icons.shield_rounded
+                                    : Icons.check_rounded,
                                 color: Colors.white,
                                 size: 28,
                               ),
@@ -1150,7 +1176,8 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal>
           ),
 
           // Photo-ID style corner brackets, sitting just outside the box.
-          if (!_hasPermissionError) ..._buildCornerMarkers(boxSize, frameSize, accentColor),
+          if (!_hasPermissionError)
+            ..._buildCornerMarkers(boxSize, frameSize, accentColor),
         ],
       ),
     );
@@ -1167,7 +1194,11 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal>
     );
   }
 
-  List<Widget> _buildCornerMarkers(double boxSize, double frameSize, Color baseColor) {
+  List<Widget> _buildCornerMarkers(
+    double boxSize,
+    double frameSize,
+    Color baseColor,
+  ) {
     const markerLen = 16.0;
     const markerThickness = 2.2;
     const cornerRadius = 6.0;
@@ -1287,15 +1318,19 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal>
                   _noCameraHardware
                       ? 'No camera detected'
                       : _hasPermissionError
-                          ? 'Camera access required'
-                          : (_scanTimedOut ? 'No face detected' : _statusText),
-                  key: ValueKey(_hasPermissionError
-                      ? 'perm'
-                      : (_scanTimedOut ? 'timeout' : _statusText)),
+                      ? 'Camera access required'
+                      : (_scanTimedOut ? 'No face detected' : _statusText),
+                  key: ValueKey(
+                    _hasPermissionError
+                        ? 'perm'
+                        : (_scanTimedOut ? 'timeout' : _statusText),
+                  ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: _scanResult != null || _isAnalyzing ? accentColor : context.textPrimary,
+                    color: _scanResult != null || _isAnalyzing
+                        ? accentColor
+                        : context.textPrimary,
                     fontSize: 14,
                     fontWeight: FontWeight.w700,
                     letterSpacing: -0.2,
@@ -1354,8 +1389,8 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal>
             _noCameraHardware
                 ? "This device doesn't have a usable camera."
                 : (widget.startupScan
-                    ? 'Camera access is needed to continue.'
-                    : 'Enable camera access in settings.'),
+                      ? 'Camera access is needed to continue.'
+                      : 'Enable camera access in settings.'),
             textAlign: TextAlign.center,
             style: TextStyle(
               color: context.textPrimary.withValues(alpha: 0.55),
@@ -1448,8 +1483,8 @@ class _PermissionActionButton extends StatelessWidget {
           color: filled
               ? AppColors.brandOrange
               : (context.isDark
-                  ? Colors.white.withValues(alpha: 0.08)
-                  : Colors.black.withValues(alpha: 0.05)),
+                    ? Colors.white.withValues(alpha: 0.08)
+                    : Colors.black.withValues(alpha: 0.05)),
           border: filled ? null : Border.all(color: context.borderMedium),
         ),
         child: Text(
@@ -1457,7 +1492,9 @@ class _PermissionActionButton extends StatelessWidget {
           style: TextStyle(
             fontSize: 13,
             fontWeight: FontWeight.w700,
-            color: filled ? Colors.black : context.textPrimary.withValues(alpha: 0.85),
+            color: filled
+                ? Colors.black
+                : context.textPrimary.withValues(alpha: 0.85),
           ),
         ),
       ),

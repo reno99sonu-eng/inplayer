@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getVisibleVideos } from "@/app/lib/contentAccessServer";
 import { isMusicType } from "@/app/lib/contentTypes";
+import { sanitizeGenre, sanitizeMusicLanguage } from "@/app/lib/musicTrack";
 import { resolveUsernames } from "@/app/lib/resolveUsernames";
 
 export const dynamic = "force-dynamic";
@@ -43,10 +44,12 @@ export async function GET(request: Request) {
           : ["/recommendations/thumbnails/1.jpg"];
 
       const primaryCover = covers[0] || (v.thumbnailUrl as string) || "";
-      const trackGenre =
-        (musicSettings.genre as string) ||
-        (v.category as string) ||
-        "Pop";
+      // Current uploads store music metadata at the video-row top level;
+      // read the nested shape too for records created by older clients.
+      const trackGenre = sanitizeGenre(v.genre ?? musicSettings.genre);
+      const trackLanguage = sanitizeMusicLanguage(
+        v.language ?? musicSettings.language,
+      );
 
       const artistName =
         (musicSettings.artist as string) ||
@@ -72,6 +75,7 @@ export async function GET(request: Request) {
             : 7,
         lyrics: Array.isArray(musicSettings.lyrics) ? musicSettings.lyrics : [],
         genre: trackGenre,
+        language: trackLanguage ?? undefined,
         category: "Music",
         contentType: "music",
         isMusic: true,

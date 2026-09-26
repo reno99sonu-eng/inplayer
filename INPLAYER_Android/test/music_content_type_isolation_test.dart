@@ -50,21 +50,18 @@ void main() {
       expect(short.isStrictMusic, isFalse);
     });
 
-    test(
-      'isMusic no longer flips true for category == "Music" either — '
-      'the leak was fixed at the field-computation level, not just via '
-      'isStrictMusic',
-      () {
-        final categorizedAsMusic = Video.fromJson({
-          'videoId': 'v4',
-          'title': 'A Music Documentary',
-          'contentType': 'video',
-          'category': 'Music',
-        });
-        expect(categorizedAsMusic.isMusic, isFalse);
-        expect(categorizedAsMusic.isStrictMusic, isFalse);
-      },
-    );
+    test('isMusic no longer flips true for category == "Music" either — '
+        'the leak was fixed at the field-computation level, not just via '
+        'isStrictMusic', () {
+      final categorizedAsMusic = Video.fromJson({
+        'videoId': 'v4',
+        'title': 'A Music Documentary',
+        'contentType': 'video',
+        'category': 'Music',
+      });
+      expect(categorizedAsMusic.isMusic, isFalse);
+      expect(categorizedAsMusic.isStrictMusic, isFalse);
+    });
 
     test('a plain video with an unrelated category is neither', () {
       final plain = Video.fromJson({
@@ -75,6 +72,34 @@ void main() {
       });
       expect(plain.isMusic, isFalse);
       expect(plain.isStrictMusic, isFalse);
+    });
+  });
+
+  group('Video music metadata', () {
+    test('keeps the music language separate from spoken-language metadata', () {
+      final track = Video.fromJson({
+        'videoId': 'song-1',
+        'title': 'Example song',
+        'contentType': 'music',
+        'genre': 'Bollywood',
+        'language': 'Hindi',
+        'spokenLanguage': 'hi',
+      });
+
+      expect(track.genre, 'Bollywood');
+      expect(track.language, 'Hindi');
+      expect(track.toJson()['language'], 'Hindi');
+    });
+
+    test('does not guess a music language from spokenLanguage', () {
+      final track = Video.fromJson({
+        'videoId': 'song-2',
+        'title': 'Instrumental',
+        'contentType': 'music',
+        'spokenLanguage': 'hi',
+      });
+
+      expect(track.language, isNull);
     });
   });
 }

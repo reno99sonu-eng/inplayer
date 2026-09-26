@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -204,14 +206,42 @@ class VideoMiniPlayerService extends ChangeNotifier {
   /// a short restarting costs seconds where a long video restarting would
   /// cost the viewer their place.
   void close() {
-    _controller?.pause();
-    _controller?.dispose();
-    _audio?.stop();
-    _audio?.dispose();
+    unawaited(closeAndWait());
+  }
+
+  /// Stop and release adopted playback before the app exits.
+  Future<void> closeAndWait() async {
+    final controller = _controller;
+    final audio = _audio;
     _controller = null;
     _audio = null;
     _video = null;
     notifyListeners();
+
+    if (controller != null) {
+      try {
+        await controller.pause();
+      } catch (_) {
+        // Still release the native player if pause races with disposal.
+      }
+      try {
+        await controller.dispose();
+      } catch (_) {
+        // Exit should continue even if a platform player has already closed.
+      }
+    }
+    if (audio != null) {
+      try {
+        await audio.stop();
+      } catch (_) {
+        // Still release the native player if stop races with disposal.
+      }
+      try {
+        await audio.dispose();
+      } catch (_) {
+        // Exit should continue even if the soundtrack player has closed.
+      }
+    }
   }
 
   @override
@@ -224,7 +254,7 @@ class VideoMiniPlayerService extends ChangeNotifier {
 
 final videoMiniPlayerServiceProvider =
     ChangeNotifierProvider<VideoMiniPlayerService>((ref) {
-  final service = VideoMiniPlayerService();
-  ref.onDispose(service.dispose);
-  return service;
-});
+      final service = VideoMiniPlayerService();
+      ref.onDispose(service.dispose);
+      return service;
+    });

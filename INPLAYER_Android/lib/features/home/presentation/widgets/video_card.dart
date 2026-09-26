@@ -363,17 +363,24 @@ class _VideoCardState extends ConsumerState<VideoCard> {
                       curve: Curves.easeOut,
                       builder: (context, opacity, child) =>
                           Opacity(opacity: opacity, child: child),
-                      child: FittedBox(
-                        fit: BoxFit.cover,
-                        clipBehavior: Clip.hardEdge,
-                        child: SizedBox(
-                          width: _previewController!.value.size.width > 0
-                              ? _previewController!.value.size.width
-                              : 640,
-                          height: _previewController!.value.size.height > 0
-                              ? _previewController!.value.size.height
-                              : 360,
-                          child: VideoPlayer(_previewController!),
+                      // Whole frame on black (contain), not crop-to-fill: a
+                      // vertical phone clip uploaded as a regular video was
+                      // zoomed to its middle third in this 16:9 tile. A 16:9
+                      // video fills the tile exactly either way.
+                      child: ColoredBox(
+                        color: Colors.black,
+                        child: FittedBox(
+                          fit: BoxFit.contain,
+                          clipBehavior: Clip.hardEdge,
+                          child: SizedBox(
+                            width: _previewController!.value.size.width > 0
+                                ? _previewController!.value.size.width
+                                : 640,
+                            height: _previewController!.value.size.height > 0
+                                ? _previewController!.value.size.height
+                                : 360,
+                            child: VideoPlayer(_previewController!),
+                          ),
                         ),
                       ),
                     ),

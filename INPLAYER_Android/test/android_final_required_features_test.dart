@@ -219,7 +219,7 @@ void main() {
       expect(find.text('Effective: September 5, 2026 • Version 2026-09-05'), findsOneWidget);
     });
 
-    testWidgets('TermsAcceptanceModalOverlay displays all 11 required policy links',
+    testWidgets('TermsAcceptanceModalOverlay displays policy hub link and action buttons',
         (WidgetTester tester) async {
       await tester.pumpWidget(
         const ProviderScope(
@@ -233,17 +233,7 @@ void main() {
 
       expect(find.text('POLICY UPDATE • SEPT 5, 2026'), findsOneWidget);
       expect(find.text('Terms & Policies Update'), findsOneWidget);
-      expect(find.text('Terms of Service'), findsOneWidget);
-      expect(find.text('Privacy Policy'), findsOneWidget);
-      expect(find.text('Copyright & Intellectual Property Policy'), findsOneWidget);
-      expect(find.text('Child Safety Policy'), findsOneWidget);
-      expect(find.text('Community Guidelines'), findsOneWidget);
-      expect(find.text('Creator Monetization Policy'), findsOneWidget);
-      expect(find.text('Online Chat & Messaging Policy'), findsOneWidget);
-      expect(find.text('Strike, Suspension & Appeals Policy'), findsOneWidget);
-      expect(find.text('Report, Complaint & Grievance Policy'), findsOneWidget);
-      expect(find.text('Advertising & Sponsorship Policy'), findsOneWidget);
-      expect(find.text('InPlayer MART Shop & Seller Policy'), findsOneWidget);
+      expect(find.text('Privacy Policies'), findsOneWidget);
       expect(find.text('Accept & Continue'), findsOneWidget);
       expect(find.text('Decline'), findsOneWidget);
     });

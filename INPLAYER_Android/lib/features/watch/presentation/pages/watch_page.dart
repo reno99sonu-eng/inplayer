@@ -26,6 +26,7 @@ import '../../../../services/caption_service.dart';
 import '../../../../services/download_service.dart';
 import '../../../../services/download_manager.dart';
 import '../../../../services/pip_service.dart';
+import '../../../../core/router/pageless_route_observer.dart';
 import '../../../../core/widgets/pattern_background.dart';
 import '../../../../core/widgets/user_avatar.dart';
 import '../../../../core/utils/playback_position_store.dart';
@@ -196,7 +197,7 @@ class _WatchPageState extends ConsumerState<WatchPage>
     // on several chipsets, so the feed hands its decoder over while a
     // full-screen player is up.
     VideoPreviewGate.instance.suspend();
-    PipService.setPipModeChangedListener(_handlePipModeChanged);
+    PipService.register(this, _handlePipModeChanged);
     unawaited(() async {
       final supported = await PipService.isSupported();
       if (mounted) setState(() => _pipSupported = supported);
@@ -204,16 +205,25 @@ class _WatchPageState extends ConsumerState<WatchPage>
     _loadVideo();
   }
 
+  // This page's own route, cached for _maybeUpdatePipPlaybackState(), which
+  // runs from a controller listener outside build().
+  ModalRoute<dynamic>? _route;
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _route = ModalRoute.of(context);
+  }
+
   @override
   void dispose() {
     SystemChrome.setPreferredOrientations([]);
     VideoPreviewGate.instance.resume();
     WidgetsBinding.instance.removeObserver(this);
-    // Belt-and-braces — a stale "playback active" flag left on the native
-    // side after this page closes could otherwise cause a phantom auto-PiP
-    // trigger the next time the user backgrounds the app from somewhere
-    // else entirely.
-    unawaited(PipService.setPlaybackActive(false));
+    // Drops this page from PipService, which re-reports auto-PiP from the
+    // pages still open (false when none are). Forcing it off here used to
+    // disable auto-PiP for a watch page still playing underneath this one.
+    PipService.unregister(this);
     _midrollTimer?.cancel();
     final adCtrl = _adVideoController;
     _adVideoController = null;
@@ -234,16 +244,54 @@ class _WatchPageState extends ConsumerState<WatchPage>
 
   // The OS actually entering/exiting PiP (not just a request being made —
   // enterPip()/the OS can still decline). If a landscape FullscreenPlayerPage
-  // route was showing when this fires, pop it first: that page's landscape
-  // lock + immersive system UI don't make sense squeezed into a tiny
-  // floating window, and this page's own minimal PiP layout (see build())
-  // is what should show while floating, regardless of which screen PiP was
-  // triggered from.
+  // route was showing when this fires, remove it: its full player chrome
+  // doesn't belong in a tiny floating window, and this page's own bare-video
+  // PiP layout (see build()) is what should show while floating.
   void _handlePipModeChanged(bool isInPip) {
     if (!mounted) return;
     setState(() => _inPip = isInPip);
-    if (isInPip && _inFullscreen) {
-      Navigator.of(context).pop();
+    final own = _route;
+    if (isInPip) {
+      // Close everything above this page — the fullscreen player AND any
+      // speed/quality/captions menu or comments sheet on top of it — so the
+      // floating window shows only this page's bare video. Removing just the
+      // fullscreen route left an open menu drawn over the PiP video, and that
+      // menu then broke after returning (its owner State was disposed).
+      // popUntil stops at this page, so it can never pop the page itself; and
+      // it only runs when nothing but those transient routes is above us, so
+      // a different screen the viewer navigated to is never closed.
+      if (own != null && own.isActive && !own.isCurrent && _pipOnScreen) {
+        // Remember that PiP closed a fullscreen player, so returning from PiP
+        // with the phone still sideways can put it back.
+        if (_inFullscreen) _restoreFullscreenAfterPip = true;
+        Navigator.of(context).popUntil((r) => r == own);
+      }
+    } else if (_restoreFullscreenAfterPip) {
+      // Expanding back out of PiP while holding the phone sideways fires the
+      // metrics change while _inPip is still true, so the auto-fullscreen
+      // check ignored it. Re-check once the layout has settled.
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _maybeAutoFullscreenOnRotate(),
+      );
+    }
+  }
+
+  // Set only when PiP closed this page's fullscreen player; the re-checks on
+  // PiP exit / resume act on nothing else, so ordinary focus changes (the
+  // notification shade, a system dialog, coming back from the share sheet)
+  // never pop fullscreen open uninvited — e.g. on a tablet held sideways.
+  bool _restoreFullscreenAfterPip = false;
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // Same reason as the post-frame re-check above: the rotation back into
+    // the full app can land before Flutter reports resumed, and
+    // _maybeAutoFullscreenOnRotate ignores it while not resumed.
+    if (state == AppLifecycleState.resumed && _restoreFullscreenAfterPip) {
+      WidgetsBinding.instance.addPostFrameCallback(
+        (_) => _maybeAutoFullscreenOnRotate(),
+      );
     }
   }
 
@@ -267,9 +315,30 @@ class _WatchPageState extends ConsumerState<WatchPage>
   // (via _inFullscreen) and only when there's actually a video loaded to
   // show fullscreen.
   void _maybeAutoFullscreenOnRotate() {
-    if (!mounted || _inFullscreen || _videoController == null) return;
+    if (!mounted || _inFullscreen || _inPip || _videoController == null) {
+      return;
+    }
+    // Only for the page actually on screen. This page stays mounted (and
+    // playing) under a channel/search page opened from it; rotating there
+    // used to push fullscreen on top of the screen the viewer was looking at.
+    if (!(_route?.isCurrent ?? true)) return;
+    // Entering system Picture-in-Picture resizes this Activity's window to a
+    // small (usually landscape 16:9) rectangle, which fires didChangeMetrics
+    // exactly like a physical rotation — often BEFORE the native
+    // onPipModeChanged callback has flipped _inPip. Without these guards the
+    // PiP window itself was mistaken for "rotated to landscape" and pushed
+    // FullscreenPlayerPage (full player chrome) on top of the bare-video PiP
+    // layout: the overlapping, untappable buttons in the floating window.
+    // The Activity is paused (Flutter: not resumed) while in PiP, and a real
+    // phone held in landscape is never under 300dp on its short side.
+    final lifecycle = WidgetsBinding.instance.lifecycleState;
+    if (lifecycle != null && lifecycle != AppLifecycleState.resumed) return;
     final view = View.of(context);
     final size = view.physicalSize / view.devicePixelRatio;
+    if (size.shortestSide < 300) return;
+    // A real check ran on a settled, resumed window: the post-PiP restore
+    // request is answered either way (reopened now, or the phone is upright).
+    _restoreFullscreenAfterPip = false;
     if (size.width > size.height) {
       _openFullscreen();
     }
@@ -313,18 +382,67 @@ class _WatchPageState extends ConsumerState<WatchPage>
     _checkPostrollOnPlayerTick();
   }
 
-  // Only calls into the platform channel when play/pause actually changes
-  // (this listener otherwise fires many times a second) — and only reports
-  // "active" to the native side when the viewer has actually opted in to
-  // auto-PiP in Settings, so onUserLeaveHint() there never fires for anyone
-  // who hasn't turned the preference on.
+  // Reports to the native side only when the value it would send changes
+  // (this listener fires many times a second while playing), and only
+  // "active" when the viewer has opted in to auto-PiP in Settings.
+  //
+  // Deduping on the SENT value rather than just play/pause matters:
+  // _autoPipEnabled loads in the background after a network premium-status
+  // call and _pipSupported is async too, so playback usually starts before
+  // either is known. The old play/pause-only latch sent `false` once and
+  // never re-armed, so pressing Home produced no floating window at all.
+  //
+  // Also only while this page (or its fullscreen player) is actually on
+  // screen: PiP floats whatever route is on top, so arming it while another
+  // page covers this one would float that page's buttons instead.
   void _maybeUpdatePipPlaybackState() {
     final playing = _videoController?.value.isPlaying ?? false;
-    if (playing == _lastPlayingForPip) return;
-    _lastPlayingForPip = playing;
-    unawaited(
-      PipService.setPlaybackActive(playing && _autoPipEnabled && _pipSupported),
-    );
+    final suppressed = _pipSuppressedUntil != null &&
+        DateTime.now().isBefore(_pipSuppressedUntil!);
+    final active = playing &&
+        _autoPipEnabled &&
+        _pipSupported &&
+        !suppressed &&
+        _pipOnScreen;
+    if (active == _lastPlayingForPip) return;
+    _lastPlayingForPip = active;
+    PipService.setActive(this, active);
+  }
+
+  // Whether PiP would float THIS page: it's the top route, or the only
+  // things above it are its own fullscreen player and/or menus, sheets and
+  // dialogs (which _handlePipModeChanged closes when PiP starts). False when
+  // a different screen was opened over it — PiP would float that screen's
+  // buttons instead of the video.
+  bool get _pipOnScreen {
+    final own = _route;
+    if (own == null || own.isCurrent) return true;
+    if (!own.isActive) return false;
+    if (pagelessRouteObserver.contains(own)) {
+      // Checks EVERY route above this page, so a different screen sitting
+      // between this page and its fullscreen player also blocks PiP (and the
+      // popUntil in _handlePipModeChanged) instead of being closed by it.
+      return pagelessRouteObserver.onlyAbove(
+        own,
+        (r) => r is PopupRoute || identical(r, _fullscreenRoute),
+      );
+    }
+    // The observer should always know this route; if it somehow doesn't,
+    // fall back to the one case checkable directly: our fullscreen on top.
+    final fs = _fullscreenRoute;
+    return fs != null && fs.isCurrent;
+  }
+
+  // Launching another app (share sheet, external link) counts as the user
+  // leaving, so with auto-PiP armed Android would float this page into PiP
+  // behind that app. Briefly disarm it around such launches; the next player
+  // tick after the window re-arms it.
+  DateTime? _pipSuppressedUntil;
+
+  void _suppressAutoPipBriefly() {
+    _pipSuppressedUntil = DateTime.now().add(const Duration(seconds: 2));
+    _lastPlayingForPip = false;
+    PipService.setActive(this, false);
   }
 
   // Throttled to once every ~4s (this listener fires many times a second) —
@@ -812,6 +930,7 @@ class _WatchPageState extends ConsumerState<WatchPage>
     final video = _video;
     if (video == null) return;
     final url = 'https://inplayer.in/watch/${video.videoId}';
+    _suppressAutoPipBriefly();
     SharePlus.instance.share(
       ShareParams(text: '${video.title}\n$url', subject: video.title),
     );
@@ -1249,8 +1368,15 @@ class _WatchPageState extends ConsumerState<WatchPage>
                     final isTabletLandscape = media.size.shortestSide >= 600 &&
                         media.orientation == Orientation.landscape;
 
-                    final playerWidget = AspectRatio(
-                      aspectRatio: 16 / 9,
+                    final playerWidget = ConstrainedBox(
+                      // A vertical video gets a taller frame (see
+                      // _playerBoxAspect), capped so the title and actions
+                      // below stay on screen.
+                      constraints: BoxConstraints(
+                        maxHeight: media.size.height * 0.6,
+                      ),
+                      child: AspectRatio(
+                      aspectRatio: _playerBoxAspect,
                       child: _isInitialized && _videoController != null
                           ? Stack(
                               alignment: Alignment.center,
@@ -1321,6 +1447,7 @@ class _WatchPageState extends ConsumerState<WatchPage>
                                     ),
                                   ),
                                 ),
+                      ),
                     );
 
                     if (isTabletLandscape) {
@@ -1474,14 +1601,21 @@ class _WatchPageState extends ConsumerState<WatchPage>
     // fixes both: once a frame has rendered, the texture stays mounted and
     // simply stops advancing while paused, same as every other video app.
     final showVideo = _firstFrameRendered && controller.value.isInitialized;
+    final size = controller.value.size;
+    final isPortraitVideo =
+        size.width > 0 && size.height > 0 && size.width < size.height;
     return Stack(
       fit: StackFit.expand,
       children: [
+        // Letterbox bars are black, whatever the frame's shape.
+        const Positioned.fill(child: ColoredBox(color: Colors.black)),
         if (video.thumbnail.isNotEmpty)
           Positioned.fill(
             child: CachedNetworkImage(
               imageUrl: video.thumbnail,
-              fit: BoxFit.cover,
+              // The stored thumbnail is a landscape crop; don't zoom it
+              // further into a vertical video's taller frame.
+              fit: isPortraitVideo ? BoxFit.contain : BoxFit.cover,
               fadeInDuration: Duration.zero,
               fadeOutDuration: Duration.zero,
               errorWidget: (context, url, error) => const SizedBox(),
@@ -1495,23 +1629,23 @@ class _WatchPageState extends ConsumerState<WatchPage>
               curve: Curves.easeOut,
               builder: (context, opacity, child) =>
                   Opacity(opacity: opacity, child: child),
-              // VideoPlayer has no intrinsic size — dropped bare into the
-              // filling Stack inside the fixed 16:9 AspectRatio above it
-              // gets scaled non-uniformly, so any clip that isn't exactly
-              // 16:9 looks stretched. Give it its native frame size and let
-              // FittedBox scale that uniformly (crop-to-fill), matching
-              // short_player_widget.dart and video_card.dart.
-              child: FittedBox(
-                fit: BoxFit.cover,
-                clipBehavior: Clip.hardEdge,
-                child: SizedBox(
-                  width: controller.value.size.width > 0
-                      ? controller.value.size.width
-                      : 1280,
-                  height: controller.value.size.height > 0
-                      ? controller.value.size.height
-                      : 720,
-                  child: VideoPlayer(controller),
+              // Show the WHOLE frame at its real shape (contain), on black.
+              // VideoPlayer has no intrinsic size: bare in this filling box
+              // it stretched any clip that isn't 16:9, and crop-to-fill
+              // (cover) zoomed a vertical phone clip down to its middle
+              // third — the "resized" new uploads, which are portrait 9:16
+              // videos uploaded as regular videos. The black backing also
+              // hides the thumbnail beneath in the letterbox bars.
+              child: ColoredBox(
+                color: Colors.black,
+                child: FittedBox(
+                  fit: BoxFit.contain,
+                  clipBehavior: Clip.hardEdge,
+                  child: SizedBox(
+                    width: size.width > 0 ? size.width : 1280,
+                    height: size.height > 0 ? size.height : 720,
+                    child: VideoPlayer(controller),
+                  ),
                 ),
               ),
             ),
@@ -1520,11 +1654,32 @@ class _WatchPageState extends ConsumerState<WatchPage>
     );
   }
 
+  // Frame shape for the inline player. Landscape videos keep the 16:9 frame
+  // exactly as before. A vertical (portrait) clip uploaded as a regular
+  // video gets a taller frame at its own ratio — no narrower than 4:5, so
+  // the controls keep room — instead of a thin strip in a 16:9 box. The
+  // video inside is letterboxed (contain), so it is never stretched or
+  // cropped whatever the frame's shape.
+  double get _playerBoxAspect {
+    final c = _videoController;
+    if (c == null || !c.value.isInitialized) return 16 / 9;
+    if (_video?.isStrictMusic ?? false) return 16 / 9;
+    final s = c.value.size;
+    if (s.width <= 0 || s.height <= 0) return 16 / 9;
+    final ratio = s.width / s.height;
+    if (ratio >= 1) return 16 / 9;
+    return math.max(ratio, 4 / 5);
+  }
+
+  // The exact route _openFullscreen() pushed, so _handlePipModeChanged() can
+  // remove that route (and only that route) when the OS floats the app into
+  // PiP.
+  Route<void>? _fullscreenRoute;
+
   Future<void> _openFullscreen() async {
-    if (_videoController == null || _inFullscreen) return;
+    if (_videoController == null || _inFullscreen || _inPip) return;
     _inFullscreen = true;
-    await Navigator.of(context).push(
-      MaterialPageRoute(
+    final route = MaterialPageRoute<void>(
         builder: (_) => FullscreenPlayerPage(
           getController: () => _videoController!,
           getMediaSurface: _buildMediaSurface,
@@ -1550,8 +1705,10 @@ class _WatchPageState extends ConsumerState<WatchPage>
               _midrollBreakActive && _currentMidrollAd != null ? _buildMidrollOverlay() : null,
           adListenable: _adStateRevision,
         ),
-      ),
     );
+    _fullscreenRoute = route;
+    await Navigator.of(context).push(route);
+    _fullscreenRoute = null;
     _inFullscreen = false;
     // A quality change made while fullscreen was open swaps _videoController
     // to a new instance (see _switchQuality) — refresh so the inline player
@@ -1601,6 +1758,11 @@ class _WatchPageState extends ConsumerState<WatchPage>
     final controller = _videoController;
     final video = _video;
     if (controller == null || video == null || !_isInitialized) return;
+    // Disarm auto-PiP now: once the listener below is removed no tick can,
+    // and this page stays registered until its pop transition finishes.
+    // Pressing Home inside that window would otherwise float the Home screen.
+    _lastPlayingForPip = false;
+    PipService.setActive(this, false);
     controller.removeListener(_onPlayerTick);
     ref
         .read(videoMiniPlayerServiceProvider)
@@ -2089,6 +2251,7 @@ class _WatchPageState extends ConsumerState<WatchPage>
                       : 'https://inplayer.in';
                   final uri = Uri.tryParse(targetUrl);
                   if (uri != null) {
+                    _suppressAutoPipBriefly();
                     await launchUrl(uri, mode: LaunchMode.externalApplication);
                   }
                 },

@@ -160,7 +160,15 @@ class _FullscreenPlayerPageState extends State<FullscreenPlayerPage> {
     _exiting = true;
     await SystemChrome.setPreferredOrientations([]);
     await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    if (mounted) Navigator.of(context).pop();
+    // WatchPage may already have removed this route (the OS just floated the
+    // app into PiP) while this State is still briefly mounted. A blind pop()
+    // then would pop WatchPage itself — disposing the video and leaving the
+    // home UI inside the PiP window. Only pop when this page is on top.
+    if (mounted && (ModalRoute.of(context)?.isCurrent ?? false)) {
+      Navigator.of(context).pop();
+    } else {
+      _exiting = false;
+    }
   }
 
   @override

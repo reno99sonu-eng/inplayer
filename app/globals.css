@@ -727,7 +727,10 @@ animation: aiGlassSweep 5.5s linear infinite;
    never blocks the card's click-through to the watch page. */
 .preview-player mux-player {
   --controls: none;
-  --media-object-fit: cover;
+  /* contain, not cover: a vertical phone clip uploaded as a regular video
+     was cropped to a zoomed middle slice in this 16:9 card. A 16:9 video
+     fills the card exactly either way. */
+  --media-object-fit: contain;
 }
 
 /* ---------- Premium Video Player Skin (watch page) ----------

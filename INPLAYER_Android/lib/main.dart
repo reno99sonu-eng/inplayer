@@ -24,6 +24,7 @@ import 'services/face_age_detector_service.dart';
 import 'providers/theme_provider.dart';
 import 'providers/app_language_provider.dart';
 import 'features/auth/presentation/widgets/terms_acceptance_modal.dart';
+import 'features/watch/presentation/widgets/video_mini_player_overlay.dart';
 import 'services/push_notification_service.dart';
 
 Future<void> main() async {
@@ -283,6 +284,12 @@ class _InplayerAppState extends ConsumerState<InplayerApp> {
           fit: StackFit.expand,
           children: [
             PatternBackground(child: content),
+            // Above every route (so it persists across search/channel/
+            // category/etc. like YouTube's mini player) but below the
+            // splash, terms and biometric overlays that follow. It hides
+            // itself on player routes and under dialogs/sheets/pageless
+            // screens (see VideoMiniPlayerOverlay._onRouteChanged).
+            if (!_geoBlocked) const VideoMiniPlayerOverlay(),
             if (_geoBlocked)
               _RegionBlockedOverlay(
                 onRetry: () {

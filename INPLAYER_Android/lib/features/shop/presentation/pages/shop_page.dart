@@ -6,6 +6,7 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/app_logo.dart';
+import '../../../../core/router/pageless_route_observer.dart';
 import '../../../../core/utils/image_utils.dart';
 import '../../../../core/widgets/pattern_background.dart';
 import '../../../../models/hammart_product.dart';
@@ -65,6 +66,11 @@ class _ShopPageState extends ConsumerState<ShopPage> {
   @override
   void dispose() {
     _searchController.dispose();
+    // Back from a root /marketplace (deep link) replaces this page via
+    // context.go while its drawer can still be open, and a disposed Scaffold
+    // never reports the drawer closing — reset so the floating video window
+    // isn't left hidden app-wide.
+    pagelessRouteObserver.drawerOpen.value = false;
     super.dispose();
   }
 
@@ -124,6 +130,9 @@ class _ShopPageState extends ConsumerState<ShopPage> {
       extendBody: true,
       backgroundColor: Colors.transparent,
       drawer: const MobileMenuDrawer(),
+      // The app-level floating video window hides while the drawer is open
+      // (it floats above the Navigator, so it would cover the menu rows).
+      onDrawerChanged: (open) => pagelessRouteObserver.drawerOpen.value = open,
       body: PatternBackground(
         child: Stack(
           children: [

@@ -3,6 +3,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart';
 import '../../providers/auth_provider.dart';
+import 'pageless_route_observer.dart';
 import '../../features/auth/presentation/pages/sign_in_page.dart';
 import '../../features/auth/presentation/pages/sign_up_page.dart';
 import '../../features/auth/presentation/pages/verify_email_page.dart';
@@ -99,6 +100,7 @@ final routerProvider = Provider<GoRouter>((ref) {
 
   return GoRouter(
     navigatorKey: rootNavigatorKey,
+    observers: [pagelessRouteObserver],
     initialLocation: '/',
     refreshListenable: refreshNotifier,
     redirect: (context, state) {

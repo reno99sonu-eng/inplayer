@@ -3,7 +3,7 @@ description: "INPLAYER Android Application"
 
 publish_to: "none"
 
-version: 1.0.9+19
+version: 1.0.10+20
 
 environment:
   sdk: ^3.12.2

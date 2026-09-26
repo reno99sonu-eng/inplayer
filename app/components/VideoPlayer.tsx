@@ -194,6 +194,29 @@ export default function VideoPlayer({
   artist,
 }: VideoPlayerProps) {
   const playerRef = useRef<MuxPlayerRefAttributes>(null);
+
+  // The loaded video's real shape (width / height), keyed by playbackId so a
+  // newly opened video never inherits the previous one's. The frame used to
+  // be 16:9 for everything not labelled a Short, so a vertical phone clip
+  // uploaded as a regular video played as a thin letterboxed strip — the
+  // "new uploads look resized" report (they are 9:16 portrait videos).
+  const [intrinsic, setIntrinsic] = useState<{
+    playbackId: string;
+    ratio: number;
+  } | null>(null);
+  const intrinsicRatio =
+    intrinsic?.playbackId === playbackId ? intrinsic.ratio : null;
+  const portraitRatio =
+    !music && intrinsicRatio !== null && intrinsicRatio < 1
+      ? intrinsicRatio
+      : null;
+  const captureIntrinsicAspect = () => {
+    const p = playerRef.current;
+    const w = p?.videoWidth ?? 0;
+    const h = p?.videoHeight ?? 0;
+    if (w > 0 && h > 0) setIntrinsic({ playbackId, ratio: w / h });
+  };
+
   const containerRef = useRef<HTMLDivElement>(null);
   const backgroundAudioRef = useRef<HTMLAudioElement | null>(null);
   // Guards against a self-triggering feedback loop in syncBackgroundAudioMute:
@@ -1460,15 +1483,35 @@ export default function VideoPlayer({
         }}
         onEnded={handleMainVideoEnded}
         onVolumeChange={syncBackgroundAudioMute}
-        onTimeUpdate={handleTimeUpdate}
-        onLoadedMetadata={applyResumePosition}
+        onTimeUpdate={() => {
+          // Belt-and-braces for players where the intrinsic size isn't
+          // known yet at loadedmetadata; a no-op once captured.
+          if (intrinsicRatio === null) captureIntrinsicAspect();
+          handleTimeUpdate();
+        }}
+        onLoadedMetadata={() => {
+          applyResumePosition();
+          captureIntrinsicAspect();
+        }}
         style={
           {
             width: "100%",
-            // A fixed 16:9 frame for ordinary videos; a vertical one instead
-            // stretches to whatever height its 9:16 parent gives it. Setting
-            // BOTH would let aspect-ratio win and re-create the bug.
-            ...(vertical ? { height: "100%" } : { aspectRatio: "16 / 9" }),
+            // A vertical (Short) player stretches to whatever height its
+            // 9:16 parent gives it; setting aspect-ratio too would win and
+            // re-create the old strip bug. A regular video gets 16:9 —
+            // unless its real shape is portrait (a vertical phone clip
+            // uploaded as a Video): then a taller frame at its own ratio
+            // (no narrower than 4:5), capped at 75vh so the page stays
+            // usable. The video is letterboxed inside (contain), never
+            // stretched or cropped. Fullscreen has its own sizing rules.
+            ...(vertical
+              ? { height: "100%" }
+              : portraitRatio !== null && !isFullscreen
+                ? {
+                    aspectRatio: String(Math.max(portraitRatio, 0.8)),
+                    maxHeight: "75vh",
+                  }
+                : { aspectRatio: "16 / 9" }),
             "--controls-backdrop-color": "rgba(0, 0, 0, 0.7)",
             "--media-menu-background": "#0c1524",
             "--media-control-background": "#0c1524",

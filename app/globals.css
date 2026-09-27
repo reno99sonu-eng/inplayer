@@ -743,7 +743,16 @@ animation: aiGlassSweep 5.5s linear infinite;
    own --controls-backdrop-color custom property (set in VideoPlayer.tsx)
    instead of a hand-rolled ::part(bottom) override. */
 .premium-player {
+  display: block;
+  width: 100%;
+  min-width: 0;
   box-shadow: 0 25px 70px -25px rgba(0, 0, 0, .5);
+}
+
+.premium-player > mux-player {
+  display: block;
+  width: 100%;
+  max-width: 100%;
 }
 
 .premium-player mux-player::part(center play button) {

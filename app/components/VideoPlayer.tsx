@@ -1392,7 +1392,7 @@ export default function VideoPlayer({
       // would crop a 9:16 video down to a slice. h-full w-full lets the
       // player actually fill the aspect-[9/16] frame WatchPageContent draws
       // around it instead of sitting as a short strip at the top of it.
-      className={`premium-player relative touch-none overflow-hidden rounded-2xl bg-black ${
+      className={`premium-player block w-full min-w-0 relative touch-none overflow-hidden rounded-2xl bg-black ${
         vertical ? "vertical-video h-full w-full" : ""
       } ${cssFullscreen ? "fake-fullscreen" : ""}`}
       onClickCapture={handlePlayerClickCapture}

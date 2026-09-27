@@ -118,7 +118,7 @@ export default function WatchPageContent({ video, relatedVideos: initialRelatedV
       <div className={`grid grid-cols-1 gap-6 transition-all duration-500 ${theaterMode ? "" : "xl:grid-cols-[minmax(0,1fr)_360px]"}`}>
         <div className="min-w-0">
           <div id="watch-player" className={`group relative scroll-mt-5 ${isShort ? "mx-auto max-w-[420px]" : "-mx-3 lg:mx-0"}`}>
-            <div className={`overflow-hidden border-white/10 bg-black light:border-black/10 ${isShort ? "aspect-[9/16] rounded-3xl border shadow-2xl" : "rounded-none border-0 shadow-none lg:rounded-[28px] lg:border lg:shadow-[0_25px_70px_rgba(0,0,0,.4)]"} ${theaterMode && !isShort ? "mx-auto max-w-[1300px]" : ""}`}>
+            <div className={`block w-full min-w-0 overflow-hidden border-white/10 bg-black light:border-black/10 ${isShort ? "aspect-[9/16] rounded-3xl border shadow-2xl" : "rounded-none border-0 shadow-none lg:rounded-[28px] lg:border lg:shadow-[0_25px_70px_rgba(0,0,0,.4)]"} ${theaterMode && !isShort ? "mx-auto max-w-[1300px]" : ""}`}>
               {showPlayer ? (
                 video.membersOnly ? (
                   <MembersOnlyVideoPlayer

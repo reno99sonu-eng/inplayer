@@ -124,6 +124,32 @@ interface VideoPlayerProps {
 const TAP_CHAIN_MS = 400;
 const SEEK_STEP_SECONDS = 10;
 
+const letterboxAspectRequests = new Map<string, Promise<number | null>>();
+
+function getLetterboxedContentAspect(playbackId: string, duration: number): Promise<number | null> {
+  const cached = letterboxAspectRequests.get(playbackId);
+  if (cached) return cached;
+
+  const params = new URLSearchParams({ playbackId });
+  if (Number.isFinite(duration) && duration > 0) {
+    params.set("duration", String(Math.round(duration)));
+  }
+
+  const request = fetch(`/api/video-display-fit?${params.toString()}`, {
+    signal: AbortSignal.timeout(10_000),
+  })
+    .then(async (response) => {
+      if (!response.ok) return null;
+      const data = (await response.json()) as { contentAspectRatio?: unknown };
+      const aspect = typeof data.contentAspectRatio === "number" ? data.contentAspectRatio : null;
+      return aspect !== null && aspect >= 1.25 && aspect <= 2.2 ? aspect : null;
+    })
+    .catch(() => null);
+
+  letterboxAspectRequests.set(playbackId, request);
+  return request;
+}
+
 // ---------------------------------------------------------------------
 // Mux Player theme colors + a targeted fix for two things its own default
 // theme does that globals.css's `.premium-player` rules can't reach:
@@ -194,6 +220,7 @@ export default function VideoPlayer({
   artist,
 }: VideoPlayerProps) {
   const playerRef = useRef<MuxPlayerRefAttributes>(null);
+  const pendingLetterboxPlaybackRef = useRef<string | null>(null);
 
   // The loaded video's real shape (width / height), keyed by playbackId so a
   // newly opened video never inherits the previous one's. The frame used to
@@ -204,6 +231,12 @@ export default function VideoPlayer({
     playbackId: string;
     ratio: number;
   } | null>(null);
+  const [letterboxedContent, setLetterboxedContent] = useState<{
+    playbackId: string;
+    aspectRatio: number;
+  } | null>(null);
+  const letterboxedAspectRatio =
+    letterboxedContent?.playbackId === playbackId ? letterboxedContent.aspectRatio : null;
   const intrinsicRatio =
     intrinsic?.playbackId === playbackId ? intrinsic.ratio : null;
   const portraitRatio =
@@ -214,7 +247,28 @@ export default function VideoPlayer({
     const p = playerRef.current;
     const w = p?.videoWidth ?? 0;
     const h = p?.videoHeight ?? 0;
-    if (w > 0 && h > 0) setIntrinsic({ playbackId, ratio: w / h });
+    if (w <= 0 || h <= 0) return;
+
+    const ratio = w / h;
+    if (pendingLetterboxPlaybackRef.current === playbackId) return;
+    if (ratio >= 1 || vertical || music) {
+      setIntrinsic({ playbackId, ratio });
+      return;
+    }
+
+    // Some uploads contain a landscape recording letterboxed inside a
+    // portrait canvas. In that case the codec dimensions describe the black
+    // canvas, not the visible scene. Analyze several Mux frames before
+    // choosing the inline frame ratio; ordinary portrait uploads keep their
+    // complete picture and the existing contain behavior.
+    pendingLetterboxPlaybackRef.current = playbackId;
+    setIntrinsic({ playbackId, ratio });
+    void getLetterboxedContentAspect(playbackId, p?.duration ?? 0).then((aspectRatio) => {
+      if (pendingLetterboxPlaybackRef.current === playbackId) {
+        pendingLetterboxPlaybackRef.current = null;
+      }
+      if (aspectRatio !== null) setLetterboxedContent({ playbackId, aspectRatio });
+    });
   };
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -1496,16 +1550,18 @@ export default function VideoPlayer({
         style={
           {
             width: "100%",
-            // A vertical (Short) player stretches to whatever height its
-            // 9:16 parent gives it; setting aspect-ratio too would win and
-            // re-create the old strip bug. A regular video gets 16:9 —
-            // unless its real shape is portrait (a vertical phone clip
-            // uploaded as a Video): then a taller frame at its own ratio
-            // (no narrower than 4:5), capped at 75vh so the page stays
-            // usable. The video is letterboxed inside (contain), never
-            // stretched or cropped. Fullscreen has its own sizing rules.
+            // Shorts stretch to their 9:16 parent. Regular portrait uploads
+            // keep their whole frame in a 4:5-or-taller container; the
+            // letterbox detector overrides that only when the source itself
+            // has stable black bands around a landscape recording.
             ...(vertical
               ? { height: "100%" }
+              : letterboxedAspectRatio !== null
+                ? {
+                    aspectRatio: String(letterboxedAspectRatio),
+                    maxHeight: "75vh",
+                    "--media-object-fit": "cover",
+                  }
               : portraitRatio !== null && !isFullscreen
                 ? {
                     aspectRatio: String(Math.max(portraitRatio, 0.8)),

@@ -104,6 +104,8 @@ class _WatchPageState extends ConsumerState<WatchPage>
   bool _isLoading = true;
   bool _hasPlayerError = false;
   Video? _video;
+  double? _letterboxContentAspectRatio;
+  String? _letterboxPlaybackId;
   bool _descExpanded = false;
   List<Video> _recommendedVideos = [];
 
@@ -647,6 +649,8 @@ class _WatchPageState extends ConsumerState<WatchPage>
       if (mounted) {
         setState(() {
           _video = video;
+          _letterboxContentAspectRatio = null;
+          _letterboxPlaybackId = null;
           _isLoading = false;
           _hasPlayerError = false;
         });
@@ -779,6 +783,18 @@ class _WatchPageState extends ConsumerState<WatchPage>
 
       if (_isInitialized && !_midrollBreakActive) _videoController?.play();
 
+      final initializedController = _videoController;
+      if (initializedController != null &&
+          initializedController.value.isInitialized) {
+        unawaited(
+          _loadLetterboxContentAspect(
+            video,
+            initializedController.value.size.aspectRatio,
+            initializedController.value.duration,
+          ),
+        );
+      }
+
       // Recommendations load in the background and fill in when they land.
       unawaited(
         videoService
@@ -818,6 +834,38 @@ class _WatchPageState extends ConsumerState<WatchPage>
     if (video.uploaderId != null && video.uploaderId!.isNotEmpty) {
       _loadSubscriptionStatus(video.uploaderId!);
     }
+  }
+
+  Future<void> _loadLetterboxContentAspect(
+    Video video,
+    double sourceAspectRatio,
+    Duration duration,
+  ) async {
+    final playbackId = video.muxPlaybackId;
+    if (playbackId == null ||
+        playbackId.isEmpty ||
+        sourceAspectRatio >= 1 ||
+        video.isShort ||
+        video.isStrictMusic) {
+      return;
+    }
+
+    final aspectRatio = await ref
+        .read(videoServiceProvider)
+        .getLetterboxedContentAspectRatio(
+          playbackId: playbackId,
+          duration: duration,
+        );
+    if (!mounted ||
+        aspectRatio == null ||
+        _video?.videoId != video.videoId ||
+        _video?.muxPlaybackId != playbackId) {
+      return;
+    }
+    setState(() {
+      _letterboxContentAspectRatio = aspectRatio;
+      _letterboxPlaybackId = playbackId;
+    });
   }
 
   Future<void> _loadLikeStatus(String videoId) async {
@@ -1368,14 +1416,18 @@ class _WatchPageState extends ConsumerState<WatchPage>
                     final isTabletLandscape = media.size.shortestSide >= 600 &&
                         media.orientation == Orientation.landscape;
 
-                    final playerWidget = ConstrainedBox(
-                      // A vertical video gets a taller frame (see
-                      // _playerBoxAspect), capped so the title and actions
-                      // below stay on screen.
-                      constraints: BoxConstraints(
-                        maxHeight: media.size.height * 0.6,
-                      ),
-                      child: AspectRatio(
+                    final playerWidget = SizedBox(
+                      // Keep the media at the full width of its column; the
+                      // surrounding Column uses loose cross-axis constraints.
+                      width: double.infinity,
+                      child: ConstrainedBox(
+                        // A vertical video gets a taller frame (see
+                        // _playerBoxAspect), capped so the title and actions
+                        // below stay on screen.
+                        constraints: BoxConstraints(
+                          maxHeight: media.size.height * 0.6,
+                        ),
+                        child: AspectRatio(
                       aspectRatio: _playerBoxAspect,
                       child: _isInitialized && _videoController != null
                           ? Stack(
@@ -1447,6 +1499,7 @@ class _WatchPageState extends ConsumerState<WatchPage>
                                     ),
                                   ),
                                 ),
+                        ),
                       ),
                     );
 
@@ -1604,6 +1657,9 @@ class _WatchPageState extends ConsumerState<WatchPage>
     final size = controller.value.size;
     final isPortraitVideo =
         size.width > 0 && size.height > 0 && size.width < size.height;
+    final cropLetterboxedLandscape =
+        _letterboxPlaybackId == video.muxPlaybackId &&
+        _letterboxContentAspectRatio != null;
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -1615,7 +1671,11 @@ class _WatchPageState extends ConsumerState<WatchPage>
               imageUrl: video.thumbnail,
               // The stored thumbnail is a landscape crop; don't zoom it
               // further into a vertical video's taller frame.
-              fit: isPortraitVideo ? BoxFit.contain : BoxFit.cover,
+              fit: cropLetterboxedLandscape
+                  ? BoxFit.cover
+                  : isPortraitVideo
+                      ? BoxFit.contain
+                      : BoxFit.cover,
               fadeInDuration: Duration.zero,
               fadeOutDuration: Duration.zero,
               errorWidget: (context, url, error) => const SizedBox(),
@@ -1629,7 +1689,9 @@ class _WatchPageState extends ConsumerState<WatchPage>
               curve: Curves.easeOut,
               builder: (context, opacity, child) =>
                   Opacity(opacity: opacity, child: child),
-              // Show the WHOLE frame at its real shape (contain), on black.
+              // Normally show the WHOLE frame at its real shape (contain),
+              // on black. If stable letterboxing was confirmed, crop those
+              // bands to show the embedded landscape recording.
               // VideoPlayer has no intrinsic size: bare in this filling box
               // it stretched any clip that isn't 16:9, and crop-to-fill
               // (cover) zoomed a vertical phone clip down to its middle
@@ -1639,7 +1701,9 @@ class _WatchPageState extends ConsumerState<WatchPage>
               child: ColoredBox(
                 color: Colors.black,
                 child: FittedBox(
-                  fit: BoxFit.contain,
+                  fit: cropLetterboxedLandscape
+                      ? BoxFit.cover
+                      : BoxFit.contain,
                   clipBehavior: Clip.hardEdge,
                   child: SizedBox(
                     width: size.width > 0 ? size.width : 1280,
@@ -1661,9 +1725,13 @@ class _WatchPageState extends ConsumerState<WatchPage>
   // video inside is letterboxed (contain), so it is never stretched or
   // cropped whatever the frame's shape.
   double get _playerBoxAspect {
+    if (_video?.isStrictMusic ?? false) return 16 / 9;
+    if (_letterboxPlaybackId == _video?.muxPlaybackId &&
+        _letterboxContentAspectRatio != null) {
+      return _letterboxContentAspectRatio!;
+    }
     final c = _videoController;
     if (c == null || !c.value.isInitialized) return 16 / 9;
-    if (_video?.isStrictMusic ?? false) return 16 / 9;
     final s = c.value.size;
     if (s.width <= 0 || s.height <= 0) return 16 / 9;
     final ratio = s.width / s.height;

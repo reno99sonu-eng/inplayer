@@ -312,6 +312,32 @@ class VideoService {
     }
   }
 
+  /// Returns a wider visible-frame ratio only when the Mux source is a
+  /// portrait canvas with stable black bands around landscape footage.
+  /// The website uses this same detector so both clients crop the same pixels.
+  Future<double?> getLetterboxedContentAspectRatio({
+    required String playbackId,
+    required Duration duration,
+  }) async {
+    try {
+      final response = await _dio.get(
+        '/api/video-display-fit',
+        queryParameters: {
+          'playbackId': playbackId,
+          if (duration.inSeconds > 0) 'duration': duration.inSeconds,
+        },
+      );
+      if (response.statusCode != 200 || response.data is! Map) return null;
+      final value = (response.data as Map)['contentAspectRatio'];
+      if (value is num && value >= 1.25 && value <= 2.2) {
+        return value.toDouble();
+      }
+    } catch (e) {
+      _logger.d('Could not inspect video letterboxing: $e');
+    }
+    return null;
+  }
+
   /// Records one view — POST /api/videos/{videoId}/view. Fire-and-forget:
   /// callers should NOT await this — a failed view count must never delay
   /// or interrupt playback. Mirrors the website's own /watch/[videoId]

@@ -22,6 +22,12 @@ const nextConfig: NextConfig = {
       "./node_modules/@img/**/*",
       "./node_modules/sharp/**/*",
     ],
+    "/api/video-display-fit": [
+      "./node_modules/@img/sharp-libvips-linux-x64/**/*",
+      "./node_modules/@img/sharp-linux-x64/**/*",
+      "./node_modules/@img/**/*",
+      "./node_modules/sharp/**/*",
+    ],
   },
 
   // Gzip compress all responses for faster transfer

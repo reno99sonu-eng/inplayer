@@ -15,6 +15,7 @@ import {
   getPlaybackPosition,
   savePlaybackPosition,
   clearPlaybackPosition,
+  consumeMiniPlayerResumePosition,
 } from "@/app/lib/playbackPositions";
 
 // Safari-only fullscreen APIs (`webkit*`) predate the standard Fullscreen
@@ -102,6 +103,14 @@ interface VideoPlayerProps {
   lyrics?: LyricLine[];
   /** Shown under the title on a track with no lyrics. */
   artist?: string;
+  onPlaybackState?: (state: {
+    currentTime: number;
+    aspectRatio: number;
+    isPlaying: boolean;
+    playbackId: string;
+    token?: string;
+    cropToContent: boolean;
+  }) => void;
 }
 
 // A chosen soundtrack now fully REPLACES a Video's own recorded audio,
@@ -218,6 +227,7 @@ export default function VideoPlayer({
   coverIntervalSeconds,
   lyrics,
   artist,
+  onPlaybackState,
 }: VideoPlayerProps) {
   const playerRef = useRef<MuxPlayerRefAttributes>(null);
   const pendingLetterboxPlaybackRef = useRef<string | null>(null);
@@ -243,6 +253,27 @@ export default function VideoPlayer({
     !music && intrinsicRatio !== null && intrinsicRatio < 1
       ? intrinsicRatio
       : null;
+  const displayAspectRatio = vertical
+    ? 9 / 16
+    : letterboxedAspectRatio ??
+      (portraitRatio !== null ? Math.max(portraitRatio, 0.8) : 16 / 9);
+  const reportPlaybackState = useCallback(
+    (playingOverride?: boolean) => {
+      const player = playerRef.current;
+      onPlaybackState?.({
+        currentTime: player?.currentTime ?? 0,
+        aspectRatio: displayAspectRatio,
+        isPlaying: playingOverride ?? Boolean(player && !player.paused),
+        playbackId,
+        token,
+        cropToContent: letterboxedAspectRatio !== null,
+      });
+    },
+    [displayAspectRatio, letterboxedAspectRatio, onPlaybackState, playbackId, token]
+  );
+  useEffect(() => {
+    reportPlaybackState();
+  }, [reportPlaybackState]);
   const captureIntrinsicAspect = () => {
     const p = playerRef.current;
     const w = p?.videoWidth ?? 0;
@@ -648,6 +679,91 @@ export default function VideoPlayer({
   const [locked, setLocked] = useState(false);
 
   const isFullscreen = realFullscreen || cssFullscreen;
+  const [inlineFrameSize, setInlineFrameSize] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
+  const [fullscreenFrameSize, setFullscreenFrameSize] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
+
+  // Keep a canonical frame size while the player is inline and fullscreen.
+  // The old max-height on the Mux element constrained only its height, so a
+  // wide phone/tablet stretched the player to the available width and broke
+  // its requested aspect ratio. Measure the available box, then size the
+  // frame itself to the same ratio on every viewport.
+  useEffect(() => {
+    const root = containerRef.current;
+    if (!root || vertical) return;
+
+    const updateFrameSize = () => {
+      const playerRoot = containerRef.current;
+      if (!playerRoot) return;
+
+      if (isFullscreen) {
+        const availableWidth = playerRoot.clientWidth;
+        const availableHeight = playerRoot.clientHeight;
+        if (availableWidth <= 0 || availableHeight <= 0) return;
+        const width = Math.min(availableWidth, availableHeight * displayAspectRatio);
+        const height = width / displayAspectRatio;
+        setFullscreenFrameSize((current) =>
+          current && Math.abs(current.width - width) < 0.5 && Math.abs(current.height - height) < 0.5
+            ? current
+            : { width, height }
+        );
+        return;
+      }
+
+      const availableWidth = playerRoot.parentElement?.clientWidth ?? playerRoot.clientWidth;
+      const availableHeight = (window.visualViewport?.height ?? window.innerHeight) * 0.75;
+      if (availableWidth <= 0 || availableHeight <= 0) return;
+      const width = Math.min(availableWidth, availableHeight * displayAspectRatio);
+      const height = width / displayAspectRatio;
+      setInlineFrameSize((current) =>
+        current && Math.abs(current.width - width) < 0.5 && Math.abs(current.height - height) < 0.5
+          ? current
+          : { width, height }
+      );
+    };
+
+    const observer = new ResizeObserver(updateFrameSize);
+    observer.observe(root);
+    if (root.parentElement) observer.observe(root.parentElement);
+    window.addEventListener("resize", updateFrameSize);
+    window.addEventListener("orientationchange", updateFrameSize);
+    window.visualViewport?.addEventListener("resize", updateFrameSize);
+    updateFrameSize();
+
+    return () => {
+      observer.disconnect();
+      window.removeEventListener("resize", updateFrameSize);
+      window.removeEventListener("orientationchange", updateFrameSize);
+      window.visualViewport?.removeEventListener("resize", updateFrameSize);
+    };
+  }, [displayAspectRatio, isFullscreen, vertical]);
+
+  const rootFrameStyle = vertical
+    ? undefined
+    : isFullscreen
+      ? undefined
+      : inlineFrameSize
+        ? {
+            width: `${inlineFrameSize.width}px`,
+            height: `${inlineFrameSize.height}px`,
+            marginInline: "auto",
+          }
+        : { width: "100%", marginInline: "auto" };
+  const mediaFrameStyle = isFullscreen
+    ? fullscreenFrameSize
+      ? {
+          width: `${fullscreenFrameSize.width}px`,
+          height: `${fullscreenFrameSize.height}px`,
+        }
+      : { width: "100%", height: "100%" }
+    : vertical || inlineFrameSize
+      ? { width: "100%", height: "100%" }
+      : { width: "100%", aspectRatio: String(displayAspectRatio) };
 
   // What kind of pointer produced the current click — lets the click
   // handler behave differently for touch (delayed toggle + tap-seek) vs
@@ -763,10 +879,22 @@ export default function VideoPlayer({
     if (!player || resumeAppliedRef.current) return;
     resumeAppliedRef.current = true;
 
+    const miniPlayerResume = consumeMiniPlayerResumePosition(videoId);
+    const duration = player.duration || 0;
+    if (miniPlayerResume !== null) {
+      if (miniPlayerResume > 0 && (!duration || miniPlayerResume < duration - 5)) {
+        try {
+          player.currentTime = miniPlayerResume;
+        } catch {
+          // Let normal playback begin if the stream cannot seek yet.
+        }
+      }
+      return;
+    }
+
     if (!playback.rememberPosition) return;
 
     const saved = getPlaybackPosition(videoId);
-    const duration = player.duration || 0;
     // Guard against a stale point past the end of a re-encoded video —
     // seeking beyond duration would strand the viewer on a black frame.
     if (saved && saved > 0 && (!duration || saved < duration - 5)) {
@@ -1449,6 +1577,7 @@ export default function VideoPlayer({
       className={`premium-player block w-full min-w-0 relative touch-none overflow-hidden rounded-2xl bg-black ${
         vertical ? "vertical-video h-full w-full" : ""
       } ${cssFullscreen ? "fake-fullscreen" : ""}`}
+      style={rootFrameStyle}
       onClickCapture={handlePlayerClickCapture}
       // Suppresses Chrome's native long-press "Copy video frame /
       // Picture-in-Picture" menu on the <video> inside Mux's shadow DOM —
@@ -1473,6 +1602,10 @@ export default function VideoPlayer({
           The stage itself — cover art crossfading on the creator's timer,
           with their time-synced lyrics beside it — lives in
           app/components/MusicStage.tsx. */}
+      <div
+        className="premium-player-media-frame relative h-full w-full overflow-hidden bg-black"
+        style={mediaFrameStyle}
+      >
       <MuxPlayer
         ref={playerRef}
         playbackId={playbackId}
@@ -1530,10 +1663,12 @@ export default function VideoPlayer({
           flashPulse("play");
           syncBackgroundAudioToPlayer(true);
           handlePreRollOnPlay();
+          reportPlaybackState(true);
         }}
         onPause={() => {
           flashPulse("pause");
           syncBackgroundAudioToPlayer(false);
+          reportPlaybackState(false);
         }}
         onEnded={handleMainVideoEnded}
         onVolumeChange={syncBackgroundAudioMute}
@@ -1542,10 +1677,12 @@ export default function VideoPlayer({
           // known yet at loadedmetadata; a no-op once captured.
           if (intrinsicRatio === null) captureIntrinsicAspect();
           handleTimeUpdate();
+          reportPlaybackState();
         }}
         onLoadedMetadata={() => {
           applyResumePosition();
           captureIntrinsicAspect();
+          reportPlaybackState();
         }}
         style={
           {
@@ -1554,20 +1691,11 @@ export default function VideoPlayer({
             // keep their whole frame in a 4:5-or-taller container; the
             // letterbox detector overrides that only when the source itself
             // has stable black bands around a landscape recording.
-            ...(vertical
-              ? { height: "100%" }
-              : letterboxedAspectRatio !== null
-                ? {
-                    aspectRatio: String(letterboxedAspectRatio),
-                    maxHeight: "75vh",
-                    "--media-object-fit": "cover",
-                  }
-              : portraitRatio !== null && !isFullscreen
-                ? {
-                    aspectRatio: String(Math.max(portraitRatio, 0.8)),
-                    maxHeight: "75vh",
-                  }
-                : { aspectRatio: "16 / 9" }),
+            height: vertical || inlineFrameSize || isFullscreen ? "100%" : "auto",
+            aspectRatio: String(displayAspectRatio),
+            ...(letterboxedAspectRatio !== null
+              ? { "--media-object-fit": "cover" }
+              : {}),
             "--controls-backdrop-color": "rgba(0, 0, 0, 0.7)",
             "--media-menu-background": "#0c1524",
             "--media-control-background": "#0c1524",
@@ -1579,6 +1707,7 @@ export default function VideoPlayer({
             "--media-menu-border-radius": "16px",
             "--media-menu-item-hover-background": "rgba(255, 154, 0, 0.22)",
             "--media-menu-item-checked-background": "rgba(255, 154, 0, 0.3)",
+            "--fullscreen-button": "none",
             // Netflix/YouTube-style left-half brightness swipe (see
             // handlePlayerPointerMove) combined with the creator's chosen
             // "Look" filter (see app/lib/videoFilters) into one CSS filter
@@ -1628,7 +1757,8 @@ export default function VideoPlayer({
           syncBackgroundAudioToPlayer/syncBackgroundAudioMute. Hidden,
           controls-less; entirely silent (paused, no src) when the video has
           no soundtrack attached. */}
-      <audio ref={backgroundAudioRef} className="hidden" />
+        <audio ref={backgroundAudioRef} className="hidden" />
+      </div>
 
       {/* Mid-roll ad break — a real interruption, not a stub: the
           underlying player is genuinely paused (see
@@ -1640,12 +1770,12 @@ export default function VideoPlayer({
           bail out early on midrollBreakActive as a backstop). */}
       {midrollBreakActive && midrollAd && (
         <div
-          className="absolute inset-0 z-40 flex flex-col items-center justify-center bg-black/95 p-2 sm:p-4 text-center select-none"
+          className="player-midroll-overlay absolute inset-0 z-40 select-none bg-black text-center"
           onClick={(e) => e.stopPropagation()}
           onPointerDown={(e) => e.stopPropagation()}
         >
-          {/* Ad video/media frame: Fixed 16:9 container with corner buttons */}
-          <div className="relative w-full max-w-2xl aspect-video overflow-hidden rounded-2xl border border-white/20 bg-black shadow-2xl flex items-center justify-center group">
+          {/* The creative fills the complete player/screen frame. */}
+          <div className="relative h-full w-full overflow-hidden bg-black group">
             {midrollAd.imageUrl.startsWith("mux:") ? (
               <MuxPlayer
                 playbackId={midrollAd.imageUrl.replace("mux:", "")}
@@ -1657,12 +1787,13 @@ export default function VideoPlayer({
                   console.warn("VideoPlayer: ad Mux error, finishing ad");
                   finishMidroll("error");
                 }}
-                className="w-full h-full object-contain"
+                className="absolute inset-0 h-full w-full object-cover"
                 style={
                   {
                     width: "100%",
                     height: "100%",
                     "--controls": "none",
+                    "--media-object-fit": "cover",
                   } as MuxCSSProperties
                 }
               />
@@ -1679,7 +1810,7 @@ export default function VideoPlayer({
                   console.warn("VideoPlayer: ad video error, finishing ad");
                   finishMidroll("error");
                 }}
-                className="w-full h-full object-contain"
+                className="absolute inset-0 h-full w-full object-cover"
               />
             ) : (
               /* eslint-disable-next-line @next/next/no-img-element */
@@ -1690,7 +1821,7 @@ export default function VideoPlayer({
                   console.warn("VideoPlayer: ad image error, finishing ad");
                   finishMidroll("error");
                 }}
-                className="w-full h-full object-contain"
+                className="absolute inset-0 h-full w-full object-cover"
               />
             )}
 
@@ -1835,8 +1966,8 @@ export default function VideoPlayer({
         </div>
       )}
 
-      {/* Mobile-only Expand/Collapse button (desktop has Mux's own
-          fullscreen control in the bar). Hidden while locked. */}
+      {/* Expand the complete player frame so custom gestures and controls
+          remain attached in fullscreen on desktop and mobile. */}
       {!locked && (
         <button
           type="button"
@@ -1846,8 +1977,8 @@ export default function VideoPlayer({
           }}
           aria-label={isFullscreen ? "Exit fullscreen" : "Expand video"}
           className="
-            lg:hidden absolute left-3 top-3 z-30
-            flex h-9 w-9 items-center justify-center rounded-full
+            absolute left-3 top-3 z-30
+            flex h-11 w-11 items-center justify-center rounded-full
             border border-white/15 bg-black/50 text-white backdrop-blur-md
             transition-transform active:scale-90
           "
@@ -1867,7 +1998,7 @@ export default function VideoPlayer({
           aria-label={locked ? "Unlock controls" : "Lock controls"}
           className="
             absolute right-3 top-3 z-30
-            flex h-9 w-9 items-center justify-center rounded-full
+            flex h-11 w-11 items-center justify-center rounded-full
             border border-white/15 bg-black/50 text-white backdrop-blur-md
             transition-transform active:scale-90
           "

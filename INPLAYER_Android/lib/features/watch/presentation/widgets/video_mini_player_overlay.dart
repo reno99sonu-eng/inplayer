@@ -133,16 +133,34 @@ class _VideoMiniPlayerOverlayState
     if (!controller.value.isInitialized) {
       return const ColoredBox(color: Colors.black);
     }
+    final sourceWidth = controller.value.size.width > 0
+        ? controller.value.size.width
+        : 1280.0;
+    final sourceHeight = controller.value.size.height > 0
+        ? controller.value.size.height
+        : 720.0;
+    if (service.cropToContent) {
+      return ColoredBox(
+        color: Colors.black,
+        child: FittedBox(
+          fit: BoxFit.cover,
+          clipBehavior: Clip.hardEdge,
+          child: SizedBox(
+            width: sourceWidth,
+            height: sourceHeight,
+            child: VideoPlayer(controller),
+          ),
+        ),
+      );
+    }
     return Container(
       color: Colors.black,
       alignment: Alignment.center,
-      child: Center(
-        child: AspectRatio(
-          aspectRatio: controller.value.aspectRatio > 0
-              ? controller.value.aspectRatio
-              : (16 / 9),
-          child: VideoPlayer(controller),
-        ),
+      child: AspectRatio(
+        aspectRatio: controller.value.aspectRatio > 0
+            ? controller.value.aspectRatio
+            : (16 / 9),
+        child: VideoPlayer(controller),
       ),
     );
   }
@@ -161,18 +179,24 @@ class _VideoMiniPlayerOverlayState
     return Semantics(
       label: tooltip,
       button: true,
-      child: GestureDetector(
-        onTap: onTap,
-        behavior: HitTestBehavior.opaque,
-        child: Container(
-          width: size,
-          height: size,
-          decoration: BoxDecoration(
-            color: Colors.black.withValues(alpha: 0.62),
-            shape: BoxShape.circle,
-            border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+      child: SizedBox(
+        width: 48,
+        height: 48,
+        child: GestureDetector(
+          onTap: onTap,
+          behavior: HitTestBehavior.opaque,
+          child: Center(
+            child: Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.62),
+                shape: BoxShape.circle,
+                border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+              ),
+              child: Icon(icon, color: Colors.white, size: iconSize),
+            ),
           ),
-          child: Icon(icon, color: Colors.white, size: iconSize),
         ),
       ),
     );
@@ -207,7 +231,7 @@ class _VideoMiniPlayerOverlayState
     final screenSize = MediaQuery.of(context).size;
 
     final width = service.isPortrait ? _portraitWidth : _landscapeWidth;
-    final height = service.isPortrait ? width * 16 / 9 : width * 9 / 16;
+    final height = width / service.displayAspectRatio;
     // Android PiP / split-screen can make the whole Flutter view smaller than
     // this window; the clamps below would then throw (upper < lower).
     if (screenSize.width < width + 16 || screenSize.height < height + 64) {
@@ -351,34 +375,40 @@ class _VideoMiniPlayerOverlayState
                     animation: controller,
                     builder: (context, _) {
                       final playing = controller.value.isPlaying;
-                      return GestureDetector(
-                        onTap: () => ref
-                            .read(videoMiniPlayerServiceProvider)
-                            .togglePlayPause(),
-                        behavior: HitTestBehavior.opaque,
-                        child: Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: Colors.black.withValues(alpha: 0.65),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.35),
-                              width: 1.2,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withValues(alpha: 0.4),
-                                blurRadius: 8,
+                      return SizedBox(
+                        width: 52,
+                        height: 52,
+                        child: GestureDetector(
+                          onTap: () => ref
+                              .read(videoMiniPlayerServiceProvider)
+                              .togglePlayPause(),
+                          behavior: HitTestBehavior.opaque,
+                          child: Center(
+                            child: Container(
+                              width: 44,
+                              height: 44,
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.65),
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.35),
+                                  width: 1.2,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.4),
+                                    blurRadius: 8,
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                          child: Icon(
-                            playing
-                                ? Icons.pause_rounded
-                                : Icons.play_arrow_rounded,
-                            color: Colors.white,
-                            size: 20,
+                              child: Icon(
+                                playing
+                                    ? Icons.pause_rounded
+                                    : Icons.play_arrow_rounded,
+                                color: Colors.white,
+                                size: 23,
+                              ),
+                            ),
                           ),
                         ),
                       );

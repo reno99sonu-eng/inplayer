@@ -41,6 +41,8 @@ class VideoMiniPlayerService extends ChangeNotifier {
   String _title = '';
   String _restoreRoute = '/';
   String _artUrl = '';
+  double? _displayAspectRatio;
+  bool _cropToContent = false;
 
   VideoPlayerController? get controller => _controller;
 
@@ -62,8 +64,17 @@ class VideoMiniPlayerService extends ChangeNotifier {
   /// full size, so their video frame is typically blank.
   String get artUrl => _artUrl;
 
-  /// Shorts are 9:16; watch-page videos are 16:9. Drives the window's shape.
-  bool get isPortrait => _kind == MiniPlayerKind.short;
+  /// The same display frame used on the watch page, including detected
+  /// landscape footage encoded inside a portrait canvas.
+  double get displayAspectRatio {
+    if (_kind == MiniPlayerKind.short) return 9 / 16;
+    final ratio =
+        _displayAspectRatio ?? _controller?.value.aspectRatio ?? 16 / 9;
+    return ratio.isFinite && ratio > 0 ? ratio : 16 / 9;
+  }
+
+  bool get isPortrait => displayAspectRatio < 1;
+  bool get cropToContent => _cropToContent;
 
   bool get isActive => _controller != null;
 
@@ -85,10 +96,14 @@ class VideoMiniPlayerService extends ChangeNotifier {
   void activate({
     required VideoPlayerController controller,
     required Video video,
+    double? displayAspectRatio,
+    bool cropToContent = false,
   }) {
     _adopt(controller, null);
     _video = video;
     _kind = MiniPlayerKind.video;
+    _displayAspectRatio = displayAspectRatio;
+    _cropToContent = cropToContent;
     _title = video.title;
     _restoreRoute = '/watch/${video.videoId}';
     _artUrl = video.isMusic
@@ -107,6 +122,8 @@ class VideoMiniPlayerService extends ChangeNotifier {
     _adopt(controller, soundtrack);
     _video = null;
     _kind = MiniPlayerKind.short;
+    _displayAspectRatio = 9 / 16;
+    _cropToContent = true;
     _title = short.title;
     _restoreRoute = '/shorts/${short.videoId}';
     _artUrl = '';
@@ -121,6 +138,8 @@ class VideoMiniPlayerService extends ChangeNotifier {
     _controller = null;
     _audio = null;
     _video = null;
+    _displayAspectRatio = null;
+    _cropToContent = false;
     if (c != null) notifyListeners();
     return c;
   }
@@ -143,6 +162,23 @@ class VideoMiniPlayerService extends ChangeNotifier {
       controller.play();
       _audio?.resume();
     }
+    notifyListeners();
+  }
+
+  /// A watch-page letterbox scan can finish after the video has already
+  /// entered the floating player. Keep its frame and crop rule synchronized
+  /// with the full-size player when that detection arrives.
+  void updateDisplayAspectRatio(
+    double aspectRatio, {
+    bool cropToContent = false,
+  }) {
+    if (_kind != MiniPlayerKind.video ||
+        !aspectRatio.isFinite ||
+        aspectRatio <= 0) {
+      return;
+    }
+    _displayAspectRatio = aspectRatio;
+    _cropToContent = cropToContent;
     notifyListeners();
   }
 
@@ -216,6 +252,8 @@ class VideoMiniPlayerService extends ChangeNotifier {
     _controller = null;
     _audio = null;
     _video = null;
+    _displayAspectRatio = null;
+    _cropToContent = false;
     notifyListeners();
 
     if (controller != null) {

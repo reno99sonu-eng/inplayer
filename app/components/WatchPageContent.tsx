@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { fetchAuthSession } from "aws-amplify/auth";
@@ -79,6 +79,33 @@ export default function WatchPageContent({ video, relatedVideos: initialRelatedV
   const [ageConfirmed, setAgeConfirmed] = useState(false);
   const [relatedVideos, setRelatedVideos] = useState(initialRelatedVideos);
   const [descExpanded, setDescExpanded] = useState(false);
+  const playbackStateRef = useRef<{
+    currentTime: number;
+    aspectRatio: number;
+    isPlaying: boolean;
+    playbackId: string;
+    token?: string;
+    cropToContent: boolean;
+  }>({
+    currentTime: 0,
+    aspectRatio: 16 / 9,
+    isPlaying: true,
+    playbackId: video.muxPlaybackId ?? "",
+    cropToContent: false,
+  });
+  const rememberPlaybackState = useCallback(
+    (state: {
+      currentTime: number;
+      aspectRatio: number;
+      isPlaying: boolean;
+      playbackId: string;
+      token?: string;
+      cropToContent: boolean;
+    }) => {
+      playbackStateRef.current = state;
+    },
+    []
+  );
   const commentsOn = video.commentsEnabled !== false;
   const showPlayer = !video.ageRestricted || ageConfirmed;
   const trimmedDescription = video.description?.trim() || "";
@@ -135,6 +162,7 @@ export default function WatchPageContent({ video, relatedVideos: initialRelatedV
                     coverIntervalSeconds={video.coverIntervalSeconds}
                     lyrics={video.lyrics}
                     artist={video.uploaderName}
+                    onPlaybackState={rememberPlaybackState}
                   />
                 ) : (
                   <VideoPlayer
@@ -156,6 +184,7 @@ export default function WatchPageContent({ video, relatedVideos: initialRelatedV
                     coverIntervalSeconds={video.coverIntervalSeconds}
                     lyrics={video.lyrics}
                     artist={video.uploaderName}
+                    onPlaybackState={rememberPlaybackState}
                   />
                 )
               ) : (
@@ -177,8 +206,17 @@ export default function WatchPageContent({ video, relatedVideos: initialRelatedV
                     title: video.title,
                     creator: video.uploaderName,
                     thumbnailUrl: video.thumbnailUrl || "/recommendations/thumbnails/1.jpg",
-                    muxPlaybackId: video.muxPlaybackId,
+                    muxPlaybackId:
+                      playbackStateRef.current.playbackId || video.muxPlaybackId,
+                    playbackToken: playbackStateRef.current.token,
                     isShort: isShort,
+                    currentTime: playbackStateRef.current.currentTime,
+                    contentAspectRatio: isShort
+                      ? 9 / 16
+                      : playbackStateRef.current.aspectRatio,
+                    isPlaying: playbackStateRef.current.isPlaying,
+                    cropToContent:
+                      isShort || playbackStateRef.current.cropToContent,
                   });
                   router.push("/");
                 }}

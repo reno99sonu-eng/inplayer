@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -28,6 +29,7 @@ import '../widgets/player_chrome.dart';
 class FullscreenPlayerPage extends StatefulWidget {
   final VideoPlayerController Function() getController;
   final Widget Function() getMediaSurface;
+  final double Function() getDisplayAspectRatio;
   final String title;
   final String Function() getQualityLabel;
   final List<QualityOption> qualityOptions;
@@ -68,6 +70,7 @@ class FullscreenPlayerPage extends StatefulWidget {
     super.key,
     required this.getController,
     required this.getMediaSurface,
+    required this.getDisplayAspectRatio,
     required this.title,
     required this.getQualityLabel,
     required this.qualityOptions,
@@ -197,30 +200,54 @@ class _FullscreenPlayerPageState extends State<FullscreenPlayerPage> {
           child: Stack(
             alignment: Alignment.center,
             children: [
-              widget.getMediaSurface(),
-              Positioned.fill(
-                child: PlayerChrome(
-                  controller: widget.getController(),
-                  title: widget.title,
-                  isFullscreen: true,
-                  onToggleFullscreen: _exit,
-                  onBack: _exit,
-                  qualityLabel: widget.getQualityLabel(),
-                  qualityOptions: widget.qualityOptions,
-                  onQualityChange: _handleQualityChange,
-                  captionLanguages: widget.captionLanguages,
-                  selectedCaptionLang: widget.getSelectedCaptionLang(),
-                  captionCues: widget.getCaptionCues(),
-                  onCaptionLanguageChange: _handleCaptionChange,
-                  pipSupported: widget.pipSupported,
-                  onPipTapped: widget.onPipTapped,
-                  initialBrightness: widget.getBrightness(),
-                  onBrightnessChanged: (v) {
-                    widget.onBrightnessChanged(v);
-                    // Rebuild so getMediaSurface() below is re-invoked with
-                    // the new value — WatchPage's own setState can't reach
-                    // this page's subtree.
-                    if (mounted) setState(() {});
+              Center(
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final requestedRatio = widget.getDisplayAspectRatio();
+                    final ratio = requestedRatio.isFinite && requestedRatio > 0
+                        ? requestedRatio
+                        : 16 / 9;
+                    final width = math.min(
+                      constraints.maxWidth,
+                      constraints.maxHeight * ratio,
+                    );
+                    final height = width / ratio;
+                    return SizedBox(
+                      width: width,
+                      height: height,
+                      child: Stack(
+                        alignment: Alignment.center,
+                        children: [
+                          widget.getMediaSurface(),
+                          Positioned.fill(
+                            child: PlayerChrome(
+                              controller: widget.getController(),
+                              title: widget.title,
+                              isFullscreen: true,
+                              onToggleFullscreen: _exit,
+                              onBack: _exit,
+                              qualityLabel: widget.getQualityLabel(),
+                              qualityOptions: widget.qualityOptions,
+                              onQualityChange: _handleQualityChange,
+                              captionLanguages: widget.captionLanguages,
+                              selectedCaptionLang: widget
+                                  .getSelectedCaptionLang(),
+                              captionCues: widget.getCaptionCues(),
+                              onCaptionLanguageChange: _handleCaptionChange,
+                              pipSupported: widget.pipSupported,
+                              onPipTapped: widget.onPipTapped,
+                              initialBrightness: widget.getBrightness(),
+                              onBrightnessChanged: (v) {
+                                widget.onBrightnessChanged(v);
+                                // Rebuild so getMediaSurface() below is
+                                // re-invoked with the new brightness value.
+                                if (mounted) setState(() {});
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
                   },
                 ),
               ),
@@ -233,10 +260,9 @@ class _FullscreenPlayerPageState extends State<FullscreenPlayerPage> {
                     return Positioned.fill(child: overlay);
                   },
                 )
-              else if (widget.getAdOverlay != null && widget.getAdOverlay!() != null)
-                Positioned.fill(
-                  child: widget.getAdOverlay!()!,
-                ),
+              else if (widget.getAdOverlay != null &&
+                  widget.getAdOverlay!() != null)
+                Positioned.fill(child: widget.getAdOverlay!()!),
             ],
           ),
         ),

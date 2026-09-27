@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useCallback, ReactNode } from "react";
 import { useRouter } from "next/navigation";
+import { saveMiniPlayerResumePosition } from "@/app/lib/playbackPositions";
 
 export interface MiniVideo {
   videoId: string;
@@ -9,8 +10,12 @@ export interface MiniVideo {
   creator: string;
   thumbnailUrl: string;
   muxPlaybackId?: string;
+  playbackToken?: string;
   isShort?: boolean;
   currentTime?: number;
+  contentAspectRatio?: number;
+  isPlaying?: boolean;
+  cropToContent?: boolean;
 }
 
 interface MiniPlayerContextType {
@@ -18,7 +23,7 @@ interface MiniPlayerContextType {
   isOpen: boolean;
   isPlaying: boolean;
   minimizeVideo: (video: MiniVideo) => void;
-  expandVideo: () => void;
+  expandVideo: (currentTime?: number) => void;
   closeMiniPlayer: () => void;
   togglePlay: () => void;
 }
@@ -34,11 +39,15 @@ export function MiniPlayerProvider({ children }: { children: ReactNode }) {
   const minimizeVideo = useCallback((video: MiniVideo) => {
     setMiniVideo(video);
     setIsOpen(true);
-    setIsPlaying(true);
+    setIsPlaying(video.isPlaying ?? true);
   }, []);
 
-  const expandVideo = useCallback(() => {
+  const expandVideo = useCallback((currentTime?: number) => {
     if (!miniVideo) return;
+    const resumeAt = currentTime ?? miniVideo.currentTime;
+    if (typeof resumeAt === "number" && Number.isFinite(resumeAt)) {
+      saveMiniPlayerResumePosition(miniVideo.videoId, resumeAt);
+    }
     setIsOpen(false);
     if (miniVideo.isShort) {
       router.push(`/shorts?v=${miniVideo.videoId}`);

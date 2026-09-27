@@ -749,6 +749,16 @@ animation: aiGlassSweep 5.5s linear infinite;
   box-shadow: 0 25px 70px -25px rgba(0, 0, 0, .5);
 }
 
+.premium-player-media-frame {
+  flex: none;
+}
+
+.premium-player-media-frame > mux-player {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+}
+
 .premium-player > mux-player {
   display: block;
   width: 100%;
@@ -862,6 +872,7 @@ animation: aiGlassSweep 5.5s linear infinite;
 .premium-player:-webkit-full-screen {
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -874,6 +885,11 @@ animation: aiGlassSweep 5.5s linear infinite;
   width: 100%;
   height: 100%;
   aspect-ratio: auto !important;
+}
+
+.premium-player:fullscreen > .premium-player-media-frame,
+.premium-player:-webkit-full-screen > .premium-player-media-frame {
+  flex: none;
 }
 
 /* CSS "fake" fullscreen — applied by VideoPlayer wherever the real
@@ -901,16 +917,8 @@ animation: aiGlassSweep 5.5s linear infinite;
   aspect-ratio: auto !important;
 }
 
-/* On touch devices, fullscreen video COVERS the whole screen (slight
-   crop) instead of letterboxing with black side bars — requested
-   behavior: "it should cover the entire screen properly on every
-   device". Desktop keeps the standard fit since monitors match 16:9. */
-@media (pointer: coarse) {
-  .premium-player:fullscreen mux-player,
-  .premium-player:-webkit-full-screen mux-player,
-  .premium-player.fake-fullscreen mux-player {
-    --media-object-fit: contain;
-  }
+.premium-player.fake-fullscreen > .premium-player-media-frame {
+  flex: none;
 }
 
 /* ── Vertical (Raftaar / Short) video on the watch page ────────────────
@@ -927,19 +935,6 @@ animation: aiGlassSweep 5.5s linear infinite;
    the exception below wins regardless of source order. */
 .premium-player.vertical-video mux-player {
   --media-object-fit: cover;
-}
-
-/* ...but NEVER while fullscreen. There the frame is the screen, whose
-   shape is nothing like 9:16 — covering a portrait video across a
-   landscape monitor (or a rotated phone) would crop it down to a narrow
-   middle slice. Contain shows the whole frame with side bars, which is
-   the correct reading of a vertical video on a wide screen. This
-   deliberately opts vertical videos out of the "cover on touch
-   fullscreen" rule directly above, which exists for 16:9 content. */
-.premium-player.vertical-video:fullscreen mux-player,
-.premium-player.vertical-video:-webkit-full-screen mux-player,
-.premium-player.vertical-video.fake-fullscreen mux-player {
-  --media-object-fit: contain;
 }
 
 /* Double/triple-tap seek feedback pill — quick pop in, fade out. */

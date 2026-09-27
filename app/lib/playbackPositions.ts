@@ -74,6 +74,37 @@ export function savePlaybackPosition(
   write(map);
 }
 
+const MINI_PLAYER_RESUME_PREFIX = "inplayer-mini-resume:";
+
+/** The mini-player's handoff is a one-time session value, even when the
+ *  viewer has disabled long-term playback-position memory. */
+export function saveMiniPlayerResumePosition(videoId: string, seconds: number): void {
+  if (typeof window === "undefined" || !videoId || !Number.isFinite(seconds) || seconds < 0) {
+    return;
+  }
+  try {
+    window.sessionStorage.setItem(`${MINI_PLAYER_RESUME_PREFIX}${videoId}`, String(seconds));
+  } catch {
+    // A mini-player handoff can still expand; it will start from its normal
+    // remembered position if the browser has disabled session storage.
+  }
+}
+
+/** Consume a one-time position written when the floating player expands. */
+export function consumeMiniPlayerResumePosition(videoId: string): number | null {
+  if (typeof window === "undefined" || !videoId) return null;
+  const key = `${MINI_PLAYER_RESUME_PREFIX}${videoId}`;
+  try {
+    const raw = window.sessionStorage.getItem(key);
+    window.sessionStorage.removeItem(key);
+    if (raw === null) return null;
+    const seconds = Number(raw);
+    return Number.isFinite(seconds) && seconds >= 0 ? seconds : null;
+  } catch {
+    return null;
+  }
+}
+
 export function getPlaybackPosition(videoId: string): number | null {
   if (typeof window === "undefined" || !videoId) return null;
   const stored = read()[videoId];

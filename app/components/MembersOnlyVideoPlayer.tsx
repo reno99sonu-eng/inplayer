@@ -29,6 +29,14 @@ interface MembersOnlyVideoPlayerProps {
   coverIntervalSeconds?: number;
   lyrics?: { time: number; text: string }[];
   artist?: string;
+  onPlaybackState?: (state: {
+    currentTime: number;
+    aspectRatio: number;
+    isPlaying: boolean;
+    playbackId: string;
+    token?: string;
+    cropToContent: boolean;
+  }) => void;
 }
 
 // Real gating, not a UI-only lock: this never receives a playable Mux
@@ -53,6 +61,7 @@ export default function MembersOnlyVideoPlayer({
   coverIntervalSeconds,
   lyrics,
   artist,
+  onPlaybackState,
 }: MembersOnlyVideoPlayerProps) {
   const { signedIn, openSignIn } = useAuthModal();
   const [state, setState] = useState<
@@ -114,6 +123,7 @@ export default function MembersOnlyVideoPlayer({
         coverIntervalSeconds={coverIntervalSeconds}
         lyrics={lyrics}
         artist={artist}
+        onPlaybackState={onPlaybackState}
       />
     );
   }

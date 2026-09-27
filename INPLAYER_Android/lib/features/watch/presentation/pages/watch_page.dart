@@ -850,18 +850,25 @@ class _WatchPageState extends ConsumerState<WatchPage>
       return;
     }
 
+    final miniPlayerService = ref.read(videoMiniPlayerServiceProvider);
     final aspectRatio = await ref
         .read(videoServiceProvider)
         .getLetterboxedContentAspectRatio(
           playbackId: playbackId,
           duration: duration,
         );
-    if (!mounted ||
-        aspectRatio == null ||
+    if (aspectRatio == null ||
         _video?.videoId != video.videoId ||
         _video?.muxPlaybackId != playbackId) {
       return;
     }
+    if (miniPlayerService.video?.videoId == video.videoId) {
+      miniPlayerService.updateDisplayAspectRatio(
+        aspectRatio,
+        cropToContent: true,
+      );
+    }
+    if (!mounted) return;
     setState(() {
       _letterboxContentAspectRatio = aspectRatio;
       _letterboxPlaybackId = playbackId;
@@ -1427,7 +1434,8 @@ class _WatchPageState extends ConsumerState<WatchPage>
                         constraints: BoxConstraints(
                           maxHeight: media.size.height * 0.6,
                         ),
-                        child: AspectRatio(
+                        child: Center(
+                          child: AspectRatio(
                       aspectRatio: _playerBoxAspect,
                       child: _isInitialized && _videoController != null
                           ? Stack(
@@ -1499,6 +1507,7 @@ class _WatchPageState extends ConsumerState<WatchPage>
                                     ),
                                   ),
                                 ),
+                          ),
                         ),
                       ),
                     );
@@ -1751,6 +1760,7 @@ class _WatchPageState extends ConsumerState<WatchPage>
         builder: (_) => FullscreenPlayerPage(
           getController: () => _videoController!,
           getMediaSurface: _buildMediaSurface,
+          getDisplayAspectRatio: () => _playerBoxAspect,
           title: _video?.title ?? '',
           getQualityLabel: () => _qualityLabel,
           qualityOptions: _availableQualityOptions,
@@ -1832,9 +1842,12 @@ class _WatchPageState extends ConsumerState<WatchPage>
     _lastPlayingForPip = false;
     PipService.setActive(this, false);
     controller.removeListener(_onPlayerTick);
-    ref
-        .read(videoMiniPlayerServiceProvider)
-        .activate(controller: controller, video: video);
+    ref.read(videoMiniPlayerServiceProvider).activate(
+      controller: controller,
+      video: video,
+      displayAspectRatio: _playerBoxAspect,
+      cropToContent: _letterboxPlaybackId == video.muxPlaybackId,
+    );
     _videoController = null;
     if (context.canPop()) {
       context.pop();
@@ -2159,22 +2172,31 @@ class _WatchPageState extends ConsumerState<WatchPage>
         fit: StackFit.expand,
         children: [
           if (_adVideoController != null && _adVideoController!.value.isInitialized)
-            Center(
-              child: AspectRatio(
-                aspectRatio: _adVideoController!.value.aspectRatio > 0
-                    ? _adVideoController!.value.aspectRatio
-                    : (16 / 9),
-                child: VideoPlayer(_adVideoController!),
+            Positioned.fill(
+              child: FittedBox(
+                fit: BoxFit.cover,
+                clipBehavior: Clip.hardEdge,
+                child: SizedBox(
+                  width: _adVideoController!.value.size.width > 0
+                      ? _adVideoController!.value.size.width
+                      : 1280,
+                  height: _adVideoController!.value.size.height > 0
+                      ? _adVideoController!.value.size.height
+                      : 720,
+                  child: VideoPlayer(_adVideoController!),
+                ),
               ),
             )
           else if (smartImageProvider(ad.imageUrl) != null)
-            Image(
-              image: smartImageProvider(ad.imageUrl)!,
-              fit: BoxFit.contain,
-              errorBuilder: (context, error, stackTrace) => Container(
-                color: Colors.black45,
-                child: const Center(
-                  child: Icon(Icons.campaign, color: Colors.white54, size: 40),
+            Positioned.fill(
+              child: Image(
+                image: smartImageProvider(ad.imageUrl)!,
+                fit: BoxFit.cover,
+                errorBuilder: (context, error, stackTrace) => Container(
+                  color: Colors.black45,
+                  child: const Center(
+                    child: Icon(Icons.campaign, color: Colors.white54, size: 40),
+                  ),
                 ),
               ),
             )

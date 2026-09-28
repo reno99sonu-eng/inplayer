@@ -3,7 +3,6 @@ import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:native_device_orientation/native_device_orientation.dart';
 import 'package:video_player/video_player.dart';
 
@@ -17,8 +16,9 @@ import '../widgets/player_chrome.dart';
 /// re-buffer or a visible restart. Mirrors the website's own "rotate the
 /// phone to landscape → fullscreen; rotate back → exit" + manual toggle
 /// behavior (see VideoPlayer.tsx's `enterFullscreen`/`exitFullscreen`/the
-/// device-rotation effect), reimplemented with `SystemChrome` orientation
-/// locking + immersive system UI instead of the web Fullscreen API.
+/// device-rotation effect). WatchPage applies and awaits the Android
+/// landscape lock before opening this route; this page monitors the raw
+/// physical sensor so the lock does not hide a deliberate rotate-back.
 ///
 /// Controller/media-surface/quality-label are all pulled through getters
 /// rather than passed once as plain values: a quality change made *while*
@@ -95,7 +95,7 @@ class _FullscreenPlayerPageState extends State<FullscreenPlayerPage> {
   // Rotate-to-exit — the other half of "rotate the phone" fullscreen
   // behavior (rotate-*in* lives in watch_page.dart's didChangeMetrics,
   // which only works because nothing has locked the app's orientation yet
-  // at that point). Once this page locks the rendered orientation to
+  // at that point). Once WatchPage locks the rendered orientation to
   // landscape below, Flutter's own MediaQuery/window-metrics APIs stop
   // reflecting the phone's real physical orientation — only a raw sensor
   // reading (native_device_orientation, useSensor: true) still can, which
@@ -103,6 +103,7 @@ class _FullscreenPlayerPageState extends State<FullscreenPlayerPage> {
   // while this page is open now auto-exits, matching the website's own
   // bidirectional rotation trigger.
   StreamSubscription<NativeDeviceOrientation>? _orientationSub;
+  Timer? _portraitExitTimer;
   bool _exiting = false;
   // Rotate-to-exit must be a genuine "rotate back" gesture and must never
   // fire on entry. When fullscreen is opened by TAPPING the button while the
@@ -111,15 +112,11 @@ class _FullscreenPlayerPageState extends State<FullscreenPlayerPage> {
   // straight back out to portrait. So only arm the portrait->exit trigger
   // after we've actually observed a physical landscape reading first.
   bool _seenLandscape = false;
+  NativeDeviceOrientation? _lastPhysicalOrientation;
 
   @override
   void initState() {
     super.initState();
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-    ]);
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     _orientationSub = NativeDeviceOrientationCommunicator()
         .onOrientationChanged(useSensor: true)
         .listen(_handlePhysicalOrientationChanged);
@@ -127,18 +124,36 @@ class _FullscreenPlayerPageState extends State<FullscreenPlayerPage> {
 
   void _handlePhysicalOrientationChanged(NativeDeviceOrientation orientation) {
     if (!mounted) return;
+    _lastPhysicalOrientation = orientation;
     // Arm the exit trigger only once the phone has physically been in
     // landscape. Until then, ignore portrait readings so tapping the
     // fullscreen button while upright doesn't immediately bounce back out.
     if (orientation == NativeDeviceOrientation.landscapeLeft ||
         orientation == NativeDeviceOrientation.landscapeRight) {
       _seenLandscape = true;
+      _portraitExitTimer?.cancel();
+      _portraitExitTimer = null;
       return;
     }
     if (!_seenLandscape) return;
     if (orientation == NativeDeviceOrientation.portraitUp ||
         orientation == NativeDeviceOrientation.portraitDown) {
-      _exit();
+      // Phone sensors can briefly report portrait while the Android window
+      // is settling into a requested landscape orientation. Require a
+      // stable portrait reading before exiting, or fullscreen appears to
+      // randomly unlock while a video is playing.
+      if (_portraitExitTimer?.isActive == true) return;
+      _portraitExitTimer?.cancel();
+      _portraitExitTimer = Timer(const Duration(milliseconds: 500), () {
+        final last = _lastPhysicalOrientation;
+        if (!mounted ||
+            !_seenLandscape ||
+            (last != NativeDeviceOrientation.portraitUp &&
+                last != NativeDeviceOrientation.portraitDown)) {
+          return;
+        }
+        _exit();
+      });
     }
   }
 
@@ -156,13 +171,10 @@ class _FullscreenPlayerPageState extends State<FullscreenPlayerPage> {
   }
 
   Future<void> _exit() async {
-    // Guards against a double-pop: the manual close button, the back
-    // gesture (via PopScope below), and the new rotate-to-exit sensor
-    // listener can all now race to call this within the same frame or two.
+    // Guards against a double-pop: the manual close button, the system back
+    // gesture, and the rotate-to-exit sensor can race within the same frame.
     if (_exiting) return;
     _exiting = true;
-    await SystemChrome.setPreferredOrientations([]);
-    await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     // WatchPage may already have removed this route (the OS just floated the
     // app into PiP) while this State is still briefly mounted. A blind pop()
     // then would pop WatchPage itself — disposing the video and leaving the
@@ -177,26 +189,15 @@ class _FullscreenPlayerPageState extends State<FullscreenPlayerPage> {
   @override
   void dispose() {
     _orientationSub?.cancel();
-    // Belt-and-braces restore in case the page is popped by something other
-    // than the back button (e.g. a system back gesture) without _exit()
-    // running first — clear orientation lock so device auto-rotation works
-    // cleanly everywhere.
-    SystemChrome.setPreferredOrientations([]);
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    _portraitExitTimer?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return PopScope(
-      onPopInvokedWithResult: (didPop, _) {
-        if (!didPop) return;
-        SystemChrome.setPreferredOrientations([]);
-        SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-      },
-      child: Scaffold(
-        backgroundColor: Colors.black,
-        body: SizedBox.expand(
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: SizedBox.expand(
           child: Stack(
             alignment: Alignment.center,
             children: [
@@ -265,7 +266,6 @@ class _FullscreenPlayerPageState extends State<FullscreenPlayerPage> {
                 Positioned.fill(child: widget.getAdOverlay!()!),
             ],
           ),
-        ),
       ),
     );
   }

@@ -23,6 +23,7 @@ import 'admin_music_studio_tab.dart';
 import 'admin_support_tab.dart';
 import 'admin_hammart_orders_tab.dart';
 import 'admin_sponsorships_tab.dart';
+import 'admin_stuck_processing_tab.dart';
 
 class AdminPage extends ConsumerStatefulWidget {
   const AdminPage({super.key});
@@ -47,6 +48,7 @@ class _AdminGroup {
 class _AdminPageState extends ConsumerState<AdminPage> {
   bool _loading = true;
   bool _isAdmin = false;
+  AdminAccess? _access;
 
   @override
   void initState() {
@@ -55,12 +57,76 @@ class _AdminPageState extends ConsumerState<AdminPage> {
   }
 
   Future<void> _checkAccess() async {
-    final isAdmin = await ref.read(adminServiceProvider).checkIsAdmin();
+    final access = await ref.read(adminServiceProvider).getAccess();
     if (!mounted) return;
     setState(() {
-      _isAdmin = isAdmin;
+      _access = access;
+      _isAdmin = access.isAdmin;
       _loading = false;
     });
+  }
+
+  List<_AdminGroup> _groupsForAccess(AdminAccess access) {
+    if (access.isMainAdmin) return _groups;
+
+    final groups = <_AdminGroup>[];
+    if (access.can('view_support')) {
+      groups.add(_AdminGroup('Overview', [
+        _AdminSection(
+          'Support Desk',
+          Icons.support_agent_outlined,
+          () => const AdminSupportTab(readOnly: true),
+        ),
+      ]));
+    }
+
+    final contentSections = <_AdminSection>[];
+    if (access.can('view_reports')) {
+      contentSections.add(_AdminSection(
+        'Moderation Reports',
+        Icons.shield_outlined,
+        () => const AdminModerationTab(reportsOnly: true, readOnly: true),
+      ));
+    }
+    if (access.can('delete_stuck_processing_videos')) {
+      contentSections.add(_AdminSection(
+        'Stuck Uploads',
+        Icons.hourglass_bottom_rounded,
+        () => const AdminStuckProcessingTab(),
+      ));
+    }
+    if (contentSections.isNotEmpty) {
+      groups.add(_AdminGroup('Content & Safety', contentSections));
+    }
+
+    if (access.can('manage_ads') || access.can('manage_navbar_theme')) {
+      groups.add(_AdminGroup('Appearance & Advertising', [
+        _AdminSection(
+          'Advertising & Navbar Theme',
+          Icons.ads_click_outlined,
+          () => AdminAdvertisingTab(
+            canManageAds: access.can('manage_ads'),
+            canManageNavbarTheme: access.can('manage_navbar_theme'),
+          ),
+        ),
+      ]));
+    }
+
+    if (access.can('view_errors') || access.can('view_bugs')) {
+      groups.add(_AdminGroup('Diagnostics', [
+        _AdminSection(
+          'Logs & Bug Reports',
+          Icons.receipt_long_outlined,
+          () => AdminLogsTab(
+            canViewAudit: false,
+            canViewErrors: access.can('view_errors'),
+            canViewBugs: access.can('view_bugs'),
+            canManage: false,
+          ),
+        ),
+      ]));
+    }
+    return groups;
   }
 
   static final _groups = [
@@ -129,19 +195,40 @@ class _AdminPageState extends ConsumerState<AdminPage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.lock_outline, size: 56, color: context.textDim),
+                  Icon(
+                    _access?.verificationFailed == true
+                        ? Icons.cloud_off_outlined
+                        : Icons.lock_outline,
+                    size: 56,
+                    color: context.textDim,
+                  ),
                   const SizedBox(height: 16),
                   Text(
-                    "You don't have access to the admin panel",
+                    _access?.verificationFailed == true
+                        ? "Couldn't verify admin access"
+                        : "You don't have access to the admin panel",
                     textAlign: TextAlign.center,
                     style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.w600),
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    'This account is not on the InPlayer admin list.',
+                    _access?.verificationFailed == true
+                        ? 'Check your connection and try again.'
+                        : '${_access?.email ?? 'This account'} is not the main admin or an active team member.',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: context.textSecondary, fontSize: 13),
                   ),
+                  if (_access?.verificationFailed == true) ...[
+                    const SizedBox(height: 16),
+                    OutlinedButton.icon(
+                      onPressed: () {
+                        setState(() => _loading = true);
+                        _checkAccess();
+                      },
+                      icon: const Icon(Icons.refresh),
+                      label: const Text('Retry'),
+                    ),
+                  ],
                 ],
               ),
             ),
@@ -149,6 +236,9 @@ class _AdminPageState extends ConsumerState<AdminPage> {
         ),
       );
     }
+
+    final access = _access!;
+    final groups = _groupsForAccess(access);
 
     return PatternBackground(
       child: Scaffold(
@@ -162,31 +252,100 @@ class _AdminPageState extends ConsumerState<AdminPage> {
             style: TextStyle(fontWeight: FontWeight.w800, color: context.textPrimary, letterSpacing: -0.5),
           ),
         ),
-        body: ListView.builder(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          itemCount: _groups.length,
-          itemBuilder: (context, groupIndex) {
-            final group = _groups[groupIndex];
-            return Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(20, 16, 20, 6),
-                  child: Text(
-                    group.label.toUpperCase(),
-                    style: const TextStyle(color: AppColors.brandOrange, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+        body: RefreshIndicator(
+          color: AppColors.brandOrange,
+          onRefresh: _checkAccess,
+          child: ListView.builder(
+            physics: const AlwaysScrollableScrollPhysics(),
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            itemCount: groups.length + (access.isMainAdmin ? 0 : 1),
+            itemBuilder: (context, groupIndex) {
+              if (!access.isMainAdmin && groupIndex == 0) {
+                return _teamAccessNotice(context, access, groups.isEmpty);
+              }
+              final group = groups[groupIndex - (access.isMainAdmin ? 0 : 1)];
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 16, 20, 6),
+                    child: Text(
+                      group.label.toUpperCase(),
+                      style: const TextStyle(color: AppColors.brandOrange, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                    ),
                   ),
-                ),
-                ...group.sections.map((section) => ListTile(
-                      leading: Icon(section.icon, color: context.textPrimary),
-                      title: Text(section.title, style: TextStyle(color: context.textPrimary, fontSize: 14)),
-                      trailing: Icon(Icons.chevron_right, color: context.textDim, size: 20),
-                      onTap: () => _open(section),
-                    )),
-              ],
-            );
-          },
+                  ...group.sections.map((section) => ListTile(
+                        leading: Icon(section.icon, color: context.textPrimary),
+                        title: Text(section.title, style: TextStyle(color: context.textPrimary, fontSize: 14)),
+                        trailing: Icon(Icons.chevron_right, color: context.textDim, size: 20),
+                        onTap: () => _open(section),
+                      )),
+                ],
+              );
+            },
+          ),
         ),
+      ),
+    );
+  }
+
+  Widget _teamAccessNotice(
+    BuildContext context,
+    AdminAccess access,
+    bool hasNoModules,
+  ) {
+    const labels = <String, String>{
+      'view_reports': 'Reports',
+      'view_support': 'Support',
+      'view_bugs': 'Bug reports',
+      'view_errors': 'Error logs',
+      'manage_navbar_theme': 'Navbar theme',
+      'manage_ads': 'Advertising',
+      'delete_stuck_processing_videos': 'Stuck uploads',
+    };
+    final grants = access.permissions
+        .map((permission) => labels[permission] ?? permission)
+        .toList()
+      ..sort();
+
+    return Container(
+      margin: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.brandOrange.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.brandOrange.withValues(alpha: 0.28)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Team access · ${access.email ?? 'signed-in account'}',
+            style: TextStyle(
+              color: context.textPrimary,
+              fontWeight: FontWeight.w800,
+              fontSize: 13,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            hasNoModules
+                ? 'This invitation has no active permissions yet. Ask the main admin to grant the sections you need.'
+                : 'The sections below match this account’s granted permissions. User management, revenue, sponsorships, full content controls, and global settings stay restricted to the main admin.',
+            style: TextStyle(color: context.textSecondary, fontSize: 12, height: 1.45),
+          ),
+          if (grants.isNotEmpty) ...[
+            const SizedBox(height: 8),
+            Text(
+              'Granted: ${grants.join(' · ')}',
+              style: TextStyle(
+                color: context.textPrimary,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }

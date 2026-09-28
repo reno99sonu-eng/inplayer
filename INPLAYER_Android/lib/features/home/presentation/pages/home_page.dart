@@ -36,6 +36,8 @@ import '../../../../core/router/pageless_route_observer.dart';
 import '../../../../models/short.dart';
 import '../../../../services/video_interaction_service.dart';
 import '../../../../services/video_mini_player_service.dart';
+import '../../../../services/ad_service.dart';
+import '../../../../services/premium_service.dart';
 import '../widgets/mobile_menu_drawer.dart';
 import '../widgets/profile_menu_modal.dart';
 import '../widgets/create_menu_popup.dart';
@@ -131,7 +133,10 @@ class _HomePageState extends ConsumerState<HomePage> {
   }) {
     return [
       _builtTabs.contains(0)
-          ? HomeFeedPage(key: ValueKey('home-feed-$feedRevision'))
+          ? HomeFeedPage(
+              key: ValueKey('home-feed-$feedRevision'),
+              isActive: _currentIndex == 0,
+            )
           : const SizedBox.shrink(),
       _builtTabs.contains(1)
           ? ShortsPage(
@@ -687,13 +692,16 @@ class _HomePageState extends ConsumerState<HomePage> {
 }
 
 class HomeFeedPage extends ConsumerStatefulWidget {
-  const HomeFeedPage({super.key});
+  const HomeFeedPage({super.key, this.isActive = true});
+
+  final bool isActive;
 
   @override
   ConsumerState<HomeFeedPage> createState() => _HomeFeedPageState();
 }
 
-class _HomeFeedPageState extends ConsumerState<HomeFeedPage> {
+class _HomeFeedPageState extends ConsumerState<HomeFeedPage>
+    with WidgetsBindingObserver {
   List<Video>? _videos;
   List<Video> _featured = const [];
   List<Short> _shorts = const [];
@@ -709,7 +717,43 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     unawaited(_loadFeedData());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_preloadMidrollCreative());
+    });
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state != AppLifecycleState.resumed) return;
+    ref.invalidate(publicPlatformSettingsProvider);
+    ref.invalidate(publicNavbarThemeProvider);
+    unawaited(_preloadMidrollCreative());
+    if (widget.isActive) unawaited(_refreshContent());
+  }
+
+  Future<void> _preloadMidrollCreative() async {
+    // Resolve account-specific ad eligibility while the viewer is still on
+    // the feed, instead of putting the premium check on the tap-to-play path.
+    unawaited(ref.read(premiumServiceProvider).getStatus());
+    final config = await ref.read(adServiceProvider).getMidrollConfig();
+    if (!mounted || config == null || !config.enabled) return;
+    final ad = config.ad ?? (config.ads.isNotEmpty ? config.ads.first : null);
+    if (ad == null) return;
+    final provider = smartImageProvider(ad.imageUrl);
+    if (provider == null) return;
+    try {
+      await precacheImage(provider, context);
+    } catch (_) {
+      // The player retries the actual creative when its pre-roll starts.
+    }
   }
 
   Future<void> _loadFeedData({bool forceRefresh = false}) async {
@@ -790,6 +834,8 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage> {
 
   Future<void> _refreshContent() async {
     setState(() => _feedRefreshTick++);
+    ref.invalidate(publicPlatformSettingsProvider);
+    ref.invalidate(publicNavbarThemeProvider);
     await _loadFeedData(forceRefresh: true);
   }
 

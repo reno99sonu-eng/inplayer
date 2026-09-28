@@ -90,16 +90,44 @@ class PremiumServiceException implements Exception {
 class PremiumService {
   final _dio = DioClient().dio;
   final _logger = Logger();
+  static const _statusCacheTtl = Duration(seconds: 30);
+  PremiumStatus? _cachedStatus;
+  DateTime? _statusCachedAt;
+  Future<PremiumStatus>? _statusRequest;
+  int _statusCacheEpoch = 0;
 
-  Future<PremiumStatus> getStatus() async {
+  Future<PremiumStatus> getStatus({bool forceRefresh = false}) {
+    final cachedAt = _statusCachedAt;
+    if (!forceRefresh &&
+        _cachedStatus != null &&
+        cachedAt != null &&
+        DateTime.now().difference(cachedAt) < _statusCacheTtl) {
+      return Future.value(_cachedStatus);
+    }
+    final inFlight = _statusRequest;
+    if (!forceRefresh && inFlight != null) return inFlight;
+
+    final request = _fetchStatus(cacheEpoch: _statusCacheEpoch);
+    _statusRequest = request;
+    return request.whenComplete(() {
+      if (identical(_statusRequest, request)) _statusRequest = null;
+    });
+  }
+
+  Future<PremiumStatus> _fetchStatus({required int cacheEpoch}) async {
     try {
       final response = await _dio.get('/api/premium/me');
       if (response.statusCode == 200 && response.data != null) {
-        return PremiumStatus(
+        final status = PremiumStatus(
           premium: response.data['premium'] == true,
           maxResolution: response.data['maxResolution'] as String? ?? '1080p',
           premiumUntil: response.data['premiumUntil'] as String?,
         );
+        if (cacheEpoch == _statusCacheEpoch) {
+          _cachedStatus = status;
+          _statusCachedAt = DateTime.now();
+        }
+        return status;
       }
     } catch (e) {
       _logger.e('Error fetching premium status: $e');
@@ -108,6 +136,15 @@ class PremiumService {
       premium: false,
       maxResolution: '1080p',
     ); // Fail closed to the free ceiling.
+  }
+
+  /// Clear account-specific entitlement data on sign-in/sign-out so the
+  /// next user always receives a fresh server decision.
+  void invalidateStatusCache() {
+    _statusCacheEpoch++;
+    _cachedStatus = null;
+    _statusCachedAt = null;
+    _statusRequest = null;
   }
 
   /// Lists plans and their price for the authenticated user. The server

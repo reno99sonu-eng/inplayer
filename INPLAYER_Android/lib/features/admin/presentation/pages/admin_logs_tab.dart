@@ -15,12 +15,41 @@ import '../widgets/admin_common.dart';
 /// /api/admin/bug-reports) grouped into one section since all three are
 /// "what went wrong / who did what."
 class AdminLogsTab extends StatelessWidget {
-  const AdminLogsTab({super.key});
+  const AdminLogsTab({
+    super.key,
+    this.canViewAudit = true,
+    this.canViewErrors = true,
+    this.canViewBugs = true,
+    this.canManage = true,
+  });
+
+  final bool canViewAudit;
+  final bool canViewErrors;
+  final bool canViewBugs;
+  final bool canManage;
 
   @override
   Widget build(BuildContext context) {
+    final tabs = <Tab>[];
+    final views = <Widget>[];
+    if (canViewAudit) {
+      tabs.add(const Tab(text: 'Audit'));
+      views.add(const _AuditLogsView());
+    }
+    if (canViewErrors) {
+      tabs.add(const Tab(text: 'Errors'));
+      views.add(_ErrorLogsView(canManage: canManage));
+    }
+    if (canViewBugs) {
+      tabs.add(const Tab(text: 'Bug reports'));
+      views.add(_BugReportsView(canManage: canManage));
+    }
+    if (tabs.isEmpty) {
+      return const Center(child: Text('No diagnostic sections are available.'));
+    }
+
     return DefaultTabController(
-      length: 3,
+      length: tabs.length,
       child: Column(
         children: [
           Container(
@@ -29,12 +58,10 @@ class AdminLogsTab extends StatelessWidget {
               indicatorColor: AppColors.brandOrange,
               labelColor: AppColors.brandOrange,
               unselectedLabelColor: context.textSecondary,
-              tabs: const [Tab(text: 'Audit'), Tab(text: 'Errors'), Tab(text: 'Bug reports')],
+              tabs: tabs,
             ),
           ),
-          const Expanded(
-            child: TabBarView(children: [_AuditLogsView(), _ErrorLogsView(), _BugReportsView()]),
-          ),
+          Expanded(child: TabBarView(children: views)),
         ],
       ),
     );
@@ -115,7 +142,9 @@ class _AuditLogsViewState extends ConsumerState<_AuditLogsView> {
 }
 
 class _ErrorLogsView extends ConsumerStatefulWidget {
-  const _ErrorLogsView();
+  const _ErrorLogsView({this.canManage = true});
+
+  final bool canManage;
 
   @override
   ConsumerState<_ErrorLogsView> createState() => _ErrorLogsViewState();
@@ -177,17 +206,18 @@ class _ErrorLogsViewState extends ConsumerState<_ErrorLogsView> {
 
     return Column(
       children: [
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          child: Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: _clearAll,
-              style: TextButton.styleFrom(foregroundColor: AppColors.error),
-              child: const Text('Clear all'),
+        if (widget.canManage)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: _clearAll,
+                style: TextButton.styleFrom(foregroundColor: AppColors.error),
+                child: const Text('Clear all'),
+              ),
             ),
           ),
-        ),
         Expanded(
           child: RefreshIndicator(
             color: AppColors.brandOrange,
@@ -205,10 +235,12 @@ class _ErrorLogsViewState extends ConsumerState<_ErrorLogsView> {
                     '${log.kind} • ${log.pathname} • ${formatTimeAgo(log.createdAt)}',
                     style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 11),
                   ),
-                  trailing: IconButton(
-                    icon: const Icon(Icons.delete_outline, color: AppColors.textSecondaryDark, size: 18),
-                    onPressed: () => _delete(log, index),
-                  ),
+                  trailing: widget.canManage
+                      ? IconButton(
+                          icon: const Icon(Icons.delete_outline, color: AppColors.textSecondaryDark, size: 18),
+                          onPressed: () => _delete(log, index),
+                        )
+                      : null,
                 );
               },
             ),
@@ -220,7 +252,9 @@ class _ErrorLogsViewState extends ConsumerState<_ErrorLogsView> {
 }
 
 class _BugReportsView extends ConsumerStatefulWidget {
-  const _BugReportsView();
+  const _BugReportsView({this.canManage = true});
+
+  final bool canManage;
 
   @override
   ConsumerState<_BugReportsView> createState() => _BugReportsViewState();
@@ -286,42 +320,54 @@ class _BugReportsViewState extends ConsumerState<_BugReportsView> {
                   Text('Reporter: ${report.reporterUsername != null ? '@${report.reporterUsername}' : report.reporterEmail}',
                       style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 11)),
                 const SizedBox(height: 12),
-                Wrap(
-                  spacing: 6,
-                  children: ['open', 'in_progress', 'resolved']
-                      .map((s) => ChoiceChip(
-                            label: Text(s.replaceAll('_', ' ')),
-                            selected: status == s,
-                            onSelected: (_) => setDialogState(() => status = s),
-                            backgroundColor: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-                            selectedColor: AppColors.brandOrange.withValues(alpha: 0.25),
-                            labelStyle: TextStyle(color: status == s ? AppColors.brandOrange : context.textSecondary, fontSize: 11),
-                            side: BorderSide.none,
-                          ))
-                      .toList(),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: notesController,
-                  maxLines: 3,
-                  style: const TextStyle(color: AppColors.textPrimaryDark),
-                  decoration: const InputDecoration(hintText: 'Admin notes', hintStyle: TextStyle(color: AppColors.textSecondaryDark)),
-                ),
+                if (widget.canManage)
+                  Wrap(
+                    spacing: 6,
+                    children: ['open', 'in_progress', 'resolved']
+                        .map((s) => ChoiceChip(
+                              label: Text(s.replaceAll('_', ' ')),
+                              selected: status == s,
+                              onSelected: (_) => setDialogState(() => status = s),
+                              backgroundColor: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+                              selectedColor: AppColors.brandOrange.withValues(alpha: 0.25),
+                              labelStyle: TextStyle(color: status == s ? AppColors.brandOrange : context.textSecondary, fontSize: 11),
+                              side: BorderSide.none,
+                            ))
+                        .toList(),
+                  )
+                else
+                  Text('Status: ${report.status.replaceAll('_', ' ')}', style: TextStyle(color: context.textSecondary)),
+                if (widget.canManage) ...[
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: notesController,
+                    maxLines: 3,
+                    style: const TextStyle(color: AppColors.textPrimaryDark),
+                    decoration: const InputDecoration(hintText: 'Admin notes', hintStyle: TextStyle(color: AppColors.textSecondaryDark)),
+                  ),
+                ] else if ((report.adminNotes ?? '').isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  Text('Admin notes: ${report.adminNotes}', style: TextStyle(color: context.textSecondary)),
+                ],
               ],
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('Cancel')),
             TextButton(
-              onPressed: () => Navigator.of(context).pop(true),
-              style: TextButton.styleFrom(foregroundColor: AppColors.brandOrange),
-              child: const Text('Save'),
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text(widget.canManage ? 'Cancel' : 'Close'),
             ),
+            if (widget.canManage)
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: TextButton.styleFrom(foregroundColor: AppColors.brandOrange),
+                child: const Text('Save'),
+              ),
           ],
         ),
       ),
     );
-    if (result != true) return;
+    if (!widget.canManage || result != true) return;
     final ok = await ref.read(adminServiceProvider).updateBugReportStatus(report.reportId, status, adminNotes: notesController.text.trim());
     if (!mounted) return;
     if (ok) {

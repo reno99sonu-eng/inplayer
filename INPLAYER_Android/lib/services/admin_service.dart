@@ -27,6 +27,73 @@ final adminServiceProvider = Provider<AdminService>((ref) {
   return AdminService();
 });
 
+/// Identity and permissions returned by the same `/api/admin/me` check the
+/// website uses. Server routes still perform their own authorization checks.
+class AdminAccess {
+  final bool isAdmin;
+  final bool isMainAdmin;
+  final String? email;
+  final Set<String> permissions;
+  final bool verificationFailed;
+
+  const AdminAccess({
+    this.isAdmin = false,
+    this.isMainAdmin = false,
+    this.email,
+    this.permissions = const {},
+    this.verificationFailed = false,
+  });
+
+  bool can(String permission) => isMainAdmin || permissions.contains(permission);
+
+  factory AdminAccess.fromJson(Map<String, dynamic> json) {
+    return AdminAccess(
+      isAdmin: json['isAdmin'] == true,
+      isMainAdmin: json['isMainAdmin'] == true,
+      email: json['email'] is String ? json['email'] as String : null,
+      permissions: (json['permissions'] as List? ?? [])
+          .whereType<String>()
+          .toSet(),
+    );
+  }
+}
+
+class AdminStuckProcessingVideo {
+  final String videoId;
+  final String title;
+  final String uploaderName;
+  final String contentType;
+  final String uploadedAt;
+  final int stuckHours;
+
+  const AdminStuckProcessingVideo({
+    required this.videoId,
+    required this.title,
+    required this.uploaderName,
+    required this.contentType,
+    required this.uploadedAt,
+    required this.stuckHours,
+  });
+
+  factory AdminStuckProcessingVideo.fromJson(Map<String, dynamic> json) {
+    return AdminStuckProcessingVideo(
+      videoId: json['videoId']?.toString() ?? '',
+      title: json['title']?.toString() ?? 'Untitled',
+      uploaderName: json['uploaderName']?.toString() ?? 'Unknown',
+      contentType: json['contentType']?.toString() ?? 'video',
+      uploadedAt: json['uploadedAt']?.toString() ?? '',
+      stuckHours: (json['stuckHours'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+class AdminStuckProcessingResult {
+  final List<AdminStuckProcessingVideo> videos;
+  final String? error;
+
+  const AdminStuckProcessingResult({required this.videos, this.error});
+}
+
 /// Full admin API surface — extended across several rounds. Round 7 covered
 /// Dashboard/Users/Moderation; this round ("finish whole admin panel")
 /// wires up everything else read from the website's app/api/admin/* routes:
@@ -43,16 +110,73 @@ class AdminService {
 
   // ── Access gate / Dashboard (Round 7) ────────────────────────────────
 
-  /// GET /api/admin/me — the ONLY way a client can find out whether the
-  /// signed-in account is an admin (the real admin allowlist is a
-  /// server-only env var). Never reveals the allowlist itself, only
-  /// whether the caller is on it.
-  Future<bool> checkIsAdmin() async {
+  /// GET /api/admin/me — the source of truth for admin identity and scoped
+  /// team permissions. The server keeps the main-admin allowlist private and
+  /// returns only the caller's role and granted permissions.
+  Future<AdminAccess> getAccess() async {
     try {
       final response = await _dio.get('${ApiConstants.admin}/me');
-      return response.statusCode == 200 && response.data is Map && response.data['isAdmin'] == true;
+      if (response.statusCode == 200 && response.data is Map) {
+        return AdminAccess.fromJson(
+          Map<String, dynamic>.from(response.data as Map),
+        );
+      }
+      _logger.w('Admin identity check returned ${response.statusCode}.');
+      return const AdminAccess(verificationFailed: true);
     } catch (e) {
       _logger.e('Error checking admin status: $e');
+      return const AdminAccess(verificationFailed: true);
+    }
+  }
+
+  Future<bool> checkIsAdmin() async => (await getAccess()).isAdmin;
+
+  /// Team-scoped route already used by the website's Stuck Uploads page.
+  Future<AdminStuckProcessingResult> getStuckProcessingVideos() async {
+    try {
+      final response = await _dio.get(
+        '${ApiConstants.admin}/videos/stuck-processing',
+      );
+      if (response.statusCode == 200 && response.data is Map) {
+        final data = response.data as Map;
+        final videos = (data['videos'] as List? ?? [])
+            .whereType<Map>()
+            .map((item) => AdminStuckProcessingVideo.fromJson(
+                  Map<String, dynamic>.from(item),
+                ))
+            .where((video) => video.videoId.isNotEmpty)
+            .toList();
+        return AdminStuckProcessingResult(videos: videos);
+      }
+      final error = response.data is Map
+          ? (response.data['error']?.toString() ?? '')
+          : '';
+      return AdminStuckProcessingResult(
+        videos: const [],
+        error: error.isNotEmpty
+            ? error
+            : 'Could not load stuck uploads (HTTP ${response.statusCode}).',
+      );
+    } catch (e) {
+      _logger.e('Error fetching stuck-processing videos: $e');
+      return const AdminStuckProcessingResult(
+        videos: [],
+        error: 'Could not load stuck uploads. Check your connection and retry.',
+      );
+    }
+  }
+
+  Future<bool> deleteStuckProcessingVideo(String videoId) async {
+    try {
+      final response = await _dio.delete(
+        '${ApiConstants.admin}/videos/stuck-processing',
+        queryParameters: {'videoId': videoId},
+      );
+      return response.statusCode == 200 &&
+          response.data is Map &&
+          response.data['success'] == true;
+    } catch (e) {
+      _logger.e('Error deleting stuck-processing video: $e');
       return false;
     }
   }

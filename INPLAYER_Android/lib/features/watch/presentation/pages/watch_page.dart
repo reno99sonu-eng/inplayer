@@ -121,6 +121,7 @@ class _WatchPageState extends ConsumerState<WatchPage>
   String _adBreakType = 'midroll'; // 'preroll', 'midroll', 'postroll'
   bool _prerollShown = false;
   bool _postrollShown = false;
+  bool _adoptingExistingPlayback = false;
   bool _isPremium = false;
   int _midrollCountdown = 0;
   final Stopwatch _midrollElapsed = Stopwatch();
@@ -212,6 +213,9 @@ class _WatchPageState extends ConsumerState<WatchPage>
     // finished let the main video start first and showed the pre-roll only
     // after the ad-config request eventually came back.
     _midrollConfigLoadFuture = _loadMidrollConfig();
+    _adoptingExistingPlayback = widget.adoptController != null ||
+        ref.read(videoMiniPlayerServiceProvider).video?.videoId ==
+            widget.videoId;
     _loadVideo();
   }
 
@@ -682,6 +686,10 @@ class _WatchPageState extends ConsumerState<WatchPage>
         _postrollShown = false;
         _midrollPlaybackStartPosition = null;
         _finishMidroll('reset');
+        // If the feed already prefetched the house creative, begin the
+        // pre-roll as soon as this video's metadata is known. The ad overlay
+        // can render while ExoPlayer initializes the content stream below.
+        _maybeTriggerPreroll();
       }
 
       // Adopt an already-playing controller either explicitly (re-expanding
@@ -1886,43 +1894,67 @@ class _WatchPageState extends ConsumerState<WatchPage>
   Future<void> _openFullscreen() async {
     if (_videoController == null || _inFullscreen || _inPip) return;
     _inFullscreen = true;
-    final route = MaterialPageRoute<void>(
-      builder: (_) => FullscreenPlayerPage(
-        getController: () => _videoController!,
-        getMediaSurface: _buildMediaSurface,
-        getDisplayAspectRatio: () => _playerBoxAspect,
-        title: _video?.title ?? '',
-        getQualityLabel: () => _qualityLabel,
-        qualityOptions: _availableQualityOptions,
-        onQualityChange: _switchQuality,
-        captionLanguages: _captionLanguages,
-        getSelectedCaptionLang: () => _selectedCaptionLang,
-        getCaptionCues: () => _captionCues,
-        onCaptionLanguageChange: _selectCaptionLanguage,
-        pipSupported: _pipSupported,
-        onPipTapped: _enterPip,
-        // Brightness lives on this page (see _playerBrightness), because
-        // this page owns the media surface both players render. A getter
-        // rather than a plain value so fullscreen opens at whatever the
-        // inline player was last set to.
-        getBrightness: () => _playerBrightness,
-        onBrightnessChanged: (v) {
-          if (mounted) setState(() => _playerBrightness = v);
-        },
-        getAdOverlay: () => _midrollBreakActive && _currentMidrollAd != null
-            ? _buildMidrollOverlay()
-            : null,
-        adListenable: _adStateRevision,
-      ),
-    );
-    _fullscreenRoute = route;
-    await Navigator.of(context).push(route);
-    _fullscreenRoute = null;
-    _inFullscreen = false;
-    // A quality change made while fullscreen was open swaps _videoController
-    // to a new instance (see _switchQuality) — refresh so the inline player
-    // picks it up too once back here.
-    if (mounted) setState(() {});
+    try {
+      // Complete the Android orientation request before creating the
+      // fullscreen route. Previously this was fire-and-forget in the child
+      // route, so the player could remain in portrait or rotate after its
+      // fullscreen layout had already been calculated.
+      await SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+      await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+      if (!mounted || _inPip) return;
+
+      final route = MaterialPageRoute<void>(
+        builder: (_) => FullscreenPlayerPage(
+          getController: () => _videoController!,
+          getMediaSurface: _buildMediaSurface,
+          getDisplayAspectRatio: () => _playerBoxAspect,
+          title: _video?.title ?? '',
+          getQualityLabel: () => _qualityLabel,
+          qualityOptions: _availableQualityOptions,
+          onQualityChange: _switchQuality,
+          captionLanguages: _captionLanguages,
+          getSelectedCaptionLang: () => _selectedCaptionLang,
+          getCaptionCues: () => _captionCues,
+          onCaptionLanguageChange: _selectCaptionLanguage,
+          pipSupported: _pipSupported,
+          onPipTapped: _enterPip,
+          // Brightness lives on this page (see _playerBrightness), because
+          // this page owns the media surface both players render. A getter
+          // rather than a plain value so fullscreen opens at whatever the
+          // inline player was last set to.
+          getBrightness: () => _playerBrightness,
+          onBrightnessChanged: (v) {
+            if (mounted) setState(() => _playerBrightness = v);
+          },
+          getAdOverlay: () => _midrollBreakActive && _currentMidrollAd != null
+              ? _buildMidrollOverlay()
+              : null,
+          adListenable: _adStateRevision,
+        ),
+      );
+      _fullscreenRoute = route;
+      await Navigator.of(context).push(route);
+    } catch (error) {
+      _logger.w('Could not open landscape video player: $error');
+    } finally {
+      _fullscreenRoute = null;
+      _inFullscreen = false;
+      // Restore automatic device rotation only after the fullscreen route is
+      // gone. This also runs when PiP or system Back removes that route.
+      try {
+        await SystemChrome.setPreferredOrientations([]);
+        await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      } catch (error) {
+        _logger.w('Could not restore app orientation after fullscreen: $error');
+      }
+      // A quality change made while fullscreen was open swaps
+      // _videoController to a new instance (see _switchQuality) — refresh so
+      // the inline player picks it up too once back here.
+      if (mounted) setState(() {});
+    }
   }
 
   /// Hands the live, already-playing controller off to the app-wide
@@ -2034,21 +2066,25 @@ class _WatchPageState extends ConsumerState<WatchPage>
   }
 
   void _maybeTriggerPreroll() {
-    if (_prerollShown || _isPremium || _midrollBreakActive) return;
+    if (_prerollShown ||
+        _adoptingExistingPlayback ||
+        _isPremium ||
+        _midrollBreakActive) {
+      return;
+    }
     final config = _midrollConfig;
     final ad = _currentMidrollAd;
-    final controller = _videoController;
     if (config == null ||
         !config.enabled ||
         ad == null ||
         _video == null ||
-        _video!.isStrictMusic ||
-        !_isInitialized ||
-        controller == null ||
-        !controller.value.isInitialized) {
+        _video!.isStrictMusic) {
       return;
     }
 
+    // Pre-roll playback is independent of the main stream controller. Waiting
+    // for that stream to initialize added its full network-buffering delay
+    // before viewers saw the ad that should precede it.
     _prerollShown = true;
     _triggerAdBreak('preroll', triggerKey: 0);
   }

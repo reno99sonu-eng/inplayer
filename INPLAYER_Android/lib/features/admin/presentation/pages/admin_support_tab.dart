@@ -7,7 +7,9 @@ import '../../../../models/admin_support_ticket.dart';
 import '../../../../services/admin_service.dart';
 
 class AdminSupportTab extends ConsumerStatefulWidget {
-  const AdminSupportTab({super.key});
+  const AdminSupportTab({super.key, this.readOnly = false});
+
+  final bool readOnly;
 
   @override
   ConsumerState<AdminSupportTab> createState() => _AdminSupportTabState();
@@ -377,7 +379,9 @@ class _AdminSupportTabState extends ConsumerState<AdminSupportTab> {
                 ],
               ),
               GestureDetector(
-                onTap: () => _changeTicketStatus(ticket),
+                onTap: widget.readOnly
+                    ? null
+                    : () => _changeTicketStatus(ticket),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(

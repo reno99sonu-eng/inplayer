@@ -34,6 +34,10 @@ final adServiceProvider = Provider<AdService>((ref) {
 class AdService {
   final _dio = DioClient().dio;
   final _logger = Logger();
+  static const _midrollCacheTtl = Duration(seconds: 30);
+  MidrollConfig? _cachedMidrollConfig;
+  DateTime? _midrollConfigCachedAt;
+  Future<MidrollConfig?>? _midrollConfigRequest;
 
   /// Returns the first real house creative for a placement, or null when
   /// the slot is off, AdSense-only, or has nothing active right now.
@@ -63,7 +67,26 @@ class AdService {
 
   /// Fetches the mid-roll advertising configuration and creatives from the backend.
   /// Returns null or disabled config if midrolls are turned off in platform settings.
-  Future<MidrollConfig?> getMidrollConfig() async {
+  Future<MidrollConfig?> getMidrollConfig({bool forceRefresh = false}) {
+    final cachedAt = _midrollConfigCachedAt;
+    if (!forceRefresh &&
+        cachedAt != null &&
+        DateTime.now().difference(cachedAt) < _midrollCacheTtl) {
+      return Future.value(_cachedMidrollConfig);
+    }
+    final inFlight = _midrollConfigRequest;
+    if (!forceRefresh && inFlight != null) return inFlight;
+
+    final request = _fetchMidrollConfig();
+    _midrollConfigRequest = request;
+    return request.whenComplete(() {
+      if (identical(_midrollConfigRequest, request)) {
+        _midrollConfigRequest = null;
+      }
+    });
+  }
+
+  Future<MidrollConfig?> _fetchMidrollConfig() async {
     try {
       // The Android app serves only creatives created in Admin > Advertising.
       // Paid sponsorship creatives share the backend table, so the source
@@ -73,7 +96,12 @@ class AdService {
         queryParameters: {'source': 'house'},
       );
       if (response.statusCode == 200 && response.data is Map) {
-        return MidrollConfig.fromJson(Map<String, dynamic>.from(response.data as Map));
+        final config = MidrollConfig.fromJson(
+          Map<String, dynamic>.from(response.data as Map),
+        );
+        _cachedMidrollConfig = config;
+        _midrollConfigCachedAt = DateTime.now();
+        return config;
       }
     } catch (e) {
       _logger.e('Error fetching midroll config: $e');

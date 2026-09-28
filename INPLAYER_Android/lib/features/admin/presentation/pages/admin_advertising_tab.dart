@@ -16,12 +16,30 @@ import '../widgets/admin_common.dart';
 /// buttons (POST /api/admin/ai-ad-generate, /api/admin/ai-navbar-theme-
 /// generate) are deliberately left out here; see the Round 8 project doc.
 class AdminAdvertisingTab extends StatelessWidget {
-  const AdminAdvertisingTab({super.key});
+  const AdminAdvertisingTab({
+    super.key,
+    this.canManageAds = true,
+    this.canManageNavbarTheme = true,
+  });
+
+  final bool canManageAds;
+  final bool canManageNavbarTheme;
 
   @override
   Widget build(BuildContext context) {
+    final tabs = <Tab>[];
+    final views = <Widget>[];
+    if (canManageAds) {
+      tabs.addAll(const [Tab(text: 'Ads'), Tab(text: 'Mid-roll')]);
+      views.addAll(const [_AdsView(), _MidrollView()]);
+    }
+    if (canManageNavbarTheme) {
+      tabs.add(const Tab(text: 'Navbar Theme'));
+      views.add(const _NavbarThemeView());
+    }
+
     return DefaultTabController(
-      length: 3,
+      length: tabs.length,
       child: Column(
         children: [
           Container(
@@ -30,12 +48,10 @@ class AdminAdvertisingTab extends StatelessWidget {
               indicatorColor: AppColors.brandOrange,
               labelColor: AppColors.brandOrange,
               unselectedLabelColor: context.textSecondary,
-              tabs: const [Tab(text: 'Ads'), Tab(text: 'Mid-roll'), Tab(text: 'Navbar Theme')],
+              tabs: tabs,
             ),
           ),
-          const Expanded(
-            child: TabBarView(children: [_AdsView(), _MidrollView(), _NavbarThemeView()]),
-          ),
+          Expanded(child: TabBarView(children: views)),
         ],
       ),
     );

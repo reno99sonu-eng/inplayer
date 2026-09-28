@@ -7,10 +7,19 @@ import '../../../../services/admin_service.dart';
 import '../../../../models/moderation_item.dart';
 
 class AdminModerationTab extends StatelessWidget {
-  const AdminModerationTab({super.key});
+  const AdminModerationTab({
+    super.key,
+    this.reportsOnly = false,
+    this.readOnly = false,
+  });
+
+  final bool reportsOnly;
+  final bool readOnly;
 
   @override
   Widget build(BuildContext context) {
+    if (reportsOnly) return const _ReportsView(readOnly: true);
+
     return DefaultTabController(
       length: 3,
       child: Column(
@@ -28,10 +37,10 @@ class AdminModerationTab extends StatelessWidget {
               ],
             ),
           ),
-          const Expanded(
+          Expanded(
             child: TabBarView(
               children: [
-                _ReportsView(),
+                _ReportsView(readOnly: readOnly),
                 _AutoFlaggedView(),
                 _StrikesView(),
               ],
@@ -50,7 +59,9 @@ void _showSnack(BuildContext context, String message) {
 }
 
 class _ReportsView extends ConsumerStatefulWidget {
-  const _ReportsView();
+  const _ReportsView({required this.readOnly});
+
+  final bool readOnly;
 
   @override
   ConsumerState<_ReportsView> createState() => _ReportsViewState();
@@ -141,10 +152,12 @@ class _ReportsViewState extends ConsumerState<_ReportsView> {
               'Reason: ${r.reason.replaceAll('_', ' ')} • ${formatTimeAgo(r.createdAt)}',
               style: const TextStyle(color: AppColors.textSecondaryDark, fontSize: 12),
             ),
-            trailing: TextButton(
-              onPressed: () => _resolve(r, index),
-              child: const Text('Resolve'),
-            ),
+            trailing: widget.readOnly
+                ? const Icon(Icons.visibility_outlined, color: AppColors.textSecondaryDark)
+                : TextButton(
+                    onPressed: () => _resolve(r, index),
+                    child: const Text('Resolve'),
+                  ),
           );
         },
       ),

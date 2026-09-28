@@ -76,7 +76,7 @@ class _PlansPurchasesPageState extends ConsumerState<PlansPurchasesPage> {
     setState(() => _loading = true);
     try {
       final results = await Future.wait<Object>([
-        ref.read(premiumServiceProvider).getStatus(),
+        ref.read(premiumServiceProvider).getStatus(forceRefresh: true),
         ref.read(premiumServiceProvider).getPlans(),
       ]);
       if (!mounted) return;
@@ -154,7 +154,9 @@ class _PlansPurchasesPageState extends ConsumerState<PlansPurchasesPage> {
 
     for (var attempt = 0; attempt < 12; attempt++) {
       await Future<void>.delayed(const Duration(seconds: 2));
-      final status = await ref.read(premiumServiceProvider).getStatus();
+      final status = await ref
+          .read(premiumServiceProvider)
+          .getStatus(forceRefresh: true);
       if (status.premium) {
         if (!mounted) return;
         setState(() {

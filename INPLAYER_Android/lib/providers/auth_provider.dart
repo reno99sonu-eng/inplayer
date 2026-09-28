@@ -1,19 +1,26 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../core/network/dio_client.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
+import '../services/premium_service.dart';
 
 final authStateProvider = StateNotifierProvider<AuthNotifier, AuthState>((ref) {
-  return AuthNotifier(ref.read(authServiceProvider));
+  return AuthNotifier(
+    ref.read(authServiceProvider),
+    ref.read(premiumServiceProvider),
+  );
 });
 
 class AuthNotifier extends StateNotifier<AuthState> {
   final AuthService _authService;
+  final PremiumService _premiumService;
   final _logger = Logger();
   static const _cachedNameKey = 'inplayer:cached_user_name';
 
-  AuthNotifier(this._authService) : super(const AuthState.initial()) {
+  AuthNotifier(this._authService, this._premiumService)
+    : super(const AuthState.initial()) {
     _init();
   }
 
@@ -41,11 +48,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
         final user = await _authService.getCurrentUser();
         if (user != null) {
           await _cacheDisplayName(user);
+          DioClient().invalidateAuthCache();
+          _premiumService.invalidateStatusCache();
           state = AuthState.authenticated(user);
         } else {
+          _premiumService.invalidateStatusCache();
           state = const AuthState.unauthenticated();
         }
       } else {
+        _premiumService.invalidateStatusCache();
         state = const AuthState.unauthenticated();
       }
     } catch (e) {
@@ -61,6 +72,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         return _attemptInit(retriesLeft: retriesLeft - 1);
       }
       _logger.e('Error initializing auth: $e');
+      _premiumService.invalidateStatusCache();
       state = const AuthState.unauthenticated();
     }
   }
@@ -71,6 +83,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final result = await _authService.signIn(email: email, password: password);
 
     if (result.success && result.user != null) {
+      DioClient().invalidateAuthCache();
+      _premiumService.invalidateStatusCache();
       try {
         await _cacheDisplayName(result.user!);
       } catch (e) {
@@ -98,6 +112,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     final result = await _authService.signInWithGoogle();
 
     if (result.success && result.user != null) {
+      DioClient().invalidateAuthCache();
+      _premiumService.invalidateStatusCache();
       try {
         await _cacheDisplayName(result.user!);
       } catch (e) {
@@ -163,6 +179,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> signOut() async {
+    DioClient().invalidateAuthCache();
+    _premiumService.invalidateStatusCache();
     state = const AuthState.loading();
 
     try {
@@ -179,6 +197,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// that locally instead of calling _authService.signOut() again, which
   /// would fail against a session that's already gone.
   void setUnauthenticated() {
+    DioClient().invalidateAuthCache();
+    _premiumService.invalidateStatusCache();
     state = const AuthState.unauthenticated();
   }
 
@@ -231,6 +251,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         code: code,
         newPassword: newPassword,
       );
+      _premiumService.invalidateStatusCache();
       state = const AuthState.unauthenticated();
     } catch (e) {
       // Same swallow as resetPassword above, and worse here: a wrong or

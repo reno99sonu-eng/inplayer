@@ -113,10 +113,43 @@ class DioClient {
           _logger.d('Request: ${options.method} ${options.uri}');
           return handler.next(options);
         },
-        onResponse: (response, handler) {
+        onResponse: (response, handler) async {
+          // A cached Cognito ID token can expire between requests. Refresh
+          // it once and retry so authenticated APIs do not become empty
+          // after a long-running app session.
+          final requestOptions = response.requestOptions;
+          final authorization = requestOptions.headers['Authorization'];
+          if (response.statusCode == 401 &&
+              requestOptions.extra['authRefreshRetried'] != true &&
+              authorization is String &&
+              authorization.startsWith('Bearer ') &&
+              authorization.length > 7) {
+            requestOptions.extra['authRefreshRetried'] = true;
+            try {
+              final freshToken = await _fetchIdToken(forceRefresh: true);
+              if (freshToken != null && freshToken.isNotEmpty) {
+                requestOptions.headers['Authorization'] = 'Bearer $freshToken';
+                final retried = await _dio.fetch<dynamic>(requestOptions);
+                handler.resolve(retried);
+                return;
+              }
+            } catch (e) {
+              _logger.w('401 retry with refreshed ID token failed: $e');
+            }
+          }
+
           _logger.d(
             'Response: ${response.statusCode} ${response.requestOptions.uri}',
           );
+          if (response.statusCode != null && response.statusCode! >= 400) {
+            final errorMessage = response.data is Map
+                ? (response.data['error']?.toString() ?? '')
+                : '';
+            _logger.w(
+              'API returned ${response.statusCode} for '
+              '${requestOptions.method} ${requestOptions.uri}: $errorMessage',
+            );
+          }
           return handler.next(response);
         },
         onError: (error, handler) {
@@ -129,6 +162,26 @@ class DioClient {
 
   Dio get dio => _dio;
 
+  Future<String?> _fetchIdToken({bool forceRefresh = false}) async {
+    final authSession = await Amplify.Auth.fetchAuthSession(
+      options: forceRefresh
+          ? const FetchAuthSessionOptions(forceRefresh: true)
+          : null,
+    );
+    final token = authSession is CognitoAuthSession
+        ? authSession.userPoolTokensResult.valueOrNull?.idToken.raw
+        : null;
+    _cachedIdToken = token;
+    _authCacheTime = DateTime.now();
+    return token;
+  }
+
+  /// Drop a previous session's cached ID token after an account change.
+  void invalidateAuthCache() {
+    _cachedIdToken = null;
+    _authCacheTime = null;
+  }
+
   void setCachedAudience(String? audience) {
     _cachedAudience = audience;
     _audienceCacheTime = DateTime.now();
@@ -139,11 +192,13 @@ class DioClient {
   // every request) — kept only in case something still calls them.
   Future<void> setAuthToken(String token) async {
     await _storage.write(key: 'auth_token', value: token);
+    invalidateAuthCache();
   }
 
   Future<void> clearAuthTokens() async {
     await _storage.delete(key: 'auth_token');
     await _storage.delete(key: 'refresh_token');
+    invalidateAuthCache();
   }
 
   Future<String?> getAuthToken() async {

@@ -6,10 +6,9 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/image_utils.dart';
 import '../../../../models/video.dart';
 
-/// Horizontal "Music" shelf — square album-art style cards for videos
-/// flagged Video.isMusic (contentType == 'music' or category == 'music',
-/// see Video.fromJson). Derived from the already-fetched home feed list,
-/// same source KidsRow uses, so no extra network round trip.
+/// Horizontal "Music" shelf — square album-art cards for explicit Music
+/// uploads only. Derived from the already-fetched home feed list, so there
+/// is no extra network round trip.
 class MusicRow extends StatelessWidget {
   final List<Video> videos;
 
@@ -17,7 +16,8 @@ class MusicRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    if (videos.isEmpty) return const SizedBox.shrink();
+    final musicTracks = videos.where((video) => video.isStrictMusic).toList();
+    if (musicTracks.isEmpty) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -46,8 +46,9 @@ class MusicRow extends StatelessWidget {
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             padding: const EdgeInsets.symmetric(horizontal: 16),
-            itemCount: videos.length,
-            itemBuilder: (context, index) => _buildCard(context, videos[index]),
+            itemCount: musicTracks.length,
+            itemBuilder: (context, index) =>
+                _buildCard(context, musicTracks[index]),
           ),
         ),
       ],

@@ -3,7 +3,7 @@ description: "INPLAYER Android Application"
 
 publish_to: "none"
 
-version: 1.0.10+20
+version: 1.0.12+22
 
 environment:
   sdk: ^3.12.2
@@ -263,15 +263,7 @@ flutter_launcher_icons:
   android: "ic_launcher"
   image_path: "assets/images/app_icon.png"
   min_sdk_android: 21
-  # Adaptive icon (Android 8+, API 26+) — same logo, split into a solid
-  # background + a foreground layer padded into the safe zone, so it
-  # doesn't get clipped by circle/squircle/rounded-square launcher masks
-  # the way the old edge-to-edge single-layer icon did. The mipmap PNGs +
-  # XML this generates were also hand-regenerated once already this round
-  # (android/app/src/main/res/mipmap-*/ic_launcher*.png +
-  # mipmap-anydpi-v26/ic_launcher.xml) since there's no Flutter SDK in this
-  # environment to run this package's generator — re-running
-  # `flutter pub run flutter_launcher_icons:main` after any future icon
-  # change will regenerate the same files from this config.
-  adaptive_icon_background: "#05070D"
+  # Use the Play Store tile for older launchers and the matching transparent
+  # logo over a white background for adaptive launcher icons.
+  adaptive_icon_background: "#FFFFFF"
   adaptive_icon_foreground: "assets/images/app_icon_foreground.png"

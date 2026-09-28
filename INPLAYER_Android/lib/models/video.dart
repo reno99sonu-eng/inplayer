@@ -90,15 +90,10 @@ class Video {
       category.toLowerCase().contains('raftaar') ||
       category.toLowerCase().contains('shorts');
 
-  /// The canonical music check: strictly `contentType == "music"`, matching
-  /// app/lib/contentTypes.ts's isMusicType() on the website. Use this (not
-  /// [isMusic]) anywhere content is being INCLUDED into a music-only surface
-  /// (the Music hub catalogue, the music player's autoplay queue, music
-  /// search) — [isMusic] also flips true from `category == "Music"`, which
-  /// is fine for EXCLUDING music from general video surfaces (a superset
-  /// exclusion is safe) but wrongly lets a video merely categorized "Music"
-  /// leak into music-only surfaces if used the other way around.
-  bool get isStrictMusic => contentType.toLowerCase() == 'music';
+  /// The canonical audio check: strictly `contentType == "music"`. Use it
+  /// for music feeds, audio playback and download handling; a video category
+  /// named "Music" does not change the underlying content type.
+  bool get isStrictMusic => contentType.trim().toLowerCase() == 'music';
 
   static String _resolveUrl(String url) {
     if (url.startsWith('/')) {
@@ -113,9 +108,9 @@ class Video {
         json['genre']?.toString() ??
         'Entertainment';
     final rawContentType =
-        json['contentType']?.toString().toLowerCase() ?? 'video';
-    // Strict isolation: only items uploaded explicitly as music (contentType == 'music')
-    // Ordinary videos categorized under "Music" belong in the main video library.
+        json['contentType']?.toString().trim().toLowerCase() ?? 'video';
+    // Retain the legacy/server-provided media hint. Content routing should
+    // use isStrictMusic so category labels never turn videos into audio.
     final isMusicTrack =
         rawContentType == 'music' ||
         rawContentType == 'audio' ||

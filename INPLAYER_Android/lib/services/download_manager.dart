@@ -115,7 +115,9 @@ class DownloadManager extends ChangeNotifier {
   }) async {
     if (_active.containsKey(video.videoId)) return;
 
-    final ext = fileName.contains('.') ? fileName.split('.').last : (video.isMusic ? 'm4a' : 'mp4');
+    final ext = fileName.contains('.')
+        ? fileName.split('.').last
+        : (video.isStrictMusic ? 'm4a' : 'mp4');
     final dir = await _downloadsDir();
     final savePath = '${dir.path}/${video.videoId}_$quality.$ext';
 
@@ -149,7 +151,7 @@ class DownloadManager extends ChangeNotifier {
         title: video.title,
         thumbnailUrl: video.thumbnail,
         uploaderName: video.creator,
-        isMusic: video.isMusic,
+        isMusic: video.isStrictMusic,
         quality: quality,
         filePath: savePath,
         fileSizeBytes: size,

@@ -105,23 +105,28 @@ class ShortWarmCache {
       }
       return;
     }
+    // Mark this request before the async ready-controller disposal below so
+    // two rapid warm() calls cannot start overlapping MediaCodec setups.
+    _warmingId = videoId;
     await _startWarm(videoId, url);
   }
 
   Future<void> _startWarm(String videoId, Uri url) async {
-    await _disposeReady();
-
-    _warmingId = videoId;
-    final controller = VideoPlayerController.networkUrl(
-      url,
-      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
-    );
-    _warmingController = controller;
+    final completion = Completer<void>();
+    final completionFuture = completion.future;
+    _warmingFuture = completionFuture;
+    VideoPlayerController? controller;
 
     try {
-      final initFuture = controller.initialize();
-      _warmingFuture = initFuture;
-      await initFuture;
+      await _disposeReady();
+      if (_warmingId != videoId) return;
+
+      controller = VideoPlayerController.networkUrl(
+        url,
+        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+      );
+      _warmingController = controller;
+      await controller.initialize().timeout(const Duration(seconds: 8));
 
       if (_warmingId != videoId) {
         await controller.dispose();
@@ -133,15 +138,20 @@ class ShortWarmCache {
     } catch (e) {
       debugPrint('[ShortWarmCache] warm-up failed for $videoId: $e');
       try {
-        await controller.dispose();
+        await controller?.dispose().timeout(const Duration(seconds: 2));
       } catch (_) {}
     } finally {
-      if (_warmingId == videoId) {
+      if (_warmingId == videoId &&
+          (controller == null || identical(_warmingController, controller))) {
         _warmingId = null;
         _warmingController = null;
         _warmingFuture = null;
       }
-      _drainPending();
+      // Let a waiting swipe take the ready controller before a newer queued
+      // warm-up disposes it. That keeps the currently visible short on the
+      // fast path when the viewer swipes during initialization.
+      if (!completion.isCompleted) completion.complete();
+      scheduleMicrotask(_drainPending);
     }
   }
 
@@ -153,6 +163,7 @@ class ShortWarmCache {
     if (id == null || url == null) return;
     if (_warmingId != null) return;
     if (_videoId == id && _controller != null) return;
+    _warmingId = id;
     unawaited(_startWarm(id, url));
   }
 
@@ -170,22 +181,25 @@ class ShortWarmCache {
       return controller;
     }
 
-    // 2. Controller is currently in-flight initializing
-    if (_warmingId == videoId && _warmingController != null) {
-      final controller = _warmingController;
+    // 2. Controller is currently in-flight initializing. Wait for the
+    // owner (_startWarm) to finish and publish it into the ready slot. Do
+    // not clear the in-flight fields here: _startWarm uses _warmingId to
+    // decide whether the controller is still wanted, so clearing it during
+    // this wait made _startWarm dispose the very controller this swipe was
+    // waiting to adopt.
+    if (_warmingId == videoId) {
       final future = _warmingFuture;
-      _warmingId = null;
-      _warmingController = null;
-      _warmingFuture = null;
       try {
         if (future != null) await future;
-        controller?.setLooping(true);
-        return controller;
-      } catch (e) {
-        try {
-          await controller?.dispose();
-        } catch (_) {}
+      } catch (_) {
         return null;
+      }
+
+      if (_videoId == videoId && _controller != null) {
+        final controller = _controller;
+        _controller = null;
+        _videoId = null;
+        return controller;
       }
     }
 

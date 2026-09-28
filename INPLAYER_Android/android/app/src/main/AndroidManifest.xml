@@ -44,7 +44,7 @@
          external-encoder flow it showed before. -->
     <uses-sdk tools:overrideLibrary="com.amazonaws.ivs.broadcast"/>
     <application
-        android:label="INPLAYER"
+        android:label="Inplayer"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

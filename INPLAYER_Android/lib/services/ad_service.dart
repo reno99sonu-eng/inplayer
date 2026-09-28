@@ -65,7 +65,13 @@ class AdService {
   /// Returns null or disabled config if midrolls are turned off in platform settings.
   Future<MidrollConfig?> getMidrollConfig() async {
     try {
-      final response = await _dio.get(ApiConstants.midrollAds);
+      // The Android app serves only creatives created in Admin > Advertising.
+      // Paid sponsorship creatives share the backend table, so the source
+      // selector must be explicit and confirmed by the API response.
+      final response = await _dio.get(
+        ApiConstants.midrollAds,
+        queryParameters: {'source': 'house'},
+      );
       if (response.statusCode == 200 && response.data is Map) {
         return MidrollConfig.fromJson(Map<String, dynamic>.from(response.data as Map));
       }
@@ -110,6 +116,7 @@ class MidrollAd {
 
 class MidrollConfig {
   final bool enabled;
+  final bool houseOnly;
   final int intervalSeconds;
   final List<int> skipTiersSeconds;
   final MidrollAd? ad;
@@ -117,6 +124,7 @@ class MidrollConfig {
 
   MidrollConfig({
     required this.enabled,
+    this.houseOnly = false,
     this.intervalSeconds = 120,
     this.skipTiersSeconds = const [5, 10, 15],
     this.ad,
@@ -125,7 +133,8 @@ class MidrollConfig {
 
   factory MidrollConfig.fromJson(Map<String, dynamic> json) {
     final enabled = json['enabled'] == true;
-    if (!enabled) {
+    final houseOnly = json['source'] == 'house';
+    if (!enabled || !houseOnly) {
       return MidrollConfig(enabled: false);
     }
     final adsList = <MidrollAd>[];
@@ -152,6 +161,7 @@ class MidrollConfig {
 
     return MidrollConfig(
       enabled: true,
+      houseOnly: true,
       intervalSeconds: (json['intervalSeconds'] as num?)?.toInt() ?? 120,
       skipTiersSeconds: skipTiers.isNotEmpty ? skipTiers : const [5, 10, 15],
       ad: singleAd,

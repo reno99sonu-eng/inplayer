@@ -28,7 +28,7 @@ class SplashScreenOverlay extends ConsumerStatefulWidget {
 }
 
 class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
-    with SingleTickerProviderStateMixin {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   static const _cachedNameKey = 'inplayer:cached_user_name';
 
   late final AnimationController _controller;
@@ -48,11 +48,14 @@ class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
   AudioPlayer? _audioPlayer;
   Timer? _fallbackTimer;
   bool _isVisible = true;
+  bool _splashStingStarted = false;
+  bool _splashAudioPrepared = false;
   String _displayName = '';
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _controller = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 4200),
@@ -189,18 +192,65 @@ class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
     // This only safeguards an interrupted animation; normal completion wins.
     _fallbackTimer = Timer(const Duration(milliseconds: 5000), _dismissSplash);
 
-    try {
-      _audioPlayer = AudioPlayer()..setVolume(1);
-      unawaited(
-        _audioPlayer!
-            .play(AssetSource('sounds/splash-logo-sting.mp3'))
-            .catchError((_) {}),
-      );
-    } catch (_) {
-      // The branding animation remains usable if audio hardware is occupied.
-    }
-
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) unawaited(_playSplashSting());
+    });
     _controller.forward().whenComplete(_dismissSplash);
+  }
+
+  Future<void> _playSplashSting() async {
+    if (_splashStingStarted || !mounted || !_isVisible) return;
+    _splashStingStarted = true;
+
+    final player = AudioPlayer();
+    _audioPlayer = player;
+    try {
+      await player.setAudioContext(
+        AudioContext(
+          android: const AudioContextAndroid(
+            contentType: AndroidContentType.sonification,
+            usageType: AndroidUsageType.assistanceSonification,
+            audioFocus: AndroidAudioFocus.gainTransientMayDuck,
+          ),
+        ),
+      );
+      await player.setReleaseMode(ReleaseMode.stop);
+      await player.setVolume(1.0);
+      await player.setSource(AssetSource('sounds/splash-logo-sting.mp3'));
+      _splashAudioPrepared = true;
+
+      // Prepare the bundled sound fully before starting it. Calling play()
+      // fire-and-forget from initState used to race player setup and could
+      // silently lose the first launch sound on slower devices.
+      if (!mounted || !_isVisible) {
+        await player.dispose();
+        if (identical(_audioPlayer, player)) _audioPlayer = null;
+        return;
+      }
+      if (WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
+        return;
+      }
+      await player.resume();
+    } catch (error) {
+      debugPrint('[InPlayer] Splash logo sound did not start: $error');
+    }
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (!_isVisible) return;
+
+    final player = _audioPlayer;
+    if (state == AppLifecycleState.resumed) {
+      if (_splashAudioPrepared && player != null) {
+        unawaited(player.resume());
+      } else if (!_splashStingStarted) {
+        unawaited(_playSplashSting());
+      }
+    } else if (_splashAudioPrepared && player != null) {
+      unawaited(player.pause());
+    }
   }
 
   void _triggerGeoCheck() {
@@ -281,6 +331,7 @@ class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
   void dispose() {
     _fallbackTimer?.cancel();
     _authSubscription.close();
+    WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
     unawaited(_audioPlayer?.dispose() ?? Future<void>.value());
     super.dispose();
@@ -414,7 +465,7 @@ class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
                               ),
                             ),
                           ),
-                          child: _AnimatedWordmark(
+                          child: _AnimatedAppIcon(
                             shinePosition: _shinePosition,
                           ),
                         ),
@@ -511,65 +562,93 @@ class _SplashScreenOverlayState extends ConsumerState<SplashScreenOverlay>
   }
 }
 
-class _AnimatedWordmark extends StatelessWidget {
+class _AnimatedAppIcon extends StatelessWidget {
   final Animation<double> shinePosition;
 
-  const _AnimatedWordmark({required this.shinePosition});
+  const _AnimatedAppIcon({required this.shinePosition});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.brandOrange.withValues(alpha: .28),
-            blurRadius: 34,
-            offset: const Offset(0, 4),
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(22),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.brandOrange.withValues(alpha: .28),
+                blurRadius: 34,
+                offset: const Offset(0, 4),
+              ),
+              BoxShadow(
+                color: const Color(0xFF22D3EE).withValues(alpha: .12),
+                blurRadius: 50,
+              ),
+            ],
           ),
-          BoxShadow(
-            color: const Color(0xFF22D3EE).withValues(alpha: .12),
-            blurRadius: 50,
-          ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(16),
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            Image.asset(
-              'assets/images/inplayer-mark-dark.png',
-              height: 76,
-              fit: BoxFit.contain,
-            ),
-            Positioned.fill(
-              child: AnimatedBuilder(
-                animation: shinePosition,
-                builder: (context, _) => FractionallySizedBox(
-                  alignment: Alignment(shinePosition.value, 0),
-                  widthFactor: .45,
-                  child: Transform(
-                    alignment: Alignment.center,
-                    transform: Matrix4.skewX(-.35),
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Colors.transparent,
-                            Colors.white.withValues(alpha: .54),
-                            Colors.transparent,
-                          ],
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(22),
+            child: SizedBox(
+              width: 112,
+              height: 112,
+              child: Stack(
+                alignment: Alignment.center,
+                children: [
+                  Image.asset(
+                    'assets/images/app_icon.png',
+                    width: 112,
+                    height: 112,
+                    fit: BoxFit.cover,
+                  ),
+                  Positioned.fill(
+                    child: AnimatedBuilder(
+                      animation: shinePosition,
+                      builder: (context, _) => FractionallySizedBox(
+                        alignment: Alignment(shinePosition.value, 0),
+                        widthFactor: .45,
+                        child: Transform(
+                          alignment: Alignment.center,
+                          transform: Matrix4.skewX(-.35),
+                          child: DecoratedBox(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.transparent,
+                                  Colors.white.withValues(alpha: .54),
+                                  Colors.transparent,
+                                ],
+                              ),
+                            ),
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
+                ],
               ),
             ),
-          ],
+          ),
         ),
-      ),
+        const SizedBox(height: 12),
+        const Text(
+          'Inplayer',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: Colors.white,
+            fontSize: 23,
+            fontWeight: FontWeight.w800,
+            letterSpacing: .2,
+            shadows: [
+              Shadow(
+                color: Color(0x66000000),
+                blurRadius: 12,
+                offset: Offset(0, 3),
+              ),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }

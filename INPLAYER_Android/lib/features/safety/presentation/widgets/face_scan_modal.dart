@@ -63,6 +63,10 @@ class FaceScanModal extends ConsumerStatefulWidget {
 
 class _FaceScanModalState extends ConsumerState<FaceScanModal>
     with TickerProviderStateMixin {
+  static const MethodChannel _screenFlashChannel = MethodChannel(
+    'inplayer.app/face_scan_screen_flash',
+  );
+
   CameraController? _cameraController;
   late FaceAgeDetectorService _ageDetector;
   late AnimationController _pulseAnim;
@@ -351,19 +355,17 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal>
             if (result == null || !result.readyForCapture) {
               _unknownFrameCount++;
 
-              // brightness is only ever populated on the "too dark" path
-              // (see checkFrame) — anything else (no face, bad angle, eyes
-              // closed) means there's plainly enough light to see all that,
-              // so the boost is never kept on for a well-lit frame that
-              // simply failed a different gate.
+              // Brightness is populated on the "too dark" path. Once that
+              // gate turns the screen flash on, keep it on through autofocus
+              // and face detection; switching it off on the first brighter
+              // frame made scans in dim rooms oscillate and lose the face.
               if (result?.brightness != null) {
                 _darkFrameCount++;
                 if (_darkFrameCount > 2 && !_lowLightBoostActive) {
                   unawaited(_setLowLightBoost(true));
                 }
-              } else if (_darkFrameCount > 0 || _lowLightBoostActive) {
+              } else if (result != null) {
                 _darkFrameCount = 0;
-                unawaited(_setLowLightBoost(false));
               }
 
               if (_unknownFrameCount > 2) {
@@ -493,14 +495,14 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal>
     }
   }
 
-  /// Turns the screen-brightness + exposure boost on or off. Exposure
-  /// compensation is best-effort — some devices/cameras don't support it,
-  /// or briefly throw while a capture is in flight — the screen brightening
-  /// (see _buildPremiumBackground) is what actually does most of the work
-  /// and always works regardless of camera capability.
+  /// Turns the screen-brightness + exposure boost on or off. Display
+  /// brightness is raised only for this scan and restored to the exact prior
+  /// window value. Exposure compensation remains best-effort because some
+  /// front cameras don't support it.
   Future<void> _setLowLightBoost(bool on) async {
     if (!mounted || _lowLightBoostActive == on) return;
     setState(() => _lowLightBoostActive = on);
+    await _setSystemScreenFlash(on);
     final controller = _cameraController;
     final maxOffset = _maxExposureOffset;
     if (controller == null || maxOffset == null || maxOffset <= 0) return;
@@ -511,24 +513,55 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal>
     }
   }
 
+  Future<void> _setSystemScreenFlash(bool enabled) async {
+    try {
+      await _screenFlashChannel.invokeMethod<void>(
+        'setEnabled',
+        <String, Object>{'enabled': enabled},
+      );
+    } on MissingPluginException {
+      // Keep the Flutter-rendered white-screen fallback on other platforms.
+    } on PlatformException catch (e) {
+      debugPrint('[FaceScanModal] Screen flash unavailable: ${e.message}');
+    } catch (e) {
+      debugPrint('[FaceScanModal] Screen flash unavailable: $e');
+    }
+  }
+
   /// Mean luminance of the frame, 0-255.
   ///
-  /// The Y plane of an NV21/YUV frame IS luminance, so this is just an
-  /// average of those bytes — sampled every 64th byte, which is plenty for a
-  /// "is there enough light to read a face" question and costs nothing.
-  /// Without this the scanner would happily score a face in near-darkness,
-  /// where the landmark positions are too imprecise for the ratios between
-  /// them to mean anything.
+  /// Only the first camera plane is used: it is the Y (luminance) plane for
+  /// NV21/YUV frames. Sampling the whole NV21 buffer also samples its VU
+  /// chroma tail (usually around 128 even in darkness), which can make a
+  /// truly dark image look bright enough to skip the screen flash. The center
+  /// region approximates the expected face area and avoids a bright window
+  /// behind the person hiding their underexposed face.
   double? _meanLuminance(CameraImage image) {
     try {
-      final bytes = image.planes.first.bytes;
+      if (image.planes.isEmpty || image.width <= 0 || image.height <= 0) {
+        return null;
+      }
+      final plane = image.planes.first;
+      final bytes = plane.bytes;
       if (bytes.isEmpty) return null;
-      const step = 64;
+      final rowStride = plane.bytesPerRow > 0 ? plane.bytesPerRow : image.width;
+      final pixelStride = plane.bytesPerPixel ?? 1;
+      final left = image.width ~/ 4;
+      final right = image.width * 3 ~/ 4;
+      final top = image.height ~/ 4;
+      final bottom = image.height * 3 ~/ 4;
+      final stepX = math.max(1, (right - left) ~/ 48);
+      final stepY = math.max(1, (bottom - top) ~/ 48);
       var total = 0;
       var count = 0;
-      for (var i = 0; i < bytes.length; i += step) {
-        total += bytes[i];
-        count++;
+      for (var y = top; y < bottom; y += stepY) {
+        final rowStart = y * rowStride;
+        for (var x = left; x < right; x += stepX) {
+          final index = rowStart + x * pixelStride;
+          if (index >= bytes.length) continue;
+          total += bytes[index];
+          count++;
+        }
       }
       if (count == 0) return null;
       return total / count;
@@ -652,6 +685,7 @@ class _FaceScanModalState extends ConsumerState<FaceScanModal>
   @override
   void dispose() {
     _startupTimeout?.cancel();
+    if (_lowLightBoostActive) unawaited(_setSystemScreenFlash(false));
     _cameraController?.dispose();
     _ageDetector.dispose();
     _pulseAnim.dispose();

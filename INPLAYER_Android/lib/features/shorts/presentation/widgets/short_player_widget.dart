@@ -124,6 +124,8 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
   bool _isPlaying = false;
   bool _showHeartBurst = false;
   int _playerGeneration = 0;
+  int _playerRetryCount = 0;
+  Timer? _playerRetryTimer;
   late final String _posterUrl;
   final ValueNotifier<double> _progressNotifier = ValueNotifier<double>(0.0);
 
@@ -207,7 +209,9 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    if (!_posterPrecached && _posterUrl.isNotEmpty && !isDataImageUrl(_posterUrl)) {
+    if (!_posterPrecached &&
+        _posterUrl.isNotEmpty &&
+        !isDataImageUrl(_posterUrl)) {
       _posterPrecached = true;
       precacheImage(CachedNetworkImageProvider(_posterUrl), context);
     }
@@ -312,6 +316,8 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
       // follows a teardown via _releasePlayer below) and this cold-inits.
       // The `else` branch is a defensive fallback only.
       if (_videoController == null) {
+        _playerRetryTimer?.cancel();
+        _playerRetryCount = 0;
         _initPlayer();
       } else {
         _resumePlayback();
@@ -323,6 +329,9 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
 
   void _releasePlayer() {
     _playerGeneration++;
+    _playerRetryTimer?.cancel();
+    _playerRetryTimer = null;
+    _playerRetryCount = 0;
     final controller = _videoController;
     _videoController = null;
     _audioPlayer?.stop();
@@ -330,10 +339,7 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
     _audioPlayer = null;
     if (controller != null) {
       unawaited(
-        controller
-            .pause()
-            .then((_) => controller.dispose())
-            .catchError((_) {}),
+        controller.pause().then((_) => controller.dispose()).catchError((_) {}),
       );
     }
     _progressNotifier.value = 0.0;
@@ -463,6 +469,27 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
             !identical(_audioPlayer, audio)) {
           return;
         }
+        // Start the separate soundtrack against the actual video playhead,
+        // not while ExoPlayer is still opening its first HLS segments.
+        for (
+          var attempt = 0;
+          attempt < 50 &&
+              mounted &&
+              generation == _playerGeneration &&
+              !controller.value.isPlaying;
+          attempt++
+        ) {
+          await Future<void>.delayed(const Duration(milliseconds: 20));
+        }
+        if (!mounted ||
+            generation != _playerGeneration ||
+            !identical(_audioPlayer, audio)) {
+          return;
+        }
+        final position = await controller.position;
+        if (position != null && position > Duration.zero) {
+          await audio.seek(position);
+        }
         await audio.resume();
       } catch (_) {}
     }());
@@ -487,7 +514,8 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
         _videoController = warmed;
         _setupSoundtrack(warmed, generation);
         _attachListenerAndReveal(warmed);
-        unawaited(warmed.play());
+        await warmed.setLooping(true);
+        await warmed.play();
         unawaited(_startFastRevealPoll(warmed));
         if (mounted) {
           setState(() {
@@ -495,6 +523,8 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
             _isPlaying = true;
           });
         }
+        _playerRetryCount = 0;
+        _playerRetryTimer?.cancel();
         return;
       }
 
@@ -514,6 +544,9 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
           !mounted ||
           !widget.isActive ||
           generation != _playerGeneration) {
+        if (videoUrl == null && mounted && widget.isActive) {
+          _schedulePlayerRetry(generation);
+        }
         return;
       }
 
@@ -547,12 +580,12 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
         if (identical(_videoController, controller)) _videoController = null;
         return;
       }
-      controller.setLooping(true);
+      await controller.setLooping(true);
 
       _attachListenerAndReveal(controller);
 
       if (widget.isActive) {
-        unawaited(controller.play());
+        await controller.play();
         unawaited(_startFastRevealPoll(controller));
         final audio = _audioPlayer;
         if (audio != null) {
@@ -563,6 +596,10 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
                   generation != _playerGeneration ||
                   !identical(_audioPlayer, audio)) {
                 return;
+              }
+              final position = await controller.position;
+              if (position != null && position > Duration.zero) {
+                await audio.seek(position);
               }
               await audio.resume();
             } catch (_) {}
@@ -576,12 +613,42 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
           _isPlaying = widget.isActive;
         });
       }
-    } catch (_) {}
+      _playerRetryCount = 0;
+      _playerRetryTimer?.cancel();
+    } catch (_) {
+      final controller = _videoController;
+      _videoController = null;
+      if (controller != null) unawaited(controller.dispose());
+      final audio = _audioPlayer;
+      _audioPlayer = null;
+      if (audio != null) unawaited(audio.dispose());
+      if (mounted && generation == _playerGeneration) {
+        setState(() {
+          _isInitialized = false;
+          _isPlaying = false;
+          _isFirstFrameRendered = false;
+        });
+        _schedulePlayerRetry(generation);
+      }
+    }
+  }
+
+  void _schedulePlayerRetry(int generation) {
+    if (_playerRetryCount >= 1 || !mounted || !widget.isActive) return;
+    _playerRetryCount++;
+    _playerRetryTimer?.cancel();
+    _playerRetryTimer = Timer(const Duration(milliseconds: 500), () {
+      if (!mounted || !widget.isActive || generation != _playerGeneration) {
+        return;
+      }
+      _initPlayer();
+    });
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _playerRetryTimer?.cancel();
     ShortsMuteState.instance.muted.removeListener(_onMuteChanged);
     _holdTimer?.cancel();
     _videoController?.pause();
@@ -589,10 +656,7 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
     _videoController = null;
     if (controller != null) {
       unawaited(
-        controller
-            .pause()
-            .then((_) => controller.dispose())
-            .catchError((_) {}),
+        controller.pause().then((_) => controller.dispose()).catchError((_) {}),
       );
     }
     _audioPlayer?.stop();
@@ -713,7 +777,9 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
         },
         onCommentDeleted: (deletedId) {
           setState(() {
-            _comments = _comments.where((c) => c.commentId != deletedId).toList();
+            _comments = _comments
+                .where((c) => c.commentId != deletedId)
+                .toList();
             _commentCount = _comments.length;
           });
         },
@@ -846,23 +912,23 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
         if (_showHeartBurst)
           IgnorePointer(
             child: Center(
-            child: TweenAnimationBuilder<double>(
-              tween: Tween(begin: 0.0, end: 1.2),
-              duration: const Duration(milliseconds: 400),
-              builder: (context, val, child) {
-                return Transform.scale(
-                  scale: val,
-                  child: const Icon(
-                    Icons.favorite,
-                    size: 110,
-                    color: Color(0xFFF43F5E), // rose-500
-                    shadows: [Shadow(color: Colors.black54, blurRadius: 20)],
-                  ),
-                );
-              },
+              child: TweenAnimationBuilder<double>(
+                tween: Tween(begin: 0.0, end: 1.2),
+                duration: const Duration(milliseconds: 400),
+                builder: (context, val, child) {
+                  return Transform.scale(
+                    scale: val,
+                    child: const Icon(
+                      Icons.favorite,
+                      size: 110,
+                      color: Color(0xFFF43F5E), // rose-500
+                      shadows: [Shadow(color: Colors.black54, blurRadius: 20)],
+                    ),
+                  );
+                },
+              ),
             ),
           ),
-        ),
 
         // 3. Play/Pause central indicator when explicitly paused.
         //
@@ -1188,8 +1254,8 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
                           _comments.isNotEmpty
                               ? '${_comments.first.userName}: ${_comments.first.text}'
                               : (_commentCount > 0
-                                  ? '$_commentCount comments • Add a comment...'
-                                  : 'Add a comment...'),
+                                    ? '$_commentCount comments • Add a comment...'
+                                    : 'Add a comment...'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -1350,9 +1416,7 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
             alignment: Alignment.center,
             child: AspectRatio(
               aspectRatio: 9 / 16,
-              child: ClipRect(
-                child: playerStack,
-              ),
+              child: ClipRect(child: playerStack),
             ),
           );
         }
@@ -1427,9 +1491,7 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
       useOldImageOnUrlChange: true,
       fadeInDuration: Duration.zero,
       fadeOutDuration: Duration.zero,
-      placeholder: (context, url) => const ColoredBox(
-        color: Colors.black,
-      ),
+      placeholder: (context, url) => const ColoredBox(color: Colors.black),
       errorWidget: (context, url, error) => Container(
         color: Colors.black,
         child: const Center(
@@ -1533,7 +1595,8 @@ class _ShortCommentsSheetState extends ConsumerState<_ShortCommentsSheet> {
         _commentCtrl.clear();
         var commentToAdd = res.comment!;
         final auth = ref.read(authStateProvider);
-        if ((commentToAdd.userUsername == null || commentToAdd.userUsername!.isEmpty) &&
+        if ((commentToAdd.userUsername == null ||
+                commentToAdd.userUsername!.isEmpty) &&
             auth is AuthStateAuthenticated &&
             auth.user.username.isNotEmpty) {
           commentToAdd = commentToAdd.copyWith(
@@ -1562,8 +1625,9 @@ class _ShortCommentsSheetState extends ConsumerState<_ShortCommentsSheet> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
-    final currentUser =
-        authState is AuthStateAuthenticated ? authState.user : null;
+    final currentUser = authState is AuthStateAuthenticated
+        ? authState.user
+        : null;
     final isSignedIn = currentUser != null;
 
     return Container(
@@ -1643,7 +1707,9 @@ class _ShortCommentsSheetState extends ConsumerState<_ShortCommentsSheet> {
                         },
                         onCommentDeleted: (deletedId) {
                           setState(() {
-                            _comments = _comments.where((x) => x.commentId != deletedId).toList();
+                            _comments = _comments
+                                .where((x) => x.commentId != deletedId)
+                                .toList();
                           });
                           widget.onCommentDeleted?.call(deletedId);
                         },
@@ -1651,9 +1717,13 @@ class _ShortCommentsSheetState extends ConsumerState<_ShortCommentsSheet> {
                           setState(() {
                             final updated = <Comment>[
                               newReply,
-                              ..._comments.where((x) => x.commentId != newReply.commentId),
+                              ..._comments.where(
+                                (x) => x.commentId != newReply.commentId,
+                              ),
                             ];
-                            _comments = Comment.assembleThreadedComments(updated);
+                            _comments = Comment.assembleThreadedComments(
+                              updated,
+                            );
                           });
                           widget.onCommentAdded(newReply);
                         },

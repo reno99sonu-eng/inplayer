@@ -26,6 +26,7 @@ import 'providers/app_language_provider.dart';
 import 'features/auth/presentation/widgets/terms_acceptance_modal.dart';
 import 'features/watch/presentation/widgets/video_mini_player_overlay.dart';
 import 'services/push_notification_service.dart';
+import 'services/presence_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -93,17 +94,25 @@ class InplayerApp extends ConsumerStatefulWidget {
   ConsumerState<InplayerApp> createState() => _InplayerAppState();
 }
 
-class _InplayerAppState extends ConsumerState<InplayerApp> {
+class _InplayerAppState extends ConsumerState<InplayerApp>
+    with WidgetsBindingObserver {
   bool _splashVisible = true;
   bool _startupScanStarted = false;
   bool _startupScanComplete = false;
   bool _geoBlocked = false;
   Future<void>? _startupPermissionsFuture;
   final _scaffoldMessengerKey = GlobalKey<ScaffoldMessengerState>();
+  Timer? _presenceTimer;
+  bool _appForeground = true;
+  bool _presenceRequestInFlight = false;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _syncPresence(ref.read(authStateProvider));
+    });
     // Ask at the first Flutter frame, before the branded splash finishes.
     // Requests are deliberately sequential because Android may discard a
     // second system permission dialog shown while the first is open.
@@ -112,6 +121,49 @@ class _InplayerAppState extends ConsumerState<InplayerApp> {
       unawaited(_startupPermissionsFuture!);
     });
     unawaited(ref.read(pushNotificationServiceProvider).initialize());
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    _appForeground = state == AppLifecycleState.resumed;
+    _syncPresence(ref.read(authStateProvider));
+  }
+
+  void _syncPresence(AuthState authState) {
+    final shouldSend = _appForeground && authState is AuthStateAuthenticated;
+    if (!shouldSend) {
+      _presenceTimer?.cancel();
+      _presenceTimer = null;
+      return;
+    }
+    if (_presenceTimer != null) return;
+
+    unawaited(_sendPresenceHeartbeat());
+    _presenceTimer = Timer.periodic(
+      const Duration(seconds: 45),
+      (_) => unawaited(_sendPresenceHeartbeat()),
+    );
+  }
+
+  Future<void> _sendPresenceHeartbeat() async {
+    if (_presenceRequestInFlight ||
+        !_appForeground ||
+        ref.read(authStateProvider) is! AuthStateAuthenticated) {
+      return;
+    }
+    _presenceRequestInFlight = true;
+    try {
+      await ref.read(presenceServiceProvider).heartbeat();
+    } finally {
+      _presenceRequestInFlight = false;
+    }
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    _presenceTimer?.cancel();
+    super.dispose();
   }
 
   Future<void> _requestStartupPermissions() async {
@@ -176,6 +228,7 @@ class _InplayerAppState extends ConsumerState<InplayerApp> {
     // Read persisted preference from SharedPreferences
     final prefs = await SharedPreferences.getInstance();
     final savedKidMode = prefs.getBool('inplayer:kids_mode_enabled') ?? false;
+    final previouslyRequestedAudience = prefs.getString('audience');
 
     // Content filtering based on face scan and user preference:
     // If the user previously turned ON Kids Mode toggle, keep Kids Mode.
@@ -194,13 +247,28 @@ class _InplayerAppState extends ConsumerState<InplayerApp> {
       mode = AudienceMode.family;
     }
 
+    // The homepage route is already mounted behind the startup splash/scan,
+    // so its first feed request may have completed with the same audience
+    // that the scan selects. Keep that valid result and its in-flight cache
+    // when there is no audience transition; refetch only when the scan
+    // changes the server-side filter.
+    final audienceAlreadyMatches = switch (mode) {
+      AudienceMode.family =>
+        previouslyRequestedAudience == null ||
+            previouslyRequestedAudience == 'family',
+      AudienceMode.kids => previouslyRequestedAudience == 'kids',
+      AudienceMode.all => false,
+    };
+
     final accessService = ref.read(contentAccessServiceProvider);
     await ref
         .read(kidModeProvider.notifier)
         .setKidMode(mode == AudienceMode.kids);
     await accessService.setModeLocally(mode);
-    VideoService.clearAudienceCaches();
-    ref.read(contentAccessRevisionProvider.notifier).state++;
+    if (!audienceAlreadyMatches) {
+      VideoService.clearAudienceCaches();
+      ref.read(contentAccessRevisionProvider.notifier).state++;
+    }
     if (mounted) setState(() => _startupScanComplete = true);
     _showAudienceFlashCard(mode, fromScan: result != null && !savedKidMode);
   }
@@ -256,6 +324,7 @@ class _InplayerAppState extends ConsumerState<InplayerApp> {
     // previous launch) from the one place all three converge, rather than
     // repeating this call in each sign-in method individually.
     ref.listen<AuthState>(authStateProvider, (previous, next) {
+      _syncPresence(next);
       final pushService = ref.read(pushNotificationServiceProvider);
       if (next is AuthStateAuthenticated) {
         unawaited(pushService.registerToken());
@@ -265,7 +334,7 @@ class _InplayerAppState extends ConsumerState<InplayerApp> {
     });
 
     return MaterialApp.router(
-      title: 'INPLAYER',
+      title: 'Inplayer',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
@@ -278,7 +347,8 @@ class _InplayerAppState extends ConsumerState<InplayerApp> {
         final content = child ?? const SizedBox.shrink();
         final authState = ref.watch(authStateProvider);
         final needsTermsAcceptance =
-            authState is AuthStateAuthenticated && !authState.user.termsAccepted;
+            authState is AuthStateAuthenticated &&
+            !authState.user.termsAccepted;
 
         return Stack(
           fit: StackFit.expand,
@@ -315,7 +385,10 @@ class _InplayerAppState extends ConsumerState<InplayerApp> {
             // Age safety runs first; biometric unlock must not cover or race
             // the camera route. It is mounted only after audience filtering
             // has completed.
-            if (!_geoBlocked && !_splashVisible && _startupScanComplete && !needsTermsAcceptance)
+            if (!_geoBlocked &&
+                !_splashVisible &&
+                _startupScanComplete &&
+                !needsTermsAcceptance)
               const BiometricLockScreen(),
           ],
         );

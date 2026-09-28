@@ -106,7 +106,7 @@ class VideoMiniPlayerService extends ChangeNotifier {
     _cropToContent = cropToContent;
     _title = video.title;
     _restoreRoute = '/watch/${video.videoId}';
-    _artUrl = video.isMusic
+    _artUrl = video.isStrictMusic
         ? (video.covers.isNotEmpty ? video.covers.first : video.thumbnail)
         : '';
     notifyListeners();
@@ -152,17 +152,32 @@ class VideoMiniPlayerService extends ChangeNotifier {
   /// Goes through the service rather than poking the controller directly so
   /// a Raftaar short's separate soundtrack player is kept in step — pausing
   /// only the video would leave its music playing on its own.
-  void togglePlayPause() {
+  Future<void> togglePlayPause() async {
     final controller = _controller;
-    if (controller == null) return;
-    if (controller.value.isPlaying) {
-      controller.pause();
-      _audio?.pause();
-    } else {
-      controller.play();
-      _audio?.resume();
+    if (controller == null || _playbackCommandInFlight) return;
+    _playbackCommandInFlight = true;
+    try {
+      final value = controller.value;
+      if (value.isPlaying) {
+        await controller.pause();
+        await _audio?.pause();
+      } else {
+        final atEnd =
+            value.duration > Duration.zero &&
+            value.position >=
+                value.duration - const Duration(milliseconds: 200);
+        if (_kind == MiniPlayerKind.video && atEnd) {
+          await controller.seekTo(Duration.zero);
+        }
+        await controller.play();
+        await _audio?.resume();
+      }
+    } catch (error, stackTrace) {
+      debugPrint('Mini-player playback toggle failed: $error\n$stackTrace');
+    } finally {
+      _playbackCommandInFlight = false;
+      if (identical(_controller, controller)) notifyListeners();
     }
-    notifyListeners();
   }
 
   /// A watch-page letterbox scan can finish after the video has already
@@ -189,6 +204,7 @@ class VideoMiniPlayerService extends ChangeNotifier {
   /// suspended, so releasing restores what the viewer had rather than
   /// starting something they had paused themselves.
   bool _wasPlayingBeforeSuspend = false;
+  bool _playbackCommandInFlight = false;
 
   /// Pause the floating window because a full-screen player is taking over
   /// the screen (the Raftaar feed, or the watch page).

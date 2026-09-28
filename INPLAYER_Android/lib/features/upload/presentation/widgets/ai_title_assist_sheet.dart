@@ -16,17 +16,18 @@ import '../../../../services/ai_assist_service.dart';
 /// sends the same prompt (see AIAssistService.buildPrompt), so the two
 /// surfaces cannot drift into suggesting differently.
 ///
-/// Pass [seesFrames] when the context carries real frames (or cover art):
-/// the typed description then becomes optional, same as the website's modal.
-/// Without them (e.g. Go Live) it stays required — a filename and a category
-/// alone only ever produced generic titles.
+/// Pass [hasSupportingContext] when the context has real video frames or
+/// useful music metadata. Without either, the creator's description is
+/// required because a filename and category alone produce generic titles,
+/// and cover art cannot tell the model what a song sounds like.
 ///
 /// Returns the picked title, or null if dismissed.
 Future<String?> showAITitleAssistSheet(
   BuildContext context, {
   required AIPromptContext Function(String userDescription) buildContext,
   String initialDescription = '',
-  bool seesFrames = false,
+  bool hasSupportingContext = false,
+  bool isMusic = false,
 }) {
   return showModalBottomSheet<String>(
     context: context,
@@ -35,7 +36,8 @@ Future<String?> showAITitleAssistSheet(
     builder: (_) => _AITitleAssistSheet(
       buildContext: buildContext,
       initialDescription: initialDescription,
-      seesFrames: seesFrames,
+      hasSupportingContext: hasSupportingContext,
+      isMusic: isMusic,
     ),
   );
 }
@@ -43,21 +45,25 @@ Future<String?> showAITitleAssistSheet(
 class _AITitleAssistSheet extends ConsumerStatefulWidget {
   final AIPromptContext Function(String userDescription) buildContext;
   final String initialDescription;
-  final bool seesFrames;
+  final bool hasSupportingContext;
+  final bool isMusic;
 
   const _AITitleAssistSheet({
     required this.buildContext,
     required this.initialDescription,
-    required this.seesFrames,
+    required this.hasSupportingContext,
+    required this.isMusic,
   });
 
   @override
-  ConsumerState<_AITitleAssistSheet> createState() => _AITitleAssistSheetState();
+  ConsumerState<_AITitleAssistSheet> createState() =>
+      _AITitleAssistSheetState();
 }
 
 class _AITitleAssistSheetState extends ConsumerState<_AITitleAssistSheet> {
-  late final TextEditingController _ctrl =
-      TextEditingController(text: widget.initialDescription);
+  late final TextEditingController _ctrl = TextEditingController(
+    text: widget.initialDescription,
+  );
 
   bool _generating = false;
   String? _error;
@@ -69,10 +75,10 @@ class _AITitleAssistSheetState extends ConsumerState<_AITitleAssistSheet> {
     super.dispose();
   }
 
-  /// Always allowed when real frames are attached (typing just sharpens the
-  /// titles); otherwise only once something has been typed.
+  /// Enabled with useful source context or a creator-entered description.
   bool get _canGenerate =>
-      !_generating && (widget.seesFrames || _ctrl.text.trim().isNotEmpty);
+      !_generating &&
+      (widget.hasSupportingContext || _ctrl.text.trim().isNotEmpty);
 
   Future<void> _generate() async {
     if (!_canGenerate) return;
@@ -123,7 +129,9 @@ class _AITitleAssistSheetState extends ConsumerState<_AITitleAssistSheet> {
         decoration: BoxDecoration(
           color: isDark ? const Color(0xFF08111F) : const Color(0xFFF5EEDC),
           borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-          border: Border.all(color: AppColors.brandOrange.withValues(alpha: 0.25)),
+          border: Border.all(
+            color: AppColors.brandOrange.withValues(alpha: 0.25),
+          ),
         ),
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
@@ -151,13 +159,19 @@ class _AITitleAssistSheetState extends ConsumerState<_AITitleAssistSheet> {
                       color: AppColors.brandOrange.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(14),
                     ),
-                    child: const Icon(Icons.auto_awesome_rounded,
-                        color: AppColors.brandOrangeLight, size: 20),
+                    child: const Icon(
+                      Icons.auto_awesome_rounded,
+                      color: AppColors.brandOrangeLight,
+                      size: 20,
+                    ),
                   ),
                   const Spacer(),
                   IconButton(
                     onPressed: () => Navigator.of(context).pop(),
-                    icon: Icon(Icons.close_rounded, color: context.textSecondary),
+                    icon: Icon(
+                      Icons.close_rounded,
+                      color: context.textSecondary,
+                    ),
                   ),
                 ],
               ),
@@ -172,13 +186,17 @@ class _AITitleAssistSheetState extends ConsumerState<_AITitleAssistSheet> {
               ),
               const SizedBox(height: 8),
               Text(
-                widget.seesFrames
+                widget.isMusic
+                    ? widget.hasSupportingContext
+                          ? "The AI uses your track title and selected music details, but it can't listen to the audio. Add a sentence about the song for closer title ideas."
+                          : "The AI can't listen to the audio. Describe the song's theme or provide its genre or language for grounded title ideas."
+                    : widget.hasSupportingContext
                     ? 'The AI looks at frames from your upload. Add a sentence '
-                        'about what happens for even sharper titles — or leave '
-                        'it blank.'
+                          'about what happens for even sharper titles — or leave '
+                          'it blank.'
                     : "The AI can't watch your video, so tell it what happens "
-                        'in a sentence or two — the more specific you are, the '
-                        'better the title options.',
+                          'in a sentence or two — the more specific you are, the '
+                          'better the title options.',
                 style: TextStyle(
                   color: context.textSecondary,
                   fontSize: 13,
@@ -193,11 +211,15 @@ class _AITitleAssistSheetState extends ConsumerState<_AITitleAssistSheet> {
                 textCapitalization: TextCapitalization.sentences,
                 style: TextStyle(color: context.textPrimary, fontSize: 14),
                 decoration: InputDecoration(
-                  hintText: widget.seesFrames
+                  hintText: widget.isMusic
+                      ? widget.hasSupportingContext
+                            ? 'Optional — describe the song’s theme or the feeling you want the title to convey'
+                            : 'e.g. A devotional song about hope and gratitude'
+                      : widget.hasSupportingContext
                       ? 'Optional — e.g. A 3-minute tutorial showing how to '
-                          'fix a leaking kitchen tap with basic tools'
+                            'fix a leaking kitchen tap with basic tools'
                       : 'e.g. A 3-minute tutorial showing how to fix a leaking '
-                          'kitchen tap with basic tools',
+                            'kitchen tap with basic tools',
                   hintStyle: TextStyle(
                     color: context.textSecondary.withValues(alpha: 0.7),
                     fontSize: 13,
@@ -231,7 +253,9 @@ class _AITitleAssistSheetState extends ConsumerState<_AITitleAssistSheet> {
                           width: 16,
                           height: 16,
                           child: CircularProgressIndicator(
-                              strokeWidth: 2, color: Colors.black87),
+                            strokeWidth: 2,
+                            color: Colors.black87,
+                          ),
                         )
                       : const Icon(Icons.auto_awesome_rounded, size: 16),
                   label: Text(
@@ -252,7 +276,10 @@ class _AITitleAssistSheetState extends ConsumerState<_AITitleAssistSheet> {
                 const SizedBox(height: 12),
                 Text(
                   _error!,
-                  style: const TextStyle(color: Color(0xFFF87171), fontSize: 12),
+                  style: const TextStyle(
+                    color: Color(0xFFF87171),
+                    fontSize: 12,
+                  ),
                 ),
               ],
               if (_suggestions.isNotEmpty) ...[
@@ -282,7 +309,9 @@ class _AITitleAssistSheetState extends ConsumerState<_AITitleAssistSheet> {
                       child: Container(
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(
-                            horizontal: 16, vertical: 14),
+                          horizontal: 16,
+                          vertical: 14,
+                        ),
                         decoration: BoxDecoration(
                           color: context.textPrimary.withValues(alpha: 0.02),
                           borderRadius: BorderRadius.circular(16),

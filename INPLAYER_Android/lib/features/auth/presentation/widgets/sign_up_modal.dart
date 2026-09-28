@@ -1,9 +1,12 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../providers/auth_provider.dart';
+import 'auth_modal_3d_hero.dart';
 import 'google_sign_in_button.dart';
 
 class SignUpModal extends ConsumerStatefulWidget {
@@ -25,7 +28,7 @@ class SignUpModal extends ConsumerStatefulWidget {
 }
 
 class _SignUpModalState extends ConsumerState<SignUpModal>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _ageController = TextEditingController();
@@ -42,6 +45,7 @@ class _SignUpModalState extends ConsumerState<SignUpModal>
   bool _success = false;
 
   late AnimationController _shakeController;
+  late AnimationController _heroController;
   late Animation<double> _shakeAnimation;
 
   @override
@@ -51,12 +55,19 @@ class _SignUpModalState extends ConsumerState<SignUpModal>
       vsync: this,
       duration: const Duration(milliseconds: 400),
     );
-    _shakeAnimation = TweenSequence<double>([
-      TweenSequenceItem(tween: Tween(begin: 0.0, end: -8.0), weight: 1),
-      TweenSequenceItem(tween: Tween(begin: -8.0, end: 8.0), weight: 2),
-      TweenSequenceItem(tween: Tween(begin: 8.0, end: -8.0), weight: 2),
-      TweenSequenceItem(tween: Tween(begin: -8.0, end: 0.0), weight: 1),
-    ]).animate(CurvedAnimation(parent: _shakeController, curve: Curves.easeInOut));
+    _heroController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 8),
+    )..repeat();
+    _shakeAnimation =
+        TweenSequence<double>([
+          TweenSequenceItem(tween: Tween(begin: 0.0, end: -8.0), weight: 1),
+          TweenSequenceItem(tween: Tween(begin: -8.0, end: 8.0), weight: 2),
+          TweenSequenceItem(tween: Tween(begin: 8.0, end: -8.0), weight: 2),
+          TweenSequenceItem(tween: Tween(begin: -8.0, end: 0.0), weight: 1),
+        ]).animate(
+          CurvedAnimation(parent: _shakeController, curve: Curves.easeInOut),
+        );
   }
 
   @override
@@ -68,6 +79,7 @@ class _SignUpModalState extends ConsumerState<SignUpModal>
     _confirmPasswordController.dispose();
     _vendorIdController.dispose();
     _shakeController.dispose();
+    _heroController.dispose();
     super.dispose();
   }
 
@@ -163,11 +175,9 @@ class _SignUpModalState extends ConsumerState<SignUpModal>
     });
 
     try {
-      await ref.read(authStateProvider.notifier).signUp(
-            email: email,
-            password: password,
-            name: name,
-          );
+      await ref
+          .read(authStateProvider.notifier)
+          .signUp(email: email, password: password, name: name);
 
       if (mounted) {
         final authState = ref.read(authStateProvider);
@@ -211,7 +221,9 @@ class _SignUpModalState extends ConsumerState<SignUpModal>
     });
 
     try {
-      final success = await ref.read(authStateProvider.notifier).signInWithGoogle();
+      final success = await ref
+          .read(authStateProvider.notifier)
+          .signInWithGoogle();
       if (success && mounted) {
         setState(() {
           _success = true;
@@ -226,12 +238,16 @@ class _SignUpModalState extends ConsumerState<SignUpModal>
         if (authState is AuthStateError) {
           _triggerError(authState.message);
         } else {
-          _triggerError("Google sign-in isn't set up for this site yet. Please create an account with your email instead.");
+          _triggerError(
+            "Google sign-in isn't set up for this site yet. Please create an account with your email instead.",
+          );
         }
       }
     } catch (_) {
       if (mounted) {
-        _triggerError("Google sign-in isn't set up for this site yet. Please create an account with your email instead.");
+        _triggerError(
+          "Google sign-in isn't set up for this site yet. Please create an account with your email instead.",
+        );
       }
     }
   }
@@ -254,86 +270,88 @@ class _SignUpModalState extends ConsumerState<SignUpModal>
           child: SingleChildScrollView(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
             child: Container(
-            constraints: const BoxConstraints(maxWidth: 440),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(28),
-              border: Border.all(
-                color: isDark
-                    ? AppColors.brandOrange.withValues(alpha: 0.22)
-                    : AppColors.brandOrange.withValues(alpha: 0.35),
-                width: 1.5,
-              ),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: isDark
-                    ? const [
-                        Color(0xFF07111F),
-                        Color(0xFF0B1728),
-                        Color(0xFF040A14),
-                      ]
-                    : const [
-                        Color(0xFFFBF6EA),
-                        Color(0xFFEDE2C9),
-                        Color(0xFFFBF6EA),
-                      ],
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: isDark ? 0.65 : 0.20),
-                  blurRadius: 50,
-                  offset: const Offset(0, 20),
+              constraints: const BoxConstraints(maxWidth: 440),
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(28),
+                border: Border.all(
+                  color: isDark
+                      ? AppColors.brandOrange.withValues(alpha: 0.22)
+                      : AppColors.brandOrange.withValues(alpha: 0.35),
+                  width: 1.5,
                 ),
-              ],
-            ),
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(28),
-              child: Stack(
-                children: [
-                  // Close 'X' Button
-                  if (!_success)
-                    Positioned(
-                      top: 16,
-                      right: 16,
-                      child: GestureDetector(
-                        onTap: _handleClose,
-                        child: Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: isDark
-                                ? Colors.white.withValues(alpha: 0.08)
-                                : Colors.black.withValues(alpha: 0.06),
-                            border: Border.all(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: isDark
+                      ? const [
+                          Color(0xFF07111F),
+                          Color(0xFF0B1728),
+                          Color(0xFF040A14),
+                        ]
+                      : const [
+                          Color(0xFFFBF6EA),
+                          Color(0xFFEDE2C9),
+                          Color(0xFFFBF6EA),
+                        ],
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? 0.65 : 0.20),
+                    blurRadius: 50,
+                    offset: const Offset(0, 20),
+                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(28),
+                child: Stack(
+                  children: [
+                    // Close 'X' Button
+                    if (!_success)
+                      Positioned(
+                        top: 16,
+                        right: 16,
+                        child: GestureDetector(
+                          onTap: _handleClose,
+                          child: Container(
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
                               color: isDark
-                                  ? Colors.white.withValues(alpha: 0.12)
-                                  : Colors.black.withValues(alpha: 0.12),
+                                  ? Colors.white.withValues(alpha: 0.08)
+                                  : Colors.black.withValues(alpha: 0.06),
+                              border: Border.all(
+                                color: isDark
+                                    ? Colors.white.withValues(alpha: 0.12)
+                                    : Colors.black.withValues(alpha: 0.12),
+                              ),
                             ),
-                          ),
-                          child: Icon(
-                            Icons.close_rounded,
-                            size: 18,
-                            color: context.textSecondary,
+                            child: Icon(
+                              Icons.close_rounded,
+                              size: 18,
+                              color: context.textSecondary,
+                            ),
                           ),
                         ),
                       ),
-                    ),
 
-                  // Main Content
-                  Padding(
-                    padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
-                    child: _success ? _buildSuccessView(context) : _buildFormView(context, isDark),
-                  ),
-                ],
+                    // Main Content
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(24, 24, 24, 24),
+                      child: _success
+                          ? _buildSuccessView(context)
+                          : _buildFormView(context, isDark),
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
         ),
       ),
-    ),
-  );
-}
+    );
+  }
 
   Widget _buildSuccessView(BuildContext context) {
     return Column(
@@ -349,7 +367,11 @@ class _SignUpModalState extends ConsumerState<SignUpModal>
             border: Border.all(color: const Color(0xFF34D399), width: 1.5),
           ),
           child: const Center(
-            child: Icon(Icons.check_rounded, color: Color(0xFF34D399), size: 34),
+            child: Icon(
+              Icons.check_rounded,
+              color: Color(0xFF34D399),
+              size: 34,
+            ),
           ),
         ),
         const SizedBox(height: 18),
@@ -364,14 +386,15 @@ class _SignUpModalState extends ConsumerState<SignUpModal>
         const SizedBox(height: 6),
         Text(
           'Setting up your InPlayer workspace...',
-          style: TextStyle(
-            color: context.textSecondary,
-            fontSize: 14,
-          ),
+          style: TextStyle(color: context.textSecondary, fontSize: 14),
         ),
         const SizedBox(height: 24),
       ],
     );
+  }
+
+  Widget _buildSignupHero(bool isDark) {
+    return AuthModal3DHero(isDark: isDark);
   }
 
   Widget _buildFormView(BuildContext context, bool isDark) {
@@ -383,13 +406,17 @@ class _SignUpModalState extends ConsumerState<SignUpModal>
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
+        _buildSignupHero(isDark),
+
         // Pill Badge
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3.5),
           decoration: BoxDecoration(
             color: AppColors.brandOrange.withValues(alpha: 0.12),
             borderRadius: BorderRadius.circular(20),
-            border: Border.all(color: AppColors.brandOrange.withValues(alpha: 0.35)),
+            border: Border.all(
+              color: AppColors.brandOrange.withValues(alpha: 0.35),
+            ),
           ),
           child: const Text(
             'INPLAYER JOIN',
@@ -434,10 +461,14 @@ class _SignUpModalState extends ConsumerState<SignUpModal>
         Container(
           padding: const EdgeInsets.all(4),
           decoration: BoxDecoration(
-            color: isDark ? const Color(0xFF07111F) : Colors.black.withValues(alpha: 0.04),
+            color: isDark
+                ? const Color(0xFF07111F)
+                : Colors.black.withValues(alpha: 0.04),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: isDark ? Colors.white.withValues(alpha: 0.10) : Colors.black.withValues(alpha: 0.10),
+              color: isDark
+                  ? Colors.white.withValues(alpha: 0.10)
+                  : Colors.black.withValues(alpha: 0.10),
             ),
           ),
           child: Row(
@@ -455,7 +486,9 @@ class _SignUpModalState extends ConsumerState<SignUpModal>
                       boxShadow: _accountType == 'user'
                           ? [
                               BoxShadow(
-                                color: AppColors.brandOrange.withValues(alpha: 0.35),
+                                color: AppColors.brandOrange.withValues(
+                                  alpha: 0.35,
+                                ),
                                 blurRadius: 10,
                                 offset: const Offset(0, 2),
                               ),
@@ -490,7 +523,9 @@ class _SignUpModalState extends ConsumerState<SignUpModal>
                       boxShadow: _accountType == 'vendor'
                           ? [
                               BoxShadow(
-                                color: AppColors.brandOrange.withValues(alpha: 0.35),
+                                color: AppColors.brandOrange.withValues(
+                                  alpha: 0.35,
+                                ),
                                 blurRadius: 10,
                                 offset: const Offset(0, 2),
                               ),
@@ -521,7 +556,11 @@ class _SignUpModalState extends ConsumerState<SignUpModal>
         // Full Name
         Text(
           'Full Name',
-          style: TextStyle(color: context.textSecondary, fontSize: 12, fontWeight: FontWeight.w600),
+          style: TextStyle(
+            color: context.textSecondary,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         const SizedBox(height: 6),
         _buildTextField(
@@ -536,7 +575,11 @@ class _SignUpModalState extends ConsumerState<SignUpModal>
         // Email
         Text(
           'Email Address',
-          style: TextStyle(color: context.textSecondary, fontSize: 12, fontWeight: FontWeight.w600),
+          style: TextStyle(
+            color: context.textSecondary,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         const SizedBox(height: 6),
         _buildTextField(
@@ -551,7 +594,11 @@ class _SignUpModalState extends ConsumerState<SignUpModal>
           const SizedBox(height: 12),
           Text(
             'Vendor ID',
-            style: TextStyle(color: context.textSecondary, fontSize: 12, fontWeight: FontWeight.w600),
+            style: TextStyle(
+              color: context.textSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
           ),
           const SizedBox(height: 6),
           _buildTextField(
@@ -567,7 +614,11 @@ class _SignUpModalState extends ConsumerState<SignUpModal>
         // Password
         Text(
           'Password',
-          style: TextStyle(color: context.textSecondary, fontSize: 12, fontWeight: FontWeight.w600),
+          style: TextStyle(
+            color: context.textSecondary,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         const SizedBox(height: 6),
         _buildTextField(
@@ -603,7 +654,9 @@ class _SignUpModalState extends ConsumerState<SignUpModal>
                   borderRadius: BorderRadius.circular(4),
                   child: LinearProgressIndicator(
                     value: (score / 5).clamp(0.0, 1.0),
-                    backgroundColor: isDark ? Colors.white.withValues(alpha: 0.1) : Colors.black.withValues(alpha: 0.08),
+                    backgroundColor: isDark
+                        ? Colors.white.withValues(alpha: 0.1)
+                        : Colors.black.withValues(alpha: 0.08),
                     valueColor: AlwaysStoppedAnimation<Color>(color),
                     minHeight: 4,
                   ),
@@ -627,7 +680,11 @@ class _SignUpModalState extends ConsumerState<SignUpModal>
         // Confirm Password
         Text(
           'Confirm Password',
-          style: TextStyle(color: context.textSecondary, fontSize: 12, fontWeight: FontWeight.w600),
+          style: TextStyle(
+            color: context.textSecondary,
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+          ),
         ),
         const SizedBox(height: 6),
         _buildTextField(
@@ -637,7 +694,8 @@ class _SignUpModalState extends ConsumerState<SignUpModal>
           obscureText: !_showConfirmPassword,
           isDark: isDark,
           suffix: GestureDetector(
-            onTap: () => setState(() => _showConfirmPassword = !_showConfirmPassword),
+            onTap: () =>
+                setState(() => _showConfirmPassword = !_showConfirmPassword),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               child: Text(
@@ -660,16 +718,26 @@ class _SignUpModalState extends ConsumerState<SignUpModal>
             decoration: BoxDecoration(
               color: const Color(0xFFEF4444).withValues(alpha: 0.12),
               borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: const Color(0xFFEF4444).withValues(alpha: 0.3)),
+              border: Border.all(
+                color: const Color(0xFFEF4444).withValues(alpha: 0.3),
+              ),
             ),
             child: Row(
               children: [
-                const Icon(Icons.error_outline_rounded, color: Color(0xFFF87171), size: 16),
+                const Icon(
+                  Icons.error_outline_rounded,
+                  color: Color(0xFFF87171),
+                  size: 16,
+                ),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     _error!,
-                    style: const TextStyle(color: Color(0xFFFCA5A5), fontSize: 11.5, height: 1.25),
+                    style: const TextStyle(
+                      color: Color(0xFFFCA5A5),
+                      fontSize: 11.5,
+                      height: 1.25,
+                    ),
                   ),
                 ),
               ],
@@ -680,37 +748,53 @@ class _SignUpModalState extends ConsumerState<SignUpModal>
         const SizedBox(height: 18),
 
         // Create Account Button
-        GestureDetector(
-          onTap: _loading ? null : _handleSignUp,
-          child: Container(
-            height: 48,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              gradient: AppColors.flameGradient,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.brandOrange.withValues(alpha: 0.35),
-                  blurRadius: 20,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Center(
-              child: _loading
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0F172A)),
-                    )
-                  : const Text(
-                      'Create Account',
-                      style: TextStyle(
-                        color: Color(0xFF0F172A),
-                        fontSize: 15,
-                        fontWeight: FontWeight.w900,
+        AnimatedBuilder(
+          animation: _heroController,
+          builder: (context, child) {
+            final tilt = math.sin(_heroController.value * math.pi * 2) * 0.012;
+            return Transform(
+              alignment: Alignment.center,
+              transform: Matrix4.identity()
+                ..setEntry(3, 2, 0.002)
+                ..rotateX(tilt),
+              child: child,
+            );
+          },
+          child: GestureDetector(
+            onTap: _loading ? null : _handleSignUp,
+            child: Container(
+              height: 48,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                gradient: AppColors.flameGradient,
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.brandOrange.withValues(alpha: 0.35),
+                    blurRadius: 20,
+                    offset: const Offset(0, 4),
+                  ),
+                ],
+              ),
+              child: Center(
+                child: _loading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Color(0xFF0F172A),
+                        ),
+                      )
+                    : const Text(
+                        'Create Account',
+                        style: TextStyle(
+                          color: Color(0xFF0F172A),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
-                    ),
+              ),
             ),
           ),
         ),
@@ -725,7 +809,11 @@ class _SignUpModalState extends ConsumerState<SignUpModal>
               padding: const EdgeInsets.symmetric(horizontal: 10),
               child: Text(
                 'OR',
-                style: TextStyle(color: context.textDim, fontSize: 10, fontWeight: FontWeight.w700),
+                style: TextStyle(
+                  color: context.textDim,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
             Expanded(child: Divider(color: context.borderSubtle)),
@@ -735,10 +823,7 @@ class _SignUpModalState extends ConsumerState<SignUpModal>
         const SizedBox(height: 14),
 
         // Google Button
-        GoogleSignInButton(
-          onPressed: _handleGoogle,
-          isLoading: _googleLoading,
-        ),
+        GoogleSignInButton(onPressed: _handleGoogle, isLoading: _googleLoading),
 
         const SizedBox(height: 16),
 
@@ -786,10 +871,14 @@ class _SignUpModalState extends ConsumerState<SignUpModal>
   }) {
     return Container(
       decoration: BoxDecoration(
-        color: isDark ? const Color(0xFF07111F) : Colors.black.withValues(alpha: 0.03),
+        color: isDark
+            ? const Color(0xFF07111F)
+            : Colors.black.withValues(alpha: 0.03),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: isDark ? Colors.white.withValues(alpha: 0.10) : Colors.black.withValues(alpha: 0.10),
+          color: isDark
+              ? Colors.white.withValues(alpha: 0.10)
+              : Colors.black.withValues(alpha: 0.10),
           width: 1,
         ),
       ),
@@ -811,7 +900,10 @@ class _SignUpModalState extends ConsumerState<SignUpModal>
           prefixIcon: Icon(icon, color: context.textDim, size: 18),
           suffixIcon: suffix,
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 14,
+            vertical: 13,
+          ),
         ),
       ),
     );

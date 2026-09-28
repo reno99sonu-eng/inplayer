@@ -37,6 +37,7 @@ class VideoService {
 
   static List<Video>? _cachedVideos;
   static DateTime? _videosCacheTime;
+  static int _audienceCacheRevision = 0;
 
   static List<Video>? _cachedFeatured;
   static DateTime? _featuredCacheTime;
@@ -48,6 +49,10 @@ class VideoService {
   /// in-memory shelves whenever a viewer changes 18+/Kids mode so existing
   /// cached cards cannot briefly bypass the newly selected filter.
   static void clearAudienceCaches() {
+    // A request started with the old audience may finish after the mode
+    // changes. Its response must not repopulate these caches with content
+    // filtered for the previous viewer.
+    _audienceCacheRevision++;
     _cachedVideos = null;
     _videosCacheTime = null;
     _cachedFeatured = null;
@@ -61,6 +66,7 @@ class VideoService {
   /// Loads the real video feed from the InPlayer website backend with instant in-memory caching.
   /// Strict separation: returns only longform videos (NO music tracks, NO shorts).
   Future<List<Video>> getVideos({bool forceRefresh = false}) async {
+    final cacheRevision = _audienceCacheRevision;
     if (!forceRefresh &&
         _cachedVideos != null &&
         _videosCacheTime != null &&
@@ -89,11 +95,13 @@ class VideoService {
       final result = videosJson
           .whereType<Map>()
           .map((json) => Video.fromJson(Map<String, dynamic>.from(json)))
-          .where((v) => !v.isMusic && !v.isShort)
+          .where((v) => !v.isStrictMusic && !v.isShort)
           .toList();
 
-      _cachedVideos = result;
-      _videosCacheTime = DateTime.now();
+      if (cacheRevision == _audienceCacheRevision) {
+        _cachedVideos = result;
+        _videosCacheTime = DateTime.now();
+      }
       return result;
     } catch (e, stackTrace) {
       _logger.e(
@@ -107,6 +115,7 @@ class VideoService {
 
   /// Loads real music tracks from dedicated GET /api/music endpoint with instant in-memory caching.
   Future<List<Video>> getMusicTracks({bool forceRefresh = false}) async {
+    final cacheRevision = _audienceCacheRevision;
     if (!forceRefresh &&
         _cachedMusic != null &&
         _musicCacheTime != null &&
@@ -142,8 +151,10 @@ class VideoService {
           .where((v) => v.isStrictMusic)
           .toList();
 
-      _cachedMusic = result;
-      _musicCacheTime = DateTime.now();
+      if (cacheRevision == _audienceCacheRevision) {
+        _cachedMusic = result;
+        _musicCacheTime = DateTime.now();
+      }
       return result;
     } catch (e, stackTrace) {
       _logger.e(
@@ -157,6 +168,7 @@ class VideoService {
 
   /// Loads the real Featured Weekly videos with instant in-memory caching.
   Future<List<Video>> getFeaturedWeekly({bool forceRefresh = false}) async {
+    final cacheRevision = _audienceCacheRevision;
     if (!forceRefresh &&
         _cachedFeatured != null &&
         _featuredCacheTime != null &&
@@ -184,11 +196,13 @@ class VideoService {
       final result = videosJson
           .whereType<Map>()
           .map((json) => Video.fromJson(Map<String, dynamic>.from(json)))
-          .where((v) => !v.isMusic)
+          .where((v) => !v.isStrictMusic)
           .toList();
 
-      _cachedFeatured = result;
-      _featuredCacheTime = DateTime.now();
+      if (cacheRevision == _audienceCacheRevision) {
+        _cachedFeatured = result;
+        _featuredCacheTime = DateTime.now();
+      }
       return result;
     } catch (e, stackTrace) {
       _logger.e(
@@ -407,6 +421,7 @@ class VideoService {
 
   /// Loads the real InPlayer Shorts/Raftaar video feed with in-memory caching.
   Future<List<Short>> getShorts({bool forceRefresh = false}) async {
+    final cacheRevision = _audienceCacheRevision;
     if (!forceRefresh &&
         _cachedShorts != null &&
         _shortsCacheTime != null &&
@@ -457,7 +472,13 @@ class VideoService {
             final type = json['contentType']?.toString().toLowerCase() ?? '';
             final cat = json['category']?.toString().toLowerCase() ?? '';
             final isShortFlag = json['isShort'] == true;
-            return type == 'short' || type == 'shorts' || type == 'raftaar' || cat.contains('raftaar') || cat.contains('shorts') || cat.contains('vertical') || isShortFlag;
+            return type == 'short' ||
+                type == 'shorts' ||
+                type == 'raftaar' ||
+                cat.contains('raftaar') ||
+                cat.contains('shorts') ||
+                cat.contains('vertical') ||
+                isShortFlag;
           })
           .map((json) => Short.fromJson(json))
           .toList();
@@ -466,8 +487,10 @@ class VideoService {
           ? filtered
           : parsed.map((json) => Short.fromJson(json)).toList();
 
-      _cachedShorts = result;
-      _shortsCacheTime = DateTime.now();
+      if (cacheRevision == _audienceCacheRevision) {
+        _cachedShorts = result;
+        _shortsCacheTime = DateTime.now();
+      }
       return result;
     } catch (e, stackTrace) {
       _logger.e(
@@ -575,7 +598,8 @@ class VideoService {
 
       if (response.statusCode != 200) {
         return MyVideosResult(
-          error: "Couldn't load your uploads "
+          error:
+              "Couldn't load your uploads "
               '(server error ${response.statusCode}).',
         );
       }
@@ -607,9 +631,7 @@ class VideoService {
         );
       }
       if (e.type == DioExceptionType.connectionError) {
-        return const MyVideosResult(
-          error: 'No internet connection.',
-        );
+        return const MyVideosResult(error: 'No internet connection.');
       }
       return MyVideosResult(
         error: "Couldn't reach the server to load your uploads.",

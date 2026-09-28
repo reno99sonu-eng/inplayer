@@ -16,10 +16,8 @@
     <style name="LaunchTheme" parent="@android:style/Theme.Black.NoTitleBar">
         <item name="android:windowBackground">@drawable/launch_background</item>
 
-        <!-- Same #05070D as the light variant — the Flutter intro opens on
-             near-black in dark mode too, so this is already the matching
-             shade and needs no separate night colour. -->
-        <item name="android:windowSplashScreenBackground">@color/ic_launcher_background</item>
+        <!-- Match the dark animated in-app intro in both system themes. -->
+        <item name="android:windowSplashScreenBackground">@color/splash_background</item>
 
         <!-- The actual fix: a transparent icon means the OS splash paints
              colour only, never the launcher triangle. -->

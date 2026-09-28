@@ -60,6 +60,10 @@ class WatchPage extends ConsumerStatefulWidget {
 
 class _WatchPageState extends ConsumerState<WatchPage>
     with WidgetsBindingObserver {
+  static const Duration _prerollBreakDuration = Duration(seconds: 15);
+  static const Duration _midrollBreakDuration = Duration(seconds: 10);
+  static const Duration _postrollBreakDuration = Duration(seconds: 10);
+
   final _logger = Logger();
   final _commentController = TextEditingController();
 
@@ -111,24 +115,23 @@ class _WatchPageState extends ConsumerState<WatchPage>
 
   // Video ad monetization: pre-roll, mid-roll, post-roll (matches VideoPlayer.tsx ad flows)
   MidrollConfig? _midrollConfig;
+  late Future<void> _midrollConfigLoadFuture;
   MidrollAd? _currentMidrollAd;
   bool _midrollBreakActive = false;
   String _adBreakType = 'midroll'; // 'preroll', 'midroll', 'postroll'
   bool _prerollShown = false;
   bool _postrollShown = false;
   bool _isPremium = false;
-  bool _midrollSkipUnlocked = false;
   int _midrollCountdown = 0;
+  final Stopwatch _midrollElapsed = Stopwatch();
   final ValueNotifier<int> _adStateRevision = ValueNotifier<int>(0);
   final Set<int> _midrollBreaksShown = {};
   bool _midrollWasPlaying = false;
+  bool _adOverlayVisible = false;
+  bool _adCreativeReady = false;
+  Duration? _midrollPlaybackStartPosition;
   Timer? _midrollTimer;
   VideoPlayerController? _adVideoController;
-  // Pre-warmed ad video controller so a Mux mid-roll doesn't cold-start
-  // (network fetch + HLS init) only at break time. Keyed by the ad's
-  // "mux:" imageUrl so it is only reused for the exact same creative.
-  VideoPlayerController? _preloadedAdController;
-  String? _preloadedAdKey;
 
   // Player chrome: quality (Mux `max_resolution`, capped by the viewer's
   // real Premium tier), and throttled "remember playback position" saves —
@@ -204,6 +207,11 @@ class _WatchPageState extends ConsumerState<WatchPage>
       final supported = await PipService.isSupported();
       if (mounted) setState(() => _pipSupported = supported);
     }());
+    // Start the ad decision at route entry, in parallel with loading video
+    // details and opening the main stream. Waiting until getVideoById had
+    // finished let the main video start first and showed the pre-roll only
+    // after the ad-config request eventually came back.
+    _midrollConfigLoadFuture = _loadMidrollConfig();
     _loadVideo();
   }
 
@@ -233,10 +241,6 @@ class _WatchPageState extends ConsumerState<WatchPage>
       adCtrl.removeListener(_onAdVideoTick);
       adCtrl.dispose();
     }
-    final preAdCtrl = _preloadedAdController;
-    _preloadedAdController = null;
-    _preloadedAdKey = null;
-    preAdCtrl?.dispose();
     _videoController?.removeListener(_onPlayerTick);
     _videoController?.dispose();
     _commentController.dispose();
@@ -287,6 +291,19 @@ class _WatchPageState extends ConsumerState<WatchPage>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
+    if (_midrollBreakActive) {
+      if (state == AppLifecycleState.resumed) {
+        final adController = _adVideoController;
+        if (adController != null &&
+            adController.value.isInitialized &&
+            !adController.value.isPlaying) {
+          unawaited(adController.play());
+        }
+      } else {
+        _adVideoController?.pause();
+      }
+      _syncMidrollPlaybackClock();
+    }
     // Same reason as the post-frame re-check above: the rotation back into
     // the full app can land before Flutter reports resumed, and
     // _maybeAutoFullscreenOnRotate ignores it while not resumed.
@@ -298,7 +315,7 @@ class _WatchPageState extends ConsumerState<WatchPage>
   }
 
   Future<void> _enterPip() async {
-    if (!_pipSupported) return;
+    if (!_pipSupported || _midrollBreakActive) return;
     final controller = _videoController;
     final size = controller?.value.size ?? const Size(16, 9);
     final width = size.width > 0 ? size.width.round() : 16;
@@ -375,7 +392,7 @@ class _WatchPageState extends ConsumerState<WatchPage>
     // was pure overhead competing with real video decode/render for
     // main-thread time: a concrete, measurable source of stutter and
     // sluggish-feeling taps, not just wasted work.
-    if (mounted && (_video?.isMusic ?? false)) {
+    if (mounted && (_video?.isStrictMusic ?? false)) {
       setState(() {});
     }
     _maybeSavePlaybackPosition();
@@ -399,9 +416,11 @@ class _WatchPageState extends ConsumerState<WatchPage>
   // page covers this one would float that page's buttons instead.
   void _maybeUpdatePipPlaybackState() {
     final playing = _videoController?.value.isPlaying ?? false;
-    final suppressed = _pipSuppressedUntil != null &&
+    final suppressed =
+        _pipSuppressedUntil != null &&
         DateTime.now().isBefore(_pipSuppressedUntil!);
-    final active = playing &&
+    final active =
+        playing &&
         _autoPipEnabled &&
         _pipSupported &&
         !suppressed &&
@@ -454,7 +473,9 @@ class _WatchPageState extends ConsumerState<WatchPage>
   void _maybeSavePlaybackPosition() {
     final controller = _videoController;
     final video = _video;
-    if (controller == null || video == null || !controller.value.isInitialized) {
+    if (controller == null ||
+        video == null ||
+        !controller.value.isInitialized) {
       return;
     }
 
@@ -659,8 +680,8 @@ class _WatchPageState extends ConsumerState<WatchPage>
         _midrollBreaksShown.clear();
         _prerollShown = false;
         _postrollShown = false;
+        _midrollPlaybackStartPosition = null;
         _finishMidroll('reset');
-        _loadMidrollConfig();
       }
 
       // Adopt an already-playing controller either explicitly (re-expanding
@@ -696,6 +717,11 @@ class _WatchPageState extends ConsumerState<WatchPage>
         _videoController = adoptedController;
         _videoController!.addListener(_onPlayerTick);
         _isInitialized = true;
+        // Re-expanding a video from the floating player resumes its existing
+        // viewing session; don't fire another pre-roll over already-playing
+        // content.
+        _prerollShown = true;
+        _midrollPlaybackStartPosition = adoptedController.value.position;
         // The adopted controller has already been playing uninterrupted in
         // the mini player, so a real frame is already on screen — no need
         // to wait for the tick-based latch above.
@@ -723,7 +749,8 @@ class _WatchPageState extends ConsumerState<WatchPage>
             if (mounted) {
               setState(() {
                 _premiumCeilingHeight =
-                    int.tryParse(maxRes.replaceAll(RegExp(r'[^0-9]'), '')) ?? 1080;
+                    int.tryParse(maxRes.replaceAll(RegExp(r'[^0-9]'), '')) ??
+                    1080;
                 _autoPipEnabled = playbackSettings.pip;
               });
             }
@@ -756,18 +783,49 @@ class _WatchPageState extends ConsumerState<WatchPage>
           await Future.delayed(const Duration(milliseconds: 100));
           if (!mounted) return;
           controller.addListener(_onPlayerTick);
-          if (mounted) {
-            setState(() {
-              _isInitialized = true;
-              _hasPlayerError = false;
-            });
-            if (!_prerollShown && !_isPremium && _midrollConfig != null && _midrollConfig!.enabled) {
-              _maybeTriggerPreroll();
-            } else {
-              controller.play();
-            }
-          }
+          // Don't expose live playback controls until the ad decision is
+          // complete; otherwise a manual tap could start content during the
+          // short window before the pre-roll configuration arrives.
+          await _midrollConfigLoadFuture;
+          if (!mounted || !identical(_videoController, controller)) return;
+          // Apply a saved resume position while the main stream is still
+          // paused. This establishes whether playback starts before or after
+          // the midpoint, avoiding a false mid-roll immediately on resume.
           await _applyResumePosition();
+          if (!mounted || !identical(_videoController, controller)) return;
+          _midrollPlaybackStartPosition = controller.value.position;
+
+          final shouldStartPreroll =
+              !_prerollShown &&
+              !_isPremium &&
+              (_midrollConfig?.enabled ?? false) &&
+              _currentMidrollAd != null;
+          if (shouldStartPreroll) await controller.pause();
+
+          setState(() {
+            _isInitialized = true;
+            _hasPlayerError = false;
+          });
+
+          if (_midrollBreakActive) {
+            // The pre-roll may already be running while the main stream
+            // finishes initializing. Keep the clicked video paused behind
+            // the ad and let _finishMidroll resume it when the break ends.
+            await controller.pause();
+          } else if (shouldStartPreroll) {
+            // The ad decision is ready and the player viewport is now
+            // mounted. The countdown itself waits until the overlay and its
+            // creative have rendered, so stream initialization can't consume
+            // the viewer's ad time invisibly.
+            _maybeTriggerPreroll();
+            if (_midrollBreakActive) {
+              await controller.pause();
+            } else {
+              await controller.play();
+            }
+          } else {
+            await controller.play();
+          }
         } catch (e) {
           _logger.e('Error initializing video player: $e');
           if (mounted) {
@@ -873,6 +931,18 @@ class _WatchPageState extends ConsumerState<WatchPage>
       _letterboxContentAspectRatio = aspectRatio;
       _letterboxPlaybackId = playbackId;
     });
+  }
+
+  /// True only after the detector has returned a content frame for the
+  /// currently loaded Mux video. Comparing nullable playback IDs alone is
+  /// not enough: when both are null it would incorrectly crop an ordinary
+  /// portrait video in the floating player.
+  bool get _hasDetectedLetterboxedContent {
+    final playbackId = _video?.muxPlaybackId;
+    return playbackId != null &&
+        playbackId.isNotEmpty &&
+        _letterboxPlaybackId == playbackId &&
+        _letterboxContentAspectRatio != null;
   }
 
   Future<void> _loadLikeStatus(String videoId) async {
@@ -1138,7 +1208,9 @@ class _WatchPageState extends ConsumerState<WatchPage>
                     child: Row(
                       children: [
                         Icon(
-                          video.isMusic ? Icons.music_note : Icons.hd_outlined,
+                          video.isStrictMusic
+                              ? Icons.music_note
+                              : Icons.hd_outlined,
                           color: ctx.textPrimary,
                           size: 18,
                         ),
@@ -1255,7 +1327,16 @@ class _WatchPageState extends ConsumerState<WatchPage>
   }
 
   static const List<String> _quickEmojis = [
-    '❤️', '🔥', '👏', '😂', '😍', '😮', '💯', '🙌', '✨', '🎉',
+    '❤️',
+    '🔥',
+    '👏',
+    '😂',
+    '😍',
+    '😮',
+    '💯',
+    '🙌',
+    '✨',
+    '🎉',
   ];
 
   void _insertEmoji(String emoji) {
@@ -1295,7 +1376,9 @@ class _WatchPageState extends ConsumerState<WatchPage>
         onCommentDeleted: (deletedId) {
           if (mounted) {
             setState(() {
-              _comments = _comments.where((c) => c.commentId != deletedId).toList();
+              _comments = _comments
+                  .where((c) => c.commentId != deletedId)
+                  .toList();
             });
           }
         },
@@ -1338,7 +1421,8 @@ class _WatchPageState extends ConsumerState<WatchPage>
       _commentController.clear();
       FocusScope.of(context).unfocus();
       var commentToAdd = result.comment!;
-      if ((commentToAdd.userUsername == null || commentToAdd.userUsername!.isEmpty) &&
+      if ((commentToAdd.userUsername == null ||
+              commentToAdd.userUsername!.isEmpty) &&
           authState.user.username.isNotEmpty) {
         commentToAdd = commentToAdd.copyWith(
           userUsername: authState.user.handle ?? authState.user.username,
@@ -1356,8 +1440,6 @@ class _WatchPageState extends ConsumerState<WatchPage>
       _showSnack(result.error ?? "Couldn't post your comment.");
     }
   }
-
-
 
   void _showSnack(String message) {
     if (!mounted) return;
@@ -1390,8 +1472,10 @@ class _WatchPageState extends ConsumerState<WatchPage>
     // Follows the finger: the page slides down, shrinks slightly and fades
     // toward the corner, so the video visibly becomes the floating window
     // rather than just vanishing when the gesture commits.
-    final dragProgress =
-        (_minimizeDrag / (_minimizeCommitPx * 2)).clamp(0.0, 1.0);
+    final dragProgress = (_minimizeDrag / (_minimizeCommitPx * 2)).clamp(
+      0.0,
+      1.0,
+    );
     final dragScale = 1.0 - (dragProgress * 0.22);
     final dragOpacity = 1.0 - (dragProgress * 0.45);
 
@@ -1407,170 +1491,221 @@ class _WatchPageState extends ConsumerState<WatchPage>
       },
       child: PatternBackground(
         child: Scaffold(
-        backgroundColor: Colors.transparent,
-        body: Transform.translate(
-          offset: Offset(0, _minimizeDrag * 0.6),
-          child: Transform.scale(
-            scale: dragScale,
-            alignment: Alignment.topCenter,
-            child: Opacity(
-              opacity: dragOpacity,
-              child: SafeArea(
-                bottom: false,
-                child: Builder(
-                  builder: (context) {
-                    final media = MediaQuery.of(context);
-                    final isTabletLandscape = media.size.shortestSide >= 600 &&
-                        media.orientation == Orientation.landscape;
+          backgroundColor: Colors.transparent,
+          body: Transform.translate(
+            offset: Offset(0, _minimizeDrag * 0.6),
+            child: Transform.scale(
+              scale: dragScale,
+              alignment: Alignment.topCenter,
+              child: Opacity(
+                opacity: dragOpacity,
+                child: SafeArea(
+                  bottom: false,
+                  child: Builder(
+                    builder: (context) {
+                      final media = MediaQuery.of(context);
+                      final isTabletLandscape =
+                          media.size.shortestSide >= 600 &&
+                          media.orientation == Orientation.landscape;
 
-                    final playerWidget = SizedBox(
-                      // Keep the media at the full width of its column; the
-                      // surrounding Column uses loose cross-axis constraints.
-                      width: double.infinity,
-                      child: ConstrainedBox(
-                        // A vertical video gets a taller frame (see
-                        // _playerBoxAspect), capped so the title and actions
-                        // below stay on screen.
-                        constraints: BoxConstraints(
-                          maxHeight: media.size.height * 0.6,
-                        ),
-                        child: Center(
-                          child: AspectRatio(
-                      aspectRatio: _playerBoxAspect,
-                      child: _isInitialized && _videoController != null
-                          ? Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                _buildMediaSurface(),
-                                Positioned.fill(
-                                  child: PlayerChrome(
-                                    controller: _videoController!,
-                                    title: _video?.title ?? '',
-                                    isFullscreen: false,
-                                    onToggleFullscreen: _openFullscreen,
-                                    onBack: () {
-                                      if (context.canPop()) {
-                                        context.pop();
-                                      } else {
-                                        context.go('/');
-                                      }
-                                    },
-                                    qualityLabel: _qualityLabel,
-                                    qualityOptions: _availableQualityOptions,
-                                    onQualityChange: _switchQuality,
-                                    captionLanguages: _captionLanguages,
-                                    selectedCaptionLang: _selectedCaptionLang,
-                                    captionCues: _captionCues,
-                                    onCaptionLanguageChange: _selectCaptionLanguage,
-                                    pipSupported: _pipSupported,
-                                    onPipTapped: _enterPip,
-                                    onMinimize: _minimizeToMiniPlayer,
-                                    onDragDown: _onPlayerDragDown,
-                                    onDragDownEnd: _onPlayerDragDownEnd,
-                                    initialBrightness: _playerBrightness,
-                                    onBrightnessChanged: (v) =>
-                                        setState(() => _playerBrightness = v),
-                                  ),
-                                ),
-                                if (_midrollBreakActive && _currentMidrollAd != null)
-                                  Positioned.fill(
-                                    child: _buildMidrollOverlay(),
-                                  ),
-                              ],
-                            )
-                          : _hasPlayerError
-                              ? Container(
-                                  color: Colors.black,
-                                  child: const Center(
-                                    child: Column(
-                                      mainAxisAlignment: MainAxisAlignment.center,
-                                      children: [
-                                        Icon(
-                                          Icons.error_outline,
-                                          size: 64,
-                                          color: Colors.white,
-                                        ),
-                                        SizedBox(height: 16),
-                                        Text(
-                                          'Video not available',
-                                          style: TextStyle(color: Colors.white),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                )
-                              : Container(
-                                  color: Colors.black,
-                                  child: const Center(
-                                    child: CircularProgressIndicator(
-                                      color: AppColors.brandOrange,
-                                    ),
-                                  ),
-                                ),
-                          ),
-                        ),
-                      ),
-                    );
+                      final playerWidget = LayoutBuilder(
+                        builder: (context, constraints) {
+                          // Size the frame to the actual media ratio, bounded
+                          // by the available column width and player height.
+                          // A loose Center inside a maxHeight constraint used
+                          // to fill the whole 60% height and leave large empty
+                          // bands above and below the video on phones.
+                          final aspectRatio = _playerBoxAspect;
+                          final maxHeight = media.size.height * 0.6;
+                          final playerWidth = math.min(
+                            constraints.maxWidth,
+                            maxHeight * aspectRatio,
+                          );
+                          final playerHeight = playerWidth / aspectRatio;
 
-                    if (isTabletLandscape) {
-                      return Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            flex: 62,
-                            child: SingleChildScrollView(
-                              padding: const EdgeInsets.fromLTRB(16, 0, 8, 20),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  playerWidget,
-                                  const SizedBox(height: 16),
-                                  if (_isLoading)
-                                    const SizedBox.shrink()
-                                  else if (_video != null)
-                                    _buildPrimaryDetails(_video!)
-                                  else
-                                    _buildPlaceholderInfo(),
-                                ],
+                          return SizedBox(
+                            width: constraints.maxWidth,
+                            height: playerHeight,
+                            child: Align(
+                              alignment: Alignment.topCenter,
+                              child: SizedBox(
+                                width: playerWidth,
+                                height: playerHeight,
+                                child: AspectRatio(
+                                  aspectRatio: aspectRatio,
+                                  child:
+                                      _isInitialized && _videoController != null
+                                      ? Stack(
+                                          alignment: Alignment.center,
+                                          children: [
+                                            _buildMediaSurface(),
+                                            Positioned.fill(
+                                              child: PlayerChrome(
+                                                controller: _videoController!,
+                                                title: _video?.title ?? '',
+                                                isFullscreen: false,
+                                                onToggleFullscreen:
+                                                    _openFullscreen,
+                                                onBack: () {
+                                                  if (context.canPop()) {
+                                                    context.pop();
+                                                  } else {
+                                                    context.go('/');
+                                                  }
+                                                },
+                                                qualityLabel: _qualityLabel,
+                                                qualityOptions:
+                                                    _availableQualityOptions,
+                                                onQualityChange: _switchQuality,
+                                                captionLanguages:
+                                                    _captionLanguages,
+                                                selectedCaptionLang:
+                                                    _selectedCaptionLang,
+                                                captionCues: _captionCues,
+                                                onCaptionLanguageChange:
+                                                    _selectCaptionLanguage,
+                                                pipSupported: _pipSupported,
+                                                onPipTapped: _enterPip,
+                                                onMinimize:
+                                                    _minimizeToMiniPlayer,
+                                                onDragDown: _onPlayerDragDown,
+                                                onDragDownEnd:
+                                                    _onPlayerDragDownEnd,
+                                                initialBrightness:
+                                                    _playerBrightness,
+                                                onBrightnessChanged: (v) =>
+                                                    setState(
+                                                      () =>
+                                                          _playerBrightness = v,
+                                                    ),
+                                              ),
+                                            ),
+                                            if (_midrollBreakActive &&
+                                                _currentMidrollAd != null)
+                                              Positioned.fill(
+                                                child: _buildMidrollOverlay(),
+                                              ),
+                                          ],
+                                        )
+                                      : _midrollBreakActive &&
+                                            _currentMidrollAd != null
+                                      ? Stack(
+                                          fit: StackFit.expand,
+                                          children: [
+                                            Container(color: Colors.black),
+                                            Positioned.fill(
+                                              child: _buildMidrollOverlay(),
+                                            ),
+                                          ],
+                                        )
+                                      : _hasPlayerError
+                                      ? Container(
+                                          color: Colors.black,
+                                          child: const Center(
+                                            child: Column(
+                                              mainAxisAlignment:
+                                                  MainAxisAlignment.center,
+                                              children: [
+                                                Icon(
+                                                  Icons.error_outline,
+                                                  size: 64,
+                                                  color: Colors.white,
+                                                ),
+                                                SizedBox(height: 16),
+                                                Text(
+                                                  'Video not available',
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                          ),
+                                        )
+                                      : Container(
+                                          color: Colors.black,
+                                          child: const Center(
+                                            child: CircularProgressIndicator(
+                                              color: AppColors.brandOrange,
+                                            ),
+                                          ),
+                                        ),
+                                ),
                               ),
                             ),
-                          ),
-                          Expanded(
-                            flex: 38,
-                            child: SingleChildScrollView(
-                              padding: const EdgeInsets.fromLTRB(8, 0, 16, 20),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  if (!_isLoading && _video != null)
-                                    _buildSecondaryDetails(),
-                                ],
+                          );
+                        },
+                      );
+
+                      if (isTabletLandscape) {
+                        return Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              flex: 62,
+                              child: SingleChildScrollView(
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  0,
+                                  8,
+                                  20,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    playerWidget,
+                                    const SizedBox(height: 16),
+                                    if (_isLoading)
+                                      const SizedBox.shrink()
+                                    else if (_video != null)
+                                      _buildPrimaryDetails(_video!)
+                                    else
+                                      _buildPlaceholderInfo(),
+                                  ],
+                                ),
                               ),
+                            ),
+                            Expanded(
+                              flex: 38,
+                              child: SingleChildScrollView(
+                                padding: const EdgeInsets.fromLTRB(
+                                  8,
+                                  0,
+                                  16,
+                                  20,
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    if (!_isLoading && _video != null)
+                                      _buildSecondaryDetails(),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ],
+                        );
+                      }
+
+                      return Column(
+                        children: [
+                          playerWidget,
+                          Expanded(
+                            child: SingleChildScrollView(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 20,
+                              ),
+                              child: _isLoading
+                                  ? const SizedBox.shrink()
+                                  : _video != null
+                                  ? _buildVideoInfo(_video!)
+                                  : _buildPlaceholderInfo(),
                             ),
                           ),
                         ],
                       );
-                    }
-
-                    return Column(
-                      children: [
-                        playerWidget,
-                        Expanded(
-                          child: SingleChildScrollView(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 20,
-                            ),
-                            child: _isLoading
-                                ? const SizedBox.shrink()
-                                : _video != null
-                                ? _buildVideoInfo(_video!)
-                                : _buildPlaceholderInfo(),
-                          ),
-                        ),
-                      ],
-                    );
-                  },
+                    },
                   ),
                 ),
               ),
@@ -1666,9 +1801,7 @@ class _WatchPageState extends ConsumerState<WatchPage>
     final size = controller.value.size;
     final isPortraitVideo =
         size.width > 0 && size.height > 0 && size.width < size.height;
-    final cropLetterboxedLandscape =
-        _letterboxPlaybackId == video.muxPlaybackId &&
-        _letterboxContentAspectRatio != null;
+    final cropLetterboxedLandscape = _hasDetectedLetterboxedContent;
     return Stack(
       fit: StackFit.expand,
       children: [
@@ -1683,8 +1816,8 @@ class _WatchPageState extends ConsumerState<WatchPage>
               fit: cropLetterboxedLandscape
                   ? BoxFit.cover
                   : isPortraitVideo
-                      ? BoxFit.contain
-                      : BoxFit.cover,
+                  ? BoxFit.contain
+                  : BoxFit.cover,
               fadeInDuration: Duration.zero,
               fadeOutDuration: Duration.zero,
               errorWidget: (context, url, error) => const SizedBox(),
@@ -1710,9 +1843,7 @@ class _WatchPageState extends ConsumerState<WatchPage>
               child: ColoredBox(
                 color: Colors.black,
                 child: FittedBox(
-                  fit: cropLetterboxedLandscape
-                      ? BoxFit.cover
-                      : BoxFit.contain,
+                  fit: cropLetterboxedLandscape ? BoxFit.cover : BoxFit.contain,
                   clipBehavior: Clip.hardEdge,
                   child: SizedBox(
                     width: size.width > 0 ? size.width : 1280,
@@ -1735,8 +1866,7 @@ class _WatchPageState extends ConsumerState<WatchPage>
   // cropped whatever the frame's shape.
   double get _playerBoxAspect {
     if (_video?.isStrictMusic ?? false) return 16 / 9;
-    if (_letterboxPlaybackId == _video?.muxPlaybackId &&
-        _letterboxContentAspectRatio != null) {
+    if (_hasDetectedLetterboxedContent) {
       return _letterboxContentAspectRatio!;
     }
     final c = _videoController;
@@ -1757,32 +1887,33 @@ class _WatchPageState extends ConsumerState<WatchPage>
     if (_videoController == null || _inFullscreen || _inPip) return;
     _inFullscreen = true;
     final route = MaterialPageRoute<void>(
-        builder: (_) => FullscreenPlayerPage(
-          getController: () => _videoController!,
-          getMediaSurface: _buildMediaSurface,
-          getDisplayAspectRatio: () => _playerBoxAspect,
-          title: _video?.title ?? '',
-          getQualityLabel: () => _qualityLabel,
-          qualityOptions: _availableQualityOptions,
-          onQualityChange: _switchQuality,
-          captionLanguages: _captionLanguages,
-          getSelectedCaptionLang: () => _selectedCaptionLang,
-          getCaptionCues: () => _captionCues,
-          onCaptionLanguageChange: _selectCaptionLanguage,
-          pipSupported: _pipSupported,
-          onPipTapped: _enterPip,
-          // Brightness lives on this page (see _playerBrightness), because
-          // this page owns the media surface both players render. A getter
-          // rather than a plain value so fullscreen opens at whatever the
-          // inline player was last set to.
-          getBrightness: () => _playerBrightness,
-          onBrightnessChanged: (v) {
-            if (mounted) setState(() => _playerBrightness = v);
-          },
-          getAdOverlay: () =>
-              _midrollBreakActive && _currentMidrollAd != null ? _buildMidrollOverlay() : null,
-          adListenable: _adStateRevision,
-        ),
+      builder: (_) => FullscreenPlayerPage(
+        getController: () => _videoController!,
+        getMediaSurface: _buildMediaSurface,
+        getDisplayAspectRatio: () => _playerBoxAspect,
+        title: _video?.title ?? '',
+        getQualityLabel: () => _qualityLabel,
+        qualityOptions: _availableQualityOptions,
+        onQualityChange: _switchQuality,
+        captionLanguages: _captionLanguages,
+        getSelectedCaptionLang: () => _selectedCaptionLang,
+        getCaptionCues: () => _captionCues,
+        onCaptionLanguageChange: _selectCaptionLanguage,
+        pipSupported: _pipSupported,
+        onPipTapped: _enterPip,
+        // Brightness lives on this page (see _playerBrightness), because
+        // this page owns the media surface both players render. A getter
+        // rather than a plain value so fullscreen opens at whatever the
+        // inline player was last set to.
+        getBrightness: () => _playerBrightness,
+        onBrightnessChanged: (v) {
+          if (mounted) setState(() => _playerBrightness = v);
+        },
+        getAdOverlay: () => _midrollBreakActive && _currentMidrollAd != null
+            ? _buildMidrollOverlay()
+            : null,
+        adListenable: _adStateRevision,
+      ),
     );
     _fullscreenRoute = route;
     await Navigator.of(context).push(route);
@@ -1824,15 +1955,14 @@ class _WatchPageState extends ConsumerState<WatchPage>
   void _onPlayerDragDownEnd(double velocityY) {
     if (!mounted) return;
     final commit =
-        _minimizeDrag >= _minimizeCommitPx || velocityY >= _minimizeCommitVelocity;
+        _minimizeDrag >= _minimizeCommitPx ||
+        velocityY >= _minimizeCommitVelocity;
     setState(() => _minimizeDrag = 0);
     if (commit) _minimizeToMiniPlayer();
   }
 
   void _minimizeToMiniPlayer() {
-    if (_midrollBreakActive) {
-      _finishMidroll('skip');
-    }
+    if (_midrollBreakActive) return;
     final controller = _videoController;
     final video = _video;
     if (controller == null || video == null || !_isInitialized) return;
@@ -1842,12 +1972,14 @@ class _WatchPageState extends ConsumerState<WatchPage>
     _lastPlayingForPip = false;
     PipService.setActive(this, false);
     controller.removeListener(_onPlayerTick);
-    ref.read(videoMiniPlayerServiceProvider).activate(
-      controller: controller,
-      video: video,
-      displayAspectRatio: _playerBoxAspect,
-      cropToContent: _letterboxPlaybackId == video.muxPlaybackId,
-    );
+    ref
+        .read(videoMiniPlayerServiceProvider)
+        .activate(
+          controller: controller,
+          video: video,
+          displayAspectRatio: _playerBoxAspect,
+          cropToContent: _hasDetectedLetterboxedContent,
+        );
     _videoController = null;
     if (context.canPop()) {
       context.pop();
@@ -1859,8 +1991,17 @@ class _WatchPageState extends ConsumerState<WatchPage>
   Future<void> _loadMidrollConfig() async {
     try {
       final premiumService = ref.read(premiumServiceProvider);
-      final status = await premiumService.getStatus();
+      // Both requests are independent; start them together so the ad
+      // decision does not pay two serial network round-trips on every video.
+      final configFuture = ref
+          .read(adServiceProvider)
+          .getMidrollConfig()
+          .timeout(const Duration(seconds: 4));
+      final status = await premiumService.getStatus().timeout(
+        const Duration(seconds: 4),
+      );
       if (status.premium) {
+        unawaited(configFuture.then<void>((_) {}).catchError((Object _) {}));
         if (mounted) {
           setState(() {
             _isPremium = true;
@@ -1871,16 +2012,21 @@ class _WatchPageState extends ConsumerState<WatchPage>
         return;
       }
 
-      final config = await ref.read(adServiceProvider).getMidrollConfig();
+      final config = await configFuture;
       if (!mounted) return;
-      if (config != null && config.enabled && (config.ad != null || config.ads.isNotEmpty)) {
+      if (config != null &&
+          config.enabled &&
+          (config.ad != null || config.ads.isNotEmpty)) {
         setState(() {
           _isPremium = false;
           _midrollConfig = config;
-          _currentMidrollAd = config.ad ?? (config.ads.isNotEmpty ? config.ads.first : null);
+          _currentMidrollAd =
+              config.ad ?? (config.ads.isNotEmpty ? config.ads.first : null);
         });
-        _preloadAdVideo(_currentMidrollAd);
-        _maybeTriggerPreroll();
+        // Cache the ad decision while the clicked video initializes. The
+        // pre-roll begins only after the watch surface is ready; its timer
+        // then waits for both the overlay and its creative to be visible.
+        if (mounted) _maybeTriggerPreroll();
       }
     } catch (e) {
       _logger.w('WatchPage: Failed to load ad config: $e');
@@ -1892,7 +2038,14 @@ class _WatchPageState extends ConsumerState<WatchPage>
     final config = _midrollConfig;
     final ad = _currentMidrollAd;
     final controller = _videoController;
-    if (config == null || !config.enabled || ad == null || controller == null || !_isInitialized) {
+    if (config == null ||
+        !config.enabled ||
+        ad == null ||
+        _video == null ||
+        _video!.isStrictMusic ||
+        !_isInitialized ||
+        controller == null ||
+        !controller.value.isInitialized) {
       return;
     }
 
@@ -1905,7 +2058,11 @@ class _WatchPageState extends ConsumerState<WatchPage>
     final config = _midrollConfig;
     final ad = _currentMidrollAd;
     final controller = _videoController;
-    if (config == null || !config.enabled || ad == null || controller == null || !_isInitialized) {
+    if (config == null ||
+        !config.enabled ||
+        ad == null ||
+        controller == null ||
+        !_isInitialized) {
       return;
     }
 
@@ -1933,125 +2090,145 @@ class _WatchPageState extends ConsumerState<WatchPage>
     // Do not trigger mid-roll before pre-roll is resolved
     if (!_prerollShown && controller.value.position.inSeconds < 2) return;
 
-    final currentAd = _currentMidrollAd ?? (config.ads.isNotEmpty ? config.ads.first : config.ad);
+    final currentAd =
+        _currentMidrollAd ??
+        (config.ads.isNotEmpty ? config.ads.first : config.ad);
     if (currentAd == null) return;
 
-    final currentTime = controller.value.position.inSeconds;
-    final duration = controller.value.duration.inSeconds;
-
-    // Never trigger in the final 5 seconds before the video ends
-    if (duration > 0 && (duration - currentTime) < 5) return;
-
-    bool shouldTrigger = false;
-    int triggerKey = 1;
-
-    // For videos shorter than 1.5x the configured interval, place a mid-roll break
-    // at the video's midpoint (at least 15s into playback)
-    if (duration > 0 && duration < (config.intervalSeconds * 1.5).round()) {
-      final midPoint = (duration ~/ 2).clamp(15, duration);
-      if (currentTime >= midPoint && !_midrollBreaksShown.contains(1)) {
-        shouldTrigger = true;
-        triggerKey = 1;
-      }
-    } else {
-      // Standard multiple-interval calculation
-      final breakIndex = currentTime ~/ config.intervalSeconds;
-      if (breakIndex >= 1 && !_midrollBreaksShown.contains(breakIndex)) {
-        shouldTrigger = true;
-        triggerKey = breakIndex;
-      }
+    final currentPosition = controller.value.position;
+    final videoDuration = controller.value.duration;
+    if (videoDuration <= Duration.zero || _midrollBreaksShown.contains(1)) {
+      return;
     }
 
-    if (!shouldTrigger) return;
-
-    _triggerAdBreak('midroll', triggerKey: triggerKey);
+    // The app has one mid-roll slot at the actual halfway point. Do not use
+    // the server's interval setting here: long videos were otherwise getting
+    // an ad at an arbitrary interval instead of at their midpoint.
+    final midpointMs = videoDuration.inMilliseconds ~/ 2;
+    final playbackStartPosition = _midrollPlaybackStartPosition;
+    if (playbackStartPosition != null &&
+        playbackStartPosition.inMilliseconds < midpointMs &&
+        currentPosition.inMilliseconds >= midpointMs) {
+      _triggerAdBreak('midroll', triggerKey: 1);
+    }
   }
 
   void _triggerAdBreak(String breakType, {int triggerKey = 1}) {
     final controller = _videoController;
     final config = _midrollConfig;
-    if (controller == null || config == null || _isPremium) return;
+    if ((controller == null && breakType != 'preroll') ||
+        config == null ||
+        _isPremium) {
+      return;
+    }
 
     _adBreakType = breakType;
+    _adOverlayVisible = false;
+    _adCreativeReady = false;
     if (breakType == 'midroll') {
       _midrollBreaksShown.add(triggerKey);
     }
-    _midrollWasPlaying = controller.value.isPlaying || _midrollWasPlaying;
-    controller.pause();
+    _midrollWasPlaying =
+        (controller?.value.isInitialized == true &&
+            controller!.value.isPlaying) ||
+        _midrollWasPlaying;
+    if (controller?.value.isInitialized == true) {
+      controller!.pause();
+    }
 
     // Rotate creative if multiple ads
     if (config.ads.length > 1) {
       final nextIndex =
-          (_midrollBreaksShown.length + (breakType == 'postroll' ? 1 : 0)) % config.ads.length;
+          (_midrollBreaksShown.length + (breakType == 'postroll' ? 1 : 0)) %
+          config.ads.length;
       _currentMidrollAd = config.ads[nextIndex];
     } else {
-      _currentMidrollAd = config.ad ?? (config.ads.isNotEmpty ? config.ads.first : null);
+      _currentMidrollAd =
+          config.ad ?? (config.ads.isNotEmpty ? config.ads.first : null);
     }
 
     final ad = _currentMidrollAd;
     if (ad == null) return;
 
-    final tierIndex = (_midrollBreaksShown.length - 1).clamp(0, config.skipTiersSeconds.length - 1);
-    _midrollCountdown = config.skipTiersSeconds.isNotEmpty ? config.skipTiersSeconds[tierIndex] : 5;
-    _midrollSkipUnlocked = false;
+    _midrollElapsed
+      ..stop()
+      ..reset();
+    _midrollCountdown = _adBreakDuration(breakType).inSeconds;
     _midrollBreakActive = true;
     _adStateRevision.value++;
 
     // Track impression when ad starts playback
     ref.read(adServiceProvider).trackMidrollEvent(ad.adId, kind: 'impression');
 
-    _startMidrollTimer();
-    _initAdVideoIfNeeded();
+    if (ad.imageUrl.startsWith('mux:')) {
+      unawaited(_initAdVideoIfNeeded());
+    } else {
+      unawaited(_prepareStillAd(ad));
+    }
 
     if (mounted) setState(() {});
   }
 
   void _startMidrollTimer() {
+    if (!_midrollBreakActive || !_adOverlayVisible || !_adCreativeReady) {
+      return;
+    }
+    if (_midrollTimer?.isActive == true) {
+      _syncMidrollPlaybackClock();
+      return;
+    }
     _midrollTimer?.cancel();
-    _midrollTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+    _syncMidrollPlaybackClock();
+    _midrollTimer = Timer.periodic(const Duration(milliseconds: 250), (timer) {
       if (!mounted || !_midrollBreakActive) {
         timer.cancel();
+        _midrollElapsed.stop();
+        _midrollTimer = null;
         return;
       }
-      if (_midrollCountdown > 1) {
-        setState(() {
-          _midrollCountdown--;
-        });
-        _adStateRevision.value++;
-      } else {
-        timer.cancel();
-        setState(() {
-          _midrollCountdown = 0;
-          _midrollSkipUnlocked = true;
-        });
-        _adStateRevision.value++;
+
+      _syncMidrollPlaybackClock();
+      final remainingMs =
+          _adBreakDuration(_adBreakType).inMilliseconds -
+          _midrollElapsed.elapsedMilliseconds;
+      if (remainingMs <= 0) {
+        _finishMidroll('completed');
+        return;
       }
+
+      final countdown = (remainingMs + 999) ~/ 1000;
+      if (countdown == _midrollCountdown) return;
+      setState(() => _midrollCountdown = countdown);
+      _adStateRevision.value++;
     });
   }
 
-  // Pre-warm a Mux ad video so the break doesn't pay the full network +
-  // HLS cold-start cost on the critical path. Fire-and-forget: any failure
-  // just falls back to the on-demand init in _initAdVideoIfNeeded.
-  Future<void> _preloadAdVideo(MidrollAd? ad) async {
-    if (ad == null || !ad.imageUrl.startsWith('mux:')) return;
-    if (_preloadedAdKey == ad.imageUrl && _preloadedAdController != null) return;
-    final prev = _preloadedAdController;
-    _preloadedAdController = null;
-    _preloadedAdKey = null;
-    prev?.dispose();
-    final playbackId = ad.imageUrl.replaceFirst('mux:', '');
-    final streamUrl = 'https://stream.mux.com/$playbackId.m3u8';
-    try {
-      final ctrl = VideoPlayerController.networkUrl(Uri.parse(streamUrl));
-      await ctrl.initialize();
-      if (!mounted) {
-        await ctrl.dispose();
-        return;
-      }
-      _preloadedAdController = ctrl;
-      _preloadedAdKey = ad.imageUrl;
-    } catch (e) {
-      _logger.w('WatchPage: Failed to preload ad video: $e');
+  Duration _adBreakDuration(String breakType) {
+    if (breakType == 'preroll') return _prerollBreakDuration;
+    if (breakType == 'postroll') return _postrollBreakDuration;
+    return _midrollBreakDuration;
+  }
+
+  void _syncMidrollPlaybackClock() {
+    if (!_midrollBreakActive || !_adOverlayVisible || !_adCreativeReady) {
+      _midrollElapsed.stop();
+      return;
+    }
+
+    final isForeground =
+        WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed;
+    final adController = _adVideoController;
+    final isAdPlaying = adController == null
+        ? true // Static image creatives count while visible in the foreground.
+        : adController.value.isInitialized &&
+              adController.value.isPlaying &&
+              !adController.value.isBuffering &&
+              adController.value.position > Duration.zero;
+
+    if (isForeground && isAdPlaying) {
+      _midrollElapsed.start();
+    } else {
+      _midrollElapsed.stop();
     }
   }
 
@@ -2060,66 +2237,116 @@ class _WatchPageState extends ConsumerState<WatchPage>
     if (ad == null) return;
 
     if (ad.imageUrl.startsWith('mux:')) {
-      // Reuse a pre-warmed controller for the exact same creative if one is
-      // ready — this is what removes the cold-start stall on mid-roll breaks.
-      if (_preloadedAdKey == ad.imageUrl && _preloadedAdController != null) {
-        final ctrl = _preloadedAdController!;
-        _preloadedAdController = null;
-        _preloadedAdKey = null;
-        if (!mounted || !_midrollBreakActive) {
-          await ctrl.dispose();
-          return;
-        }
-        _adVideoController = ctrl;
-        await ctrl.setVolume(1.0);
-        ctrl.addListener(_onAdVideoTick);
-        await ctrl.play();
-        _adStateRevision.value++;
-        if (mounted) setState(() {});
-        return;
-      }
       final playbackId = ad.imageUrl.replaceFirst('mux:', '');
       final streamUrl = 'https://stream.mux.com/$playbackId.m3u8';
+      final ctrl = VideoPlayerController.networkUrl(Uri.parse(streamUrl));
+      _adVideoController = ctrl;
       try {
-        final ctrl = VideoPlayerController.networkUrl(Uri.parse(streamUrl));
-        _adVideoController = ctrl;
-        await ctrl.initialize();
+        await ctrl.initialize().timeout(const Duration(seconds: 12));
         if (!mounted || !_midrollBreakActive) {
+          if (identical(_adVideoController, ctrl)) _adVideoController = null;
           await ctrl.dispose();
           return;
         }
+        await ctrl.setLooping(true);
         await ctrl.setVolume(1.0);
         ctrl.addListener(_onAdVideoTick);
         await ctrl.play();
+        _adCreativeReady = true;
+        _startMidrollTimer();
         _adStateRevision.value++;
         if (mounted) setState(() {});
       } catch (e) {
         _logger.w('WatchPage: Failed to initialize ad video: $e');
-        if (mounted) {
-          setState(() {
-            _midrollSkipUnlocked = true;
-          });
-          _adStateRevision.value++;
+        final isCurrentAdController = identical(_adVideoController, ctrl);
+        if (isCurrentAdController) _adVideoController = null;
+        try {
+          ctrl.removeListener(_onAdVideoTick);
+          await ctrl.dispose();
+        } catch (_) {}
+        if (isCurrentAdController && mounted && _midrollBreakActive) {
+          _finishMidroll('error');
         }
       }
     }
   }
 
   void _onAdVideoTick() {
-    final ctrl = _adVideoController;
-    if (ctrl == null || !ctrl.value.isInitialized) return;
-    if (ctrl.value.position >= ctrl.value.duration && ctrl.value.duration > Duration.zero) {
-      _finishMidroll('ended');
+    _syncMidrollPlaybackClock();
+  }
+
+  Future<void> _prepareStillAd(MidrollAd ad) async {
+    final provider = smartImageProvider(ad.imageUrl);
+    if (provider == null) {
+      _logger.w('WatchPage: House ad ${ad.adId} has no usable image source.');
+      if (mounted &&
+          _midrollBreakActive &&
+          _currentMidrollAd?.adId == ad.adId) {
+        _finishMidroll('error');
+      }
+      return;
     }
+
+    ImageStream? stream;
+    ImageStreamListener? listener;
+    final ready = Completer<void>();
+    try {
+      stream = provider.resolve(createLocalImageConfiguration(context));
+      listener = ImageStreamListener(
+        (image, synchronousCall) {
+          if (!ready.isCompleted) ready.complete();
+        },
+        onError: (Object error, StackTrace? stackTrace) {
+          if (!ready.isCompleted) ready.completeError(error, stackTrace);
+        },
+      );
+      stream.addListener(listener);
+      await ready.future.timeout(const Duration(seconds: 15));
+    } catch (error) {
+      _logger.w('WatchPage: House ad ${ad.adId} image failed to load: $error');
+      if (mounted &&
+          _midrollBreakActive &&
+          _currentMidrollAd?.adId == ad.adId) {
+        _finishMidroll('error');
+      }
+      return;
+    } finally {
+      if (stream != null && listener != null) {
+        stream.removeListener(listener);
+      }
+    }
+
+    if (!mounted ||
+        !_midrollBreakActive ||
+        _currentMidrollAd?.adId != ad.adId) {
+      return;
+    }
+    _adCreativeReady = true;
+    _startMidrollTimer();
+  }
+
+  void _markMidrollOverlayVisible(String adId) {
+    if (_adOverlayVisible) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted ||
+          !_midrollBreakActive ||
+          _currentMidrollAd?.adId != adId ||
+          _adOverlayVisible) {
+        return;
+      }
+      _adOverlayVisible = true;
+      _adStateRevision.value++;
+      _startMidrollTimer();
+    });
   }
 
   void _finishMidroll(String reason) {
     if (!_midrollBreakActive && reason != 'reset') return;
     _midrollTimer?.cancel();
-
-    if (_currentMidrollAd != null && (reason == 'skip' || reason == 'ended')) {
-      ref.read(adServiceProvider).trackMidrollEvent(_currentMidrollAd!.adId, kind: 'skip');
-    }
+    _midrollTimer = null;
+    _midrollElapsed
+      ..stop()
+      ..reset();
 
     final adCtrl = _adVideoController;
     _adVideoController = null;
@@ -2133,6 +2360,8 @@ class _WatchPageState extends ConsumerState<WatchPage>
 
     final finishedBreakType = _adBreakType;
     _midrollBreakActive = false;
+    _adOverlayVisible = false;
+    _adCreativeReady = false;
     if (finishedBreakType == 'preroll') {
       _prerollShown = true;
     } else if (finishedBreakType == 'postroll') {
@@ -2143,20 +2372,12 @@ class _WatchPageState extends ConsumerState<WatchPage>
     if (mounted) setState(() {});
 
     final controller = _videoController;
-    if (controller != null && reason != 'reset' && finishedBreakType != 'postroll') {
+    if (controller != null &&
+        reason != 'reset' &&
+        finishedBreakType != 'postroll') {
       if (controller.value.isInitialized) {
         controller.play().catchError((err) {
           _logger.w('WatchPage: resume main video error: $err');
-        });
-      } else {
-        controller.initialize().then((_) {
-          if (mounted && !_midrollBreakActive) {
-            controller.play().catchError((err) {
-              _logger.w('WatchPage: resume main video error: $err');
-            });
-          }
-        }).catchError((err) {
-          _logger.w('WatchPage: initialize on resume error: $err');
         });
       }
     }
@@ -2165,13 +2386,15 @@ class _WatchPageState extends ConsumerState<WatchPage>
   Widget _buildMidrollOverlay() {
     final ad = _currentMidrollAd;
     if (ad == null || !_midrollBreakActive) return const SizedBox();
+    _markMidrollOverlayVisible(ad.adId);
 
     return Container(
       color: Colors.black,
       child: Stack(
         fit: StackFit.expand,
         children: [
-          if (_adVideoController != null && _adVideoController!.value.isInitialized)
+          if (_adVideoController != null &&
+              _adVideoController!.value.isInitialized)
             Positioned.fill(
               child: FittedBox(
                 fit: BoxFit.cover,
@@ -2195,7 +2418,11 @@ class _WatchPageState extends ConsumerState<WatchPage>
                 errorBuilder: (context, error, stackTrace) => Container(
                   color: Colors.black45,
                   child: const Center(
-                    child: Icon(Icons.campaign, color: Colors.white54, size: 40),
+                    child: Icon(
+                      Icons.campaign,
+                      color: Colors.white54,
+                      size: 40,
+                    ),
                   ),
                 ),
               ),
@@ -2223,18 +2450,23 @@ class _WatchPageState extends ConsumerState<WatchPage>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
                     decoration: BoxDecoration(
                       color: Colors.amber.withValues(alpha: 0.25),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
+                      border: Border.all(
+                        color: Colors.amber.withValues(alpha: 0.5),
+                      ),
                     ),
                     child: Text(
                       _adBreakType == 'preroll'
-                          ? 'Ad'
+                          ? 'Pre-Roll Ad'
                           : _adBreakType == 'postroll'
-                              ? 'Post-Roll Ad'
-                              : 'Sponsored Break',
+                          ? 'Post-Roll Ad'
+                          : 'Mid-Roll Ad',
                       style: const TextStyle(
                         color: Colors.amber,
                         fontSize: 10,
@@ -2264,65 +2496,45 @@ class _WatchPageState extends ConsumerState<WatchPage>
             ),
           ),
 
-          // Bottom-Left: Skip Countdown Button (exact same baseline as Visit Sponsor)
+          // Ad breaks are non-skippable for their full configured slot.
           Positioned(
             bottom: 12,
             left: 12,
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                onTap: _midrollSkipUnlocked ? () => _finishMidroll('skip') : null,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.85),
                 borderRadius: BorderRadius.circular(20),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: _midrollSkipUnlocked
-                        ? Colors.white
-                        : Colors.black.withValues(alpha: 0.85),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: _midrollSkipUnlocked
-                          ? Colors.white
-                          : Colors.white.withValues(alpha: 0.5),
-                      width: 1.5,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withValues(alpha: 0.5),
-                        blurRadius: 6,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      if (_midrollSkipUnlocked) ...[
-                        const Text(
-                          'Skip Ad',
-                          style: TextStyle(
-                            color: Colors.black,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(width: 4),
-                        const Icon(Icons.skip_next, size: 16, color: Colors.black),
-                      ] else ...[
-                        const Icon(Icons.timer_outlined, size: 14, color: Colors.amber),
-                        const SizedBox(width: 6),
-                        Text(
-                          'Skip in ${_midrollCountdown}s',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.5),
+                  width: 1.5,
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.5),
+                    blurRadius: 6,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Icon(
+                    Icons.timer_outlined,
+                    size: 14,
+                    color: Colors.amber,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'Ad ends in ${_midrollCountdown}s',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -2335,7 +2547,9 @@ class _WatchPageState extends ConsumerState<WatchPage>
               color: Colors.transparent,
               child: InkWell(
                 onTap: () async {
-                  ref.read(adServiceProvider).trackMidrollEvent(ad.adId, kind: 'click');
+                  ref
+                      .read(adServiceProvider)
+                      .trackMidrollEvent(ad.adId, kind: 'click');
                   final targetUrl = ad.linkUrl.trim().isNotEmpty
                       ? ad.linkUrl.trim()
                       : 'https://inplayer.in';
@@ -2347,7 +2561,10 @@ class _WatchPageState extends ConsumerState<WatchPage>
                 },
                 borderRadius: BorderRadius.circular(20),
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 14,
+                    vertical: 8,
+                  ),
                   decoration: BoxDecoration(
                     color: Colors.black.withValues(alpha: 0.85),
                     borderRadius: BorderRadius.circular(20),
@@ -2914,11 +3131,13 @@ class _WatchPageState extends ConsumerState<WatchPage>
     }
 
     final authState = ref.watch(authStateProvider);
-    final currentUser =
-        authState is AuthStateAuthenticated ? authState.user : null;
+    final currentUser = authState is AuthStateAuthenticated
+        ? authState.user
+        : null;
     final isSignedIn = currentUser != null;
-    final visibleComments =
-        _commentsExpanded ? _comments : _comments.take(3).toList();
+    final visibleComments = _commentsExpanded
+        ? _comments
+        : _comments.take(3).toList();
     final totalCount = _comments.isNotEmpty
         ? _comments.length
         : (_video?.commentCount ?? 0);
@@ -3110,9 +3329,15 @@ class _WatchPageState extends ConsumerState<WatchPage>
                                         ),
                                         decoration: BoxDecoration(
                                           color: context.isDark
-                                              ? Colors.white.withValues(alpha: 0.06)
-                                              : Colors.black.withValues(alpha: 0.04),
-                                          borderRadius: BorderRadius.circular(8),
+                                              ? Colors.white.withValues(
+                                                  alpha: 0.06,
+                                                )
+                                              : Colors.black.withValues(
+                                                  alpha: 0.04,
+                                                ),
+                                          borderRadius: BorderRadius.circular(
+                                            8,
+                                          ),
                                         ),
                                         child: Text(
                                           emoji,
@@ -3134,8 +3359,8 @@ class _WatchPageState extends ConsumerState<WatchPage>
                               onTap: hasText && !_postingComment
                                   ? _postComment
                                   : (isSignedIn
-                                      ? null
-                                      : () => _showSnack(
+                                        ? null
+                                        : () => _showSnack(
                                             'Please sign in to comment.',
                                           )),
                               child: AnimatedContainer(
@@ -3151,8 +3376,12 @@ class _WatchPageState extends ConsumerState<WatchPage>
                                   color: hasText && !_postingComment
                                       ? null
                                       : (context.isDark
-                                          ? Colors.white.withValues(alpha: 0.1)
-                                          : Colors.black.withValues(alpha: 0.08)),
+                                            ? Colors.white.withValues(
+                                                alpha: 0.1,
+                                              )
+                                            : Colors.black.withValues(
+                                                alpha: 0.08,
+                                              )),
                                   borderRadius: BorderRadius.circular(16),
                                 ),
                                 child: _postingComment
@@ -3404,7 +3633,16 @@ class _WatchCommentsSheetState extends ConsumerState<_WatchCommentsSheet> {
   bool _posting = false;
 
   static const List<String> _sheetEmojis = [
-    '❤️', '🔥', '👏', '😂', '😍', '😮', '💯', '🙌', '✨', '🎉',
+    '❤️',
+    '🔥',
+    '👏',
+    '😂',
+    '😍',
+    '😮',
+    '💯',
+    '🙌',
+    '✨',
+    '🎉',
   ];
 
   @override
@@ -3425,8 +3663,9 @@ class _WatchCommentsSheetState extends ConsumerState<_WatchCommentsSheet> {
   Future<void> _fetchComments() async {
     setState(() => _loading = true);
     try {
-      final list =
-          await ref.read(commentServiceProvider).getComments(widget.videoId);
+      final list = await ref
+          .read(commentServiceProvider)
+          .getComments(widget.videoId);
       if (mounted) {
         setState(() {
           _comments = Comment.assembleThreadedComments(list);
@@ -3495,7 +3734,8 @@ class _WatchCommentsSheetState extends ConsumerState<_WatchCommentsSheet> {
         FocusScope.of(context).unfocus();
         var commentToAdd = res.comment!;
         final auth = ref.read(authStateProvider);
-        if ((commentToAdd.userUsername == null || commentToAdd.userUsername!.isEmpty) &&
+        if ((commentToAdd.userUsername == null ||
+                commentToAdd.userUsername!.isEmpty) &&
             auth is AuthStateAuthenticated &&
             auth.user.username.isNotEmpty) {
           commentToAdd = commentToAdd.copyWith(
@@ -3524,8 +3764,9 @@ class _WatchCommentsSheetState extends ConsumerState<_WatchCommentsSheet> {
   @override
   Widget build(BuildContext context) {
     final authState = ref.watch(authStateProvider);
-    final currentUser =
-        authState is AuthStateAuthenticated ? authState.user : null;
+    final currentUser = authState is AuthStateAuthenticated
+        ? authState.user
+        : null;
     final isSignedIn = currentUser != null;
 
     return Center(
@@ -3534,264 +3775,280 @@ class _WatchCommentsSheetState extends ConsumerState<_WatchCommentsSheet> {
         child: Container(
           height: MediaQuery.of(context).size.height * 0.70,
           decoration: BoxDecoration(
-            color: context.isDark ? AppColors.drawerDark : AppColors.surfaceLight,
+            color: context.isDark
+                ? AppColors.drawerDark
+                : AppColors.surfaceLight,
             borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
             border: Border.all(color: context.borderSubtle),
           ),
-      child: Column(
-        children: [
-          // Drag Handle
-          Container(
-            margin: const EdgeInsets.only(top: 10, bottom: 6),
-            width: 38,
-            height: 4,
-            decoration: BoxDecoration(
-              color: context.textDim.withValues(alpha: 0.3),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Row(
-                  children: [
-                    Text(
-                      'Comments',
-                      style: TextStyle(
-                        color: context.textPrimary,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    if (_comments.isNotEmpty) ...[
-                      const SizedBox(width: 8),
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 2,
-                        ),
-                        decoration: BoxDecoration(
-                          color: AppColors.brandOrange.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(
-                          '${_comments.length}',
-                          style: const TextStyle(
-                            color: AppColors.brandOrange,
-                            fontSize: 12,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ],
+          child: Column(
+            children: [
+              // Drag Handle
+              Container(
+                margin: const EdgeInsets.only(top: 10, bottom: 6),
+                width: 38,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: context.textDim.withValues(alpha: 0.3),
+                  borderRadius: BorderRadius.circular(2),
                 ),
-                IconButton(
-                  icon: Icon(
-                    Icons.close,
-                    color: context.textSecondary,
-                    size: 20,
-                  ),
-                  onPressed: () => Navigator.pop(context),
+              ),
+              Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 8,
                 ),
-              ],
-            ),
-          ),
-          Divider(color: context.borderSubtle, height: 1),
-
-          // Comments List
-          Expanded(
-            child: _loading
-                ? const Center(
-                    child: CircularProgressIndicator(
-                      color: AppColors.brandOrange,
-                    ),
-                  )
-                : _comments.isEmpty
-                ? Center(
-                    child: Text(
-                      'No comments yet. Be the first to comment!',
-                      style: TextStyle(color: context.textSecondary),
-                    ),
-                  )
-                : ListView.builder(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    itemCount: _comments.length,
-                    itemBuilder: (ctx, i) {
-                      final c = _comments[i];
-                      return CommentThreadTile(
-                        key: ValueKey(c.commentId),
-                        comment: c,
-                        videoId: widget.videoId,
-                        onProfileNavigated: () {
-                          Navigator.of(context).pop();
-                        },
-                        onCommentDeleted: (deletedId) {
-                          setState(() {
-                            _comments = _comments.where((x) => x.commentId != deletedId).toList();
-                          });
-                          widget.onCommentDeleted?.call(deletedId);
-                        },
-                        onReplyAdded: (newReply) {
-                          setState(() {
-                            final updated = [
-                              newReply,
-                              ..._comments.where((x) => x.commentId != newReply.commentId),
-                            ];
-                            _comments = Comment.assembleThreadedComments(updated);
-                          });
-                          widget.onCommentAdded(newReply);
-                        },
-                      );
-                    },
-                  ),
-          ),
-
-          // Composer Bar at Bottom
-          Container(
-            padding: EdgeInsets.fromLTRB(
-              16,
-              8,
-              16,
-              MediaQuery.of(context).viewInsets.bottom + 12,
-            ),
-            decoration: BoxDecoration(
-              color: context.isDark
-                  ? Colors.black.withValues(alpha: 0.5)
-                  : Colors.white,
-              border: Border(top: BorderSide(color: context.borderSubtle)),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    UserAvatar(
-                      avatarUrl: currentUser?.avatarUrl,
-                      name: currentUser?.displayName ?? 'User',
-                      size: 28,
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: TextField(
-                        controller: _commentCtrl,
-                        style: TextStyle(
-                          color: context.textPrimary,
-                          fontSize: 13,
-                        ),
-                        textInputAction: TextInputAction.send,
-                        onSubmitted: (_) => _postComment(),
-                        decoration: InputDecoration(
-                          hintText: isSignedIn
-                              ? 'Add a comment...'
-                              : 'Sign in to comment...',
-                          hintStyle: TextStyle(
-                            color: context.textDim,
-                            fontSize: 13,
-                          ),
-                          filled: true,
-                          fillColor: context.isDark
-                              ? Colors.white.withValues(alpha: 0.08)
-                              : Colors.black.withValues(alpha: 0.04),
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 10,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(20),
-                            borderSide: BorderSide.none,
+                    Row(
+                      children: [
+                        Text(
+                          'Comments',
+                          style: TextStyle(
+                            color: context.textPrimary,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
                           ),
                         ),
-                      ),
-                    ),
-                    const SizedBox(width: 8),
-                    ValueListenableBuilder<TextEditingValue>(
-                      valueListenable: _commentCtrl,
-                      builder: (context, value, _) {
-                        final hasText = value.text.trim().isNotEmpty;
-                        return GestureDetector(
-                          onTap: hasText && !_posting ? _postComment : null,
-                          child: Container(
-                            width: 34,
-                            height: 34,
+                        if (_comments.isNotEmpty) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: hasText ? AppColors.flameGradient : null,
-                              color: hasText
-                                  ? null
-                                  : (context.isDark
-                                      ? Colors.white12
-                                      : Colors.black12),
+                              color: AppColors.brandOrange.withValues(
+                                alpha: 0.15,
+                              ),
+                              borderRadius: BorderRadius.circular(10),
                             ),
-                            alignment: Alignment.center,
-                            child: _posting
-                                ? const SizedBox(
-                                    width: 14,
-                                    height: 14,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      valueColor:
-                                          AlwaysStoppedAnimation(Colors.white),
-                                    ),
-                                  )
-                                : Icon(
-                                    Icons.arrow_upward_rounded,
-                                    color: hasText
-                                        ? Colors.white
-                                        : context.textDim,
-                                    size: 16,
-                                  ),
+                            child: Text(
+                              '${_comments.length}',
+                              style: const TextStyle(
+                                color: AppColors.brandOrange,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w700,
+                              ),
+                            ),
                           ),
-                        );
-                      },
+                        ],
+                      ],
+                    ),
+                    IconButton(
+                      icon: Icon(
+                        Icons.close,
+                        color: context.textSecondary,
+                        size: 20,
+                      ),
+                      onPressed: () => Navigator.pop(context),
                     ),
                   ],
                 ),
-                const SizedBox(height: 6),
-                // Sheet Quick Emojis
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      for (final emoji in _sheetEmojis)
-                        Padding(
-                          padding: const EdgeInsets.only(right: 6),
-                          child: InkWell(
-                            onTap: () => _insertEmoji(emoji),
-                            borderRadius: BorderRadius.circular(8),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 7,
-                                vertical: 3,
+              ),
+              Divider(color: context.borderSubtle, height: 1),
+
+              // Comments List
+              Expanded(
+                child: _loading
+                    ? const Center(
+                        child: CircularProgressIndicator(
+                          color: AppColors.brandOrange,
+                        ),
+                      )
+                    : _comments.isEmpty
+                    ? Center(
+                        child: Text(
+                          'No comments yet. Be the first to comment!',
+                          style: TextStyle(color: context.textSecondary),
+                        ),
+                      )
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 16,
+                          vertical: 12,
+                        ),
+                        itemCount: _comments.length,
+                        itemBuilder: (ctx, i) {
+                          final c = _comments[i];
+                          return CommentThreadTile(
+                            key: ValueKey(c.commentId),
+                            comment: c,
+                            videoId: widget.videoId,
+                            onProfileNavigated: () {
+                              Navigator.of(context).pop();
+                            },
+                            onCommentDeleted: (deletedId) {
+                              setState(() {
+                                _comments = _comments
+                                    .where((x) => x.commentId != deletedId)
+                                    .toList();
+                              });
+                              widget.onCommentDeleted?.call(deletedId);
+                            },
+                            onReplyAdded: (newReply) {
+                              setState(() {
+                                final updated = [
+                                  newReply,
+                                  ..._comments.where(
+                                    (x) => x.commentId != newReply.commentId,
+                                  ),
+                                ];
+                                _comments = Comment.assembleThreadedComments(
+                                  updated,
+                                );
+                              });
+                              widget.onCommentAdded(newReply);
+                            },
+                          );
+                        },
+                      ),
+              ),
+
+              // Composer Bar at Bottom
+              Container(
+                padding: EdgeInsets.fromLTRB(
+                  16,
+                  8,
+                  16,
+                  MediaQuery.of(context).viewInsets.bottom + 12,
+                ),
+                decoration: BoxDecoration(
+                  color: context.isDark
+                      ? Colors.black.withValues(alpha: 0.5)
+                      : Colors.white,
+                  border: Border(top: BorderSide(color: context.borderSubtle)),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Row(
+                      children: [
+                        UserAvatar(
+                          avatarUrl: currentUser?.avatarUrl,
+                          name: currentUser?.displayName ?? 'User',
+                          size: 28,
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: TextField(
+                            controller: _commentCtrl,
+                            style: TextStyle(
+                              color: context.textPrimary,
+                              fontSize: 13,
+                            ),
+                            textInputAction: TextInputAction.send,
+                            onSubmitted: (_) => _postComment(),
+                            decoration: InputDecoration(
+                              hintText: isSignedIn
+                                  ? 'Add a comment...'
+                                  : 'Sign in to comment...',
+                              hintStyle: TextStyle(
+                                color: context.textDim,
+                                fontSize: 13,
                               ),
-                              decoration: BoxDecoration(
-                                color: context.isDark
-                                    ? Colors.white.withValues(alpha: 0.06)
-                                    : Colors.black.withValues(alpha: 0.04),
-                                borderRadius: BorderRadius.circular(8),
+                              filled: true,
+                              fillColor: context.isDark
+                                  ? Colors.white.withValues(alpha: 0.08)
+                                  : Colors.black.withValues(alpha: 0.04),
+                              contentPadding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 10,
                               ),
-                              child: Text(
-                                emoji,
-                                style: const TextStyle(fontSize: 15),
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(20),
+                                borderSide: BorderSide.none,
                               ),
                             ),
                           ),
                         ),
-                    ],
-                  ),
+                        const SizedBox(width: 8),
+                        ValueListenableBuilder<TextEditingValue>(
+                          valueListenable: _commentCtrl,
+                          builder: (context, value, _) {
+                            final hasText = value.text.trim().isNotEmpty;
+                            return GestureDetector(
+                              onTap: hasText && !_posting ? _postComment : null,
+                              child: Container(
+                                width: 34,
+                                height: 34,
+                                decoration: BoxDecoration(
+                                  shape: BoxShape.circle,
+                                  gradient: hasText
+                                      ? AppColors.flameGradient
+                                      : null,
+                                  color: hasText
+                                      ? null
+                                      : (context.isDark
+                                            ? Colors.white12
+                                            : Colors.black12),
+                                ),
+                                alignment: Alignment.center,
+                                child: _posting
+                                    ? const SizedBox(
+                                        width: 14,
+                                        height: 14,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          valueColor: AlwaysStoppedAnimation(
+                                            Colors.white,
+                                          ),
+                                        ),
+                                      )
+                                    : Icon(
+                                        Icons.arrow_upward_rounded,
+                                        color: hasText
+                                            ? Colors.white
+                                            : context.textDim,
+                                        size: 16,
+                                      ),
+                              ),
+                            );
+                          },
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    // Sheet Quick Emojis
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          for (final emoji in _sheetEmojis)
+                            Padding(
+                              padding: const EdgeInsets.only(right: 6),
+                              child: InkWell(
+                                onTap: () => _insertEmoji(emoji),
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 7,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: context.isDark
+                                        ? Colors.white.withValues(alpha: 0.06)
+                                        : Colors.black.withValues(alpha: 0.04),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    emoji,
+                                    style: const TextStyle(fontSize: 15),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
-        ],
+        ),
       ),
-    ),
-  ),
-);
-}
+    );
+  }
 }

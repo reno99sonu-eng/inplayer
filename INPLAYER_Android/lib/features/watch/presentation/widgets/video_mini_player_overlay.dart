@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -374,14 +376,22 @@ class _VideoMiniPlayerOverlayState
                   child: AnimatedBuilder(
                     animation: controller,
                     builder: (context, _) {
-                      final playing = controller.value.isPlaying;
+                      final value = controller.value;
+                      final playing = value.isPlaying;
+                      final atEnd =
+                          value.duration > Duration.zero &&
+                          value.position >=
+                              value.duration -
+                                  const Duration(milliseconds: 200);
                       return SizedBox(
                         width: 52,
                         height: 52,
                         child: GestureDetector(
-                          onTap: () => ref
-                              .read(videoMiniPlayerServiceProvider)
-                              .togglePlayPause(),
+                          onTap: () => unawaited(
+                            ref
+                                .read(videoMiniPlayerServiceProvider)
+                                .togglePlayPause(),
+                          ),
                           behavior: HitTestBehavior.opaque,
                           child: Center(
                             child: Container(
@@ -404,6 +414,8 @@ class _VideoMiniPlayerOverlayState
                               child: Icon(
                                 playing
                                     ? Icons.pause_rounded
+                                    : atEnd
+                                    ? Icons.replay_rounded
                                     : Icons.play_arrow_rounded,
                                 color: Colors.white,
                                 size: 23,

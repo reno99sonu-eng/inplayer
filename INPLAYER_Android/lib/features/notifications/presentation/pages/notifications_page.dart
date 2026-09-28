@@ -6,6 +6,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/pattern_background.dart';
 import '../../../../services/notification_service.dart';
 import '../../../../services/notification_badge_service.dart';
+import '../../../../services/message_service.dart';
 import '../../../../models/notification_item.dart';
 
 class NotificationsPage extends ConsumerStatefulWidget {
@@ -18,6 +19,8 @@ class NotificationsPage extends ConsumerStatefulWidget {
 class _NotificationsPageState extends ConsumerState<NotificationsPage> {
   bool _loading = true;
   List<NotificationItem> _notifications = [];
+  final Set<String> _respondingToRequests = {};
+  Map<String, String> _messageRequestStates = {};
 
   @override
   void initState() {
@@ -33,10 +36,34 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    final notifications = await ref.read(notificationServiceProvider).getNotifications();
+    final notificationFuture = ref
+        .read(notificationServiceProvider)
+        .getNotifications();
+    final conversationsFuture = ref
+        .read(messageServiceProvider)
+        .getConversations();
+    final notifications = await notificationFuture;
+    final conversations = await conversationsFuture;
     if (!mounted) return;
+    final requestStates = <String, String>{
+      for (final conversation in conversations.requests)
+        conversation.conversationId: 'pending',
+      for (final conversation in conversations.conversations)
+        conversation.conversationId: conversation.requestStatus,
+    };
+    if (conversations.success) {
+      for (final notification in notifications) {
+        final id = notification.conversationId;
+        if (notification.type == 'message_request' &&
+            id != null &&
+            !requestStates.containsKey(id)) {
+          requestStates[id] = 'unavailable';
+        }
+      }
+    }
     setState(() {
       _notifications = notifications;
+      _messageRequestStates = requestStates;
       _loading = false;
     });
 
@@ -108,14 +135,15 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
     return AppColors.brandOrange;
   }
 
-  bool _isMessageType(String type) =>
-      type == 'message' || type == 'message_request';
-
   /// Whether tapping this row does anything
   bool _isTappable(NotificationItem n) {
     if (n.type == 'live_stream') return true;
     if (n.type == 'subscribe') return true;
-    if (_isMessageType(n.type)) return n.conversationId != null;
+    if (n.type == 'message_request') {
+      return n.conversationId != null &&
+          _messageRequestStates[n.conversationId] == 'accepted';
+    }
+    if (n.type == 'message') return n.conversationId != null;
     if (n.videoId != null) return true;
     final msg = n.message.toLowerCase();
     if (msg.contains('copyright') ||
@@ -133,9 +161,11 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: const Text(
-              "Watching other creators' live streams isn't available in the app yet."),
-          backgroundColor:
-              context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+            "Watching other creators' live streams isn't available in the app yet.",
+          ),
+          backgroundColor: context.isDark
+              ? AppColors.surfaceDark
+              : AppColors.surfaceLight,
         ),
       );
       return;
@@ -144,7 +174,14 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
       context.push('/studio');
       return;
     }
-    if (_isMessageType(n.type) && n.conversationId != null) {
+    if (n.type == 'message_request') {
+      if (_messageRequestStates[n.conversationId] == 'accepted' &&
+          n.conversationId != null) {
+        context.push('/messages/${n.conversationId}');
+      }
+      return;
+    }
+    if (n.type == 'message' && n.conversationId != null) {
       context.push('/messages/${n.conversationId}');
       return;
     }
@@ -174,11 +211,7 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
           ),
           content: Text(
             n.message,
-            style: TextStyle(
-              color: ctx.textPrimary,
-              fontSize: 14,
-              height: 1.4,
-            ),
+            style: TextStyle(color: ctx.textPrimary, fontSize: 14, height: 1.4),
           ),
           actions: [
             TextButton(
@@ -196,6 +229,47 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
       );
       return;
     }
+  }
+
+  Future<void> _respondToMessageRequest(
+    NotificationItem notification,
+    bool accept,
+  ) async {
+    final conversationId = notification.conversationId;
+    if (conversationId == null ||
+        _respondingToRequests.contains(conversationId)) {
+      return;
+    }
+
+    setState(() => _respondingToRequests.add(conversationId));
+    final success = await ref
+        .read(messageServiceProvider)
+        .conversationAction(conversationId, accept ? 'accept' : 'decline');
+    if (!mounted) return;
+
+    setState(() {
+      _respondingToRequests.remove(conversationId);
+      if (success) {
+        _messageRequestStates[conversationId] = accept
+            ? 'accepted'
+            : 'declined';
+      }
+    });
+
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          success
+              ? (accept
+                    ? 'Message request accepted.'
+                    : 'Message request declined.')
+              : "Couldn't update that message request. Try again.",
+        ),
+        backgroundColor: context.isDark
+            ? AppColors.surfaceDark
+            : AppColors.surfaceLight,
+      ),
+    );
   }
 
   @override
@@ -218,89 +292,200 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
         ),
         body: _loading
             ? const Center(
-                child: CircularProgressIndicator(color: AppColors.brandOrange))
+                child: CircularProgressIndicator(color: AppColors.brandOrange),
+              )
             : Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 720),
                   child: RefreshIndicator(
-                color: AppColors.brandOrange,
-                backgroundColor: context.bgCard,
-                onRefresh: _load,
-                child: _notifications.isEmpty
-                    ? ListView(
-                        children: [
-                          SizedBox(
-                            height: MediaQuery.of(context).size.height * 0.6,
-                            child: Center(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(Icons.notifications_none,
-                                      size: 48, color: context.textDim),
-                                  const SizedBox(height: 16),
-                                  Text("You're all caught up",
-                                      style:
-                                          TextStyle(color: context.textSecondary)),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      )
-                    : ListView.separated(
-                        itemCount: _notifications.length,
-                        separatorBuilder: (context, index) =>
-                            Divider(height: 1, color: context.borderSubtle),
-                        itemBuilder: (context, index) {
-                          final n = _notifications[index];
-                          return ListTile(
-                            onTap: _isTappable(n) ? () => _handleTap(n) : null,
-                            tileColor: n.read
-                                ? Colors.transparent
-                                : AppColors.brandOrange.withValues(alpha: 0.08),
-                            leading: CircleAvatar(
-                              radius: 18,
-                              backgroundColor: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-                              child: Icon(
-                                _iconFor(n),
-                                size: 18,
-                                color: _iconColorFor(n),
-                              ),
-                            ),
-                            title: Text(
-                              n.message,
-                              style: TextStyle(
-                                color: context.textPrimary,
-                                fontSize: 13.5,
-                                fontWeight: n.read ? FontWeight.normal : FontWeight.bold,
-                              ),
-                            ),
-                            subtitle: Padding(
-                              padding: const EdgeInsets.only(top: 4),
-                              child: Text(
-                                n.timeAgo,
-                                style: TextStyle(
-                                  color: context.textDim,
-                                  fontSize: 11,
+                    color: AppColors.brandOrange,
+                    backgroundColor: context.bgCard,
+                    onRefresh: _load,
+                    child: _notifications.isEmpty
+                        ? ListView(
+                            children: [
+                              SizedBox(
+                                height:
+                                    MediaQuery.of(context).size.height * 0.6,
+                                child: Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.notifications_none,
+                                        size: 48,
+                                        color: context.textDim,
+                                      ),
+                                      const SizedBox(height: 16),
+                                      Text(
+                                        "You're all caught up",
+                                        style: TextStyle(
+                                          color: context.textSecondary,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ),
-                            ),
-                            trailing: n.read
-                                ? null
-                                : Container(
-                                    width: 8,
-                                    height: 8,
-                                    decoration: const BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      color: AppColors.brandOrange,
-                                    ),
+                            ],
+                          )
+                        : ListView.separated(
+                            itemCount: _notifications.length,
+                            separatorBuilder: (context, index) =>
+                                Divider(height: 1, color: context.borderSubtle),
+                            itemBuilder: (context, index) {
+                              final n = _notifications[index];
+                              final requestStatus = n.conversationId == null
+                                  ? null
+                                  : _messageRequestStates[n.conversationId];
+                              final isRequest = n.type == 'message_request';
+                              final canRespond =
+                                  isRequest &&
+                                  n.conversationId != null &&
+                                  (requestStatus == null ||
+                                      requestStatus == 'pending');
+                              final isResponding =
+                                  n.conversationId != null &&
+                                  _respondingToRequests.contains(
+                                    n.conversationId,
+                                  );
+                              return ListTile(
+                                onTap: _isTappable(n)
+                                    ? () => _handleTap(n)
+                                    : null,
+                                tileColor: n.read
+                                    ? Colors.transparent
+                                    : AppColors.brandOrange.withValues(
+                                        alpha: 0.08,
+                                      ),
+                                leading: CircleAvatar(
+                                  radius: 18,
+                                  backgroundColor: context.isDark
+                                      ? AppColors.surfaceDark
+                                      : AppColors.surfaceLight,
+                                  child: Icon(
+                                    _iconFor(n),
+                                    size: 18,
+                                    color: _iconColorFor(n),
                                   ),
-                          );
-                        },
-                      ),
+                                ),
+                                title: Text(
+                                  n.message,
+                                  style: TextStyle(
+                                    color: context.textPrimary,
+                                    fontSize: 13.5,
+                                    fontWeight: n.read
+                                        ? FontWeight.normal
+                                        : FontWeight.bold,
+                                  ),
+                                ),
+                                subtitle: Padding(
+                                  padding: const EdgeInsets.only(top: 4),
+                                  child: Column(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        n.timeAgo,
+                                        style: TextStyle(
+                                          color: context.textDim,
+                                          fontSize: 11,
+                                        ),
+                                      ),
+                                      if (isRequest && canRespond) ...[
+                                        const SizedBox(height: 8),
+                                        Wrap(
+                                          spacing: 8,
+                                          runSpacing: 4,
+                                          children: [
+                                            OutlinedButton(
+                                              onPressed: isResponding
+                                                  ? null
+                                                  : () =>
+                                                        _respondToMessageRequest(
+                                                          n,
+                                                          false,
+                                                        ),
+                                              style: OutlinedButton.styleFrom(
+                                                visualDensity:
+                                                    VisualDensity.compact,
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 12,
+                                                      vertical: 4,
+                                                    ),
+                                              ),
+                                              child: const Text('Reject'),
+                                            ),
+                                            FilledButton(
+                                              onPressed: isResponding
+                                                  ? null
+                                                  : () =>
+                                                        _respondToMessageRequest(
+                                                          n,
+                                                          true,
+                                                        ),
+                                              style: FilledButton.styleFrom(
+                                                backgroundColor:
+                                                    AppColors.brandOrange,
+                                                foregroundColor: Colors.white,
+                                                visualDensity:
+                                                    VisualDensity.compact,
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      horizontal: 12,
+                                                      vertical: 4,
+                                                    ),
+                                              ),
+                                              child: isResponding
+                                                  ? const SizedBox(
+                                                      width: 14,
+                                                      height: 14,
+                                                      child:
+                                                          CircularProgressIndicator(
+                                                            strokeWidth: 2,
+                                                          ),
+                                                    )
+                                                  : const Text('Accept'),
+                                            ),
+                                          ],
+                                        ),
+                                      ] else if (isRequest &&
+                                          requestStatus != null) ...[
+                                        const SizedBox(height: 5),
+                                        Text(
+                                          requestStatus == 'accepted'
+                                              ? 'Request accepted'
+                                              : requestStatus == 'declined'
+                                              ? 'Request declined'
+                                              : 'Request no longer available',
+                                          style: TextStyle(
+                                            color: context.textDim,
+                                            fontSize: 11,
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                ),
+                                trailing: n.read
+                                    ? null
+                                    : Container(
+                                        width: 8,
+                                        height: 8,
+                                        decoration: const BoxDecoration(
+                                          shape: BoxShape.circle,
+                                          color: AppColors.brandOrange,
+                                        ),
+                                      ),
+                              );
+                            },
+                          ),
+                  ),
+                ),
               ),
-            ),
-          ),
       ),
     );
   }

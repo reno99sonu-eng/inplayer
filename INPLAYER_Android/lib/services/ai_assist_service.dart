@@ -18,6 +18,11 @@ class AIPromptContext {
   /// 'video' | 'short' | 'music'
   final String contentType;
 
+  /// Music metadata is explicit source context because the model cannot
+  /// listen to the audio file uploaded by the app.
+  final String? musicGenre;
+  final String? musicLanguage;
+
   /// Free text the creator typed specifically to help the AI. The model
   /// cannot watch the video, so when this is present it is by far the
   /// strongest signal available — it is what stopped titles coming back
@@ -36,6 +41,8 @@ class AIPromptContext {
     required this.description,
     required this.category,
     required this.contentType,
+    this.musicGenre,
+    this.musicLanguage,
     this.userDescription,
     this.images = const [],
   });
@@ -71,35 +78,40 @@ class AIAssistService {
   /// all. Feeding that in as if it were a real working title is exactly why
   /// suggestions came back looking random, so detect the shape and tell the
   /// model to ignore it instead.
-  static bool _looksLikeAutoFilename(String title) {
+  static bool looksLikeAutoFilename(String title) {
     final t = title.trim();
     if (t.isEmpty) return true;
-    if (RegExp(r'^(?:img|vid|dcim|video|movie|clip|mov|rec)[-_ ]?\d{3,}',
-            caseSensitive: false)
-        .hasMatch(t)) {
+    if (RegExp(
+      r'^(?:img|vid|dcim|video|movie|clip|mov|rec)[-_ ]?\d{3,}',
+      caseSensitive: false,
+    ).hasMatch(t)) {
       return true;
     }
     if (RegExp(r'^\d{6,}').hasMatch(t)) return true;
-    if (RegExp(r'^[a-f0-9]{8}-[a-f0-9-]{4,}$', caseSensitive: false)
-        .hasMatch(t)) {
+    if (RegExp(
+      r'^[a-f0-9]{8}-[a-f0-9-]{4,}$',
+      caseSensitive: false,
+    ).hasMatch(t)) {
       return true;
     }
     return false;
   }
 
   static String buildPrompt(AIGenerateType type, AIPromptContext ctx) {
-    final isMusic = ctx.contentType == 'music' || ctx.category.toLowerCase() == 'music';
-    final isShort = ctx.contentType == 'short' ||
+    final isMusic =
+        ctx.contentType == 'music' || ctx.category.toLowerCase() == 'music';
+    final isShort =
+        ctx.contentType == 'short' ||
         ctx.category.toLowerCase().contains('short') ||
         ctx.category.toLowerCase().contains('raftaar');
 
     final format = isShort
         ? 'vertical short-form video (like a Reel/Short)'
         : isMusic
-            ? 'music track / song (audio track with cover art, not a video)'
-            : 'video';
+        ? 'music track / song (audio track with cover art, not a video)'
+        : 'video';
 
-    final titleLine = _looksLikeAutoFilename(ctx.title)
+    final titleLine = looksLikeAutoFilename(ctx.title)
         ? 'No real title yet — the current value is just an auto-generated filename, ignore it as content signal.'
         : 'Working title: ${ctx.title.trim()}';
 
@@ -111,17 +123,36 @@ class AIAssistService {
         ? "What this content is actually about, in the creator's own words: ${ctx.userDescription!.trim()}"
         : null;
 
+    final musicMetadata = isMusic
+        ? [
+            if ((ctx.musicGenre?.trim().isNotEmpty ?? false))
+              if (ctx.musicGenre!.trim().toLowerCase() != 'other')
+                'Track genre: ${ctx.musicGenre!.trim()}',
+            if ((ctx.musicLanguage?.trim().isNotEmpty ?? false))
+              if (ctx.musicLanguage!.trim().toLowerCase() != 'other')
+                'Track language: ${ctx.musicLanguage!.trim()}',
+          ]
+        : const <String>[];
+
     final context = [
       'This is a ${ctx.category} $format.',
       creatorContextLine,
+      ...musicMetadata,
       titleLine,
       descriptionLine,
     ].whereType<String>().join('\n');
 
+    final accuracyNote = isMusic
+        ? 'Use only the title, creator description, genre and language as facts. The attached cover art is not the audio: do not claim specific lyrics, instruments, tempo, or sound qualities unless the creator stated them.'
+        : ctx.images.isNotEmpty
+        ? 'Use only details supported by the creator context and the attached real frames. Do not invent people, locations, events, or actions. If the source does not establish a detail, leave it out.'
+        : 'Use only details stated in the creator-provided context above. Do not infer people, locations, events, or actions from the category or filename.';
+    final groundedContext = '$context\n$accuracyNote';
+
     switch (type) {
       case AIGenerateType.title:
         if (isMusic) {
-          return '$context\n\n'
+          return '$groundedContext\n\n'
               'Generate five artistic, radio-ready song title options for this music track/song in the ${ctx.category} genre. '
               'The five titles must each follow these distinct creative styles:\n'
               '(1) Poetic / emotional — heartfelt, soulful title that captures the feeling;\n'
@@ -131,7 +162,7 @@ class AIAssistService {
               '(5) Minimalist aesthetic — one or two iconic words, clean and timeless.\n'
               'Return ONLY the five song titles, one per line, no numbering, no quotation marks, no labels identifying the style.';
         } else if (isShort) {
-          return '$context\n\n'
+          return '$groundedContext\n\n'
               'Generate five viral, scroll-stopping title hooks for this short-form vertical video (Raftaar/Short). '
               'Each title MUST be under 50 characters, punchy, and follow these 5 viral hook styles:\n'
               '(1) Curiosity hook — irresistible scroll-stopper;\n'
@@ -141,7 +172,7 @@ class AIAssistService {
               '(5) Bold & punchy phrase — short, striking statement.\n'
               'Return ONLY the five titles, one per line, strictly under 50 characters each, no numbering, no quotation marks, no labels.';
         } else {
-          return '$context\n\n'
+          return '$groundedContext\n\n'
               'Generate five title options appropriate for the ${ctx.category} category. '
               'Each of the five must be written in a genuinely different TONE, not just a different structure — use exactly these five tones, one per title, in this order: '
               '(1) high-CTR/clickbait — bold, urgent, makes a big promise; '
@@ -154,39 +185,48 @@ class AIAssistService {
 
       case AIGenerateType.description:
         if (isMusic) {
-          return '$context\n\n'
-              'Write an engaging music track release description for streaming listeners. '
-              'Highlight the musical vibe, mood, rhythm/beats, emotional tone, and artist message for this ${ctx.category} track. '
-              'Include a welcoming invitation to stream, save to playlists, and share. Return ONLY the description.';
+          return '$groundedContext\n\n'
+              'Write a concise music release description for listeners using only the supported source facts above. '
+              'Do not infer the sound, lyrics, mood, instruments, tempo, or artist message from the title or cover art. '
+              'Include an invitation to stream, save to playlists, and share. Keep the result at or under 500 characters. Return ONLY the description.';
         } else if (isShort) {
-          return '$context\n\n'
-              'Write a snappy, viral caption (2 to 3 sentences maximum) for a short-form vertical video. '
-              'Include a quick engagement hook, an invite to comment/share, and 3-4 trending hashtags like #Raftaar #Shorts #Trending. Return ONLY the description.';
+          return '$groundedContext\n\n'
+              'Write a snappy, accurate caption (2 to 3 sentences maximum) for this short-form vertical video. '
+              'Include a brief engagement hook and invite viewers to comment or share. Add 3-4 relevant hashtags only when supported by the content. '
+              'Keep the result at or under 500 characters. Return ONLY the description.';
         } else {
-          return '$context\n\n'
-              'Write a professional, engaging video description a viewer would actually want to read, appropriate for the ${ctx.category} category. '
-              'Include a clear summary, what viewers will discover, and an invitation to subscribe and comment. Return ONLY the description.';
+          return '$groundedContext\n\n'
+              'Write a professional, engaging and accurate video description for the ${ctx.category} category. '
+              'Summarize only what the source establishes; do not make up events or promise details the video may not contain. '
+              'Invite viewers to subscribe and comment. Keep the result at or under 500 characters. Return ONLY the description.';
         }
 
       case AIGenerateType.tags:
         if (isMusic) {
-          return '$context\n\n'
-              'Generate 15 high-ranking music discovery tags for this ${ctx.category} track (including genre, subgenre, mood, vibe, tempo, instrument style, and playlist keywords). '
+          return '$groundedContext\n\n'
+              'Generate up to 15 relevant music discovery tags for this ${ctx.category} track. Use only the known genre, language, title and creator-provided details; '
+              'do not guess mood, tempo, instruments, lyrics or subgenre. '
               'Return ONLY comma-separated tags, no hashtags, no numbering.';
         } else if (isShort) {
-          return '$context\n\n'
-              'Generate 15 viral, trending discoverability tags for this ${ctx.category} short-form vertical video (like Raftaar/Shorts/Reels). '
+          return '$groundedContext\n\n'
+              'Generate up to 15 relevant discoverability tags for this ${ctx.category} short-form vertical video (like Raftaar/Shorts/Reels). '
               'Return ONLY comma-separated tags, no hashtags, no numbering.';
         } else {
-          return '$context\n\n'
-              'Generate 15 SEO-friendly, relevant search tags for this ${ctx.category} video. Return ONLY comma-separated tags, no hashtags, no numbering.';
+          return '$groundedContext\n\n'
+              'Generate up to 15 SEO-friendly, relevant search tags for this ${ctx.category} video. '
+              'Use only supported facts from the source. Return ONLY comma-separated tags, no hashtags, no numbering.';
         }
     }
   }
 
   /// Cleans the model's raw multi-line response into a deduped, capped list.
   /// Port of `parseAITitleSuggestions`.
-  static List<String> parseTitleSuggestions(String rawText, {int max = 5}) {
+  static List<String> parseTitleSuggestions(
+    String rawText, {
+    int max = 5,
+    int? maxLength,
+  }) {
+    if (max <= 0) return const [];
     final seen = <String>{};
     final cleaned = <String>[];
 
@@ -195,13 +235,18 @@ class AIAssistService {
       if (t.isEmpty) continue;
 
       t = t.replaceFirst(RegExp(r'^[•\-\*]\s*'), '');
-      t = t.replaceFirst(RegExp(r'^\s*\d+[).\-\s]*'), '');
+      t = t.replaceFirst(RegExp(r'^\s*\d+[).\-]\s*'), '');
+      if (RegExp(
+        r"^(?:here (?:are|is)\b|these are\b|suggestions?\s*[:\-]|generated titles?\s*[:\-])",
+        caseSensitive: false,
+      ).hasMatch(t)) {
+        continue;
+      }
       t = t.replaceFirst(
-        RegExp(r"^(?:here are|here's|some ideas?|suggestions?)\s*[:\-]?\s*", caseSensitive: false),
-        '',
-      );
-      t = t.replaceFirst(
-        RegExp(r'^(?:title|titles|idea|ideas)\s*[:\-]?\s*', caseSensitive: false),
+        RegExp(
+          r'^(?:title|titles|idea|ideas)\s*[:\-]?\s*',
+          caseSensitive: false,
+        ),
         '',
       );
       t = t.replaceAll(RegExp(r'''^["'“”‘’]+|["'“”‘’]+$'''), '');
@@ -209,12 +254,7 @@ class AIAssistService {
 
       if (t.isEmpty) continue;
       final lowered = t.toLowerCase();
-      if (lowered.contains('here are') ||
-          lowered.contains('suggestions') ||
-          lowered.contains('generated') ||
-          lowered.contains('ideas')) {
-        continue;
-      }
+      if (maxLength != null && t.length > maxLength) continue;
 
       final key = lowered;
       if (seen.contains(key)) continue;
@@ -228,55 +268,137 @@ class AIAssistService {
   /// Comma-separated tag response → a clean list, matching how the website
   /// applies the `tags` generation result.
   static List<String> parseTags(String rawText, {int max = 15}) {
+    if (max <= 0) return const [];
     final seen = <String>{};
     final out = <String>[];
-    for (final raw in rawText.split(RegExp(r'[,\n]'))) {
-      final t = raw.replaceAll('#', '').trim();
-      if (t.isEmpty) continue;
-      final key = t.toLowerCase();
-      if (!seen.add(key)) continue;
-      out.add(t);
-      if (out.length >= max) break;
+    for (final line in rawText.split('\n')) {
+      var cleanedLine = line.trim();
+      if (cleanedLine.isEmpty) continue;
+      cleanedLine = cleanedLine.replaceFirst(RegExp(r'^[•\-*]\s*'), '');
+      cleanedLine = cleanedLine.replaceFirst(RegExp(r'^\d+[).:\-]\s*'), '');
+      cleanedLine = cleanedLine.replaceFirst(
+        RegExp(
+          r'^(?:here (?:are|is)|these are)\b[^:]{0,100}:\s*',
+          caseSensitive: false,
+        ),
+        '',
+      );
+
+      for (final rawTag in cleanedLine.split(RegExp(r'[,;|]'))) {
+        var tag = rawTag.trim();
+        tag = tag.replaceFirst(
+          RegExp(r'^(?:tags?|keywords?)\s*[:\-]\s*', caseSensitive: false),
+          '',
+        );
+        tag = tag.replaceFirst(RegExp(r'^[•\-*]\s*'), '');
+        tag = tag.replaceFirst(RegExp(r'^\d+[).:\-]\s*'), '');
+        tag = tag.replaceFirst(RegExp(r'^#+'), '').trim();
+        tag = tag.replaceAll(RegExp(r'''^["'“”‘’]+|["'“”‘’]+$'''), '').trim();
+        if (tag.isEmpty) continue;
+
+        final key = tag.toLowerCase();
+        if (!seen.add(key)) continue;
+        out.add(tag);
+        if (out.length >= max) return out;
+      }
     }
     return out;
   }
 
+  static bool _hasSupportingContext(AIPromptContext ctx) {
+    if (ctx.images.any(
+      (image) =>
+          image.startsWith('data:image/') || image.startsWith('https://'),
+    )) {
+      return true;
+    }
+    if (ctx.userDescription?.trim().isNotEmpty ?? false) return true;
+    if (ctx.description.trim().isNotEmpty) return true;
+    if (ctx.contentType == 'music' || ctx.category.toLowerCase() == 'music') {
+      final genre = ctx.musicGenre?.trim();
+      final language = ctx.musicLanguage?.trim();
+      return (genre?.isNotEmpty == true && genre!.toLowerCase() != 'other') ||
+          (language?.isNotEmpty == true && language!.toLowerCase() != 'other');
+    }
+    return false;
+  }
+
+  static void _requireSupportingContext(AIPromptContext ctx, String task) {
+    if (_hasSupportingContext(ctx)) return;
+    throw AIAssistException(
+      'Add a short description or wait for video frames to load before generating an accurate $task.',
+    );
+  }
+
+  static bool _hasMusicTextContext(AIPromptContext ctx) {
+    final genre = ctx.musicGenre?.trim();
+    final language = ctx.musicLanguage?.trim();
+    return ctx.description.trim().isNotEmpty ||
+        (ctx.userDescription?.trim().isNotEmpty ?? false) ||
+        (genre?.isNotEmpty == true && genre!.toLowerCase() != 'other') ||
+        (language?.isNotEmpty == true && language!.toLowerCase() != 'other');
+  }
+
+  static String? _serverErrorMessage(Object? data) {
+    if (data is! Map) return null;
+    final message = data['error'];
+    return message is String && message.trim().isNotEmpty
+        ? message.trim()
+        : null;
+  }
+
+  static bool _isTimeout(DioException error) =>
+      error.type == DioExceptionType.connectionTimeout ||
+      error.type == DioExceptionType.receiveTimeout ||
+      error.type == DioExceptionType.sendTimeout;
+
   /// POST /api/ai-generate — returns the raw `text` the model produced, or
   /// throws [AIAssistException] carrying a message worth showing a person.
-  Future<String> generate(String prompt, {List<String> images = const []}) async {
+  Future<String> generate(
+    String prompt, {
+    List<String> images = const [],
+  }) async {
     try {
       final response = await _dio.post(
         '/api/ai-generate',
-        data: {
-          'prompt': prompt,
-          if (images.isNotEmpty) 'images': images,
-        },
+        data: {'prompt': prompt, if (images.isNotEmpty) 'images': images},
         options: _aiOptions,
       );
 
       final data = response.data;
       if (response.statusCode == 200 && data is Map && data['text'] is String) {
         final text = (data['text'] as String).trim();
-        if (text.isNotEmpty) return text;
+        if (text.isNotEmpty) {
+          if (images.isNotEmpty && data['grounded'] != true) {
+            throw const AIAssistException(
+              'The AI could not read the upload frames. Add a short description and try again.',
+            );
+          }
+          return text;
+        }
         throw const AIAssistException('The AI returned an empty response.');
       }
 
-      final serverError = data is Map ? data['error'] as String? : null;
       throw AIAssistException(
-        serverError ?? 'AI is unavailable right now. Please try again shortly.',
+        _serverErrorMessage(data) ??
+            'AI is unavailable right now. Please try again shortly.',
       );
     } on AIAssistException {
       rethrow;
-    } catch (e) {
+    } on DioException catch (e) {
       _logger.e('AI generate failed: $e');
-      if (e is DioException &&
-          (e.type == DioExceptionType.connectionTimeout ||
-              e.type == DioExceptionType.receiveTimeout ||
-              e.type == DioExceptionType.sendTimeout)) {
+      if (_isTimeout(e)) {
         throw const AIAssistException(
           'The AI took too long to respond. Please try again.',
         );
       }
+      final serverError = _serverErrorMessage(e.response?.data);
+      if (serverError != null) throw AIAssistException(serverError);
+      throw const AIAssistException(
+        'Could not reach the AI service. Check your connection and try again.',
+      );
+    } catch (e) {
+      _logger.e('AI generate failed: $e');
       throw const AIAssistException(
         'Could not reach the AI service. Check your connection and try again.',
       );
@@ -285,26 +407,72 @@ class AIAssistService {
 
   /// Five title options for the upload in progress.
   Future<List<String>> suggestTitles(AIPromptContext ctx) async {
+    _requireSupportingContext(ctx, 'titles');
+    if ((ctx.contentType == 'music' || ctx.category.toLowerCase() == 'music') &&
+        !_hasMusicTextContext(ctx)) {
+      throw const AIAssistException(
+        'Add a track description or select its genre or language before generating music titles.',
+      );
+    }
     final raw = await generate(
       buildPrompt(AIGenerateType.title, ctx),
       images: ctx.images,
     );
-    final suggestions = parseTitleSuggestions(raw);
+    final isShort =
+        ctx.contentType == 'short' ||
+        ctx.category.toLowerCase().contains('short') ||
+        ctx.category.toLowerCase().contains('raftaar');
+    final suggestions = parseTitleSuggestions(
+      raw,
+      maxLength: isShort ? 49 : 100,
+    );
     if (suggestions.isEmpty) {
-      throw const AIAssistException('The AI did not return any usable titles.');
+      throw AIAssistException(
+        isShort
+            ? 'The AI did not return a usable title under 50 characters. Please try again.'
+            : 'The AI did not return a usable title under 100 characters. Please try again.',
+      );
     }
     return suggestions;
   }
 
-  Future<String> suggestDescription(AIPromptContext ctx) =>
-      generate(buildPrompt(AIGenerateType.description, ctx), images: ctx.images);
+  Future<String> suggestDescription(AIPromptContext ctx) async {
+    _requireSupportingContext(ctx, 'description');
+    if ((ctx.contentType == 'music' || ctx.category.toLowerCase() == 'music') &&
+        !_hasMusicTextContext(ctx)) {
+      throw const AIAssistException(
+        'Add a track description or select its genre or language before generating a music description.',
+      );
+    }
+    final text = await generate(
+      buildPrompt(AIGenerateType.description, ctx),
+      images: ctx.images,
+    );
+    if (text.length > 500) {
+      throw const AIAssistException(
+        'The AI returned more than the 500-character limit. Please try again.',
+      );
+    }
+    return text;
+  }
 
   Future<List<String>> suggestTags(AIPromptContext ctx) async {
+    _requireSupportingContext(ctx, 'tags');
+    if ((ctx.contentType == 'music' || ctx.category.toLowerCase() == 'music') &&
+        !_hasMusicTextContext(ctx)) {
+      throw const AIAssistException(
+        'Add a track description or select its genre or language before generating music tags.',
+      );
+    }
     final raw = await generate(
       buildPrompt(AIGenerateType.tags, ctx),
       images: ctx.images,
     );
-    return parseTags(raw);
+    final tags = parseTags(raw);
+    if (tags.isEmpty) {
+      throw const AIAssistException('The AI did not return any usable tags.');
+    }
+    return tags;
   }
 
   /// POST /api/ai-thumbnail.
@@ -334,7 +502,8 @@ class AIAssistService {
           'title': title,
           'category': category,
           'contentType': contentType,
-          if (description != null && description.isNotEmpty) 'description': description,
+          if (description != null && description.isNotEmpty)
+            'description': description,
           if (frameUrls.isNotEmpty) 'frameUrls': frameUrls,
           if (generateNew) 'generateNew': true,
           if (prompt != null && prompt.isNotEmpty) 'prompt': prompt,
@@ -345,20 +514,40 @@ class AIAssistService {
       final data = response.data;
       if (response.statusCode == 200 &&
           data is Map &&
-          data['thumbnailUrl'] is String) {
+          data['thumbnailUrl'] is String &&
+          (data['thumbnailUrl'] as String).trim().isNotEmpty) {
+        final thumbnailUrl = (data['thumbnailUrl'] as String).trim();
+        if (!thumbnailUrl.startsWith('data:image/') &&
+            !thumbnailUrl.startsWith('https://')) {
+          throw const AIAssistException(
+            'The AI returned an invalid thumbnail.',
+          );
+        }
         return AIThumbnailResult(
-          thumbnailUrl: data['thumbnailUrl'] as String,
-          reason: data['reason'] as String?,
+          thumbnailUrl: thumbnailUrl,
+          reason: data['reason'] is String ? data['reason'] as String : null,
           generated: data['generated'] == true,
         );
       }
 
-      final serverError = data is Map ? data['error'] as String? : null;
       throw AIAssistException(
-        serverError ?? 'Could not generate a thumbnail right now.',
+        _serverErrorMessage(data) ??
+            'Could not generate a thumbnail right now.',
       );
     } on AIAssistException {
       rethrow;
+    } on DioException catch (e) {
+      _logger.e('AI thumbnail failed: $e');
+      if (_isTimeout(e)) {
+        throw const AIAssistException(
+          'The AI took too long to choose a thumbnail. Please try again.',
+        );
+      }
+      final serverError = _serverErrorMessage(e.response?.data);
+      if (serverError != null) throw AIAssistException(serverError);
+      throw const AIAssistException(
+        'Could not generate a thumbnail right now. Please try again.',
+      );
     } catch (e) {
       _logger.e('AI thumbnail failed: $e');
       throw const AIAssistException(

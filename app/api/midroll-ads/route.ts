@@ -10,21 +10,34 @@ import { MIDROLL_ADS_TABLE, MIDROLL_SKIP_TIERS_SECONDS, getAllMidrollAds } from 
 // so, which creative to show when a break triggers.
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  // The native app requests only house creatives. The website keeps the
+  // existing unfiltered response when this parameter is omitted.
+  const houseOnly = request.nextUrl.searchParams.get("source") === "house";
   const settings = await getPlatformSettings();
 
   if (!settings.midrollEnabled) {
-    return NextResponse.json({ enabled: false });
+    return NextResponse.json({ enabled: false, ...(houseOnly ? { source: "house" } : {}) });
   }
 
   try {
     const allAds = await getAllMidrollAds();
     const now = Date.now();
+    const sourceAds = houseOnly
+      ? allAds.filter(
+          (item) =>
+            item.sponsorshipId === undefined ||
+            item.sponsorshipId === null ||
+            (typeof item.sponsorshipId === "string" && !item.sponsorshipId.trim())
+        )
+      : allAds;
 
-    let items = allAds.filter(
+    const items = sourceAds.filter(
       (item) =>
         item.active === true &&
         (item.status === undefined || item.status === "ready") &&
+        (!houseOnly ||
+          (typeof item.imageUrl === "string" && item.imageUrl.trim().length > 0)) &&
         (!item.expiresAt || new Date(item.expiresAt as string).getTime() > now)
     );
 
@@ -35,14 +48,14 @@ export async function GET() {
     // request (which every single video load blocks on to learn its ad
     // config) hang or time out. The very next video load picks up whatever
     // this run heals, same as before, just never on the critical path.
-    if (items.length === 0 && allAds.some((a) => a.status === "processing")) {
-      void selfHealMidrollAdsBatch(allAds).catch((err) =>
+    if (items.length === 0 && sourceAds.some((a) => a.status === "processing")) {
+      void selfHealMidrollAdsBatch(sourceAds).catch((err) =>
         console.error("Background midroll ad self-heal failed:", err)
       );
     }
 
     if (items.length === 0) {
-      return NextResponse.json({ enabled: false });
+      return NextResponse.json({ enabled: false, ...(houseOnly ? { source: "house" } : {}) });
     }
 
     const pick = items[Math.floor(Math.random() * items.length)];
@@ -53,6 +66,7 @@ export async function GET() {
 
     return NextResponse.json({
       enabled: true,
+      ...(houseOnly ? { source: "house" } : {}),
       intervalSeconds: settings.midrollIntervalSeconds,
       skipTiersSeconds: MIDROLL_SKIP_TIERS_SECONDS,
       ad: {
@@ -70,7 +84,7 @@ export async function GET() {
     });
   } catch (err) {
     console.error("Midroll ad lookup failed (table may not exist yet):", err);
-    return NextResponse.json({ enabled: false });
+    return NextResponse.json({ enabled: false, ...(houseOnly ? { source: "house" } : {}) });
   }
 }
 

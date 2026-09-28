@@ -15,13 +15,12 @@ import '../../../../services/music_player_service.dart';
 import '../../../../services/video_service.dart';
 import '../../../music/presentation/widgets/music_track_tile.dart';
 
-/// The Music hub — a purpose-built Spotify-grade home for every music
+/// The Music hub — a purpose-built premium home for every music
 /// track on InPlayer (contentType "music").
 ///
-/// Redesigned with Spotify's signature aesthetic: deep obsidian (#121212),
-/// iconic Spotify green (#1DB954), 2-column quick-access shelf, spotlight
-/// release with vinyl peek, unconstrained 1:1 square artwork sleeves with
-/// [BoxFit.cover], and vibrant browse tiles.
+/// Uses a warm InPlayer palette, 2-column quick-access shelf, spotlight
+/// release with vinyl detail, 1:1 square artwork sleeves with [BoxFit.cover],
+/// and browse filters that stay within the explicit Music content type.
 class MusicPage extends ConsumerStatefulWidget {
   final bool isActive;
 
@@ -87,6 +86,7 @@ class _MusicPageState extends ConsumerState<MusicPage> {
   List<Video> _recommended = [];
   bool _loadFailed = false;
   String _selectedLanguage = 'All';
+  String _selectedGenre = 'All';
   String _searchQuery = '';
   bool _searchOpen = false;
   bool _isListening = false;
@@ -174,9 +174,15 @@ class _MusicPageState extends ConsumerState<MusicPage> {
 
   List<Video> _filterTracks(Iterable<Video> source) {
     final language = _selectedLanguage.toLowerCase();
+    final genre = _selectedGenre.toLowerCase();
     final query = _searchQuery.trim().toLowerCase();
     return source
         .where((track) {
+          if (!track.isStrictMusic) return false;
+          final trackGenre = (track.genre?.trim().isNotEmpty == true)
+              ? track.genre!.trim().toLowerCase()
+              : 'other';
+          if (genre != 'all' && trackGenre != genre) return false;
           if (language != 'all' &&
               (track.language ?? '').toLowerCase() != language) {
             return false;
@@ -224,7 +230,10 @@ class _MusicPageState extends ConsumerState<MusicPage> {
         return;
       }
       if (!mounted) return;
-      setState(() => _isListening = true);
+      setState(() {
+        _searchOpen = true;
+        _isListening = true;
+      });
       await _speech.listen(
         onResult: (result) {
           if (!mounted) return;
@@ -352,23 +361,75 @@ class _MusicPageState extends ConsumerState<MusicPage> {
             ],
           ),
           actions: [
-            IconButton(
-              icon: Icon(
-                _searchOpen ? Icons.close_rounded : Icons.search_rounded,
-                color: context.textPrimary,
+            Container(
+              height: 38,
+              margin: const EdgeInsets.symmetric(vertical: 5),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  colors: context.isDark
+                      ? [const Color(0xFF29242A), const Color(0xFF1D1B20)]
+                      : [const Color(0xFFFFF4E8), const Color(0xFFF1E8DF)],
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: context.borderSubtle),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.brandOrange.withValues(alpha: 0.10),
+                    blurRadius: 12,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
               ),
-              tooltip: _searchOpen ? 'Close music search' : 'Search music',
-              onPressed: () {
-                setState(() {
-                  _searchOpen = !_searchOpen;
-                  if (!_searchOpen) {
-                    _searchQuery = '';
-                    _searchController.clear();
-                    _isListening = false;
-                  }
-                });
-                if (!_searchOpen) unawaited(_speech.stop());
-              },
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 38,
+                      height: 38,
+                    ),
+                    icon: Icon(
+                      _searchOpen ? Icons.close_rounded : Icons.search_rounded,
+                      color: context.textPrimary,
+                      size: 20,
+                    ),
+                    tooltip: _searchOpen
+                        ? 'Close music search'
+                        : 'Search music',
+                    onPressed: () {
+                      setState(() {
+                        _searchOpen = !_searchOpen;
+                        if (!_searchOpen) {
+                          _searchQuery = '';
+                          _searchController.clear();
+                          _isListening = false;
+                        }
+                      });
+                      if (!_searchOpen) unawaited(_speech.stop());
+                    },
+                  ),
+                  Container(width: 1, height: 19, color: context.borderSubtle),
+                  IconButton(
+                    visualDensity: VisualDensity.compact,
+                    constraints: const BoxConstraints.tightFor(
+                      width: 38,
+                      height: 38,
+                    ),
+                    icon: Icon(
+                      _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
+                      color: _isListening
+                          ? AppColors.brandOrange
+                          : context.textSecondary,
+                      size: 19,
+                    ),
+                    tooltip: _isListening
+                        ? 'Stop voice search'
+                        : 'Search by voice',
+                    onPressed: _toggleVoiceSearch,
+                  ),
+                ],
+              ),
             ),
             IconButton(
               icon: const Icon(
@@ -378,23 +439,58 @@ class _MusicPageState extends ConsumerState<MusicPage> {
               tooltip: 'Upload music',
               onPressed: () => context.push('/upload?type=music'),
             ),
-            IconButton(
-              icon: Icon(Icons.tune_rounded, color: context.textPrimary),
-              tooltip: 'Music settings',
-              onPressed: () => context.push('/settings/music'),
-            ),
-            IconButton(
-              icon: Icon(
-                Icons.download_for_offline_outlined,
-                color: context.textPrimary,
-              ),
-              onPressed: () => context.push('/downloads'),
-              tooltip: 'Downloaded',
+            PopupMenuButton<String>(
+              tooltip: 'More music options',
+              icon: Icon(Icons.more_vert_rounded, color: context.textPrimary),
+              onSelected: (value) {
+                if (value == 'settings') context.push('/settings/music');
+                if (value == 'downloads') context.push('/downloads');
+              },
+              itemBuilder: (context) => [
+                PopupMenuItem(
+                  value: 'settings',
+                  child: Row(
+                    children: const [
+                      Icon(Icons.tune_rounded, size: 18),
+                      SizedBox(width: 10),
+                      Text('Music settings'),
+                    ],
+                  ),
+                ),
+                PopupMenuItem(
+                  value: 'downloads',
+                  child: Row(
+                    children: const [
+                      Icon(Icons.download_for_offline_outlined, size: 18),
+                      SizedBox(width: 10),
+                      Text('Downloads'),
+                    ],
+                  ),
+                ),
+              ],
             ),
             const SizedBox(width: 8),
           ],
         ),
-        body: tracks == null
+        body: DecoratedBox(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: isDark
+                  ? const [
+                      Color(0xFF19161B),
+                      Color(0xFF111014),
+                      Color(0xFF0A0A0D),
+                    ]
+                  : const [
+                      Color(0xFFFFF8EF),
+                      Color(0xFFF4ECE3),
+                      Color(0xFFEDE5DE),
+                    ],
+            ),
+          ),
+          child: tracks == null
             ? const Center(
                 child: CircularProgressIndicator(color: _spotifyGreen),
               )
@@ -412,8 +508,7 @@ class _MusicPageState extends ConsumerState<MusicPage> {
                       padding: const EdgeInsets.only(bottom: 120),
                       children: [
                         const SizedBox(height: 6),
-                        // Spotify Category Pills
-                        _buildCategoryPills(context),
+                        _buildCategoryPills(context, allTracks!),
                         if (_searchOpen) _buildMusicSearchField(context),
                         _buildLanguageFilters(context),
                         const SizedBox(height: 14),
@@ -486,44 +581,103 @@ class _MusicPageState extends ConsumerState<MusicPage> {
                   ),
                 ),
               ),
+          ),
       ),
     );
   }
 
-  Widget _buildCategoryPills(BuildContext context) {
-    final pills = ['All', 'Music', 'Podcasts', 'Charts'];
-    return SizedBox(
-      height: 34,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: pills.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 8),
-        itemBuilder: (context, i) {
-          final isSelected = i == 0;
-          return Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-            decoration: BoxDecoration(
-              color: isSelected
-                  ? _spotifyGreen
-                  : (context.isDark
-                        ? const Color(0xFF282828)
-                        : const Color(0xFFE5E5E5)),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Center(
-              child: Text(
-                pills[i],
+  Widget _buildCategoryPills(BuildContext context, List<Video> tracks) {
+    final present = <String>{};
+    for (final track in tracks) {
+      final genre = (track.genre?.trim().isNotEmpty == true)
+          ? track.genre!.trim()
+          : 'Other';
+      present.add(genre);
+    }
+    final genres = present.toList()
+      ..sort((a, b) {
+        final aIndex = _genreOrder.indexWhere(
+          (known) => known.toLowerCase() == a.toLowerCase(),
+        );
+        final bIndex = _genreOrder.indexWhere(
+          (known) => known.toLowerCase() == b.toLowerCase(),
+        );
+        if (aIndex < 0 && bIndex < 0) return a.compareTo(b);
+        if (aIndex < 0) return 1;
+        if (bIndex < 0) return -1;
+        return aIndex.compareTo(bIndex);
+      });
+    final filters = ['All', ...genres];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+          child: Row(
+            children: [
+              Text(
+                'GENRES',
                 style: TextStyle(
-                  color: isSelected ? Colors.black : context.textPrimary,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
+                  color: context.textDim,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 1.4,
                 ),
               ),
-            ),
-          );
-        },
-      ),
+              const Spacer(),
+              if (_selectedGenre != 'All')
+                Text(
+                  _selectedGenre,
+                  style: const TextStyle(
+                    color: _spotifyGreen,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 38,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: filters.length,
+            separatorBuilder: (context, index) => const SizedBox(width: 8),
+            itemBuilder: (context, index) {
+              final genre = filters[index];
+              final selected =
+                  _selectedGenre.toLowerCase() == genre.toLowerCase();
+              return Material(
+                color: selected
+                    ? _spotifyGreen
+                    : (context.isDark
+                          ? const Color(0xFF24242A)
+                          : const Color(0xFFECE7E2)),
+                borderRadius: BorderRadius.circular(18),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: () => setState(() => _selectedGenre = genre),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 15),
+                    child: Center(
+                      child: Text(
+                        genre == 'All' ? 'All genres' : genre,
+                        style: TextStyle(
+                          color: selected ? Colors.black : context.textPrimary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -542,16 +696,16 @@ class _MusicPageState extends ConsumerState<MusicPage> {
           hintText: 'Search tracks or artists',
           hintStyle: TextStyle(color: context.textDim),
           prefixIcon: Icon(Icons.search_rounded, color: context.textSecondary),
-          suffixIcon: IconButton(
-            tooltip: _isListening ? 'Stop voice search' : 'Search by voice',
-            onPressed: _toggleVoiceSearch,
-            icon: Icon(
-              _isListening ? Icons.mic_rounded : Icons.mic_none_rounded,
-              color: _isListening
-                  ? AppColors.brandOrange
-                  : context.textSecondary,
-            ),
-          ),
+          suffixIcon: _searchQuery.isEmpty
+              ? null
+              : IconButton(
+                  tooltip: 'Clear search',
+                  onPressed: () {
+                    _searchController.clear();
+                    setState(() => _searchQuery = '');
+                  },
+                  icon: Icon(Icons.close_rounded, color: context.textSecondary),
+                ),
           filled: true,
           fillColor: fill,
           isDense: true,
@@ -574,46 +728,61 @@ class _MusicPageState extends ConsumerState<MusicPage> {
 
   Widget _buildLanguageFilters(BuildContext context) {
     final languages = ['All', ..._musicLanguageFilters];
-    return Padding(
-      padding: const EdgeInsets.only(top: 14),
-      child: SizedBox(
-        height: 36,
-        child: ListView.separated(
-          scrollDirection: Axis.horizontal,
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          itemCount: languages.length,
-          separatorBuilder: (context, index) => const SizedBox(width: 8),
-          itemBuilder: (context, index) {
-            final language = languages[index];
-            final selected = _selectedLanguage == language;
-            return Material(
-              color: selected
-                  ? _spotifyGreen
-                  : (context.isDark
-                        ? const Color(0xFF282828)
-                        : const Color(0xFFE5E5E5)),
-              borderRadius: BorderRadius.circular(20),
-              child: InkWell(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 13, 16, 7),
+          child: Text(
+            'LANGUAGES',
+            style: TextStyle(
+              color: context.textDim,
+              fontSize: 10,
+              fontWeight: FontWeight.w900,
+              letterSpacing: 1.4,
+            ),
+          ),
+        ),
+        SizedBox(
+          height: 36,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: languages.length,
+            separatorBuilder: (context, index) => const SizedBox(width: 8),
+            itemBuilder: (context, index) {
+              final language = languages[index];
+              final selected =
+                  _selectedLanguage.toLowerCase() == language.toLowerCase();
+              return Material(
+                color: selected
+                    ? _spotifyGreen
+                    : (context.isDark
+                          ? const Color(0xFF282828)
+                          : const Color(0xFFE5E5E5)),
                 borderRadius: BorderRadius.circular(20),
-                onTap: () => setState(() => _selectedLanguage = language),
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  child: Center(
-                    child: Text(
-                      language,
-                      style: TextStyle(
-                        color: selected ? Colors.black : context.textPrimary,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(20),
+                  onTap: () => setState(() => _selectedLanguage = language),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    child: Center(
+                      child: Text(
+                        language,
+                        style: TextStyle(
+                          color: selected ? Colors.black : context.textPrimary,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
                     ),
                   ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
-      ),
+      ],
     );
   }
 
@@ -640,6 +809,7 @@ class _MusicPageState extends ConsumerState<MusicPage> {
               onPressed: () {
                 setState(() {
                   _selectedLanguage = 'All';
+                  _selectedGenre = 'All';
                   _searchQuery = '';
                   _searchController.clear();
                 });
@@ -795,8 +965,8 @@ class _MusicPageState extends ConsumerState<MusicPage> {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: isDark
-              ? [const Color(0xFF1a3a27), const Color(0xFF181818)]
-              : [const Color(0xFFE8F5E9), Colors.white],
+              ? [const Color(0xFF3A2118), const Color(0xFF18171B)]
+              : [const Color(0xFFFFE6CF), Colors.white],
         ),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: _spotifyGreen.withValues(alpha: 0.3)),

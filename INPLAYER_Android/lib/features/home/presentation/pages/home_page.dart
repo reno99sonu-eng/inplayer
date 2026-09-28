@@ -987,22 +987,20 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage> {
 
   /// Every home surface runs its list through this.
   ///
-  /// Music tracks are uploaded into the same collection as everything else,
-  /// so /api/videos and /api/featured-weekly hand them back mixed in with
-  /// ordinary video rows. Without this filter a track like a devotional
-  /// song renders as a plain 7-minute "video" card in the middle of the
-  /// feed — which is exactly what it was doing.
+  /// Explicit Music uploads share the same collection as videos, so the
+  /// video endpoints can return both. Filter by contentType, not category:
+  /// a regular video tagged with the Music category is still a video.
   ///
-  /// Music belongs to the dedicated Music tab and nowhere else on home.
+  /// Music tracks belong to the dedicated Music tab and nowhere else on home.
   /// Applying the filter here rather than inside VideoService.getVideos()
   /// is deliberate: getVideos() is shared with search, channel pages, the
   /// Filters out Music tracks and Raftaar Shorts from the main long-form video feed.
   ///
-  /// Longform videos belong on the main feed grid, Raftaar Shorts belong in the
-  /// dedicated Raftaar tab and the horizontal Raftaar shelf, and Music belongs in the
-  /// dedicated Music tab.
+  /// Longform videos belong on the main feed grid, Raftaar Shorts belong in
+  /// the dedicated Raftaar tab and horizontal Raftaar shelf, and explicit
+  /// Music uploads belong in the dedicated Music tab.
   static List<Video> _onlyLongformVideos(List<Video> videos) =>
-      videos.where((v) => !v.isMusic && !v.isShort).toList();
+      videos.where((v) => !v.isStrictMusic && !v.isShort).toList();
 
   Widget _buildHomeContent() {
     if (_videos == null && _feedLoading) {

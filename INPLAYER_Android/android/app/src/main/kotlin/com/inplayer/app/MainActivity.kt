@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.content.res.Configuration
 import android.os.Build
 import android.util.Rational
+import android.view.WindowManager
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.ryanheise.audioservice.AudioServiceFragmentActivity
@@ -15,8 +16,11 @@ import io.flutter.plugin.common.MethodChannel
 class MainActivity : AudioServiceFragmentActivity() {
     private val pipChannelName = "inplayer.app/pip"
     private val permissionChannelName = "inplayer.app/permissions"
+    private val faceScanScreenFlashChannelName = "inplayer.app/face_scan_screen_flash"
     private var pipChannel: MethodChannel? = null
     private var isPlaybackActive = false
+    private var faceScanScreenFlashEnabled = false
+    private var previousScreenBrightness: Float? = null
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
@@ -39,6 +43,19 @@ class MainActivity : AudioServiceFragmentActivity() {
             }
         }
         pipChannel = channel
+
+        MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            faceScanScreenFlashChannelName,
+        ).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "setEnabled" -> {
+                    setFaceScanScreenFlash(call.argument<Boolean>("enabled") == true)
+                    result.success(null)
+                }
+                else -> result.notImplemented()
+            }
+        }
 
         val permChannel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, permissionChannelName)
         permChannel.setMethodCallHandler { call, result ->
@@ -65,6 +82,53 @@ class MainActivity : AudioServiceFragmentActivity() {
                 else -> result.notImplemented()
             }
         }
+    }
+
+    private fun setFaceScanScreenFlash(enabled: Boolean) {
+        if (enabled) {
+            if (!faceScanScreenFlashEnabled) {
+                previousScreenBrightness = window.attributes.screenBrightness
+            }
+            faceScanScreenFlashEnabled = true
+            window.attributes = window.attributes.apply {
+                screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_FULL
+            }
+            return
+        }
+
+        faceScanScreenFlashEnabled = false
+        restoreFaceScanScreenBrightness(clearSavedValue = true)
+    }
+
+    private fun restoreFaceScanScreenBrightness(clearSavedValue: Boolean) {
+        previousScreenBrightness?.let { previous ->
+            window.attributes = window.attributes.apply {
+                screenBrightness = previous
+            }
+        }
+        if (clearSavedValue) previousScreenBrightness = null
+    }
+
+    override fun onStart() {
+        super.onStart()
+        if (faceScanScreenFlashEnabled) {
+            window.attributes = window.attributes.apply {
+                screenBrightness = WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_FULL
+            }
+        }
+    }
+
+    override fun onStop() {
+        if (faceScanScreenFlashEnabled) {
+            restoreFaceScanScreenBrightness(clearSavedValue = false)
+        }
+        super.onStop()
+    }
+
+    override fun onDestroy() {
+        faceScanScreenFlashEnabled = false
+        restoreFaceScanScreenBrightness(clearSavedValue = true)
+        super.onDestroy()
     }
 
     // Builds a PictureInPictureParams with the video's real aspect ratio

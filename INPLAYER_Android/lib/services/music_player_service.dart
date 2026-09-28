@@ -314,6 +314,7 @@ class MusicPlayerService extends ChangeNotifier {
       final seed = _queue.last;
       final already = _queue.map((t) => t.videoId).toSet();
       final candidates = (await fetch())
+          .where((t) => t.isStrictMusic)
           .where((t) => (t.muxPlaybackId ?? '').isNotEmpty)
           .where((t) => !already.contains(t.videoId))
           .toList();
@@ -382,7 +383,10 @@ class MusicPlayerService extends ChangeNotifier {
   /// (still processing — no muxPlaybackId) are skipped rather than failing
   /// the whole queue.
   Future<void> playQueue(List<Video> tracks, {int startIndex = 0}) async {
-    final playable = tracks.where((t) => (t.muxPlaybackId ?? '').isNotEmpty).toList();
+    final playable = tracks
+        .where((t) => t.isStrictMusic)
+        .where((t) => (t.muxPlaybackId ?? '').isNotEmpty)
+        .toList();
     if (playable.isEmpty) return;
 
     await _refreshMusicSettings();
@@ -438,7 +442,7 @@ class MusicPlayerService extends ChangeNotifier {
   /// interrupting what's playing now — the standard "Play Next". If
   /// nothing is playing yet, this just starts a fresh single-track queue.
   Future<void> playNext(Video track) async {
-    if ((track.muxPlaybackId ?? '').isEmpty) return;
+    if (!track.isStrictMusic || (track.muxPlaybackId ?? '').isEmpty) return;
     if (_queue.isEmpty || _currentIndex == null) {
       await playQueue([track]);
       return;
@@ -456,7 +460,7 @@ class MusicPlayerService extends ChangeNotifier {
   /// Appends [track] to the end of the current queue — playback keeps
   /// going, the track just joins the back of the line.
   Future<void> addToQueue(Video track) async {
-    if ((track.muxPlaybackId ?? '').isEmpty) return;
+    if (!track.isStrictMusic || (track.muxPlaybackId ?? '').isEmpty) return;
     if (_queue.isEmpty || _currentIndex == null) {
       await playQueue([track]);
       return;

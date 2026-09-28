@@ -39,6 +39,7 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
   String _requestStatus = 'accepted';
   bool _muted = false;
   bool _otherIsOnline = false;
+  String? _otherLastActiveAt;
   bool _otherIsTyping = false;
 
   bool _loadingMeta = true;
@@ -106,9 +107,30 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
       _otherAvatarUrl = detail.conversation.otherAvatarUrl ?? _otherAvatarUrl;
       _requestStatus = detail.conversation.requestStatus;
       _otherIsOnline = detail.otherIsOnline;
+      _otherLastActiveAt = detail.otherLastActiveAt;
       _chatThemeId = detail.conversation.chatTheme;
       _loadingMeta = false;
     });
+  }
+
+  String _lastSeenLabel() {
+    if (_otherIsOnline) return 'Online';
+    final raw = _otherLastActiveAt;
+    if (raw == null || raw.trim().isEmpty) return '';
+
+    final lastActive = DateTime.tryParse(raw)?.toLocal();
+    if (lastActive == null) return '';
+    final age = DateTime.now().difference(lastActive);
+    if (age.isNegative || age.inSeconds < 60) return 'Last seen just now';
+    if (age.inMinutes < 60) return 'Last seen ${age.inMinutes}m ago';
+    if (age.inHours < 24) return 'Last seen ${age.inHours}h ago';
+
+    final now = DateTime.now();
+    final lastDay = DateTime(lastActive.year, lastActive.month, lastActive.day);
+    final today = DateTime(now.year, now.month, now.day);
+    final calendarDays = today.difference(lastDay).inDays;
+    if (calendarDays == 1) return 'Last seen yesterday';
+    return 'Last seen ${lastActive.day}/${lastActive.month}/${lastActive.year}';
   }
 
   Future<void> _loadMessages() async {
@@ -189,7 +211,9 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(res.error ?? "Couldn't send message."),
-          backgroundColor: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
+          backgroundColor: context.isDark
+              ? AppColors.surfaceDark
+              : AppColors.surfaceLight,
         ),
       );
     }
@@ -199,7 +223,11 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
 
   Future<void> _pickAndSendImage() async {
     final picker = ImagePicker();
-    final file = await picker.pickImage(source: ImageSource.gallery, imageQuality: 50, maxWidth: 800);
+    final file = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 50,
+      maxWidth: 800,
+    );
     if (file == null || !mounted) return;
 
     setState(() => _sending = true);
@@ -208,13 +236,13 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
       final ext = file.path.split('.').last.toLowerCase();
       final mime = ext == 'png' ? 'image/png' : 'image/jpeg';
       final base64Image = 'data:$mime;base64,${base64Encode(bytes)}';
-      
+
       await _send(text: '', imageUrl: base64Image);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Failed to process image")),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text("Failed to process image")));
     } finally {
       if (mounted) setState(() => _sending = false);
     }
@@ -223,7 +251,9 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
   Future<void> _respondToRequest(bool accept) async {
     final id = _conversationId;
     if (id == null) return;
-    final ok = await ref.read(messageServiceProvider).conversationAction(id, accept ? 'accept' : 'decline');
+    final ok = await ref
+        .read(messageServiceProvider)
+        .conversationAction(id, accept ? 'accept' : 'decline');
     if (!mounted) return;
     if (ok) {
       setState(() => _requestStatus = accept ? 'accepted' : 'declined');
@@ -263,26 +293,51 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
                 Center(
                   child: CircleAvatar(
                     radius: 40,
-                    backgroundColor: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
-                    backgroundImage: _otherAvatarUrl != null ? smartImageProvider(_otherAvatarUrl!) : null,
-                    child: _otherAvatarUrl == null ? Icon(Icons.person, size: 40, color: context.textSecondary) : null,
+                    backgroundColor: context.isDark
+                        ? AppColors.surfaceDark
+                        : AppColors.surfaceLight,
+                    backgroundImage: _otherAvatarUrl != null
+                        ? smartImageProvider(_otherAvatarUrl!)
+                        : null,
+                    child: _otherAvatarUrl == null
+                        ? Icon(
+                            Icons.person,
+                            size: 40,
+                            color: context.textSecondary,
+                          )
+                        : null,
                   ),
                 ),
                 const SizedBox(height: 16),
                 Center(
                   child: Text(
                     _otherUsername ?? 'User',
-                    style: TextStyle(color: context.textPrimary, fontSize: 20, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      color: context.textPrimary,
+                      fontSize: 20,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                 ),
                 const SizedBox(height: 32),
-                Text('CHAT SETTINGS', style: TextStyle(color: context.textSecondary, fontSize: 12, fontWeight: FontWeight.bold)),
+                Text(
+                  'CHAT SETTINGS',
+                  style: TextStyle(
+                    color: context.textSecondary,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const SizedBox(height: 16),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: Text('Chat Theme', style: TextStyle(color: context.textPrimary)),
+                  title: Text(
+                    'Chat Theme',
+                    style: TextStyle(color: context.textPrimary),
+                  ),
                   trailing: Text(
-                    AppChatThemes.themes[_chatThemeId ?? 'default']?.name ?? 'Default',
+                    AppChatThemes.themes[_chatThemeId ?? 'default']?.name ??
+                        'Default',
                     style: TextStyle(color: context.textSecondary),
                   ),
                   onTap: () {
@@ -292,7 +347,10 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
                 ),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: Text('Mute Notifications', style: TextStyle(color: context.textPrimary)),
+                  title: Text(
+                    'Mute Notifications',
+                    style: TextStyle(color: context.textPrimary),
+                  ),
                   activeThumbColor: AppColors.brandOrange,
                   value: _muted,
                   onChanged: (val) {
@@ -303,11 +361,16 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
                 const SizedBox(height: 32),
                 ListTile(
                   contentPadding: EdgeInsets.zero,
-                  title: const Text('Block User', style: TextStyle(color: AppColors.error)),
+                  title: const Text(
+                    'Block User',
+                    style: TextStyle(color: AppColors.error),
+                  ),
                   onTap: () {
                     _handleMenuAction('block');
                     Navigator.pop(context);
-                    Navigator.pop(context); // go back to messages list after blocking
+                    Navigator.pop(
+                      context,
+                    ); // go back to messages list after blocking
                   },
                 ),
               ],
@@ -574,9 +637,7 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
                           ),
                         ),
                         Text(
-                          _otherIsTyping
-                              ? 'typing...'
-                              : (_otherIsOnline ? 'Online' : ''),
+                          _otherIsTyping ? 'typing...' : _lastSeenLabel(),
                           style: TextStyle(
                             color: _otherIsTyping
                                 ? AppColors.brandOrange

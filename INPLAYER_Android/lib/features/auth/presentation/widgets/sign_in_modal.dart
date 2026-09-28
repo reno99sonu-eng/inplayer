@@ -1,9 +1,12 @@
+import 'dart:math' as math;
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../providers/auth_provider.dart';
+import 'auth_modal_3d_hero.dart';
 import 'google_sign_in_button.dart';
 
 class SignInModal extends ConsumerStatefulWidget {
@@ -25,7 +28,7 @@ class SignInModal extends ConsumerStatefulWidget {
 }
 
 class _SignInModalState extends ConsumerState<SignInModal>
-    with SingleTickerProviderStateMixin {
+    with TickerProviderStateMixin {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _rememberMe = true;
@@ -36,6 +39,7 @@ class _SignInModalState extends ConsumerState<SignInModal>
   bool _success = false;
 
   late AnimationController _shakeController;
+  late AnimationController _heroController;
   late Animation<double> _shakeAnimation;
 
   @override
@@ -45,6 +49,10 @@ class _SignInModalState extends ConsumerState<SignInModal>
       vsync: this,
       duration: const Duration(milliseconds: 400),
     );
+    _heroController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 7200),
+    )..repeat();
     _shakeAnimation = TweenSequence<double>([
       TweenSequenceItem(tween: Tween(begin: 0.0, end: -8.0), weight: 1),
       TweenSequenceItem(tween: Tween(begin: -8.0, end: 8.0), weight: 2),
@@ -58,6 +66,7 @@ class _SignInModalState extends ConsumerState<SignInModal>
     _emailController.dispose();
     _passwordController.dispose();
     _shakeController.dispose();
+    _heroController.dispose();
     super.dispose();
   }
 
@@ -318,6 +327,8 @@ class _SignInModalState extends ConsumerState<SignInModal>
       crossAxisAlignment: CrossAxisAlignment.start,
       mainAxisSize: MainAxisSize.min,
       children: [
+        AuthModal3DHero(isDark: isDark),
+
         // Pill Badge
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3.5),
@@ -495,37 +506,61 @@ class _SignInModalState extends ConsumerState<SignInModal>
         const SizedBox(height: 18),
 
         // Sign In Button
-        GestureDetector(
-          onTap: _loading ? null : _handleSignIn,
-          child: Container(
-            height: 48,
-            width: double.infinity,
-            decoration: BoxDecoration(
-              gradient: AppColors.flameGradient,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.brandOrange.withValues(alpha: 0.35),
-                  blurRadius: 20,
-                  offset: const Offset(0, 4),
+        AnimatedBuilder(
+          animation: _heroController,
+          builder: (context, child) {
+            final tilt = math.sin(_heroController.value * math.pi * 2) * .012;
+            return Transform(
+              alignment: Alignment.center,
+              transform: Matrix4.identity()
+                ..setEntry(3, 2, .002)
+                ..rotateX(tilt),
+              child: child,
+            );
+          },
+          child: GestureDetector(
+            onTap: _loading ? null : _handleSignIn,
+            child: Container(
+              height: 48,
+              width: double.infinity,
+              decoration: BoxDecoration(
+                gradient: AppColors.flameGradient,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: .38),
                 ),
-              ],
-            ),
-            child: Center(
-              child: _loading
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFF0F172A)),
-                    )
-                  : const Text(
-                      'Sign In',
-                      style: TextStyle(
-                        color: Color(0xFF0F172A),
-                        fontSize: 15,
-                        fontWeight: FontWeight.w900,
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.brandOrange.withValues(alpha: 0.42),
+                    blurRadius: 22,
+                    offset: const Offset(0, 6),
+                  ),
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: isDark ? .22 : .08),
+                    blurRadius: 8,
+                    offset: const Offset(0, 3),
+                  ),
+                ],
+              ),
+              child: Center(
+                child: _loading
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Color(0xFF0F172A),
+                        ),
+                      )
+                    : const Text(
+                        'Sign In',
+                        style: TextStyle(
+                          color: Color(0xFF0F172A),
+                          fontSize: 15,
+                          fontWeight: FontWeight.w900,
+                        ),
                       ),
-                    ),
+              ),
             ),
           ),
         ),

@@ -16,11 +16,9 @@
     <style name="LaunchTheme" parent="@android:style/Theme.Light.NoTitleBar">
         <item name="android:windowBackground">@drawable/launch_background</item>
 
-        <!-- The OS splash's backdrop. Deliberately the same #05070D the
-             launcher-icon background and launch_background.xml already use,
-             so the pre-Flutter frame and the Flutter intro's own dark
-             backdrop are the same shade and the handover is invisible. -->
-        <item name="android:windowSplashScreenBackground">@color/ic_launcher_background</item>
+        <!-- Keep the animated in-app intro dark while the launcher icon uses
+             the white Play Store background. -->
+        <item name="android:windowSplashScreenBackground">@color/splash_background</item>
 
         <!-- The actual fix: a transparent icon means the OS splash paints
              colour only, never the launcher triangle. -->

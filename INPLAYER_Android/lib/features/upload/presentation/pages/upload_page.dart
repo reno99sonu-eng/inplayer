@@ -69,13 +69,6 @@ const _visibilityOptions = [
   (value: 'private', label: 'Private — only you'),
 ];
 
-// Matches AUDIENCE_OPTIONS in the website's app/lib/contentAccess.ts exactly.
-const _audienceOptions = [
-  (value: 'everyone', label: 'Everyone', hint: 'Shown to all viewers'),
-  (value: 'kids', label: 'Kids', hint: 'Also appears in the Kids row'),
-  (value: 'adult', label: '18+', hint: 'Hidden unless 18+ is unlocked'),
-];
-
 const _languageOptions = [
   (value: 'auto', label: 'Auto-detect'),
   (value: 'en', label: 'English'),
@@ -149,6 +142,8 @@ class _UploadPageState extends ConsumerState<UploadPage> {
   // screenshot, then torn back down.
   VideoPlayerController? _captureController;
   GlobalKey? _captureBoundaryKey;
+  Future<void>? _frameCaptureFuture;
+  String? _frameCaptureSourcePath;
   final List<XFile> _musicCovers = [];
   bool _aiCoverBusy = false;
   int _coverIntervalSeconds = 12;
@@ -166,13 +161,8 @@ class _UploadPageState extends ConsumerState<UploadPage> {
   String _genre = 'Other';
   String _musicLanguage = '';
   final List<String> _tags = [];
-  // One 3-way choice (Everyone / Kids / 18+) — matches the website's
-  // `VideoAudience` (app/lib/contentAccess.ts), replacing what used to be
-  // two separate switches here that could contradict each other (e.g. both
-  // "made for kids" and "18+" on at once). The two legacy booleans below are
-  // still what actually gets sent to the API, derived from this choice via
-  // the same `audienceFlags()` logic the website uses, so the backend
-  // contract is unchanged.
+  // The final video/short upload prompt only offers Everyone or Kids. These
+  // remain the existing audience fields sent to the upload API.
   String _audience = 'everyone';
   bool get _madeForKids => _audience == 'kids';
   bool get _ageRestricted => _audience == 'adult';
@@ -186,6 +176,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
   String? _uploadedVideoId;
   String? _errorMessage;
   bool _publishing = false;
+  bool _audiencePromptOpen = false;
   Timer? _pollTimer;
   int _pollAttempts = 0;
 
@@ -233,8 +224,10 @@ class _UploadPageState extends ConsumerState<UploadPage> {
   /// website's own initial state (no track, 30s, "original").
   ShortSettings _shortSettings = const ShortSettings();
 
-  bool get _isMusicUpload =>
-      _contentType == 'music' || _category.toLowerCase() == 'music';
+  // A Music category on an ordinary Video/Raftaar upload is still video.
+  // Only the explicit Music upload type receives music metadata and appears
+  // in music-only feeds.
+  bool get _isMusicUpload => _contentType == 'music';
 
   @override
   void dispose() {
@@ -276,6 +269,8 @@ class _UploadPageState extends ConsumerState<UploadPage> {
         _file = picked;
         _thumbnailFile = null;
         _localFrameCandidates.clear();
+        _groundingImages = const [];
+        _groundingKey = '';
         _fileSizeBytes = size;
         _contentType = contentType;
         if (contentType == 'short') {
@@ -286,7 +281,10 @@ class _UploadPageState extends ConsumerState<UploadPage> {
       });
 
       if (contentType != 'music') {
-        unawaited(_captureLocalFrameCandidates(picked.path));
+        _frameCaptureSourcePath = picked.path;
+        final capture = _captureLocalFrameCandidates(picked.path);
+        _frameCaptureFuture = capture;
+        unawaited(capture);
       }
     } catch (e) {
       if (!mounted) return;
@@ -315,7 +313,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
     try {
       controller = VideoPlayerController.file(File(videoPath));
       await controller.initialize();
-      if (!mounted) return;
+      if (!mounted || _file?.path != videoPath) return;
 
       final boundaryKey = GlobalKey();
       setState(() {
@@ -333,18 +331,18 @@ class _UploadPageState extends ConsumerState<UploadPage> {
           : const [0.0];
 
       for (final fraction in fractions) {
-        if (!mounted) return;
+        if (!mounted || _file?.path != videoPath) return;
         await controller.seekTo(
           Duration(milliseconds: (durationMs * fraction).round()),
         );
         // The texture needs a beat to actually present the seeked frame
         // before a screenshot of it means anything.
         await Future.delayed(const Duration(milliseconds: 220));
-        if (!mounted) return;
+        if (!mounted || _file?.path != videoPath) return;
         // One extra frame so the just-seeked texture is definitely what
         // gets painted into the boundary this pass.
         await WidgetsBinding.instance.endOfFrame;
-        if (!mounted) return;
+        if (!mounted || _file?.path != videoPath) return;
 
         final renderObject = boundaryKey.currentContext?.findRenderObject();
         if (renderObject is! RenderRepaintBoundary) continue;
@@ -361,7 +359,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
           final outPath =
               '${dir.path}/local_frame_${DateTime.now().millisecondsSinceEpoch}_${fractions.indexOf(fraction)}.png';
           await File(outPath).writeAsBytes(byteData.buffer.asUint8List());
-          if (!mounted) return;
+          if (!mounted || _file?.path != videoPath) return;
           setState(() => _localFrameCandidates.add(XFile(outPath)));
         } catch (_) {
           // Skip this one candidate, keep going for the rest.
@@ -371,7 +369,9 @@ class _UploadPageState extends ConsumerState<UploadPage> {
       // Silent by design — see the doc comment above.
     } finally {
       await controller?.dispose();
-      if (mounted) {
+      if (mounted && _frameCaptureSourcePath == videoPath) {
+        _frameCaptureFuture = null;
+        _frameCaptureSourcePath = null;
         setState(() {
           _captureController = null;
           _captureBoundaryKey = null;
@@ -430,19 +430,27 @@ class _UploadPageState extends ConsumerState<UploadPage> {
   Future<void> _generateAiMusicCover() async {
     if (_aiCoverBusy || _musicCovers.length >= 5) return;
     final title = _titleController.text.trim();
-    if (title.isEmpty) {
-      _showSnack('Add a title first — the AI cover is built from it.');
+    if (AIAssistService.looksLikeAutoFilename(title)) {
+      _showSnack('Add a song title first — the AI cover is built from it.');
       return;
     }
     setState(() => _aiCoverBusy = true);
     try {
+      final coverBrief = [
+        if (_descriptionController.text.trim().isNotEmpty)
+          'Creator description: ${_descriptionController.text.trim()}',
+        'Genre: $_genre',
+        if (_musicLanguage.isNotEmpty && _musicLanguage != 'Other')
+          'Language: $_musicLanguage',
+        'Create interpretive cover art from these details; do not imply a real person, place, event, or literal scene unless it is described.',
+      ].join('\n');
       final result = await ref
           .read(aiAssistServiceProvider)
           .pickThumbnail(
             title: title,
             category: 'Music',
             contentType: 'music',
-            description: _descriptionController.text.trim(),
+            description: coverBrief,
             generateNew: true,
           );
       final filePath = await _saveAiImage(result.thumbnailUrl, 'ai_cover');
@@ -455,8 +463,9 @@ class _UploadPageState extends ConsumerState<UploadPage> {
     } on AIAssistException catch (e) {
       if (mounted) _showSnack(e.message);
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         _showSnack("Couldn't generate an AI cover. Please try again.");
+      }
     } finally {
       if (mounted) setState(() => _aiCoverBusy = false);
     }
@@ -543,8 +552,225 @@ class _UploadPageState extends ConsumerState<UploadPage> {
     _tagController.clear();
   }
 
+  Future<String?> _chooseVideoAudience() async {
+    var selected = _audience == 'kids' ? 'kids' : 'everyone';
+
+    return showModalBottomSheet<String>(
+      context: context,
+      useSafeArea: true,
+      backgroundColor: Colors.transparent,
+      builder: (sheetContext) => StatefulBuilder(
+        builder: (context, setSheetState) {
+          Widget audienceCard({
+            required String value,
+            required String title,
+            required String description,
+            required IconData icon,
+          }) {
+            final active = selected == value;
+            return AnimatedContainer(
+              duration: const Duration(milliseconds: 180),
+              decoration: BoxDecoration(
+                color: active
+                    ? AppColors.brandOrange.withValues(alpha: 0.12)
+                    : context.bgCard.withValues(alpha: 0.72),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: active ? AppColors.brandOrange : context.borderSubtle,
+                  width: active ? 1.5 : 1,
+                ),
+                boxShadow: active
+                    ? [
+                        BoxShadow(
+                          color: AppColors.brandOrange.withValues(alpha: 0.12),
+                          blurRadius: 18,
+                          offset: const Offset(0, 5),
+                        ),
+                      ]
+                    : const [],
+              ),
+              child: Material(
+                color: Colors.transparent,
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(18),
+                  onTap: () => setSheetState(() => selected = value),
+                  child: Padding(
+                    padding: const EdgeInsets.all(14),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            gradient: active ? AppColors.flameGradient : null,
+                            color: active
+                                ? null
+                                : AppColors.brandOrange.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(14),
+                          ),
+                          child: Icon(
+                            icon,
+                            color: active
+                                ? Colors.white
+                                : AppColors.brandOrange,
+                            size: 21,
+                          ),
+                        ),
+                        const SizedBox(width: 13),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                title,
+                                style: TextStyle(
+                                  color: context.textPrimary,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 3),
+                              Text(
+                                description,
+                                style: TextStyle(
+                                  color: context.textSecondary,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          active
+                              ? Icons.check_circle_rounded
+                              : Icons.circle_outlined,
+                          color: active
+                              ? AppColors.brandOrange
+                              : context.textDim,
+                          size: 22,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            );
+          }
+
+          return Container(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: context.isDark
+                    ? [const Color(0xFF28232A), const Color(0xFF151419)]
+                    : [const Color(0xFFFFF7ED), const Color(0xFFF4EBE3)],
+              ),
+              borderRadius: const BorderRadius.vertical(
+                top: Radius.circular(28),
+              ),
+              border: Border.all(color: context.borderSubtle),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Container(
+                    width: 42,
+                    height: 4,
+                    decoration: BoxDecoration(
+                      color: context.textDim.withValues(alpha: 0.45),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Who can watch this upload?',
+                  style: TextStyle(
+                    color: context.textPrimary,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: -0.4,
+                  ),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  'Choose the audience before your video is uploaded.',
+                  style: TextStyle(
+                    color: context.textSecondary,
+                    fontSize: 13,
+                    height: 1.35,
+                  ),
+                ),
+                const SizedBox(height: 18),
+                audienceCard(
+                  value: 'everyone',
+                  title: 'Everyone',
+                  description: 'Available to all InPlayer viewers',
+                  icon: Icons.public_rounded,
+                ),
+                const SizedBox(height: 10),
+                audienceCard(
+                  value: 'kids',
+                  title: 'Kids',
+                  description: 'Include this video in the Kids experience',
+                  icon: Icons.child_care_rounded,
+                ),
+                const SizedBox(height: 18),
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () => Navigator.pop(sheetContext),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size.fromHeight(48),
+                          foregroundColor: context.textPrimary,
+                          side: BorderSide(color: context.borderSubtle),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        child: const Text('Cancel'),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      flex: 2,
+                      child: ElevatedButton.icon(
+                        onPressed: () => Navigator.pop(sheetContext, selected),
+                        icon: const Icon(Icons.cloud_upload_rounded, size: 18),
+                        label: Text(
+                          selected == 'kids' ? 'Upload for Kids' : 'Upload',
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.brandOrange,
+                          foregroundColor: Colors.white,
+                          minimumSize: const Size.fromHeight(48),
+                          elevation: 5,
+                          shadowColor: AppColors.brandOrange.withValues(
+                            alpha: 0.32,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   Future<void> _publish() async {
-    if (_file == null || _publishing) return;
+    if (_file == null || _publishing || _audiencePromptOpen) return;
 
     final title = _titleController.text.trim();
     if (title.isEmpty) {
@@ -562,6 +788,20 @@ class _UploadPageState extends ConsumerState<UploadPage> {
         'Please add cover art — a music upload needs at least one image.',
       );
       return;
+    }
+
+    // Ask at the final publish action, before upload setup or media transfer.
+    // Music uploads do not have a video audience prompt.
+    if (_contentType == 'video' || _contentType == 'short') {
+      _audiencePromptOpen = true;
+      String? selectedAudience;
+      try {
+        selectedAudience = await _chooseVideoAudience();
+      } finally {
+        _audiencePromptOpen = false;
+      }
+      if (!mounted || selectedAudience == null) return;
+      setState(() => _audience = selectedAudience!);
     }
 
     setState(() {
@@ -673,9 +913,9 @@ class _UploadPageState extends ConsumerState<UploadPage> {
           contentType: _isMusicUpload ? 'music' : _contentType,
           spokenLanguage: _spokenLanguage,
           visibility: _visibility,
-          audience: _audience,
-          madeForKids: _madeForKids,
-          ageRestricted: _ageRestricted,
+          audience: _isMusicUpload ? 'everyone' : _audience,
+          madeForKids: !_isMusicUpload && _madeForKids,
+          ageRestricted: !_isMusicUpload && _ageRestricted,
           commentsEnabled: _commentsEnabled,
           membersOnly: _membersOnly,
           tags: _tags,
@@ -799,8 +1039,13 @@ class _UploadPageState extends ConsumerState<UploadPage> {
       _file = null;
       _thumbnailFile = null;
       _localFrameCandidates.clear();
+      _capturingFrameCandidates = false;
+      _captureController = null;
+      _captureBoundaryKey = null;
       _groundingImages = const [];
       _groundingKey = '';
+      _frameCaptureFuture = null;
+      _frameCaptureSourcePath = null;
       _aiBusyField = null;
       _aiThumbnailBusy = false;
       _musicCovers.clear();
@@ -847,26 +1092,41 @@ class _UploadPageState extends ConsumerState<UploadPage> {
     description: _descriptionController.text,
     category: _category,
     contentType: _isMusicUpload ? 'music' : _contentType,
+    musicGenre: _isMusicUpload ? _genre : null,
+    musicLanguage: _isMusicUpload ? _musicLanguage : null,
     userDescription: userDescription,
     images: _groundingImages,
   );
 
-  /// Up to 3 real frames from the picked video (or 2 music covers), shrunk
+  /// Up to 4 real frames from the picked video (or 2 music covers), shrunk
   /// to small JPEG data URLs, so the AI writes about what is actually in the
   /// upload instead of guessing from a category and a camera filename.
   /// AI-generated thumbnails are excluded — only frames from the file itself.
   Future<List<String>> _ensureGroundingImages() async {
     final isMusic = _isMusicUpload;
+    if (!isMusic && _frameCaptureSourcePath == _file?.path) {
+      final capture = _frameCaptureFuture;
+      if (capture != null) {
+        try {
+          await capture;
+        } catch (_) {
+          // Extraction is best-effort. Text helpers can still use creator
+          // context, while thumbnail selection reports that no frames exist.
+        }
+      }
+    }
+
     final sources = isMusic
         ? _musicCovers.take(2).toList()
         : _localFrameCandidates
               .where((f) => f.path.contains('local_frame_'))
-              .take(3)
+              .take(4)
               .toList();
-    final key = sources.map((f) => f.path).join('|');
+    final ratio = isMusic ? 1.0 : (_contentType == 'short' ? 9 / 16 : 16 / 9);
+    final key =
+        '${ratio.toStringAsFixed(5)}|${sources.map((f) => f.path).join('|')}';
     if (key == _groundingKey) return _groundingImages;
 
-    final ratio = isMusic ? 1.0 : (_contentType == 'short' ? 9 / 16 : 16 / 9);
     final out = <String>[];
     for (final f in sources) {
       // Best-effort: a frame that can't be read is just skipped — the AI
@@ -950,16 +1210,33 @@ class _UploadPageState extends ConsumerState<UploadPage> {
       _aiBusy = true;
       _aiBusyField = 'title';
     });
-    await _ensureGroundingImages();
+    try {
+      await _ensureGroundingImages();
+    } catch (_) {
+      if (mounted) {
+        _showSnack(
+          'Could not prepare upload frames. Add a short description and try again.',
+        );
+      }
+      return;
+    } finally {
+      if (mounted) {
+        setState(() {
+          _aiBusy = false;
+          _aiBusyField = null;
+        });
+      }
+    }
     if (!mounted) return;
-    setState(() {
-      _aiBusy = false;
-      _aiBusyField = null;
-    });
     final picked = await showAITitleAssistSheet(
       context,
       initialDescription: _descriptionController.text.trim(),
-      seesFrames: _groundingImages.isNotEmpty,
+      hasSupportingContext: _isMusicUpload
+          ? (_descriptionController.text.trim().isNotEmpty ||
+                (_genre != 'Other') ||
+                (_musicLanguage.isNotEmpty && _musicLanguage != 'Other'))
+          : _groundingImages.isNotEmpty,
+      isMusic: _isMusicUpload,
       buildContext: (userDescription) =>
           _aiContext(userDescription: userDescription),
     );
@@ -1018,8 +1295,9 @@ class _UploadPageState extends ConsumerState<UploadPage> {
     } on AIAssistException catch (e) {
       if (mounted) _showSnack(e.message);
     } catch (_) {
-      if (mounted)
+      if (mounted) {
         _showSnack("Couldn't suggest tags right now. Please try again.");
+      }
     } finally {
       if (mounted) {
         setState(() {
@@ -1030,35 +1308,33 @@ class _UploadPageState extends ConsumerState<UploadPage> {
     }
   }
 
-  /// Asks POST /api/ai-thumbnail (same route as the website's button) for a
-  /// brand-new image built from the title, description and category, with
-  /// the real frames attached so the server can fall back to picking the
-  /// best actual frame if generation fails. The result joins the candidate
-  /// grid below the thumbnail box — the creator taps it to use it.
+  /// Asks POST /api/ai-thumbnail to choose the clearest real frame from this
+  /// upload. Using a frame from the actual video keeps the suggested
+  /// thumbnail faithful to its contents across the app.
   Future<void> _generateAIThumbnail() async {
     if (_aiThumbnailBusy) return;
     final title = _titleController.text.trim();
-    if (title.isEmpty) {
-      _showSnack('Add a title first — the AI thumbnail is built from it.');
-      return;
-    }
     setState(() => _aiThumbnailBusy = true);
     try {
       final frames = await _ensureGroundingImages();
+      if (frames.isEmpty) {
+        throw const AIAssistException(
+          'No video frames were available for AI thumbnail selection. Try another video or choose an image manually.',
+        );
+      }
       final result = await ref
           .read(aiAssistServiceProvider)
           .pickThumbnail(
-            title: title,
+            title: AIAssistService.looksLikeAutoFilename(title) ? '' : title,
             category: _category,
             contentType: _isMusicUpload ? 'music' : _contentType,
             description: _descriptionController.text.trim(),
             frameUrls: frames,
-            generateNew: true,
           );
       final filePath = await _saveAiImage(result.thumbnailUrl, 'ai_thumbnail');
       if (!mounted) return;
       setState(() => _localFrameCandidates.insert(0, XFile(filePath)));
-      _showSnack('AI thumbnail ready — tap it below to use it.');
+      _showSnack('AI thumbnail suggestion ready — tap it below to use it.');
     } on AIAssistException catch (e) {
       if (mounted) _showSnack(e.message);
     } catch (_) {
@@ -2125,26 +2401,6 @@ class _UploadPageState extends ConsumerState<UploadPage> {
             }).toList(),
           ),
         ],
-        const SizedBox(height: 12),
-        _label('Audience'),
-        DropdownButtonFormField<String>(
-          initialValue: _audience,
-          dropdownColor: context.bgCard,
-          style: TextStyle(color: context.textPrimary),
-          decoration: _inputDecoration(null),
-          items: _audienceOptions
-              .map(
-                (o) => DropdownMenuItem(
-                  value: o.value,
-                  child: Text(
-                    '${o.label} — ${o.hint}',
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                ),
-              )
-              .toList(),
-          onChanged: (v) => setState(() => _audience = v ?? _audience),
-        ),
         const SizedBox(height: 12),
         SwitchListTile(
           title: Text(

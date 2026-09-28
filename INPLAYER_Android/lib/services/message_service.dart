@@ -30,7 +30,11 @@ class MessageService {
             .whereType<Map>()
             .map((j) => Conversation.fromJson(Map<String, dynamic>.from(j)))
             .toList();
-        return ConversationsResult(conversations: conversations, requests: requests);
+        return ConversationsResult(
+          conversations: conversations,
+          requests: requests,
+          success: true,
+        );
       }
       return ConversationsResult(conversations: [], requests: []);
     } catch (e) {
@@ -71,8 +75,12 @@ class MessageService {
         );
       }
 
-      final error = (response.data is Map ? response.data['error'] : null) as String?;
-      return SendMessageResult(success: false, error: error ?? "Couldn't send that message.");
+      final error =
+          (response.data is Map ? response.data['error'] : null) as String?;
+      return SendMessageResult(
+        success: false,
+        error: error ?? "Couldn't send that message.",
+      );
     } catch (e) {
       _logger.e('Error sending message: $e');
       return SendMessageResult(
@@ -86,7 +94,9 @@ class MessageService {
   /// as a side effect) plus the other participant's live online status.
   Future<ConversationDetail?> getConversation(String conversationId) async {
     try {
-      final response = await _dio.get('${ApiConstants.messages}/$conversationId');
+      final response = await _dio.get(
+        '${ApiConstants.messages}/$conversationId',
+      );
       if (response.statusCode == 200 && response.data is Map) {
         final data = response.data as Map;
         if (data['conversation'] is! Map) return null;
@@ -108,14 +118,20 @@ class MessageService {
   /// PATCH /api/messages/{id} — accept/decline a request, block/unblock,
   /// mute/unmute. (Chat wallpaper themes and disappearing-messages timers
   /// also live on this action endpoint but aren't exposed in the app yet.)
-  Future<bool> conversationAction(String conversationId, String action, {String? theme, int? disappearingSeconds}) async {
+  Future<bool> conversationAction(
+    String conversationId,
+    String action, {
+    String? theme,
+    int? disappearingSeconds,
+  }) async {
     try {
       final response = await _dio.patch(
         '${ApiConstants.messages}/$conversationId',
         data: {
           'action': action,
           if (theme != null) 'theme': theme,
-          if (disappearingSeconds != null) 'disappearingSeconds': disappearingSeconds,
+          if (disappearingSeconds != null)
+            'disappearingSeconds': disappearingSeconds,
         },
       );
       return response.statusCode == 200;
@@ -132,7 +148,9 @@ class MessageService {
   /// typing indicator in a single round trip, same as the website does.
   Future<MessagesResult> getMessages(String conversationId) async {
     try {
-      final response = await _dio.get('${ApiConstants.messages}/$conversationId/messages');
+      final response = await _dio.get(
+        '${ApiConstants.messages}/$conversationId/messages',
+      );
       if (response.statusCode == 200 && response.data is Map) {
         final data = response.data as Map;
         final messages = (data['messages'] as List? ?? [])
@@ -187,7 +205,12 @@ class MessageService {
 class ConversationsResult {
   final List<Conversation> conversations;
   final List<Conversation> requests;
-  ConversationsResult({required this.conversations, required this.requests});
+  final bool success;
+  ConversationsResult({
+    required this.conversations,
+    required this.requests,
+    this.success = false,
+  });
 }
 
 class SendMessageResult {
@@ -218,5 +241,9 @@ class MessagesResult {
   final List<ChatMessage> messages;
   final String? otherLastReadAt;
   final bool otherIsTyping;
-  MessagesResult({required this.messages, this.otherLastReadAt, this.otherIsTyping = false});
+  MessagesResult({
+    required this.messages,
+    this.otherLastReadAt,
+    this.otherIsTyping = false,
+  });
 }

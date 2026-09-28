@@ -1320,7 +1320,7 @@ class _MyChannelStudioPageState extends ConsumerState<MyChannelStudioPage>
       context.push('/shorts/${video.videoId}');
       return;
     }
-    if (video.isMusic) {
+    if (video.isStrictMusic) {
       unawaited(
         ref.read(musicPlayerServiceProvider).playSingle(video),
       );

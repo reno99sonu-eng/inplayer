@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -59,8 +60,8 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
     super.initState();
     _glowController = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 3),
-    )..repeat(reverse: true);
+      duration: const Duration(seconds: 14),
+    )..repeat();
   }
 
   @override
@@ -612,33 +613,83 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
     final ad = player.currentAd;
     final displayUrl = isAd ? ad!.imageUrl : coverUrl;
 
-    return AnimatedBuilder(
-      animation: _glowController,
-      builder: (context, child) {
-        final glow = 0.25 + (_glowController.value * 0.20);
-        return Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(24),
-            boxShadow: [
-              BoxShadow(
-                color: isAd
-                    ? Colors.amber.withValues(alpha: glow)
-                    : AppColors.brandOrange.withValues(alpha: glow),
-                blurRadius: 46,
-                spreadRadius: 2,
-              ),
-              BoxShadow(
-                color: Colors.black.withValues(
-                  alpha: context.isDark ? 0.5 : 0.18,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final frameWidth = constraints.maxWidth.clamp(180.0, 320.0).toDouble();
+        final artSize = (frameWidth - 40).clamp(160.0, 280.0).toDouble();
+        final discSize = artSize - 10;
+
+        return AnimatedBuilder(
+          animation: _glowController,
+          builder: (context, child) {
+            final phase = _glowController.value;
+            final pulse = 1 - (phase - 0.5).abs() * 2;
+            final glow = 0.19 + (pulse * 0.13);
+            final tilt = (phase - 0.5) * 0.075;
+
+            return Center(
+              child: SizedBox(
+                width: frameWidth,
+                height: artSize,
+                child: Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Positioned(
+                      right: 0,
+                      top: (artSize - discSize) / 2,
+                      child: Transform.rotate(
+                        angle: phase * math.pi * 2,
+                        child: _buildVinylDisc(
+                          discSize,
+                          isAd ? Colors.amber : AppColors.brandOrange,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      left: 0,
+                      top: 0,
+                      child: Transform(
+                        alignment: Alignment.center,
+                        transform: Matrix4.identity()
+                          ..setEntry(3, 2, 0.0014)
+                          ..rotateY(tilt),
+                        child: Container(
+                          width: artSize,
+                          height: artSize,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(22),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.28),
+                              width: 1.1,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: isAd
+                                    ? Colors.amber.withValues(alpha: glow)
+                                    : AppColors.brandOrange.withValues(
+                                        alpha: glow,
+                                      ),
+                                blurRadius: 38,
+                                spreadRadius: 1,
+                              ),
+                              BoxShadow(
+                                color: Colors.black.withValues(
+                                  alpha: context.isDark ? 0.52 : 0.2,
+                                ),
+                                blurRadius: 28,
+                                offset: const Offset(0, 16),
+                              ),
+                            ],
+                          ),
+                          child: child,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                blurRadius: 30,
-                offset: const Offset(0, 18),
               ),
-            ],
-          ),
-          child: child,
-        );
-      },
+            );
+          },
       child: ClipRRect(
         borderRadius: BorderRadius.circular(24),
         child: AspectRatio(
@@ -801,6 +852,67 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
             ],
           ),
         ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildVinylDisc(double size, Color labelColor) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: const RadialGradient(
+          colors: [Color(0xFF3A3940), Color(0xFF16161A), Color(0xFF08080A)],
+          stops: [0.0, 0.55, 1.0],
+        ),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.2)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.48),
+            blurRadius: 18,
+            offset: const Offset(0, 8),
+          ),
+        ],
+      ),
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          for (final scale in [0.82, 0.68, 0.52, 0.36])
+            SizedBox(
+              width: size * scale,
+              height: size * scale,
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.075),
+                    width: 1,
+                  ),
+                ),
+              ),
+            ),
+          Container(
+            width: size * 0.28,
+            height: size * 0.28,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [labelColor, labelColor.withValues(alpha: 0.68)],
+              ),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.4)),
+            ),
+            child: Icon(
+              Icons.music_note_rounded,
+              color: Colors.white.withValues(alpha: 0.9),
+              size: size * 0.13,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1023,30 +1135,39 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
     return Row(
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
-        IconButton(
-          icon: Icon(
-            Icons.shuffle_rounded,
-            color: player.isShuffled
-                ? AppColors.brandOrangeLight
-                : context.textSecondary,
-            size: 20,
-          ),
+        _transportButton(
+          context,
+          icon: Icons.shuffle_rounded,
+          tooltip: 'Shuffle',
+          selected: player.isShuffled,
           onPressed: () => player.toggleShuffle(),
         ),
-        IconButton(
-          icon: Icon(
-            Icons.skip_previous_rounded,
-            color: context.textPrimary,
-            size: 34,
-          ),
+        _transportButton(
+          context,
+          icon: Icons.skip_previous_rounded,
+          tooltip: 'Previous track',
+          iconSize: 31,
           onPressed: () => player.previous(),
         ),
         Container(
           width: 68,
           height: 68,
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             gradient: AppColors.flameGradient,
             shape: BoxShape.circle,
+            border: Border.all(color: Colors.white.withValues(alpha: 0.55)),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.brandOrange.withValues(alpha: 0.42),
+                blurRadius: 20,
+                offset: const Offset(0, 8),
+              ),
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.2),
+                blurRadius: 9,
+                offset: const Offset(0, 5),
+              ),
+            ],
           ),
           child: IconButton(
             icon: Icon(
@@ -1063,27 +1184,89 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
                 : () => player.togglePlayPause(),
           ),
         ),
-        IconButton(
-          icon: Icon(
-            Icons.skip_next_rounded,
-            color: context.textPrimary,
-            size: 34,
-          ),
+        _transportButton(
+          context,
+          icon: Icons.skip_next_rounded,
+          tooltip: 'Next track',
+          iconSize: 31,
           onPressed: () => player.next(),
         ),
-        IconButton(
-          icon: Icon(
-            player.loopMode == LoopMode.one
-                ? Icons.repeat_one_rounded
-                : Icons.repeat_rounded,
-            color: player.loopMode != LoopMode.off
-                ? AppColors.brandOrangeLight
-                : context.textSecondary,
-            size: 20,
-          ),
+        _transportButton(
+          context,
+          icon: player.loopMode == LoopMode.one
+              ? Icons.repeat_one_rounded
+              : Icons.repeat_rounded,
+          tooltip: player.loopMode == LoopMode.off
+              ? 'Repeat off'
+              : player.loopMode == LoopMode.one
+                  ? 'Repeat this track'
+                  : 'Repeat queue',
+          selected: player.loopMode != LoopMode.off,
           onPressed: () => player.cycleRepeatMode(),
         ),
       ],
+    );
+  }
+
+  Widget _transportButton(
+    BuildContext context, {
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onPressed,
+    bool selected = false,
+    double iconSize = 20,
+  }) {
+    final colors = selected
+        ? [AppColors.brandOrange, AppColors.brandGold]
+        : context.isDark
+            ? [const Color(0xFF34323A), const Color(0xFF1C1B20)]
+            : [const Color(0xFFFFF8F1), const Color(0xFFE9E0D8)];
+
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: Colors.transparent,
+        child: Ink(
+          width: 46,
+          height: 46,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: colors,
+            ),
+            border: Border.all(
+              color: Colors.white.withValues(alpha: selected ? 0.38 : 0.12),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(
+                  alpha: context.isDark ? 0.24 : 0.1,
+                ),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+              if (selected)
+                BoxShadow(
+                  color: AppColors.brandOrange.withValues(alpha: 0.24),
+                  blurRadius: 12,
+                ),
+            ],
+          ),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onPressed,
+            child: Center(
+              child: Icon(
+                icon,
+                size: iconSize,
+                color: selected ? Colors.white : context.textPrimary,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 

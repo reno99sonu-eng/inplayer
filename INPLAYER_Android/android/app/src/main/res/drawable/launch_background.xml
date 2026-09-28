@@ -13,5 +13,5 @@
      native flash. Only the color shows now, so the Flutter animation is
      the first and only thing anyone actually sees animate in. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:drawable="@color/ic_launcher_background" />
+    <item android:drawable="@color/splash_background" />
 </layer-list>

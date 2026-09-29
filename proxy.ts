@@ -126,6 +126,7 @@ const BYPASS_EXACT = new Set([
   // snippet" email) could never actually succeed even after the real
   // ads.txt content (public/ads.txt) was correctly filled in.
   "/ads.txt",
+  "/app-ads.txt",
 ]);
 
 function shouldBypass(pathname: string): boolean {

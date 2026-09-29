@@ -1090,12 +1090,31 @@ class AdminService {
         return AdminSponsorshipsResult(
           items: items,
           tableMissing: data['tableMissing'] == true,
+          error: data['error']?.toString(),
         );
       }
-      return AdminSponsorshipsResult(items: []);
+      final data = response.data;
+      final message = data is Map ? data['error']?.toString() : null;
+      return AdminSponsorshipsResult(
+        items: [],
+        error: message ?? 'Sponsorship request failed (HTTP ${response.statusCode}).',
+      );
     } catch (e) {
       _logger.e('Error fetching admin sponsorships: $e');
-      return AdminSponsorshipsResult(items: []);
+      if (e is DioException) {
+        final data = e.response?.data;
+        final message = data is Map ? data['error']?.toString() : null;
+        if (message != null && message.isNotEmpty) {
+          return AdminSponsorshipsResult(items: [], error: message);
+        }
+        if (e.response?.statusCode == 401 || e.response?.statusCode == 403) {
+          return AdminSponsorshipsResult(items: [], error: 'This sponsorship section requires the main admin account.');
+        }
+      }
+      return AdminSponsorshipsResult(
+        items: [],
+        error: 'Could not reach the admin API. Check the connection and retry.',
+      );
     }
   }
 }

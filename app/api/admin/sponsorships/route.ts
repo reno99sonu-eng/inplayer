@@ -37,6 +37,16 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ items });
   } catch (err) {
     console.error("admin/sponsorships: list failed (table may not exist yet):", err);
-    return NextResponse.json({ items: [], tableMissing: true });
+    const errorName =
+      err && typeof err === "object" && "name" in err
+        ? String((err as { name?: unknown }).name)
+        : "";
+    if (errorName === "ResourceNotFoundException") {
+      return NextResponse.json({ items: [], tableMissing: true });
+    }
+    return NextResponse.json(
+      { items: [], error: "Could not load sponsorships from the admin data store." },
+      { status: 500 }
+    );
   }
 }

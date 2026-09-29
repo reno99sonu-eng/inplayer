@@ -60,7 +60,7 @@ class _AdminSettingsTabState extends ConsumerState<AdminSettingsTab> {
       _announcementTextController.text = settings?.announcementText ?? '';
       _announcementLinkController.text = settings?.announcementLinkUrl ?? '';
       _adsensePublisherController.text = settings?.adsensePublisherId ?? '';
-      _midrollIntervalController.text = '${settings?.midrollIntervalSeconds ?? 900}';
+      _midrollIntervalController.text = '${settings?.midrollIntervalSeconds ?? 120}';
       _loading = false;
     });
   }
@@ -73,7 +73,7 @@ class _AdminSettingsTabState extends ConsumerState<AdminSettingsTab> {
     final parsedInterval = int.tryParse(_midrollIntervalController.text.trim());
     final midrollIntervalSeconds = parsedInterval == null
         ? original.midrollIntervalSeconds
-        : parsedInterval.clamp(60, 3600).toInt();
+        : parsedInterval.clamp(30, 3600).toInt();
 
     final updated = current.copyWith(
       maintenanceMessage: _maintenanceMsgController.text.trim(),
@@ -84,12 +84,12 @@ class _AdminSettingsTabState extends ConsumerState<AdminSettingsTab> {
     );
 
     final partial = <String, dynamic>{};
-    if (updated.maintenanceMode != original.maintenanceMode) partial['maintenanceMode'] = updated.maintenanceMode;
-    if (updated.maintenanceMessage != original.maintenanceMessage) partial['maintenanceMessage'] = updated.maintenanceMessage;
+    if (updated.maintenanceMode != original.maintenanceMode) partial['inplayerMaintenanceMode'] = updated.maintenanceMode;
+    if (updated.maintenanceMessage != original.maintenanceMessage) partial['inplayerMaintenanceMessage'] = updated.maintenanceMessage;
     if (updated.signupsEnabled != original.signupsEnabled) partial['signupsEnabled'] = updated.signupsEnabled;
-    if (updated.announcementEnabled != original.announcementEnabled) partial['announcementEnabled'] = updated.announcementEnabled;
-    if (updated.announcementText != original.announcementText) partial['announcementText'] = updated.announcementText;
-    if (updated.announcementLinkUrl != original.announcementLinkUrl) partial['announcementLinkUrl'] = updated.announcementLinkUrl;
+    if (updated.announcementEnabled != original.announcementEnabled) partial['inplayerAnnouncementEnabled'] = updated.announcementEnabled;
+    if (updated.announcementText != original.announcementText) partial['inplayerAnnouncementText'] = updated.announcementText;
+    if (updated.announcementLinkUrl != original.announcementLinkUrl) partial['inplayerAnnouncementLinkUrl'] = updated.announcementLinkUrl;
     if (updated.moderationEnabledComments != original.moderationEnabledComments) partial['moderationEnabledComments'] = updated.moderationEnabledComments;
     if (updated.moderationEnabledMessages != original.moderationEnabledMessages) partial['moderationEnabledMessages'] = updated.moderationEnabledMessages;
     if (updated.moderationEnabledUploads != original.moderationEnabledUploads) partial['moderationEnabledUploads'] = updated.moderationEnabledUploads;

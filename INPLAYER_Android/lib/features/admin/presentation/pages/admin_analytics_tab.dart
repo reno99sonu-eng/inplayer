@@ -16,7 +16,7 @@ class AdminAnalyticsTab extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return DefaultTabController(
-      length: 3,
+      length: 2,
       child: Column(
         children: [
           Container(
@@ -25,7 +25,7 @@ class AdminAnalyticsTab extends StatelessWidget {
               indicatorColor: AppColors.brandOrange,
               labelColor: AppColors.brandOrange,
               unselectedLabelColor: context.textSecondary,
-              tabs: const [Tab(text: 'Analytics'), Tab(text: 'Revenue'), Tab(text: 'Payouts')],
+              tabs: const [Tab(text: 'Analytics'), Tab(text: 'Revenue')],
             ),
           ),
           const Expanded(

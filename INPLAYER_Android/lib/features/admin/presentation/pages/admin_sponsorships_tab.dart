@@ -17,6 +17,7 @@ class _AdminSponsorshipsTabState extends ConsumerState<AdminSponsorshipsTab> {
   bool _loading = true;
   List<AdminSponsorship> _sponsorships = [];
   bool _tableMissing = false;
+  String? _error;
 
   @override
   void initState() {
@@ -31,6 +32,7 @@ class _AdminSponsorshipsTabState extends ConsumerState<AdminSponsorshipsTab> {
     setState(() {
       _sponsorships = result.items;
       _tableMissing = result.tableMissing;
+      _error = result.error;
       _loading = false;
     });
   }
@@ -55,8 +57,28 @@ class _AdminSponsorshipsTabState extends ConsumerState<AdminSponsorshipsTab> {
       );
     }
 
+    if (_error != null && !_loading) {
+      return Center(
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(Icons.cloud_off_outlined, size: 42, color: context.textDim),
+              const SizedBox(height: 12),
+              Text('Could not load sponsorships', style: TextStyle(color: context.textPrimary, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 6),
+              Text(_error!, textAlign: TextAlign.center, style: TextStyle(color: context.textSecondary, fontSize: 12)),
+              const SizedBox(height: 12),
+              OutlinedButton.icon(onPressed: _load, icon: const Icon(Icons.refresh), label: const Text('Retry')),
+            ],
+          ),
+        ),
+      );
+    }
+
     final totalAssets = _sponsorships.fold<int>(0, (sum, s) => sum + s.assetCount);
-    final activeCount = _sponsorships.where((s) => s.status == 'active' || s.status == 'approved').length;
+    final activeCount = _sponsorships.where((s) => s.status == 'active').length;
 
     return Scaffold(
       backgroundColor: Colors.transparent,
@@ -158,20 +180,20 @@ class _AdminSponsorshipsTabState extends ConsumerState<AdminSponsorshipsTab> {
     Color statusColor;
     switch (s.status) {
       case 'active':
-      case 'approved':
         statusColor = const Color(0xFF10B981);
         break;
-      case 'pending':
+      case 'pending_payment':
+      case 'awaiting_assets':
         statusColor = const Color(0xFFF59E0B);
         break;
-      case 'rejected':
+      case 'cancelled':
         statusColor = const Color(0xFFEF4444);
         break;
       default:
         statusColor = context.textDim;
     }
 
-    final amount = s.amountInr ?? s.budgetInr;
+    final amount = s.amountInr;
 
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
@@ -189,7 +211,7 @@ class _AdminSponsorshipsTabState extends ConsumerState<AdminSponsorshipsTab> {
             children: [
               Expanded(
                 child: Text(
-                  s.sponsorName,
+                  s.companyName,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(color: context.textPrimary, fontSize: 14, fontWeight: FontWeight.bold),
@@ -202,25 +224,29 @@ class _AdminSponsorshipsTabState extends ConsumerState<AdminSponsorshipsTab> {
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: Text(
-                  s.status.toUpperCase(),
+                  s.statusLabel.toUpperCase(),
                   style: TextStyle(color: statusColor, fontSize: 9.5, fontWeight: FontWeight.w800),
                 ),
               ),
             ],
           ),
-          if (s.brandName != null && s.brandName!.isNotEmpty) ...[
+          if (s.contactName.isNotEmpty || s.contactEmail.isNotEmpty) ...[
             const SizedBox(height: 2),
             Text(
-              'Brand: ${s.brandName}',
+              [s.contactName, s.contactEmail].where((value) => value.isNotEmpty).join(' · '),
               style: TextStyle(color: context.textSecondary, fontSize: 11.5),
             ),
           ],
-          if (s.campaignTitle != null && s.campaignTitle!.isNotEmpty) ...[
+          if (s.packageLabel.isNotEmpty) ...[
             const SizedBox(height: 4),
             Text(
-              'Campaign: ${s.campaignTitle}',
+              'Package: ${s.packageLabel}',
               style: TextStyle(color: context.textPrimary, fontSize: 12, fontWeight: FontWeight.w600),
             ),
+          ],
+          if (s.sections.isNotEmpty) ...[
+            const SizedBox(height: 3),
+            Text('Placements: ${s.sections.map((section) => section.replaceAll('_', ' ')).join(', ')}', style: TextStyle(color: context.textSecondary, fontSize: 11)),
           ],
           const SizedBox(height: 8),
           Row(
@@ -248,8 +274,22 @@ class _AdminSponsorshipsTabState extends ConsumerState<AdminSponsorshipsTab> {
               ),
             ],
           ),
+          const SizedBox(height: 4),
+          Text('Payment: ${s.paymentStatus.replaceAll('_', ' ')}', style: TextStyle(color: context.textDim, fontSize: 10.5)),
+          if (s.status == 'active' && s.expiresAt != null) ...[
+            const SizedBox(height: 3),
+            Text('Runs until ${_formatDate(s.expiresAt!)}', style: TextStyle(color: context.textSecondary, fontSize: 10.5)),
+          ],
         ],
       ),
     );
+  }
+
+  String _formatDate(String value) {
+    final date = DateTime.tryParse(value)?.toLocal();
+    if (date == null) return value;
+    final month = date.month.toString().padLeft(2, '0');
+    final day = date.day.toString().padLeft(2, '0');
+    return '$day/$month/${date.year}';
   }
 }

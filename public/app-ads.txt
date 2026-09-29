@@ -1,2 +1,2 @@
 # InPlayer - Google AdMob
-google.com, pub-6015485001941451, DIRECT, f08c47fec0942fa0
+google.com, pub-2093353589258497, DIRECT, f08c47fec0942fa0

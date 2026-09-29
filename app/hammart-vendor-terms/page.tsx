@@ -23,6 +23,10 @@ import LegalNav from "../components/LegalNav";
 // at scale.
 export const metadata = {
   title: "Vendor Terms — Hammart",
+  description: "Terms and conditions for vendors selling on Hammart marketplace on InPlayer.",
+  alternates: {
+    canonical: "https://inplayer.in/hammart-vendor-terms",
+  },
 };
 
 const LAST_UPDATED = "11 August 2026";

@@ -28,6 +28,8 @@ import '../widgets/ai_title_assist_sheet.dart';
 import '../../../../models/soundtrack.dart';
 import '../widgets/lyrics_sync_editor.dart';
 import '../widgets/short_creation_tools.dart';
+import '../../../../services/raftaar_films_service.dart';
+import '../../../../models/film_series.dart';
 
 const _categories = [
   'Entertainment',
@@ -172,6 +174,36 @@ class _UploadPageState extends ConsumerState<UploadPage> {
   // instead of the value being silently hardcoded true (Round 24 parity fix).
   bool _declaredOwnership = false;
 
+  bool get _isFilmUpload => _contentType == 'film';
+  bool _isFilmApproved = false;
+  List<FilmSeries> _mySeriesList = [];
+  String? _selectedSeriesId;
+  final _episodeNumberController = TextEditingController(text: '1');
+  final _episodeTitleController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _checkFilmCreatorStatus();
+  }
+
+  Future<void> _checkFilmCreatorStatus() async {
+    try {
+      final service = ref.read(raftaarFilmsServiceProvider);
+      final app = await service.getApplicationStatus();
+      if (app != null && app.isApproved && mounted) {
+        final series = await service.getMySeries();
+        setState(() {
+          _isFilmApproved = true;
+          _mySeriesList = series;
+          if (series.isNotEmpty) {
+            _selectedSeriesId = series.first.seriesId;
+          }
+        });
+      }
+    } catch (_) {}
+  }
+
   double _progress = 0;
   String? _uploadedVideoId;
   String? _errorMessage;
@@ -235,6 +267,8 @@ class _UploadPageState extends ConsumerState<UploadPage> {
     _descriptionController.dispose();
     _tagController.dispose();
     _lyricsController.dispose();
+    _episodeNumberController.dispose();
+    _episodeTitleController.dispose();
     _pollTimer?.cancel();
     super.dispose();
   }
@@ -275,6 +309,8 @@ class _UploadPageState extends ConsumerState<UploadPage> {
         _contentType = contentType;
         if (contentType == 'short') {
           _category = 'Raftaar (Vertical Videos)';
+        } else if (contentType == 'film') {
+          _category = 'Drama';
         }
         _titleController.text = nameWithoutExt;
         _stage = _Stage.details;
@@ -835,7 +871,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
       // the website's app/lib/contentTypes.ts.
       final aspectRatio = _isMusicUpload
           ? 1.0
-          : (_contentType == 'short' ? 9 / 16 : 16 / 9);
+          : (_contentType == 'short' || _contentType == 'film' ? 9 / 16 : 16 / 9);
       thumbnailDataUrl = await compressImageToThumbnailDataUrl(
         _thumbnailFile!.path,
         aspectRatio: aspectRatio,
@@ -936,6 +972,13 @@ class _UploadPageState extends ConsumerState<UploadPage> {
           // shortSettings key at all rather than a default-shaped one.
           shortSettings: (!_isMusicUpload && !_shortSettings.isDefault)
               ? _shortSettings.toJson()
+              : null,
+          seriesId: _isFilmUpload ? _selectedSeriesId : null,
+          episodeNumber: _isFilmUpload
+              ? int.tryParse(_episodeNumberController.text) ?? 1
+              : null,
+          episodeTitle: _isFilmUpload && _episodeTitleController.text.trim().isNotEmpty
+              ? _episodeTitleController.text.trim()
               : null,
         );
 
@@ -1122,7 +1165,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
               .where((f) => f.path.contains('local_frame_'))
               .take(4)
               .toList();
-    final ratio = isMusic ? 1.0 : (_contentType == 'short' ? 9 / 16 : 16 / 9);
+    final ratio = isMusic ? 1.0 : (_contentType == 'short' || _contentType == 'film' ? 9 / 16 : 16 / 9);
     final key =
         '${ratio.toStringAsFixed(5)}|${sources.map((f) => f.path).join('|')}';
     if (key == _groundingKey) return _groundingImages;
@@ -1556,6 +1599,41 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                 ),
               ),
             ),
+            if (_isFilmApproved) ...[
+              const SizedBox(height: 14),
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  color: context.bgCard,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: const Color(0xFFFF7A18).withValues(alpha: 0.5),
+                  ),
+                ),
+                child: OutlinedButton.icon(
+                  onPressed: () => _pickVideo('film'),
+                  icon: const Icon(
+                    Icons.movie_filter_rounded,
+                    color: Color(0xFFFF9A00),
+                  ),
+                  label: Text(
+                    'Upload Raftaar Films Episode (🎬)',
+                    style: TextStyle(
+                      color: context.textPrimary,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size(double.infinity, 52),
+                    side: BorderSide.none,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -1629,7 +1707,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                     ),
                     const SizedBox(height: 2),
                     Text(
-                      '$sizeLabel • ${_contentType == 'short' ? 'Raftaar Short' : (_isMusicUpload ? 'Music Track' : 'Longform Video')}',
+                      '$sizeLabel • ${_contentType == 'short' ? 'Raftaar Short' : (_contentType == 'film' ? 'Raftaar Film Episode' : (_isMusicUpload ? 'Music Track' : 'Longform Video'))}',
                       style: TextStyle(color: context.textDim, fontSize: 12),
                     ),
                   ],
@@ -1643,13 +1721,119 @@ class _UploadPageState extends ConsumerState<UploadPage> {
           ),
         ),
         const SizedBox(height: 16),
-        // The content-type SegmentedButton used to live here.
-        //
-        // It duplicated the three buttons on the previous screen and appeared
-        // AFTER the file was already picked — switching Video to Music on a
-        // chosen .mp4 published it as music without changing the file, and
-        // switching to Short never set the Raftaar category. The choice now
-        // happens once, up front, where it also decides which picker opens.
+        if (_isFilmUpload) ...[
+          Container(
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: context.bgCard,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: const Color(0xFFFF7A18).withValues(alpha: 0.4),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.movie_filter_rounded,
+                      color: Color(0xFFFF7A18),
+                      size: 18,
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      'Raftaar Films Series Assignment',
+                      style: TextStyle(
+                        color: context.textPrimary,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                if (_mySeriesList.isNotEmpty) ...[
+                  _label('Select Series'),
+                  const SizedBox(height: 6),
+                  DropdownButtonFormField<String>(
+                    initialValue: _selectedSeriesId,
+                    items: _mySeriesList.map((s) {
+                      return DropdownMenuItem<String>(
+                        value: s.seriesId,
+                        child: Text(s.title),
+                      );
+                    }).toList(),
+                    onChanged: (val) {
+                      setState(() => _selectedSeriesId = val);
+                    },
+                    decoration: InputDecoration(
+                      filled: true,
+                      fillColor: context.bgInput,
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  ),
+                ] else ...[
+                  Text(
+                    'No series found. Create one first from Raftaar Films Studio.',
+                    style: TextStyle(color: Colors.amber[300], fontSize: 12),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    Expanded(
+                      flex: 1,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _label('Episode #'),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: _episodeNumberController,
+                            keyboardType: TextInputType.number,
+                            decoration: InputDecoration(
+                              filled: true,
+                              fillColor: context.bgInput,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      flex: 2,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _label('Episode Title'),
+                          const SizedBox(height: 6),
+                          TextField(
+                            controller: _episodeTitleController,
+                            decoration: InputDecoration(
+                              hintText: 'e.g. The Beginning',
+                              filled: true,
+                              fillColor: context.bgInput,
+                              border: OutlineInputBorder(
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+        ],
 
         // Custom Cover / Thumbnail selector
         if (!_isMusicUpload) ...[
@@ -1663,7 +1847,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
           Padding(
             padding: const EdgeInsets.only(bottom: 6),
             child: Text(
-              _contentType == 'short'
+              _contentType == 'short' || _contentType == 'film'
                   ? 'Recommended: 9:16 portrait'
                   : 'Recommended: 16:9 landscape',
               style: TextStyle(color: context.textSecondary, fontSize: 11),
@@ -2357,7 +2541,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
         // Soundtrack + Look. Hidden for music uploads, matching the website:
         // a music upload IS the audio, so laying a background track over it
         // is meaningless.
-        if (!_isMusicUpload)
+        if (!_isMusicUpload && !_isFilmUpload)
           ShortCreationTools(
             value: _shortSettings,
             onChanged: (v) => setState(() => _shortSettings = v),

@@ -24,10 +24,12 @@ export async function GET(request: Request) {
       items = items.filter((v) => isMusicType(v.contentType));
     } else if (contentType === "short" || contentType === "raftaar") {
       items = items.filter((v) => v.contentType === "short");
+    } else if (contentType === "film" || contentType === "raftaar_film") {
+      items = items.filter((v) => v.contentType === "film");
     } else if (contentType !== "all") {
       // Default: pure longform videos only
       items = items.filter(
-        (v) => !isMusicType(v.contentType) && v.contentType !== "short"
+        (v) => !isMusicType(v.contentType) && v.contentType !== "short" && v.contentType !== "film"
       );
     }
 

@@ -181,6 +181,22 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                       },
                     ),
                     _buildMenuItem(
+                      icon: Icons.play_circle_outline,
+                      title: 'Raftaar',
+                      onTap: () {
+                        Navigator.pop(context);
+                        context.go('/shorts');
+                      },
+                    ),
+                    _buildMenuItem(
+                      icon: Icons.movie_filter_outlined,
+                      title: 'Raftaar Films',
+                      onTap: () {
+                        Navigator.pop(context);
+                        context.push('/raftaar-films');
+                      },
+                    ),
+                    _buildMenuItem(
                       icon: Icons.sports_esports_outlined,
                       title: 'InJoy',
                       onTap: () {

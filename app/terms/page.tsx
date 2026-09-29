@@ -5,6 +5,9 @@ import LegalNav from "../components/LegalNav";
 export const metadata = {
   title: "Terms & Conditions — InPlayer",
   description: "Terms and conditions governing access to and use of the InPlayer platform operated by Homox Prime Private Limited.",
+  alternates: {
+    canonical: "https://inplayer.in/terms",
+  },
 };
 
 const EFFECTIVE_DATE = "September 5, 2026";

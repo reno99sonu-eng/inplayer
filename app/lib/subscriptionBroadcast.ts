@@ -10,7 +10,7 @@ interface VideoBroadcastParams {
   uploaderId: string;
   uploaderName: string;
   uploaderAvatarUrl?: string;
-  contentType?: "video" | "short" | "music";
+  contentType?: "video" | "short" | "music" | "film";
 }
 
 /**
@@ -19,10 +19,16 @@ interface VideoBroadcastParams {
 export async function broadcastNewVideoToSubscribers(params: VideoBroadcastParams): Promise<number> {
   const { videoId, title, uploaderId, uploaderName, contentType = "video" } = params;
 
-  // "Short" / "video" / "track" — a song announced as a "new video" reads
+  // "Short" / "video" / "track" / "episode" — a song announced as a "new video" reads
   // as a mistake to the person who gets the notification.
   const noun =
-    contentType === "short" ? "Short" : contentType === "music" ? "track" : "video";
+    contentType === "short"
+      ? "Short"
+      : contentType === "music"
+      ? "track"
+      : contentType === "film"
+      ? "episode"
+      : "video";
 
   try {
     // 1. Query all subscribers of the creator from InPlayer-Subscriptions GSI (creatorId-index)

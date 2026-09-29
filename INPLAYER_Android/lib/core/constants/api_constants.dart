@@ -30,6 +30,13 @@ class ApiConstants {
   // Shorts
   static const String shorts = '/api/shorts';
 
+  // Raftaar Films
+  static const String raftaarFilmsSeries = '/api/raftaar-films/series';
+  static const String raftaarFilmsGenres = '/api/raftaar-films/genres';
+  static const String raftaarFilmsTrending = '/api/raftaar-films/trending';
+  static const String raftaarFilmsApply = '/api/raftaar-films/apply';
+  static const String raftaarFilmsMySeries = '/api/raftaar-films/my-series';
+
   // Search
   static const String search = '/api/search';
 

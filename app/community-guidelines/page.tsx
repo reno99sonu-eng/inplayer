@@ -5,6 +5,9 @@ import LegalNav from "../components/LegalNav";
 export const metadata = {
   title: "Community Guidelines — InPlayer",
   description: "Official Community Guidelines of InPlayer operated by Homox Prime Private Limited, establishing safety, conduct, and content standards for creators and users.",
+  alternates: {
+    canonical: "https://inplayer.in/community-guidelines",
+  },
 };
 
 const EFFECTIVE_DATE = "September 5, 2026";

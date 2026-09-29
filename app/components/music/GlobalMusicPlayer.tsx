@@ -316,11 +316,11 @@ export default function GlobalMusicPlayer() {
                     {/* Visualizer overlay */}
                     {isPlaying && (
                       <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex items-end gap-1 px-3 py-1.5 rounded-full bg-black/60 backdrop-blur-md border border-white/10 z-10">
-                        <span className="w-1 h-3.5 bg-emerald-400 rounded-full animate-pulse" />
-                        <span className="w-1 h-5 bg-emerald-300 rounded-full animate-pulse [animation-delay:150ms]" />
-                        <span className="w-1 h-2.5 bg-emerald-500 rounded-full animate-pulse [animation-delay:300ms]" />
-                        <span className="w-1 h-4 bg-emerald-400 rounded-full animate-pulse [animation-delay:450ms]" />
-                        <span className="w-1 h-6 bg-emerald-300 rounded-full animate-pulse [animation-delay:200ms]" />
+                        <span className="w-1 h-3.5 bg-orange-400 rounded-full animate-pulse" />
+                        <span className="w-1 h-5 bg-amber-300 rounded-full animate-pulse [animation-delay:150ms]" />
+                        <span className="w-1 h-2.5 bg-orange-500 rounded-full animate-pulse [animation-delay:300ms]" />
+                        <span className="w-1 h-4 bg-orange-400 rounded-full animate-pulse [animation-delay:450ms]" />
+                        <span className="w-1 h-6 bg-amber-300 rounded-full animate-pulse [animation-delay:200ms]" />
                       </div>
                     )}
                   </div>

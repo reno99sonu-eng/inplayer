@@ -6,10 +6,11 @@ import { AUDIENCE_OPTIONS, type VideoAudience } from "@/app/lib/contentAccess";
 import { THUMBNAIL_RATIO_LABEL } from "@/app/lib/contentTypes";
 
 // Matches THUMBNAIL_RATIO_LABEL 1:1 — the plain-English word for each shape.
-const THUMBNAIL_ORIENTATION_WORD: Record<"video" | "short" | "music", string> = {
+const THUMBNAIL_ORIENTATION_WORD: Record<"video" | "short" | "music" | "film", string> = {
   video: "landscape",
   short: "portrait",
   music: "square",
+  film: "portrait",
 };
 
 export const CONTENT_TYPES = [
@@ -38,7 +39,7 @@ export interface VideoMetadataValue {
   title: string;
   description: string;
   category: string;
-  contentType: "video" | "short" | "music";
+  contentType: "video" | "short" | "music" | "film";
   spokenLanguage: SpokenLanguage;
   visibility: Visibility;
   // The single source of truth for who may see this video (see
@@ -307,21 +308,23 @@ export default function VideoMetadataFields({
                   <p className="mb-1.5 text-[11px] font-semibold text-slate-400 light:text-slate-600">
                     🎬 Pick a thumbnail
                   </p>
-                  <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                  <div className={`grid gap-2 ${value.contentType === "short" ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-2 sm:grid-cols-4"}`}>
                     {muxFrames.map((frameUrl, idx) => {
                       const selected = thumbnail?.previewUrl === frameUrl || thumbnail?.selectedMuxThumbnail === frameUrl;
+                      const isVertical = value.contentType === "short" || value.contentType === "film";
+                      const aspectClass = isVertical ? "aspect-[9/16]" : value.contentType === "music" ? "aspect-square" : "aspect-video";
                       return (
                         <button
                           key={idx}
                           type="button"
                           onClick={() => thumbnail?.onMuxThumbnailSelected?.(frameUrl)}
-                          className={`aspect-video overflow-hidden rounded-xl border transition-all ${
+                          className={`${aspectClass} overflow-hidden rounded-xl border transition-all ${
                             selected
                               ? "border-orange-500 ring-2 ring-orange-500"
                               : "border-white/10 hover:border-orange-400/50"
                           }`}
                         >
-                          <img src={frameUrl} alt={`Frame ${idx + 1}`} className="h-full w-full object-contain" />
+                          <img src={frameUrl} alt={`Frame ${idx + 1}`} className="h-full w-full object-cover" />
                         </button>
                       );
                     })}
@@ -329,18 +332,24 @@ export default function VideoMetadataFields({
                 </div>
               )}
 
-              <div className="flex items-center gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
                 <div
                   onClick={() => thumbInputRef.current?.click()}
                   role="button"
-                  className="group relative flex aspect-video h-14 cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-dashed border-white/20 bg-black/20 hover:border-orange-400/50"
+                  className={`group relative flex ${
+                    value.contentType === "short" || value.contentType === "film"
+                      ? "aspect-[9/16] h-28"
+                      : value.contentType === "music"
+                      ? "aspect-square h-16"
+                      : "aspect-video h-16"
+                  } cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-dashed border-white/20 bg-black/20 hover:border-orange-400/50`}
                 >
                   {thumbnail.previewUrl && (!muxFrames || !muxFrames.includes(thumbnail.previewUrl)) ? (
-                    <img src={thumbnail.previewUrl} alt="Custom" className="h-full w-full object-contain" />
+                    <img src={thumbnail.previewUrl} alt="Custom" className="h-full w-full object-cover" />
                   ) : (
-                    <div className="flex items-center gap-1.5 text-slate-400 px-3 text-center">
+                    <div className="flex flex-col items-center gap-1 text-slate-400 px-2 text-center">
                       <UploadCloud size={16} className="text-orange-400" />
-                      <span className="text-[11px] font-semibold">Upload Custom Image</span>
+                      <span className="text-[10px] font-semibold leading-tight">Upload Custom</span>
                     </div>
                   )}
                   <input
@@ -355,10 +364,33 @@ export default function VideoMetadataFields({
                     }}
                   />
                 </div>
+
+                {thumbnail.previewUrl && (
+                  <div className="flex flex-col gap-1 text-[11px] text-slate-300">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-orange-400">Selected Thumbnail:</span>
+                      {(() => {
+                        if (thumbnail.previewUrl.startsWith("data:")) {
+                          const base64 = thumbnail.previewUrl.split(",")[1] || "";
+                          const bytes = Math.round(base64.length * 0.75);
+                          const sizeStr = bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+                          return (
+                            <span className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[10px] text-emerald-300">
+                              {sizeStr}
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
+                    </div>
+                    <p className="text-[10px] text-slate-400">
+                      Accurate ratio: <span className="text-slate-200 font-medium">{THUMBNAIL_RATIO_LABEL[value.contentType]}</span> ({THUMBNAIL_ORIENTATION_WORD[value.contentType]})
+                    </p>
+                  </div>
+                )}
               </div>
               <p className="text-[10px] text-slate-500">
-                {THUMBNAIL_RATIO_LABEL[value.contentType]} recommended — uploads outside this shape get
-                center-cropped to fit.
+                {THUMBNAIL_RATIO_LABEL[value.contentType]} recommended — uploads and AI suggestions are automatically scaled and center-cropped to this exact aspect ratio.
               </p>
               {thumbnail.error && <p className="mt-1 text-xs text-red-400">{thumbnail.error}</p>}
             </div>
@@ -544,7 +576,7 @@ export default function VideoMetadataFields({
             />
             {/* Longform only — Shorts are never gated. Music is longform,
                 and a members-only track is an ordinary thing to publish. */}
-            {value.contentType !== "short" && (
+            {value.contentType !== "short" && value.contentType !== "film" && (
               <ToggleRow
                 label="Members only"
                 desc="Gated to paid members"

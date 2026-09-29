@@ -8,7 +8,8 @@ import { THUMBNAIL_DATA_URL_MAX_LENGTH } from "@/app/lib/imageCompress";
 import { ensureUsername } from "@/app/lib/ensureUsername";
 import { moderateText, UNCHECKED } from "@/app/lib/moderation";
 import { getPlatformSettings } from "@/app/lib/platformSettings";
-import { isMusicType, normalizeContentType } from "@/app/lib/contentTypes";
+import { isMusicType, isFilmType, normalizeContentType } from "@/app/lib/contentTypes";
+import { incrementSeriesStats } from "@/app/lib/raftaarFilms";
 import {
   normalizeCoverInterval,
   sanitizeCovers,
@@ -139,6 +140,10 @@ export async function POST(request: NextRequest) {
       language,
       audioSha256,
       declaredOwnership,
+      seriesId,
+      episodeNumber,
+      seasonNumber,
+      episodeTitle,
     } = body;
 
     if (!title?.trim() || !category?.trim()) {
@@ -268,6 +273,7 @@ export async function POST(request: NextRequest) {
     );
     const uploaderAvatarUrl = profileResult.Item?.avatarUrl || null;
     const isShort = contentType === "short";
+    const isFilm = isFilmType(contentType);
 
     // Real-time auto-moderation on the title + description (app/lib/
     // moderation.ts) — this scans the submitted text, not the video content
@@ -333,7 +339,7 @@ export async function POST(request: NextRequest) {
         // plays for anyone who has the URL regardless of app logic. Every
         // video still gets a public ID too, since most videos aren't
         // members-only and should keep working exactly as before.
-        playback_policy: isShort ? ["public"] : ["public", "signed"],
+        playback_policy: isShort || isFilm ? ["public"] : ["public", "signed"],
         // Music: one audio-only downloadable rendition instead of the MP4
         // ladder. Asking Mux for "1080p" on an asset with no video track is
         // simply skipped and max_resolution_tier is meaningless here, but an
@@ -440,19 +446,25 @@ export async function POST(request: NextRequest) {
             customThumbnailUrl,
             thumbnailUrl: customThumbnailUrl,
           }),
-          // "unavailable" for Shorts (never offered), "preparing" for
+          // "unavailable" for Shorts and Films (never offered), "preparing" for
           // videos (the static renditions requested above are already in
           // flight), flips to "ready" once Mux's webhook confirms them.
-          downloadStatus: isShort ? "unavailable" : "preparing",
+          downloadStatus: isShort || isFilm ? "unavailable" : "preparing",
           // Videos only: when the rendition was requested (so prepare-download
           // can tell a genuinely in-flight request apart from one stuck
           // because its webhook got silently lost — see STUCK_THRESHOLD_MS),
           // and an empty renditions map that the webhook fills in per quality
           // (resolution -> filename). Pre-creating the map lets the webhook
           // use a direct nested update without a read-merge race.
-          ...(!isShort && {
+          ...(!isShort && !isFilm && {
             downloadRequestedAt: new Date().toISOString(),
             downloadRenditions: {},
+          }),
+          ...(isFilm && {
+            seriesId: typeof seriesId === "string" ? seriesId.trim() : undefined,
+            episodeNumber: typeof episodeNumber === "number" ? episodeNumber : 1,
+            seasonNumber: typeof seasonNumber === "number" ? seasonNumber : 1,
+            episodeTitle: typeof episodeTitle === "string" && episodeTitle.trim() ? episodeTitle.trim() : title.trim(),
           }),
           // Upload options (YouTube-style). DynamoDB needs no schema change
           // to store these new attributes.
@@ -520,6 +532,14 @@ export async function POST(request: NextRequest) {
         },
       })
     );
+
+    if (isFilm && typeof seriesId === "string" && seriesId.trim()) {
+      try {
+        await incrementSeriesStats(seriesId.trim(), "episodeCount", 1);
+      } catch (incErr) {
+        console.error("Failed to increment series episode count:", incErr);
+      }
+    }
 
     if (moderationHidden) {
       const isOnlyCopyright =

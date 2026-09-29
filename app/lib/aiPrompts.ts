@@ -4,11 +4,13 @@
 // VideoMetadataFields itself is shared, so the two forms can never ask two
 // different questions or parse the answer two different ways.
 
+import type { ContentType } from "@/app/lib/contentTypes";
+
 export interface AIPromptContext {
   title: string;
   description: string;
   category: string;
-  contentType: "video" | "short" | "music";
+  contentType: ContentType;
   /** Free-text context the creator typed specifically to help the AI (see
       AITitleAssistModal) — the AI can't watch the actual video, so when
       this is present it's by far the strongest signal available, and is
@@ -38,7 +40,9 @@ export function buildAIGeneratePrompt(
   const format =
     ctx.contentType === "short"
       ? "vertical short-form video (like a Reel/Short)"
-      : ctx.contentType === "music"
+      : ctx.contentType === "film"
+        ? "vertical micro-drama film episode (like an episodic reel series)"
+        : ctx.contentType === "music"
         // Naming the format matters: without it the model writes video
         // copy ("watch", "in this video") for something nobody watches.
         ? "music track / song (audio only — the listener sees cover art, not footage)"

@@ -1,6 +1,7 @@
 import type { MetadataRoute } from "next";
 import { getReadyVideos } from "./lib/videoStore";
 import { filterByAudience, DEFAULT_AUDIENCE_MODE } from "./lib/contentAccess";
+import { isMusicType } from "./lib/contentTypes";
 import { playables } from "./data/playables";
 
 const SITE_URL = "https://inplayer.in";
@@ -18,7 +19,8 @@ const STATIC_ROUTES: Array<{ path: string; priority: number }> = [
   { path: "/about", priority: 0.8 },
   { path: "/contact", priority: 0.7 },
   { path: "/videos", priority: 0.8 },
-  { path: "/shorts", priority: 0.7 },
+  { path: "/shorts", priority: 0.8 },
+  { path: "/music", priority: 0.8 },
   { path: "/shop", priority: 0.7 },
   { path: "/creators", priority: 0.6 },
   { path: "/help", priority: 0.5 },
@@ -66,22 +68,37 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // a broken page" convention as the rest of this app (see
   // app/lib/trendingStore.ts) — a sitemap hiccup must never take the
   // whole route down.
+  //
+  // CRITICAL SEO FIX (Google Search Console "Page with redirect" report):
+  // /watch/[videoId] redirects shorts to /shorts?v=... and music tracks to
+  // /music?v=... (see app/watch/[videoId]/page.tsx). Googlebot flags sitemap
+  // entries that respond with HTTP 307 redirects. We now output the direct
+  // 200-OK canonical URL for each content type:
+  // - standard video -> /watch/[videoId]
+  // - short (Raftaar) -> /shorts?v=[videoId]
+  // - music -> /music?v=[videoId]
   try {
-    // Deliberately filtered at the DEFAULT (safe) audience mode rather than
-    // any particular viewer's: a sitemap is generated with no request and
-    // no cookie, and 18+ URLs have no business being handed to search
-    // engines regardless of who can unlock them inside the app.
     const videos = filterByAudience(await getReadyVideos(), DEFAULT_AUDIENCE_MODE);
     const videoEntries: MetadataRoute.Sitemap = videos
       .filter((video) => Boolean(video.videoId))
       .slice(0, 500)
       .map((video) => {
         const uploadedAt = video.uploadedAt as string | undefined;
+        const vid = video.videoId as string;
+        const isShort = video.contentType === "short";
+        const isMusic = isMusicType(video.contentType);
+
+        const targetUrl = isShort
+          ? `${SITE_URL}/shorts?v=${vid}`
+          : isMusic
+          ? `${SITE_URL}/music?v=${vid}`
+          : `${SITE_URL}/watch/${vid}`;
+
         return {
-          url: `${SITE_URL}/watch/${video.videoId as string}`,
+          url: targetUrl,
           lastModified: uploadedAt ? new Date(uploadedAt) : undefined,
           changeFrequency: "weekly" as const,
-          priority: 0.65,
+          priority: isShort || isMusic ? 0.6 : 0.65,
         };
       });
     return [...staticEntries, ...gameEntries, ...videoEntries];

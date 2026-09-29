@@ -1,9 +1,18 @@
+import type { Metadata } from "next";
 import { getVisibleVideos } from "@/app/lib/contentAccessServer";
 import type { Short } from "@/app/data/shorts";
 import ShortsPageContent from "@/app/components/ShortsPageContent";
 import { resolveUsernames } from "@/app/lib/resolveUsernames";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Raftaar Shorts — Watch Short Form Vertical Videos",
+  description: "Watch and discover addictive vertical short videos, comedy, dance, quick tips, and creator highlights on InPlayer Raftaar.",
+  alternates: {
+    canonical: "https://inplayer.in/shorts",
+  },
+};
 
 interface ShortsPageProps {
   // Next.js 13+ App Router passes searchParams as a Promise. `v` is an

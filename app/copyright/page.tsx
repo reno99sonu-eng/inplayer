@@ -6,6 +6,9 @@ import CopyrightHubClient from "./CopyrightHubClient";
 export const metadata = {
   title: "Copyright & Intellectual Property Policy — InPlayer",
   description: "Official Copyright and Intellectual Property Policy of InPlayer operated by Homox Prime Private Limited, in accordance with the Indian Copyright Act, 1957.",
+  alternates: {
+    canonical: "https://inplayer.in/copyright",
+  },
 };
 
 const EFFECTIVE_DATE = "September 5, 2026";

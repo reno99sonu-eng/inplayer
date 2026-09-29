@@ -40,7 +40,7 @@ import {
 // original 400ms — the bigger part of the "slow to start" feeling was the
 // on-demand @mux/mux-player-react chunk load (see the prefetch effect in
 // the default export below), but a snappier delay helps too.
-const HOVER_PREVIEW_DELAY = 200;
+const HOVER_PREVIEW_DELAY = 100;
 
 interface RecommendationFeedProps {
   realVideos?: Recommendation[];
@@ -245,7 +245,7 @@ export const HomeVideoCard = memo(function HomeVideoCard({
   // toggle: no autoplaying preview clips burning mobile data.
   //
   // Crucially, this no longer sets local "previewing" state directly —
-  // several cards can cross the 60%-visible threshold in the same instant
+  // several cards can cross the visibility threshold in the same instant
   // (e.g. right when the homepage first finishes loading), and without the
   // shared gate below, every one of them used to start streaming its own
   // preview clip at once. Now this only ever REQUESTS the shared slot;
@@ -258,7 +258,7 @@ export const HomeVideoCard = memo(function HomeVideoCard({
     const el = cardRef.current;
     // Debounced the same way the hover path above already is
     // (HOVER_PREVIEW_DELAY) — without this, a fast scroll flings a card
-    // through the 60%-visible threshold and back out again in a single
+    // through the 45%-visible threshold and back out again in a single
     // frame, and each crossing was immediately mounting/unmounting a real
     // Mux player, thrashing playback instead of only ever activating the
     // card a viewer actually paused on.
@@ -275,7 +275,7 @@ export const HomeVideoCard = memo(function HomeVideoCard({
           releaseActivePreview(cardId);
         }
       },
-      { threshold: 0.6 }
+      { threshold: 0.45 }
     );
     observer.observe(el);
     return () => {

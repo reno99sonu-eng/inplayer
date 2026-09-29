@@ -28,14 +28,14 @@
 //   3. No automatic captions — running speech recognition over a song
 //      costs money and produces nonsense.
 
-export type ContentType = "video" | "short" | "music";
+export type ContentType = "video" | "short" | "music" | "film";
 
-export const CONTENT_TYPES: ContentType[] = ["video", "short", "music"];
+export const CONTENT_TYPES: ContentType[] = ["video", "short", "music", "film"];
 
 /** Anything unrecognised becomes "video" — the safe, most-capable default,
  *  and what every row written before this feature existed already is. */
 export function normalizeContentType(raw: unknown): ContentType {
-  return raw === "short" || raw === "music" ? raw : "video";
+  return raw === "short" || raw === "music" || raw === "film" ? raw : "video";
 }
 
 export function isShortType(raw: unknown): boolean {
@@ -46,8 +46,12 @@ export function isMusicType(raw: unknown): boolean {
   return normalizeContentType(raw) === "music";
 }
 
-/** True strictly for normal longform video — excludes shorts AND music tracks.
- *  Enforces the core product rule: MUSIC != NORMAL VIDEO. */
+export function isFilmType(raw: unknown): boolean {
+  return normalizeContentType(raw) === "film";
+}
+
+/** True strictly for normal longform video — excludes shorts, music tracks, and films.
+ *  Enforces the core product rule: MUSIC != NORMAL VIDEO != FILM != SHORT. */
 export function isLongformType(raw: unknown): boolean {
   return normalizeContentType(raw) === "video";
 }
@@ -57,6 +61,7 @@ export const CONTENT_TYPE_LABEL: Record<ContentType, string> = {
   video: "Video",
   short: "Short",
   music: "Music",
+  film: "Film Episode",
 };
 
 /** Lowercase, for mid-sentence copy ("Uploading your music…"). */
@@ -64,11 +69,13 @@ export const CONTENT_TYPE_WORD: Record<ContentType, string> = {
   video: "video",
   short: "short",
   music: "track",
+  film: "episode",
 };
 
 /** Where an item of this type is watched/played. Shorts live in the vertical
- *  feed; music plays on the ordinary watch page, same as a video. */
+ *  feed; music plays on the ordinary watch page; films live under /raftaar-films. */
 export function watchHrefFor(contentType: unknown, videoId: string): string {
+  if (isFilmType(contentType)) return `/raftaar-films?v=${videoId}`;
   return isShortType(contentType) ? `/shorts?v=${videoId}` : `/watch/${videoId}`;
 }
 
@@ -81,6 +88,7 @@ export const UPLOAD_ACCEPT: Record<ContentType, string> = {
   video: "video/*",
   short: "video/*",
   music: ".mp3,.m4a,.aac,.wav,.flac,.ogg,audio/*",
+  film: "video/*",
 };
 
 // The single source of truth for "what shape is this content's thumbnail".
@@ -92,6 +100,7 @@ export const THUMBNAIL_ASPECT_RATIO: Record<ContentType, number> = {
   video: 16 / 9,
   short: 9 / 16,
   music: 1,
+  film: 9 / 16,
 };
 
 /** Human-readable label for upload-form copy ("16:9 landscape thumbnail"). */
@@ -99,4 +108,5 @@ export const THUMBNAIL_RATIO_LABEL: Record<ContentType, string> = {
   video: "16:9",
   short: "9:16",
   music: "1:1",
+  film: "9:16",
 };

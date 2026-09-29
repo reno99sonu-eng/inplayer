@@ -38,15 +38,70 @@ export async function POST(request: NextRequest, { params }: Params) {
   }
 
   try {
-    await docClient.send(
+    const updateResult = await docClient.send(
       new UpdateCommand({
         TableName: "InPlayer-Videos",
         Key: { videoId },
         UpdateExpression: "SET #views = if_not_exists(#views, :zero) + :inc",
         ExpressionAttributeNames: { "#views": "views" },
         ExpressionAttributeValues: { ":inc": 1, ":zero": 0 },
+        ReturnValues: "ALL_NEW",
       })
     );
+
+    const updatedVideo = updateResult.Attributes;
+    if (updatedVideo) {
+      // If this is a film episode with a seriesId, increment series views
+      if (updatedVideo.seriesId) {
+        try {
+          const { incrementSeriesStats } = await import("@/app/lib/raftaarFilms");
+          await incrementSeriesStats(updatedVideo.seriesId, "totalViews", 1);
+        } catch (seriesErr) {
+          console.error("Failed to increment series views:", seriesErr);
+        }
+      }
+
+      // Check 100-view milestone for creator to unlock Raftaar Films eligibility notification
+      const uploaderId = updatedVideo.uploaderId;
+      if (uploaderId) {
+        try {
+          const userUpdate = await docClient.send(
+            new UpdateCommand({
+              TableName: "InPlayer-Users",
+              Key: { userId: uploaderId },
+              UpdateExpression: "SET #tv = if_not_exists(#tv, :zero) + :inc",
+              ExpressionAttributeNames: { "#tv": "totalViews" },
+              ExpressionAttributeValues: { ":inc": 1, ":zero": 0 },
+              ReturnValues: "ALL_NEW",
+            })
+          );
+          const userAttrs = userUpdate.Attributes;
+          if (
+            userAttrs &&
+            (userAttrs.totalViews || 0) >= 100 &&
+            !userAttrs.raftaarFilmsApproved &&
+            !userAttrs.raftaarFilmsMilestoneNotified
+          ) {
+            await docClient.send(
+              new UpdateCommand({
+                TableName: "InPlayer-Users",
+                Key: { userId: uploaderId },
+                UpdateExpression: "SET raftaarFilmsMilestoneNotified = :true",
+                ExpressionAttributeValues: { ":true": true },
+              })
+            );
+            const { createNotification } = await import("@/app/lib/notifications");
+            await createNotification({
+              userId: uploaderId,
+              type: "film_milestone_100_views",
+              message: "🎉 You've reached 100 total views! You are now eligible to apply and upload Raftaar Films.",
+            });
+          }
+        } catch (milestoneErr) {
+          console.error("Milestone view check error (non-fatal):", milestoneErr);
+        }
+      }
+    }
   } catch (err) {
     console.error("Failed to record view:", err);
     // Fall through — the daily bucket below is independent and still worth

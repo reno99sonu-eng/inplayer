@@ -9,6 +9,7 @@ import {
   ResolvedSoundtrack,
   CUSTOM_AUDIO_MAX_SECONDS,
 } from "@/app/data/soundtracks";
+import type { ContentType } from "@/app/lib/contentTypes";
 
 export interface ShortSettings {
   soundtrack: ResolvedSoundtrack | null;
@@ -36,7 +37,7 @@ export default function ShortCreationTools({
   // cut short of the track's natural end) — a Video instead loops the
   // track for its whole runtime (see VideoPlayer.tsx), so that control is
   // hidden when this is "video".
-  contentType: "video" | "short" | "music";
+  contentType: ContentType;
 }) {
   const [query, setQuery] = useState("");
   const [previewingId, setPreviewingId] = useState<string | null>(null);

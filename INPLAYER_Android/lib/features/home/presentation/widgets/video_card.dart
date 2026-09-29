@@ -114,8 +114,9 @@ class _VideoCardState extends ConsumerState<VideoCard> {
   void _onCardHover(bool isHovered) {
     if (_dataSaver ||
         widget.video.muxPlaybackId == null ||
-        widget.video.videoId.isEmpty)
+        widget.video.videoId.isEmpty) {
       return;
+    }
     _hoverTimer?.cancel();
     if (isHovered) {
       // Match the short start delay used by the website's preview cards.
@@ -135,14 +136,16 @@ class _VideoCardState extends ConsumerState<VideoCard> {
     if (!mounted ||
         _dataSaver ||
         widget.video.muxPlaybackId == null ||
-        widget.video.videoId.isEmpty)
+        widget.video.videoId.isEmpty) {
       return;
+    }
 
     final renderObject = context.findRenderObject();
     if (renderObject is! RenderBox ||
         !renderObject.hasSize ||
-        !renderObject.attached)
+        !renderObject.attached) {
       return;
+    }
 
     final top = renderObject.localToGlobal(Offset.zero).dy;
     final bottom = top + renderObject.size.height;

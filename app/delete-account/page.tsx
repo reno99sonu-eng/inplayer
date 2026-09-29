@@ -8,6 +8,9 @@ export const metadata = {
   title: "Delete Account & Data Retention — InPlayer",
   description:
     "Information and instructions on how to request deletion of your InPlayer account and personal data, data retention principles, and statutory exceptions under DPDPA 2023.",
+  alternates: {
+    canonical: "https://inplayer.in/delete-account",
+  },
 };
 
 const EFFECTIVE_DATE = "September 5, 2026";

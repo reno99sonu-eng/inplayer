@@ -23,9 +23,6 @@ const jakarta = Plus_Jakarta_Sans({
 export const metadata: Metadata = {
   // Base URL every relative/og/canonical link in the app resolves against.
   metadataBase: new URL("https://inplayer.in"),
-  alternates: {
-    canonical: "https://inplayer.in",
-  },
   title: {
     default: "InPlayer — Stream Videos, Music, Live TV, Shorts & Shop Online | India",
     template: "%s | INPLAYER",

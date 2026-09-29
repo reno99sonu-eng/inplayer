@@ -64,8 +64,9 @@ class UploadService {
           final serverMessage = e.response?.data is Map
               ? e.response?.data['error'] as String?
               : null;
-          if (serverMessage != null && serverMessage.isNotEmpty)
+          if (serverMessage != null && serverMessage.isNotEmpty) {
             return serverMessage;
+          }
           if (code == 401 || code == 403) {
             return 'You are signed out. Sign in again and retry the upload.';
           }
@@ -117,6 +118,10 @@ class UploadService {
     /// Look filter) — see ShortSettings.toJson(). Null omits the key
     /// entirely, which is what the server treats as "nothing was picked".
     Map<String, dynamic>? shortSettings,
+    String? seriesId,
+    int? episodeNumber,
+    int? seasonNumber,
+    String? episodeTitle,
   }) async {
     try {
       final response = await _dio.post(
@@ -157,6 +162,12 @@ class UploadService {
             if (language != null && language.isNotEmpty) 'language': language,
             if (audioSha256 != null && audioSha256.isNotEmpty)
               'audioSha256': audioSha256,
+          },
+          if (contentType == 'film') ...{
+            if (seriesId != null) 'seriesId': seriesId,
+            if (episodeNumber != null) 'episodeNumber': episodeNumber,
+            if (seasonNumber != null) 'seasonNumber': seasonNumber,
+            if (episodeTitle != null) 'episodeTitle': episodeTitle,
           },
           // Kept under the `shortSettings` name for video AND short
           // deliberately, matching the server: renaming it would mean

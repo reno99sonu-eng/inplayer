@@ -5,6 +5,9 @@ import LegalNav from "../components/LegalNav";
 export const metadata = {
   title: "Child Safety Policy — InPlayer",
   description: "Official Child Safety Policy of InPlayer operated by Homox Prime Private Limited, establishing zero tolerance for child exploitation and setting standards for young audiences under Indian law.",
+  alternates: {
+    canonical: "https://inplayer.in/child-safety",
+  },
 };
 
 const EFFECTIVE_DATE = "September 5, 2026";

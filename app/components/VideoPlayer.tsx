@@ -373,11 +373,14 @@ export default function VideoPlayer({
   const [midrollSkipUnlocked, setMidrollSkipUnlocked] = useState(false);
   const [midrollCountdown, setMidrollCountdown] = useState(0);
   const [adMuted, setAdMuted] = useState(true);
+  const [adDecisionResolved, setAdDecisionResolved] = useState(premium.premium);
   const midrollBreaksShownRef = useRef<Set<number>>(new Set());
   const midrollWasPlayingRef = useRef(false);
   const preRollShownRef = useRef(false);
   const postRollShownRef = useRef(false);
   const preRollTriggeredRef = useRef(false);
+  const adDecisionResolvedRef = useRef(premium.premium);
+  const preRollRequestedRef = useRef(false);
 
   // Central ad decision: premium users NEVER receive video ads
   const shouldShowVideoAds =
@@ -408,14 +411,19 @@ export default function VideoPlayer({
     preRollShownRef.current = false;
     postRollShownRef.current = false;
     preRollTriggeredRef.current = false;
+    preRollRequestedRef.current = false;
   }, [videoId]);
 
   useEffect(() => {
     // Premium viewers bypass all video ads: do not fetch or store ad config
     if (premium.premium) {
+      adDecisionResolvedRef.current = true;
+      setAdDecisionResolved(true);
       return;
     }
 
+    adDecisionResolvedRef.current = false;
+    setAdDecisionResolved(false);
     let cancelled = false;
     (async () => {
       try {
@@ -442,6 +450,14 @@ export default function VideoPlayer({
         }
       } catch (err) {
         console.error("VideoPlayer: ad config fetch failed:", err);
+      } finally {
+        if (!cancelled) {
+          // Playback may have attempted to start while this request was in
+          // flight. Release that attempt only after we know whether it needs
+          // to become a pre-roll.
+          adDecisionResolvedRef.current = true;
+          setAdDecisionResolved(true);
+        }
       }
     })();
     return () => {
@@ -472,6 +488,7 @@ export default function VideoPlayer({
     if (!currentAd) return;
 
     preRollTriggeredRef.current = true;
+    preRollRequestedRef.current = false;
     const player = playerRef.current;
     if (player) {
       player.pause();
@@ -485,6 +502,25 @@ export default function VideoPlayer({
     setAdBreakType("preroll");
     trackMidrollEvent("impression", currentAd.adId);
   }, [shouldShowVideoAds, midrollAd, midrollAdsPool, midrollConfig, trackMidrollEvent]);
+
+  useEffect(() => {
+    if (!adDecisionResolved || !preRollRequestedRef.current) return;
+    const player = playerRef.current;
+    if (!player) return;
+
+    preRollRequestedRef.current = false;
+    if (shouldShowVideoAds) {
+      handlePreRollOnPlay();
+      return;
+    }
+
+    // No eligible ad (or a failed lookup): resume the attempted playback.
+    // Muted retry matches Mux's autoplay fallback on mobile browsers.
+    player.play().catch(() => {
+      player.muted = true;
+      player.play().catch(() => {});
+    });
+  }, [adDecisionResolved, shouldShowVideoAds, handlePreRollOnPlay]);
 
   // If video started playing before ad configuration arrived, pause and start pre-roll
   useEffect(() => {
@@ -1660,6 +1696,15 @@ export default function VideoPlayer({
         // Real poster frame instead of a flat black rectangle.
         thumbnailTime={0}
         onPlay={() => {
+          if (!adDecisionResolvedRef.current && !premium.premium) {
+            // Mux can begin autoplay before the ad-config request finishes.
+            // Hold that first play attempt so a slow response cannot let the
+            // video run and then interrupt it with a late pre-roll.
+            preRollRequestedRef.current = true;
+            playerRef.current?.pause();
+            reportPlaybackState(false);
+            return;
+          }
           flashPulse("play");
           syncBackgroundAudioToPlayer(true);
           handlePreRollOnPlay();
@@ -1779,9 +1824,10 @@ export default function VideoPlayer({
             {midrollAd.imageUrl.startsWith("mux:") ? (
               <MuxPlayer
                 playbackId={midrollAd.imageUrl.replace("mux:", "")}
-                autoPlay="any"
+                autoPlay="muted"
                 muted={adMuted}
                 playsInline
+                preload="auto"
                 onEnded={() => finishMidroll("ended")}
                 onError={() => {
                   console.warn("VideoPlayer: ad Mux error, finishing ad");

@@ -5,6 +5,9 @@ import LegalNav from "../components/LegalNav";
 export const metadata = {
   title: "Creator Monetization Policy — InPlayer",
   description: "Official Creator Monetization Policy of InPlayer operated by Homox Prime Private Limited, covering KYC eligibility, revenue programs, and compliance requirements in India.",
+  alternates: {
+    canonical: "https://inplayer.in/creator-monetization",
+  },
 };
 
 const EFFECTIVE_DATE = "September 5, 2026";

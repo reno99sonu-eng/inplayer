@@ -62,6 +62,10 @@ import '../../features/sponsorship/presentation/pages/sponsorship_success_page.d
 import '../../features/home/presentation/pages/injoy_page.dart';
 import '../../features/home/presentation/pages/injoy_game_page.dart';
 import '../../features/home/presentation/pages/music_page.dart';
+import '../../features/raftaar_films/presentation/pages/raftaar_films_landing_page.dart';
+import '../../features/raftaar_films/presentation/pages/raftaar_films_detail_page.dart';
+import '../../features/raftaar_films/presentation/pages/raftaar_films_player_page.dart';
+import '../../features/raftaar_films/presentation/pages/raftaar_films_apply_page.dart';
 import '../../services/video_service.dart';
 
 // Bridges authStateProvider's changes into a plain Listenable go_router can
@@ -253,6 +257,36 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/upload',
         name: 'upload',
         builder: (context, state) => const UploadPage(),
+      ),
+      GoRoute(
+        path: '/raftaar-films',
+        name: 'raftaar-films',
+        builder: (context, state) => const RaftaarFilmsLandingPage(),
+      ),
+      GoRoute(
+        path: '/raftaar-films/apply',
+        name: 'raftaar-films-apply',
+        builder: (context, state) => const RaftaarFilmsApplyPage(),
+      ),
+      GoRoute(
+        path: '/raftaar-films/:seriesId',
+        name: 'raftaar-films-detail',
+        builder: (context, state) {
+          final seriesId = state.pathParameters['seriesId'] ?? '';
+          return RaftaarFilmsDetailPage(seriesId: seriesId);
+        },
+      ),
+      GoRoute(
+        path: '/raftaar-films/:seriesId/:episodeId',
+        name: 'raftaar-films-player',
+        builder: (context, state) {
+          final seriesId = state.pathParameters['seriesId'] ?? '';
+          final episodeId = state.pathParameters['episodeId'] ?? '';
+          return RaftaarFilmsPlayerPage(
+            seriesId: seriesId,
+            episodeId: episodeId,
+          );
+        },
       ),
       GoRoute(
         path: '/settings',

@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { getVisibleVideos } from "@/app/lib/contentAccessServer";
 import { isMusicType } from "@/app/lib/contentTypes";
 import { searchUsersByUsername } from "@/app/lib/userSearch";
@@ -7,6 +8,14 @@ import { Film } from "lucide-react";
 import BackButton from "@/app/components/BackButton";
 
 export const dynamic = "force-dynamic";
+
+export const metadata: Metadata = {
+  title: "Videos — Watch Trending & Popular Videos",
+  description: "Browse and watch high-quality trending videos across entertainment, tech, education, gaming, and lifestyle on InPlayer.",
+  alternates: {
+    canonical: "https://inplayer.in/videos",
+  },
+};
 
 interface VideosPageProps {
   searchParams: Promise<{ category?: string; search?: string }>;

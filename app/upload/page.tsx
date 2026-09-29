@@ -87,6 +87,13 @@ export default function UploadPage() {
   const [aiTitleAssistOpen, setAiTitleAssistOpen] = useState(false);
   const [audienceModalOpen, setAudienceModalOpen] = useState(false);
 
+  // Raftaar Films State
+  const [isFilmApproved, setIsFilmApproved] = useState(false);
+  const [mySeriesList, setMySeriesList] = useState<{ seriesId: string; title: string; episodeCount: number; genre: string }[]>([]);
+  const [selectedSeriesId, setSelectedSeriesId] = useState<string>("");
+  const [episodeNumber, setEpisodeNumber] = useState<number>(1);
+  const [episodeTitle, setEpisodeTitle] = useState<string>("");
+
   useEffect(() => {
     (() => {
       try {
@@ -95,6 +102,7 @@ export default function UploadPage() {
         if (typeParam === "short") setContentType("short");
         if (typeParam === "video") setContentType("video");
         if (typeParam === "music") setContentType("music");
+        if (typeParam === "film" || typeParam === "raftaar-film") setContentType("film");
 
         const preset = sessionStorage.getItem("inplayer-upload-preset");
         if (preset === "podcast" && CATEGORIES.includes("Podcasts")) {
@@ -103,6 +111,45 @@ export default function UploadPage() {
         if (preset) sessionStorage.removeItem("inplayer-upload-preset");
       } catch {
         /* ignore */
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const session = await fetchAuthSession().catch(() => null);
+        const token = session?.tokens?.idToken?.toString();
+        if (!token) return;
+
+        const res = await fetch("/api/raftaar-films/apply", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.application?.status === "approved") {
+            setIsFilmApproved(true);
+            const seriesRes = await fetch("/api/raftaar-films/my-series", {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (seriesRes.ok) {
+              const seriesData = await seriesRes.json();
+              if (Array.isArray(seriesData.series) && seriesData.series.length > 0) {
+                setMySeriesList(seriesData.series);
+                const params = new URLSearchParams(window.location.search);
+                const urlSeriesId = params.get("seriesId");
+                const matched = urlSeriesId
+                  ? seriesData.series.find((s: { seriesId: string }) => s.seriesId === urlSeriesId)
+                  : null;
+                const chosen = matched || seriesData.series[0];
+                setSelectedSeriesId(chosen.seriesId);
+                setEpisodeNumber((chosen.episodeCount || 0) + 1);
+              }
+            }
+          }
+        }
+      } catch (err) {
+        console.error("Failed to check film creator status:", err);
       }
     })();
   }, []);
@@ -395,6 +442,11 @@ export default function UploadPage() {
       return;
     }
 
+    if (contentType === "film" && !selectedSeriesId) {
+      setError("Please select a series for this episode or create one first in Raftaar Films Studio.");
+      return;
+    }
+
     setError(null);
     setAudienceModalOpen(true);
   };
@@ -449,11 +501,18 @@ export default function UploadPage() {
           // Longform, not literally "video" — a members-only track is an
           // ordinary thing to publish, and the watch page already handles
           // gated audio.
-          membersOnly: contentType !== "short" ? membersOnly : undefined,
+          membersOnly: contentType !== "short" && contentType !== "film" ? membersOnly : undefined,
           // Sent for both content types now — Videos can pick a background
           // soundtrack/Look too (see ShortCreationTools below).
           shortSettings,
           thumbnailDataUrl: thumbnailPreview,
+          // Film-only.
+          ...(contentType === "film" && {
+            seriesId: selectedSeriesId,
+            episodeNumber: Number(episodeNumber) || 1,
+            seasonNumber: 1,
+            episodeTitle: episodeTitle.trim() || title.trim(),
+          }),
           // Music-only. Ignored by the server for any other content type.
           ...(contentType === "music" && {
             covers: musicSettings.covers,
@@ -651,6 +710,24 @@ export default function UploadPage() {
           <Music2 size={18} />
           <span>Music Panel</span>
         </button>
+
+        {isFilmApproved && (
+          <button
+            type="button"
+            onClick={() => {
+              setContentType("film");
+              setAudience("everyone");
+            }}
+            className={`flex items-center gap-2.5 rounded-2xl px-6 py-3 text-sm font-bold transition-all duration-300 ${
+              contentType === "film"
+                ? "bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white shadow-[0_10px_25px_rgba(255,153,0,.35)] scale-105"
+                : "border border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/10 hover:text-white light:border-black/10 light:bg-black/[0.03] light:text-slate-700"
+            }`}
+          >
+            <Film size={18} />
+            <span>Raftaar Films</span>
+          </button>
+        )}
       </div>
 
       <div className="mt-4">
@@ -681,6 +758,8 @@ export default function UploadPage() {
                 <PlaySquare size={30} className="text-orange-400" />
               ) : contentType === "music" ? (
                 <Music2 size={30} className="text-orange-400" />
+              ) : contentType === "film" ? (
+                <Film size={30} className="text-orange-400" />
               ) : (
                 <UploadCloud size={30} className="text-orange-400" />
               )}
@@ -691,7 +770,9 @@ export default function UploadPage() {
                   ? "Drag and drop a short video file (9:16 vertical)"
                   : contentType === "music"
                     ? "Drag and drop an audio file (MP3, M4A, WAV, FLAC)"
-                    : "Drag and drop a video file (16:9 recommended)"}
+                    : contentType === "film"
+                      ? "Drag and drop an episode video file (9:16 vertical)"
+                      : "Drag and drop a video file (16:9 recommended)"}
               </p>
               <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
                 or click to browse from your device
@@ -732,6 +813,75 @@ export default function UploadPage() {
                 <X size={16} />
               </button>
             </div>
+
+            {/* Raftaar Films: Series & Episode Selector */}
+            {contentType === "film" && (
+              <div className="rounded-2xl border border-orange-500/30 bg-[#071120] p-4 shadow-lg light:border-orange-500/20 light:bg-white">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-2">
+                    <Film size={18} className="text-orange-400" />
+                    <h3 className="text-sm font-bold text-white light:text-slate-900">Series & Episode Assignment</h3>
+                  </div>
+                  <a
+                    href="/my-videos?tab=films"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-xs font-semibold text-orange-400 hover:underline"
+                  >
+                    + Manage Series
+                  </a>
+                </div>
+
+                {mySeriesList.length === 0 ? (
+                  <div className="p-4 text-center bg-orange-500/10 rounded-xl">
+                    <p className="text-xs text-orange-300">You don't have any series created yet.</p>
+                    <a
+                      href="/my-videos?tab=films"
+                      className="mt-2 inline-block rounded-lg bg-orange-500 px-3.5 py-1.5 text-xs font-bold text-white"
+                    >
+                      Create a Series First
+                    </a>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 light:text-slate-700 mb-1">
+                        Select Series *
+                      </label>
+                      <select
+                        value={selectedSeriesId}
+                        onChange={(e) => {
+                          const sid = e.target.value;
+                          setSelectedSeriesId(sid);
+                          const chosen = mySeriesList.find((s) => s.seriesId === sid);
+                          if (chosen) setEpisodeNumber((chosen.episodeCount || 0) + 1);
+                        }}
+                        className="w-full rounded-xl border border-white/10 bg-[#060D18] px-3 py-2 text-xs text-white outline-none focus:border-orange-400 light:border-black/10 light:bg-white light:text-slate-900"
+                      >
+                        {mySeriesList.map((s) => (
+                          <option key={s.seriesId} value={s.seriesId} className="bg-slate-900 text-white">
+                            {s.title} ({s.episodeCount} existing episodes)
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 light:text-slate-700 mb-1">
+                        Episode Number
+                      </label>
+                      <input
+                        type="number"
+                        min="1"
+                        value={episodeNumber}
+                        onChange={(e) => setEpisodeNumber(Math.max(1, parseInt(e.target.value) || 1))}
+                        className="w-full rounded-xl border border-white/10 bg-[#060D18] px-3 py-2 text-xs text-white outline-none focus:border-orange-400 light:border-black/10 light:bg-white light:text-slate-900"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
 
             <VideoMetadataFields
               value={metadataValue}
@@ -883,8 +1033,15 @@ export default function UploadPage() {
                     muxPlaybackId={info.muxPlaybackId}
                     duration={info.duration}
                     defaultThumbnailUrl={info.thumbnailUrl}
-                    contentType={contentType}
-                    onDone={() => router.push(`/watch/${uploadedVideoId}`)}
+                    onDone={() =>
+                      router.push(
+                        contentType === "film"
+                          ? selectedSeriesId
+                            ? `/raftaar-films/${selectedSeriesId}/${uploadedVideoId}`
+                            : "/raftaar-films"
+                          : `/watch/${uploadedVideoId}`
+                      )
+                    }
                   />
                 )
               }

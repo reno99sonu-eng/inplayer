@@ -23,7 +23,11 @@ export type NotificationType =
   | "copyright"
   | "admin_announcement"
   | "live_stream"
-  | "video_upload";
+  | "video_upload"
+  | "film_application_approved"
+  | "film_application_rejected"
+  | "film_new_episode"
+  | "film_milestone_100_views";
 
 interface CreateNotificationInput {
   userId: string; // recipient
@@ -58,10 +62,13 @@ export async function createNotification(input: CreateNotificationInput): Promis
     console.error(`Failed to write "${input.type}" notification:`, err);
   }
 
-  // Independent of the write above — a person still sees this in the bell
-  // icon even on a device with no push token registered, or if Firebase
-  // isn't configured at all yet (sendPushToUser no-ops in that case).
-  void sendPushToUser({ userId: input.userId, title: "INPLAYER", body: input.message });
+  // Message activity is intentionally bell-only. Requests can be accepted or
+  // rejected from the in-app notification list; an OS push would bypass that
+  // decision point and is not needed for these two notification types.
+  // Every other notification still reaches both the bell and push channel.
+  if (input.type !== "message" && input.type !== "message_request") {
+    void sendPushToUser({ userId: input.userId, title: "INPLAYER", body: input.message });
+  }
 }
 
 /**

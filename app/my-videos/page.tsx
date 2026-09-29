@@ -44,6 +44,7 @@ import VideoMetadataFields, {
 } from "@/app/components/VideoMetadataFields";
 import AITitleAssistModal from "@/app/components/AITitleAssistModal";
 import { CONTENT_CATEGORIES } from "@/app/data/categories";
+import FilmSeriesManager from "@/app/components/raftaar-films/FilmSeriesManager";
 
 const CATEGORIES = CONTENT_CATEGORIES;
 const SPOKEN_LANGUAGE_VALUES = ["auto", "en", "hi", "bn"];
@@ -95,7 +96,7 @@ const emptyContentStats: ContentStats = {
   shares: 0,
 };
 
-type ActivePanel = "dashboard" | "edit" | "profile" | "revenue" | "how-it-works";
+type ActivePanel = "dashboard" | "raftaar-films" | "edit" | "profile" | "revenue" | "how-it-works";
 
 export default function MyVideosPage() {
   const { signedIn, authLoading, openSignIn, user } = useAuthModal();
@@ -138,6 +139,18 @@ export default function MyVideosPage() {
   const [analyticsLoading, setAnalyticsLoading] = useState(true);
   const [payoutStatus, setPayoutStatus] = useState<PayoutStatus | null>(null);
   const [payoutLoading, setPayoutLoading] = useState(true);
+
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      const tabParam = params.get("tab");
+      if (tabParam === "films" || tabParam === "raftaar-films") {
+        setActiveTab("raftaar-films");
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   // Load Channel Bio — real, persisted value from InPlayer-Users
   // (AuthProvider fetches it via GET /api/profile/avatar), not a
@@ -502,6 +515,7 @@ export default function MyVideosPage() {
 
   const sidebarNavItems = [
     { id: "dashboard", label: "Dashboard", icon: LayoutDashboard },
+    { id: "raftaar-films", label: "Raftaar Films", icon: Film },
     { id: "edit", label: "Edit Content", icon: Pencil, disabled: false },
     { id: "profile", label: "Profile & Settings", icon: User },
     { id: "revenue", label: "Revenue & KYC", icon: DollarSign },
@@ -913,6 +927,8 @@ export default function MyVideosPage() {
             </div>
           )}
 
+          {/* PANEL: RAFTAAR FILMS */}
+          {activeTab === "raftaar-films" && <FilmSeriesManager />}
 
           {/* PANEL 4: DEDICATED EDIT CONTENT SCREEN */}
           {activeTab === "edit" && (

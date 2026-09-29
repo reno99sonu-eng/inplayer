@@ -8,6 +8,7 @@ import {
   Star,
   Video,
   Film,
+  Clapperboard,
   Flag,
   Copyright,
   IndianRupee,
@@ -29,6 +30,7 @@ import {
   LifeBuoy,
   Music2,
   UserCog,
+  UserCheck,
 } from "lucide-react";
 import { useAdminMode, type AdminMode } from "@/app/components/admin/AdminModeContext";
 import { useAdminIdentity } from "@/app/components/admin/AdminIdentityContext";
@@ -57,6 +59,8 @@ const inplayerItems = [
   { id: "error-logs", label: "Error Logs", icon: AlertTriangle, href: "/admin/error-logs", permission: "view_errors" },
   { id: "videos", label: "Videos", icon: Video, href: "/admin/videos" },
   { id: "shorts", label: "Shorts", icon: Film, href: "/admin/videos?type=short" },
+  { id: "raftaar-films", label: "Raftaar Films", icon: Clapperboard, href: "/admin/raftaar-films" },
+  { id: "raftaar-films-applications", label: "Film Applications", icon: UserCheck, href: "/admin/raftaar-films-applications" },
   { id: "music", label: "Music Studio", icon: Music2, href: "/admin/music" },
   { id: "stuck-processing", label: "Stuck Uploads", icon: AlertOctagon, href: "/admin/stuck-processing", permission: "delete_stuck_processing_videos" },
   { id: "reports", label: "Reports & Moderation", icon: Flag, href: "/admin/moderation", permission: "view_reports" },

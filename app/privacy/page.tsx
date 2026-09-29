@@ -5,6 +5,9 @@ import LegalNav from "../components/LegalNav";
 export const metadata = {
   title: "Privacy Policy — InPlayer",
   description: "Comprehensive privacy policy of InPlayer operated by Homox Prime Private Limited, in compliance with Indian data protection laws and DPDPA 2023.",
+  alternates: {
+    canonical: "https://inplayer.in/privacy",
+  },
 };
 
 const EFFECTIVE_DATE = "September 5, 2026";

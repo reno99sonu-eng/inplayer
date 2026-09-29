@@ -90,15 +90,9 @@ export default function ShortsPageContent({
 
   const shorts = initialShorts;
   const [activeIndex, setActiveIndex] = useState(0);
-  // Try for sound from the very first frame (matches the watch page) —
-  // paired with autoPlay="any" below, which attempts unmuted playback
-  // first and only falls back to muted if the browser actually blocks it
-  // (mobile browsers do this far more often than desktop). The
-  // volumechange listener further down keeps this state truthful if that
-  // silent fallback happens, so the speaker icon never lies about
-  // whether sound is really playing — and a single tap always reliably
-  // fixes it either way (see toggleMuted below).
-  const [muted, setMuted] = useState(false);
+  // Start muted so mobile browsers can reliably autoplay the active short.
+  // The viewer can turn audio on with the speaker button or a video tap.
+  const [muted, setMuted] = useState(true);
   const [burstIndex, setBurstIndex] = useState<number | null>(null);
   const [progress, setProgress] = useState(0);
   const [commentsFor, setCommentsFor] = useState<string | null>(null);
@@ -187,7 +181,7 @@ export default function ShortsPageContent({
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
-          if (entry.isIntersecting && entry.intersectionRatio > 0.6) {
+          if (entry.isIntersecting && entry.intersectionRatio > 0.45) {
             const index = slideRefs.current.findIndex(
               (el) => el === entry.target
             );
@@ -198,7 +192,7 @@ export default function ShortsPageContent({
           }
         });
       },
-      { threshold: [0.6] }
+      { threshold: [0.45] }
     );
 
     slideRefs.current.forEach((el) => {
@@ -238,14 +232,8 @@ export default function ShortsPageContent({
     });
   }, [activeIndex, shorts]);
 
-  // Keeps the speaker icon truthful. autoPlay="any" tries unmuted
-  // playback first and silently falls back to muted if the browser
-  // blocks it (common on mobile) — without this, the icon could keep
-  // showing "sound on" even though playback quietly fell back to muted,
-  // which is exactly the "no sound but the icon looks fine" confusion
-  // reported before. This syncs React state to whatever the player is
-  // ACTUALLY doing, whenever that changes for any reason (autoplay
-  // fallback, a tap, anything else).
+  // Keep the speaker icon synchronized with the player after the viewer
+  // changes the mute state or the browser updates its media state.
   useEffect(() => {
     const player = playerRef.current;
     if (!player) return;
@@ -320,10 +308,8 @@ export default function ShortsPageContent({
 
     audio.muted = muted;
     audio.play().catch(() => {
-      // Match MuxPlayer's autoPlay="any" fallback just above: browsers that
-      // block unmuted autoplay still generally allow a muted one, so at
-      // least start the beat instead of leaving it silent until the next
-      // tap (toggleMuted's own play() retry then recovers real sound).
+      // Browsers may still reject a soundtrack start until a user gesture.
+      // Keep it muted and retry when the viewer taps the sound control.
       if (!audio.muted) {
         audio.muted = true;
         audio.play().catch(() => {});
@@ -885,7 +871,11 @@ export default function ShortsPageContent({
       >
         {shorts.map((short, index) => {
           const isActive = activeIndex === index;
-          const hasRealVideo = isActive && !!short.muxPlaybackId;
+          // Keep one upcoming decoder warm while the current Short plays.
+          // The same keyed player is promoted when its slide becomes active,
+          // avoiding a cold HLS start on every vertical swipe.
+          const isNext = index === activeIndex + 1;
+          const hasRealVideo = (isActive || isNext) && !!short.muxPlaybackId;
 
           const like = likeStatus[short.id];
           const isLiked = like?.liked || false;
@@ -977,10 +967,10 @@ export default function ShortsPageContent({
                   {hasRealVideo ? (
                     <div className="shorts-player h-full w-full">
                       <MuxPlayer
-                        ref={playerRef}
+                        ref={isActive ? playerRef : undefined}
                         playbackId={short.muxPlaybackId}
                         streamType="on-demand"
-                        autoPlay="any"
+                        autoPlay={isActive ? "muted" : "none"}
                         loop
                         // Force-muted whenever this Short has a soundtrack —
                         // that track IS the audio (see shortHasSoundtrack

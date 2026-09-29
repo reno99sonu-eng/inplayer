@@ -40,3 +40,10 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# mobile binaries and temporary
+*.aab
+*.apk
+Claude outputs/
+PlayStore-Assets-Originals-*/
+

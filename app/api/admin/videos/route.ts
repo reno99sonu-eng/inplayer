@@ -3,7 +3,7 @@ import { ScanCommand, GetCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { requireAdmin } from "@/app/lib/isAdmin";
 import { getMuxThumbnailUrl } from "@/app/lib/muxThumbnail";
-import { normalizeContentType } from "@/app/lib/contentTypes";
+import { normalizeContentType, type ContentType } from "@/app/lib/contentTypes";
 import { videoAudience, type VideoAudience } from "@/app/lib/contentAccess";
 
 const PAGE_SIZE = 25;
@@ -28,7 +28,7 @@ const MAX_SCAN_PAGES = 20;
 export interface AdminVideoRow {
   videoId: string;
   title: string;
-  contentType: "video" | "short" | "music";
+  contentType: ContentType;
   status: string | null;
   visibility: string | null;
   views: number;

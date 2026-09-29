@@ -1,3 +1,4 @@
+import type { Metadata } from "next";
 import { Suspense } from "react";
 import FeaturedHero from "./components/featuredHero/FeaturedHero";
 import FeaturedHeroAd from "./components/featuredHero/FeaturedHeroAd";
@@ -12,6 +13,12 @@ import type { Short } from "./data/shorts";
 import type { FeaturedSlide } from "./data/featuredSlides";
 import { resolveUsernames } from "./lib/resolveUsernames";
 import { formatCompactNumber } from "./lib/formatters";
+
+export const metadata: Metadata = {
+  alternates: {
+    canonical: "https://inplayer.in",
+  },
+};
 
 function formatDuration(seconds: number): string {
   if (!seconds) return "0:00";

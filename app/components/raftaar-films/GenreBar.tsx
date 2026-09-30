@@ -44,7 +44,7 @@ export default function GenreBar({ selectedGenre, onSelectGenre }: GenreBarProps
     <div className="w-full relative py-1">
       <div 
         ref={scrollRef}
-        className="flex items-center space-x-3 overflow-x-auto scrollbar-hide px-4 md:px-8 py-3.5 cursor-grab active:cursor-grabbing snap-x"
+        className="flex items-center space-x-2 sm:space-x-2.5 overflow-x-auto scrollbar-hide px-3 sm:px-6 py-2 cursor-grab active:cursor-grabbing snap-x select-none"
         onMouseDown={onMouseDown}
         onMouseLeave={onMouseLeave}
         onMouseUp={onMouseUp}
@@ -57,10 +57,10 @@ export default function GenreBar({ selectedGenre, onSelectGenre }: GenreBarProps
             <button
               key={genre}
               onClick={() => onSelectGenre(genre)}
-              className={`rf-chip snap-start whitespace-nowrap px-5 py-2 rounded-full text-sm font-medium transition-all duration-300 ${
+              className={`rf-chip snap-start whitespace-nowrap px-3.5 py-1.5 sm:px-4 sm:py-1.5 rounded-full text-xs font-bold transition-all duration-200 active:scale-95 ${
                 isActive 
-                  ? 'rf-chip-active bg-gradient-to-r from-orange-500 to-orange-600 text-white shadow-[0_0_15px_rgba(249,115,22,0.4)] border border-orange-400'
-                  : 'bg-zinc-800/50 text-zinc-300 border border-zinc-700/50 hover:bg-zinc-700/80 hover:text-white'
+                  ? 'rf-chip-active bg-gradient-to-r from-orange-500 to-amber-500 text-slate-950 shadow-[0_0_12px_rgba(249,115,22,0.45)] border border-amber-300/60 font-black'
+                  : 'bg-white/[0.06] text-zinc-300 border border-white/[0.08] hover:bg-white/[0.12] hover:text-white'
               }`}
             >
               {genre}

@@ -34,6 +34,7 @@ class _RaftaarFilmsLandingPageState
   String? _selectedCreatorId;
   bool _isLoading = true;
   bool _isApproved = false;
+  bool _isSearchOpen = false;
 
   @override
   void initState() {
@@ -149,7 +150,13 @@ class _RaftaarFilmsLandingPageState
             color: isDark ? Colors.white : Colors.black87,
             size: 20,
           ),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/raftaar-films');
+            }
+          },
         ),
         title: Row(
           mainAxisSize: MainAxisSize.min,
@@ -192,8 +199,26 @@ class _RaftaarFilmsLandingPageState
             ),
           ],
         ),
-        centerTitle: false,
+        centerTitle: true,
         actions: [
+          IconButton(
+            icon: Icon(
+              _isSearchOpen ? Icons.close_rounded : Icons.search_rounded,
+              color: _isSearchOpen
+                  ? const Color(0xFFFF7A18)
+                  : (isDark ? Colors.white : Colors.black87),
+              size: 22,
+            ),
+            onPressed: () {
+              setState(() {
+                _isSearchOpen = !_isSearchOpen;
+                if (!_isSearchOpen) {
+                  _searchController.clear();
+                  _filterSeries();
+                }
+              });
+            },
+          ),
           if (_isApproved)
             Padding(
               padding: const EdgeInsets.symmetric(vertical: 10),
@@ -262,40 +287,24 @@ class _RaftaarFilmsLandingPageState
               parent: BouncingScrollPhysics(),
             ),
             slivers: [
-              // Search Bar
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
-                  child: FilmSearchBar(
-                    controller: _searchController,
-                    onChanged: (val) => _filterSeries(),
-                    onClear: () => _filterSeries(),
+              // Expandable Search Bar (Opened via Magnifying Glass)
+              if (_isSearchOpen)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 6, 16, 10),
+                    child: FilmSearchBar(
+                      controller: _searchController,
+                      onChanged: (val) => _filterSeries(),
+                      onClear: () => _filterSeries(),
+                    ),
                   ),
                 ),
-              ),
 
-              // Genres Bar
-              SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 14),
-                  child: GenreChipBar(
-                    genres: _genres,
-                    selectedGenre: _selectedGenre,
-                    onSelectGenre: (g) {
-                      setState(() {
-                        _selectedGenre = g;
-                        _filterSeries();
-                      });
-                    },
-                  ),
-                ),
-              ),
-
-              // Creator Stories Strip
+              // Creator Stories Strip (At the Top)
               if (creators.isNotEmpty)
                 SliverToBoxAdapter(
                   child: Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
+                    padding: const EdgeInsets.only(top: 4, bottom: 8),
                     child: CreatorStoriesStrip(
                       creators: creators,
                       selectedCreatorId: _selectedCreatorId,
@@ -308,6 +317,23 @@ class _RaftaarFilmsLandingPageState
                     ),
                   ),
                 ),
+
+              // Genres Bar (Just below Creator Stories)
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: GenreChipBar(
+                    genres: _genres,
+                    selectedGenre: _selectedGenre,
+                    onSelectGenre: (g) {
+                      setState(() {
+                        _selectedGenre = g;
+                        _filterSeries();
+                      });
+                    },
+                  ),
+                ),
+              ),
 
               // Creator Application Prompt Banner
               SliverToBoxAdapter(

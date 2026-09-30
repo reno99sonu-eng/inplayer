@@ -433,4 +433,84 @@
   box-shadow: 0 0 0 3px rgba(255, 122, 24, 0.8), 0 0 24px rgba(255, 122, 24, 0.65) !important;
 }
 
+/* ─────────── 3D LIQUID GLASS ICON SUITE ─────────── */
+@keyframes rf-liquid-glass-pulse {
+  0%, 100% {
+    transform: perspective(600px) rotateX(0deg) rotateY(0deg) translateY(0px) scale(1);
+    box-shadow: 
+      0 4px 18px rgba(255, 107, 0, 0.45),
+      0 0 10px rgba(255, 174, 0, 0.3),
+      inset 0 1.5px 2px rgba(255, 255, 255, 0.75),
+      inset 0 -1.5px 3px rgba(0, 0, 0, 0.4);
+  }
+  50% {
+    transform: perspective(600px) rotateX(6deg) rotateY(-4deg) translateY(-2px) scale(1.06);
+    box-shadow: 
+      0 8px 26px rgba(255, 107, 0, 0.65),
+      0 0 18px rgba(255, 190, 11, 0.45),
+      inset 0 1.5px 2px rgba(255, 255, 255, 0.85),
+      inset 0 -1.5px 3px rgba(0, 0, 0, 0.4);
+  }
+}
+
+@keyframes rf-glass-specular-sweep {
+  0% {
+    transform: translateX(-160%) skewX(-25deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 0.9;
+  }
+  60% {
+    transform: translateX(260%) skewX(-25deg);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateX(260%) skewX(-25deg);
+    opacity: 0;
+  }
+}
+
+.rf-liquid-glass-badge {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, rgba(255, 122, 24, 0.65) 0%, rgba(255, 174, 0, 0.4) 45%, rgba(255, 61, 0, 0.55) 100%);
+  border: 1.5px solid rgba(255, 255, 255, 0.45);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  overflow: hidden;
+  animation: rf-liquid-glass-pulse 3.5s ease-in-out infinite;
+  transform-style: preserve-3d;
+  flex-shrink: 0;
+}
+
+.rf-liquid-glass-badge::before {
+  content: '';
+  position: absolute;
+  top: -40%;
+  left: -40%;
+  width: 180%;
+  height: 180%;
+  background: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.65) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.rf-liquid-glass-badge::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 35%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.8), transparent);
+  animation: rf-glass-specular-sweep 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+
 

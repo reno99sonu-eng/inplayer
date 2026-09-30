@@ -50,120 +50,116 @@
   to   { opacity: 1; transform: perspective(900px) translateY(0) rotateX(0deg); }
 }
 
-/* ─────────── LIQUID GLASS 3D INTRO ─────────── */
-@keyframes rf-liquid-morph-1 {
-  0%   { border-radius: 42% 58% 70% 30% / 45% 45% 55% 55%; transform: translate(0, 0) rotate(0deg) scale(1); }
-  33%  { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; transform: translate(30px, -25px) rotate(120deg) scale(1.12); }
-  66%  { border-radius: 30% 70% 50% 50% / 30% 65% 35% 70%; transform: translate(-25px, 20px) rotate(240deg) scale(0.96); }
-  100% { border-radius: 42% 58% 70% 30% / 45% 45% 55% 55%; transform: translate(0, 0) rotate(360deg) scale(1); }
+/* ─────────── HIGH-PERFORMANCE LIQUID GLASS 3D INTRO ─────────── */
+@keyframes rf-orb-float-1 {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(24px, -18px, 0) scale(1.08); }
 }
 
-@keyframes rf-liquid-morph-2 {
-  0%   { border-radius: 55% 45% 40% 60% / 50% 60% 40% 50%; transform: translate(0, 0) rotate(0deg) scale(1); }
-  50%  { border-radius: 35% 65% 60% 40% / 65% 35% 65% 35%; transform: translate(-35px, 25px) rotate(-180deg) scale(1.18); }
-  100% { border-radius: 55% 45% 40% 60% / 50% 60% 40% 50%; transform: translate(0, 0) rotate(-360deg) scale(1); }
-}
-
-@keyframes rf-glass-float {
-  0%   { transform: perspective(1200px) rotateX(4deg) rotateY(-4deg) translateY(0); }
-  50%  { transform: perspective(1200px) rotateX(-2deg) rotateY(3deg) translateY(-12px); }
-  100% { transform: perspective(1200px) rotateX(4deg) rotateY(-4deg) translateY(0); }
+@keyframes rf-orb-float-2 {
+  0%, 100% { transform: translate3d(0, 0, 0) scale(1); }
+  50%      { transform: translate3d(-20px, 16px, 0) scale(1.1); }
 }
 
 @keyframes rf-glass-sweep {
-  0%   { transform: translateX(-150%) skewX(-25deg); opacity: 0; }
-  20%  { opacity: 0.9; }
-  80%  { opacity: 0.9; }
-  100% { transform: translateX(250%) skewX(-25deg); opacity: 0; }
+  0%   { transform: translateX(-150%) skewX(-20deg); opacity: 0; }
+  15%  { opacity: 0.8; }
+  85%  { opacity: 0.8; }
+  100% { transform: translateX(250%) skewX(-20deg); opacity: 0; }
 }
 
 @keyframes rf-wave-bar {
   0%, 100% { height: 6px; opacity: 0.4; }
-  50%      { height: 28px; opacity: 1; }
+  50%      { height: 26px; opacity: 1; }
 }
 
 .rf-intro-overlay {
   position: fixed;
   inset: 0;
   z-index: 9999;
-  background: radial-gradient(circle at 50% 50%, #0a0b16 0%, #040407 100%);
+  background: radial-gradient(circle at 50% 50%, #0d0f1d 0%, #040407 100%);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   overflow: hidden;
-  backdrop-filter: blur(20px);
+  will-change: opacity;
+  cursor: pointer;
 }
 
 .rf-intro-overlay.rf-intro-exiting {
-  animation: rf-exit 0.65s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+  animation: rf-exit 0.45s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
+/* Naturally soft radial gradients — ZERO blur filter overhead on GPU */
 .rf-intro-bg-orb-1 {
   position: absolute;
-  width: 520px;
-  height: 520px;
-  background: radial-gradient(circle, rgba(255, 122, 24, 0.45) 0%, rgba(255, 69, 0, 0.25) 45%, transparent 75%);
-  filter: blur(60px);
+  width: 500px;
+  height: 500px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 122, 24, 0.35) 0%, rgba(255, 69, 0, 0.12) 45%, transparent 70%);
   top: -10%;
   left: 10%;
-  animation: rf-liquid-morph-1 12s ease-in-out infinite;
+  pointer-events: none;
+  will-change: transform;
+  animation: rf-orb-float-1 8s ease-in-out infinite;
 }
 
 .rf-intro-bg-orb-2 {
   position: absolute;
-  width: 480px;
-  height: 480px;
-  background: radial-gradient(circle, rgba(255, 174, 0, 0.4) 0%, rgba(255, 61, 0, 0.2) 50%, transparent 75%);
-  filter: blur(65px);
-  bottom: -5%;
-  right: 15%;
-  animation: rf-liquid-morph-2 14s ease-in-out infinite;
+  width: 460px;
+  height: 460px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 174, 0, 0.32) 0%, rgba(255, 61, 0, 0.1) 50%, transparent 70%);
+  bottom: -8%;
+  right: 12%;
+  pointer-events: none;
+  will-change: transform;
+  animation: rf-orb-float-2 9s ease-in-out infinite;
 }
 
 .rf-intro-bg-orb-3 {
   position: absolute;
   width: 320px;
   height: 320px;
-  background: radial-gradient(circle, rgba(255, 215, 0, 0.3) 0%, transparent 70%);
-  filter: blur(50px);
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 215, 0, 0.18) 0%, transparent 70%);
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  animation: rf-glow-pulse 4s ease-in-out infinite;
+  pointer-events: none;
 }
 
 .rf-glass-shield {
   position: relative;
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.02) 60%, rgba(0, 0, 0, 0.45) 100%);
-  backdrop-filter: blur(35px) saturate(220%);
-  -webkit-backdrop-filter: blur(35px) saturate(220%);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.02) 65%, rgba(0, 0, 0, 0.45) 100%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   border: 1.5px solid rgba(255, 255, 255, 0.22);
-  border-radius: 36px;
-  padding: 3.5rem 4.5rem;
+  border-radius: 32px;
+  padding: 3rem 4rem;
   box-shadow:
-    0 40px 100px -20px rgba(0, 0, 0, 0.9),
-    0 0 60px rgba(255, 122, 24, 0.3),
-    inset 0 1.5px 2px rgba(255, 255, 255, 0.45),
-    inset 0 -1.5px 2px rgba(0, 0, 0, 0.6);
-  transform-style: preserve-3d;
-  animation: rf-logo-enter 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards,
-             rf-glass-float 5s ease-in-out 0.9s infinite;
+    0 24px 60px rgba(0, 0, 0, 0.8),
+    0 0 40px rgba(255, 122, 24, 0.22),
+    inset 0 1px 1px rgba(255, 255, 255, 0.4);
+  animation: rf-logo-enter 0.75s cubic-bezier(0.22, 1, 0.36, 1) forwards;
   display: flex;
   flex-direction: column;
   align-items: center;
   overflow: hidden;
+  will-change: transform, opacity;
 }
 
 .rf-glass-sweep-shine {
   position: absolute;
   top: 0;
   left: 0;
-  width: 45%;
+  width: 40%;
   height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.22), transparent);
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.18), rgba(255, 255, 255, 0.35), rgba(255, 255, 255, 0.18), transparent);
   pointer-events: none;
-  animation: rf-glass-sweep 2.2s cubic-bezier(0.4, 0, 0.2, 1) 0.5s infinite;
+  animation: rf-glass-sweep 2.4s cubic-bezier(0.4, 0, 0.2, 1) 0.4s infinite;
+  will-change: transform;
 }
 
 .rf-intro-logo {
@@ -227,15 +223,14 @@
 
 /* ─────────── CARD 3D ─────────── */
 .rf-card-3d {
-  transform-style: preserve-3d;
-  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
-              box-shadow 0.35s ease;
+  will-change: transform;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
 }
 .rf-card-3d:hover {
-  transform: translateY(-10px) rotateX(4deg) rotateY(-4deg) scale(1.025);
+  transform: translateY(-6px) scale(1.02);
   box-shadow:
-    0 28px 60px rgba(255, 122, 24, 0.22),
-    0 10px 30px rgba(0, 0, 0, 0.55);
+    0 16px 36px rgba(255, 122, 24, 0.2),
+    0 8px 24px rgba(0, 0, 0, 0.5);
 }
 
 /* ─────────── LIQUID BUTTON ─────────── */
@@ -292,8 +287,8 @@
 
 /* ─────────── HERO PARALLAX ─────────── */
 .rf-hero {
-  transform-style: preserve-3d;
-  transition: transform 0.12s linear;
+  will-change: transform;
+  transition: transform 0.15s ease-out;
 }
 
 /* ─────────── GLASS CARD ─────────── */

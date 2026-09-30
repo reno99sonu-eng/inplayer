@@ -9,15 +9,23 @@ interface Props {
 export default function RaftaarFilmsIntro({ onComplete }: Props) {
   const [exiting, setExiting] = useState(false);
 
+  const dismiss = () => {
+    setExiting(true);
+    setTimeout(() => onComplete(), 300);
+  };
+
   useEffect(() => {
-    // After 2.4s, start exit animation, then call onComplete
-    const exitTimer = setTimeout(() => setExiting(true), 2400);
-    const doneTimer = setTimeout(() => onComplete(), 3000);
+    const exitTimer = setTimeout(() => setExiting(true), 1300);
+    const doneTimer = setTimeout(() => onComplete(), 1750);
     return () => { clearTimeout(exitTimer); clearTimeout(doneTimer); };
   }, [onComplete]);
 
   return (
-    <div className={`rf-intro-overlay${exiting ? ' rf-intro-exiting' : ''}`}>
+    <div
+      onClick={dismiss}
+      title="Click to skip"
+      className={`rf-intro-overlay${exiting ? ' rf-intro-exiting' : ''}`}
+    >
       {/* Dynamic Morphing Liquid Glass Orbs */}
       <div className="rf-intro-bg-orb-1" />
       <div className="rf-intro-bg-orb-2" />

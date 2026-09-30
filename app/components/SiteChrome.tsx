@@ -75,40 +75,21 @@ export default function SiteChrome({
     return <>{children}</>;
   }
 
-  if (isRaftaarFilms) {
-    // Only wrap in the music/mini-player providers (needed for auth context
-    // passthrough), then render children completely bare.
-    return (
-      <MusicPlayerProvider>
-        <MiniPlayerProvider>
-          <MaintenanceGate initialMaintenance={initialMaintenance}>
-            <GeoGate initialGeoAllowed={initialGeoAllowed}>
-              {children}
-            </GeoGate>
-          </MaintenanceGate>
-        </MiniPlayerProvider>
-      </MusicPlayerProvider>
-    );
-  }
-
   return (
     <MusicPlayerProvider>
       <MiniPlayerProvider>
-        {/* Overlay only — the real chrome/content below still mounts and
-            loads normally underneath it, so the splash never delays the
-            actual page. */}
-        <SplashScreen />
+        {!isRaftaarFilms && <SplashScreen />}
         <MaintenanceGate initialMaintenance={initialMaintenance}>
           <GeoGate initialGeoAllowed={initialGeoAllowed}>
-            <Navbar />
-            <AnnouncementBanner />
-            <div className="pb-20 lg:pb-0">{children}</div>
-            <MobileBottomNav />
-            <IdleViewerPrompt />
-            <SupportChatWidget />
-            <FloatingAIButton />
-            <GlobalMusicPlayer />
-            <MiniPlayer />
+            {!isRaftaarFilms && <Navbar />}
+            {!isRaftaarFilms && <AnnouncementBanner />}
+            <div className={isRaftaarFilms ? "" : "pb-20 lg:pb-0"}>{children}</div>
+            {!isRaftaarFilms && <MobileBottomNav />}
+            {!isRaftaarFilms && <IdleViewerPrompt />}
+            {!isRaftaarFilms && <SupportChatWidget />}
+            {!isRaftaarFilms && <FloatingAIButton />}
+            {!isRaftaarFilms && <GlobalMusicPlayer />}
+            {!isRaftaarFilms && <MiniPlayer />}
           </GeoGate>
         </MaintenanceGate>
       </MiniPlayerProvider>

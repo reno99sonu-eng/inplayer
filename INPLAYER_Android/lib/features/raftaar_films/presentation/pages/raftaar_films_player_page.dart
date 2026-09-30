@@ -473,6 +473,14 @@ class _SingleFilmEpisodeViewState
 
   @override
   Widget build(BuildContext context) {
+    final authState = ref.watch(authStateProvider);
+    final currentUser = authState is AuthStateAuthenticated ? authState.user : null;
+    final cleanHandle = widget.series.creatorHandle.replaceAll('@', '').trim();
+    final isOwner = currentUser != null &&
+        (currentUser.userId == widget.series.creatorId ||
+         (currentUser.handle != null && currentUser.handle!.replaceAll('@', '').trim().toLowerCase() == cleanHandle.toLowerCase()) ||
+         currentUser.username.replaceAll('@', '').trim().toLowerCase() == cleanHandle.toLowerCase());
+
     final thumb = widget.episode.thumbnailUrl.isNotEmpty
         ? widget.episode.thumbnailUrl
         : widget.series.posterUrl;
@@ -559,7 +567,13 @@ class _SingleFilmEpisodeViewState
                       color: Colors.white,
                       size: 20,
                     ),
-                    onPressed: () => context.pop(),
+                    onPressed: () {
+                      if (context.canPop()) {
+                        context.pop();
+                      } else {
+                        context.go('/raftaar-films/${widget.series.seriesId}');
+                      }
+                    },
                   ),
                   const SizedBox(width: 4),
                   Expanded(
@@ -674,56 +688,99 @@ class _SingleFilmEpisodeViewState
               // Creator Row with Follow Button
               Row(
                 children: [
-                  CircleAvatar(
-                    radius: 16,
-                    backgroundColor: Colors.white24,
-                    backgroundImage: widget.series.creatorAvatarUrl.isNotEmpty
-                        ? CachedNetworkImageProvider(
-                            widget.series.creatorAvatarUrl,
-                          )
-                        : null,
-                    child: widget.series.creatorAvatarUrl.isEmpty
-                        ? const Icon(Icons.person, size: 16, color: Colors.white)
-                        : null,
-                  ),
-                  const SizedBox(width: 8),
                   Expanded(
-                    child: Text(
-                      widget.series.creatorName,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontWeight: FontWeight.w700,
-                        fontSize: 14,
-                        shadows: [Shadow(color: Colors.black, blurRadius: 4)],
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () {
+                        if (isOwner) {
+                          context.push('/my-videos');
+                        } else {
+                          final handle = cleanHandle.isNotEmpty ? cleanHandle : widget.series.creatorId;
+                          if (handle.isNotEmpty) {
+                            context.push('/channel/$handle');
+                          }
+                        }
+                      },
+                      child: Row(
+                        children: [
+                          CircleAvatar(
+                            radius: 16,
+                            backgroundColor: Colors.white24,
+                            backgroundImage: widget.series.creatorAvatarUrl.isNotEmpty
+                                ? CachedNetworkImageProvider(
+                                    widget.series.creatorAvatarUrl,
+                                  )
+                                : null,
+                            child: widget.series.creatorAvatarUrl.isEmpty
+                                ? const Icon(Icons.person, size: 16, color: Colors.white)
+                                : null,
+                          ),
+                          const SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              widget.series.creatorName,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.w700,
+                                fontSize: 14,
+                                shadows: [Shadow(color: Colors.black, blurRadius: 4)],
+                              ),
+                            ),
+                          ),
+                          if (isOwner) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFFFF7A18).withValues(alpha: 0.25),
+                                borderRadius: BorderRadius.circular(4),
+                                border: Border.all(
+                                  color: const Color(0xFFFF7A18).withValues(alpha: 0.5),
+                                  width: 0.5,
+                                ),
+                              ),
+                              child: const Text(
+                                'You',
+                                style: TextStyle(
+                                  color: Color(0xFFFF7A18),
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ),
                   ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: _toggleFollow,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 10,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: _isFollowing
-                            ? Colors.white.withValues(alpha: 0.15)
-                            : const Color(0xFFFF7A18),
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                      child: Text(
-                        _isFollowing ? 'Following' : '+ Follow',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w700,
+                  if (!isOwner) ...[
+                    const SizedBox(width: 8),
+                    GestureDetector(
+                      onTap: _toggleFollow,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 10,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: _isFollowing
+                              ? Colors.white.withValues(alpha: 0.15)
+                              : const Color(0xFFFF7A18),
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                        child: Text(
+                          _isFollowing ? 'In-Family' : '+ In-Family',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                     ),
-                  ),
+                  ],
                 ],
               ),
               const SizedBox(height: 8),

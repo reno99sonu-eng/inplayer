@@ -8,6 +8,7 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../models/film_series.dart';
 import '../../../../models/film_episode.dart';
 import '../../../../services/raftaar_films_service.dart';
+import '../../../../providers/auth_provider.dart';
 
 class RaftaarFilmsDetailPage extends ConsumerStatefulWidget {
   final String seriesId;
@@ -108,6 +109,13 @@ class _RaftaarFilmsDetailPageState
 
     final series = _series!;
     final firstEpisode = _episodes.isNotEmpty ? _episodes.first : null;
+    final authState = ref.watch(authStateProvider);
+    final currentUser = authState is AuthStateAuthenticated ? authState.user : null;
+    final cleanHandle = series.creatorHandle.replaceAll('@', '').trim();
+    final isOwner = currentUser != null &&
+        (currentUser.userId == series.creatorId ||
+         (currentUser.handle != null && currentUser.handle!.replaceAll('@', '').trim().toLowerCase() == cleanHandle.toLowerCase()) ||
+         currentUser.username.replaceAll('@', '').trim().toLowerCase() == cleanHandle.toLowerCase());
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F13),
@@ -175,7 +183,13 @@ class _RaftaarFilmsDetailPageState
                               color: Colors.white,
                               size: 18,
                             ),
-                            onPressed: () => context.pop(),
+                            onPressed: () {
+                              if (context.canPop()) {
+                                context.pop();
+                              } else {
+                                context.go('/raftaar-films');
+                              }
+                            },
                           ),
                         ),
                         CircleAvatar(
@@ -276,79 +290,129 @@ class _RaftaarFilmsDetailPageState
                     ),
                     child: Row(
                       children: [
-                        CircleAvatar(
-                          radius: 20,
-                          backgroundColor: Colors.grey[800],
-                          backgroundImage: series.creatorAvatarUrl.isNotEmpty
-                              ? CachedNetworkImageProvider(series.creatorAvatarUrl)
-                              : null,
-                          child: series.creatorAvatarUrl.isEmpty
-                              ? const Icon(Icons.person, color: Colors.white)
-                              : null,
-                        ),
-                        const SizedBox(width: 12),
                         Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                series.creatorName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                  fontSize: 14,
-                                ),
-                              ),
-                              Text(
-                                '@${series.creatorHandle}',
-                                style: const TextStyle(
-                                  color: Colors.white54,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        GestureDetector(
-                          onTap: _toggleFollow,
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 200),
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 16,
-                              vertical: 8,
-                            ),
-                            decoration: BoxDecoration(
-                              color: _isFollowing
-                                  ? Colors.white.withValues(alpha: 0.1)
-                                  : const Color(0xFFFF7A18),
-                              borderRadius: BorderRadius.circular(20),
-                              border: _isFollowing
-                                  ? Border.all(color: Colors.white24)
-                                  : null,
-                            ),
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: () {
+                              if (isOwner) {
+                                context.push('/my-videos');
+                              } else {
+                                final handle = cleanHandle.isNotEmpty ? cleanHandle : series.creatorId;
+                                if (handle.isNotEmpty) {
+                                  context.push('/channel/$handle');
+                                }
+                              }
+                            },
                             child: Row(
-                              mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(
-                                  _isFollowing ? Icons.check : Icons.add,
-                                  size: 14,
-                                  color: Colors.white,
+                                CircleAvatar(
+                                  radius: 20,
+                                  backgroundColor: Colors.grey[800],
+                                  backgroundImage: series.creatorAvatarUrl.isNotEmpty
+                                      ? CachedNetworkImageProvider(series.creatorAvatarUrl)
+                                      : null,
+                                  child: series.creatorAvatarUrl.isEmpty
+                                      ? const Icon(Icons.person, color: Colors.white)
+                                      : null,
                                 ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  _isFollowing ? 'Following' : 'Follow',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Flexible(
+                                            child: Text(
+                                              series.creatorName,
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.w700,
+                                                fontSize: 14,
+                                              ),
+                                            ),
+                                          ),
+                                          if (isOwner) ...[
+                                            const SizedBox(width: 6),
+                                            Container(
+                                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                              decoration: BoxDecoration(
+                                                color: const Color(0xFFFF7A18).withValues(alpha: 0.25),
+                                                borderRadius: BorderRadius.circular(4),
+                                                border: Border.all(
+                                                  color: const Color(0xFFFF7A18).withValues(alpha: 0.5),
+                                                  width: 0.5,
+                                                ),
+                                              ),
+                                              child: const Text(
+                                                'You',
+                                                style: TextStyle(
+                                                  color: Color(0xFFFF7A18),
+                                                  fontSize: 10,
+                                                  fontWeight: FontWeight.w700,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ],
+                                      ),
+                                      Text(
+                                        '@$cleanHandle',
+                                        style: const TextStyle(
+                                          color: Colors.white54,
+                                          fontSize: 12,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
                             ),
                           ),
                         ),
+                        if (!isOwner) ...[
+                          const SizedBox(width: 8),
+                          GestureDetector(
+                            onTap: _toggleFollow,
+                            child: AnimatedContainer(
+                              duration: const Duration(milliseconds: 200),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 16,
+                                vertical: 8,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _isFollowing
+                                    ? Colors.white.withValues(alpha: 0.1)
+                                    : const Color(0xFFFF7A18),
+                                borderRadius: BorderRadius.circular(20),
+                                border: _isFollowing
+                                    ? Border.all(color: Colors.white24)
+                                    : null,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    _isFollowing ? Icons.check : Icons.add,
+                                    size: 14,
+                                    color: Colors.white,
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    _isFollowing ? 'In-Family' : 'In-Family',
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                      fontWeight: FontWeight.w700,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),

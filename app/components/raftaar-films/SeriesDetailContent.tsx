@@ -1,16 +1,40 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import Link from "next/link";
-import { Play, ChevronLeft, Share2, Plus, Check, Sparkles, Film } from "lucide-react";
+import { Play, ChevronLeft, Share2, Plus, Check, Film } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import "./RaftaarFilms3DStyles.css";
 
-export default function SeriesDetailContent({ series, episodes, user }: any) {
+export default function SeriesDetailContent({ series, episodes }: any) {
   const router = useRouter();
+  const { user, signedIn } = useAuthModal();
   const [isFollowing, setIsFollowing] = useState(false);
   const [showFullDesc, setShowFullDesc] = useState(false);
   const [toastMsg, setToastMsg] = useState<string | null>(null);
+
+  const cleanHandle = (series?.creatorHandle || "")
+    .replace(/^@/, "")
+    .trim();
+
+  // Check if the current signed-in user is the creator of this series
+  const isOwner = Boolean(
+    signedIn &&
+    user &&
+    (user.userId === series?.creatorId ||
+      (cleanHandle && (user.handle === cleanHandle || user.username === cleanHandle)))
+  );
+
+  // If creator themselves clicks avatar: open their Your Channel Raftaar Films studio page
+  // If another viewer clicks avatar: open creator's public profile channel
+  const creatorProfileUrl = isOwner
+    ? "/my-videos?tab=raftaar-films"
+    : cleanHandle
+    ? `/u/${cleanHandle}`
+    : series?.creatorId
+    ? `/u/${series.creatorId}`
+    : `/raftaar-films?creatorId=${series?.creatorId}`;
 
   const sortedEpisodes = [...(episodes || [])].sort(
     (a: any, b: any) => (Number(a.episodeNumber) || 0) - (Number(b.episodeNumber) || 0)
@@ -18,10 +42,16 @@ export default function SeriesDetailContent({ series, episodes, user }: any) {
   const firstEpisode = sortedEpisodes?.[0];
   const nextEpisode = firstEpisode;
 
-  const showToast = (msg: string) => {
+  const showToast = useCallback((msg: string) => {
     setToastMsg(msg);
     setTimeout(() => setToastMsg(null), 2500);
-  };
+  }, []);
+
+  const handleBack = useCallback((e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    e?.preventDefault();
+    router.push("/raftaar-films");
+  }, [router]);
 
   const handleFollow = async () => {
     const nextState = !isFollowing;
@@ -94,15 +124,17 @@ export default function SeriesDetailContent({ series, episodes, user }: any) {
         {/* Header Actions */}
         <div className="absolute top-0 w-full pt-[max(1rem,env(safe-area-inset-top,16px))] px-4 sm:px-6 lg:px-8 flex justify-between items-center z-20 max-w-7xl mx-auto inset-x-0">
           <button
-            onClick={() => router.back()}
-            className="w-10 h-10 rounded-full bg-black/50 hover:bg-black/80 backdrop-blur-md flex items-center justify-center border border-white/15 text-white transition-all hover:scale-105 active:scale-95 shadow-xl"
-            aria-label="Go back"
+            type="button"
+            onClick={handleBack}
+            className="w-10 h-10 rounded-full bg-black/50 hover:bg-black/80 backdrop-blur-md flex items-center justify-center border border-white/15 text-white transition-all hover:scale-105 active:scale-95 shadow-xl cursor-pointer"
+            aria-label="Back to Raftaar Films"
           >
             <ChevronLeft className="w-6 h-6" />
           </button>
           <button
+            type="button"
             onClick={handleShare}
-            className="w-10 h-10 rounded-full bg-black/50 hover:bg-black/80 backdrop-blur-md flex items-center justify-center border border-white/15 text-white transition-all hover:scale-105 active:scale-95 shadow-xl"
+            className="w-10 h-10 rounded-full bg-black/50 hover:bg-black/80 backdrop-blur-md flex items-center justify-center border border-white/15 text-white transition-all hover:scale-105 active:scale-95 shadow-xl cursor-pointer"
             aria-label="Share series"
           >
             <Share2 className="w-5 h-5" />
@@ -150,12 +182,24 @@ export default function SeriesDetailContent({ series, episodes, user }: any) {
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
           {/* Left Column: Creator, Synopsis & Watch Action */}
           <div className="lg:col-span-4 space-y-6">
-            {/* Ultra-Luxurious Creator Card with In-Family Button */}
+            {/* Ultra-Luxurious Creator Card with In-Family Button & Clickable Profile Avatar */}
             <div className="p-4 bg-zinc-900/60 rounded-2xl border border-white/10 backdrop-blur-xl shadow-xl flex items-center justify-between gap-3 rf-card-3d-lux">
-              <div className="flex items-center gap-3 min-w-0">
-                <div className="w-12 h-12 rounded-full overflow-hidden bg-zinc-800 p-0.5 border border-orange-500/40 relative flex-shrink-0 shadow-md">
+              <Link
+                href={creatorProfileUrl}
+                className="flex items-center gap-3 min-w-0 group/creator cursor-pointer"
+                title={
+                  isOwner
+                    ? "Open Your Channel Raftaar Films Studio"
+                    : `View ${series.creatorName || "Creator"}'s channel`
+                }
+              >
+                <div className="w-12 h-12 rounded-full overflow-hidden bg-zinc-800 p-0.5 border border-orange-500/40 relative flex-shrink-0 shadow-md group-hover/creator:scale-105 group-hover/creator:border-orange-400 transition-all">
                   <img
-                    src={series.creatorAvatarUrl || series.creatorProfilePic || "/avatars/avatar.png"}
+                    src={
+                      series.creatorAvatarUrl ||
+                      series.creatorProfilePic ||
+                      "/avatars/avatar.png"
+                    }
                     alt={series.creatorName || "Creator"}
                     className="w-full h-full object-cover rounded-full"
                     onError={(e) => {
@@ -167,32 +211,46 @@ export default function SeriesDetailContent({ series, episodes, user }: any) {
                   />
                 </div>
                 <div className="min-w-0">
-                  <p className="font-bold text-sm text-white truncate">{series.creatorName || "Creator"}</p>
-                  <p className="text-xs text-orange-300/80 truncate">@{series.creatorHandle || "creator"}</p>
+                  <div className="flex items-center gap-1.5">
+                    <p className="font-bold text-sm text-white truncate group-hover/creator:text-orange-300 transition-colors">
+                      {series.creatorName || "Creator"}
+                    </p>
+                    {isOwner && (
+                      <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-orange-500/25 text-orange-400 border border-orange-500/35">
+                        You
+                      </span>
+                    )}
+                  </div>
+                  <p className="text-xs text-orange-300/80 truncate">
+                    @{cleanHandle || "creator"}
+                  </p>
                 </div>
-              </div>
+              </Link>
 
-              {/* In-Family Button (Replaces Follow/Subscribe) */}
-              <button
-                onClick={handleFollow}
-                className={`flex-shrink-0 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shadow-md active:scale-95 ${
-                  isFollowing
-                    ? "bg-white/15 text-orange-300 border border-orange-400/40"
-                    : "bg-gradient-to-r from-orange-500 to-amber-500 text-slate-950 font-black shadow-[0_0_15px_rgba(249,115,22,0.4)] hover:brightness-110"
-                }`}
-              >
-                {isFollowing ? (
-                  <>
-                    <Check className="w-3.5 h-3.5 stroke-[2.5]" />
-                    <span>In-Family</span>
-                  </>
-                ) : (
-                  <>
-                    <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-                    <span>In-Family</span>
-                  </>
-                )}
-              </button>
+              {/* In-Family Button (Shown for viewers, hidden if creator is viewing their own series) */}
+              {!isOwner && (
+                <button
+                  type="button"
+                  onClick={handleFollow}
+                  className={`flex-shrink-0 flex items-center gap-1.5 px-3.5 py-1.5 rounded-full text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer ${
+                    isFollowing
+                      ? "bg-white/15 text-orange-300 border border-orange-400/40 hover:bg-white/25"
+                      : "bg-gradient-to-r from-orange-500 to-amber-500 text-slate-950 font-black shadow-[0_0_15px_rgba(249,115,22,0.4)] hover:brightness-110"
+                  }`}
+                >
+                  {isFollowing ? (
+                    <>
+                      <Check className="w-3.5 h-3.5 stroke-[2.5]" />
+                      <span>In-Family</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
+                      <span>In-Family</span>
+                    </>
+                  )}
+                </button>
+              )}
             </div>
 
             {/* Primary Watch Action Button (Ultra-Luxurious 3D) */}
@@ -208,12 +266,19 @@ export default function SeriesDetailContent({ series, episodes, user }: any) {
 
             {/* Series Synopsis */}
             <div className="p-5 bg-zinc-900/40 rounded-2xl border border-white/5 backdrop-blur-md">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-orange-400 mb-2">Synopsis</h3>
-              <p className={`text-zinc-300 text-sm leading-relaxed ${!showFullDesc && "line-clamp-4"}`}>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-orange-400 mb-2">
+                Synopsis
+              </h3>
+              <p
+                className={`text-zinc-300 text-sm leading-relaxed ${
+                  !showFullDesc && "line-clamp-4"
+                }`}
+              >
                 {series.description || "No description provided."}
               </p>
               {series.description?.length > 180 && (
                 <button
+                  type="button"
                   onClick={() => setShowFullDesc(!showFullDesc)}
                   className="text-orange-400 text-xs font-bold mt-2 hover:text-orange-300 transition-colors"
                 >
@@ -227,12 +292,16 @@ export default function SeriesDetailContent({ series, episodes, user }: any) {
           <div className="lg:col-span-8">
             <div className="flex items-center justify-between mb-4 pb-2 border-b border-white/10">
               <div className="flex items-center gap-2">
-                <h2 className="text-xl sm:text-2xl font-extrabold text-white">Episodes</h2>
+                <h2 className="text-xl sm:text-2xl font-extrabold text-white">
+                  Episodes
+                </h2>
                 <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-orange-500/20 text-orange-400 border border-orange-500/30">
                   {sortedEpisodes.length}
                 </span>
               </div>
-              <span className="text-xs text-zinc-400">Micro-drama vertical episodes</span>
+              <span className="text-xs text-zinc-400">
+                Micro-drama vertical episodes
+              </span>
             </div>
 
             {/* 3D Episode Grid - Responsive for all screen sizes */}
@@ -297,4 +366,3 @@ export default function SeriesDetailContent({ series, episodes, user }: any) {
     </div>
   );
 }
-

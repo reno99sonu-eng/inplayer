@@ -42,8 +42,31 @@ export default function FilmPlayerContent({
   currentEpisodeId,
 }: FilmPlayerProps) {
   const router = useRouter();
-  const { signedIn, openSignIn } = useAuthModal();
+  const { user, signedIn, openSignIn } = useAuthModal();
   const playerRef = useRef<MuxPlayerRefAttributes | null>(null);
+
+  // Clean creator handle (strips @ if present)
+  const cleanHandle = (series?.creatorHandle || "")
+    .replace(/^@/, "")
+    .trim();
+
+  // Check if the current signed-in user is the creator of this series
+  const isOwner = Boolean(
+    signedIn &&
+    user &&
+    (user.userId === series?.creatorId ||
+      (cleanHandle && (user.handle === cleanHandle || user.username === cleanHandle)))
+  );
+
+  // If creator themselves clicks avatar: open their Your Channel Raftaar Films studio page
+  // If another viewer clicks avatar: open creator's public profile channel
+  const creatorProfileUrl = isOwner
+    ? "/my-videos?tab=raftaar-films"
+    : cleanHandle
+    ? `/u/${cleanHandle}`
+    : series?.creatorId
+    ? `/u/${series.creatorId}`
+    : `/raftaar-films?creatorId=${series?.creatorId}`;
 
   // Guarantee episodes are strictly sorted by episodeNumber
   const sortedEpisodes = useMemo(() => {
@@ -176,6 +199,17 @@ export default function FilmPlayerContent({
     };
   }, []);
 
+  // Back Navigation handler - Always navigates to Series Detail or Raftaar Films Explore
+  const handleBack = useCallback((e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    e?.preventDefault();
+    if (series?.seriesId) {
+      router.push(`/raftaar-films/${series.seriesId}`);
+    } else {
+      router.push("/raftaar-films");
+    }
+  }, [series?.seriesId, router]);
+
   // Navigation handlers
   const goToNext = useCallback(() => {
     if (nextEpisode) {
@@ -252,11 +286,14 @@ export default function FilmPlayerContent({
       } else if (e.key.toLowerCase() === "m") {
         e.preventDefault();
         toggleMute();
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        handleBack();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [goToPrev, goToNext, togglePlay, toggleMute]);
+  }, [goToPrev, goToNext, togglePlay, toggleMute, handleBack]);
 
   // Like handler
   const handleLike = useCallback(async () => {
@@ -333,6 +370,10 @@ export default function FilmPlayerContent({
 
   // Touch handlers for Reels vertical swipe (both up and down)
   const handleTouchStart = (e: React.TouchEvent) => {
+    const target = e.target as HTMLElement;
+    if (target?.closest("button") || target?.closest("a") || target?.closest("input")) {
+      return;
+    }
     touchStartYRef.current = e.touches[0].clientY;
     touchStartXRef.current = e.touches[0].clientX;
     touchStartTimeRef.current = Date.now();
@@ -340,6 +381,11 @@ export default function FilmPlayerContent({
 
   const handleTouchEnd = (e: React.TouchEvent) => {
     if (showComments || showEpisodesList) return;
+
+    const target = e.target as HTMLElement;
+    if (target?.closest("button") || target?.closest("a") || target?.closest("input")) {
+      return;
+    }
 
     const deltaY = touchStartYRef.current - e.changedTouches[0].clientY;
     const deltaX = Math.abs(touchStartXRef.current - e.changedTouches[0].clientX);
@@ -441,7 +487,8 @@ export default function FilmPlayerContent({
   };
 
   // Follow / In-Family Subscription handler
-  const handleFollow = async () => {
+  const handleFollow = async (e?: React.MouseEvent) => {
+    e?.stopPropagation();
     if (!signedIn) {
       openSignIn();
       return;
@@ -483,24 +530,15 @@ export default function FilmPlayerContent({
     }
   };
 
-  const handleBack = () => {
-    if (series?.seriesId) {
-      router.push(`/raftaar-films/${series.seriesId}`);
-    } else if (typeof window !== "undefined" && window.history.length > 1) {
-      router.back();
-    } else {
-      router.push("/raftaar-films");
-    }
-  };
-
   if (!currentEpisode) {
     return (
       <div className="min-h-screen bg-black flex flex-col items-center justify-center text-white p-4">
         <h2 className="text-xl font-bold mb-2">Episode not found</h2>
         <div className="flex gap-3">
           <button
+            type="button"
             onClick={handleBack}
-            className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-bold text-white hover:bg-white/20 transition"
+            className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-bold text-white hover:bg-white/20 transition cursor-pointer"
           >
             ← Go Back
           </button>
@@ -623,11 +661,12 @@ export default function FilmPlayerContent({
                 </p>
                 {nextEpisode && (
                   <button
+                    type="button"
                     onClick={(e) => {
                       e.stopPropagation();
                       goToNext();
                     }}
-                    className="mt-2 rounded-xl rf-btn-3d-lux px-4 py-2 text-xs font-bold text-white hover:brightness-110 transition"
+                    className="mt-2 rounded-xl rf-btn-3d-lux px-4 py-2 text-xs font-bold text-white hover:brightness-110 transition cursor-pointer"
                   >
                     Play Next Episode →
                   </button>
@@ -676,20 +715,27 @@ export default function FilmPlayerContent({
           </div>
         )}
 
-        {/* Top Header - with safe area padding to ensure notch/status bar never cuts off header */}
-        <div className="absolute top-0 w-full pt-[max(1rem,env(safe-area-inset-top,16px))] px-4 pb-3 flex items-center justify-between z-30 bg-gradient-to-b from-black/85 via-black/40 to-transparent">
+        {/* Top Header - Stop propagation on touches so header buttons never trigger vertical swipe */}
+        <div
+          className="absolute top-0 w-full pt-[max(1rem,env(safe-area-inset-top,16px))] px-4 pb-3 flex items-center justify-between z-30 bg-gradient-to-b from-black/85 via-black/40 to-transparent"
+          onTouchStart={(e) => e.stopPropagation()}
+          onTouchEnd={(e) => e.stopPropagation()}
+        >
+          {/* Back Button - Goes to Series Detail or Raftaar Films Explore */}
           <button
+            type="button"
             onClick={handleBack}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-black/45 border border-white/15 text-white backdrop-blur-md hover:bg-white/15 hover:scale-105 active:scale-95 transition-all shadow-lg"
-            aria-label="Back"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-black/55 border border-white/20 text-white backdrop-blur-md hover:bg-white/20 hover:scale-105 active:scale-95 transition-all shadow-lg cursor-pointer z-40"
+            aria-label="Back to series"
           >
             <ChevronLeft size={20} />
           </button>
 
           {/* Episode selector trigger */}
           <button
+            type="button"
             onClick={() => setShowEpisodesList(true)}
-            className="flex flex-col items-center flex-1 mx-3 min-w-0"
+            className="flex flex-col items-center flex-1 mx-3 min-w-0 cursor-pointer"
           >
             <span className="text-xs font-bold opacity-90 line-clamp-1 drop-shadow-md text-slate-100">
               {series.title}
@@ -706,11 +752,12 @@ export default function FilmPlayerContent({
 
           {/* Mute / Unmute Toggle */}
           <button
+            type="button"
             onClick={toggleMute}
-            className={`flex h-9 w-9 items-center justify-center rounded-full border backdrop-blur-md hover:scale-105 active:scale-95 transition-all shadow-lg ${
+            className={`flex h-9 w-9 items-center justify-center rounded-full border backdrop-blur-md hover:scale-105 active:scale-95 transition-all shadow-lg cursor-pointer z-40 ${
               isMuted
                 ? "bg-red-500/25 border-red-500/50 text-red-300"
-                : "bg-black/45 border-white/15 text-white hover:bg-white/15"
+                : "bg-black/55 border-white/20 text-white hover:bg-white/20"
             }`}
             aria-label={isMuted ? "Unmute" : "Mute"}
           >
@@ -719,12 +766,17 @@ export default function FilmPlayerContent({
         </div>
 
         {/* Right Action Rail (3D luxury glass buttons) */}
-        <div className="absolute right-3.5 bottom-28 flex flex-col items-center gap-4 z-30">
+        <div
+          className="absolute right-3.5 bottom-28 flex flex-col items-center gap-4 z-30"
+          onTouchStart={(e) => e.stopPropagation()}
+          onTouchEnd={(e) => e.stopPropagation()}
+        >
           {/* Like Button */}
           <div className="flex flex-col items-center gap-1">
             <button
+              type="button"
               onClick={handleLike}
-              className={`flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-xl border transition-all duration-200 hover:scale-110 active:scale-90 shadow-xl ${
+              className={`flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-xl border transition-all duration-200 hover:scale-110 active:scale-90 shadow-xl cursor-pointer ${
                 isLiked
                   ? "bg-red-500/30 border-red-500 text-red-400 shadow-[0_0_20px_rgba(239,68,68,0.5)]"
                   : "bg-black/45 border-white/20 text-white hover:border-white/40 shadow-black/80"
@@ -744,8 +796,9 @@ export default function FilmPlayerContent({
           {/* Comment Button */}
           <div className="flex flex-col items-center gap-1">
             <button
+              type="button"
               onClick={() => setShowComments(true)}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-black/45 border border-white/20 text-white backdrop-blur-xl hover:border-amber-400/60 hover:scale-110 active:scale-90 transition-all duration-200 shadow-xl shadow-black/80"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-black/45 border border-white/20 text-white backdrop-blur-xl hover:border-amber-400/60 hover:scale-110 active:scale-90 transition-all duration-200 shadow-xl shadow-black/80 cursor-pointer"
               aria-label="View comments"
             >
               <MessageCircle size={20} />
@@ -758,8 +811,9 @@ export default function FilmPlayerContent({
           {/* Save / Bookmark Button */}
           <div className="flex flex-col items-center gap-1">
             <button
+              type="button"
               onClick={handleSave}
-              className={`flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-xl border transition-all duration-200 hover:scale-110 active:scale-90 shadow-xl ${
+              className={`flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-xl border transition-all duration-200 hover:scale-110 active:scale-90 shadow-xl cursor-pointer ${
                 isSaved
                   ? "bg-amber-500/30 border-amber-500 text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.5)]"
                   : "bg-black/45 border-white/20 text-white hover:border-white/40 shadow-black/80"
@@ -779,8 +833,9 @@ export default function FilmPlayerContent({
           {/* Share Button */}
           <div className="flex flex-col items-center gap-1">
             <button
+              type="button"
               onClick={handleShare}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-black/45 border border-white/20 text-white backdrop-blur-xl hover:border-amber-400/60 hover:scale-110 active:scale-90 transition-all duration-200 shadow-xl shadow-black/80"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-black/45 border border-white/20 text-white backdrop-blur-xl hover:border-amber-400/60 hover:scale-110 active:scale-90 transition-all duration-200 shadow-xl shadow-black/80 cursor-pointer"
               aria-label="Share episode"
             >
               <Share2 size={19} />
@@ -791,19 +846,26 @@ export default function FilmPlayerContent({
           </div>
         </div>
 
-        {/* Bottom Info Overlay */}
-        <div className="absolute bottom-0 w-full bg-gradient-to-t from-black via-black/75 to-transparent p-4 pb-6 z-20 pointer-events-auto">
+        {/* Bottom Info Overlay - Isolated from swipe touches */}
+        <div
+          className="absolute bottom-0 w-full bg-gradient-to-t from-black via-black/75 to-transparent p-4 pb-6 z-20 pointer-events-auto"
+          onTouchStart={(e) => e.stopPropagation()}
+          onTouchEnd={(e) => e.stopPropagation()}
+        >
           {/* Creator Profile Row - With pr-20 constraint so In-Family button NEVER overlaps the right action rail */}
           <div className="flex items-center gap-3 mb-2.5 pr-20 max-w-[calc(100%-60px)]">
+            {/* Clickable Creator Avatar: Opens /my-videos?tab=raftaar-films for creator, /u/[username] for viewers */}
             <Link
-              href={
-                series.creatorHandle
-                  ? `/u/${series.creatorHandle}`
-                  : `/raftaar-films?creatorId=${series.creatorId}`
+              href={creatorProfileUrl}
+              onClick={(e) => e.stopPropagation()}
+              className="relative flex-shrink-0 group/avatar cursor-pointer"
+              title={
+                isOwner
+                  ? "Open Your Channel Raftaar Films Studio"
+                  : `View ${series.creatorName || "Creator"}'s channel`
               }
-              className="relative flex-shrink-0 group/avatar"
             >
-              <div className="h-10 w-10 rounded-full overflow-hidden bg-zinc-800 border-2 border-orange-500/50 p-0.5 shadow-lg shadow-orange-500/20 group-hover/avatar:scale-105 transition-transform">
+              <div className="h-10 w-10 rounded-full overflow-hidden bg-zinc-800 border-2 border-orange-500/50 p-0.5 shadow-lg shadow-orange-500/20 group-hover/avatar:scale-105 group-hover/avatar:border-orange-400 transition-all">
                 <img
                   src={
                     series.creatorAvatarUrl ||
@@ -824,37 +886,57 @@ export default function FilmPlayerContent({
 
             <div className="min-w-0 flex flex-col justify-center">
               <div className="flex items-center gap-2 flex-wrap">
-                <p className="text-xs font-bold leading-tight drop-shadow-md truncate text-white">
-                  {series.creatorName || "Creator"}
-                </p>
-
-                {/* In-Family Button (Safely placed beside name, renamed from Follow/Subscribe) */}
-                <button
-                  onClick={handleFollow}
-                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold tracking-wide transition-all shadow-md active:scale-95 ${
-                    isFollowing
-                      ? "bg-white/20 text-slate-200 border border-white/30 backdrop-blur-md hover:bg-white/30"
-                      : "rf-btn-3d-lux text-white shadow-orange-500/40"
-                  }`}
-                  aria-label={isFollowing ? "Leave In-Family" : "Join In-Family"}
+                {/* Clickable Creator Name */}
+                <Link
+                  href={creatorProfileUrl}
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex items-center gap-1.5 hover:text-orange-300 transition-colors cursor-pointer"
                 >
-                  {isFollowing ? (
-                    <>
-                      <Check size={11} className="text-emerald-400 stroke-[3]" />
-                      <span>In-Family</span>
-                    </>
-                  ) : (
-                    <>
-                      <Plus size={11} className="stroke-[3]" />
-                      <span>In-Family</span>
-                    </>
+                  <p className="text-xs font-bold leading-tight drop-shadow-md truncate text-white">
+                    {series.creatorName || "Creator"}
+                  </p>
+                  {isOwner && (
+                    <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-orange-500/25 text-orange-300 border border-orange-500/40">
+                      You
+                    </span>
                   )}
-                </button>
+                </Link>
+
+                {/* In-Family Button (Safely placed beside name; hidden if viewing own series) */}
+                {!isOwner && (
+                  <button
+                    type="button"
+                    onClick={handleFollow}
+                    className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold tracking-wide transition-all shadow-md active:scale-95 cursor-pointer ${
+                      isFollowing
+                        ? "bg-white/20 text-slate-200 border border-white/30 backdrop-blur-md hover:bg-white/30"
+                        : "rf-btn-3d-lux text-white shadow-orange-500/40"
+                    }`}
+                    aria-label={isFollowing ? "Leave In-Family" : "Join In-Family"}
+                  >
+                    {isFollowing ? (
+                      <>
+                        <Check size={11} className="text-emerald-400 stroke-[3]" />
+                        <span>In-Family</span>
+                      </>
+                    ) : (
+                      <>
+                        <Plus size={11} className="stroke-[3]" />
+                        <span>In-Family</span>
+                      </>
+                    )}
+                  </button>
+                )}
               </div>
 
-              <p className="text-[10px] text-orange-200/90 drop-shadow truncate mt-0.5">
-                @{series.creatorHandle || "creator"}
-              </p>
+              {/* Clickable Creator Handle */}
+              <Link
+                href={creatorProfileUrl}
+                onClick={(e) => e.stopPropagation()}
+                className="text-[10px] text-orange-200/90 drop-shadow truncate mt-0.5 hover:underline cursor-pointer"
+              >
+                @{cleanHandle || "creator"}
+              </Link>
             </div>
           </div>
 
@@ -901,8 +983,9 @@ export default function FilmPlayerContent({
                   </p>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setShowEpisodesList(false)}
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-slate-300 hover:text-white transition"
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-slate-300 hover:text-white transition cursor-pointer"
                   aria-label="Close episode selector"
                 >
                   <X size={18} />
@@ -997,8 +1080,9 @@ export default function FilmPlayerContent({
                   </p>
                 </div>
                 <button
+                  type="button"
                   onClick={() => setShowComments(false)}
-                  className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-slate-300 hover:text-white transition"
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-slate-300 hover:text-white transition cursor-pointer"
                   aria-label="Close comments"
                 >
                   <X size={18} />

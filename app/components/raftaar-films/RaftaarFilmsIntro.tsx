@@ -18,32 +18,39 @@ export default function RaftaarFilmsIntro({ onComplete }: Props) {
 
   return (
     <div className={`rf-intro-overlay${exiting ? ' rf-intro-exiting' : ''}`}>
-      {/* Ambient orbs */}
-      <div
-        className="rf-intro-bg-orb"
-        style={{
-          width: '60vw', height: '60vw',
-          background: 'radial-gradient(circle, #FF7A18 0%, transparent 70%)',
-          top: '-20%', left: '-20%', animationDelay: '0s',
-        }}
-      />
-      <div
-        className="rf-intro-bg-orb"
-        style={{
-          width: '50vw', height: '50vw',
-          background: 'radial-gradient(circle, #FF4500 0%, transparent 70%)',
-          bottom: '-15%', right: '-15%', animationDelay: '1.5s',
-        }}
-      />
+      {/* Dynamic Morphing Liquid Glass Orbs */}
+      <div className="rf-intro-bg-orb-1" />
+      <div className="rf-intro-bg-orb-2" />
+      <div className="rf-intro-bg-orb-3" />
 
-      {/* Logo container */}
-      <div style={{ position: 'relative', textAlign: 'center', padding: '0 2rem' }}>
-        <div className="rf-intro-beam" />
-        <div className="rf-intro-logo">
+      {/* Floating 3D Liquid Glass Shield */}
+      <div className="rf-glass-shield">
+        {/* Specular Light Sweep */}
+        <div className="rf-glass-sweep-shine" />
+
+        {/* 3D Molten Typography */}
+        <h1 className="rf-intro-logo">
           Raftaar Films
+        </h1>
+
+        {/* Frosted Glass Badge */}
+        <div className="rf-intro-subtitle-pill">
+          <span className="rf-intro-pill-dot" />
+          <span>BY INPLAYER</span>
         </div>
-        <div className="rf-intro-subtitle">by InPlayer</div>
-        <div className="rf-intro-line" />
+
+        {/* Film / Sound Wave Rhythm Bars */}
+        <div className="rf-intro-wave-container">
+          {[0.2, 0.45, 0.7, 0.9, 0.6, 0.35, 0.15].map((delay, idx) => (
+            <div
+              key={idx}
+              className="rf-intro-wave-bar"
+              style={{
+                animation: `rf-wave-bar 1.2s ease-in-out ${delay}s infinite`,
+              }}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );

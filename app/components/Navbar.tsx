@@ -17,13 +17,9 @@ import MobileSearchOverlay from "./MobileSearchOverlay";
 import { useRouter, usePathname } from "next/navigation";
 import { CONTACT_EMAILS } from "@/app/lib/contactEmails";
 import { getSiteDomain } from "@/app/lib/siteDomain";
-import RaftaarFilmsIntro from "@/app/components/raftaar-films/RaftaarFilmsIntro";
-
-
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [rfIntroActive, setRfIntroActive] = useState(false);
   const pathname = usePathname();
   // Which panel we're on (inplayer / hammart / sponsorship) — drives the
   // hamburger "Support" entry below, which every panel except Hammart gets.
@@ -219,14 +215,6 @@ export default function Navbar() {
 
   return (
     <>
-      {rfIntroActive && (
-        <RaftaarFilmsIntro
-          onComplete={() => {
-            setRfIntroActive(false);
-            goTo("/raftaar-films");
-          }}
-        />
-      )}
       <header
         className="
           relative
@@ -704,10 +692,7 @@ lg:right-auto
               </button>
 
               <button
-                onClick={() => {
-                  setMenuOpen(false);
-                  setRfIntroActive(true);
-                }}
+                onClick={() => goTo("/raftaar-films?intro=1")}
                 className="
                   flex
                   w-full

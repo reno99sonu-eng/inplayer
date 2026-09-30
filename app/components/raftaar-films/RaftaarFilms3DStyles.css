@@ -50,72 +50,179 @@
   to   { opacity: 1; transform: perspective(900px) translateY(0) rotateX(0deg); }
 }
 
-/* ─────────── INTRO OVERLAY ─────────── */
+/* ─────────── LIQUID GLASS 3D INTRO ─────────── */
+@keyframes rf-liquid-morph-1 {
+  0%   { border-radius: 42% 58% 70% 30% / 45% 45% 55% 55%; transform: translate(0, 0) rotate(0deg) scale(1); }
+  33%  { border-radius: 60% 40% 30% 70% / 60% 30% 70% 40%; transform: translate(30px, -25px) rotate(120deg) scale(1.12); }
+  66%  { border-radius: 30% 70% 50% 50% / 30% 65% 35% 70%; transform: translate(-25px, 20px) rotate(240deg) scale(0.96); }
+  100% { border-radius: 42% 58% 70% 30% / 45% 45% 55% 55%; transform: translate(0, 0) rotate(360deg) scale(1); }
+}
+
+@keyframes rf-liquid-morph-2 {
+  0%   { border-radius: 55% 45% 40% 60% / 50% 60% 40% 50%; transform: translate(0, 0) rotate(0deg) scale(1); }
+  50%  { border-radius: 35% 65% 60% 40% / 65% 35% 65% 35%; transform: translate(-35px, 25px) rotate(-180deg) scale(1.18); }
+  100% { border-radius: 55% 45% 40% 60% / 50% 60% 40% 50%; transform: translate(0, 0) rotate(-360deg) scale(1); }
+}
+
+@keyframes rf-glass-float {
+  0%   { transform: perspective(1200px) rotateX(4deg) rotateY(-4deg) translateY(0); }
+  50%  { transform: perspective(1200px) rotateX(-2deg) rotateY(3deg) translateY(-12px); }
+  100% { transform: perspective(1200px) rotateX(4deg) rotateY(-4deg) translateY(0); }
+}
+
+@keyframes rf-glass-sweep {
+  0%   { transform: translateX(-150%) skewX(-25deg); opacity: 0; }
+  20%  { opacity: 0.9; }
+  80%  { opacity: 0.9; }
+  100% { transform: translateX(250%) skewX(-25deg); opacity: 0; }
+}
+
+@keyframes rf-wave-bar {
+  0%, 100% { height: 6px; opacity: 0.4; }
+  50%      { height: 28px; opacity: 1; }
+}
+
 .rf-intro-overlay {
   position: fixed;
   inset: 0;
   z-index: 9999;
-  background: #08080f;
+  background: radial-gradient(circle at 50% 50%, #0a0b16 0%, #040407 100%);
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
   overflow: hidden;
+  backdrop-filter: blur(20px);
 }
 
 .rf-intro-overlay.rf-intro-exiting {
-  animation: rf-exit 0.6s ease forwards;
+  animation: rf-exit 0.65s cubic-bezier(0.4, 0, 0.2, 1) forwards;
 }
 
-.rf-intro-bg-orb {
+.rf-intro-bg-orb-1 {
   position: absolute;
-  border-radius: 50%;
-  filter: blur(80px);
-  animation: rf-glow-pulse 3s ease-in-out infinite;
+  width: 520px;
+  height: 520px;
+  background: radial-gradient(circle, rgba(255, 122, 24, 0.45) 0%, rgba(255, 69, 0, 0.25) 45%, transparent 75%);
+  filter: blur(60px);
+  top: -10%;
+  left: 10%;
+  animation: rf-liquid-morph-1 12s ease-in-out infinite;
+}
+
+.rf-intro-bg-orb-2 {
+  position: absolute;
+  width: 480px;
+  height: 480px;
+  background: radial-gradient(circle, rgba(255, 174, 0, 0.4) 0%, rgba(255, 61, 0, 0.2) 50%, transparent 75%);
+  filter: blur(65px);
+  bottom: -5%;
+  right: 15%;
+  animation: rf-liquid-morph-2 14s ease-in-out infinite;
+}
+
+.rf-intro-bg-orb-3 {
+  position: absolute;
+  width: 320px;
+  height: 320px;
+  background: radial-gradient(circle, rgba(255, 215, 0, 0.3) 0%, transparent 70%);
+  filter: blur(50px);
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  animation: rf-glow-pulse 4s ease-in-out infinite;
+}
+
+.rf-glass-shield {
+  position: relative;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.02) 60%, rgba(0, 0, 0, 0.45) 100%);
+  backdrop-filter: blur(35px) saturate(220%);
+  -webkit-backdrop-filter: blur(35px) saturate(220%);
+  border: 1.5px solid rgba(255, 255, 255, 0.22);
+  border-radius: 36px;
+  padding: 3.5rem 4.5rem;
+  box-shadow:
+    0 40px 100px -20px rgba(0, 0, 0, 0.9),
+    0 0 60px rgba(255, 122, 24, 0.3),
+    inset 0 1.5px 2px rgba(255, 255, 255, 0.45),
+    inset 0 -1.5px 2px rgba(0, 0, 0, 0.6);
+  transform-style: preserve-3d;
+  animation: rf-logo-enter 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards,
+             rf-glass-float 5s ease-in-out 0.9s infinite;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow: hidden;
+}
+
+.rf-glass-sweep-shine {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 45%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.4), rgba(255, 255, 255, 0.22), transparent);
+  pointer-events: none;
+  animation: rf-glass-sweep 2.2s cubic-bezier(0.4, 0, 0.2, 1) 0.5s infinite;
 }
 
 .rf-intro-logo {
   position: relative;
-  font-size: clamp(2.5rem, 8vw, 6rem);
+  font-size: clamp(2.5rem, 8vw, 5.5rem);
   font-weight: 900;
-  letter-spacing: -0.03em;
-  line-height: 1;
-  background: linear-gradient(135deg, #FF7A18 0%, #FFD700 40%, #FF4500 70%, #FF9A00 100%);
+  letter-spacing: -0.04em;
+  line-height: 1.05;
+  background: linear-gradient(135deg, #FF6B00 0%, #FFA800 25%, #FFF099 48%, #FF3D00 75%, #FF8C00 100%);
   background-size: 300% 300%;
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
-  animation: rf-logo-enter 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards,
-             rf-liquid 4s ease infinite;
-  opacity: 0;
+  animation: rf-liquid 3.5s ease infinite;
+  text-shadow: 0 10px 30px rgba(255, 107, 0, 0.3);
+  filter: drop-shadow(0 4px 20px rgba(255, 122, 24, 0.45));
 }
 
-.rf-intro-beam {
-  position: absolute;
-  top: 0;
-  width: 25%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
-  transform: skewX(-15deg);
-  animation: rf-beam 1.8s ease 0.4s forwards;
-}
-
-.rf-intro-subtitle {
-  margin-top: 1rem;
-  font-size: clamp(0.9rem, 2.5vw, 1.25rem);
-  color: rgba(255,255,255,0.55);
-  letter-spacing: 0.25em;
+.rf-intro-subtitle-pill {
+  margin-top: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 1.2rem;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  backdrop-filter: blur(16px);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.85rem;
+  letter-spacing: 0.28em;
   text-transform: uppercase;
-  font-weight: 600;
-  animation: rf-rise 0.7s ease 0.8s both;
+  font-weight: 700;
+  animation: rf-rise 0.7s ease 0.6s both;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
 }
 
-.rf-intro-line {
-  margin-top: 2rem;
-  width: 120px;
-  height: 2px;
-  background: linear-gradient(90deg, transparent, #FF7A18, transparent);
-  animation: rf-rise 0.5s ease 1.2s both;
+.rf-intro-pill-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #FF7A18;
+  box-shadow: 0 0 10px #FF7A18, 0 0 20px #FF7A18;
+  animation: rf-glow-pulse 1.5s ease-in-out infinite;
+}
+
+.rf-intro-wave-container {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 1.5rem;
+  height: 28px;
+}
+
+.rf-intro-wave-bar {
+  width: 3.5px;
+  background: linear-gradient(180deg, #FFA800, #FF3D00);
+  border-radius: 4px;
+  box-shadow: 0 0 8px rgba(255, 122, 24, 0.5);
 }
 
 /* ─────────── CARD 3D ─────────── */

@@ -192,19 +192,9 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                     _buildMenuItem(
                       icon: Icons.movie_filter_outlined,
                       title: 'Raftaar Films',
-                      onTap: () async {
+                      onTap: () {
                         Navigator.pop(context);
-                        await showGeneralDialog(
-                          context: context,
-                          barrierDismissible: false,
-                          barrierColor: Colors.transparent,
-                          pageBuilder: (ctx, _, __) => RaftaarFilmsIntroAnimation(
-                            onComplete: () {
-                              Navigator.of(ctx).pop();
-                              context.push('/raftaar-films');
-                            },
-                          ),
-                        );
+                        context.push('/raftaar-films?intro=true');
                       },
                     ),
                     _buildMenuItem(

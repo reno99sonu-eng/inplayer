@@ -261,7 +261,10 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/raftaar-films',
         name: 'raftaar-films',
-        builder: (context, state) => const RaftaarFilmsLandingPage(),
+        builder: (context, state) {
+          final showIntro = state.uri.queryParameters['intro'] == 'true';
+          return RaftaarFilmsLandingPage(showIntro: showIntro);
+        },
       ),
       GoRoute(
         path: '/raftaar-films/apply',

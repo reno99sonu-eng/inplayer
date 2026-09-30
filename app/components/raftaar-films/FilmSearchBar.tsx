@@ -52,14 +52,14 @@ export default function FilmSearchBar({ value, onChange, placeholder = "Search f
 
   return (
     <div className="relative w-full max-w-2xl mx-auto group">
-      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-        <Search className="h-5 w-5 text-zinc-400 group-focus-within:text-orange-500 transition-colors" />
+      <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none z-10">
+        <Search className="h-5 w-5 text-zinc-400 group-focus-within:text-orange-400 transition-colors" />
       </div>
       <input
         type="text"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="block w-full pl-11 pr-24 py-3 sm:text-sm bg-zinc-800/80 border border-zinc-700/50 rounded-full text-white placeholder-zinc-400 focus:ring-2 focus:ring-orange-500 focus:border-transparent backdrop-blur-sm transition-all shadow-lg"
+        className="block w-full pl-12 pr-24 py-3.5 sm:text-sm bg-white/[0.07] hover:bg-white/[0.1] focus:bg-white/[0.12] border-0 outline-none rounded-full text-white placeholder-zinc-400 focus:ring-2 focus:ring-orange-500/60 backdrop-blur-2xl transition-all duration-300 shadow-[0_8px_30px_rgba(0,0,0,0.5)]"
         placeholder={placeholder}
       />
       <div className="absolute inset-y-0 right-0 flex items-center pr-2 space-x-1">

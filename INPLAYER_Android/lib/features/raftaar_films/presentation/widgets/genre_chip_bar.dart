@@ -18,9 +18,10 @@ class GenreChipBar extends StatelessWidget {
     final isDark = context.isDark;
 
     return SizedBox(
-      height: 40,
+      height: 50,
       child: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        clipBehavior: Clip.none,
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
         scrollDirection: Axis.horizontal,
         itemCount: genres.length,
         separatorBuilder: (context, index) => const SizedBox(width: 8),
@@ -32,7 +33,9 @@ class GenreChipBar extends StatelessWidget {
             onTap: () => onSelectGenre(genre),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              height: 38,
+              padding: const EdgeInsets.symmetric(horizontal: 18),
+              alignment: Alignment.center,
               decoration: BoxDecoration(
                 gradient: isSelected
                     ? const LinearGradient(

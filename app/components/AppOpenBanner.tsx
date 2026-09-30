@@ -58,7 +58,15 @@ export default function AppOpenBanner({
   // instant it's tapped, without waiting on a re-render to re-read storage.
   const [justDismissed, setJustDismissed] = useState(false);
 
-  if (!isAndroidMobile || storedDismissed || justDismissed) return null;
+  if (
+    !isAndroidMobile ||
+    storedDismissed ||
+    justDismissed ||
+    pathname?.startsWith("/raftaar-films") ||
+    pathname?.startsWith("/admin")
+  ) {
+    return null;
+  }
 
   function dismiss() {
     setJustDismissed(true);

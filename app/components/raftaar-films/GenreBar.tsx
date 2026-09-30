@@ -41,10 +41,10 @@ export default function GenreBar({ selectedGenre, onSelectGenre }: GenreBarProps
   const genres = ['All', ...FILM_GENRES];
 
   return (
-    <div className="w-full relative overflow-hidden py-4">
+    <div className="w-full relative py-1">
       <div 
         ref={scrollRef}
-        className="flex space-x-3 overflow-x-auto scrollbar-hide px-4 md:px-8 cursor-grab active:cursor-grabbing snap-x"
+        className="flex items-center space-x-3 overflow-x-auto scrollbar-hide px-4 md:px-8 py-3.5 cursor-grab active:cursor-grabbing snap-x"
         onMouseDown={onMouseDown}
         onMouseLeave={onMouseLeave}
         onMouseUp={onMouseUp}

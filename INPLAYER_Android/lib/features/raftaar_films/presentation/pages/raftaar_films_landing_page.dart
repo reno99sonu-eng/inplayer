@@ -11,9 +11,11 @@ import '../widgets/genre_chip_bar.dart';
 import '../widgets/film_search_bar.dart';
 import '../widgets/creator_stories_strip.dart';
 import '../widgets/series_card_widget.dart';
+import '../widgets/raftaar_films_intro_animation.dart';
 
 class RaftaarFilmsLandingPage extends ConsumerStatefulWidget {
-  const RaftaarFilmsLandingPage({super.key});
+  final bool showIntro;
+  const RaftaarFilmsLandingPage({super.key, this.showIntro = false});
 
   @override
   ConsumerState<RaftaarFilmsLandingPage> createState() =>
@@ -24,6 +26,7 @@ class _RaftaarFilmsLandingPageState
     extends ConsumerState<RaftaarFilmsLandingPage> {
   final TextEditingController _searchController = TextEditingController();
 
+  late bool _introActive;
   List<FilmSeries> _allSeries = [];
   List<FilmSeries> _filteredSeries = [];
   List<String> _genres = ['All'];
@@ -34,6 +37,7 @@ class _RaftaarFilmsLandingPageState
   @override
   void initState() {
     super.initState();
+    _introActive = widget.showIntro;
     _loadData();
   }
 
@@ -129,7 +133,7 @@ class _RaftaarFilmsLandingPageState
     final isDark = context.isDark;
     final creators = _extractCreators();
 
-    return Scaffold(
+    final scaffold = Scaffold(
       backgroundColor: isDark ? const Color(0xFF0F0F13) : Colors.white,
       appBar: AppBar(
         backgroundColor: isDark ? const Color(0xFF0F0F13) : Colors.white,
@@ -450,6 +454,23 @@ class _RaftaarFilmsLandingPageState
           ),
         ),
       ),
+    );
+
+    if (!_introActive) {
+      return scaffold;
+    }
+
+    return Stack(
+      children: [
+        scaffold,
+        RaftaarFilmsIntroAnimation(
+          onComplete: () {
+            if (mounted) {
+              setState(() => _introActive = false);
+            }
+          },
+        ),
+      ],
     );
   }
 }

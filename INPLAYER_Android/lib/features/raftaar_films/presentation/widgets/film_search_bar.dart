@@ -86,17 +86,15 @@ class _FilmSearchBarState extends State<FilmSearchBar> {
       width: double.infinity,
         decoration: BoxDecoration(
           color: isDark
-              ? Colors.white.withValues(alpha: 0.07)
-              : Colors.black.withValues(alpha: 0.04),
+              ? Colors.white.withValues(alpha: 0.08)
+              : Colors.black.withValues(alpha: 0.05),
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: _isListening
-                ? const Color(0xFFFF7A18)
-                : (isDark
-                    ? Colors.white.withValues(alpha: 0.12)
-                    : Colors.black.withValues(alpha: 0.08)),
-            width: _isListening ? 1.5 : 1.0,
-          ),
+          border: _isListening
+              ? Border.all(
+                  color: const Color(0xFFFF7A18),
+                  width: 1.5,
+                )
+              : null,
           boxShadow: _isListening
               ? [
                   BoxShadow(

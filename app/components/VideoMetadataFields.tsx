@@ -488,7 +488,7 @@ export default function VideoMetadataFields({
             <label className="mb-1 block text-xs font-bold text-slate-300 light:text-slate-700">
               Audience
             </label>
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-2 gap-1.5">
               {AUDIENCE_OPTIONS.map((option) => (
                 <button
                   key={option.value}
@@ -506,11 +506,9 @@ export default function VideoMetadataFields({
               ))}
             </div>
             <p className="mt-1 text-[10px] leading-4 text-slate-500">
-              {value.audience === "adult"
-                ? "Only viewers who have unlocked 18+ content in their settings will see this anywhere on InPlayer."
-                : value.audience === "kids"
-                  ? "Appears normally, and also in the Kids row for viewers in Kids-only mode."
-                  : "Visible to everyone except viewers in Kids-only mode."}
+              {value.audience === "kids"
+                ? "Appears normally, and also in the Kids row for viewers in Kids-only mode."
+                : "Visible to everyone except viewers in Kids-only mode."}
             </p>
           </div>
 

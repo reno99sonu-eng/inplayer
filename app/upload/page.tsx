@@ -61,9 +61,9 @@ export default function UploadPage() {
 
   // YouTube-style upload options.
   const [visibility, setVisibility] = useState<Visibility>("public");
-  // One 3-way choice (Everyone / Kids / 18+) replacing what used to be a
+  // One choice (Everyone / Kids) replacing what used to be a
   // separate "made for kids" picker AND a "restrict to 18+" toggle that
-  // could contradict each other. The two old booleans are still sent to
+  // could contradict each other. The old booleans are still sent to
   // the API, derived from this via audienceFlags(), so every existing
   // reader of them keeps working unchanged.
   const [audience, setAudience] = useState<VideoAudience>("everyone");
@@ -1297,29 +1297,6 @@ export default function UploadPage() {
                   </div>
                   <p className="mt-0.5 text-xs text-slate-300 light:text-slate-600">
                     Safe for children and family. Visible when viewers browse in Kids mode.
-                  </p>
-                </div>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => handleConfirmAudienceAndUpload("adult")}
-                className="group w-full flex items-start gap-3.5 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-left transition-all hover:border-amber-400 hover:bg-amber-500/20 active:scale-[0.99]"
-              >
-                <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-2xl">
-                  🔞
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-bold text-white group-hover:text-amber-300 light:text-slate-900">
-                      18+
-                    </p>
-                    <span className="rounded-md bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-400">
-                      Mature / Adults
-                    </span>
-                  </div>
-                  <p className="mt-0.5 text-xs text-slate-300 light:text-slate-600">
-                    Contains mature or adult themes. Filtered across the platform and only visible to viewers who unlocked 18+ mode.
                   </p>
                 </div>
               </button>

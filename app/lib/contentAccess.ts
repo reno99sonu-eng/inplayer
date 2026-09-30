@@ -175,7 +175,6 @@ export const AUDIENCE_OPTIONS: {
 }[] = [
   { value: "everyone", label: "Everyone", hint: "Shown to all viewers" },
   { value: "kids", label: "Kids", hint: "Also appears in the Kids row" },
-  { value: "adult", label: "18+", hint: "Hidden unless 18+ is unlocked" },
 ];
 
 /** Human-readable label for the current mode, shown in Settings. */

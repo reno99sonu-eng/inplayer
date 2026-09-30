@@ -93,7 +93,7 @@ export async function POST(request: NextRequest) {
       description: description ? description.trim() : "",
       genre,
       categories: categories || [genre],
-      posterUrl: posterUrl || "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=600",
+      posterUrl: posterUrl || "",
       bannerUrl: bannerUrl || undefined,
       visibility: visibility || "public",
       audience: audience || "everyone",

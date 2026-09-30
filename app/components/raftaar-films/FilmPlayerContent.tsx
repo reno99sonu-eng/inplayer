@@ -326,16 +326,34 @@ export default function FilmPlayerContent({
     }
   };
 
+  const handleBack = () => {
+    if (series?.seriesId) {
+      router.push(`/raftaar-films/${series.seriesId}`);
+    } else if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+    } else {
+      router.push("/raftaar-films");
+    }
+  };
+
   if (!currentEpisode) {
     return (
       <div className="min-h-screen bg-black flex flex-col items-center justify-center text-white p-4">
         <h2 className="text-xl font-bold mb-2">Episode not found</h2>
-        <Link
-          href={`/raftaar-films/${series.seriesId}`}
-          className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-bold text-white hover:bg-orange-600"
-        >
-          Back to Series
-        </Link>
+        <div className="flex gap-3">
+          <button
+            onClick={handleBack}
+            className="rounded-xl border border-white/20 bg-white/10 px-4 py-2 text-sm font-bold text-white hover:bg-white/20 transition"
+          >
+            ← Go Back
+          </button>
+          <Link
+            href={series?.seriesId ? `/raftaar-films/${series.seriesId}` : "/raftaar-films"}
+            className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-bold text-white hover:bg-orange-600 transition"
+          >
+            Back to Series
+          </Link>
+        </div>
       </div>
     );
   }
@@ -458,9 +476,9 @@ export default function FilmPlayerContent({
         {/* Top Header */}
         <div className="absolute top-0 w-full p-4 flex items-center justify-between z-30 bg-gradient-to-b from-black/80 via-black/40 to-transparent">
           <button
-            onClick={() => router.push(`/raftaar-films/${series.seriesId}`)}
+            onClick={handleBack}
             className="flex h-9 w-9 items-center justify-center rounded-full bg-black/40 border border-white/10 text-white backdrop-blur-md hover:bg-white/10 transition"
-            aria-label="Back to series"
+            aria-label="Back"
           >
             <ChevronLeft size={20} />
           </button>

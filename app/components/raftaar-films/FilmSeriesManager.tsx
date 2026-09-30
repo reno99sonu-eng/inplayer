@@ -18,8 +18,10 @@ import {
   Clock,
   CheckCircle,
   AlertCircle,
+  Upload,
 } from "lucide-react";
 import { FILM_GENRES } from "@/app/lib/raftaarFilms";
+import { compressImageToThumbnail } from "@/app/lib/imageCompress";
 
 interface SeriesItem {
   seriesId: string;
@@ -63,6 +65,15 @@ export default function FilmSeriesManager() {
   const [newPosterUrl, setNewPosterUrl] = useState("");
   const [creating, setCreating] = useState(false);
   const [createError, setCreateError] = useState<string | null>(null);
+
+  // Edit series form
+  const [editingSeries, setEditingSeries] = useState<SeriesItem | null>(null);
+  const [editTitle, setEditTitle] = useState("");
+  const [editGenre, setEditGenre] = useState<string>(FILM_GENRES[0]);
+  const [editDescription, setEditDescription] = useState("");
+  const [editPosterUrl, setEditPosterUrl] = useState("");
+  const [updating, setUpdating] = useState(false);
+  const [updateError, setUpdateError] = useState<string | null>(null);
 
   const getToken = async (): Promise<string | null> => {
     try {
@@ -158,7 +169,7 @@ export default function FilmSeriesManager() {
           title: newTitle.trim(),
           genre: newGenre,
           description: newDescription.trim(),
-          posterUrl: newPosterUrl.trim() || "https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=600",
+          posterUrl: newPosterUrl.trim() || "",
           status: "published",
           visibility: "public",
           categories: [newGenre],
@@ -179,6 +190,92 @@ export default function FilmSeriesManager() {
       setCreateError(err instanceof Error ? err.message : "Something went wrong.");
     } finally {
       setCreating(false);
+    }
+  };
+
+  const handlePosterFileChange = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    isEdit = false
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const compressed = await compressImageToThumbnail(file, 9 / 16);
+      if (isEdit) {
+        setEditPosterUrl(compressed);
+      } else {
+        setNewPosterUrl(compressed);
+      }
+    } catch (err) {
+      console.error("Failed to process poster image:", err);
+    }
+  };
+
+  const handleUpdateSeries = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSeries || !editTitle.trim()) {
+      setUpdateError("Series title is required.");
+      return;
+    }
+
+    setUpdating(true);
+    setUpdateError(null);
+    try {
+      const token = await getToken();
+      if (!token) throw new Error("Please sign in.");
+
+      const res = await fetch(`/api/raftaar-films/my-series/${editingSeries.seriesId}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          title: editTitle.trim(),
+          genre: editGenre,
+          description: editDescription.trim(),
+          posterUrl: editPosterUrl.trim() || "",
+        }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        throw new Error(errData?.error || "Failed to update series.");
+      }
+
+      setSeriesList((prev) =>
+        prev.map((s) =>
+          s.seriesId === editingSeries.seriesId
+            ? {
+                ...s,
+                title: editTitle.trim(),
+                genre: editGenre,
+                description: editDescription.trim(),
+                posterUrl: editPosterUrl.trim() || s.posterUrl,
+              }
+            : s
+        )
+      );
+
+      if (selectedSeries?.seriesId === editingSeries.seriesId) {
+        setSelectedSeries((prev) =>
+          prev
+            ? {
+                ...prev,
+                title: editTitle.trim(),
+                genre: editGenre,
+                description: editDescription.trim(),
+                posterUrl: editPosterUrl.trim() || prev.posterUrl,
+              }
+            : null
+        );
+      }
+
+      setEditingSeries(null);
+    } catch (err: unknown) {
+      setUpdateError(err instanceof Error ? err.message : "Failed to update series.");
+    } finally {
+      setUpdating(false);
     }
   };
 
@@ -306,7 +403,11 @@ export default function FilmSeriesManager() {
 
         <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 rounded-2xl border border-white/10 bg-[#071120] p-4 light:border-black/10 light:bg-white">
           <img
-            src={selectedSeries.posterUrl || "/default-poster.png"}
+            src={
+              selectedSeries.posterUrl && !selectedSeries.posterUrl.includes("photo-1536440136628-849c177e76a1")
+                ? selectedSeries.posterUrl
+                : "/placeholder-vertical.svg"
+            }
             alt={selectedSeries.title}
             className="h-28 w-20 flex-shrink-0 rounded-xl object-cover ring-1 ring-white/10"
           />
@@ -322,13 +423,32 @@ export default function FilmSeriesManager() {
               {selectedSeries.episodeCount} Episodes • {selectedSeries.totalViews || 0} Total Views
             </p>
           </div>
-          <Link
-            href={`/upload?type=film&seriesId=${selectedSeries.seriesId}`}
-            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF7A18] to-[#FFD54A] px-4 py-2.5 text-xs font-bold text-white shadow transition hover:scale-105"
-          >
-            <Plus size={14} />
-            Upload Episode
-          </Link>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                setEditingSeries(selectedSeries);
+                setEditTitle(selectedSeries.title);
+                setEditGenre(selectedSeries.genre);
+                setEditDescription(selectedSeries.description || "");
+                setEditPosterUrl(
+                  selectedSeries.posterUrl && !selectedSeries.posterUrl.includes("photo-1536440136628-849c177e76a1")
+                    ? selectedSeries.posterUrl
+                    : ""
+                );
+              }}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3.5 py-2.5 text-xs font-semibold text-slate-200 hover:bg-white/10 hover:text-white transition"
+            >
+              <Edit size={14} />
+              Edit Series
+            </button>
+            <Link
+              href={`/upload?type=film&seriesId=${selectedSeries.seriesId}`}
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#FF7A18] to-[#FFD54A] px-4 py-2.5 text-xs font-bold text-white shadow transition hover:scale-105"
+            >
+              <Plus size={14} />
+              Upload Episode
+            </Link>
+          </div>
         </div>
 
         {/* Episode List */}
@@ -442,27 +562,33 @@ export default function FilmSeriesManager() {
               key={series.seriesId}
               className="flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#071120] transition hover:border-orange-400/40 light:border-black/10 light:bg-white"
             >
-              <div className="relative aspect-[16/9] w-full bg-slate-800">
-                {series.posterUrl ? (
-                  <img src={series.posterUrl} alt={series.title} className="h-full w-full object-cover" />
-                ) : (
-                  <div className="flex h-full w-full items-center justify-center text-slate-600">
-                    <Film size={32} />
+              <div className="flex gap-3.5 p-3.5 flex-1">
+                <div className="relative aspect-[9/16] w-24 flex-shrink-0 overflow-hidden rounded-xl bg-slate-800 ring-1 ring-white/10">
+                  <img
+                    src={
+                      series.posterUrl && !series.posterUrl.includes("photo-1536440136628-849c177e76a1")
+                        ? series.posterUrl
+                        : "/placeholder-vertical.svg"
+                    }
+                    alt={series.title}
+                    className="h-full w-full object-cover"
+                  />
+                  <div className="absolute top-1.5 left-1.5">
+                    <span className="rounded bg-black/75 px-1.5 py-0.5 text-[9px] font-bold text-orange-400 backdrop-blur-md">
+                      {series.genre}
+                    </span>
                   </div>
-                )}
-                <div className="absolute top-2.5 right-2.5">
-                  <span className="rounded-md bg-black/60 px-2 py-0.5 text-[10px] font-bold text-white backdrop-blur-md">
-                    {series.genre}
-                  </span>
                 </div>
-              </div>
 
-              <div className="flex-1 p-4">
-                <h3 className="font-bold text-sm text-white light:text-slate-900 line-clamp-1">{series.title}</h3>
-                <p className="mt-1 text-xs text-slate-400 line-clamp-2">{series.description || "No description provided."}</p>
-                <div className="mt-3 flex items-center justify-between text-xs text-slate-400">
-                  <span>🎬 {series.episodeCount} episodes</span>
-                  <span>👁️ {series.totalViews || 0} views</span>
+                <div className="flex-1 min-w-0 flex flex-col justify-between">
+                  <div>
+                    <h3 className="font-bold text-sm text-white light:text-slate-900 line-clamp-1">{series.title}</h3>
+                    <p className="mt-1 text-xs text-slate-400 line-clamp-2">{series.description || "No description provided."}</p>
+                  </div>
+                  <div className="mt-2 text-xs text-slate-400 space-y-0.5">
+                    <p>🎬 {series.episodeCount} episodes</p>
+                    <p>👁️ {series.totalViews || 0} views</p>
+                  </div>
                 </div>
               </div>
 
@@ -483,8 +609,24 @@ export default function FilmSeriesManager() {
                   Upload Ep
                 </Link>
                 <button
+                  onClick={() => {
+                    setEditingSeries(series);
+                    setEditTitle(series.title);
+                    setEditGenre(series.genre);
+                    setEditDescription(series.description || "");
+                    setEditPosterUrl(
+                      series.posterUrl && !series.posterUrl.includes("photo-1536440136628-849c177e76a1")
+                        ? series.posterUrl
+                        : ""
+                    );
+                  }}
+                  className="rounded-xl border border-white/10 bg-white/5 py-1.5 text-center text-[11px] font-semibold text-slate-300 hover:bg-white/10 hover:text-white transition"
+                >
+                  Edit Series
+                </button>
+                <button
                   onClick={() => handleDeleteSeries(series.seriesId)}
-                  className="col-span-2 text-center py-1.5 text-[11px] font-medium text-red-400 hover:text-red-300 transition"
+                  className="rounded-xl border border-red-500/20 bg-red-500/10 text-center py-1.5 text-[11px] font-medium text-red-400 hover:bg-red-500/20 hover:text-red-300 transition"
                 >
                   Delete Series
                 </button>
@@ -543,14 +685,51 @@ export default function FilmSeriesManager() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold mb-1">Poster Image URL (9:16 portrait)</label>
-                <input
-                  type="url"
-                  value={newPosterUrl}
-                  onChange={(e) => setNewPosterUrl(e.target.value)}
-                  placeholder="https://example.com/poster.jpg"
-                  className="w-full rounded-xl border border-white/10 bg-[#060D18] px-3 py-2 text-xs text-white outline-none focus:border-orange-400 light:border-black/10 light:bg-white light:text-slate-900"
-                />
+                <label className="block text-xs font-semibold mb-1">Series Poster (9:16 Vertical)</label>
+                <div className="flex gap-3 items-start">
+                  {newPosterUrl ? (
+                    <div className="relative aspect-[9/16] w-20 flex-shrink-0 overflow-hidden rounded-xl bg-black/40 border border-orange-500/40">
+                      <img
+                        src={newPosterUrl}
+                        alt="Poster preview"
+                        className="h-full w-full object-cover"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setNewPosterUrl("")}
+                        className="absolute top-1 right-1 rounded-full bg-black/70 p-1 text-white hover:bg-red-500"
+                        title="Remove poster"
+                      >
+                        <Trash2 size={10} />
+                      </button>
+                    </div>
+                  ) : null}
+
+                  <div className="flex-1 space-y-2">
+                    <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-white/20 bg-white/5 py-2.5 px-3 text-xs font-semibold text-slate-300 hover:border-orange-400 hover:bg-white/10 transition">
+                      <Upload size={14} className="text-orange-400" />
+                      <span>{newPosterUrl ? "Change Poster Image" : "Upload Poster Image"}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => handlePosterFileChange(e, false)}
+                      />
+                    </label>
+
+                    <input
+                      type="url"
+                      value={newPosterUrl.startsWith("data:") ? "" : newPosterUrl}
+                      onChange={(e) => setNewPosterUrl(e.target.value)}
+                      placeholder="Or paste poster image URL..."
+                      className="w-full rounded-xl border border-white/10 bg-[#060D18] px-3 py-2 text-[11px] text-white outline-none focus:border-orange-400 light:border-black/10 light:bg-white light:text-slate-900"
+                    />
+
+                    <p className="text-[10px] text-slate-400">
+                      💡 Tip: Leave blank to automatically use your first episode&apos;s thumbnail as the series poster!
+                    </p>
+                  </div>
+                </div>
               </div>
 
               <div className="mt-5 flex items-center justify-end gap-2.5 pt-2">
@@ -567,6 +746,124 @@ export default function FilmSeriesManager() {
                   className="rounded-xl bg-gradient-to-r from-[#FF7A18] to-[#FFD54A] px-5 py-2 text-xs font-bold text-white shadow disabled:opacity-50"
                 >
                   {creating ? "Creating..." : "Create Series"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Series Modal */}
+      {editingSeries && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-md rounded-3xl border border-white/15 bg-[#0B1526] p-6 shadow-2xl text-white light:border-black/15 light:bg-white light:text-slate-900">
+            <h3 className="text-lg font-bold">Edit Film Series</h3>
+            <p className="mt-1 text-xs text-slate-400">Update series title, synopsis, or poster image</p>
+
+            {updateError && <p className="mt-3 text-xs text-red-400">{updateError}</p>}
+
+            <form onSubmit={handleUpdateSeries} className="mt-4 space-y-3.5">
+              <div>
+                <label className="block text-xs font-semibold mb-1">Series Title *</label>
+                <input
+                  type="text"
+                  required
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-[#060D18] px-3 py-2 text-xs text-white outline-none focus:border-orange-400 light:border-black/10 light:bg-white light:text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1">Genre *</label>
+                <select
+                  value={editGenre}
+                  onChange={(e) => setEditGenre(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-[#060D18] px-3 py-2 text-xs text-white outline-none focus:border-orange-400 light:border-black/10 light:bg-white light:text-slate-900"
+                >
+                  {FILM_GENRES.map((g) => (
+                    <option key={g} value={g} className="bg-slate-900 text-white">
+                      {g}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1">Synopsis / Story Description</label>
+                <textarea
+                  rows={3}
+                  value={editDescription}
+                  onChange={(e) => setEditDescription(e.target.value)}
+                  placeholder="Brief synopsis of your series..."
+                  className="w-full rounded-xl border border-white/10 bg-[#060D18] px-3 py-2 text-xs text-white outline-none focus:border-orange-400 light:border-black/10 light:bg-white light:text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold mb-1">Series Poster (9:16 Vertical)</label>
+                <div className="flex gap-3 items-start">
+                  {editPosterUrl ? (
+                    <div className="relative aspect-[9/16] w-20 flex-shrink-0 overflow-hidden rounded-xl bg-black/40 border border-orange-500/40">
+                      <img
+                        src={editPosterUrl}
+                        alt="Poster preview"
+                        className="h-full w-full object-cover"
+                        onError={(e) => {
+                          const target = e.currentTarget;
+                          if (target.src !== "/placeholder-vertical.svg") {
+                            target.src = "/placeholder-vertical.svg";
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setEditPosterUrl("")}
+                        className="absolute top-1 right-1 rounded-full bg-black/70 p-1 text-white hover:bg-red-500"
+                        title="Remove poster"
+                      >
+                        <Trash2 size={10} />
+                      </button>
+                    </div>
+                  ) : null}
+
+                  <div className="flex-1 space-y-2">
+                    <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-white/20 bg-white/5 py-2.5 px-3 text-xs font-semibold text-slate-300 hover:border-orange-400 hover:bg-white/10 transition">
+                      <Upload size={14} className="text-orange-400" />
+                      <span>{editPosterUrl ? "Change Poster Image" : "Upload Poster Image"}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => handlePosterFileChange(e, true)}
+                      />
+                    </label>
+
+                    <input
+                      type="url"
+                      value={editPosterUrl.startsWith("data:") ? "" : editPosterUrl}
+                      onChange={(e) => setEditPosterUrl(e.target.value)}
+                      placeholder="Or paste poster image URL..."
+                      className="w-full rounded-xl border border-white/10 bg-[#060D18] px-3 py-2 text-[11px] text-white outline-none focus:border-orange-400 light:border-black/10 light:bg-white light:text-slate-900"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingSeries(null)}
+                  className="rounded-xl px-4 py-2 text-xs font-semibold text-slate-400 hover:text-white"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={updating}
+                  className="rounded-xl bg-gradient-to-r from-[#FF7A18] to-[#FFD54A] px-5 py-2 text-xs font-bold text-white shadow disabled:opacity-50"
+                >
+                  {updating ? "Saving..." : "Save Changes"}
                 </button>
               </div>
             </form>

@@ -1,7 +1,7 @@
 "use client";
 
 import { useRef } from "react";
-import { UploadCloud, X, Globe, Link2, Lock, Film, PlaySquare, Loader2, Sparkles } from "lucide-react";
+import { UploadCloud, X, Globe, Link2, Lock, Film, PlaySquare, Loader2, Sparkles, Check } from "lucide-react";
 import { AUDIENCE_OPTIONS, type VideoAudience } from "@/app/lib/contentAccess";
 import { THUMBNAIL_RATIO_LABEL } from "@/app/lib/contentTypes";
 
@@ -193,7 +193,7 @@ export default function VideoMetadataFields({
 
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:gap-6">
+      <div className={`grid grid-cols-1 gap-4 ${value.contentType === "film" ? "" : "lg:grid-cols-2 lg:gap-6"}`}>
         {/* SECTION 1: Details & Thumbnail — always visible, no tab to switch */}
         <div className="space-y-3.5">
           <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500 light:text-slate-400">
@@ -308,9 +308,11 @@ export default function VideoMetadataFields({
                   <p className="mb-1.5 text-[11px] font-semibold text-slate-400 light:text-slate-600">
                     🎬 Pick a thumbnail
                   </p>
-                  <div className={`grid gap-2 ${value.contentType === "short" ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-2 sm:grid-cols-4"}`}>
+                  <div className={`grid gap-2 ${value.contentType === "short" || value.contentType === "film" ? "grid-cols-2 sm:grid-cols-4" : "grid-cols-2 sm:grid-cols-4"}`}>
                     {muxFrames.map((frameUrl, idx) => {
-                      const selected = thumbnail?.previewUrl === frameUrl || thumbnail?.selectedMuxThumbnail === frameUrl;
+                      const selected =
+                        thumbnail?.selectedMuxThumbnail === frameUrl ||
+                        thumbnail?.previewUrl === frameUrl;
                       const isVertical = value.contentType === "short" || value.contentType === "film";
                       const aspectClass = isVertical ? "aspect-[9/16]" : value.contentType === "music" ? "aspect-square" : "aspect-video";
                       return (
@@ -318,13 +320,18 @@ export default function VideoMetadataFields({
                           key={idx}
                           type="button"
                           onClick={() => thumbnail?.onMuxThumbnailSelected?.(frameUrl)}
-                          className={`${aspectClass} overflow-hidden rounded-xl border transition-all ${
+                          className={`relative ${aspectClass} overflow-hidden rounded-xl border transition-all ${
                             selected
-                              ? "border-orange-500 ring-2 ring-orange-500"
+                              ? "border-orange-500 ring-4 ring-orange-500/40 scale-[1.02] shadow-lg shadow-orange-500/20"
                               : "border-white/10 hover:border-orange-400/50"
                           }`}
                         >
                           <img src={frameUrl} alt={`Frame ${idx + 1}`} className="h-full w-full object-cover" />
+                          {selected && (
+                            <div className="absolute top-1.5 right-1.5 flex h-5 w-5 items-center justify-center rounded-full bg-orange-500 text-white shadow-md">
+                              <Check size={12} strokeWidth={3} />
+                            </div>
+                          )}
                         </button>
                       );
                     })}
@@ -332,26 +339,64 @@ export default function VideoMetadataFields({
                 </div>
               )}
 
-              <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-                <div
-                  onClick={() => thumbInputRef.current?.click()}
-                  role="button"
-                  className={`group relative flex ${
-                    value.contentType === "short" || value.contentType === "film"
-                      ? "aspect-[9/16] h-28"
-                      : value.contentType === "music"
-                      ? "aspect-square h-16"
-                      : "aspect-video h-16"
-                  } cursor-pointer items-center justify-center overflow-hidden rounded-xl border border-dashed border-white/20 bg-black/20 hover:border-orange-400/50`}
-                >
-                  {thumbnail.previewUrl && (!muxFrames || !muxFrames.includes(thumbnail.previewUrl)) ? (
-                    <img src={thumbnail.previewUrl} alt="Custom" className="h-full w-full object-cover" />
-                  ) : (
-                    <div className="flex flex-col items-center gap-1 text-slate-400 px-2 text-center">
-                      <UploadCloud size={16} className="text-orange-400" />
-                      <span className="text-[10px] font-semibold leading-tight">Upload Custom</span>
+              <div className="flex flex-col sm:flex-row sm:items-start gap-3 pt-1">
+                {/* Selected Preview Box */}
+                {thumbnail.previewUrl && (
+                  <div className="flex items-start gap-3 flex-shrink-0">
+                    <div
+                      className={`relative overflow-hidden rounded-xl border-2 border-orange-500/70 bg-black/40 shadow-md ${
+                        value.contentType === "short" || value.contentType === "film"
+                          ? "w-24 sm:w-28 aspect-[9/16]"
+                          : value.contentType === "music"
+                          ? "w-24 aspect-square"
+                          : "w-36 aspect-video"
+                      } flex-shrink-0 self-start`}
+                    >
+                      <img
+                        src={thumbnail.previewUrl}
+                        alt="Selected thumbnail preview"
+                        className="h-full w-full object-cover"
+                      />
+                      <span className="absolute bottom-1 left-1 rounded bg-black/75 px-1 py-0.5 text-[9px] font-bold text-orange-400">
+                        Selected
+                      </span>
                     </div>
-                  )}
+
+                    <div className="flex flex-col gap-1 text-[11px] text-slate-300">
+                      <span className="font-semibold text-orange-400">Selected Thumbnail:</span>
+                      {(() => {
+                        if (thumbnail.previewUrl.startsWith("data:")) {
+                          const base64 = thumbnail.previewUrl.split(",")[1] || "";
+                          const bytes = Math.round(base64.length * 0.75);
+                          const sizeStr =
+                            bytes < 1024 * 1024
+                              ? `${(bytes / 1024).toFixed(1)} KB`
+                              : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+                          return (
+                            <span className="w-fit rounded bg-white/10 px-1.5 py-0.5 font-mono text-[10px] text-emerald-300">
+                              {sizeStr}
+                            </span>
+                          );
+                        }
+                        return null;
+                      })()}
+                      <p className="text-[10px] text-slate-400">
+                        Ratio: <span className="font-medium text-slate-200">{THUMBNAIL_RATIO_LABEL[value.contentType]}</span> ({THUMBNAIL_ORIENTATION_WORD[value.contentType]})
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Custom Upload Button */}
+                <div className="self-start">
+                  <button
+                    type="button"
+                    onClick={() => thumbInputRef.current?.click()}
+                    className="flex items-center gap-2 rounded-xl border border-dashed border-white/20 bg-white/[0.03] px-3.5 py-2.5 text-xs font-semibold text-slate-300 transition hover:border-orange-400/50 hover:bg-orange-500/10 hover:text-white"
+                  >
+                    <UploadCloud size={16} className="text-orange-400" />
+                    <span>Upload Custom Image</span>
+                  </button>
                   <input
                     ref={thumbInputRef}
                     type="file"
@@ -364,30 +409,6 @@ export default function VideoMetadataFields({
                     }}
                   />
                 </div>
-
-                {thumbnail.previewUrl && (
-                  <div className="flex flex-col gap-1 text-[11px] text-slate-300">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold text-orange-400">Selected Thumbnail:</span>
-                      {(() => {
-                        if (thumbnail.previewUrl.startsWith("data:")) {
-                          const base64 = thumbnail.previewUrl.split(",")[1] || "";
-                          const bytes = Math.round(base64.length * 0.75);
-                          const sizeStr = bytes < 1024 * 1024 ? `${(bytes / 1024).toFixed(1)} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-                          return (
-                            <span className="rounded bg-white/10 px-1.5 py-0.5 font-mono text-[10px] text-emerald-300">
-                              {sizeStr}
-                            </span>
-                          );
-                        }
-                        return null;
-                      })()}
-                    </div>
-                    <p className="text-[10px] text-slate-400">
-                      Accurate ratio: <span className="text-slate-200 font-medium">{THUMBNAIL_RATIO_LABEL[value.contentType]}</span> ({THUMBNAIL_ORIENTATION_WORD[value.contentType]})
-                    </p>
-                  </div>
-                )}
               </div>
               <p className="text-[10px] text-slate-500">
                 {THUMBNAIL_RATIO_LABEL[value.contentType]} recommended — uploads and AI suggestions are automatically scaled and center-cropped to this exact aspect ratio.
@@ -397,11 +418,12 @@ export default function VideoMetadataFields({
           )}
         </div>
 
-        {/* SECTION 2: Visibility & Settings — always visible, no tab to switch */}
-        <div className="space-y-3.5">
-          <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500 light:text-slate-400">
-            Visibility & Settings
-          </p>
+        {/* SECTION 2: Visibility & Settings — omitted for Raftaar Films */}
+        {value.contentType !== "film" && (
+          <div className="space-y-3.5">
+            <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500 light:text-slate-400">
+              Visibility & Settings
+            </p>
           {/* Category & Spoken Language */}
           <div className="grid grid-cols-2 gap-2">
             <div>
@@ -574,7 +596,7 @@ export default function VideoMetadataFields({
             />
             {/* Longform only — Shorts are never gated. Music is longform,
                 and a members-only track is an ordinary thing to publish. */}
-            {value.contentType !== "short" && value.contentType !== "film" && (
+            {value.contentType !== "short" && (
               <ToggleRow
                 label="Members only"
                 desc="Gated to paid members"
@@ -584,6 +606,7 @@ export default function VideoMetadataFields({
             )}
           </div>
         </div>
+      )}
       </div>
     </div>
   );

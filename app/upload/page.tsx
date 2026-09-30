@@ -73,6 +73,7 @@ export default function UploadPage() {
   const [tagInput, setTagInput] = useState("");
 
   const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+  const [selectedThumbnailUrl, setSelectedThumbnailUrl] = useState<string | null>(null);
   const [localVideoFrames, setLocalVideoFrames] = useState<string[]>([]);
   // Only the frames actually extracted from the picked file — what the AI
   // text buttons are shown so they describe the real upload.
@@ -221,6 +222,7 @@ export default function UploadPage() {
     }
     setThumbnailError(null);
     setThumbnailBusy(true);
+    setSelectedThumbnailUrl(null);
     try {
       const dataUrl = await compressImageToThumbnail(selected, THUMBNAIL_ASPECT_RATIO[contentType]);
       setThumbnailPreview(dataUrl);
@@ -368,6 +370,7 @@ export default function UploadPage() {
         setLocalVideoFrames(frames);
         setGroundingFrames(frames);
         if (frames.length > 0) {
+          setSelectedThumbnailUrl(frames[0]);
           setThumbnailPreview((prev) => prev || frames[0]);
         }
       }
@@ -669,6 +672,7 @@ export default function UploadPage() {
     setTags([]);
     setTagInput("");
     setThumbnailPreview(null);
+    setSelectedThumbnailUrl(null);
     setLocalVideoFrames([]);
     setGroundingFrames([]);
     setThumbnailBusy(false);
@@ -1037,6 +1041,7 @@ export default function UploadPage() {
               onChange={handleMetadataChange}
               categories={CATEGORIES}
               allowContentTypeChange={true}
+              allowAudienceChange={false}
               aiGenerating={aiGenerating}
               onOpenAITitleAssist={() => setAiTitleAssistOpen(true)}
               aiError={aiType === "title" ? aiError : null}
@@ -1051,11 +1056,13 @@ export default function UploadPage() {
               // the thumbnail automatically.
               thumbnail={contentType === "music" ? undefined : {
                 previewUrl: thumbnailPreview,
+                selectedMuxThumbnail: selectedThumbnailUrl,
                 onFileSelected: handleThumbnailSelected,
                 busy: thumbnailBusy,
                 error: thumbnailError,
                 muxFrames: localVideoFrames,
                 onMuxThumbnailSelected: async (url) => {
+                  setSelectedThumbnailUrl(url);
                   try {
                     const cropped = await cropDataUrlToThumbnail(url, THUMBNAIL_ASPECT_RATIO[contentType]);
                     setThumbnailPreview(cropped);
@@ -1082,7 +1089,7 @@ export default function UploadPage() {
               />
             )}
 
-            {contentType !== "music" && (
+            {contentType !== "music" && contentType !== "film" && (
               <ShortCreationTools
                 value={shortSettings}
                 onChange={setShortSettings}
@@ -1176,6 +1183,44 @@ export default function UploadPage() {
                       </button>
                     </div>
                   </div>
+                ) : contentType === "film" ? (
+                  <div className="py-8 text-center space-y-4">
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-500/15 text-orange-400">
+                      <Film size={32} />
+                    </div>
+                    <p className="text-xl font-black text-white light:text-slate-900">
+                      Episode {episodeNumber} is Published! 🍿
+                    </p>
+                    <p className="mx-auto max-w-md text-xs text-slate-400 light:text-slate-600">
+                      Your Raftaar Films episode has been processed and added to your series.
+                    </p>
+                    <div className="mt-4 flex flex-wrap items-center justify-center gap-3">
+                      <button
+                        onClick={() =>
+                          router.push(
+                            selectedSeriesId
+                              ? `/raftaar-films/${selectedSeriesId}/${uploadedVideoId}`
+                              : "/raftaar-films"
+                          )
+                        }
+                        className="rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-6 py-2.5 text-sm font-bold text-white shadow-[0_10px_25px_rgba(255,153,0,.35)] transition-all hover:scale-105"
+                      >
+                        Watch Episode
+                      </button>
+                      <button
+                        onClick={resetUpload}
+                        className="rounded-2xl border border-white/10 px-6 py-2.5 text-sm font-semibold text-slate-200 transition hover:border-orange-400/30 hover:bg-white/5 light:border-black/10 light:text-slate-700 light:hover:bg-black/5"
+                      >
+                        Upload Another Episode
+                      </button>
+                      <a
+                        href="/my-videos?tab=films"
+                        className="rounded-2xl border border-orange-500/30 bg-orange-500/10 px-6 py-2.5 text-sm font-semibold text-orange-300 hover:bg-orange-500/20 transition"
+                      >
+                        Manage Series
+                      </a>
+                    </div>
+                  </div>
                 ) : (
                   <UploadThumbnailStep
                     videoId={uploadedVideoId}
@@ -1183,15 +1228,7 @@ export default function UploadPage() {
                     duration={info.duration}
                     defaultThumbnailUrl={info.thumbnailUrl}
                     contentType={contentType}
-                    onDone={() =>
-                      router.push(
-                        contentType === "film"
-                          ? selectedSeriesId
-                            ? `/raftaar-films/${selectedSeriesId}/${uploadedVideoId}`
-                            : "/raftaar-films"
-                          : `/watch/${uploadedVideoId}`
-                      )
-                    }
+                    onDone={() => router.push(`/watch/${uploadedVideoId}`)}
                   />
                 )
               }

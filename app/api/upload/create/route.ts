@@ -9,7 +9,7 @@ import { ensureUsername } from "@/app/lib/ensureUsername";
 import { moderateText, UNCHECKED } from "@/app/lib/moderation";
 import { getPlatformSettings } from "@/app/lib/platformSettings";
 import { isMusicType, isFilmType, normalizeContentType } from "@/app/lib/contentTypes";
-import { incrementSeriesStats } from "@/app/lib/raftaarFilms";
+import { incrementSeriesStats, getSeriesById, updateSeries } from "@/app/lib/raftaarFilms";
 import {
   normalizeCoverInterval,
   sanitizeCovers,
@@ -555,6 +555,19 @@ export async function POST(request: NextRequest) {
         await incrementSeriesStats(seriesId.trim(), "episodeCount", 1);
       } catch (incErr) {
         console.error("Failed to increment series episode count:", incErr);
+      }
+
+      // If the series has no poster or has the default placeholder/unsplash URL,
+      // update its posterUrl to this episode's thumbnail so it displays the real cover!
+      if (customThumbnailUrl) {
+        try {
+          const series = await getSeriesById(seriesId.trim());
+          if (series && (!series.posterUrl || series.posterUrl.includes("unsplash.com") || series.posterUrl.includes("placeholder"))) {
+            await updateSeries(seriesId.trim(), user.userId, { posterUrl: customThumbnailUrl });
+          }
+        } catch (posterErr) {
+          console.warn("Failed to update series poster with episode thumbnail:", posterErr);
+        }
       }
     }
 

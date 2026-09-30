@@ -73,6 +73,9 @@ interface MyVideo {
   commentsEnabled?: boolean;
   spokenLanguage?: string;
   membersOnly?: boolean;
+  seriesId?: string;
+  episodeNumber?: number;
+  episodeTitle?: string;
 }
 
 interface AnalyticsResponse {
@@ -104,7 +107,8 @@ export default function MyVideosPage() {
   const [loading, setLoading] = useState(true);
 
   const [activeTab, setActiveTab] = useState<ActivePanel>("dashboard");
-  const [libraryFilter, setLibraryFilter] = useState<"all" | "video" | "short" | "music">("all");
+  const [libraryFilter, setLibraryFilter] = useState<"all" | "video" | "short" | "music" | "film">("all");
+  const [mySeries, setMySeries] = useState<any[]>([]);
   // Which content kind the analytics cards and the trend chart describe.
   // Before this existed the panel always rendered `analytics.videos` and
   // there was no way to see Shorts numbers at all — so this both answers
@@ -209,15 +213,23 @@ export default function MyVideosPage() {
           const idToken = session.tokens?.idToken?.toString();
           const headers = { Authorization: `Bearer ${idToken}` };
 
-          const [videosRes, analyticsRes, payoutRes] = await Promise.all([
+          const [videosRes, analyticsRes, payoutRes, seriesRes] = await Promise.all([
             fetch("/api/my-videos", { headers, cache: "no-store" }),
             fetch("/api/my-videos/analytics", { headers, cache: "no-store" }),
             fetch("/api/creator/payout-status", { headers, cache: "no-store" }),
+            fetch("/api/raftaar-films/my-series", { headers, cache: "no-store" }).catch(() => null),
           ]);
 
           const videosData = await videosRes.json();
           setVideos(videosData.videos || []);
           setLoading(false);
+
+          if (seriesRes && seriesRes.ok) {
+            const seriesData = await seriesRes.json().catch(() => null);
+            if (Array.isArray(seriesData?.series)) {
+              setMySeries(seriesData.series);
+            }
+          }
 
           if (analyticsRes.ok) {
             setAnalytics(await analyticsRes.json());
@@ -487,11 +499,18 @@ export default function MyVideosPage() {
     );
   }
 
-  const isVideoShort = (v: MyVideo) => v.contentType === "short" || v.category?.toLowerCase().includes("raftaar") || v.category?.toLowerCase().includes("short");
+  const isFilmItem = (v: MyVideo) => v.contentType === "film" || Boolean(v.seriesId);
   const isMusicItem = (v: MyVideo) => v.contentType === "music";
+  const isVideoShort = (v: MyVideo) =>
+    !isFilmItem(v) &&
+    (v.contentType === "short" ||
+      (v.category?.toLowerCase().includes("short") && !v.category?.toLowerCase().includes("film")) ||
+      (v.category?.toLowerCase().includes("raftaar") && !v.category?.toLowerCase().includes("film")));
+
+  const filmItems = videos.filter((v) => isFilmItem(v));
   const shortItems = videos.filter((v) => isVideoShort(v));
-  const musicItems = videos.filter((v) => isMusicItem(v) && !isVideoShort(v));
-  const videoItems = videos.filter((v) => !isVideoShort(v) && !isMusicItem(v));
+  const musicItems = videos.filter((v) => isMusicItem(v) && !isVideoShort(v) && !isFilmItem(v));
+  const videoItems = videos.filter((v) => !isVideoShort(v) && !isMusicItem(v) && !isFilmItem(v));
 
   const musicStats = analytics?.music ?? emptyContentStats;
   const analyticsForScope =
@@ -721,7 +740,9 @@ export default function MyVideosPage() {
               {/* Your Uploads (Videos + Raftaar, combined) */}
                 {(() => {
               const displayedItems =
-                libraryFilter === "video"
+                libraryFilter === "film"
+                  ? filmItems
+                  : libraryFilter === "video"
                   ? videoItems
                   : libraryFilter === "short"
                   ? shortItems
@@ -731,6 +752,66 @@ export default function MyVideosPage() {
 
               return (
                 <div className="space-y-5">
+                  {/* Raftaar Film Series Quick Shelf */}
+                  {mySeries.length > 0 && (
+                    <div className="space-y-3 rounded-2xl border border-orange-500/20 bg-gradient-to-b from-orange-500/5 to-transparent p-4 light:border-orange-500/20 light:bg-orange-50/20">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Film className="h-4 w-4 text-orange-400" />
+                          <h2 className="text-base font-black text-white light:text-slate-900 sm:text-lg">
+                            Raftaar Film Series ({mySeries.length})
+                          </h2>
+                        </div>
+                        <button
+                          onClick={() => setActiveTab("raftaar-films")}
+                          className="text-xs font-bold text-orange-400 transition hover:text-orange-300"
+                        >
+                          Manage in Studio →
+                        </button>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+                        {mySeries.map((s: any) => {
+                          const poster =
+                            s.posterUrl && !s.posterUrl.includes("photo-1536440136628-849c177e76a1")
+                              ? s.posterUrl
+                              : "/placeholder-vertical.svg";
+                          return (
+                            <div
+                              key={s.seriesId}
+                              onClick={() => setActiveTab("raftaar-films")}
+                              className="group relative cursor-pointer overflow-hidden rounded-xl border border-white/10 bg-[#071120] transition hover:border-orange-500/50"
+                            >
+                              <div className="relative aspect-[9/16] w-full bg-black/40">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={poster}
+                                  alt={s.title}
+                                  className="h-full w-full object-cover transition duration-300 group-hover:scale-105"
+                                  onError={(e) => {
+                                    const target = e.currentTarget;
+                                    if (target.src !== "/placeholder-vertical.svg") {
+                                      target.src = "/placeholder-vertical.svg";
+                                    }
+                                  }}
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/20 to-transparent" />
+                                <div className="absolute bottom-2 left-2 right-2">
+                                  <p className="line-clamp-1 text-xs font-black text-white">
+                                    {s.title}
+                                  </p>
+                                  <p className="text-[10px] text-orange-300">
+                                    {s.episodeCount || 0} eps • {s.genre || "Drama"}
+                                  </p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex flex-col gap-3 rounded-2xl border border-white/10 bg-[#071120] p-4 light:border-black/10 light:bg-white sm:flex-row sm:items-center sm:justify-between">
                     <div>
                       <h2 className="text-base font-black text-white light:text-slate-900 sm:text-lg">
@@ -774,6 +855,16 @@ export default function MyVideosPage() {
                           Shorts ({shortItems.length})
                         </button>
                         <button
+                          onClick={() => setLibraryFilter("film")}
+                          className={`rounded-lg px-3 py-1 text-xs font-bold transition ${
+                            libraryFilter === "film"
+                              ? "bg-gradient-to-r from-[#FF7A18] to-[#FF9A00] text-white shadow"
+                              : "text-slate-400 hover:text-white light:text-slate-600"
+                          }`}
+                        >
+                          Films ({filmItems.length})
+                        </button>
+                        <button
                           onClick={() => setLibraryFilter("music")}
                           className={`rounded-lg px-3 py-1 text-xs font-bold transition ${
                             libraryFilter === "music"
@@ -813,80 +904,101 @@ export default function MyVideosPage() {
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-                      {displayedItems.map((video) => (
-                      <div
-                        key={video.videoId}
-                        className="group flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#071120] p-3 transition-all hover:border-orange-500/40 light:border-black/10 light:bg-white"
-                      >
-                        <div className="relative aspect-video w-full overflow-hidden rounded-xl bg-black/20">
-                          {video.thumbnailUrl && (
-                            <Image
-                              src={video.thumbnailUrl}
-                              alt={video.title}
-                              fill
-                              sizes="300px"
-                              className="object-cover transition-transform duration-300 group-hover:scale-105"
-                            />
-                          )}
-                          <span
-                            className={`absolute top-2 left-2 rounded-full px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider ${
-                              video.status === "ready"
-                                ? "bg-emerald-500/90 text-white shadow"
-                                : video.status === "processing"
-                                ? "bg-amber-500/90 text-white shadow"
-                                : "bg-red-500/90 text-white shadow"
-                            }`}
+                      {displayedItems.map((video) => {
+                        const isFilm = isFilmItem(video);
+                        const isShort = isVideoShort(video);
+                        const isMusic = isMusicItem(video);
+                        const isVertical = isFilm || isShort;
+                        const watchHref = isFilm
+                          ? `/raftaar-films/${video.seriesId || "series"}/${video.videoId}`
+                          : isShort
+                          ? `/shorts?v=${video.videoId}`
+                          : `/watch/${video.videoId}`;
+
+                        return (
+                          <div
+                            key={video.videoId}
+                            className="group flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-[#071120] p-3 transition-all hover:border-orange-500/40 light:border-black/10 light:bg-white"
                           >
-                            {video.status}
-                          </span>
-                          {video.visibility && (
-                            <span className="absolute top-2 right-2 rounded-full bg-black/60 backdrop-blur-md px-2 py-0.5 text-[9px] font-bold text-white capitalize">
-                              {video.visibility}
-                            </span>
-                          )}
-                          {isMusicItem(video) && (
-                            <span className="absolute bottom-2 left-2 flex items-center gap-1 rounded-full bg-violet-500/90 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-white shadow">
-                              <Music2 size={9} /> Music
-                            </span>
-                          )}
-                        </div>
+                            <div className={`relative ${isVertical ? "aspect-[9/16] max-h-72" : "aspect-video"} w-full overflow-hidden rounded-xl bg-black/20`}>
+                              {video.thumbnailUrl && (
+                                <Image
+                                  src={video.thumbnailUrl}
+                                  alt={video.title}
+                                  fill
+                                  sizes="300px"
+                                  className="object-cover transition-transform duration-300 group-hover:scale-105"
+                                />
+                              )}
+                              <span
+                                className={`absolute top-2 left-2 rounded-full px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider ${
+                                  video.status === "ready"
+                                    ? "bg-emerald-500/90 text-white shadow"
+                                    : video.status === "processing"
+                                    ? "bg-amber-500/90 text-white shadow"
+                                    : "bg-red-500/90 text-white shadow"
+                                }`}
+                              >
+                                {video.status}
+                              </span>
+                              {video.visibility && (
+                                <span className="absolute top-2 right-2 rounded-full bg-black/60 backdrop-blur-md px-2 py-0.5 text-[9px] font-bold text-white capitalize">
+                                  {video.visibility}
+                                </span>
+                              )}
+                              {isFilm && (
+                                <span className="absolute bottom-2 left-2 flex items-center gap-1 rounded-full bg-orange-500/90 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-white shadow">
+                                  <Film size={9} /> Film (Ep {video.episodeNumber || 1})
+                                </span>
+                              )}
+                              {isShort && !isFilm && (
+                                <span className="absolute bottom-2 left-2 flex items-center gap-1 rounded-full bg-amber-500/90 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-white shadow">
+                                  ⚡ Short
+                                </span>
+                              )}
+                              {isMusic && (
+                                <span className="absolute bottom-2 left-2 flex items-center gap-1 rounded-full bg-violet-500/90 px-2 py-0.5 text-[9px] font-extrabold uppercase tracking-wider text-white shadow">
+                                  <Music2 size={9} /> Music
+                                </span>
+                              )}
+                            </div>
 
-                        <div className="mt-2.5 flex-1 min-w-0">
-                          <h3 className="line-clamp-2 text-xs font-bold text-white light:text-slate-900 sm:text-sm">
-                            {video.title}
-                          </h3>
-                          <p className="mt-1 text-[11px] font-medium text-slate-400 light:text-slate-600">
-                            {video.category || "General"} • {formatViews(video.views || 0)} views • {formatTimeAgo(video.uploadedAt)}
-                          </p>
-                        </div>
+                            <div className="mt-2.5 flex-1 min-w-0">
+                              <h3 className="line-clamp-2 text-xs font-bold text-white light:text-slate-900 sm:text-sm">
+                                {video.title}
+                              </h3>
+                              <p className="mt-1 text-[11px] font-medium text-slate-400 light:text-slate-600">
+                                {video.category || "General"} • {formatViews(video.views || 0)} views • {formatTimeAgo(video.uploadedAt)}
+                              </p>
+                            </div>
 
-                        <div className="mt-3 flex items-center justify-between gap-1.5 border-t border-white/10 pt-2.5 light:border-black/10">
-                          <div className="flex items-center gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() => startEditing(video)}
-                              className="flex items-center gap-1 rounded-lg bg-orange-500/15 px-2.5 py-1 text-xs font-bold text-orange-400 transition hover:bg-orange-500 hover:text-white light:bg-orange-500/10 light:text-orange-600"
-                            >
-                              <Pencil size={12} />
-                              Edit
-                            </button>
+                            <div className="mt-3 flex items-center justify-between gap-1.5 border-t border-white/10 pt-2.5 light:border-black/10">
+                              <div className="flex items-center gap-1.5">
+                                <button
+                                  type="button"
+                                  onClick={() => startEditing(video)}
+                                  className="flex items-center gap-1 rounded-lg bg-orange-500/15 px-2.5 py-1 text-xs font-bold text-orange-400 transition hover:bg-orange-500 hover:text-white light:bg-orange-500/10 light:text-orange-600"
+                                >
+                                  <Pencil size={12} />
+                                  Edit
+                                </button>
 
-                            <Link
-                              href={`/creators/studio/${video.videoId}/localization`}
-                              className="flex items-center gap-1 rounded-lg bg-blue-500/15 px-2.5 py-1 text-xs font-bold text-blue-400 transition hover:bg-blue-500 hover:text-white"
-                            >
-                              <Globe size={12} />
-                              Translate
-                            </Link>
+                                <Link
+                                  href={`/creators/studio/${video.videoId}/localization`}
+                                  className="flex items-center gap-1 rounded-lg bg-blue-500/15 px-2.5 py-1 text-xs font-bold text-blue-400 transition hover:bg-blue-500 hover:text-white"
+                                >
+                                  <Globe size={12} />
+                                  Translate
+                                </Link>
 
-                            <Link
-                              href={`/watch/${video.videoId}`}
-                              className="flex items-center gap-1 rounded-lg bg-white/10 px-2.5 py-1 text-xs font-semibold text-slate-200 transition hover:bg-white/20 light:bg-black/5 light:text-slate-700"
-                            >
-                              <ExternalLink size={12} />
-                              Watch
-                            </Link>
-                          </div>
+                                <Link
+                                  href={watchHref}
+                                  className="flex items-center gap-1 rounded-lg bg-white/10 px-2.5 py-1 text-xs font-semibold text-slate-200 transition hover:bg-white/20 light:bg-black/5 light:text-slate-700"
+                                >
+                                  <ExternalLink size={12} />
+                                  Watch
+                                </Link>
+                              </div>
 
                           {confirmingDeleteId === video.videoId ? (
                             <div className="flex items-center gap-1">
@@ -918,7 +1030,8 @@ export default function MyVideosPage() {
                           )}
                         </div>
                       </div>
-                    ))}
+                    );
+                  })}
                   </div>
                 )}
               </div>

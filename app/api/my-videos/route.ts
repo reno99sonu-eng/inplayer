@@ -3,6 +3,7 @@ import { ScanCommand } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { verifyAuth } from "@/app/lib/verifyAuth";
 import { selfHealVideoBatch } from "@/app/lib/selfHealVideo";
+import { getSeriesByCreator, getSeriesEpisodes } from "@/app/lib/raftaarFilms";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest) {
     const page = await docClient.send(
       new ScanCommand({
         TableName: "InPlayer-Videos",
-        FilterExpression: "uploaderId = :uid",
+        FilterExpression: "uploaderId = :uid OR userId = :uid OR creatorId = :uid",
         ExpressionAttributeValues: { ":uid": user.userId },
         ExclusiveStartKey: exclusiveStartKey,
       })
@@ -32,6 +33,26 @@ export async function GET(request: NextRequest) {
     items.push(...(page.Items || []));
     exclusiveStartKey = page.LastEvaluatedKey;
   } while (exclusiveStartKey);
+
+  // Guarantee all episodes from the creator's Raftaar Films series are present
+  try {
+    const seriesList = await getSeriesByCreator(user.userId).catch(() => []);
+    if (seriesList.length > 0) {
+      const nestedEpisodes = await Promise.all(
+        seriesList.map((s) => getSeriesEpisodes(s.seriesId).catch(() => []))
+      );
+      const allSeriesEpisodes = nestedEpisodes.flat();
+      const existingIds = new Set(items.map((i) => i.videoId));
+      for (const ep of allSeriesEpisodes) {
+        if (ep && ep.videoId && !existingIds.has(ep.videoId)) {
+          items.push(ep);
+          existingIds.add(ep.videoId);
+        }
+      }
+    }
+  } catch (err) {
+    console.warn("Series episodes fetch fallback warning in /api/my-videos:", err);
+  }
 
   const healed = await selfHealVideoBatch(items);
 

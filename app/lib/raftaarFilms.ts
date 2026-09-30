@@ -144,15 +144,24 @@ export async function getSeriesByCreator(creatorId: string): Promise<FilmSeries[
       return (response.Items as FilmSeries[]) || [];
     } catch (e: any) {
       if (e.name === 'ValidationException' && e.message.includes('index')) {
-        const scanCommand = new ScanCommand({
-          TableName: FILM_SERIES_TABLE,
-          FilterExpression: "creatorId = :creatorId",
-          ExpressionAttributeValues: {
-            ":creatorId": creatorId
+        const series: FilmSeries[] = [];
+        let exclusiveStartKey: Record<string, any> | undefined;
+        do {
+          const scanCommand = new ScanCommand({
+            TableName: FILM_SERIES_TABLE,
+            FilterExpression: "creatorId = :creatorId",
+            ExpressionAttributeValues: {
+              ":creatorId": creatorId
+            },
+            ExclusiveStartKey: exclusiveStartKey,
+          });
+          const scanResponse = await docClient.send(scanCommand);
+          if (scanResponse.Items) {
+            series.push(...(scanResponse.Items as FilmSeries[]));
           }
-        });
-        const scanResponse = await docClient.send(scanCommand);
-        return (scanResponse.Items as FilmSeries[]) || [];
+          exclusiveStartKey = scanResponse.LastEvaluatedKey;
+        } while (exclusiveStartKey);
+        return series;
       }
       throw e;
     }
@@ -164,19 +173,27 @@ export async function getSeriesByCreator(creatorId: string): Promise<FilmSeries[
 
 export async function getSeriesEpisodes(seriesId: string): Promise<any[]> {
   try {
-    const command = new ScanCommand({
-      TableName: "InPlayer-Videos",
-      FilterExpression: "contentType = :contentType AND seriesId = :seriesId",
-      ExpressionAttributeValues: {
-        ":contentType": "film",
-        ":seriesId": seriesId
+    const episodes: any[] = [];
+    let exclusiveStartKey: Record<string, any> | undefined;
+
+    do {
+      const response = await docClient.send(
+        new ScanCommand({
+          TableName: "InPlayer-Videos",
+          FilterExpression: "seriesId = :seriesId",
+          ExpressionAttributeValues: {
+            ":seriesId": seriesId,
+          },
+          ExclusiveStartKey: exclusiveStartKey,
+        })
+      );
+      if (response.Items) {
+        episodes.push(...response.Items);
       }
-    });
+      exclusiveStartKey = response.LastEvaluatedKey;
+    } while (exclusiveStartKey);
     
-    const response = await docClient.send(command);
-    const episodes = response.Items || [];
-    
-    return episodes.sort((a, b) => (a.episodeNumber || 0) - (b.episodeNumber || 0));
+    return episodes.sort((a, b) => (Number(a.episodeNumber) || 0) - (Number(b.episodeNumber) || 0));
   } catch (error) {
     console.error("Error getting series episodes:", error);
     throw error;

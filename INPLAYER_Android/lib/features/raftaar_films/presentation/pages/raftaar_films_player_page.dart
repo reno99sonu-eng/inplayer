@@ -13,6 +13,7 @@ import '../../../../services/raftaar_films_service.dart';
 import '../../../../services/like_service.dart';
 import '../../../../services/watchlist_service.dart';
 import '../../../../services/comment_service.dart';
+import '../../../../services/video_service.dart';
 import '../../../../models/comment.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../auth/presentation/widgets/auth_modals.dart';
@@ -300,6 +301,7 @@ class _SingleFilmEpisodeViewState
   Duration _duration = Duration.zero;
   bool _isDraggingSlider = false;
   double? _sliderDragValue;
+  bool _hasRecordedView = false;
 
   String? _seekIndicatorText;
   bool _seekIndicatorForward = true;
@@ -369,6 +371,11 @@ class _SingleFilmEpisodeViewState
       _controller!.play();
 
       _controller!.addListener(_videoListener);
+
+      if (!_hasRecordedView) {
+        _hasRecordedView = true;
+        ref.read(videoServiceProvider).recordView(widget.episode.videoId);
+      }
 
       if (mounted) {
         setState(() {
@@ -442,6 +449,7 @@ class _SingleFilmEpisodeViewState
       await ref.read(likeServiceProvider).react(
             widget.episode.videoId,
             nextLiked ? 'like' : 'remove',
+            seriesId: widget.series.seriesId,
           );
     } catch (_) {}
   }

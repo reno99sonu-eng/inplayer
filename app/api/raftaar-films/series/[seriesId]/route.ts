@@ -16,8 +16,22 @@ export async function GET(
     }
 
     const episodes = await getSeriesEpisodes(seriesId);
+    const totalViews = Math.max(
+      series.totalViews || 0,
+      episodes.reduce((acc, ep) => acc + (Number(ep.views) || 0), 0)
+    );
+    const totalLikes = Math.max(
+      series.totalLikes || 0,
+      episodes.reduce((acc, ep) => acc + (Number(ep.likeCount ?? ep.likes) || 0), 0)
+    );
+    const enrichedSeries = {
+      ...series,
+      totalViews,
+      totalLikes,
+      episodeCount: Math.max(series.episodeCount || 0, episodes.length),
+    };
 
-    return NextResponse.json({ series, episodes });
+    return NextResponse.json({ series: enrichedSeries, episodes });
   } catch (error) {
     console.error("Error fetching series details:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

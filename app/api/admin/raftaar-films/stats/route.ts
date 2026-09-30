@@ -39,26 +39,37 @@ export async function GET(request: NextRequest) {
 
     const pendingApplications = appsResult.Count || 0;
 
-    // 3. Total Episodes & Total Views (InPlayer-Videos where contentType='film')
-    const videosResult = await docClient.send(
-      new ScanCommand({
-        TableName: "InPlayer-Videos",
-        FilterExpression: "contentType = :type",
-        ExpressionAttributeValues: {
-          ":type": "film",
-        },
-      })
-    );
-    
-    const episodes = videosResult.Items || [];
+    // 3. Total Episodes, Views & Likes (InPlayer-Videos where contentType='film' or attribute_exists(seriesId))
+    const episodes: any[] = [];
+    let exclusiveStartKey: Record<string, any> | undefined;
+
+    do {
+      const vResult = await docClient.send(
+        new ScanCommand({
+          TableName: "InPlayer-Videos",
+          FilterExpression: "contentType = :type OR attribute_exists(seriesId)",
+          ExpressionAttributeValues: { ":type": "film" },
+          ProjectionExpression: "videoId, seriesId, #v, #l, likeCount",
+          ExpressionAttributeNames: { "#v": "views", "#l": "likes" },
+          ExclusiveStartKey: exclusiveStartKey,
+        })
+      );
+      if (vResult.Items) {
+        episodes.push(...vResult.Items);
+      }
+      exclusiveStartKey = vResult.LastEvaluatedKey;
+    } while (exclusiveStartKey);
+
     const totalEpisodes = episodes.length;
-    const totalFilmViews = episodes.reduce((acc, ep) => acc + (ep.views || 0), 0);
+    const totalFilmViews = episodes.reduce((acc, ep) => acc + (Number(ep.views) || 0), 0);
+    const totalFilmLikes = episodes.reduce((acc, ep) => acc + (Number(ep.likeCount ?? ep.likes) || 0), 0);
 
     return NextResponse.json({
       totalSeries,
       totalEpisodes,
       pendingApplications,
       totalFilmViews,
+      totalFilmLikes,
     });
   } catch (err) {
     console.error("Failed to fetch stats:", err);

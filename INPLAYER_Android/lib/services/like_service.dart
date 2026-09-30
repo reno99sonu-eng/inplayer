@@ -32,11 +32,15 @@ class LikeService {
   }
 
   /// action must be 'like' | 'dislike' | 'remove'.
-  Future<bool> react(String videoId, String action) async {
+  Future<bool> react(String videoId, String action, {String? seriesId}) async {
     try {
       final response = await _dio.post(
         ApiConstants.likes,
-        data: {'videoId': videoId, 'action': action},
+        data: {
+          'videoId': videoId,
+          'action': action,
+          'seriesId': ?seriesId,
+        },
       );
       return response.statusCode == 200;
     } catch (e) {

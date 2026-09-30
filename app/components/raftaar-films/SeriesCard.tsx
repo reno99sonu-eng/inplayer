@@ -47,29 +47,29 @@ export default function SeriesCard({ series, onClick }: SeriesCardProps) {
         </div>
         
         {/* Top Badges */}
-        <div className="absolute top-3 left-3 flex flex-col gap-1.5 z-10">
-          <span className="bg-black/65 backdrop-blur-md text-slate-100 text-[10px] font-extrabold px-2.5 py-1 rounded-md uppercase tracking-wider border border-white/15 shadow-md">
+        <div className="absolute top-2.5 left-2.5 flex flex-col gap-1 z-10">
+          <span className="bg-black/75 backdrop-blur-md text-slate-100 text-[8.5px] font-bold px-2 py-0.5 rounded uppercase tracking-wide border border-white/15 shadow-sm">
             {series.episodeCount} Episodes
           </span>
           {series.totalViews > 500 && (
-            <span className="bg-gradient-to-r from-orange-500 to-amber-500 backdrop-blur-md text-white text-[10px] font-black px-2.5 py-0.5 rounded-md uppercase tracking-wider shadow-[0_0_12px_rgba(249,115,22,0.4)]">
+            <span className="bg-gradient-to-r from-orange-500 to-amber-500 backdrop-blur-md text-white text-[7.5px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider shadow-[0_0_8px_rgba(249,115,22,0.35)]">
               Trending
             </span>
           )}
         </div>
 
         {/* Bottom Content with 3D Depth */}
-        <div className="absolute bottom-0 left-0 right-0 p-3.5 sm:p-4 z-10 transform transition-transform duration-300">
+        <div className="absolute bottom-0 left-0 right-0 p-2.5 sm:p-3 z-10 transform transition-transform duration-300">
           {series.genre && (
-            <span className="text-[10px] font-bold text-amber-300/90 tracking-wide uppercase mb-1 block">
+            <span className="text-[8.5px] font-bold text-amber-400/95 tracking-wider uppercase mb-0.5 block">
               {series.genre}
             </span>
           )}
-          <h3 className="text-white font-bold text-base sm:text-lg leading-tight mb-2 line-clamp-2 drop-shadow-lg group-hover:text-orange-200 transition-colors">
+          <h3 className="text-white font-bold text-xs sm:text-sm leading-snug mb-1 line-clamp-2 drop-shadow-md group-hover:text-orange-200 transition-colors">
             {series.title}
           </h3>
-          <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-full overflow-hidden bg-zinc-800 border border-orange-500/40 flex-shrink-0">
+          <div className="flex items-center gap-1.5">
+            <div className="w-4 h-4 rounded-full overflow-hidden bg-zinc-800 border border-orange-500/40 flex-shrink-0">
               <img 
                 src={series.creatorAvatarUrl || '/avatars/avatar.png'} 
                 alt={series.creatorName} 
@@ -82,7 +82,7 @@ export default function SeriesCard({ series, onClick }: SeriesCardProps) {
                 }}
               />
             </div>
-            <span className="text-zinc-300 text-xs font-semibold truncate drop-shadow-md">
+            <span className="text-zinc-300 text-[10px] font-medium truncate drop-shadow-sm">
               {series.creatorName}
             </span>
           </div>

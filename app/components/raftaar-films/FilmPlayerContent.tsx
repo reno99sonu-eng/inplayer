@@ -112,6 +112,7 @@ export default function FilmPlayerContent({
   const singleTapTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastTapRef = useRef<number>(0);
   const isWheelLockedRef = useRef<boolean>(false);
+  const recordedViewVideoIdRef = useRef<string | null>(null);
 
   // Manual scrubber drag state
   const [isScrubbing, setIsScrubbing] = useState(false);
@@ -158,7 +159,17 @@ export default function FilmPlayerContent({
     }
 
     if (currentEpisode?.videoId) {
-      setLikeCount(currentEpisode.likeCount || 0);
+      setLikeCount(currentEpisode.likeCount ?? currentEpisode.likes ?? 0);
+
+      // Record view in real-time for video, series, and daily stats
+      if (recordedViewVideoIdRef.current !== currentEpisode.videoId) {
+        recordedViewVideoIdRef.current = currentEpisode.videoId;
+        fetch(`/api/videos/${currentEpisode.videoId}/view`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ seriesId: series?.seriesId }),
+        }).catch((err) => console.warn("Failed to record episode view:", err));
+      }
 
       // Check like status
       (async () => {
@@ -172,8 +183,8 @@ export default function FilmPlayerContent({
           });
           if (res.ok) {
             const data = await res.json();
-            setIsLiked(data.liked || false);
-            if (typeof data.count === "number") setLikeCount(data.count);
+            setIsLiked(data.myReaction === "like");
+            if (typeof data.likeCount === "number") setLikeCount(data.likeCount);
           }
         } catch {
           /* ignore */
@@ -324,7 +335,7 @@ export default function FilmPlayerContent({
       const session = await fetchAuthSession().catch(() => null);
       const token = session?.tokens?.idToken?.toString();
       if (!token) return;
-      await fetch("/api/likes", {
+      const res = await fetch("/api/likes", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -332,13 +343,20 @@ export default function FilmPlayerContent({
         },
         body: JSON.stringify({
           videoId: currentEpisode.videoId,
-          action: nextLiked ? "like" : "unlike",
+          action: nextLiked ? "like" : "remove",
+          seriesId: series?.seriesId,
         }),
       });
+      if (res.ok) {
+        const data = await res.json();
+        if (typeof data.likeCount === "number") {
+          setLikeCount(data.likeCount);
+        }
+      }
     } catch (e) {
       console.error("Failed to toggle like:", e);
     }
-  }, [currentEpisode?.videoId, signedIn, openSignIn, isLiked]);
+  }, [currentEpisode?.videoId, series?.seriesId, signedIn, openSignIn, isLiked]);
 
   // Central gesture handling (prevents conflict with MuxPlayer native click)
   const handleVideoStageClick = (e: React.MouseEvent<HTMLDivElement>) => {

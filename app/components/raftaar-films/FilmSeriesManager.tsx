@@ -44,6 +44,8 @@ interface EpisodeItem {
   episodeNumber: number;
   seasonNumber?: number;
   views?: number;
+  likeCount?: number;
+  likes?: number;
   thumbnailUrl?: string;
 }
 
@@ -482,7 +484,7 @@ export default function FilmSeriesManager() {
                     </span>
                     <div className="min-w-0">
                       <p className="text-xs font-bold text-white light:text-slate-900 truncate">{ep.title}</p>
-                      <p className="text-[11px] text-slate-400">{ep.views || 0} views</p>
+                      <p className="text-[11px] text-slate-400">{(ep.views || 0).toLocaleString()} views • {(ep.likeCount || ep.likes || 0).toLocaleString()} likes</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -585,9 +587,10 @@ export default function FilmSeriesManager() {
                     <h3 className="font-bold text-sm text-white light:text-slate-900 line-clamp-1">{series.title}</h3>
                     <p className="mt-1 text-xs text-slate-400 line-clamp-2">{series.description || "No description provided."}</p>
                   </div>
-                  <div className="mt-2 text-xs text-slate-400 space-y-0.5">
-                    <p>🎬 {series.episodeCount} episodes</p>
-                    <p>👁️ {series.totalViews || 0} views</p>
+                  <div className="mt-2 text-[11px] text-slate-400 flex flex-wrap items-center gap-2.5">
+                    <span>🎬 {series.episodeCount} ep</span>
+                    <span>👁️ {(series.totalViews || 0).toLocaleString()} views</span>
+                    <span>❤️ {(series.totalLikes || 0).toLocaleString()} likes</span>
                   </div>
                 </div>
               </div>

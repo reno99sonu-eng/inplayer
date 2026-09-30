@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAuth } from "@/app/lib/verifyAuth";
-import { isApprovedFilmCreator, getSeriesByCreator, createSeries, getApplicationByUserId } from "@/app/lib/raftaarFilms";
+import { isApprovedFilmCreator, getSeriesByCreator, createSeries, getApplicationByUserId, getSeriesEpisodes } from "@/app/lib/raftaarFilms";
 import { docClient } from "@/app/lib/dynamodb";
 import { GetCommand, UpdateCommand } from "@aws-sdk/lib-dynamodb";
 
@@ -14,7 +14,52 @@ export async function GET(request: NextRequest) {
     }
 
     const series = await getSeriesByCreator(auth.userId);
-    return NextResponse.json({ series: series || [] });
+    if (!series || series.length === 0) {
+      return NextResponse.json({ series: [] });
+    }
+
+    // Live reconcile views, likes, and episode count from InPlayer-Videos
+    const enrichedSeries = await Promise.all(
+      series.map(async (s) => {
+        try {
+          const episodes = await getSeriesEpisodes(s.seriesId);
+          const liveViews = episodes.reduce((acc, ep) => acc + (Number(ep.views) || 0), 0);
+          const liveLikes = episodes.reduce((acc, ep) => acc + (Number(ep.likeCount ?? ep.likes) || 0), 0);
+          const episodeCount = episodes.length;
+
+          // Self-heal InPlayer-Film-Series table if counts drifted
+          if (
+            s.totalViews !== liveViews ||
+            s.totalLikes !== liveLikes ||
+            s.episodeCount !== episodeCount
+          ) {
+            void docClient.send(
+              new UpdateCommand({
+                TableName: "InPlayer-Film-Series",
+                Key: { seriesId: s.seriesId },
+                UpdateExpression: "SET totalViews = :tv, totalLikes = :tl, episodeCount = :ec",
+                ExpressionAttributeValues: {
+                  ":tv": liveViews,
+                  ":tl": liveLikes,
+                  ":ec": episodeCount,
+                },
+              })
+            ).catch(() => {});
+          }
+
+          return {
+            ...s,
+            totalViews: Math.max(s.totalViews || 0, liveViews),
+            totalLikes: Math.max(s.totalLikes || 0, liveLikes),
+            episodeCount: Math.max(s.episodeCount || 0, episodeCount),
+          };
+        } catch {
+          return s;
+        }
+      })
+    );
+
+    return NextResponse.json({ series: enrichedSeries });
   } catch (error) {
     console.error("Error in GET /api/raftaar-films/my-series:", error);
     return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });

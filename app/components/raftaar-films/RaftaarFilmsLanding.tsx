@@ -312,9 +312,9 @@ export default function RaftaarFilmsLanding() {
         <GenreBar selectedGenre={selectedGenre} onSelectGenre={setSelectedGenre} />
 
         {/* Series Section & Grid */}
-        <div className="mt-3 mb-10">
-          <div className="flex items-center justify-between mb-3 px-1">
-            <h2 className="text-base sm:text-lg font-extrabold text-white tracking-tight flex items-center gap-2">
+        <div className="mt-2.5 mb-10">
+          <div className="flex items-center justify-between mb-2 px-1">
+            <h2 className="text-xs sm:text-sm font-bold text-white tracking-tight flex items-center gap-1.5">
               {searchQuery ? (
                 <>
                   <span>Search:</span>
@@ -328,7 +328,7 @@ export default function RaftaarFilmsLanding() {
                 'Explore Micro-Series'
               )}
             </h2>
-            <span className="text-xs text-zinc-400 font-medium">{filteredSeries.length} series</span>
+            <span className="text-[10px] text-zinc-400 font-medium">{filteredSeries.length} series</span>
           </div>
           
           <SeriesGrid series={filteredSeries} loading={loading} />

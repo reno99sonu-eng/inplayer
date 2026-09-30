@@ -188,7 +188,16 @@ export async function getSeriesEpisodes(seriesId: string): Promise<any[]> {
         })
       );
       if (response.Items) {
-        episodes.push(...response.Items);
+        for (const item of response.Items) {
+          const views = Number(item.views) || 0;
+          const likes = Number(item.likes ?? item.likeCount) || 0;
+          episodes.push({
+            ...item,
+            views,
+            likes,
+            likeCount: likes,
+          });
+        }
       }
       exclusiveStartKey = response.LastEvaluatedKey;
     } while (exclusiveStartKey);
@@ -541,20 +550,84 @@ export async function isSubscribedToSeries(seriesId: string, userId: string): Pr
   }
 }
 
-export async function incrementSeriesStats(seriesId: string, field: 'totalViews' | 'totalLikes' | 'episodeCount' | 'subscriberCount', delta: number = 1): Promise<void> {
+export async function incrementSeriesStats(
+  seriesId: string,
+  field: 'totalViews' | 'totalLikes' | 'episodeCount' | 'subscriberCount',
+  delta: number = 1
+): Promise<void> {
   try {
     const command = new UpdateCommand({
       TableName: FILM_SERIES_TABLE,
       Key: { seriesId },
-      UpdateExpression: "ADD #field :delta",
+      UpdateExpression: "SET #field = if_not_exists(#field, :zero) + :delta, updatedAt = :now",
       ExpressionAttributeNames: { "#field": field },
-      ExpressionAttributeValues: { ":delta": delta }
+      ExpressionAttributeValues: {
+        ":delta": delta,
+        ":zero": 0,
+        ":now": new Date().toISOString(),
+      },
     });
 
     await docClient.send(command);
   } catch (error) {
     console.error(`Error incrementing series stat ${field}:`, error);
-    throw error;
+    try {
+      const getRes = await docClient.send(
+        new GetCommand({ TableName: FILM_SERIES_TABLE, Key: { seriesId } })
+      );
+      if (getRes.Item) {
+        const curVal = Number(getRes.Item[field]) || 0;
+        const newVal = Math.max(0, curVal + delta);
+        await docClient.send(
+          new UpdateCommand({
+            TableName: FILM_SERIES_TABLE,
+            Key: { seriesId },
+            UpdateExpression: "SET #field = :val, updatedAt = :now",
+            ExpressionAttributeNames: { "#field": field },
+            ExpressionAttributeValues: {
+              ":val": newVal,
+              ":now": new Date().toISOString(),
+            },
+          })
+        );
+      }
+    } catch (fallbackErr) {
+      console.error(`Fallback update for series stat ${field} failed:`, fallbackErr);
+    }
+  }
+}
+
+export async function syncSeriesStats(
+  seriesId: string
+): Promise<{ totalViews: number; totalLikes: number; episodeCount: number }> {
+  try {
+    const episodes = await getSeriesEpisodes(seriesId);
+    const episodeCount = episodes.length;
+    const totalViews = episodes.reduce((sum, ep) => sum + (Number(ep.views) || 0), 0);
+    const totalLikes = episodes.reduce(
+      (sum, ep) => sum + (Number(ep.likeCount ?? ep.likes) || 0),
+      0
+    );
+
+    await docClient.send(
+      new UpdateCommand({
+        TableName: FILM_SERIES_TABLE,
+        Key: { seriesId },
+        UpdateExpression:
+          "SET episodeCount = :ec, totalViews = :tv, totalLikes = :tl, updatedAt = :now",
+        ExpressionAttributeValues: {
+          ":ec": episodeCount,
+          ":tv": totalViews,
+          ":tl": totalLikes,
+          ":now": new Date().toISOString(),
+        },
+      })
+    );
+
+    return { totalViews, totalLikes, episodeCount };
+  } catch (err) {
+    console.error(`Failed to sync series stats for ${seriesId}:`, err);
+    return { totalViews: 0, totalLikes: 0, episodeCount: 0 };
   }
 }
 

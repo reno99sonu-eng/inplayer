@@ -37,6 +37,15 @@ export async function POST(request: NextRequest, { params }: Params) {
     return NextResponse.json({ error: "videoId is required." }, { status: 400 });
   }
 
+  let body: any = null;
+  try {
+    body = await request.json();
+  } catch {
+    // Body is optional
+  }
+
+  let finalViews = 0;
+
   try {
     const updateResult = await docClient.send(
       new UpdateCommand({
@@ -51,18 +60,34 @@ export async function POST(request: NextRequest, { params }: Params) {
 
     const updatedVideo = updateResult.Attributes;
     if (updatedVideo) {
+      finalViews = Number(updatedVideo.views) || 0;
       // If this is a film episode with a seriesId, increment series views
-      if (updatedVideo.seriesId) {
+      const targetSeriesId = updatedVideo.seriesId || body?.seriesId;
+      if (targetSeriesId) {
+        if (!updatedVideo.seriesId) {
+          try {
+            await docClient.send(
+              new UpdateCommand({
+                TableName: "InPlayer-Videos",
+                Key: { videoId },
+                UpdateExpression: "SET seriesId = :sid",
+                ExpressionAttributeValues: { ":sid": targetSeriesId },
+              })
+            );
+          } catch (linkErr) {
+            console.warn("Could not backlink seriesId to video:", linkErr);
+          }
+        }
         try {
           const { incrementSeriesStats } = await import("@/app/lib/raftaarFilms");
-          await incrementSeriesStats(updatedVideo.seriesId, "totalViews", 1);
+          await incrementSeriesStats(targetSeriesId, "totalViews", 1);
         } catch (seriesErr) {
           console.error("Failed to increment series views:", seriesErr);
         }
       }
 
       // Check 100-view milestone for creator to unlock Raftaar Films eligibility notification
-      const uploaderId = updatedVideo.uploaderId;
+      const uploaderId = updatedVideo.uploaderId || updatedVideo.creatorId;
       if (uploaderId) {
         try {
           const userUpdate = await docClient.send(
@@ -123,8 +148,5 @@ export async function POST(request: NextRequest, { params }: Params) {
     console.error("Failed to record daily view:", err);
   }
 
-  // Always 200: a viewer's playback must never appear to fail because a
-  // best-effort counter write had trouble — same reasoning as every other
-  // fire-and-forget analytics call in this codebase.
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, views: finalViews });
 }

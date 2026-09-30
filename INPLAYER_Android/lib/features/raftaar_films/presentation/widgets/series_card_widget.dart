@@ -142,7 +142,7 @@ class _SeriesCardWidgetState extends State<SeriesCardWidget> {
                             '${widget.series.episodeCount} ${widget.series.episodeCount == 1 ? "Ep" : "Eps"}',
                             style: const TextStyle(
                               color: Colors.white,
-                              fontSize: 10.5,
+                              fontSize: 9.0,
                               fontWeight: FontWeight.w700,
                             ),
                           ),
@@ -157,16 +157,16 @@ class _SeriesCardWidgetState extends State<SeriesCardWidget> {
                       top: 10,
                       left: 10,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
                         decoration: BoxDecoration(
                           color: const Color(0xFFFF7A18).withValues(alpha: 0.85),
-                          borderRadius: BorderRadius.circular(8),
+                          borderRadius: BorderRadius.circular(6),
                         ),
                         child: Text(
                           widget.series.genre,
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 9.5,
+                            fontSize: 8.5,
                             fontWeight: FontWeight.w800,
                             letterSpacing: 0.2,
                           ),
@@ -189,7 +189,7 @@ class _SeriesCardWidgetState extends State<SeriesCardWidget> {
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: Colors.white,
-                            fontSize: 14,
+                            fontSize: 12.0,
                             fontWeight: FontWeight.w800,
                             height: 1.2,
                             shadows: [
@@ -200,20 +200,20 @@ class _SeriesCardWidgetState extends State<SeriesCardWidget> {
                             ],
                           ),
                         ),
-                        const SizedBox(height: 6),
+                        const SizedBox(height: 5),
                         Row(
                           children: [
                             CircleAvatar(
-                              radius: 9,
+                              radius: 7.5,
                               backgroundColor: Colors.white24,
                               backgroundImage: widget.series.creatorAvatarUrl.isNotEmpty
                                   ? CachedNetworkImageProvider(widget.series.creatorAvatarUrl)
                                   : null,
                               child: widget.series.creatorAvatarUrl.isEmpty
-                                  ? const Icon(Icons.person, size: 10, color: Colors.white)
+                                  ? const Icon(Icons.person, size: 8, color: Colors.white)
                                   : null,
                             ),
-                            const SizedBox(width: 6),
+                            const SizedBox(width: 5),
                             Expanded(
                               child: Text(
                                 widget.series.creatorName,
@@ -221,7 +221,7 @@ class _SeriesCardWidgetState extends State<SeriesCardWidget> {
                                 overflow: TextOverflow.ellipsis,
                                 style: const TextStyle(
                                   color: Colors.white70,
-                                  fontSize: 11,
+                                  fontSize: 9.5,
                                   fontWeight: FontWeight.w500,
                                 ),
                               ),

@@ -119,158 +119,98 @@ class _RaftaarFilmsDetailPageState
 
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F13),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF0F0F13),
+        elevation: 0,
+        surfaceTintColor: Colors.transparent,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_new_rounded,
+            color: Colors.white,
+            size: 18,
+          ),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/raftaar-films');
+            }
+          },
+        ),
+        title: Row(
+          children: [
+            Expanded(
+              child: Text(
+                series.title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+            if (series.genre.isNotEmpty) ...[
+              const SizedBox(width: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF7A18).withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: const Color(0xFFFF7A18).withValues(alpha: 0.4),
+                    width: 0.8,
+                  ),
+                ),
+                child: Text(
+                  series.genre,
+                  style: const TextStyle(
+                    color: Color(0xFFFF7A18),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          // Small creator avatar only
+          GestureDetector(
+            onTap: () {
+              if (isOwner) {
+                context.push('/my-videos');
+              } else {
+                final handle = cleanHandle.isNotEmpty ? cleanHandle : series.creatorId;
+                if (handle.isNotEmpty) {
+                  context.push('/channel/$handle');
+                }
+              }
+            },
+            child: CircleAvatar(
+              radius: 14,
+              backgroundColor: Colors.grey[800],
+              backgroundImage: series.creatorAvatarUrl.isNotEmpty
+                  ? CachedNetworkImageProvider(series.creatorAvatarUrl)
+                  : null,
+              child: series.creatorAvatarUrl.isEmpty
+                  ? const Icon(Icons.person, color: Colors.white, size: 14)
+                  : null,
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.share_outlined, color: Colors.white, size: 20),
+            onPressed: _shareSeries,
+          ),
+          const SizedBox(width: 6),
+        ],
+      ),
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Hero Backdrop Banner
-            Stack(
-              children: [
-                SizedBox(
-                  height: 380,
-                  width: double.infinity,
-                  child: series.bannerUrl.isNotEmpty || series.posterUrl.isNotEmpty
-                      ? CachedNetworkImage(
-                          imageUrl: series.bannerUrl.isNotEmpty
-                              ? series.bannerUrl
-                              : series.posterUrl,
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) => Container(color: Colors.grey[900]),
-                          errorWidget: (context, url, error) => Container(color: Colors.grey[900]),
-                        )
-                      : Container(
-                          decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [Color(0xFF2E0854), Color(0xFF180B26)],
-                              begin: Alignment.topCenter,
-                              end: Alignment.bottomCenter,
-                            ),
-                          ),
-                        ),
-                ),
-
-                // Gradient Vignette
-                Positioned.fill(
-                  child: Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.black.withValues(alpha: 0.3),
-                          Colors.transparent,
-                          const Color(0xFF0F0F13).withValues(alpha: 0.6),
-                          const Color(0xFF0F0F13),
-                        ],
-                        stops: const [0.0, 0.4, 0.75, 1.0],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
-                    ),
-                  ),
-                ),
-
-                // Top Buttons
-                SafeArea(
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        CircleAvatar(
-                          backgroundColor: Colors.black.withValues(alpha: 0.5),
-                          child: IconButton(
-                            icon: const Icon(
-                              Icons.arrow_back_ios_new_rounded,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                            onPressed: () {
-                              if (context.canPop()) {
-                                context.pop();
-                              } else {
-                                context.go('/raftaar-films');
-                              }
-                            },
-                          ),
-                        ),
-                        CircleAvatar(
-                          backgroundColor: Colors.black.withValues(alpha: 0.5),
-                          child: IconButton(
-                            icon: const Icon(Icons.share_outlined, color: Colors.white, size: 20),
-                            onPressed: _shareSeries,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                // Title & Tags over gradient
-                Positioned(
-                  left: 16,
-                  right: 16,
-                  bottom: 16,
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        series.title,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 28,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: -0.5,
-                          shadows: [
-                            Shadow(color: Colors.black, blurRadius: 8),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Row(
-                        children: [
-                          if (series.genre.isNotEmpty) ...[
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withValues(alpha: 0.15),
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                              child: Text(
-                                series.genre,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                          ],
-                          Text(
-                            '•  ${series.episodeCount} Episodes',
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          if (series.totalViews > 0) ...[
-                            const SizedBox(width: 8),
-                            Text(
-                              '•  ${series.totalViews} Views',
-                              style: const TextStyle(
-                                color: Colors.white70,
-                                fontSize: 12,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ],
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ],
-            ),
+            const SizedBox(height: 8),
 
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),

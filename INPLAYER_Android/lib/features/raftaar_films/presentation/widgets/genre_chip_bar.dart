@@ -18,10 +18,10 @@ class GenreChipBar extends StatelessWidget {
     final isDark = context.isDark;
 
     return SizedBox(
-      height: 50,
+      height: 54,
       child: ListView.separated(
         clipBehavior: Clip.none,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
         scrollDirection: Axis.horizontal,
         itemCount: genres.length,
         separatorBuilder: (context, index) => const SizedBox(width: 8),

@@ -167,30 +167,29 @@ export default function RaftaarFilmsLanding() {
 
       {/* Dedicated Compact Raftaar Films Header */}
       <header className="sticky top-0 z-40 bg-black/85 backdrop-blur-2xl border-b border-white/[0.08] px-3 sm:px-6 py-2.5 transition-all">
-        <div className="max-w-7xl mx-auto relative flex items-center justify-between">
-          {/* Small sleek back button without text */}
-          <div className="flex items-center">
+        <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
+          {/* Left: Back button + Raftaar Films Title with 3D Animated Liquid Glass Icon */}
+          <div className="flex items-center gap-2 sm:gap-2.5 min-w-0 shrink">
             <Link
               href="/"
               aria-label="Back"
-              className="flex items-center justify-center w-8 h-8 rounded-full bg-white/[0.08] hover:bg-white/[0.18] border border-white/[0.12] text-zinc-300 hover:text-white transition-all backdrop-blur-md active:scale-95 shadow-sm"
+              className="flex items-center justify-center w-8 h-8 rounded-full bg-white/[0.08] hover:bg-white/[0.18] border border-white/[0.12] text-zinc-300 hover:text-white transition-all backdrop-blur-md active:scale-95 shadow-sm shrink-0"
             >
               <ArrowLeft className="w-4 h-4" />
             </Link>
-          </div>
 
-          {/* Raftaar Films Title in the Middle with 3D Animated Liquid Glass Icon */}
-          <div className="absolute left-1/2 -translate-x-1/2 flex items-center gap-2 pointer-events-auto">
-            <div className="rf-liquid-glass-badge">
-              <Film className="w-3.5 h-3.5 text-white drop-shadow" />
+            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+              <div className="rf-liquid-glass-badge shrink-0">
+                <Film className="w-3.5 h-3.5 text-white drop-shadow" />
+              </div>
+              <span className="font-extrabold text-xs sm:text-sm md:text-base tracking-tight bg-gradient-to-r from-orange-400 via-amber-300 to-orange-500 bg-clip-text text-transparent select-none whitespace-nowrap truncate">
+                Raftaar Films
+              </span>
             </div>
-            <span className="font-extrabold text-sm sm:text-base tracking-tight bg-gradient-to-r from-orange-400 via-amber-300 to-orange-500 bg-clip-text text-transparent select-none whitespace-nowrap">
-              Raftaar Films
-            </span>
           </div>
 
           {/* Right: Search magnifying glass beside Upload/Apply button */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
             {/* Magnifying Glass Search Button */}
             <button
               type="button"
@@ -215,7 +214,7 @@ export default function RaftaarFilmsLanding() {
                 </Link>
                 <Link
                   href="/upload?type=film"
-                  className="inline-flex items-center gap-1 text-[11px] font-black px-3 py-1.5 rounded-full bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-400 hover:from-orange-400 hover:to-yellow-300 text-slate-950 shadow-[0_0_12px_rgba(249,115,22,0.4)] transition-all hover:scale-105 active:scale-95"
+                  className="inline-flex items-center gap-1 text-[11px] font-black px-2.5 sm:px-3 py-1.5 rounded-full bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-400 hover:from-orange-400 hover:to-yellow-300 text-slate-950 shadow-[0_0_12px_rgba(249,115,22,0.4)] transition-all hover:scale-105 active:scale-95"
                 >
                   <Upload className="w-3 h-3 stroke-[2.5]" />
                   <span>Upload</span>
@@ -240,9 +239,10 @@ export default function RaftaarFilmsLanding() {
                     router.push("/raftaar-films/apply");
                   }
                 }}
-                className="text-[11px] font-bold px-3 py-1.5 rounded-full bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white shadow-[0_0_12px_rgba(234,88,12,0.35)] transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
+                className="text-[10px] sm:text-[11px] font-bold px-2.5 sm:px-3 py-1.5 rounded-full bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white shadow-[0_0_12px_rgba(234,88,12,0.35)] transition-all hover:scale-105 active:scale-95 whitespace-nowrap"
               >
-                Apply as Creator
+                <span className="hidden xs:inline">Apply as Creator</span>
+                <span className="xs:hidden">Apply</span>
               </button>
             )}
           </div>

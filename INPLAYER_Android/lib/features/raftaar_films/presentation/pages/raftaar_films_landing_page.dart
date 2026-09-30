@@ -199,7 +199,7 @@ class _RaftaarFilmsLandingPageState
             ),
           ],
         ),
-        centerTitle: true,
+        centerTitle: false,
         actions: [
           IconButton(
             icon: Icon(

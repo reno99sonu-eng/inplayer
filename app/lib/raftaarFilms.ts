@@ -53,10 +53,12 @@ export interface FilmCreatorApplication {
   companyName?: string;
   personalName: string;
   username: string;
+  phoneNumber: string;
+  email: string;
   profilePicUrl?: string;
-  bio: string;
-  portfolioLinks: string[];
-  socialLinks: Record<string, string>;
+  bio?: string;
+  portfolioLinks?: string[];
+  socialLinks?: Record<string, string>;
   status: "pending" | "approved" | "rejected";
   reviewedBy?: string;
   reviewedAt?: string;

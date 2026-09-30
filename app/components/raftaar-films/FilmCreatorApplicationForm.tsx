@@ -13,10 +13,8 @@ export default function FilmCreatorApplicationForm() {
     companyName: '',
     legalName: '',
     handle: '',
-    profilePicture: '',
-    bio: '',
-    portfolioLinks: '',
-    socialLinks: ''
+    email: '',
+    phoneNumber: ''
   });
 
   const [submitting, setSubmitting] = useState(false);
@@ -32,10 +30,11 @@ export default function FilmCreatorApplicationForm() {
       const res = await fetch('/api/raftaar-films/apply');
       if (res.ok) {
         const data = await res.json();
-        if (data && data.status) {
-          setStatus(data.status);
-          if (data.rejectionReason) {
-            setRejectionReason(data.rejectionReason);
+        const app = data?.application || data;
+        if (app && app.status) {
+          setStatus(app.status);
+          if (app.rejectionReason) {
+            setRejectionReason(app.rejectionReason);
           }
         } else {
           setStatus('none');
@@ -166,29 +165,23 @@ export default function FilmCreatorApplicationForm() {
               </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Profile Picture URL *</label>
-              <input required type="url" name="profilePicture" value={formData.profilePicture} onChange={handleChange} placeholder="https://..." className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
-              <p className="text-xs text-gray-500 mt-1">Provide a link to your channel logo or profile photo.</p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email ID *</label>
+                <input required type="email" name="email" value={formData.email} onChange={handleChange} placeholder="creator@example.com" className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Phone Number *</label>
+                <input required type="tel" name="phoneNumber" value={formData.phoneNumber} onChange={handleChange} placeholder="+91 98765 43210" className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white" />
+              </div>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Bio / Channel Pitch *</label>
-              <textarea required name="bio" value={formData.bio} onChange={handleChange} rows={4} placeholder="What kind of micro-dramas will you produce?" className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"></textarea>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Portfolio Links</label>
-              <textarea name="portfolioLinks" value={formData.portfolioLinks} onChange={handleChange} rows={2} placeholder="YouTube, Instagram, Vimeo links..." className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"></textarea>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Social Links</label>
-              <textarea name="socialLinks" value={formData.socialLinks} onChange={handleChange} rows={2} placeholder="Instagram, Twitter/X, LinkedIn..." className="w-full px-3 py-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"></textarea>
+            <div className="rounded-lg bg-slate-50 dark:bg-slate-700/40 border border-slate-200 dark:border-slate-600 p-3 text-xs text-slate-600 dark:text-slate-300">
+              💡 <strong>Note:</strong> You can upload your Profile Picture and set your Channel Bio and Social Links inside <strong>My Profile</strong> after creating your account.
             </div>
 
             <div className="pt-4">
-              <button disabled={submitting} type="submit" className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-md disabled:opacity-50">
+              <button disabled={submitting} type="submit" className="w-full bg-orange-600 hover:bg-orange-700 text-white font-bold py-3 px-4 rounded-md transition-colors disabled:opacity-50">
                 {submitting ? 'Submitting...' : 'Submit Application'}
               </button>
             </div>

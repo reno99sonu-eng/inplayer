@@ -17,6 +17,10 @@ class EditProfilePage extends ConsumerStatefulWidget {
 class _EditProfilePageState extends ConsumerState<EditProfilePage> {
   late final TextEditingController _nameController;
   late final TextEditingController _bioController;
+  late final TextEditingController _instagramController;
+  late final TextEditingController _youtubeController;
+  late final TextEditingController _xController;
+  late final TextEditingController _facebookController;
   bool _saving = false;
 
   Widget _buildSectionHeader(String label) {
@@ -41,6 +45,15 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     final user = authState is AuthStateAuthenticated ? authState.user : null;
     _nameController = TextEditingController(text: user?.name ?? '');
     _bioController = TextEditingController(text: user?.bio ?? '');
+
+    final socials = user?.socialLinks ?? {};
+    _instagramController =
+        TextEditingController(text: socials['instagram'] ?? '');
+    _youtubeController =
+        TextEditingController(text: socials['youtube'] ?? '');
+    _xController = TextEditingController(text: socials['x'] ?? '');
+    _facebookController =
+        TextEditingController(text: socials['facebook'] ?? '');
     
     // Refresh quietly in background
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -55,6 +68,19 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
           if (_bioController.text == user?.bio) {
             _bioController.text = freshUser.bio;
           }
+          final freshSocials = freshUser.socialLinks;
+          if (_instagramController.text.isEmpty && freshSocials.containsKey('instagram')) {
+            _instagramController.text = freshSocials['instagram']!;
+          }
+          if (_youtubeController.text.isEmpty && freshSocials.containsKey('youtube')) {
+            _youtubeController.text = freshSocials['youtube']!;
+          }
+          if (_xController.text.isEmpty && freshSocials.containsKey('x')) {
+            _xController.text = freshSocials['x']!;
+          }
+          if (_facebookController.text.isEmpty && freshSocials.containsKey('facebook')) {
+            _facebookController.text = freshSocials['facebook']!;
+          }
         }
       });
     });
@@ -64,6 +90,10 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
   void dispose() {
     _nameController.dispose();
     _bioController.dispose();
+    _instagramController.dispose();
+    _youtubeController.dispose();
+    _xController.dispose();
+    _facebookController.dispose();
     super.dispose();
   }
 
@@ -84,23 +114,47 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
     final service = ref.read(settingsServiceProvider);
     final bio = _bioController.text.trim();
 
+    final socialMap = <String, String>{};
+    if (_instagramController.text.trim().isNotEmpty) {
+      socialMap['instagram'] = _instagramController.text.trim();
+    }
+    if (_youtubeController.text.trim().isNotEmpty) {
+      socialMap['youtube'] = _youtubeController.text.trim();
+    }
+    if (_xController.text.trim().isNotEmpty) {
+      socialMap['x'] = _xController.text.trim();
+    }
+    if (_facebookController.text.trim().isNotEmpty) {
+      socialMap['facebook'] = _facebookController.text.trim();
+    }
+
+    final authState = ref.read(authStateProvider);
+    final user = authState is AuthStateAuthenticated ? authState.user : null;
+
     final results = await Future.wait([
       service.updateName(name),
       service.updateBio(bio),
+      service.updateSocialLinks(social: socialMap, other: user?.otherLinks ?? []),
     ]);
 
     if (!mounted) return;
     setState(() => _saving = false);
 
-    if (results.every((ok) => ok)) {
-      ref
-          .read(authStateProvider.notifier)
-          .updateLocalUser((u) => u.copyWith(name: name, bio: bio));
+    final nameOk = results[0] as bool;
+    final bioOk = results[1] as bool;
+    final socialRes = results[2] as SettingsActionResult;
+
+    if (nameOk && bioOk && socialRes.success) {
+      ref.read(authStateProvider.notifier).updateLocalUser((u) => u.copyWith(
+            name: name,
+            bio: bio,
+            socialLinks: socialMap,
+          ));
       Navigator.of(context).pop();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text("Couldn't save your profile. Please try again."),
+          content: Text(socialRes.error ?? "Couldn't save your profile. Please try again."),
           backgroundColor: context.isDark ? AppColors.surfaceDark : AppColors.surfaceLight,
         ),
       );
@@ -234,9 +288,37 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    'Tap the camera icon to change your profile photo',
+                    'Tap the camera icon or button below to upload your photo',
                     textAlign: TextAlign.center,
                     style: TextStyle(color: context.textDim, fontSize: 12),
+                  ),
+                  const SizedBox(height: 10),
+                  OutlinedButton.icon(
+                    onPressed: () async {
+                      final dataUrl = await pickImageAsDataUrl(
+                        maxDimension: 800,
+                        quality: 75,
+                        maxChars: 150000,
+                      );
+                      if (dataUrl != null) {
+                        final ok = await ref.read(settingsServiceProvider).updateAvatar(dataUrl);
+                        if (!context.mounted) return;
+                        if (ok) {
+                          ref.read(authStateProvider.notifier).updateLocalUser((u) => u.copyWith(avatarUrl: dataUrl));
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            const SnackBar(content: Text('Avatar updated!'), backgroundColor: Color(0xFF10B981)),
+                          );
+                          setState(() {});
+                        }
+                      }
+                    },
+                    icon: const Icon(Icons.file_upload_outlined, size: 16, color: AppColors.brandOrange),
+                    label: const Text('Upload Photo', style: TextStyle(color: AppColors.brandOrange, fontWeight: FontWeight.w700, fontSize: 12)),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: AppColors.brandOrange, width: 1.2),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    ),
                   ),
                 ],
               ),
@@ -269,6 +351,45 @@ class _EditProfilePageState extends ConsumerState<EditProfilePage> {
                     maxLines: 4,
                     style: TextStyle(color: context.textPrimary),
                     decoration: _fieldDecoration('Tell viewers about your channel'),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: context.bgCard,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: context.borderSubtle),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSectionHeader('Social Links'),
+                  const SizedBox(height: 4),
+                  TextField(
+                    controller: _instagramController,
+                    style: TextStyle(color: context.textPrimary),
+                    decoration: _fieldDecoration('Instagram: instagram.com/yourname'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _youtubeController,
+                    style: TextStyle(color: context.textPrimary),
+                    decoration: _fieldDecoration('YouTube: youtube.com/@channel'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _xController,
+                    style: TextStyle(color: context.textPrimary),
+                    decoration: _fieldDecoration('X (Twitter): x.com/yourname'),
+                  ),
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: _facebookController,
+                    style: TextStyle(color: context.textPrimary),
+                    decoration: _fieldDecoration('Facebook: facebook.com/yourname'),
                   ),
                 ],
               ),

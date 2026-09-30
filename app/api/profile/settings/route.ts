@@ -90,8 +90,8 @@ export async function POST(request: NextRequest) {
   }
 
   if (action === "update_bio") {
-    const { description } = body;
-    const trimmed = typeof description === "string" ? description.trim().slice(0, 500) : "";
+    const raw = typeof body.description === "string" ? body.description : typeof body.bio === "string" ? body.bio : "";
+    const trimmed = raw.trim().slice(0, 500);
 
     // This is the real, persisted channel bio — the public channel page
     // (app/api/users/[username]/route.ts) reads this same "description"
@@ -101,7 +101,7 @@ export async function POST(request: NextRequest) {
       new UpdateCommand({
         TableName: "InPlayer-Users",
         Key: { userId: user.userId },
-        UpdateExpression: "SET description = :d, updatedAt = :u",
+        UpdateExpression: "SET description = :d, bio = :d, updatedAt = :u",
         ExpressionAttributeValues: {
           ":d": trimmed,
           ":u": new Date().toISOString(),

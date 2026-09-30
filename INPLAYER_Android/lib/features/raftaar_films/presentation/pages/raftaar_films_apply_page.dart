@@ -26,8 +26,8 @@ class _RaftaarFilmsApplyPageState
   final _personalNameCtrl = TextEditingController();
   final _companyCtrl = TextEditingController();
   final _usernameCtrl = TextEditingController();
-  final _bioCtrl = TextEditingController();
-  final _portfolioCtrl = TextEditingController();
+  final _phoneCtrl = TextEditingController();
+  final _emailCtrl = TextEditingController();
 
   FilmCreatorApplication? _existingApp;
   bool _isLoading = true;
@@ -46,8 +46,8 @@ class _RaftaarFilmsApplyPageState
     _personalNameCtrl.dispose();
     _companyCtrl.dispose();
     _usernameCtrl.dispose();
-    _bioCtrl.dispose();
-    _portfolioCtrl.dispose();
+    _phoneCtrl.dispose();
+    _emailCtrl.dispose();
     super.dispose();
   }
 
@@ -82,12 +82,6 @@ class _RaftaarFilmsApplyPageState
       _error = null;
     });
 
-    final links = _portfolioCtrl.text
-        .split(RegExp(r'[,\n]'))
-        .map((s) => s.trim())
-        .where((s) => s.isNotEmpty)
-        .toList();
-
     final data = {
       'channelName': _channelNameCtrl.text.trim(),
       'personalName': _personalNameCtrl.text.trim(),
@@ -95,8 +89,8 @@ class _RaftaarFilmsApplyPageState
           ? _companyCtrl.text.trim()
           : null,
       'username': _usernameCtrl.text.trim(),
-      'bio': _bioCtrl.text.trim(),
-      'portfolioLinks': links,
+      'email': _emailCtrl.text.trim(),
+      'phoneNumber': _phoneCtrl.text.trim(),
     };
 
     final service = ref.read(raftaarFilmsServiceProvider);
@@ -126,9 +120,19 @@ class _RaftaarFilmsApplyPageState
     final authState = ref.watch(authStateProvider);
     final user = authState is AuthStateAuthenticated ? authState.user : null;
 
-    if (user != null && _usernameCtrl.text.isEmpty) {
-      _usernameCtrl.text = user.username;
-      _personalNameCtrl.text = user.name;
+    if (user != null) {
+      if (_usernameCtrl.text.isEmpty) {
+        _usernameCtrl.text = user.handle ?? user.username;
+      }
+      if (_personalNameCtrl.text.isEmpty) {
+        _personalNameCtrl.text = user.name;
+      }
+      if (_emailCtrl.text.isEmpty && user.email.isNotEmpty) {
+        _emailCtrl.text = user.email;
+      }
+      if (_phoneCtrl.text.isEmpty && (user.phoneNumber?.isNotEmpty ?? false)) {
+        _phoneCtrl.text = user.phoneNumber!;
+      }
     }
 
     return Scaffold(
@@ -418,22 +422,73 @@ class _RaftaarFilmsApplyPageState
                             ),
                             const SizedBox(height: 14),
                             _buildTextField(
-                              label: 'Channel Pitch & Micro-Drama Concept *',
-                              controller: _bioCtrl,
-                              hint:
-                                  'What genre and stories will you produce? (e.g. suspense thriller, romantic drama...)',
-                              maxLines: 4,
-                              validator: (val) =>
-                                  val == null || val.trim().length < 20
-                                      ? 'Please describe your concept (at least 20 characters)'
-                                      : null,
+                              label: 'Email ID *',
+                              controller: _emailCtrl,
+                              hint: 'creator@example.com',
+                              keyboardType: TextInputType.emailAddress,
+                              validator: (val) {
+                                if (val == null || val.trim().isEmpty) {
+                                  return 'Email is required';
+                                }
+                                if (!val.contains('@') || !val.contains('.')) {
+                                  return 'Enter a valid email address';
+                                }
+                                return null;
+                              },
                             ),
                             const SizedBox(height: 14),
                             _buildTextField(
-                              label: 'Portfolio Links (YouTube, Instagram, Reels)',
-                              controller: _portfolioCtrl,
-                              hint: 'https://youtube.com/@channel, https://instagram.com/...',
-                              maxLines: 2,
+                              label: 'Phone Number *',
+                              controller: _phoneCtrl,
+                              hint: '+91 98765 43210',
+                              keyboardType: TextInputType.phone,
+                              validator: (val) {
+                                if (val == null || val.trim().isEmpty) {
+                                  return 'Phone number is required';
+                                }
+                                if (val.trim().length < 7) {
+                                  return 'Enter a valid phone number';
+                                }
+                                return null;
+                              },
+                            ),
+                            const SizedBox(height: 16),
+                            Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: BoxDecoration(
+                                color: isDark
+                                    ? Colors.white.withValues(alpha: 0.05)
+                                    : Colors.black.withValues(alpha: 0.03),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(
+                                  color: isDark
+                                      ? Colors.white.withValues(alpha: 0.1)
+                                      : Colors.black.withValues(alpha: 0.08),
+                                ),
+                              ),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Icon(
+                                    Icons.info_outline_rounded,
+                                    color: Color(0xFFFF7A18),
+                                    size: 18,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'You can upload your Profile Picture, and set your Channel Bio and Social Links inside My Profile (Settings > Edit Profile) once your account is created.',
+                                      style: TextStyle(
+                                        color: isDark
+                                            ? Colors.white.withValues(alpha: 0.7)
+                                            : Colors.black87,
+                                        fontSize: 12,
+                                        height: 1.4,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                             const SizedBox(height: 24),
 
@@ -509,6 +564,7 @@ class _RaftaarFilmsApplyPageState
     required TextEditingController controller,
     String? hint,
     int maxLines = 1,
+    TextInputType? keyboardType,
     String? Function(String?)? validator,
   }) {
     final isDark = context.isDark;
@@ -528,6 +584,7 @@ class _RaftaarFilmsApplyPageState
         TextFormField(
           controller: controller,
           maxLines: maxLines,
+          keyboardType: keyboardType,
           validator: validator,
           style: TextStyle(color: isDark ? Colors.white : Colors.black87),
           decoration: InputDecoration(

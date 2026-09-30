@@ -5,6 +5,8 @@ class FilmCreatorApplication {
   final String personalName;
   final String? companyName;
   final String username;
+  final String? phoneNumber;
+  final String? email;
   final String status;
   final String? rejectionReason;
   final String submittedAt;
@@ -17,6 +19,8 @@ class FilmCreatorApplication {
     required this.personalName,
     this.companyName,
     required this.username,
+    this.phoneNumber,
+    this.email,
     required this.status,
     this.rejectionReason,
     required this.submittedAt,
@@ -31,6 +35,8 @@ class FilmCreatorApplication {
       personalName: json['personalName'] ?? '',
       companyName: json['companyName'] as String?,
       username: json['username'] ?? '',
+      phoneNumber: json['phoneNumber']?.toString() ?? json['phone']?.toString(),
+      email: json['email']?.toString(),
       status: json['status'] ?? 'pending',
       rejectionReason: json['rejectionReason'] as String?,
       submittedAt: json['submittedAt'] ?? '',

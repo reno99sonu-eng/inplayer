@@ -22,10 +22,12 @@ interface Application {
   companyName?: string;
   personalName: string;
   username: string;
+  phoneNumber?: string;
+  email?: string;
   profilePicUrl?: string;
-  bio: string;
-  portfolioLinks: string[];
-  socialLinks: Record<string, string>;
+  bio?: string;
+  portfolioLinks?: string[];
+  socialLinks?: Record<string, string>;
   status: "pending" | "approved" | "rejected";
   submittedAt: string;
   reviewedBy?: string;
@@ -242,18 +244,22 @@ export default function RaftaarFilmsApplicationsPage() {
                       </span>
                     </div>
 
-                    <p className="mt-1 text-xs text-slate-300 light:text-slate-700 line-clamp-2">
-                      {app.bio}
-                    </p>
+                    {app.bio && (
+                      <p className="mt-1 text-xs text-slate-300 light:text-slate-700 line-clamp-2">
+                        {app.bio}
+                      </p>
+                    )}
 
                     <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-400">
                       <span>👤 Legal Name: {app.personalName}</span>
+                      {app.email && <span>✉️ Email: <strong className="text-slate-200">{app.email}</strong></span>}
+                      {app.phoneNumber && <span>📞 Phone: <strong className="text-slate-200">{app.phoneNumber}</strong></span>}
                       <span>📅 Submitted: {new Date(app.submittedAt).toLocaleDateString()}</span>
                       {app.reviewedBy && <span>Reviewed by: {app.reviewedBy}</span>}
                     </div>
 
                     {/* Portfolio & Social links */}
-                    {(app.portfolioLinks?.length > 0 || (app.socialLinks && Object.keys(app.socialLinks).length > 0)) && (
+                    {((app.portfolioLinks && app.portfolioLinks.length > 0) || (app.socialLinks && Object.keys(app.socialLinks).length > 0)) && (
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         {app.portfolioLinks?.map((link, idx) => (
                           <a

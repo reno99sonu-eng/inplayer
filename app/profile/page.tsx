@@ -25,6 +25,7 @@ import { isValidUsernameFormat } from "@/app/lib/username";
 
 const SOCIAL_PLATFORMS = [
   { key: "instagram", label: "Instagram", placeholder: "instagram.com/yourname" },
+  { key: "youtube", label: "YouTube", placeholder: "youtube.com/@channel" },
   { key: "x", label: "X (Twitter)", placeholder: "x.com/yourname" },
   { key: "facebook", label: "Facebook", placeholder: "facebook.com/yourname" },
 ] as const;
@@ -278,6 +279,47 @@ export default function ProfilePage() {
       await refreshUser();
       setAgeMessage("Age saved.");
     } catch { setAgeMessage("Couldn't save your age."); } finally { setSavingAge(false); }
+  };
+
+  // ---- Bio ----
+  const [bioDraft, setBioDraft] = useState("");
+  const [savingBio, setSavingBio] = useState(false);
+  const [bioSaved, setBioSaved] = useState(false);
+  const [bioError, setBioError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (user?.bio) setBioDraft(user.bio);
+  }, [user?.bio]);
+
+  const handleSaveBio = async () => {
+    setSavingBio(true);
+    setBioError(null);
+    try {
+      const session = await fetchAuthSession();
+      const idToken = session.tokens?.idToken?.toString();
+      const res = await fetch("/api/profile/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${idToken}` },
+        body: JSON.stringify({
+          action: "update_bio",
+          description: bioDraft.trim(),
+          bio: bioDraft.trim(),
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setBioError(data.error || "Couldn't save your bio.");
+        return;
+      }
+      await refreshUser();
+      setBioSaved(true);
+      setTimeout(() => setBioSaved(false), 2000);
+    } catch (err) {
+      console.error("Failed to save bio:", err);
+      setBioError("Couldn't save your bio. Please try again.");
+    } finally {
+      setSavingBio(false);
+    }
   };
 
   // ---- Username (handle) ----
@@ -646,6 +688,16 @@ export default function ProfilePage() {
               onChange={handleAvatarChange}
             />
           </div>
+
+          <button
+            type="button"
+            onClick={handleAvatarClick}
+            disabled={uploadingAvatar}
+            className="mt-3 flex items-center gap-1.5 rounded-full border border-orange-400/30 bg-orange-500/10 px-4 py-1.5 text-xs font-bold text-orange-300 light:text-orange-700 transition hover:bg-orange-500/20 disabled:opacity-60"
+          >
+            <Camera size={14} />
+            {uploadingAvatar ? "Uploading photo..." : "Upload Profile Picture"}
+          </button>
         </div>
 
         <div className="mt-8 space-y-5">
@@ -717,6 +769,47 @@ export default function ProfilePage() {
           >
             {savingName ? "Saving..." : saved ? "Saved ✓" : "Save Changes"}
           </button>
+        </div>
+
+        {/* Channel Bio */}
+        <div className="mt-8 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.02] light:bg-black/[0.02] p-5">
+          <div className="flex items-center justify-between">
+            <h2 className="flex items-center gap-2 text-sm font-black text-white light:text-slate-900">
+              <span className="text-orange-400">📝</span>
+              Channel Bio & Pitch
+            </h2>
+            <span className="text-xs text-slate-400 light:text-slate-600">
+              {bioDraft.length}/500
+            </span>
+          </div>
+          <p className="mt-1 text-xs text-slate-400 light:text-slate-600">
+            Tell viewers about your channel, series, concept, and background. Shown publicly on your channel page.
+          </p>
+
+          <div className="mt-4">
+            <textarea
+              value={bioDraft}
+              onChange={(e) => setBioDraft(e.target.value.slice(0, 500))}
+              rows={4}
+              placeholder="Tell viewers and subscribers about your channel, content style, upcoming films, and stories..."
+              className="w-full rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4 text-sm text-white light:text-slate-900 caret-orange-400 outline-none transition focus:border-orange-400/50"
+            />
+
+            {bioError && (
+              <p className="mt-2 rounded-xl border border-red-500/20 bg-red-500/10 p-2.5 text-xs text-red-300 light:text-red-700">
+                {bioError}
+              </p>
+            )}
+
+            <button
+              type="button"
+              onClick={handleSaveBio}
+              disabled={savingBio}
+              className="mt-3 w-full rounded-2xl bg-gradient-to-r from-orange-500 to-amber-400 py-3 text-sm font-bold text-white transition hover:scale-[1.01] disabled:opacity-40 disabled:hover:scale-100"
+            >
+              {savingBio ? "Saving Bio..." : bioSaved ? "Bio Saved ✓" : "Save Bio"}
+            </button>
+          </div>
         </div>
 
         {/* Username */}

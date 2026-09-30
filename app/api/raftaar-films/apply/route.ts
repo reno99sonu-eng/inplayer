@@ -32,9 +32,28 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
+    const channelName = body.channelName?.trim();
+    const personalName = body.personalName?.trim() || body.legalName?.trim();
+    const username = body.username?.trim() || body.handle?.trim();
+    const phoneNumber = body.phoneNumber?.trim() || body.phone?.trim();
+    const email = body.email?.trim();
+    const companyName = body.companyName?.trim() || undefined;
+
+    if (!channelName || !personalName || !username || !phoneNumber || !email) {
+      return NextResponse.json(
+        { error: "Channel name, personal name, username, phone number, and email are required." },
+        { status: 400 }
+      );
+    }
+
     const application = await submitApplication({
-      ...body,
       userId: auth.userId,
+      channelName,
+      personalName,
+      username,
+      phoneNumber,
+      email,
+      companyName,
     });
 
     return NextResponse.json({ application }, { status: 201 });

@@ -1,0 +1,199 @@
+/* ═══════════════════════════════════════════════════════════
+   Raftaar Films — 3D Premium Design System
+   Zero external dependencies. Pure CSS transforms + keyframes.
+   ═══════════════════════════════════════════════════════════ */
+
+/* ── Liquid gradient text ── */
+@keyframes rf-liquid {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* ── 3D logo flip-in from below the screen plane ── */
+@keyframes rf-logo-enter {
+  0%   { opacity: 0; transform: perspective(1200px) rotateX(90deg) translateZ(-80px); }
+  40%  { opacity: 1; transform: perspective(1200px) rotateX(-12deg) translateZ(30px); }
+  65%  { transform: perspective(1200px) rotateX(6deg) translateZ(0); }
+  100% { opacity: 1; transform: perspective(1200px) rotateX(0deg) translateZ(0); }
+}
+
+/* ── Subtitle rise ── */
+@keyframes rf-rise {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Light-beam sweep across the logo ── */
+@keyframes rf-beam {
+  0%   { left: -60%; opacity: 0; }
+  5%   { opacity: 1; }
+  95%  { opacity: 1; }
+  100% { left: 120%; opacity: 0; }
+}
+
+/* ── Overlay fade-out ── */
+@keyframes rf-exit {
+  from { opacity: 1; }
+  to   { opacity: 0; pointer-events: none; }
+}
+
+/* ── Ambient glow pulse ── */
+@keyframes rf-glow-pulse {
+  0%, 100% { opacity: 0.25; transform: scale(1); }
+  50%       { opacity: 0.55; transform: scale(1.15); }
+}
+
+/* ── Scroll-reveal 3D ── */
+@keyframes rf-scroll-in {
+  from { opacity: 0; transform: perspective(900px) translateY(40px) rotateX(12deg); }
+  to   { opacity: 1; transform: perspective(900px) translateY(0) rotateX(0deg); }
+}
+
+/* ─────────── INTRO OVERLAY ─────────── */
+.rf-intro-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #08080f;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.rf-intro-overlay.rf-intro-exiting {
+  animation: rf-exit 0.6s ease forwards;
+}
+
+.rf-intro-bg-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  animation: rf-glow-pulse 3s ease-in-out infinite;
+}
+
+.rf-intro-logo {
+  position: relative;
+  font-size: clamp(2.5rem, 8vw, 6rem);
+  font-weight: 900;
+  letter-spacing: -0.03em;
+  line-height: 1;
+  background: linear-gradient(135deg, #FF7A18 0%, #FFD700 40%, #FF4500 70%, #FF9A00 100%);
+  background-size: 300% 300%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: rf-logo-enter 0.9s cubic-bezier(0.22, 1, 0.36, 1) forwards,
+             rf-liquid 4s ease infinite;
+  opacity: 0;
+}
+
+.rf-intro-beam {
+  position: absolute;
+  top: 0;
+  width: 25%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.12), transparent);
+  transform: skewX(-15deg);
+  animation: rf-beam 1.8s ease 0.4s forwards;
+}
+
+.rf-intro-subtitle {
+  margin-top: 1rem;
+  font-size: clamp(0.9rem, 2.5vw, 1.25rem);
+  color: rgba(255,255,255,0.55);
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  font-weight: 600;
+  animation: rf-rise 0.7s ease 0.8s both;
+}
+
+.rf-intro-line {
+  margin-top: 2rem;
+  width: 120px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #FF7A18, transparent);
+  animation: rf-rise 0.5s ease 1.2s both;
+}
+
+/* ─────────── CARD 3D ─────────── */
+.rf-card-3d {
+  transform-style: preserve-3d;
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.35s ease;
+}
+.rf-card-3d:hover {
+  transform: translateY(-10px) rotateX(4deg) rotateY(-4deg) scale(1.025);
+  box-shadow:
+    0 28px 60px rgba(255, 122, 24, 0.22),
+    0 10px 30px rgba(0, 0, 0, 0.55);
+}
+
+/* ─────────── LIQUID BUTTON ─────────── */
+.rf-btn-liquid {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #FF7A18, #FF9A00, #FF4500, #FF7A18);
+  background-size: 300% 300%;
+  animation: rf-liquid 3s ease infinite;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+.rf-btn-liquid:hover {
+  transform: translateY(-3px) scale(1.03);
+  box-shadow: 0 12px 36px rgba(255, 122, 24, 0.55);
+}
+.rf-btn-liquid::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  left: -70%;
+  width: 35%;
+  background: rgba(255, 255, 255, 0.15);
+  transform: skewX(-15deg);
+  transition: left 0.6s ease;
+}
+.rf-btn-liquid:hover::after { left: 130%; }
+
+/* ─────────── SCROLL REVEAL ─────────── */
+.rf-reveal {
+  opacity: 0;
+  transform: perspective(900px) translateY(40px) rotateX(12deg);
+  transition: opacity 0.65s ease, transform 0.65s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.rf-reveal.rf-visible {
+  opacity: 1;
+  transform: perspective(900px) translateY(0) rotateX(0deg);
+}
+
+/* ─────────── GENRE CHIP ─────────── */
+.rf-chip {
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.25s ease;
+  cursor: pointer;
+}
+.rf-chip:hover {
+  transform: translateY(-4px) scale(1.08);
+  box-shadow: 0 8px 24px rgba(255, 122, 24, 0.3);
+}
+.rf-chip-active {
+  background: linear-gradient(135deg, #FF7A18, #FF9A00) !important;
+  box-shadow: 0 4px 18px rgba(255, 122, 24, 0.5);
+  transform: translateY(-2px);
+}
+
+/* ─────────── HERO PARALLAX ─────────── */
+.rf-hero {
+  transform-style: preserve-3d;
+  transition: transform 0.12s linear;
+}
+
+/* ─────────── GLASS CARD ─────────── */
+.rf-glass {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}

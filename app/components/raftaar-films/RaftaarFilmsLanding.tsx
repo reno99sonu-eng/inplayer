@@ -119,7 +119,7 @@ export default function RaftaarFilmsLanding() {
           
           <h2 className="text-3xl md:text-4xl font-bold mb-4 relative z-10">Got a Story to Tell?</h2>
           <p className="text-zinc-400 max-w-2xl mx-auto mb-8 relative z-10">
-            Join Raftaar Films as a creator and bring your micro-drama series to millions of viewers. Monetize your content from day one.
+            Join Raftaar Films as a creator and bring your micro-drama series to millions of viewers. Share your content and build a dedicated fanbase from day one.
           </p>
           <div className="relative z-10">
             <Link href="/raftaar-films/apply" className="inline-block bg-white text-black px-8 py-4 rounded-full font-bold hover:bg-zinc-200 transition-colors">

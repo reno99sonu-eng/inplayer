@@ -147,17 +147,29 @@ class _RaftaarFilmsLandingPageState
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.all(6),
               decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFFFF7A18), Color(0xFFFF9A00)],
-                ),
-                borderRadius: BorderRadius.circular(8),
+                borderRadius: BorderRadius.circular(10),
+                boxShadow: [
+                  BoxShadow(
+                    color: const Color(0xFFFF7A18).withValues(alpha: 0.5),
+                    blurRadius: 16,
+                    spreadRadius: 2,
+                  ),
+                ],
               ),
-              child: const Icon(
-                Icons.movie_filter_rounded,
-                color: Colors.white,
-                size: 18,
+              child: Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFFFF7A18), Color(0xFFFF9A00)],
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.movie_filter_rounded,
+                  color: Colors.white,
+                  size: 18,
+                ),
               ),
             ),
             const SizedBox(width: 10),
@@ -205,7 +217,7 @@ class _RaftaarFilmsLandingPageState
               // Search Bar
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.only(top: 10, bottom: 12),
+                  padding: const EdgeInsets.fromLTRB(4, 10, 4, 12),
                   child: FilmSearchBar(
                     controller: _searchController,
                     onChanged: (val) => _filterSeries(),

@@ -88,7 +88,8 @@ export type AuditTargetType =
   | "midroll_ad"
   | "sponsorship"
   | "team_member"
-  | "invitation";
+  | "invitation"
+  | "copyright_report";
 
 // Which admin panel an action belongs to. Derived from the action name
 // rather than stored on the row, deliberately: every entry already written

@@ -23,7 +23,7 @@ export default function RaftaarFilmsApplyPage() {
           <div className="space-y-6">
             <div>
               <h3 className="text-lg font-medium text-gray-900 dark:text-white">What is Raftaar Films?</h3>
-              <p className="mt-2 text-gray-600 dark:text-gray-300">Raftaar Films is our premium tier for vertical micro-dramas. Creators can monetize their short-form series directly with our audience.</p>
+              <p className="mt-2 text-gray-600 dark:text-gray-300">Raftaar Films is our premium vertical micro-drama platform. Creators can share their short-form series directly with our audience and build a dedicated fanbase.</p>
             </div>
             <div>
               <h3 className="text-lg font-medium text-gray-900 dark:text-white">How long does the review take?</h3>

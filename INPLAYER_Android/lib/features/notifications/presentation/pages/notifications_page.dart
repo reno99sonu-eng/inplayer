@@ -79,7 +79,7 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
       return Icons.share_rounded;
     }
     if (type == 'copyright' || msg.contains('copyright')) {
-      return Icons.copyright_rounded;
+      return Icons.gpp_bad_outlined;
     }
     if (type == 'ai_flag' ||
         msg.contains('violating') ||
@@ -124,7 +124,7 @@ class _NotificationsPageState extends ConsumerState<NotificationsPage> {
       return Colors.amber.shade700;
     }
     if (type == 'copyright' || msg.contains('copyright')) {
-      return AppColors.brandOrange;
+      return Colors.redAccent;
     }
     if (type == 'like') {
       return Colors.redAccent;

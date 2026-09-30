@@ -268,7 +268,7 @@ export default function FilmSeriesManager() {
             <Sparkles className="mx-auto h-12 w-12 text-orange-400 mb-3" />
             <h3 className="text-lg font-bold text-white light:text-slate-900">Become a Raftaar Films Creator</h3>
             <p className="mx-auto mt-2 max-w-md text-xs text-slate-400 light:text-slate-600 leading-relaxed">
-              Raftaar Films is our dedicated vertical micro-drama format. Verified creators can release episodic series with dedicated channels, follower notifications, and built-in monetization.
+              Raftaar Films is our dedicated vertical micro-drama format. Verified creators can release episodic series with dedicated channels, follower notifications, and built-in audience growth.
             </p>
             <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
               <Link

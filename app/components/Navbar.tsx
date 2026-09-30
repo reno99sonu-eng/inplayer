@@ -17,11 +17,13 @@ import MobileSearchOverlay from "./MobileSearchOverlay";
 import { useRouter, usePathname } from "next/navigation";
 import { CONTACT_EMAILS } from "@/app/lib/contactEmails";
 import { getSiteDomain } from "@/app/lib/siteDomain";
+import RaftaarFilmsIntro from "@/app/components/raftaar-films/RaftaarFilmsIntro";
 
 
 
 export default function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
+  const [rfIntroActive, setRfIntroActive] = useState(false);
   const pathname = usePathname();
   // Which panel we're on (inplayer / hammart / sponsorship) — drives the
   // hamburger "Support" entry below, which every panel except Hammart gets.
@@ -217,6 +219,14 @@ export default function Navbar() {
 
   return (
     <>
+      {rfIntroActive && (
+        <RaftaarFilmsIntro
+          onComplete={() => {
+            setRfIntroActive(false);
+            goTo("/raftaar-films");
+          }}
+        />
+      )}
       <header
         className="
           relative
@@ -570,9 +580,11 @@ export default function Navbar() {
   open={mobileSearchOpen}
   onClose={() => setMobileSearchOpen(false)}
 />
-      <Suspense fallback={<div className="h-[48px] border-b border-white/5 light:border-black/10 bg-[#06101D]/95 light:bg-[#F5EEDC]/95" />}>
-        <NavigationCategories />
-      </Suspense>
+      {!pathname.startsWith("/raftaar-films") && (
+        <Suspense fallback={<div className="h-[48px] border-b border-white/5 light:border-black/10 bg-[#06101D]/95 light:bg-[#F5EEDC]/95" />}>
+          <NavigationCategories />
+        </Suspense>
+      )}
       {/* Backdrop */}
       <div
         className={`fixed inset-0 z-[90] bg-black/50 backdrop-blur-md transition-all duration-300 ${
@@ -692,7 +704,10 @@ lg:right-auto
               </button>
 
               <button
-                onClick={() => goTo("/raftaar-films")}
+                onClick={() => {
+                  setMenuOpen(false);
+                  setRfIntroActive(true);
+                }}
                 className="
                   flex
                   w-full

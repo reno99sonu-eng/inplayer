@@ -13,6 +13,7 @@ import '../../../../providers/auth_provider.dart';
 import '../../../../services/video_service.dart';
 import '../../../auth/presentation/widgets/auth_modals.dart';
 import 'content_access_drawer_section.dart';
+import '../../../raftaar_films/presentation/widgets/raftaar_films_intro_animation.dart';
 
 class MobileMenuDrawer extends ConsumerStatefulWidget {
   const MobileMenuDrawer({super.key});
@@ -191,9 +192,19 @@ class _MobileMenuDrawerState extends ConsumerState<MobileMenuDrawer> {
                     _buildMenuItem(
                       icon: Icons.movie_filter_outlined,
                       title: 'Raftaar Films',
-                      onTap: () {
+                      onTap: () async {
                         Navigator.pop(context);
-                        context.push('/raftaar-films');
+                        await showGeneralDialog(
+                          context: context,
+                          barrierDismissible: false,
+                          barrierColor: Colors.transparent,
+                          pageBuilder: (ctx, _, __) => RaftaarFilmsIntroAnimation(
+                            onComplete: () {
+                              Navigator.of(ctx).pop();
+                              context.push('/raftaar-films');
+                            },
+                          ),
+                        );
                       },
                     ),
                     _buildMenuItem(

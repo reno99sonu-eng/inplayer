@@ -11,7 +11,7 @@ interface SeriesCardProps {
 export default function SeriesCard({ series, onClick }: SeriesCardProps) {
   return (
     <Link href={`/raftaar-films/${series.seriesId}`} onClick={onClick}>
-      <div className="group relative aspect-[9/16] w-full rounded-2xl overflow-hidden cursor-pointer bg-zinc-900 border border-zinc-800 shadow-xl transition-transform duration-300 hover:scale-[1.02] hover:z-10 hover:shadow-orange-500/20">
+      <div className="rf-card-3d group relative aspect-[9/16] w-full rounded-2xl overflow-hidden cursor-pointer bg-zinc-900 border border-zinc-800 shadow-xl transition-transform duration-300 hover:scale-[1.02] hover:z-10 hover:shadow-orange-500/20">
         {/* Poster Image */}
         <img 
           src={series.posterUrl || '/placeholder-vertical.png'} 

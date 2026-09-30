@@ -264,7 +264,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const isShort = existing.Item.contentType === "short";
+    const isVertical = existing.Item.contentType === "short" || existing.Item.contentType === "film";
     // Music has no video track, so Mux cannot render a frame and the URL
     // getMuxThumbnailUrl builds would 404. In practice the if_not_exists
     // below always picks the mandatory cover instead — but computing a URL
@@ -272,7 +272,7 @@ export async function POST(request: NextRequest) {
     // how a later edit quietly ships one.
     const thumbnailUrl = isMusicType(existing.Item.contentType)
       ? ((existing.Item.customThumbnailUrl as string | undefined) ?? "")
-      : getMuxThumbnailUrl(playbackId, isShort);
+      : getMuxThumbnailUrl(playbackId, isVertical);
 
     const updateResult = await docClient.send(
       new UpdateCommand({

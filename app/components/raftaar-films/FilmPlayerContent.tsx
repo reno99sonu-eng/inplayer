@@ -1,72 +1,187 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
+import dynamic from "next/dynamic";
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { 
-  ChevronLeft, Share2, Plus, Heart, MessageCircle, Bookmark, 
-  MoreVertical, Play, Pause, ListVideo, X
-} from "lucide-react";
+import { fetchAuthSession } from "aws-amplify/auth";
+import type { MuxPlayerRefAttributes } from "@mux/mux-player-react";
+const MuxPlayer = dynamic(() => import("@mux/mux-player-react"), { ssr: false });
 
-export default function FilmPlayerContent({ series, episodes, currentEpisodeId, user }: any) {
+import {
+  ChevronLeft,
+  Share2,
+  Plus,
+  Check,
+  Heart,
+  MessageCircle,
+  Bookmark,
+  MoreVertical,
+  Play,
+  Pause,
+  ListVideo,
+  X,
+  Volume2,
+  VolumeX,
+  ChevronDown,
+  ChevronUp,
+  Sparkles,
+  Loader2,
+} from "lucide-react";
+import CommentSection from "@/app/components/CommentSection";
+import { useAuthModal } from "@/app/components/auth/AuthProvider";
+
+interface FilmPlayerProps {
+  series: any;
+  episodes: any[];
+  currentEpisodeId: string;
+  user?: any;
+}
+
+export default function FilmPlayerContent({
+  series,
+  episodes,
+  currentEpisodeId,
+}: FilmPlayerProps) {
   const router = useRouter();
-  const videoRef = useRef<HTMLVideoElement>(null);
-  
+  const { signedIn, openSignIn } = useAuthModal();
+  const playerRef = useRef<MuxPlayerRefAttributes | null>(null);
+
   // Find current index
-  const currentIndex = episodes?.findIndex((ep: any) => ep.videoId === currentEpisodeId) ?? 0;
-  const currentEpisode = episodes?.[currentIndex];
-  
+  const currentIndex =
+    episodes?.findIndex((ep: any) => ep.videoId === currentEpisodeId) ?? 0;
+  const currentEpisode = episodes?.[currentIndex >= 0 ? currentIndex : 0];
+
   const prevEpisode = currentIndex > 0 ? episodes[currentIndex - 1] : null;
-  const nextEpisode = currentIndex < (episodes?.length - 1) ? episodes[currentIndex + 1] : null;
+  const nextEpisode =
+    currentIndex < (episodes?.length ?? 0) - 1 ? episodes[currentIndex + 1] : null;
 
   const [isPlaying, setIsPlaying] = useState(true);
+  const [isMuted, setIsMuted] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [showCenterIcon, setShowCenterIcon] = useState(false);
   const [isFollowing, setIsFollowing] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState<number>(
+    currentEpisode?.likeCount || 0
+  );
   const [isSaved, setIsSaved] = useState(false);
   const [showEpisodesList, setShowEpisodesList] = useState(false);
-  const [likeCount, setLikeCount] = useState<number>(currentEpisode?.likeCount || 0);
+  const [showComments, setShowComments] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  const posterImage =
+    currentEpisode?.thumbnailUrl ||
+    currentEpisode?.customThumbnailUrl ||
+    series?.posterUrl ||
+    "/placeholder-vertical.svg";
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 2500);
+  };
+
+  // Fetch likes and subscription on episode change
   useEffect(() => {
-    // Reset state when episode changes
     setIsPlaying(true);
     setProgress(0);
-    if (videoRef.current) {
-      videoRef.current.play().catch(e => console.log("Autoplay prevented:", e));
+    setShowCenterIcon(false);
+
+    if (currentEpisode?.videoId) {
+      setLikeCount(currentEpisode.likeCount || 0);
+
+      // Check like status
+      (async () => {
+        try {
+          const session = await fetchAuthSession().catch(() => null);
+          const token = session?.tokens?.idToken?.toString();
+          const headers: Record<string, string> = {};
+          if (token) headers["Authorization"] = `Bearer ${token}`;
+          const res = await fetch(`/api/likes?videoId=${currentEpisode.videoId}`, {
+            headers,
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setIsLiked(data.liked || false);
+            if (typeof data.count === "number") setLikeCount(data.count);
+          }
+        } catch {
+          /* ignore */
+        }
+      })();
     }
-  }, [currentEpisodeId]);
+
+    if (series?.seriesId) {
+      // Check series subscription
+      (async () => {
+        try {
+          const session = await fetchAuthSession().catch(() => null);
+          const token = session?.tokens?.idToken?.toString();
+          if (!token) return;
+          const res = await fetch(
+            `/api/raftaar-films/series/${series.seriesId}/subscribe`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          );
+          if (res.ok) {
+            const data = await res.json();
+            setIsFollowing(data.subscribed || false);
+          }
+        } catch {
+          /* ignore */
+        }
+      })();
+    }
+  }, [currentEpisodeId, currentEpisode?.videoId, series?.seriesId]);
 
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowUp' || e.key === 'PageUp') {
-        if (prevEpisode) router.push(`/raftaar-films/${series.seriesId}/${prevEpisode.videoId}`);
-      } else if (e.key === 'ArrowDown' || e.key === 'PageDown') {
-        if (nextEpisode) router.push(`/raftaar-films/${series.seriesId}/${nextEpisode.videoId}`);
-      } else if (e.key === ' ') {
+      // Ignore when typing in inputs or textareas
+      if (
+        document.activeElement?.tagName === "INPUT" ||
+        document.activeElement?.tagName === "TEXTAREA"
+      ) {
+        return;
+      }
+
+      if (e.key === "ArrowUp" || e.key === "PageUp") {
+        e.preventDefault();
+        if (prevEpisode) {
+          router.push(`/raftaar-films/${series.seriesId}/${prevEpisode.videoId}`);
+        }
+      } else if (e.key === "ArrowDown" || e.key === "PageDown") {
+        e.preventDefault();
+        if (nextEpisode) {
+          router.push(`/raftaar-films/${series.seriesId}/${nextEpisode.videoId}`);
+        }
+      } else if (e.key === " ") {
+        e.preventDefault();
         togglePlay();
+      } else if (e.key.toLowerCase() === "m") {
+        e.preventDefault();
+        setIsMuted((prev) => !prev);
       }
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [prevEpisode, nextEpisode, series.seriesId, router]);
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [prevEpisode, nextEpisode, series.seriesId, router, isPlaying]);
 
   const togglePlay = () => {
-    if (videoRef.current) {
-      if (isPlaying) {
-        videoRef.current.pause();
+    if (playerRef.current) {
+      if (playerRef.current.paused) {
+        playerRef.current.play().catch(() => {});
+        setIsPlaying(true);
       } else {
-        videoRef.current.play();
+        playerRef.current.pause();
+        setIsPlaying(false);
       }
-      setIsPlaying(!isPlaying);
-    }
-  };
-
-  const handleTimeUpdate = () => {
-    if (videoRef.current) {
-      const progress = (videoRef.current.currentTime / videoRef.current.duration) * 100;
-      setProgress(progress);
+      setShowCenterIcon(true);
+      setTimeout(() => setShowCenterIcon(false), 900);
+    } else {
+      setIsPlaying((prev) => !prev);
     }
   };
 
@@ -77,200 +192,625 @@ export default function FilmPlayerContent({ series, episodes, currentEpisodeId, 
   };
 
   const handleLike = async () => {
-    setIsLiked(!isLiked);
-    setLikeCount((prev: number) => isLiked ? prev - 1 : prev + 1);
-    // In real app, call /api/likes
-  };
+    if (!currentEpisode?.videoId) return;
+    if (!signedIn) {
+      openSignIn();
+      return;
+    }
+    const nextLiked = !isLiked;
+    setIsLiked(nextLiked);
+    setLikeCount((prev) => (nextLiked ? prev + 1 : Math.max(0, prev - 1)));
 
-  const handleShare = () => {
-    if (navigator.share) {
-      navigator.share({
-        title: currentEpisode?.title || series.title,
-        url: window.location.href,
+    try {
+      const session = await fetchAuthSession().catch(() => null);
+      const token = session?.tokens?.idToken?.toString();
+      if (!token) return;
+      await fetch("/api/likes", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          videoId: currentEpisode.videoId,
+          action: nextLiked ? "like" : "unlike",
+        }),
       });
+    } catch (e) {
+      console.error("Failed to toggle like:", e);
     }
   };
 
-  if (!currentEpisode) return <div className="min-h-screen bg-black flex items-center justify-center text-white">Episode not found</div>;
+  const handleShare = async () => {
+    const shareData = {
+      title: `${series.title} - Ep ${currentEpisode?.episodeNumber || 1}: ${
+        currentEpisode?.episodeTitle || currentEpisode?.title || ""
+      }`,
+      text: `Watch ${series.title} on InPlayer Raftaar Films`,
+      url: window.location.href,
+    };
+    if (navigator.share) {
+      try {
+        await navigator.share(shareData);
+      } catch {
+        /* user dismissed */
+      }
+    } else {
+      try {
+        await navigator.clipboard.writeText(window.location.href);
+        showToast("Link copied to clipboard!");
+      } catch {
+        /* fallback */
+      }
+    }
+  };
+
+  const handleSave = async () => {
+    if (!currentEpisode?.videoId) return;
+    if (!signedIn) {
+      openSignIn();
+      return;
+    }
+    const nextSaved = !isSaved;
+    setIsSaved(nextSaved);
+    showToast(nextSaved ? "Saved to Watchlist" : "Removed from Watchlist");
+
+    try {
+      const session = await fetchAuthSession().catch(() => null);
+      const token = session?.tokens?.idToken?.toString();
+      if (!token) return;
+      if (nextSaved) {
+        await fetch("/api/watchlist", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            videoId: currentEpisode.videoId,
+            title: currentEpisode.title,
+            uploaderName: series.creatorName || "Creator",
+            thumbnailUrl: currentEpisode.thumbnailUrl || series.posterUrl,
+          }),
+        });
+      } else {
+        await fetch(`/api/watchlist?videoId=${currentEpisode.videoId}`, {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${token}` },
+        });
+      }
+    } catch (e) {
+      console.error("Failed to update watchlist:", e);
+    }
+  };
+
+  const handleFollow = async () => {
+    if (!signedIn) {
+      openSignIn();
+      return;
+    }
+    const nextFollowing = !isFollowing;
+    setIsFollowing(nextFollowing);
+    showToast(nextFollowing ? `Subscribed to ${series.title}` : `Unsubscribed`);
+
+    try {
+      const session = await fetchAuthSession().catch(() => null);
+      const token = session?.tokens?.idToken?.toString();
+      if (!token) return;
+      await fetch(`/api/raftaar-films/series/${series.seriesId}/subscribe`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          action: nextFollowing ? "subscribe" : "unsubscribe",
+        }),
+      });
+    } catch (e) {
+      console.error("Failed to toggle subscription:", e);
+    }
+  };
+
+  const handleProgressBarClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    e.stopPropagation();
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const pct = Math.max(0, Math.min(1, clickX / rect.width));
+    if (playerRef.current) {
+      const dur = playerRef.current.duration;
+      if (dur && isFinite(dur)) {
+        playerRef.current.currentTime = dur * pct;
+        setProgress(pct * 100);
+      }
+    }
+  };
+
+  if (!currentEpisode) {
+    return (
+      <div className="min-h-screen bg-black flex flex-col items-center justify-center text-white p-4">
+        <h2 className="text-xl font-bold mb-2">Episode not found</h2>
+        <Link
+          href={`/raftaar-films/${series.seriesId}`}
+          className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-bold text-white hover:bg-orange-600"
+        >
+          Back to Series
+        </Link>
+      </div>
+    );
+  }
+
+  const hasPlaybackSource = Boolean(
+    currentEpisode.muxPlaybackId || currentEpisode.videoUrl
+  );
 
   return (
-    <div className="fixed inset-0 bg-black text-white flex flex-col md:max-w-md md:mx-auto relative overflow-hidden">
-      
-      {/* Video Background */}
-      <div className="absolute inset-0 flex items-center justify-center bg-gray-900" onClick={togglePlay}>
-        {currentEpisode.videoUrl ? (
-          <video
-            ref={videoRef}
-            src={currentEpisode.videoUrl}
-            className="w-full h-full object-cover"
-            playsInline
-            loop={false}
-            autoPlay
-            onTimeUpdate={handleTimeUpdate}
-            onEnded={handleVideoEnded}
-            onClick={(e) => { e.stopPropagation(); togglePlay(); }}
-          />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-b from-gray-800 to-black flex items-center justify-center text-gray-500">
-            [Video Player Placeholder]
-          </div>
-        )}
-      </div>
+    <div className="relative min-h-screen w-full bg-[#050914] text-white flex items-center justify-center overflow-hidden select-none">
+      {/* Ambient blurred backdrop for desktop screen */}
+      <div
+        className="pointer-events-none absolute inset-0 hidden md:block opacity-25 filter blur-[110px] transform scale-110"
+        style={{
+          backgroundImage: `url(${posterImage})`,
+          backgroundSize: "cover",
+          backgroundPosition: "center",
+        }}
+      />
 
-      {/* Play/Pause Overlay Icon (shows briefly) */}
-      {!isPlaying && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-20">
-          <div className="w-16 h-16 bg-black/50 rounded-full flex items-center justify-center backdrop-blur-sm">
-            <Play className="w-8 h-8 text-white ml-1" />
-          </div>
-        </div>
-      )}
-
-      {/* Top Header */}
-      <div className="absolute top-0 w-full p-4 flex items-center justify-between z-30 bg-gradient-to-b from-black/70 to-transparent pt-safe">
-        <button onClick={() => router.push(`/raftaar-films/${series.seriesId}`)} className="p-2 -ml-2 rounded-full active:bg-white/10">
-          <ChevronLeft className="w-6 h-6" />
-        </button>
-        
-        <button 
-          onClick={() => setShowEpisodesList(true)}
-          className="flex flex-col items-center flex-1 mx-4"
+      {/* Main vertical player viewport (9:16 mobile container) */}
+      <div className="relative w-full h-[100dvh] max-w-[440px] md:h-[94vh] md:max-h-[880px] md:rounded-3xl md:overflow-hidden md:border md:border-white/10 md:shadow-2xl md:shadow-black/80 bg-black flex flex-col">
+        {/* Video Stage */}
+        <div
+          className="absolute inset-0 flex items-center justify-center bg-black cursor-pointer overflow-hidden"
+          onClick={togglePlay}
         >
-          <span className="text-sm font-semibold opacity-90 drop-shadow-md line-clamp-1">{series.title}</span>
-          <div className="flex items-center gap-1 text-xs opacity-70 bg-white/10 px-2 py-0.5 rounded-full mt-1 backdrop-blur-md">
-            <ListVideo className="w-3 h-3" />
-            <span>Ep {currentEpisode.episodeNumber} / {episodes.length} <ChevronLeft className="w-3 h-3 inline rotate-[-90deg]" /></span>
-          </div>
-        </button>
-
-        <button className="p-2 -mr-2 rounded-full active:bg-white/10">
-          <MoreVertical className="w-6 h-6" />
-        </button>
-      </div>
-
-      {/* Right Action Rail */}
-      <div className="absolute right-4 bottom-32 flex flex-col items-center gap-6 z-30">
-        <div className="flex flex-col items-center gap-1">
-          <button 
-            onClick={handleLike}
-            className={`w-12 h-12 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center border ${isLiked ? 'border-red-500 bg-red-500/20' : 'border-white/10'} transition-transform active:scale-90`}
-          >
-            <Heart className={`w-6 h-6 ${isLiked ? 'fill-red-500 text-red-500' : 'text-white'}`} />
-          </button>
-          <span className="text-xs font-semibold drop-shadow-md">{likeCount || 'Like'}</span>
-        </div>
-
-        <div className="flex flex-col items-center gap-1">
-          <button className="w-12 h-12 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center border border-white/10 transition-transform active:scale-90">
-            <MessageCircle className="w-6 h-6 text-white" />
-          </button>
-          <span className="text-xs font-semibold drop-shadow-md">{currentEpisode.commentCount || 'Comment'}</span>
-        </div>
-
-        <div className="flex flex-col items-center gap-1">
-          <button 
-            onClick={() => setIsSaved(!isSaved)}
-            className="w-12 h-12 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center border border-white/10 transition-transform active:scale-90"
-          >
-            <Bookmark className={`w-6 h-6 ${isSaved ? 'fill-white text-white' : 'text-white'}`} />
-          </button>
-          <span className="text-xs font-semibold drop-shadow-md">Save</span>
-        </div>
-
-        <div className="flex flex-col items-center gap-1">
-          <button 
-            onClick={handleShare}
-            className="w-12 h-12 rounded-full bg-black/30 backdrop-blur-sm flex items-center justify-center border border-white/10 transition-transform active:scale-90"
-          >
-            <Share2 className="w-6 h-6 text-white" />
-          </button>
-          <span className="text-xs font-semibold drop-shadow-md">Share</span>
-        </div>
-      </div>
-
-      {/* Bottom Info Overlay */}
-      <div className="absolute bottom-0 w-full bg-gradient-to-t from-black via-black/60 to-transparent p-4 pb-8 z-20">
-        
-        {/* Creator Profile */}
-        <div className="flex items-center gap-3 mb-3">
-          <div className="relative">
-            <div className="w-10 h-10 rounded-full overflow-hidden bg-gray-700 border border-white/20">
-              {series.creatorProfilePic ? (
-                <Image src={series.creatorProfilePic} alt="Creator" fill className="object-cover" />
-              ) : (
-                <div className="w-full h-full bg-indigo-600 flex items-center justify-center text-sm font-bold">
-                  {series.creatorName?.[0] || "C"}
+          {hasPlaybackSource ? (
+            <div className="h-full w-full relative">
+              <MuxPlayer
+                ref={playerRef}
+                playbackId={currentEpisode.muxPlaybackId || undefined}
+                src={
+                  !currentEpisode.muxPlaybackId && currentEpisode.videoUrl
+                    ? currentEpisode.videoUrl
+                    : undefined
+                }
+                poster={posterImage}
+                streamType="on-demand"
+                autoPlay="any"
+                playsInline
+                loop={false}
+                muted={isMuted}
+                preload="auto"
+                nohotkeys
+                style={{
+                  width: "100%",
+                  height: "100%",
+                  objectFit: "cover",
+                }}
+                onTimeUpdate={(e) => {
+                  const el = e.target as HTMLMediaElement;
+                  if (el?.currentTime && el?.duration) {
+                    setProgress((el.currentTime / el.duration) * 100);
+                  }
+                }}
+                onPlay={() => setIsPlaying(true)}
+                onPause={() => setIsPlaying(false)}
+                onEnded={handleVideoEnded}
+              />
+            </div>
+          ) : (
+            <div className="relative w-full h-full flex flex-col items-center justify-center bg-zinc-950 p-6 text-center">
+              <img
+                src={posterImage}
+                alt="Episode backdrop"
+                className="absolute inset-0 w-full h-full object-cover opacity-20 filter blur-sm"
+              />
+              <div className="relative z-10 flex flex-col items-center gap-3 max-w-xs">
+                <div className="h-14 w-14 rounded-2xl bg-orange-500/15 border border-orange-500/30 flex items-center justify-center text-orange-400">
+                  <Loader2 size={28} className="animate-spin" />
                 </div>
+                <h3 className="text-base font-bold text-white">
+                  Episode is Processing
+                </h3>
+                <p className="text-xs text-slate-400 leading-relaxed">
+                  Our video engine is preparing smooth adaptive playback for
+                  this episode. It will be ready in just a moment.
+                </p>
+                {nextEpisode && (
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      router.push(
+                        `/raftaar-films/${series.seriesId}/${nextEpisode.videoId}`
+                      );
+                    }}
+                    className="mt-2 rounded-xl bg-orange-500 px-4 py-2 text-xs font-bold text-white hover:bg-orange-600 transition"
+                  >
+                    Play Next Episode →
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Play/Pause Pulse Icon */}
+        {showCenterIcon && (
+          <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30 animate-in fade-in zoom-in-75 duration-200">
+            <div className="h-16 w-16 rounded-full bg-black/60 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shadow-xl">
+              {isPlaying ? (
+                <Play size={28} className="fill-current ml-1" />
+              ) : (
+                <Pause size={28} className="fill-current" />
               )}
             </div>
-            {!isFollowing && (
-              <button 
-                onClick={() => setIsFollowing(true)}
-                className="absolute -bottom-1 -right-1 bg-red-500 rounded-full p-0.5 border border-black"
+          </div>
+        )}
+
+        {/* Toast Notification */}
+        {toastMessage && (
+          <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none animate-in fade-in slide-in-from-top duration-200">
+            <div className="rounded-full bg-black/80 px-4 py-1.5 text-xs font-semibold text-white border border-white/15 backdrop-blur-md shadow-xl">
+              {toastMessage}
+            </div>
+          </div>
+        )}
+
+        {/* Top Header */}
+        <div className="absolute top-0 w-full p-4 flex items-center justify-between z-30 bg-gradient-to-b from-black/80 via-black/40 to-transparent">
+          <button
+            onClick={() => router.push(`/raftaar-films/${series.seriesId}`)}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-black/40 border border-white/10 text-white backdrop-blur-md hover:bg-white/10 transition"
+            aria-label="Back to series"
+          >
+            <ChevronLeft size={20} />
+          </button>
+
+          {/* Episode selector trigger */}
+          <button
+            onClick={() => setShowEpisodesList(true)}
+            className="flex flex-col items-center flex-1 mx-3 min-w-0"
+          >
+            <span className="text-xs font-bold opacity-90 line-clamp-1 drop-shadow-md text-slate-100">
+              {series.title}
+            </span>
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold bg-black/50 border border-white/15 px-2.5 py-0.5 rounded-full mt-0.5 backdrop-blur-md text-orange-300 hover:border-orange-400/50 transition">
+              <ListVideo size={13} />
+              <span>
+                Ep {currentEpisode.episodeNumber || currentIndex + 1} /{" "}
+                {episodes?.length || 1}
+              </span>
+              <ChevronDown size={12} />
+            </div>
+          </button>
+
+          {/* Mute Toggle */}
+          <button
+            onClick={() => setIsMuted((prev) => !prev)}
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-black/40 border border-white/10 text-white backdrop-blur-md hover:bg-white/10 transition"
+            aria-label={isMuted ? "Unmute" : "Mute"}
+          >
+            {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
+          </button>
+        </div>
+
+        {/* Right Action Rail */}
+        <div className="absolute right-3.5 bottom-28 flex flex-col items-center gap-5 z-30">
+          {/* Like Button */}
+          <div className="flex flex-col items-center gap-1">
+            <button
+              onClick={handleLike}
+              className={`flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-md border transition-all active:scale-90 ${
+                isLiked
+                  ? "bg-red-500/25 border-red-500 text-red-400"
+                  : "bg-black/40 border-white/15 text-white hover:border-white/30"
+              }`}
+              aria-label="Like episode"
+            >
+              <Heart
+                size={20}
+                className={isLiked ? "fill-current text-red-500" : ""}
+              />
+            </button>
+            <span className="text-[11px] font-bold drop-shadow-md text-slate-100">
+              {likeCount > 0 ? likeCount : "Like"}
+            </span>
+          </div>
+
+          {/* Comment Button */}
+          <div className="flex flex-col items-center gap-1">
+            <button
+              onClick={() => setShowComments(true)}
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-black/40 border border-white/15 text-white backdrop-blur-md hover:border-white/30 transition-all active:scale-90"
+              aria-label="View comments"
+            >
+              <MessageCircle size={20} />
+            </button>
+            <span className="text-[11px] font-bold drop-shadow-md text-slate-100">
+              {currentEpisode.commentCount || "Comment"}
+            </span>
+          </div>
+
+          {/* Save / Bookmark Button */}
+          <div className="flex flex-col items-center gap-1">
+            <button
+              onClick={handleSave}
+              className={`flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-md border transition-all active:scale-90 ${
+                isSaved
+                  ? "bg-orange-500/25 border-orange-500 text-orange-400"
+                  : "bg-black/40 border-white/15 text-white hover:border-white/30"
+              }`}
+              aria-label="Save to watchlist"
+            >
+              <Bookmark
+                size={20}
+                className={isSaved ? "fill-current text-orange-400" : ""}
+              />
+            </button>
+            <span className="text-[11px] font-bold drop-shadow-md text-slate-100">
+              {isSaved ? "Saved" : "Save"}
+            </span>
+          </div>
+
+          {/* Share Button */}
+          <div className="flex flex-col items-center gap-1">
+            <button
+              onClick={handleShare}
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-black/40 border border-white/15 text-white backdrop-blur-md hover:border-white/30 transition-all active:scale-90"
+              aria-label="Share episode"
+            >
+              <Share2 size={19} />
+            </button>
+            <span className="text-[11px] font-bold drop-shadow-md text-slate-100">
+              Share
+            </span>
+          </div>
+
+          {/* Previous / Next Quick Jump */}
+          <div className="flex flex-col gap-1.5 pt-1">
+            {prevEpisode && (
+              <button
+                onClick={() =>
+                  router.push(
+                    `/raftaar-films/${series.seriesId}/${prevEpisode.videoId}`
+                  )
+                }
+                title="Previous Episode"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-black/50 border border-white/10 text-slate-300 hover:text-white transition active:scale-90"
               >
-                <Plus className="w-3 h-3 text-white" />
+                <ChevronUp size={16} />
+              </button>
+            )}
+            {nextEpisode && (
+              <button
+                onClick={() =>
+                  router.push(
+                    `/raftaar-films/${series.seriesId}/${nextEpisode.videoId}`
+                  )
+                }
+                title="Next Episode"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-black/50 border border-white/10 text-slate-300 hover:text-white transition active:scale-90"
+              >
+                <ChevronDown size={16} />
               </button>
             )}
           </div>
-          <div>
-            <p className="font-semibold text-sm leading-tight drop-shadow-md">@{series.creatorHandle || "creator"}</p>
-          </div>
         </div>
 
-        {/* Title */}
-        <div className="pr-20 mb-2">
-          <div className="inline-block bg-white/20 backdrop-blur-md px-2 py-0.5 rounded text-[10px] font-bold mb-1 uppercase tracking-wider text-red-100 border border-white/10">
-            Episode {currentEpisode.episodeNumber}
-          </div>
-          <h2 className="text-base font-medium line-clamp-2 drop-shadow-md">{currentEpisode.title}</h2>
-        </div>
-      </div>
-
-      {/* Progress Bar */}
-      <div className="absolute bottom-0 left-0 w-full h-1 bg-white/20 z-40 cursor-pointer">
-        <div 
-          className="h-full bg-red-500 relative" 
-          style={{ width: `${progress}%` }}
-        >
-          <div className="absolute right-0 top-1/2 -translate-y-1/2 w-2 h-2 bg-white rounded-full shadow" />
-        </div>
-      </div>
-
-      {/* Episodes Drawer/Modal */}
-      {showEpisodesList && (
-        <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-sm flex flex-col justify-end">
-          <div className="bg-[#1C1C1E] h-[60vh] rounded-t-2xl flex flex-col overflow-hidden animate-in slide-in-from-bottom">
-            <div className="p-4 border-b border-white/10 flex justify-between items-center">
-              <div>
-                <h3 className="font-bold text-lg">Episodes</h3>
-                <p className="text-xs text-gray-400">{series.title}</p>
+        {/* Bottom Info Overlay */}
+        <div className="absolute bottom-0 w-full bg-gradient-to-t from-black via-black/70 to-transparent p-4 pb-6 z-20 pointer-events-auto">
+          {/* Creator Profile */}
+          <div className="flex items-center gap-2.5 mb-2.5">
+            <Link
+              href={
+                series.creatorHandle
+                  ? `/u/${series.creatorHandle}`
+                  : `/raftaar-films?creatorId=${series.creatorId}`
+              }
+              className="relative flex-shrink-0"
+            >
+              <div className="h-9 w-9 rounded-full overflow-hidden bg-zinc-800 border border-orange-500/40 p-0.5">
+                <img
+                  src={
+                    series.creatorAvatarUrl ||
+                    series.creatorProfilePic ||
+                    "/avatars/avatar.png"
+                  }
+                  alt={series.creatorName || "Creator"}
+                  className="h-full w-full rounded-full object-cover"
+                  onError={(e) => {
+                    const target = e.currentTarget;
+                    if (target.src !== "/avatars/avatar.png") {
+                      target.src = "/avatars/avatar.png";
+                    }
+                  }}
+                />
               </div>
-              <button onClick={() => setShowEpisodesList(false)} className="p-2 bg-white/5 rounded-full">
-                <X className="w-5 h-5" />
-              </button>
+            </Link>
+
+            <div className="min-w-0 flex-1">
+              <p className="text-xs font-bold leading-tight drop-shadow-md truncate text-white">
+                {series.creatorName || "Creator"}
+              </p>
+              <p className="text-[10px] text-orange-200/80 drop-shadow truncate">
+                @{series.creatorHandle || "creator"}
+              </p>
             </div>
-            
-            <div className="flex-1 overflow-y-auto p-4">
-              <div className="grid grid-cols-5 gap-2">
-                {episodes.map((ep: any) => (
-                  <Link
-                    key={ep.videoId}
-                    href={`/raftaar-films/${series.seriesId}/${ep.videoId}`}
-                    onClick={() => setShowEpisodesList(false)}
-                    className={`aspect-square flex items-center justify-center rounded-xl text-sm font-semibold transition-colors ${
-                      ep.videoId === currentEpisodeId 
-                        ? 'bg-red-500 text-white' 
-                        : 'bg-white/5 hover:bg-white/10 text-gray-300'
-                    }`}
-                  >
-                    {ep.episodeNumber}
-                  </Link>
-                ))}
+
+            {/* Follow Button */}
+            <button
+              onClick={handleFollow}
+              className={`flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold transition-all shadow ${
+                isFollowing
+                  ? "bg-white/15 text-slate-200 border border-white/20"
+                  : "bg-gradient-to-r from-[#FF7A18] to-[#FF9A00] text-white hover:brightness-110 active:scale-95"
+              }`}
+            >
+              {isFollowing ? (
+                <>
+                  <Check size={12} />
+                  <span>Following</span>
+                </>
+              ) : (
+                <>
+                  <Plus size={12} />
+                  <span>Follow</span>
+                </>
+              )}
+            </button>
+          </div>
+
+          {/* Episode Title & Badge */}
+          <div className="pr-16 mb-2">
+            <div className="inline-flex items-center gap-1.5 bg-orange-500/25 border border-orange-500/40 backdrop-blur-md px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider text-orange-300 mb-1">
+              <span>Episode {currentEpisode.episodeNumber || currentIndex + 1}</span>
+              {series.genre && <span>• {series.genre}</span>}
+            </div>
+            <h2 className="text-sm font-semibold line-clamp-2 drop-shadow-md text-white">
+              {currentEpisode.episodeTitle || currentEpisode.title}
+            </h2>
+          </div>
+
+          {/* Interactive Scrubbable Progress Bar */}
+          <div
+            onClick={handleProgressBarClick}
+            className="w-full h-3 flex items-center cursor-pointer group/progress pt-1"
+          >
+            <div className="w-full h-1 bg-white/25 rounded-full overflow-hidden relative group-hover/progress:h-1.5 transition-all">
+              <div
+                className="h-full bg-gradient-to-r from-orange-500 to-amber-400 relative"
+                style={{ width: `${progress}%` }}
+              >
+                <div className="absolute right-0 top-1/2 -translate-y-1/2 h-2 w-2 rounded-full bg-white shadow-md opacity-0 group-hover/progress:opacity-100 transition-opacity" />
               </div>
             </div>
           </div>
         </div>
-      )}
+
+        {/* Episodes Drawer / Modal */}
+        {showEpisodesList && (
+          <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-md flex flex-col justify-end animate-in fade-in duration-200">
+            <div className="bg-[#0c1424] border-t border-white/15 h-[68vh] rounded-t-3xl flex flex-col overflow-hidden shadow-2xl">
+              <div className="p-4 border-b border-white/10 flex justify-between items-center">
+                <div>
+                  <h3 className="font-bold text-base text-white">
+                    Episodes ({episodes?.length || 0})
+                  </h3>
+                  <p className="text-xs text-orange-300 line-clamp-1">
+                    {series.title}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowEpisodesList(false)}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-slate-300 hover:text-white transition"
+                  aria-label="Close episode selector"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              {/* Episode list */}
+              <div className="flex-1 overflow-y-auto p-3 space-y-2">
+                {episodes?.map((ep: any, idx: number) => {
+                  const isActive = ep.videoId === currentEpisodeId;
+                  const epThumb =
+                    ep.thumbnailUrl ||
+                    ep.customThumbnailUrl ||
+                    series.posterUrl ||
+                    "/placeholder-vertical.svg";
+                  return (
+                    <Link
+                      key={ep.videoId}
+                      href={`/raftaar-films/${series.seriesId}/${ep.videoId}`}
+                      onClick={() => setShowEpisodesList(false)}
+                      className={`flex items-center gap-3 p-2.5 rounded-2xl border transition-all ${
+                        isActive
+                          ? "border-orange-500/60 bg-orange-500/15 ring-1 ring-orange-500/50"
+                          : "border-white/5 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.07]"
+                      }`}
+                    >
+                      <div className="relative aspect-[9/16] w-12 flex-shrink-0 rounded-xl overflow-hidden bg-black/40 border border-white/10">
+                        <img
+                          src={epThumb}
+                          alt={ep.title}
+                          className="h-full w-full object-cover"
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            if (target.src !== "/placeholder-vertical.svg") {
+                              target.src = "/placeholder-vertical.svg";
+                            }
+                          }}
+                        />
+                        {isActive && (
+                          <div className="absolute inset-0 bg-orange-500/30 flex items-center justify-center">
+                            <Play size={14} className="fill-current text-white" />
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span
+                            className={`text-[10px] font-black uppercase px-1.5 py-0.5 rounded ${
+                              isActive
+                                ? "bg-orange-500 text-white"
+                                : "bg-white/10 text-slate-300"
+                            }`}
+                          >
+                            Ep {ep.episodeNumber || idx + 1}
+                          </span>
+                          {isActive && (
+                            <span className="text-[10px] font-bold text-orange-400">
+                              Now Playing
+                            </span>
+                          )}
+                        </div>
+                        <p
+                          className={`text-xs font-semibold line-clamp-1 ${
+                            isActive ? "text-orange-200" : "text-white"
+                          }`}
+                        >
+                          {ep.episodeTitle || ep.title}
+                        </p>
+                        <p className="text-[10px] text-slate-400 mt-0.5">
+                          {(ep.views || ep.viewCount || 0).toLocaleString()} views
+                        </p>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Comments Drawer / Modal */}
+        {showComments && (
+          <div className="absolute inset-0 z-50 bg-black/80 backdrop-blur-md flex flex-col justify-end animate-in fade-in duration-200">
+            <div className="bg-[#0B1526] border-t border-white/15 h-[68vh] rounded-t-3xl flex flex-col overflow-hidden shadow-2xl">
+              <div className="p-4 border-b border-white/10 flex justify-between items-center">
+                <div>
+                  <h3 className="font-bold text-base text-white">Comments</h3>
+                  <p className="text-xs text-slate-400">
+                    Ep {currentEpisode.episodeNumber || currentIndex + 1} •{" "}
+                    {currentEpisode.episodeTitle || currentEpisode.title}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setShowComments(false)}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-slate-300 hover:text-white transition"
+                  aria-label="Close comments"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto p-4">
+                <CommentSection videoId={currentEpisode.videoId} />
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

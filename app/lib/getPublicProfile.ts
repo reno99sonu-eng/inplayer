@@ -6,6 +6,7 @@ import { ensureUsername } from "@/app/lib/ensureUsername";
 import { selfHealVideoBatch } from "@/app/lib/selfHealVideo";
 import { getAudienceMode } from "@/app/lib/contentAccessServer";
 import { isVideoVisible } from "@/app/lib/contentAccess";
+import { getSeriesByCreator, getSeriesEpisodes, type FilmSeries } from "@/app/lib/raftaarFilms";
 
 export interface PublicProfileVideo {
   videoId: string;
@@ -18,6 +19,10 @@ export interface PublicProfileVideo {
   contentType: string;
   category?: string;
   muxPlaybackId?: string;
+  seriesId?: string;
+  episodeNumber?: number;
+  seasonNumber?: number;
+  episodeTitle?: string;
 }
 
 export interface PublicProfileData {
@@ -37,6 +42,7 @@ export interface PublicProfileData {
   subscriberCount?: number;
   totalViews?: number;
   videos?: PublicProfileVideo[];
+  series?: FilmSeries[];
 }
 
 export type GetPublicProfileResult =
@@ -164,7 +170,7 @@ export async function getPublicProfile(
     // 500'd this whole endpoint and made every channel page show
     // "No channel at @username", even once the username itself resolved
     // correctly. Confirmed via production runtime logs on 2026-07-28.
-    const [subscriberCountResult, videosResult] = await Promise.all([
+    const [subscriberCountResult, seriesList] = await Promise.all([
       docClient.send(
         new QueryCommand({
           TableName: "InPlayer-Subscriptions",
@@ -174,47 +180,57 @@ export async function getPublicProfile(
           Select: "COUNT",
         })
       ),
-      (async () => {
-        const items: Record<string, unknown>[] = [];
-        let exclusiveStartKey: Record<string, unknown> | undefined;
-
-        do {
-          const page = await docClient.send(
-            new ScanCommand({
-              TableName: "InPlayer-Videos",
-              // Fall back to userId when uploaderId doesn't match — some
-              // rows predate the uploaderId rename and only have userId set
-              // (same defensive OR pattern already used in
-              // app/api/admin/creators/route.ts's v.uploaderId || v.userId
-              // fallback), so those videos weren't showing up on the
-              // owning user's own public channel page.
-              FilterExpression: "uploaderId = :uid OR userId = :uid",
-              ExpressionAttributeValues: { ":uid": targetUserId },
-              ExclusiveStartKey: exclusiveStartKey,
-            })
-          );
-          items.push(...(page.Items || []));
-          exclusiveStartKey = page.LastEvaluatedKey;
-        } while (exclusiveStartKey);
-
-        const healedItems = await selfHealVideoBatch(items);
-        return healedItems;
-      })(),
+      getSeriesByCreator(targetUserId).catch((err) => {
+        console.warn("Failed to fetch creator series for public profile:", err);
+        return [] as FilmSeries[];
+      }),
     ]);
 
+    // Fetch this creator's uploaded videos from InPlayer-Videos
+    const items: Record<string, unknown>[] = [];
+    let exclusiveStartKey: Record<string, unknown> | undefined;
+    do {
+      const page = await docClient.send(
+        new ScanCommand({
+          TableName: "InPlayer-Videos",
+          FilterExpression: "uploaderId = :uid OR userId = :uid OR creatorId = :uid",
+          ExpressionAttributeValues: { ":uid": targetUserId },
+          ExclusiveStartKey: exclusiveStartKey,
+        })
+      );
+      items.push(...(page.Items || []));
+      exclusiveStartKey = page.LastEvaluatedKey;
+    } while (exclusiveStartKey);
+
+    // Also fetch all episodes associated with this creator's series to guarantee 100% episode coverage
+    if (seriesList.length > 0) {
+      try {
+        const seriesEpisodesNested = await Promise.all(
+          seriesList.map((s) => getSeriesEpisodes(s.seriesId).catch(() => []))
+        );
+        const seriesEpisodes = seriesEpisodesNested.flat();
+        const existingIds = new Set(items.map((i) => i.videoId));
+        for (const ep of seriesEpisodes) {
+          if (ep && ep.videoId && !existingIds.has(ep.videoId)) {
+            items.push(ep);
+            existingIds.add(ep.videoId);
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to fetch additional series episodes for creator:", err);
+      }
+    }
+
+    const healedItems = await selfHealVideoBatch(items);
+
     // Audience filtering applies here too, not just to the shared feeds
-    // (app/lib/contentAccessServer.ts). A channel page is a public browsing
-    // surface reachable from search, a comment, or a shared link — without
-    // this it would be a straightforward way around Kids mode and the 18+
-    // setting, listing exactly the content those hide everywhere else.
-    //
-    // The owner is exempt: a creator must always be able to see and manage
-    // their own uploads from their own channel, whatever viewing mode their
-    // browser happens to be in.
+    // (app/lib/contentAccessServer.ts).
     const audienceMode = await getAudienceMode();
-    const publicVideos = videosResult.filter(
+    const publicVideos = healedItems.filter(
       (video) =>
-        (isOwner || video.status === "ready") &&
+        (isOwner || video.status === "ready" || video.status === "processing" || video.contentType === "film") &&
+        video.status !== "failed" &&
+        video.status !== "deleted" &&
         (isOwner || !video.visibility || video.visibility === "public") &&
         (isOwner || isVideoVisible(video, audienceMode))
     );
@@ -235,6 +251,10 @@ export async function getPublicProfile(
         contentType: (v.contentType as string) || "video",
         category: v.category as string | undefined,
         muxPlaybackId: v.muxPlaybackId as string | undefined,
+        seriesId: v.seriesId as string | undefined,
+        episodeNumber: typeof v.episodeNumber === "number" ? v.episodeNumber : undefined,
+        seasonNumber: typeof v.seasonNumber === "number" ? v.seasonNumber : undefined,
+        episodeTitle: (v.episodeTitle as string | undefined) || undefined,
       }));
 
     console.log(`Profile data for ${usernameLower}:`, {
@@ -262,6 +282,7 @@ export async function getPublicProfile(
         subscriberCount: subscriberCountResult.Count || 0,
         totalViews,
         videos,
+        series: seriesList || [],
       },
     };
   } catch (err) {

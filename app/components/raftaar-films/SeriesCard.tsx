@@ -14,10 +14,16 @@ export default function SeriesCard({ series, onClick }: SeriesCardProps) {
       <div className="rf-card-3d group relative aspect-[9/16] w-full rounded-2xl overflow-hidden cursor-pointer bg-zinc-900 border border-zinc-800 shadow-xl transition-transform duration-300 hover:scale-[1.02] hover:z-10 hover:shadow-orange-500/20">
         {/* Poster Image */}
         <img 
-          src={series.posterUrl || '/placeholder-vertical.png'} 
+          src={series.posterUrl || '/placeholder-vertical.svg'} 
           alt={series.title}
           className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
           loading="lazy"
+          onError={(e) => {
+            const target = e.currentTarget;
+            if (target.src !== '/placeholder-vertical.svg') {
+              target.src = '/placeholder-vertical.svg';
+            }
+          }}
         />
         
         {/* Gradient Overlay */}
@@ -49,7 +55,17 @@ export default function SeriesCard({ series, onClick }: SeriesCardProps) {
           </h3>
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-full overflow-hidden bg-zinc-700 border border-zinc-500">
-              <img src={series.creatorAvatarUrl || '/default-avatar.png'} alt={series.creatorName} className="w-full h-full object-cover" />
+              <img 
+                src={series.creatorAvatarUrl || '/avatars/avatar.png'} 
+                alt={series.creatorName} 
+                className="w-full h-full object-cover" 
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  if (target.src !== '/avatars/avatar.png') {
+                    target.src = '/avatars/avatar.png';
+                  }
+                }}
+              />
             </div>
             <span className="text-zinc-300 text-xs font-medium truncate drop-shadow-md">
               {series.creatorName}

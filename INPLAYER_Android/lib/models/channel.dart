@@ -18,6 +18,19 @@ class ChannelVideo {
   final String contentType;
   final String? category;
   final String? muxPlaybackId;
+  final String? seriesId;
+  final int? episodeNumber;
+  final int? seasonNumber;
+  final String? episodeTitle;
+
+  bool get isFilm =>
+      contentType.toLowerCase() == 'film' ||
+      contentType.toLowerCase() == 'raftaar-film' ||
+      contentType.toLowerCase() == 'raftaar_film';
+
+  bool get isShort =>
+      contentType.toLowerCase() == 'short' ||
+      contentType.toLowerCase() == 'shorts';
 
   ChannelVideo({
     required this.videoId,
@@ -30,6 +43,10 @@ class ChannelVideo {
     this.contentType = 'video',
     this.category,
     this.muxPlaybackId,
+    this.seriesId,
+    this.episodeNumber,
+    this.seasonNumber,
+    this.episodeTitle,
   });
 
   static int _toInt(dynamic value) {
@@ -50,6 +67,10 @@ class ChannelVideo {
       contentType: (json['contentType'] as String?) ?? 'video',
       category: json['category'] as String?,
       muxPlaybackId: json['muxPlaybackId'] as String?,
+      seriesId: json['seriesId']?.toString(),
+      episodeNumber: json['episodeNumber'] != null ? _toInt(json['episodeNumber']) : null,
+      seasonNumber: json['seasonNumber'] != null ? _toInt(json['seasonNumber']) : null,
+      episodeTitle: json['episodeTitle']?.toString(),
     );
   }
 

@@ -12,7 +12,7 @@ interface UploadThumbnailStepProps {
   duration: number;
   defaultThumbnailUrl: string | null;
   onDone: () => void;
-  contentType?: "video" | "short" | "music";
+  contentType?: "video" | "short" | "music" | "film";
 }
 
 export default function UploadThumbnailStep({
@@ -23,12 +23,13 @@ export default function UploadThumbnailStep({
   contentType,
   onDone,
 }: UploadThumbnailStepProps) {
+  const isVertical = contentType === "short" || contentType === "film";
   const candidates = useMemo(
     () =>
       muxPlaybackId && contentType !== "music"
-        ? getMuxThumbnailCandidates(muxPlaybackId, duration, 5, contentType === "short")
+        ? getMuxThumbnailCandidates(muxPlaybackId, duration, 5, isVertical)
         : [],
-    [muxPlaybackId, duration, contentType]
+    [muxPlaybackId, duration, contentType, isVertical]
   );
   const [selected, setSelected] = useState<string | null>(defaultThumbnailUrl);
   const [saving, setSaving] = useState(false);
@@ -102,7 +103,7 @@ export default function UploadThumbnailStep({
                 <img
                   src={url}
                   alt="Thumbnail option"
-                  className={`w-full object-contain bg-black/20 ${contentType === "short" ? "aspect-[9/16]" : "aspect-video"}`}
+                  className={`w-full object-contain bg-black/20 ${isVertical ? "aspect-[9/16]" : "aspect-video"}`}
                 />
               </button>
             ))}

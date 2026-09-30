@@ -45,12 +45,13 @@ export default async function VideosPage({ searchParams }: VideosPageProps) {
   // Shared 30-second cached list (see lib/videoStore) — no per-request
   // table Scan. Already sorted newest-first.
   let videos: VideoCard[] = (await getVisibleVideos())
-    // Strict separation: only public longform videos (NO music tracks, NO shorts)
+    // Strict separation: only public longform videos (NO music tracks, NO shorts, NO films)
     .filter(
       (v) =>
         (!v.visibility || v.visibility === "public") &&
         !isMusicType(v.contentType) &&
-        v.contentType !== "short"
+        v.contentType !== "short" &&
+        v.contentType !== "film"
     )
     .map((v) => ({
       videoId: v.videoId as string,

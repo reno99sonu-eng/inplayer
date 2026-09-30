@@ -3,14 +3,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
+import Link from "next/link";
 import { fetchAuthSession } from "aws-amplify/auth";
-import { BadgeCheck, Film, Lock, MessageSquare, Search, UserCheck } from "lucide-react";
+import { BadgeCheck, Film, Lock, MessageSquare, Search, UserCheck, Play } from "lucide-react";
 
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import BackButton from "@/app/components/BackButton";
 import SubscribeButton from "@/app/components/SubscribeButton";
 import MembershipButton from "@/app/components/MembershipButton";
 import ShortsShelf from "@/app/components/ShortsShelf";
+import SeriesCard from "@/app/components/raftaar-films/SeriesCard";
 import { HomeVideoCard } from "@/app/components/RecommendationFeed";
 import type { Recommendation } from "@/app/data/recommendations";
 import type { Short } from "@/app/data/shorts";
@@ -101,8 +103,10 @@ export default function ChannelPageContent({ username, initialProfile }: Channel
   // long-form videos into the Shorts bucket whenever they were tagged with
   // that category, which is what made the two sections look like they
   // were showing overlapping/duplicate content.
-  const regularVideos = useMemo(() => sortVideos(matchingVideos.filter((video) => video.contentType !== "short"), sort), [matchingVideos, sort]);
+  const regularVideos = useMemo(() => sortVideos(matchingVideos.filter((video) => video.contentType !== "short" && video.contentType !== "film"), sort), [matchingVideos, sort]);
   const shortVideos = useMemo(() => sortVideos(matchingVideos.filter((video) => video.contentType === "short"), sort), [matchingVideos, sort]);
+  const filmEpisodes = useMemo(() => sortVideos(matchingVideos.filter((video) => video.contentType === "film"), sort), [matchingVideos, sort]);
+  const creatorSeries = useMemo(() => profile.series || [], [profile.series]);
 
   // A real, creator-chosen cover photo always wins over the old fallback
   // (borrowing whichever video happened to be most-viewed as a makeshift
@@ -128,6 +132,111 @@ export default function ChannelPageContent({ username, initialProfile }: Channel
           redundant heading directly on top of it, which is what made this
           look like two separate/duplicate panels for the same content. */}
       <section className="mt-7">{shorts.length ? <ShortsShelf items={shorts} /> : <EmptyCollection label="Raftaar" />}</section>
+
+      {/* Dedicated Raftaar Films & Episodes Section */}
+      {(creatorSeries.length > 0 || filmEpisodes.length > 0) && (
+        <section className="mt-8 rounded-3xl border border-orange-500/20 bg-[#080d1a]/80 p-5 backdrop-blur-xl shadow-xl light:border-orange-500/20 light:bg-white/80">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+            <div>
+              <p className="text-[11px] font-black uppercase tracking-[0.22em] text-orange-400">
+                Micro-Drama Series
+              </p>
+              <h2 className="mt-0.5 text-base sm:text-xl font-black text-white light:text-slate-900 flex items-center gap-2">
+                <span>🍿 Raftaar Films</span>
+                {creatorSeries.length > 0 && (
+                  <span className="rounded-full bg-orange-500/20 px-2 py-0.5 text-xs font-bold text-orange-300">
+                    {creatorSeries.length} {creatorSeries.length === 1 ? "Series" : "Series"}
+                  </span>
+                )}
+                {filmEpisodes.length > 0 && (
+                  <span className="rounded-full bg-white/10 px-2 py-0.5 text-xs font-bold text-slate-300 light:bg-black/5 light:text-slate-700">
+                    {filmEpisodes.length} {filmEpisodes.length === 1 ? "Episode" : "Episodes"}
+                  </span>
+                )}
+              </h2>
+            </div>
+            <Link
+              href="/raftaar-films"
+              className="text-xs font-bold text-orange-400 hover:text-orange-300 transition"
+            >
+              Explore All Films →
+            </Link>
+          </div>
+
+          {/* Series Posters */}
+          {creatorSeries.length > 0 && (
+            <div className="mb-6">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Series Collections</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-3.5 sm:gap-4">
+                {creatorSeries.map((s) => (
+                  <SeriesCard key={s.seriesId} series={s} />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Individual Episodes Grid */}
+          {filmEpisodes.length > 0 && (
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-3">Episodes</h3>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-3 sm:gap-3.5">
+                {filmEpisodes.map((ep) => {
+                  const targetSeriesId = ep.seriesId || creatorSeries[0]?.seriesId;
+                  const href = targetSeriesId
+                    ? `/raftaar-films/${targetSeriesId}/${ep.videoId}`
+                    : `/raftaar-films?v=${ep.videoId}`;
+                  return (
+                    <Link
+                      key={ep.videoId}
+                      href={href}
+                      className="group relative flex flex-col overflow-hidden rounded-2xl border border-white/10 bg-zinc-950 transition-all duration-300 hover:scale-[1.02] hover:border-orange-500/50 hover:shadow-lg hover:shadow-orange-500/10"
+                    >
+                      <div className="relative aspect-[9/16] w-full overflow-hidden bg-zinc-900">
+                        <img
+                          src={ep.thumbnailUrl || "/placeholder-vertical.svg"}
+                          alt={ep.episodeTitle || ep.title}
+                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                          onError={(e) => {
+                            const target = e.currentTarget;
+                            if (target.src !== "/placeholder-vertical.svg") {
+                              target.src = "/placeholder-vertical.svg";
+                            }
+                          }}
+                        />
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-transparent to-black/30" />
+                        
+                        {/* Episode badge */}
+                        <div className="absolute top-2 left-2">
+                          <span className="rounded-md bg-orange-500 px-2 py-0.5 text-[10px] font-black uppercase text-white shadow">
+                            Ep {ep.episodeNumber || 1}
+                          </span>
+                        </div>
+
+                        {/* Hover play button */}
+                        <div className="absolute inset-0 flex items-center justify-center opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-500 text-white shadow-lg">
+                            <Play size={18} className="fill-current ml-0.5" />
+                          </div>
+                        </div>
+
+                        {/* Views & time */}
+                        <div className="absolute bottom-2 left-2 right-2">
+                          <p className="line-clamp-2 text-xs font-bold text-white drop-shadow">
+                            {ep.episodeTitle || ep.title}
+                          </p>
+                          <p className="mt-0.5 text-[10px] text-slate-300 drop-shadow">
+                            {formatViews(ep.views || 0)} views • {formatTimeAgo(ep.uploadedAt)}
+                          </p>
+                        </div>
+                      </div>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </section>
+      )}
       <section className="mt-7 rounded-2xl border border-white/[0.09] bg-white/[0.035] p-5 backdrop-blur-xl light:border-black/[0.09] light:bg-black/[0.025]"><p className="text-[11px] font-black uppercase tracking-[0.22em] text-orange-300 light:text-orange-700">About</p><p className="mt-3 max-w-3xl whitespace-pre-wrap text-sm leading-7 text-slate-300 light:text-slate-700">{profile.description?.trim() || "No channel description provided."}</p>{socialLinks.length > 0 && <div className="mt-5"><p className="text-[11px] font-black uppercase tracking-[0.18em] text-orange-300 light:text-orange-700">Elsewhere</p><div className="mt-3 flex flex-wrap gap-2">{socialLinks.map((link) => <a key={`${link.label}-${link.url}`} href={link.url} target="_blank" rel="noopener noreferrer nofollow" className="rounded-full border border-white/10 bg-white/[0.04] px-3 py-1.5 text-xs font-bold text-slate-200 transition hover:border-orange-400/40 hover:text-orange-300 light:border-black/10 light:text-slate-700">{link.label}</a>)}</div></div>}</section>
     </>}
   </main>;

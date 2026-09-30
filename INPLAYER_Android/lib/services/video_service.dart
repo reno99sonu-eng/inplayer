@@ -95,7 +95,7 @@ class VideoService {
       final result = videosJson
           .whereType<Map>()
           .map((json) => Video.fromJson(Map<String, dynamic>.from(json)))
-          .where((v) => !v.isStrictMusic && !v.isShort)
+          .where((v) => !v.isStrictMusic && !v.isShort && !v.isFilm)
           .toList();
 
       if (cacheRevision == _audienceCacheRevision) {

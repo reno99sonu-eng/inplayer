@@ -32,6 +32,7 @@ import MusicUploadTools, {
 import { sha256HexOfFile } from "@/app/lib/audioHash";
 import { extractLocalVideoThumbnails } from "@/app/lib/videoThumbnailExtractor";
 import { audienceFlags, type VideoAudience } from "@/app/lib/contentAccess";
+import { FILM_GENRES } from "@/app/lib/raftaarFilms";
 
 // Same categories as the nav bar's category chips (shared source).
 const CATEGORIES = CONTENT_CATEGORIES;
@@ -93,6 +94,58 @@ export default function UploadPage() {
   const [selectedSeriesId, setSelectedSeriesId] = useState<string>("");
   const [episodeNumber, setEpisodeNumber] = useState<number>(1);
   const [episodeTitle, setEpisodeTitle] = useState<string>("");
+
+  // Quick Create Series Modal State
+  const [showNewSeriesModal, setShowNewSeriesModal] = useState(false);
+  const [newSeriesTitle, setNewSeriesTitle] = useState("");
+  const [newSeriesGenre, setNewSeriesGenre] = useState<string>("Drama");
+  const [newSeriesDesc, setNewSeriesDesc] = useState("");
+  const [creatingSeries, setCreatingSeries] = useState(false);
+  const [newSeriesError, setNewSeriesError] = useState<string | null>(null);
+
+  const handleCreateQuickSeries = async () => {
+    if (!newSeriesTitle.trim()) {
+      setNewSeriesError("Please enter a series title.");
+      return;
+    }
+    setCreatingSeries(true);
+    setNewSeriesError(null);
+    try {
+      const session = await fetchAuthSession().catch(() => null);
+      const token = session?.tokens?.idToken?.toString();
+      if (!token) throw new Error("Please sign in first.");
+
+      const res = await fetch("/api/raftaar-films/my-series", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          title: newSeriesTitle.trim(),
+          genre: newSeriesGenre || "Drama",
+          description: newSeriesDesc.trim(),
+          visibility: "public",
+          audience: audience,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to create series.");
+      const created = data.series;
+      if (created && created.seriesId) {
+        setMySeriesList((prev) => [created, ...prev]);
+        setSelectedSeriesId(created.seriesId);
+        setEpisodeNumber(1);
+        setShowNewSeriesModal(false);
+        setNewSeriesTitle("");
+        setNewSeriesDesc("");
+      }
+    } catch (err: any) {
+      setNewSeriesError(err?.message || "Failed to create series.");
+    } finally {
+      setCreatingSeries(false);
+    }
+  };
 
   useEffect(() => {
     (() => {
@@ -311,12 +364,12 @@ export default function UploadPage() {
             cropDataUrlToThumbnail(frame, ratio).catch(() => frame)
           )
         );
-        // Not auto-selected — shown as a grid of candidates in
-        // VideoMetadataFields for the creator to actually tap one, same as
-        // the AI thumbnail result below. Nothing here silently picks for
-        // them.
+        // Set candidate frames and automatically select the first frame if none is selected yet
         setLocalVideoFrames(frames);
         setGroundingFrames(frames);
+        if (frames.length > 0) {
+          setThumbnailPreview((prev) => prev || frames[0]);
+        }
       }
     } catch (err) {
       console.error("Failed to extract video frame thumbnails:", err);
@@ -884,59 +937,93 @@ export default function UploadPage() {
                     <Film size={18} className="text-orange-400" />
                     <h3 className="text-sm font-bold text-white light:text-slate-900">Series & Episode Assignment</h3>
                   </div>
-                  <a
-                    href="/my-videos?tab=films"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="text-xs font-semibold text-orange-400 hover:underline"
-                  >
-                    + Manage Series
-                  </a>
+                  <div className="flex items-center gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setShowNewSeriesModal(true)}
+                      className="text-xs font-semibold text-orange-400 hover:text-orange-300 transition cursor-pointer"
+                    >
+                      + New Series
+                    </button>
+                    <a
+                      href="/my-videos?tab=films"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-xs font-semibold text-slate-400 hover:underline"
+                    >
+                      Manage Series ↗
+                    </a>
+                  </div>
                 </div>
 
                 {mySeriesList.length === 0 ? (
-                  <div className="p-4 text-center bg-orange-500/10 rounded-xl">
-                    <p className="text-xs text-orange-300">You don't have any series created yet.</p>
-                    <a
-                      href="/my-videos?tab=films"
-                      className="mt-2 inline-block rounded-lg bg-orange-500 px-3.5 py-1.5 text-xs font-bold text-white"
+                  <div className="p-4 text-center bg-orange-500/10 rounded-xl space-y-2">
+                    <p className="text-xs text-orange-300">You don't have any series created yet. Start a series for this episode:</p>
+                    <button
+                      type="button"
+                      onClick={() => setShowNewSeriesModal(true)}
+                      className="inline-block rounded-xl bg-orange-500 px-4 py-2 text-xs font-bold text-white shadow-md hover:bg-orange-600 transition cursor-pointer"
                     >
-                      Create a Series First
-                    </a>
+                      + Quick Create Series
+                    </button>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-300 light:text-slate-700 mb-1">
-                        Select Series *
-                      </label>
-                      <select
-                        value={selectedSeriesId}
-                        onChange={(e) => {
-                          const sid = e.target.value;
-                          setSelectedSeriesId(sid);
-                          const chosen = mySeriesList.find((s) => s.seriesId === sid);
-                          if (chosen) setEpisodeNumber((chosen.episodeCount || 0) + 1);
-                        }}
-                        className="w-full rounded-xl border border-white/10 bg-[#060D18] px-3 py-2 text-xs text-white outline-none focus:border-orange-400 light:border-black/10 light:bg-white light:text-slate-900"
-                      >
-                        {mySeriesList.map((s) => (
-                          <option key={s.seriesId} value={s.seriesId} className="bg-slate-900 text-white">
-                            {s.title} ({s.episodeCount} existing episodes)
-                          </option>
-                        ))}
-                      </select>
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="block text-xs font-semibold text-slate-300 light:text-slate-700">
+                            Select Series *
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => setShowNewSeriesModal(true)}
+                            className="text-[11px] font-bold text-orange-400 hover:underline"
+                          >
+                            + New
+                          </button>
+                        </div>
+                        <select
+                          value={selectedSeriesId}
+                          onChange={(e) => {
+                            const sid = e.target.value;
+                            setSelectedSeriesId(sid);
+                            const chosen = mySeriesList.find((s) => s.seriesId === sid);
+                            if (chosen) setEpisodeNumber((chosen.episodeCount || 0) + 1);
+                          }}
+                          className="w-full rounded-xl border border-white/10 bg-[#060D18] px-3 py-2 text-xs text-white outline-none focus:border-orange-400 light:border-black/10 light:bg-white light:text-slate-900"
+                        >
+                          {mySeriesList.map((s) => (
+                            <option key={s.seriesId} value={s.seriesId} className="bg-slate-900 text-white">
+                              {s.title} ({s.episodeCount} existing episodes)
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-300 light:text-slate-700 mb-1">
+                          Episode Number *
+                        </label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={episodeNumber}
+                          onChange={(e) => setEpisodeNumber(Math.max(1, parseInt(e.target.value) || 1))}
+                          className="w-full rounded-xl border border-white/10 bg-[#060D18] px-3 py-2 text-xs text-white outline-none focus:border-orange-400 light:border-black/10 light:bg-white light:text-slate-900"
+                        />
+                      </div>
                     </div>
 
                     <div>
                       <label className="block text-xs font-semibold text-slate-300 light:text-slate-700 mb-1">
-                        Episode Number
+                        Episode Title (Optional)
                       </label>
                       <input
-                        type="number"
-                        min="1"
-                        value={episodeNumber}
-                        onChange={(e) => setEpisodeNumber(Math.max(1, parseInt(e.target.value) || 1))}
+                        type="text"
+                        value={episodeTitle}
+                        onChange={(e) => setEpisodeTitle(e.target.value)}
+                        placeholder={`Ep ${episodeNumber}: Title of this episode`}
                         className="w-full rounded-xl border border-white/10 bg-[#060D18] px-3 py-2 text-xs text-white outline-none focus:border-orange-400 light:border-black/10 light:bg-white light:text-slate-900"
                       />
                     </div>
@@ -976,7 +1063,7 @@ export default function UploadPage() {
                     setThumbnailPreview(url);
                   }
                 },
-                onGenerateAIThumbnail: handleGenerateAIThumbnail,
+                onGenerateAIThumbnail: contentType === "film" ? undefined : handleGenerateAIThumbnail,
                 aiThumbnailBusy: aiThumbnailBusy,
               }}
               tagInput={tagInput}
@@ -1095,6 +1182,7 @@ export default function UploadPage() {
                     muxPlaybackId={info.muxPlaybackId}
                     duration={info.duration}
                     defaultThumbnailUrl={info.thumbnailUrl}
+                    contentType={contentType}
                     onDone={() =>
                       router.push(
                         contentType === "film"
@@ -1245,6 +1333,109 @@ export default function UploadPage() {
               >
                 Go Back & Review Details
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Quick Create Series Modal */}
+      {showNewSeriesModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="relative w-full max-w-md rounded-3xl border border-white/15 bg-[#0B1526] p-6 shadow-2xl text-white light:border-black/15 light:bg-white light:text-slate-900">
+            <button
+              type="button"
+              onClick={() => {
+                setShowNewSeriesModal(false);
+                setNewSeriesError(null);
+              }}
+              className="absolute right-4 top-4 flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-white/10 hover:text-white light:hover:bg-black/10 light:hover:text-slate-900"
+              aria-label="Close"
+            >
+              <X size={18} />
+            </button>
+
+            <div className="mb-4">
+              <span className="inline-block rounded-full bg-orange-500/15 px-3 py-1 text-[11px] font-bold uppercase tracking-wider text-orange-400">
+                Raftaar Films
+              </span>
+              <h3 className="mt-2 text-xl font-black">
+                Create New Film Series
+              </h3>
+              <p className="mt-1 text-xs text-slate-400 light:text-slate-600">
+                Start a vertical micro-drama series for your episodes.
+              </p>
+            </div>
+
+            {newSeriesError && (
+              <div className="mb-4 rounded-xl border border-red-500/30 bg-red-500/15 p-3 text-xs text-red-300">
+                {newSeriesError}
+              </div>
+            )}
+
+            <div className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 light:text-slate-700 mb-1">
+                  Series Title *
+                </label>
+                <input
+                  type="text"
+                  value={newSeriesTitle}
+                  onChange={(e) => setNewSeriesTitle(e.target.value)}
+                  placeholder="e.g. Adbhut, Dil Ki Baatein"
+                  className="w-full rounded-xl border border-white/10 bg-[#060D18] px-3.5 py-2.5 text-sm text-white caret-orange-400 outline-none focus:border-orange-400 light:border-black/10 light:bg-white light:text-slate-900"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 light:text-slate-700 mb-1">
+                  Genre *
+                </label>
+                <select
+                  value={newSeriesGenre}
+                  onChange={(e) => setNewSeriesGenre(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-[#060D18] px-3.5 py-2.5 text-sm text-white outline-none focus:border-orange-400 light:border-black/10 light:bg-white light:text-slate-900"
+                >
+                  {FILM_GENRES.map((g) => (
+                    <option key={g} value={g} className="bg-slate-900 text-white">
+                      {g}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 light:text-slate-700 mb-1">
+                  Synopsis / Description
+                </label>
+                <textarea
+                  rows={3}
+                  value={newSeriesDesc}
+                  onChange={(e) => setNewSeriesDesc(e.target.value)}
+                  placeholder="What is this series about?"
+                  className="w-full resize-none rounded-xl border border-white/10 bg-[#060D18] px-3.5 py-2 text-xs text-white caret-orange-400 outline-none focus:border-orange-400 light:border-black/10 light:bg-white light:text-slate-900"
+                />
+              </div>
+
+              <div className="flex gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowNewSeriesModal(false);
+                    setNewSeriesError(null);
+                  }}
+                  className="flex-1 rounded-xl border border-white/10 py-2.5 text-xs font-semibold text-slate-300 hover:bg-white/5 transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCreateQuickSeries}
+                  disabled={creatingSeries || !newSeriesTitle.trim()}
+                  className="flex-1 rounded-xl bg-gradient-to-r from-[#FF7A18] to-[#FF9A00] py-2.5 text-xs font-bold text-white shadow-md hover:from-orange-500 hover:to-amber-500 transition disabled:opacity-50"
+                >
+                  {creatingSeries ? "Creating..." : "Create & Select"}
+                </button>
+              </div>
             </div>
           </div>
         </div>

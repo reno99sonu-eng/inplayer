@@ -44,18 +44,18 @@ export default function SeriesDetailContent({ series, episodes, user }: any) {
   return (
     <div className="min-h-screen bg-[#0F0F13] text-white pb-24 max-w-md mx-auto relative overflow-hidden">
       {/* Top Banner & Header */}
-      <div className="relative h-72 w-full">
-        {series.thumbnailUrl ? (
-          <Image
-            src={series.thumbnailUrl}
-            alt={series.title}
-            fill
-            className="object-cover"
-            priority
-          />
-        ) : (
-          <div className="w-full h-full bg-gradient-to-br from-indigo-900 to-purple-900" />
-        )}
+      <div className="relative h-72 w-full bg-zinc-950">
+        <img
+          src={series.bannerUrl || series.posterUrl || series.thumbnailUrl || '/placeholder-vertical.svg'}
+          alt={series.title}
+          className="w-full h-full object-cover"
+          onError={(e) => {
+            const target = e.currentTarget;
+            if (target.src !== '/placeholder-vertical.svg') {
+              target.src = '/placeholder-vertical.svg';
+            }
+          }}
+        />
         
         {/* Gradient Overlay */}
         <div className="absolute inset-0 bg-gradient-to-t from-[#0F0F13] via-[#0F0F13]/40 to-transparent" />
@@ -96,13 +96,17 @@ export default function SeriesDetailContent({ series, episodes, user }: any) {
         <div className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/10">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 rounded-full overflow-hidden bg-gray-700 relative">
-              {series.creatorProfilePic ? (
-                <Image src={series.creatorProfilePic} alt="Creator" fill className="object-cover" />
-              ) : (
-                <div className="w-full h-full bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center text-xl font-bold">
-                  {series.creatorName?.[0] || "C"}
-                </div>
-              )}
+              <img 
+                src={series.creatorAvatarUrl || series.creatorProfilePic || '/avatars/avatar.png'} 
+                alt="Creator" 
+                className="w-full h-full object-cover" 
+                onError={(e) => {
+                  const target = e.currentTarget;
+                  if (target.src !== '/avatars/avatar.png') {
+                    target.src = '/avatars/avatar.png';
+                  }
+                }}
+              />
             </div>
             <div>
               <p className="font-semibold text-white">{series.creatorName || "Creator"}</p>
@@ -159,39 +163,41 @@ export default function SeriesDetailContent({ series, episodes, user }: any) {
           </div>
 
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-            {episodes?.map((ep: any, index: number) => (
-              <Link 
-                key={ep.videoId}
-                href={`/raftaar-films/${series.seriesId}/${ep.videoId}`}
-                className="group relative rounded-xl overflow-hidden aspect-[9/16] border border-white/5 bg-gray-900 transition-transform active:scale-95 hover:border-white/20"
-              >
-                {ep.thumbnailUrl ? (
-                  <Image 
-                    src={ep.thumbnailUrl}
+            {episodes?.map((ep: any, index: number) => {
+              const thumbSrc = ep.thumbnailUrl || series.posterUrl || '/placeholder-vertical.svg';
+              return (
+                <Link 
+                  key={ep.videoId}
+                  href={`/raftaar-films/${series.seriesId}/${ep.videoId}`}
+                  className="group relative rounded-xl overflow-hidden aspect-[9/16] border border-white/5 bg-gray-900 transition-transform active:scale-95 hover:border-white/20"
+                >
+                  <img 
+                    src={thumbSrc}
                     alt={ep.title}
-                    fill
-                    className="object-cover transition-transform group-hover:scale-105"
+                    className="w-full h-full object-cover transition-transform group-hover:scale-105"
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      if (target.src !== '/placeholder-vertical.svg') {
+                        target.src = '/placeholder-vertical.svg';
+                      }
+                    }}
                   />
-                ) : (
-                  <div className="w-full h-full bg-gray-800 flex items-center justify-center text-gray-600">
-                    <Play className="w-10 h-10" />
+                  
+                  {/* Overlay details */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-2.5">
+                    <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-md px-2 py-1 rounded text-xs font-semibold">
+                      Ep {ep.episodeNumber || index + 1}
+                    </div>
+                    <h3 className="text-sm font-semibold text-white line-clamp-2 leading-tight">
+                      {ep.title}
+                    </h3>
+                    <div className="flex items-center gap-2 text-[10px] text-gray-300 mt-1">
+                      <span>{ep.views || ep.viewCount || 0} views</span>
+                    </div>
                   </div>
-                )}
-                
-                {/* Overlay details */}
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-2.5">
-                  <div className="absolute top-2 left-2 bg-black/60 backdrop-blur-md px-2 py-1 rounded text-xs font-semibold">
-                    Ep {ep.episodeNumber}
-                  </div>
-                  <h3 className="text-sm font-semibold text-white line-clamp-2 leading-tight">
-                    {ep.title}
-                  </h3>
-                  <div className="flex items-center gap-2 text-[10px] text-gray-300 mt-1">
-                    <span>{ep.viewCount || 0} views</span>
-                  </div>
-                </div>
-              </Link>
-            ))}
+                </Link>
+              );
+            })}
             
             {(!episodes || episodes.length === 0) && (
               <div className="col-span-2 sm:col-span-3 text-center py-10 text-gray-500 bg-white/5 rounded-xl">

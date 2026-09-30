@@ -92,6 +92,7 @@ async function rankByWindow(
       if (
         !video ||
         video.contentType === "short" ||
+        video.contentType === "film" ||
         isMusicType(video.contentType) ||
         (video.visibility && video.visibility !== "public")
       ) {
@@ -292,6 +293,7 @@ export async function getFeaturedThisWeek(limit = 6): Promise<RankedVideo[]> {
         .filter(
           (v) =>
             v.contentType !== "short" &&
+            v.contentType !== "film" &&
             !isMusicType(v.contentType) &&
             (!v.visibility || v.visibility === "public") &&
             Boolean(v.uploaderId)

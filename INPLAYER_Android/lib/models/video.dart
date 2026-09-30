@@ -90,6 +90,12 @@ class Video {
       category.toLowerCase().contains('raftaar') ||
       category.toLowerCase().contains('shorts');
 
+  /// Strictly Raftaar Films micro-drama episodes.
+  bool get isFilm =>
+      contentType.trim().toLowerCase() == 'film' ||
+      contentType.trim().toLowerCase() == 'raftaar-film' ||
+      contentType.trim().toLowerCase() == 'raftaar_film';
+
   /// The canonical audio check: strictly `contentType == "music"`. Use it
   /// for music feeds, audio playback and download handling; a video category
   /// named "Music" does not change the underlying content type.
@@ -154,12 +160,16 @@ class Video {
 
     final playbackId = json['muxPlaybackId']?.toString();
     final isShort = rawContentType == 'short';
+    final isFilm = rawContentType == 'film' ||
+        rawContentType == 'raftaar-film' ||
+        rawContentType == 'raftaar_film';
+    final isPortrait = isShort || isFilm;
     String rawThumb =
         json['thumbnail']?.toString() ?? json['thumbnailUrl']?.toString() ?? '';
     if (rawThumb.trim().isEmpty &&
         playbackId != null &&
         playbackId.isNotEmpty) {
-      rawThumb = isShort
+      rawThumb = isPortrait
           ? 'https://image.mux.com/$playbackId/thumbnail.webp?width=640&height=1138&fit_mode=smartcrop&time=1'
           : 'https://image.mux.com/$playbackId/thumbnail.webp?width=640&height=360&fit_mode=smartcrop&time=1';
     }

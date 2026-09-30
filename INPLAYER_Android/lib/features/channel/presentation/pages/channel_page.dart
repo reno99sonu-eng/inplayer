@@ -90,7 +90,7 @@ class _ChannelPageState extends ConsumerState<ChannelPage>
     // _buildRaftaarShelf) — excluded here so they don't also show up as
     // full-width cards in the main grid underneath it.
     var videos = channel.videos
-      .where((v) => v.contentType != 'short' && v.contentType != 'music')
+      .where((v) => !v.isShort && v.contentType != 'music' && !v.isFilm)
       .toList();
     if (_query.isNotEmpty) {
       videos = videos
@@ -673,6 +673,170 @@ class _ChannelPageState extends ConsumerState<ChannelPage>
                                                 color: context.textDim,
                                                 size: 32,
                                               ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              ),
+              Builder(
+                builder: (context) {
+                  final films = channel.videos
+                      .where((v) => v.isFilm)
+                      .toList();
+                  if (films.isEmpty) {
+                    return const SliverToBoxAdapter(child: SizedBox.shrink());
+                  }
+                  return SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.only(
+                        left: 16,
+                        right: 16,
+                        top: 6,
+                        bottom: 8,
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.movie_filter_rounded,
+                                color: AppColors.brandOrange,
+                                size: 16,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                'Raftaar Films & Episodes',
+                                style: TextStyle(
+                                  color: context.textPrimary,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          SizedBox(
+                            height: 190,
+                            child: ListView.separated(
+                              scrollDirection: Axis.horizontal,
+                              itemCount: films.length,
+                              separatorBuilder: (context, index) =>
+                                  const SizedBox(width: 10),
+                              itemBuilder: (context, index) {
+                                final f = films[index];
+                                final image = (f.thumbnailUrl ?? '').isNotEmpty
+                                    ? smartImageProvider(f.thumbnailUrl!)
+                                    : null;
+                                return Material(
+                                  color: Colors.transparent,
+                                  child: InkWell(
+                                    onTap: () =>
+                                        context.push('/raftaar-films/${f.seriesId ?? "series"}/${f.videoId}'),
+                                    borderRadius: BorderRadius.circular(14),
+                                    child: Ink(
+                                      width: 114,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(14),
+                                        color: context.bgCard,
+                                        border: Border.all(
+                                          color: context.borderSubtle
+                                              .withValues(alpha: 0.5),
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: (context.isDark
+                                                    ? Colors.black
+                                                    : const Color(0xFFCBD5E1))
+                                                .withValues(alpha: 0.12),
+                                            blurRadius: 12,
+                                            offset: const Offset(0, 4),
+                                          ),
+                                        ],
+                                      ),
+                                      child: Stack(
+                                        children: [
+                                          Positioned.fill(
+                                            child: ClipRRect(
+                                              borderRadius: BorderRadius.circular(14),
+                                              child: image != null
+                                                  ? Image(
+                                                      image: image,
+                                                      fit: BoxFit.cover,
+                                                    )
+                                                  : Container(
+                                                      color: Colors.black26,
+                                                      child: Icon(
+                                                        Icons.movie_outlined,
+                                                        color: context.textDim,
+                                                        size: 32,
+                                                      ),
+                                                    ),
+                                            ),
+                                          ),
+                                          Positioned(
+                                            bottom: 0,
+                                            left: 0,
+                                            right: 0,
+                                            child: Container(
+                                              padding: const EdgeInsets.all(6),
+                                              decoration: BoxDecoration(
+                                                borderRadius: const BorderRadius.vertical(
+                                                  bottom: Radius.circular(14),
+                                                ),
+                                                gradient: LinearGradient(
+                                                  colors: [
+                                                    Colors.black.withValues(alpha: 0.85),
+                                                    Colors.transparent,
+                                                  ],
+                                                  begin: Alignment.bottomCenter,
+                                                  end: Alignment.topCenter,
+                                                ),
+                                              ),
+                                              child: Column(
+                                                crossAxisAlignment: CrossAxisAlignment.start,
+                                                mainAxisSize: MainAxisSize.min,
+                                                children: [
+                                                  if (f.episodeNumber != null)
+                                                    Container(
+                                                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                                                      decoration: BoxDecoration(
+                                                        color: AppColors.brandOrange,
+                                                        borderRadius: BorderRadius.circular(4),
+                                                      ),
+                                                      child: Text(
+                                                        'Ep ${f.episodeNumber}',
+                                                        style: const TextStyle(
+                                                          color: Colors.white,
+                                                          fontSize: 9,
+                                                          fontWeight: FontWeight.bold,
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  const SizedBox(height: 2),
+                                                  Text(
+                                                    f.title,
+                                                    maxLines: 1,
+                                                    overflow: TextOverflow.ellipsis,
+                                                    style: const TextStyle(
+                                                      color: Colors.white,
+                                                      fontSize: 11,
+                                                      fontWeight: FontWeight.w600,
+                                                    ),
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                          ),
+                                        ],
                                       ),
                                     ),
                                   ),

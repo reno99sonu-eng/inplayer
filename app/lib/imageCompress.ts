@@ -73,8 +73,15 @@ function cropImageElementToThumbnail(
   const cropX = (img.width - cropWidth) / 2;
   const cropY = (img.height - cropHeight) / 2;
 
-  const outWidth = Math.min(maxWidth, cropWidth);
-  const outHeight = outWidth / aspectRatio;
+  // For portrait aspect ratios (e.g. 9/16 = 0.5625), if width is 640 then height is 1138,
+  // which produces 728k pixels (3x larger than 640x360 landscape).
+  // Constraining max dimension to 640 (so width becomes ~360 and height 640) keeps the pixel
+  // count at 230k pixels, identical to landscape, and guarantees base64 size stays well under
+  // THUMBNAIL_DATA_URL_MAX_LENGTH (200,000 chars).
+  const effectiveMaxWidth =
+    aspectRatio < 1 ? Math.min(maxWidth, Math.round(640 * aspectRatio)) : maxWidth;
+  const outWidth = Math.max(1, Math.round(Math.min(effectiveMaxWidth, cropWidth)));
+  const outHeight = Math.max(1, Math.round(outWidth / aspectRatio));
 
   const canvas = document.createElement("canvas");
   canvas.width = outWidth;
@@ -96,7 +103,15 @@ function cropImageElementToThumbnail(
     outWidth,
     outHeight
   );
-  return canvas.toDataURL("image/jpeg", quality);
+
+  // Progressive compression fallback to strictly ensure output stays within THUMBNAIL_DATA_URL_MAX_LENGTH
+  let q = quality;
+  let dataUrl = canvas.toDataURL("image/jpeg", q);
+  while (dataUrl.length > THUMBNAIL_DATA_URL_MAX_LENGTH && q > 0.45) {
+    q -= 0.1;
+    dataUrl = canvas.toDataURL("image/jpeg", q);
+  }
+  return dataUrl;
 }
 
 export function compressImageToThumbnail(
@@ -376,9 +391,21 @@ export function extractVideoFramePoster(file: File): Promise<string> {
 
     video.onseeked = () => {
       try {
+        const ratio = (video.videoWidth || 16) / (video.videoHeight || 9);
+        const maxDim = 640;
+        let w = video.videoWidth || 640;
+        let h = video.videoHeight || 360;
+        if (ratio < 1) {
+          h = Math.min(maxDim, h);
+          w = Math.round(h * ratio);
+        } else {
+          w = Math.min(maxDim, w);
+          h = Math.round(w / ratio);
+        }
+
         const canvas = document.createElement("canvas");
-        canvas.width = Math.min(1200, video.videoWidth || 640);
-        canvas.height = canvas.width / ((video.videoWidth || 16) / (video.videoHeight || 9));
+        canvas.width = Math.max(1, w);
+        canvas.height = Math.max(1, h);
 
         const ctx = canvas.getContext("2d");
         if (!ctx) {
@@ -389,7 +416,13 @@ export function extractVideoFramePoster(file: File): Promise<string> {
 
         ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
         URL.revokeObjectURL(url);
-        resolve(canvas.toDataURL("image/jpeg", 0.82));
+        let q = 0.82;
+        let dataUrl = canvas.toDataURL("image/jpeg", q);
+        while (dataUrl.length > THUMBNAIL_DATA_URL_MAX_LENGTH && q > 0.45) {
+          q -= 0.1;
+          dataUrl = canvas.toDataURL("image/jpeg", q);
+        }
+        resolve(dataUrl);
       } catch (err) {
         URL.revokeObjectURL(url);
         reject(err instanceof Error ? err : new Error("Failed to extract video poster frame."));

@@ -87,7 +87,18 @@ export default function CreatorStoryStrip({ creators, selectedCreatorId, onSelec
                   : 'bg-gradient-to-tr from-zinc-700 to-zinc-600 group-hover:from-orange-500/50 group-hover:to-orange-400/50'
               }`}>
                 <div className="w-full h-full bg-zinc-900 rounded-full border-2 border-black overflow-hidden">
-                  <img src={creator.avatarUrl || '/default-avatar.png'} alt={creator.name} className="w-full h-full object-cover" draggable={false} />
+                  <img 
+                    src={creator.avatarUrl || '/avatars/avatar.png'} 
+                    alt={creator.name} 
+                    className="w-full h-full object-cover" 
+                    draggable={false} 
+                    onError={(e) => {
+                      const target = e.currentTarget;
+                      if (target.src !== '/avatars/avatar.png') {
+                        target.src = '/avatars/avatar.png';
+                      }
+                    }}
+                  />
                 </div>
               </div>
               <span className={`text-[10px] text-center w-full truncate ${isSelected ? 'text-orange-500 font-bold' : 'text-zinc-400'}`}>

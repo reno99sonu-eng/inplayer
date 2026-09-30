@@ -93,7 +93,9 @@ export default function FilmSeriesManager() {
       });
       if (appRes.ok) {
         const appData = await appRes.json();
-        if (appData.application) {
+        if (appData.isApproved || appData.status === "approved" || appData.application?.status === "approved") {
+          setAppStatus("approved");
+        } else if (appData.application) {
           setAppStatus(appData.application.status);
           if (appData.application.rejectionReason) {
             setRejectionReason(appData.application.rejectionReason);

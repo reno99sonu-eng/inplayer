@@ -33,6 +33,7 @@ class _RaftaarFilmsLandingPageState
   String _selectedGenre = 'All';
   String? _selectedCreatorId;
   bool _isLoading = true;
+  bool _isApproved = false;
 
   @override
   void initState() {
@@ -55,10 +56,12 @@ class _RaftaarFilmsLandingPageState
       final results = await Future.wait([
         service.getSeries(),
         service.getGenres(),
+        service.isApprovedCreator(),
       ]);
 
       final seriesList = results[0] as List<FilmSeries>;
       final rawGenres = results[1] as List<Map<String, dynamic>>;
+      final isApproved = results[2] as bool;
 
       final genresList = ['All'];
       for (final g in rawGenres) {
@@ -85,6 +88,7 @@ class _RaftaarFilmsLandingPageState
         setState(() {
           _allSeries = seriesList;
           _genres = genresList;
+          _isApproved = isApproved;
           _filterSeries();
           _isLoading = false;
         });
@@ -190,22 +194,62 @@ class _RaftaarFilmsLandingPageState
         ),
         centerTitle: false,
         actions: [
-          TextButton.icon(
-            onPressed: () => context.push('/raftaar-films/apply'),
-            icon: const Icon(
-              Icons.stars_rounded,
-              color: Color(0xFFFF9A00),
-              size: 18,
-            ),
-            label: const Text(
-              'Apply',
-              style: TextStyle(
+          if (_isApproved)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 10),
+              child: InkWell(
+                onTap: () => context.push('/upload?type=film'),
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFF7A18), Color(0xFFFF9A00)],
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFFFF7A18).withValues(alpha: 0.35),
+                        blurRadius: 8,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.video_call_rounded, color: Colors.white, size: 16),
+                      SizedBox(width: 4),
+                      Text(
+                        'Upload',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            )
+          else
+            TextButton.icon(
+              onPressed: () => context.push('/raftaar-films/apply'),
+              icon: const Icon(
+                Icons.stars_rounded,
                 color: Color(0xFFFF9A00),
-                fontWeight: FontWeight.w700,
-                fontSize: 13,
+                size: 18,
+              ),
+              label: const Text(
+                'Apply',
+                style: TextStyle(
+                  color: Color(0xFFFF9A00),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 13,
+                ),
               ),
             ),
-          ),
           const SizedBox(width: 8),
         ],
       ),

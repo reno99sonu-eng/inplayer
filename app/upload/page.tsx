@@ -116,6 +116,11 @@ export default function UploadPage() {
   }, []);
 
   useEffect(() => {
+    if (!signedIn) {
+      setIsFilmApproved(false);
+      setMySeriesList([]);
+      return;
+    }
     (async () => {
       try {
         const session = await fetchAuthSession().catch(() => null);
@@ -127,7 +132,7 @@ export default function UploadPage() {
         });
         if (res.ok) {
           const data = await res.json();
-          if (data.application?.status === "approved") {
+          if (data.isApproved || data.status === "approved" || data.application?.status === "approved") {
             setIsFilmApproved(true);
             const seriesRes = await fetch("/api/raftaar-films/my-series", {
               headers: { Authorization: `Bearer ${token}` },
@@ -146,13 +151,15 @@ export default function UploadPage() {
                 setEpisodeNumber((chosen.episodeCount || 0) + 1);
               }
             }
+          } else {
+            setIsFilmApproved(false);
           }
         }
       } catch (err) {
         console.error("Failed to check film creator status:", err);
       }
     })();
-  }, []);
+  }, [signedIn]);
 
   const handleThumbnailSelected = async (selected: File) => {
     if (!selected.type.startsWith("image/")) {
@@ -631,19 +638,32 @@ export default function UploadPage() {
 
   if (!signedIn) {
     return (
-      <div className="flex min-h-[60vh] flex-col items-center justify-center px-6 text-center">
-        <h2 className="text-2xl font-black text-white light:text-slate-900">
-          Sign in to upload
-        </h2>
-        <p className="mt-2 max-w-sm text-sm text-slate-400 light:text-slate-600">
-          You need an InPlayer account to upload videos and shorts.
-        </p>
-        <button
-          onClick={() => openSignIn()}
-          className="mt-6 rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-8 py-3 font-bold text-white shadow-[0_15px_35px_rgba(255,153,0,.3)] transition-all hover:-translate-y-0.5"
-        >
-          Sign In
-        </button>
+      <div className="mx-auto max-w-[760px] px-4 py-8 sm:py-12">
+        <div className="flex min-h-[50vh] flex-col items-center justify-center text-center">
+          <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-500/15 text-orange-400">
+            <UploadCloud size={32} />
+          </div>
+          <h2 className="mt-4 text-2xl font-black text-white light:text-slate-900 sm:text-3xl">
+            Sign in to upload
+          </h2>
+          <p className="mt-2 max-w-md text-sm text-slate-400 light:text-slate-600">
+            Sign in to your InPlayer account to upload videos, shorts, music, and Raftaar Films episodes.
+          </p>
+
+          <div className="mt-6 flex flex-wrap items-center justify-center gap-2 text-xs font-semibold text-slate-300">
+            <span className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 light:border-black/10 light:bg-black/5 light:text-slate-700">🎬 16:9 Videos</span>
+            <span className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 light:border-black/10 light:bg-black/5 light:text-slate-700">⚡ Raftaar Shorts</span>
+            <span className="rounded-xl border border-white/10 bg-white/5 px-3 py-1.5 light:border-black/10 light:bg-black/5 light:text-slate-700">🎵 Music & Audio</span>
+            <span className="rounded-xl border border-orange-500/30 bg-orange-500/10 px-3 py-1.5 text-orange-300">🍿 Raftaar Films</span>
+          </div>
+
+          <button
+            onClick={() => openSignIn()}
+            className="mt-8 rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-8 py-3.5 font-bold text-white shadow-[0_15px_35px_rgba(255,153,0,.3)] transition-all hover:scale-105"
+          >
+            Sign In to Upload
+          </button>
+        </div>
       </div>
     );
   }
@@ -656,19 +676,27 @@ export default function UploadPage() {
 
       <div className="text-center sm:text-left">
         <h1 className="text-2xl font-black text-white light:text-slate-900 sm:text-3xl">
-          {contentType === "short" ? "Shorts Upload Panel" : contentType === "music" ? "Music Upload Panel" : "Videos Upload Panel"}
+          {contentType === "short"
+            ? "Raftaar Shorts Upload"
+            : contentType === "music"
+              ? "Music Upload Panel"
+              : contentType === "film"
+                ? "Raftaar Films Upload"
+                : "Videos Upload Panel"}
         </h1>
         <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
           {contentType === "short"
             ? "Upload vertical short videos (9:16 format) up to 60 seconds with music and filters."
             : contentType === "music"
               ? "Upload a song or audio track. It plays in the normal player with your cover art on screen, and behaves like a video everywhere else."
-              : "Upload 16:9 long-form videos, tutorials, podcasts, and movies for your channel."}
+              : contentType === "film"
+                ? "Upload micro-drama episodes (9:16 vertical) and link them to your Raftaar Films series."
+                : "Upload 16:9 long-form videos, tutorials, podcasts, and movies for your channel."}
         </p>
       </div>
 
-      {/* Individual Panel Selector Buttons: Videos & Shorts */}
-      <div className="mt-6 mb-8 flex items-center justify-center gap-3 sm:justify-start">
+      {/* Individual Panel Selector Buttons: Videos, Raftaar Shorts, Music, Raftaar Films */}
+      <div className="mt-6 mb-8 flex flex-wrap items-center justify-center gap-3 sm:justify-start">
         <button
           type="button"
           onClick={() => setContentType("video")}
@@ -692,7 +720,7 @@ export default function UploadPage() {
           }`}
         >
           <PlaySquare size={18} />
-          <span>Shorts Panel</span>
+          <span>Raftaar Shorts</span>
         </button>
 
         <button
@@ -711,81 +739,115 @@ export default function UploadPage() {
           <span>Music Panel</span>
         </button>
 
-        {isFilmApproved && (
-          <button
-            type="button"
-            onClick={() => {
-              setContentType("film");
-              setAudience("everyone");
-            }}
-            className={`flex items-center gap-2.5 rounded-2xl px-6 py-3 text-sm font-bold transition-all duration-300 ${
-              contentType === "film"
-                ? "bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white shadow-[0_10px_25px_rgba(255,153,0,.35)] scale-105"
-                : "border border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/10 hover:text-white light:border-black/10 light:bg-black/[0.03] light:text-slate-700"
-            }`}
-          >
-            <Film size={18} />
-            <span>Raftaar Films</span>
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => {
+            setContentType("film");
+            setAudience("everyone");
+          }}
+          className={`flex items-center gap-2.5 rounded-2xl px-6 py-3 text-sm font-bold transition-all duration-300 ${
+            contentType === "film"
+              ? "bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] text-white shadow-[0_10px_25px_rgba(255,153,0,.35)] scale-105"
+              : "border border-white/10 bg-white/[0.03] text-slate-300 hover:bg-white/10 hover:text-white light:border-black/10 light:bg-black/[0.03] light:text-slate-700"
+          }`}
+        >
+          <Film size={18} />
+          <span>Raftaar Films</span>
+          {!isFilmApproved && (
+            <span className="rounded-full bg-orange-500/20 px-1.5 py-0.5 text-[10px] font-bold text-orange-300 border border-orange-500/30">
+              Apply
+            </span>
+          )}
+        </button>
       </div>
 
       <div className="mt-4">
         {stage === "picking" && (
-          <div
-            onDragOver={(e) => {
-              e.preventDefault();
-              setDragActive(true);
-            }}
-            onDragLeave={() => setDragActive(false)}
-            onDrop={handleDrop}
-            onClick={() => fileInputRef.current?.click()}
-            className={`
-              flex flex-col items-center justify-center gap-4
-              rounded-[28px] border-2 border-dashed
-              px-6 py-16 sm:py-20
-              text-center cursor-pointer
-              transition-all duration-300
-              ${
-                dragActive
-                  ? "border-orange-400 bg-orange-500/10"
-                  : "border-white/15 light:border-black/15 bg-white/[0.02] light:bg-black/[0.02] hover:border-orange-400/50"
-              }
-            `}
-          >
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-orange-500/10">
-              {contentType === "short" ? (
-                <PlaySquare size={30} className="text-orange-400" />
-              ) : contentType === "music" ? (
-                <Music2 size={30} className="text-orange-400" />
-              ) : contentType === "film" ? (
-                <Film size={30} className="text-orange-400" />
-              ) : (
-                <UploadCloud size={30} className="text-orange-400" />
-              )}
-            </div>
-            <div>
-              <p className="font-semibold text-white light:text-slate-900 sm:text-lg">
-                {contentType === "short"
-                  ? "Drag and drop a short video file (9:16 vertical)"
-                  : contentType === "music"
-                    ? "Drag and drop an audio file (MP3, M4A, WAV, FLAC)"
-                    : contentType === "film"
-                      ? "Drag and drop an episode video file (9:16 vertical)"
-                      : "Drag and drop a video file (16:9 recommended)"}
+          contentType === "film" && !isFilmApproved ? (
+            <div className="rounded-[28px] border border-orange-500/30 bg-[#071120] p-8 text-center shadow-xl light:border-orange-500/20 light:bg-white sm:p-12">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-orange-500/15 text-orange-400">
+                <Film size={32} />
+              </div>
+              <h2 className="mt-4 text-xl font-black text-white light:text-slate-900 sm:text-2xl">
+                Raftaar Films Creator Access Required
+              </h2>
+              <p className="mx-auto mt-2 max-w-md text-sm text-slate-300 light:text-slate-600">
+                Raftaar Films is an exclusive vertical micro-drama series platform. Apply as a creator to publish vertical episodes and build your subscriber base.
               </p>
-              <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
-                or click to browse from your device
-              </p>
+              <div className="mt-3 inline-flex items-center gap-2 rounded-xl border border-amber-500/30 bg-amber-500/10 px-3.5 py-1.5 text-xs font-semibold text-amber-300">
+                ⏱️ Editorial review turnaround: 48–72 hours
+              </div>
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                <a
+                  href="/raftaar-films/apply"
+                  className="rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-7 py-3 text-sm font-bold text-white shadow-[0_10px_25px_rgba(255,153,0,.35)] transition-all hover:scale-105"
+                >
+                  Apply as Creator
+                </a>
+                <a
+                  href="/raftaar-films"
+                  className="rounded-2xl border border-white/10 bg-white/5 px-6 py-3 text-sm font-bold text-slate-300 hover:bg-white/10 hover:text-white transition light:border-black/10 light:bg-black/5 light:text-slate-700"
+                >
+                  Browse Raftaar Films
+                </a>
+              </div>
             </div>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept={UPLOAD_ACCEPT[contentType]}
-              className="hidden"
-              onChange={(e) => handleFile(e.target.files?.[0] || null)}
-            />
-          </div>
+          ) : (
+            <div
+              onDragOver={(e) => {
+                e.preventDefault();
+                setDragActive(true);
+              }}
+              onDragLeave={() => setDragActive(false)}
+              onDrop={handleDrop}
+              onClick={() => fileInputRef.current?.click()}
+              className={`
+                flex flex-col items-center justify-center gap-4
+                rounded-[28px] border-2 border-dashed
+                px-6 py-16 sm:py-20
+                text-center cursor-pointer
+                transition-all duration-300
+                ${
+                  dragActive
+                    ? "border-orange-400 bg-orange-500/10"
+                    : "border-white/15 light:border-black/15 bg-white/[0.02] light:bg-black/[0.02] hover:border-orange-400/50"
+                }
+              `}
+            >
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-orange-500/10">
+                {contentType === "short" ? (
+                  <PlaySquare size={30} className="text-orange-400" />
+                ) : contentType === "music" ? (
+                  <Music2 size={30} className="text-orange-400" />
+                ) : contentType === "film" ? (
+                  <Film size={30} className="text-orange-400" />
+                ) : (
+                  <UploadCloud size={30} className="text-orange-400" />
+                )}
+              </div>
+              <div>
+                <p className="font-semibold text-white light:text-slate-900 sm:text-lg">
+                  {contentType === "short"
+                    ? "Drag and drop a short video file (9:16 vertical)"
+                    : contentType === "music"
+                      ? "Drag and drop an audio file (MP3, M4A, WAV, FLAC)"
+                      : contentType === "film"
+                        ? "Drag and drop an episode video file (9:16 vertical)"
+                        : "Drag and drop a video file (16:9 recommended)"}
+                </p>
+                <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
+                  or click to browse from your device
+                </p>
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept={UPLOAD_ACCEPT[contentType]}
+                className="hidden"
+                onChange={(e) => handleFile(e.target.files?.[0] || null)}
+              />
+            </div>
+          )
         )}
 
         {(stage === "details" || stage === "error") && file && (

@@ -365,6 +365,23 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    let resolvedUploaderName = user.name;
+    if (!resolvedUploaderName || resolvedUploaderName === "Unknown") {
+      try {
+        const uRes = await docClient.send(
+          new GetCommand({
+            TableName: "InPlayer-Users",
+            Key: { userId: user.userId },
+            ProjectionExpression: "#n, channelName, username",
+            ExpressionAttributeNames: { "#n": "name" },
+          })
+        );
+        resolvedUploaderName = uRes.Item?.channelName || uRes.Item?.name || uRes.Item?.username || "Creator";
+      } catch {
+        resolvedUploaderName = "Creator";
+      }
+    }
+
     // Save a "processing" placeholder now, keyed by the Mux upload ID.
     // Mux's webhook (fired once transcoding finishes, usually a minute
     // or two later) will look up this same record by that same ID and
@@ -381,7 +398,7 @@ export async function POST(request: NextRequest) {
           contentType: normalizeContentType(contentType),
           spokenLanguage: spokenLang,
           uploaderId: user.userId,
-          uploaderName: user.name || "Unknown",
+          uploaderName: resolvedUploaderName || "Creator",
           uploaderAvatarUrl,
           uploadedAt: new Date().toISOString(),
           views: 0,
@@ -461,9 +478,9 @@ export async function POST(request: NextRequest) {
             downloadRenditions: {},
           }),
           ...(isFilm && {
-            seriesId: typeof seriesId === "string" ? seriesId.trim() : undefined,
-            episodeNumber: typeof episodeNumber === "number" ? episodeNumber : 1,
-            seasonNumber: typeof seasonNumber === "number" ? seasonNumber : 1,
+            seriesId: typeof seriesId === "string" && seriesId.trim() ? seriesId.trim() : undefined,
+            episodeNumber: Number(episodeNumber) > 0 ? Number(episodeNumber) : 1,
+            seasonNumber: Number(seasonNumber) > 0 ? Number(seasonNumber) : 1,
             episodeTitle: typeof episodeTitle === "string" && episodeTitle.trim() ? episodeTitle.trim() : title.trim(),
           }),
           // Upload options (YouTube-style). DynamoDB needs no schema change

@@ -8,6 +8,8 @@ import {
 } from "@aws-sdk/lib-dynamodb";
 import { docClient } from "@/app/lib/dynamodb";
 import { randomUUID } from "crypto";
+import { isAdminEmail } from "@/app/lib/isAdmin";
+
 
 export const FILM_SERIES_TABLE = "InPlayer-Film-Series";
 export const FILM_APPLICATIONS_TABLE = "InPlayer-Film-Creator-Applications";
@@ -395,13 +397,26 @@ export async function reviewApplication(applicationId: string, action: "approve"
     await docClient.send(updateCommand);
 
     if (action === "approve") {
-      const userUpdateCommand = new UpdateCommand({
-        TableName: "InPlayer-Users",
-        Key: { userId: application.userId },
-        UpdateExpression: "SET raftaarFilmsApproved = :approved",
-        ExpressionAttributeValues: { ":approved": true }
-      });
-      await docClient.send(userUpdateCommand);
+      try {
+        const userUpdateCommand = new UpdateCommand({
+          TableName: "InPlayer-Users",
+          Key: { userId: application.userId },
+          UpdateExpression:
+            "SET raftaarFilmsApproved = :approved, #n = if_not_exists(#n, :name), username = if_not_exists(username, :username), email = if_not_exists(email, :email), phoneNumber = if_not_exists(phoneNumber, :phone), channelName = if_not_exists(channelName, :channelName)",
+          ExpressionAttributeNames: { "#n": "name" },
+          ExpressionAttributeValues: {
+            ":approved": true,
+            ":name": application.personalName || application.channelName || "Creator",
+            ":username": application.username || `creator_${application.userId.slice(0, 6)}`,
+            ":email": application.email || "",
+            ":phone": application.phoneNumber || "",
+            ":channelName": application.channelName || "",
+          },
+        });
+        await docClient.send(userUpdateCommand);
+      } catch (userErr) {
+        console.warn("Could not sync user profile in InPlayer-Users on approval:", userErr);
+      }
     }
   } catch (error) {
     console.error("Error reviewing application:", error);
@@ -409,21 +424,49 @@ export async function reviewApplication(applicationId: string, action: "approve"
   }
 }
 
-export async function isApprovedFilmCreator(userId: string): Promise<boolean> {
+export async function isApprovedFilmCreator(userId: string, email?: string): Promise<boolean> {
   try {
+    if (email && isAdminEmail(email)) {
+      return true;
+    }
+
     const command = new GetCommand({
       TableName: "InPlayer-Users",
       Key: { userId },
-      ProjectionExpression: "raftaarFilmsApproved"
+      ProjectionExpression: "raftaarFilmsApproved, email"
     });
     
     const response = await docClient.send(command);
-    return !!response.Item?.raftaarFilmsApproved;
+    if (response.Item?.raftaarFilmsApproved) {
+      return true;
+    }
+    if (response.Item?.email && isAdminEmail(response.Item.email)) {
+      return true;
+    }
+
+    // Fallback: check if user has an approved creator application
+    const app = await getApplicationByUserId(userId);
+    if (app && app.status === "approved") {
+      try {
+        await docClient.send(new UpdateCommand({
+          TableName: "InPlayer-Users",
+          Key: { userId },
+          UpdateExpression: "SET raftaarFilmsApproved = :approved",
+          ExpressionAttributeValues: { ":approved": true }
+        }));
+      } catch (e) {
+        console.warn("Auto-heal raftaarFilmsApproved notice:", e);
+      }
+      return true;
+    }
+
+    return false;
   } catch (error) {
     console.error("Error checking film creator approval:", error);
-    throw error;
+    return false;
   }
 }
+
 
 export async function subscribeToSeries(seriesId: string, userId: string): Promise<void> {
   try {

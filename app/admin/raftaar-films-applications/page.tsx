@@ -13,6 +13,7 @@ import {
   Loader2,
   UserCheck,
   UserX,
+  Copy,
 } from "lucide-react";
 
 interface Application {
@@ -44,6 +45,13 @@ export default function RaftaarFilmsApplicationsPage() {
   const [actingId, setActingId] = useState<string | null>(null);
   const [rejectModalApp, setRejectModalApp] = useState<Application | null>(null);
   const [rejectionReason, setRejectionReason] = useState("");
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+
+  const copyToClipboard = (text: string, id: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedId(id);
+    setTimeout(() => setCopiedId(null), 2000);
+  };
 
   const getToken = async (): Promise<string | null> => {
     try {
@@ -251,11 +259,48 @@ export default function RaftaarFilmsApplicationsPage() {
                     )}
 
                     <div className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-400">
-                      <span>👤 Legal Name: {app.personalName}</span>
+                      <span>👤 Legal Name: <strong className="text-slate-200">{app.personalName}</strong></span>
                       {app.email && <span>✉️ Email: <strong className="text-slate-200">{app.email}</strong></span>}
                       {app.phoneNumber && <span>📞 Phone: <strong className="text-slate-200">{app.phoneNumber}</strong></span>}
                       <span>📅 Submitted: {new Date(app.submittedAt).toLocaleDateString()}</span>
                       {app.reviewedBy && <span>Reviewed by: {app.reviewedBy}</span>}
+                    </div>
+
+                    {/* Prominent User ID & Application ID with 1-click copy */}
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <div className="inline-flex items-center gap-1.5 rounded-lg border border-orange-500/30 bg-orange-500/10 px-2.5 py-1 text-[11px] font-mono text-orange-300">
+                        <span className="font-bold text-orange-400">🆔 User ID:</span>
+                        <span className="font-semibold select-all text-white">{app.userId}</span>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(app.userId, `user-${app.applicationId}`)}
+                          className="ml-1 rounded p-0.5 text-orange-300 hover:bg-orange-500/20 hover:text-white transition"
+                          title="Copy User ID"
+                        >
+                          {copiedId === `user-${app.applicationId}` ? (
+                            <Check size={12} className="text-emerald-400" />
+                          ) : (
+                            <Copy size={12} />
+                          )}
+                        </button>
+                      </div>
+
+                      <div className="inline-flex items-center gap-1.5 rounded-lg border border-white/10 bg-white/5 px-2.5 py-1 text-[11px] font-mono text-slate-300 light:border-black/10 light:bg-black/5 light:text-slate-700">
+                        <span className="text-slate-400">📄 App ID:</span>
+                        <span className="select-all text-slate-300">{app.applicationId}</span>
+                        <button
+                          type="button"
+                          onClick={() => copyToClipboard(app.applicationId, `app-${app.applicationId}`)}
+                          className="ml-1 rounded p-0.5 text-slate-400 hover:bg-white/10 hover:text-white transition"
+                          title="Copy Application ID"
+                        >
+                          {copiedId === `app-${app.applicationId}` ? (
+                            <Check size={12} className="text-emerald-400" />
+                          ) : (
+                            <Copy size={12} />
+                          )}
+                        </button>
+                      </div>
                     </div>
 
                     {/* Portfolio & Social links */}

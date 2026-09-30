@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Plus, Video, Radio, Mic2, Sparkles } from "lucide-react";
+import { Plus, Video, PlaySquare, Film, Radio, Mic2, Sparkles } from "lucide-react";
 
 import CreatePopup from "./CreatePopup";
 import AIStudioModal from "./AIStudioModal";
@@ -49,9 +49,23 @@ export default function MobileCreateButton() {
     {
       icon: <Video size={20} />,
       title: "Upload Video",
-      subtitle: "Movies • Shorts • Series",
+      subtitle: "Movies & Long-form",
       color: "from-red-500 to-orange-500",
-      onClick: () => go("/upload"),
+      onClick: () => go("/upload?type=video"),
+    },
+    {
+      icon: <PlaySquare size={20} />,
+      title: "Upload Raftaar",
+      subtitle: "Vertical 60s Shorts",
+      color: "from-orange-500 to-amber-500",
+      onClick: () => go("/upload?type=short"),
+    },
+    {
+      icon: <Film size={20} />,
+      title: "Raftaar Films",
+      subtitle: "Micro-Drama Episodes",
+      color: "from-amber-500 to-yellow-400",
+      onClick: () => go("/upload?type=film"),
     },
     {
       icon: <Radio size={20} />,

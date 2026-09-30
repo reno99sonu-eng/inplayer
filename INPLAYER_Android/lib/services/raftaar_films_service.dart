@@ -152,6 +152,22 @@ class RaftaarFilmsService {
     }
   }
 
+  /// Check if the signed in user is an approved Raftaar Films creator
+  Future<bool> isApprovedCreator() async {
+    try {
+      final response = await _dio.get(ApiConstants.raftaarFilmsApply);
+      if (response.statusCode == 200 && response.data != null) {
+        final isApproved = response.data['isApproved'] == true ||
+            response.data['status'] == 'approved' ||
+            response.data['application']?['status'] == 'approved';
+        return isApproved;
+      }
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
   /// Submit creator application
   Future<bool> submitApplication(Map<String, dynamic> data) async {
     try {

@@ -7,8 +7,11 @@ import GenreBar from './GenreBar';
 import CreatorStoryStrip, { TopCreator } from './CreatorStoryStrip';
 import SeriesGrid from './SeriesGrid';
 import RaftaarFilmsIntro from './RaftaarFilmsIntro';
-import { Play, Sparkles, ArrowLeft, Film } from 'lucide-react';
+import { Play, Sparkles, ArrowLeft, Film, Upload } from 'lucide-react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useAuthModal } from '@/app/components/auth/AuthProvider';
+import { fetchAuthSession } from 'aws-amplify/auth';
 
 export default function RaftaarFilmsLanding() {
   const [series, setSeries] = useState<FilmSeries[]>([]);
@@ -16,9 +19,53 @@ export default function RaftaarFilmsLanding() {
   const [loading, setLoading] = useState(true);
   const [showIntro, setShowIntro] = useState(false);
   
+  const router = useRouter();
+  const { signedIn, openSignIn } = useAuthModal();
+  const [isApproved, setIsApproved] = useState(false);
+  const [appStatus, setAppStatus] = useState<string>("none");
+
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedGenre, setSelectedGenre] = useState('All');
   const [selectedCreatorId, setSelectedCreatorId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let canceled = false;
+    async function checkApproval() {
+      if (!signedIn) {
+        setIsApproved(false);
+        setAppStatus("none");
+        return;
+      }
+      try {
+        const session = await fetchAuthSession().catch(() => null);
+        const token = session?.tokens?.idToken?.toString();
+        if (!token || canceled) return;
+
+        const res = await fetch("/api/raftaar-films/apply", {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (res.ok && !canceled) {
+          const data = await res.json();
+          if (data.isApproved || data.status === "approved" || data.application?.status === "approved") {
+            setIsApproved(true);
+            setAppStatus("approved");
+          } else if (data.status === "pending" || data.application?.status === "pending") {
+            setIsApproved(false);
+            setAppStatus("pending");
+          } else {
+            setIsApproved(false);
+            setAppStatus("none");
+          }
+        }
+      } catch (err) {
+        console.error("Error checking creator approval:", err);
+      }
+    }
+    checkApproval();
+    return () => {
+      canceled = true;
+    };
+  }, [signedIn]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -99,13 +146,45 @@ export default function RaftaarFilmsLanding() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
-            <Link
-              href="/raftaar-films/apply"
-              className="text-xs font-bold px-4 py-2 rounded-full bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white shadow-[0_0_15px_rgba(234,88,12,0.35)] transition-all hover:scale-105"
-            >
-              Apply as Creator
-            </Link>
+          <div className="flex items-center gap-2.5">
+            {isApproved ? (
+              <>
+                <Link
+                  href="/my-videos?tab=raftaar-films"
+                  className="hidden sm:inline-flex text-xs font-bold px-3.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 border border-white/15 text-zinc-200 hover:text-white transition-all"
+                >
+                  Series Studio
+                </Link>
+                <Link
+                  href="/upload?type=film"
+                  className="inline-flex items-center gap-1.5 text-xs font-black px-4 py-2 rounded-full bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-400 hover:from-orange-400 hover:to-yellow-300 text-slate-950 shadow-[0_0_15px_rgba(249,115,22,0.4)] transition-all hover:scale-105"
+                >
+                  <Upload className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Upload</span>
+                </Link>
+              </>
+            ) : appStatus === "pending" ? (
+              <Link
+                href="/raftaar-films/apply"
+                className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 text-amber-300 text-xs font-semibold hover:bg-amber-500/25 transition-all"
+              >
+                <span className="w-2 h-2 rounded-full bg-amber-400 animate-pulse" />
+                <span>Under Review (48-72h)</span>
+              </Link>
+            ) : (
+              <button
+                onClick={() => {
+                  if (!signedIn) {
+                    openSignIn();
+                  } else {
+                    router.push("/raftaar-films/apply");
+                  }
+                }}
+                className="text-xs font-bold px-4 py-2 rounded-full bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-500 hover:to-amber-500 text-white shadow-[0_0_15px_rgba(234,88,12,0.35)] transition-all hover:scale-105"
+              >
+                Apply as Creator
+              </button>
+            )}
           </div>
         </div>
       </header>
@@ -161,23 +240,64 @@ export default function RaftaarFilmsLanding() {
           <SeriesGrid series={filteredSeries} loading={loading} />
         </div>
 
-        {/* Apply as Creator Banner */}
+        {/* Apply as Creator / Upload Banner */}
         <div className="mt-16 bg-gradient-to-br from-zinc-900 to-zinc-800 border border-zinc-700/50 rounded-3xl p-8 md:p-12 text-center relative overflow-hidden group">
           <div className="absolute top-0 right-0 -mr-16 -mt-16 w-64 h-64 bg-orange-500/10 rounded-full blur-3xl group-hover:bg-orange-500/20 transition-all"></div>
           <div className="absolute bottom-0 left-0 -ml-16 -mb-16 w-64 h-64 bg-yellow-500/10 rounded-full blur-3xl group-hover:bg-yellow-500/20 transition-all"></div>
           
-          <h2 className="text-3xl md:text-4xl font-bold mb-4 relative z-10">Got a Story to Tell?</h2>
+          <h2 className="text-3xl md:text-4xl font-bold mb-4 relative z-10">
+            {isApproved ? "Ready to Publish Your Next Episode?" : "Got a Story to Tell?"}
+          </h2>
           <p className="text-zinc-400 max-w-2xl mx-auto mb-8 relative z-10">
-            Join Raftaar Films as a creator and bring your micro-drama series to millions of viewers. Share your content and build a dedicated fanbase from day one.
+            {isApproved
+              ? "Your Raftaar Films creator account is approved! Create new series, upload vertical episodes, and share your storytelling with thousands of daily viewers."
+              : "Join Raftaar Films as a creator and bring your micro-drama series to millions of viewers. Share your content and build a dedicated fanbase from day one."}
           </p>
-          <div className="relative z-10">
-            <Link href="/raftaar-films/apply" className="inline-block bg-white text-black px-8 py-4 rounded-full font-bold hover:bg-zinc-200 transition-colors">
-              Apply as Creator
-            </Link>
-            <div className="mt-4 flex items-center justify-center gap-2 text-sm text-zinc-500 font-medium">
-              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-              Fast-track approval within 48-72 hrs
-            </div>
+          <div className="relative z-10 flex flex-wrap items-center justify-center gap-3">
+            {isApproved ? (
+              <>
+                <Link
+                  href="/upload?type=film"
+                  className="inline-flex items-center gap-2 bg-gradient-to-r from-orange-500 via-amber-500 to-yellow-400 text-slate-950 px-8 py-4 rounded-full font-black text-sm hover:scale-105 transition-all shadow-[0_0_20px_rgba(249,115,22,0.4)]"
+                >
+                  <Upload className="w-4 h-4 stroke-[2.5]" />
+                  <span>Upload Episode</span>
+                </Link>
+                <Link
+                  href="/my-videos?tab=raftaar-films"
+                  className="inline-flex items-center gap-2 bg-white/10 hover:bg-white/20 border border-white/20 text-white px-8 py-4 rounded-full font-bold text-sm transition-all"
+                >
+                  Series Studio
+                </Link>
+              </>
+            ) : appStatus === "pending" ? (
+              <Link
+                href="/raftaar-films/apply"
+                className="inline-flex items-center gap-2 bg-amber-500/20 border border-amber-500/40 text-amber-300 px-8 py-4 rounded-full font-bold text-sm hover:bg-amber-500/30 transition-all"
+              >
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-400 animate-pulse" />
+                Application Under Review (48-72 hrs)
+              </Link>
+            ) : (
+              <>
+                <button
+                  onClick={() => {
+                    if (!signedIn) {
+                      openSignIn();
+                    } else {
+                      router.push("/raftaar-films/apply");
+                    }
+                  }}
+                  className="inline-block bg-white text-black px-8 py-4 rounded-full font-bold hover:bg-zinc-200 transition-colors"
+                >
+                  Apply as Creator
+                </button>
+                <div className="w-full mt-2 flex items-center justify-center gap-2 text-sm text-zinc-500 font-medium">
+                  <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
+                  Fast-track approval within 48-72 hrs
+                </div>
+              </>
+            )}
           </div>
         </div>
       </div>

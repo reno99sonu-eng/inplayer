@@ -11,6 +11,8 @@ import {
   Bell,
   Plus,
   Video,
+  PlaySquare,
+  Film,
   Radio,
   Mic2,
   Sparkles,
@@ -160,11 +162,31 @@ export default function NavbarActions() {
     {
       icon: <Video size={20} />,
       title: "Upload Video",
-      subtitle: "Movies • Shorts • Series",
+      subtitle: "Movies & Long-form",
       color: "from-red-500 to-orange-500",
       onClick: () => {
         setOpen(false);
-        router.push("/upload");
+        router.push("/upload?type=video");
+      },
+    },
+    {
+      icon: <PlaySquare size={20} />,
+      title: "Upload Raftaar",
+      subtitle: "Vertical 60s Shorts",
+      color: "from-orange-500 to-amber-500",
+      onClick: () => {
+        setOpen(false);
+        router.push("/upload?type=short");
+      },
+    },
+    {
+      icon: <Film size={20} />,
+      title: "Raftaar Films",
+      subtitle: "Micro-Drama Episodes",
+      color: "from-amber-500 to-yellow-400",
+      onClick: () => {
+        setOpen(false);
+        router.push("/upload?type=film");
       },
     },
     {

@@ -13,8 +13,13 @@ export function getDocClient() {
       },
     });
 
-    client = DynamoDBDocumentClient.from(rawClient);
+    client = DynamoDBDocumentClient.from(rawClient, {
+      marshallOptions: {
+        removeUndefinedValues: true,
+      },
+    });
   }
+
 
   return client;
 }

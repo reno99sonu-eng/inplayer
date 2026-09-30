@@ -81,11 +81,9 @@ class _FilmSearchBarState extends State<FilmSearchBar> {
   Widget build(BuildContext context) {
     final isDark = context.isDark;
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        height: 48,
-        width: double.infinity,
+    return Container(
+      height: 48,
+      width: double.infinity,
         decoration: BoxDecoration(
           color: isDark
               ? Colors.white.withValues(alpha: 0.07)

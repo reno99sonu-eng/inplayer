@@ -66,9 +66,29 @@ export default function SiteChrome({
 }) {
   const pathname = usePathname();
   const isAdmin = pathname?.startsWith("/admin");
+  // Raftaar Films is a fully isolated micro-drama platform with its own
+  // navigation and layout. It must not inherit any InPlayer chrome —
+  // no top Navbar, no category bar, no bottom tab bar, no floating buttons.
+  const isRaftaarFilms = pathname?.startsWith("/raftaar-films");
 
   if (isAdmin) {
     return <>{children}</>;
+  }
+
+  if (isRaftaarFilms) {
+    // Only wrap in the music/mini-player providers (needed for auth context
+    // passthrough), then render children completely bare.
+    return (
+      <MusicPlayerProvider>
+        <MiniPlayerProvider>
+          <MaintenanceGate initialMaintenance={initialMaintenance}>
+            <GeoGate initialGeoAllowed={initialGeoAllowed}>
+              {children}
+            </GeoGate>
+          </MaintenanceGate>
+        </MiniPlayerProvider>
+      </MusicPlayerProvider>
+    );
   }
 
   return (

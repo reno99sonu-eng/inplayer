@@ -217,7 +217,7 @@ class _RaftaarFilmsLandingPageState
               // Search Bar
               SliverToBoxAdapter(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(4, 10, 4, 12),
+                  padding: const EdgeInsets.fromLTRB(16, 10, 16, 12),
                   child: FilmSearchBar(
                     controller: _searchController,
                     onChanged: (val) => _filterSeries(),

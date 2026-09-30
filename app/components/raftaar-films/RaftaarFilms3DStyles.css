@@ -327,3 +327,110 @@
   animation: rf-heart-pop 0.85s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
 }
 
+/* ─────────── ULTRA-LUXURIOUS 3D ANIMATED SUITE ─────────── */
+
+/* ── 3D Card Floating Depth with Dynamic Amber Rim ── */
+.rf-card-3d-lux {
+  position: relative;
+  transform-style: preserve-3d;
+  perspective: 1000px;
+  transition: transform 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.2),
+              box-shadow 0.4s cubic-bezier(0.2, 0.9, 0.3, 1.2),
+              border-color 0.3s ease;
+  will-change: transform, box-shadow;
+}
+
+.rf-card-3d-lux:hover {
+  transform: translateY(-8px) scale(1.025) rotateX(3deg) rotateY(-2deg);
+  box-shadow: 
+    0 22px 50px -10px rgba(249, 115, 22, 0.35),
+    0 10px 25px -5px rgba(0, 0, 0, 0.7),
+    inset 0 1px 1px rgba(255, 255, 255, 0.2);
+  border-color: rgba(249, 115, 22, 0.55);
+}
+
+/* ── 3D Ultra Liquid Golden Amber Button ── */
+.rf-btn-3d-lux {
+  position: relative;
+  overflow: hidden;
+  background: linear-gradient(135deg, #FF6B00 0%, #FFA800 50%, #FF4D00 100%);
+  background-size: 200% 200%;
+  animation: rf-liquid 4s ease infinite;
+  box-shadow: 0 8px 25px rgba(255, 107, 0, 0.4), inset 0 1px 2px rgba(255, 255, 255, 0.35);
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  transform: translateZ(0);
+}
+
+.rf-btn-3d-lux:hover {
+  transform: translateY(-3px) scale(1.04);
+  box-shadow: 0 16px 38px rgba(255, 107, 0, 0.6), 0 0 25px rgba(255, 168, 0, 0.5);
+}
+
+.rf-btn-3d-lux:active {
+  transform: translateY(1px) scale(0.97);
+}
+
+.rf-btn-3d-lux::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  transform: skewX(-25deg);
+  transition: left 0.7s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.rf-btn-3d-lux:hover::after {
+  left: 200%;
+}
+
+/* ── Ambient Pulsing Golden Glow ── */
+@keyframes rf-pulse-amber-halo {
+  0%, 100% {
+    box-shadow: 0 0 25px rgba(249, 115, 22, 0.25), 0 0 60px rgba(245, 158, 11, 0.15);
+  }
+  50% {
+    box-shadow: 0 0 45px rgba(249, 115, 22, 0.45), 0 0 90px rgba(245, 158, 11, 0.3);
+  }
+}
+
+.rf-glow-pulse-amber {
+  animation: rf-pulse-amber-halo 3.5s ease-in-out infinite;
+}
+
+/* ── Smart TV & Large Screen Adaptations ── */
+@media (min-width: 1920px) {
+  .rf-tv-scale {
+    transform-origin: center top;
+    zoom: 1.15;
+  }
+}
+
+/* ── 3D Floating Action Button ── */
+.rf-action-btn-3d {
+  position: relative;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1),
+              box-shadow 0.25s ease,
+              border-color 0.25s ease;
+  transform-style: preserve-3d;
+}
+
+.rf-action-btn-3d:hover {
+  transform: translateY(-4px) scale(1.12);
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.6), 0 0 15px rgba(255, 122, 24, 0.35);
+  border-color: rgba(255, 122, 24, 0.6);
+}
+
+.rf-action-btn-3d:active {
+  transform: translateY(1px) scale(0.92);
+}
+
+/* ── Smart TV & Keyboard D-Pad Focus Ring ── */
+.rf-tv-focus:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(255, 122, 24, 0.8), 0 0 24px rgba(255, 122, 24, 0.65) !important;
+}
+
+

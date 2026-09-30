@@ -1,8 +1,7 @@
 "use client";
 
-import { useState, useRef, useEffect, useCallback } from "react";
+import { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import dynamic from "next/dynamic";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { fetchAuthSession } from "aws-amplify/auth";
@@ -17,7 +16,6 @@ import {
   Heart,
   MessageCircle,
   Bookmark,
-  MoreVertical,
   Play,
   Pause,
   ListVideo,
@@ -25,7 +23,6 @@ import {
   Volume2,
   VolumeX,
   ChevronDown,
-  Sparkles,
   Loader2,
 } from "lucide-react";
 import CommentSection from "@/app/components/CommentSection";
@@ -48,14 +45,29 @@ export default function FilmPlayerContent({
   const { signedIn, openSignIn } = useAuthModal();
   const playerRef = useRef<MuxPlayerRefAttributes | null>(null);
 
-  // Find current index
-  const currentIndex =
-    episodes?.findIndex((ep: any) => ep.videoId === currentEpisodeId) ?? 0;
-  const currentEpisode = episodes?.[currentIndex >= 0 ? currentIndex : 0];
+  // Guarantee episodes are strictly sorted by episodeNumber
+  const sortedEpisodes = useMemo(() => {
+    if (!episodes || !Array.isArray(episodes)) return [];
+    return [...episodes].sort(
+      (a: any, b: any) =>
+        (Number(a.episodeNumber) || 0) - (Number(b.episodeNumber) || 0)
+    );
+  }, [episodes]);
 
-  const prevEpisode = currentIndex > 0 ? episodes[currentIndex - 1] : null;
+  // Find current index
+  const currentIndex = useMemo(() => {
+    const idx = sortedEpisodes.findIndex(
+      (ep: any) => ep.videoId === currentEpisodeId
+    );
+    return idx >= 0 ? idx : 0;
+  }, [sortedEpisodes, currentEpisodeId]);
+
+  const currentEpisode = sortedEpisodes[currentIndex] || sortedEpisodes[0];
+  const prevEpisode = currentIndex > 0 ? sortedEpisodes[currentIndex - 1] : null;
   const nextEpisode =
-    currentIndex < (episodes?.length ?? 0) - 1 ? episodes[currentIndex + 1] : null;
+    currentIndex < sortedEpisodes.length - 1
+      ? sortedEpisodes[currentIndex + 1]
+      : null;
 
   const [isPlaying, setIsPlaying] = useState(true);
   const [isMuted, setIsMuted] = useState(false);
@@ -71,22 +83,42 @@ export default function FilmPlayerContent({
   const [showComments, setShowComments] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
+  const centerIconTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const singleTapTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastTapRef = useRef<number>(0);
+  const isWheelLockedRef = useRef<boolean>(false);
+
+  // Touch tracking for Reels vertical swipe
+  const touchStartYRef = useRef<number>(0);
+  const touchStartXRef = useRef<number>(0);
+  const touchStartTimeRef = useRef<number>(0);
+
+  // Double-tap to like floating hearts
+  const [floatingHearts, setFloatingHearts] = useState<
+    Array<{ id: number; x: number; y: number }>
+  >([]);
+
   const posterImage =
     currentEpisode?.thumbnailUrl ||
     currentEpisode?.customThumbnailUrl ||
     series?.posterUrl ||
     "/placeholder-vertical.svg";
 
-  const showToast = (msg: string) => {
+  const showToast = useCallback((msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(null), 2500);
-  };
+  }, []);
 
-  // Fetch likes and subscription on episode change
+  // Sync state on episode change
   useEffect(() => {
     setIsPlaying(true);
     setProgress(0);
     setShowCenterIcon(false);
+
+    if (singleTapTimerRef.current) {
+      clearTimeout(singleTapTimerRef.current);
+      singleTapTimerRef.current = null;
+    }
 
     if (currentEpisode?.videoId) {
       setLikeCount(currentEpisode.likeCount || 0);
@@ -113,7 +145,7 @@ export default function FilmPlayerContent({
     }
 
     if (series?.seriesId) {
-      // Check series subscription
+      // Check series subscription (In-Family)
       (async () => {
         try {
           const session = await fetchAuthSession().catch(() => null);
@@ -136,13 +168,22 @@ export default function FilmPlayerContent({
     }
   }, [currentEpisodeId, currentEpisode?.videoId, series?.seriesId]);
 
+  // Clean up timers on unmount
+  useEffect(() => {
+    return () => {
+      if (singleTapTimerRef.current) clearTimeout(singleTapTimerRef.current);
+      if (centerIconTimerRef.current) clearTimeout(centerIconTimerRef.current);
+    };
+  }, []);
+
+  // Navigation handlers
   const goToNext = useCallback(() => {
     if (nextEpisode) {
       router.push(`/raftaar-films/${series.seriesId}/${nextEpisode.videoId}`);
     } else {
       showToast("You're on the latest episode 🎉");
     }
-  }, [nextEpisode, series.seriesId, router]);
+  }, [nextEpisode, series?.seriesId, router, showToast]);
 
   const goToPrev = useCallback(() => {
     if (prevEpisode) {
@@ -150,78 +191,48 @@ export default function FilmPlayerContent({
     } else {
       showToast("This is the first episode 🎬");
     }
-  }, [prevEpisode, series.seriesId, router]);
+  }, [prevEpisode, series?.seriesId, router, showToast]);
 
-  // Reels vertical swipe touch handlers
-  const touchStartYRef = useRef<number>(0);
-  const touchStartXRef = useRef<number>(0);
-  const touchStartTimeRef = useRef<number>(0);
-  const isWheelLockedRef = useRef<boolean>(false);
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartYRef.current = e.touches[0].clientY;
-    touchStartXRef.current = e.touches[0].clientX;
-    touchStartTimeRef.current = Date.now();
-  };
-
-  const handleTouchEnd = (e: React.TouchEvent) => {
-    if (showComments || showEpisodesList) return;
-
-    const deltaY = touchStartYRef.current - e.changedTouches[0].clientY;
-    const deltaX = Math.abs(touchStartXRef.current - e.changedTouches[0].clientX);
-    const duration = Date.now() - touchStartTimeRef.current;
-
-    // Minimum swipe threshold: 45px vertical, predominantly vertical, within 700ms
-    if (Math.abs(deltaY) > 45 && Math.abs(deltaY) > deltaX * 1.3 && duration < 700) {
-      if (deltaY > 0) {
-        // Swiped UP -> Next Episode (standard Reels gesture)
-        goToNext();
+  // Play / Pause toggle with zero flickering
+  const togglePlay = useCallback(() => {
+    const el = playerRef.current;
+    if (el) {
+      if (el.paused) {
+        el.play()
+          .then(() => setIsPlaying(true))
+          .catch(() => {});
       } else {
-        // Swiped DOWN -> Previous Episode (standard Reels gesture)
-        goToPrev();
+        el.pause();
+        setIsPlaying(false);
       }
+    } else {
+      setIsPlaying((prev) => !prev);
     }
-  };
-
-  // Reels mouse wheel handler
-  const handleWheel = (e: React.WheelEvent) => {
-    if (showComments || showEpisodesList) return;
-    if (isWheelLockedRef.current) return;
-
-    if (e.deltaY > 35) {
-      isWheelLockedRef.current = true;
-      goToNext();
-      setTimeout(() => {
-        isWheelLockedRef.current = false;
-      }, 650);
-    } else if (e.deltaY < -35) {
-      isWheelLockedRef.current = true;
-      goToPrev();
-      setTimeout(() => {
-        isWheelLockedRef.current = false;
-      }, 650);
-    }
-  };
-
-  // Double-tap to like with floating heart animation
-  const [floatingHearts, setFloatingHearts] = useState<
-    Array<{ id: number; x: number; y: number }>
-  >([]);
-  const lastTapRef = useRef<number>(0);
-  const singleTapTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    return () => {
-      if (singleTapTimerRef.current) {
-        clearTimeout(singleTapTimerRef.current);
-      }
-    };
+    setShowCenterIcon(true);
+    if (centerIconTimerRef.current) clearTimeout(centerIconTimerRef.current);
+    centerIconTimerRef.current = setTimeout(() => setShowCenterIcon(false), 750);
   }, []);
+
+  // Sound & Mute handler
+  const toggleMute = useCallback((e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    const nextMuted = !isMuted;
+    setIsMuted(nextMuted);
+    if (playerRef.current) {
+      playerRef.current.muted = nextMuted;
+      if (!nextMuted) {
+        playerRef.current.volume = 1;
+        if (playerRef.current.paused) {
+          playerRef.current.play().catch(() => {});
+        }
+      }
+    }
+    showToast(nextMuted ? "Sound Muted 🔇" : "Sound Unmuted 🔊");
+  }, [isMuted, showToast]);
 
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Ignore when typing in inputs or textareas
       if (
         document.activeElement?.tagName === "INPUT" ||
         document.activeElement?.tagName === "TEXTAREA"
@@ -240,76 +251,15 @@ export default function FilmPlayerContent({
         togglePlay();
       } else if (e.key.toLowerCase() === "m") {
         e.preventDefault();
-        setIsMuted((prev) => !prev);
+        toggleMute();
       }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [goToPrev, goToNext]);
+  }, [goToPrev, goToNext, togglePlay, toggleMute]);
 
-  const togglePlay = () => {
-    if (playerRef.current) {
-      if (playerRef.current.paused) {
-        playerRef.current.play().catch(() => {});
-        setIsPlaying(true);
-      } else {
-        playerRef.current.pause();
-        setIsPlaying(false);
-      }
-      setShowCenterIcon(true);
-      setTimeout(() => setShowCenterIcon(false), 900);
-    } else {
-      setIsPlaying((prev) => !prev);
-    }
-  };
-
-  const handleVideoEnded = () => {
-    goToNext();
-  };
-
-  const handleVideoStageClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    const target = e.target as HTMLElement;
-    if (target.closest("button") || target.closest("a") || target.closest("input")) {
-      return;
-    }
-
-    const now = Date.now();
-    const diff = now - lastTapRef.current;
-
-    if (diff < 320) {
-      // DOUBLE TAP DETECTED!
-      if (singleTapTimerRef.current) {
-        clearTimeout(singleTapTimerRef.current);
-        singleTapTimerRef.current = null;
-      }
-      lastTapRef.current = 0;
-
-      // Like video if not already liked
-      if (!isLiked) {
-        handleLike();
-      }
-
-      // Spawn animated heart at tap location
-      const rect = e.currentTarget.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      const heartId = Date.now() + Math.random();
-
-      setFloatingHearts((prev) => [...prev, { id: heartId, x, y }]);
-      setTimeout(() => {
-        setFloatingHearts((prev) => prev.filter((h) => h.id !== heartId));
-      }, 900);
-    } else {
-      // POSSIBLE SINGLE TAP (play/pause toggle)
-      lastTapRef.current = now;
-      singleTapTimerRef.current = setTimeout(() => {
-        togglePlay();
-        singleTapTimerRef.current = null;
-      }, 280);
-    }
-  };
-
-  const handleLike = async () => {
+  // Like handler
+  const handleLike = useCallback(async () => {
     if (!currentEpisode?.videoId) return;
     if (!signedIn) {
       openSignIn();
@@ -336,6 +286,94 @@ export default function FilmPlayerContent({
       });
     } catch (e) {
       console.error("Failed to toggle like:", e);
+    }
+  }, [currentEpisode?.videoId, signedIn, openSignIn, isLiked]);
+
+  // Central gesture handling (prevents conflict with MuxPlayer native click)
+  const handleVideoStageClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    if (target.closest("button") || target.closest("a") || target.closest("input")) {
+      return;
+    }
+
+    const now = Date.now();
+    const diff = now - lastTapRef.current;
+
+    if (diff < 320) {
+      // DOUBLE TAP: Cancel single-tap timeout and trigger double-tap heart pop
+      if (singleTapTimerRef.current) {
+        clearTimeout(singleTapTimerRef.current);
+        singleTapTimerRef.current = null;
+      }
+      lastTapRef.current = 0;
+
+      if (!isLiked) {
+        handleLike();
+      }
+
+      // Spawn animated heart at tap location
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const heartId = Date.now() + Math.random();
+
+      setFloatingHearts((prev) => [...prev, { id: heartId, x, y }]);
+      setTimeout(() => {
+        setFloatingHearts((prev) => prev.filter((h) => h.id !== heartId));
+      }, 900);
+    } else {
+      // SINGLE TAP: Debounced play/pause toggle
+      lastTapRef.current = now;
+      singleTapTimerRef.current = setTimeout(() => {
+        togglePlay();
+        singleTapTimerRef.current = null;
+      }, 260);
+    }
+  };
+
+  // Touch handlers for Reels vertical swipe (both up and down)
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartYRef.current = e.touches[0].clientY;
+    touchStartXRef.current = e.touches[0].clientX;
+    touchStartTimeRef.current = Date.now();
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (showComments || showEpisodesList) return;
+
+    const deltaY = touchStartYRef.current - e.changedTouches[0].clientY;
+    const deltaX = Math.abs(touchStartXRef.current - e.changedTouches[0].clientX);
+    const duration = Date.now() - touchStartTimeRef.current;
+
+    // Minimum swipe threshold: 30px vertical, predominantly vertical, within 900ms
+    if (Math.abs(deltaY) > 30 && Math.abs(deltaY) > deltaX * 1.1 && duration < 900) {
+      if (deltaY > 0) {
+        // Swiped UP -> Next Episode
+        goToNext();
+      } else {
+        // Swiped DOWN -> Previous Episode
+        goToPrev();
+      }
+    }
+  };
+
+  // Mouse wheel handler for desktop Reels scrolling
+  const handleWheel = (e: React.WheelEvent) => {
+    if (showComments || showEpisodesList) return;
+    if (isWheelLockedRef.current) return;
+
+    if (e.deltaY > 20) {
+      isWheelLockedRef.current = true;
+      goToNext();
+      setTimeout(() => {
+        isWheelLockedRef.current = false;
+      }, 600);
+    } else if (e.deltaY < -20) {
+      isWheelLockedRef.current = true;
+      goToPrev();
+      setTimeout(() => {
+        isWheelLockedRef.current = false;
+      }, 600);
     }
   };
 
@@ -402,6 +440,7 @@ export default function FilmPlayerContent({
     }
   };
 
+  // Follow / In-Family Subscription handler
   const handleFollow = async () => {
     if (!signedIn) {
       openSignIn();
@@ -409,7 +448,7 @@ export default function FilmPlayerContent({
     }
     const nextFollowing = !isFollowing;
     setIsFollowing(nextFollowing);
-    showToast(nextFollowing ? `Subscribed to ${series.title}` : `Unsubscribed`);
+    showToast(nextFollowing ? "Joined In-Family ❤️" : "Left In-Family");
 
     try {
       const session = await fetchAuthSession().catch(() => null);
@@ -426,7 +465,7 @@ export default function FilmPlayerContent({
         }),
       });
     } catch (e) {
-      console.error("Failed to toggle subscription:", e);
+      console.error("Failed to toggle In-Family status:", e);
     }
   };
 
@@ -466,7 +505,11 @@ export default function FilmPlayerContent({
             ← Go Back
           </button>
           <Link
-            href={series?.seriesId ? `/raftaar-films/${series.seriesId}` : "/raftaar-films"}
+            href={
+              series?.seriesId
+                ? `/raftaar-films/${series.seriesId}`
+                : "/raftaar-films"
+            }
             className="rounded-xl bg-orange-500 px-4 py-2 text-sm font-bold text-white hover:bg-orange-600 transition"
           >
             Back to Series
@@ -482,90 +525,82 @@ export default function FilmPlayerContent({
 
   return (
     <div className="relative h-[100dvh] w-full bg-[#050914] text-white flex items-center justify-center overflow-hidden select-none">
-      {/* Self-contained keyframes for reels double-tap heart pop */}
-      <style jsx global>{`
-        @keyframes rf-heart-pop {
-          0% {
-            opacity: 0;
-            transform: translate(-50%, -50%) scale(0) rotate(-15deg);
-          }
-          20% {
-            opacity: 1;
-            transform: translate(-50%, -50%) scale(1.35) rotate(0deg);
-          }
-          45% {
-            transform: translate(-50%, -50%) scale(1.05) rotate(4deg);
-          }
-          75% {
-            opacity: 1;
-            transform: translate(-50%, -70px) scale(1.15) rotate(-3deg);
-          }
-          100% {
-            opacity: 0;
-            transform: translate(-50%, -110px) scale(0.65) rotate(0deg);
-          }
-        }
-        .rf-heart-pop {
-          animation: rf-heart-pop 0.85s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-        }
-      `}</style>
-
-      {/* Ambient blurred backdrop for desktop screen */}
+      {/* Ambient 3D blurred dual-layer glow backdrop for desktop & TV */}
       <div
-        className="pointer-events-none absolute inset-0 hidden md:block opacity-25 filter blur-[110px] transform scale-110"
+        className="pointer-events-none absolute inset-0 hidden md:block opacity-35 filter blur-[120px] transform scale-110"
         style={{
           backgroundImage: `url(${posterImage})`,
           backgroundSize: "cover",
           backgroundPosition: "center",
         }}
       />
+      <div className="pointer-events-none absolute inset-0 hidden md:block bg-radial-gradient from-transparent via-[#050914]/80 to-[#050914]" />
 
-      {/* Main vertical player viewport (9:16 reels-style container) */}
+      {/* Main vertical player shell (9:16 reels-style container) */}
       <div
-        className="fixed inset-0 md:relative w-full h-[100dvh] md:h-[94vh] md:max-w-[440px] md:max-h-[880px] md:rounded-3xl md:overflow-hidden md:border md:border-white/10 md:shadow-2xl md:shadow-black/80 bg-black flex flex-col overflow-hidden"
+        className="fixed inset-0 md:relative w-full h-[100dvh] md:h-[94vh] md:max-w-[460px] md:max-h-[920px] 2xl:max-w-[540px] 2xl:max-h-[1020px] md:rounded-3xl md:overflow-hidden md:border md:border-white/15 md:shadow-[0_25px_70px_rgba(0,0,0,0.9),0_0_50px_rgba(255,122,24,0.15)] bg-black flex flex-col overflow-hidden"
+        style={{
+          overscrollBehaviorY: "none",
+          touchAction: "pan-x",
+        }}
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
         onWheel={handleWheel}
       >
-        {/* Video Stage */}
-        <div
-          className="absolute inset-0 flex items-center justify-center bg-black cursor-pointer overflow-hidden"
-          onClick={handleVideoStageClick}
-        >
+        {/* Video Stage & Gesture Interceptor */}
+        <div className="absolute inset-0 flex items-center justify-center bg-black overflow-hidden">
           {hasPlaybackSource ? (
             <div className="h-full w-full relative">
-              <MuxPlayer
-                ref={playerRef}
-                playbackId={currentEpisode.muxPlaybackId || undefined}
-                src={
-                  !currentEpisode.muxPlaybackId && currentEpisode.videoUrl
-                    ? currentEpisode.videoUrl
-                    : undefined
-                }
-                poster={posterImage}
-                streamType="on-demand"
-                autoPlay="any"
-                playsInline
-                loop={false}
-                muted={isMuted}
-                preload="auto"
-                nohotkeys
-                style={{
-                  width: "100%",
-                  height: "100%",
-                  objectFit: "cover",
-                  "--media-object-fit": "cover",
-                  "--media-object-position": "center center",
-                } as MuxCSSProperties}
-                onTimeUpdate={(e) => {
-                  const el = e.target as HTMLMediaElement;
-                  if (el?.currentTime && el?.duration) {
-                    setProgress((el.currentTime / el.duration) * 100);
+              {/* Native MuxPlayer with pointer-events-none so custom single/double tap controls gestures cleanly */}
+              <div className="h-full w-full pointer-events-none">
+                <MuxPlayer
+                  ref={playerRef}
+                  playbackId={currentEpisode.muxPlaybackId || undefined}
+                  src={
+                    !currentEpisode.muxPlaybackId && currentEpisode.videoUrl
+                      ? currentEpisode.videoUrl
+                      : undefined
                   }
-                }}
-                onPlay={() => setIsPlaying(true)}
-                onPause={() => setIsPlaying(false)}
-                onEnded={handleVideoEnded}
+                  poster={posterImage}
+                  streamType="on-demand"
+                  autoPlay="any"
+                  playsInline
+                  loop={false}
+                  muted={isMuted}
+                  preload="auto"
+                  nohotkeys
+                  style={
+                    {
+                      width: "100%",
+                      height: "100%",
+                      objectFit: "cover",
+                      "--media-object-fit": "cover",
+                      "--media-object-position": "center center",
+                    } as MuxCSSProperties
+                  }
+                  onTimeUpdate={(e) => {
+                    const el = e.target as HTMLMediaElement;
+                    if (el?.currentTime && el?.duration) {
+                      setProgress((el.currentTime / el.duration) * 100);
+                    }
+                  }}
+                  onVolumeChange={(e) => {
+                    const el = e.target as HTMLMediaElement;
+                    if (el) {
+                      setIsMuted(el.muted || el.volume === 0);
+                    }
+                  }}
+                  onPlay={() => setIsPlaying(true)}
+                  onPause={() => setIsPlaying(false)}
+                  onEnded={goToNext}
+                />
+              </div>
+
+              {/* Transparent Gesture Overlay (Prevents play/pause flickering from Mux native clicks) */}
+              <div
+                className="absolute inset-0 z-10 cursor-pointer"
+                onClick={handleVideoStageClick}
+                aria-label="Tap to play/pause, double tap to like"
               />
             </div>
           ) : (
@@ -592,7 +627,7 @@ export default function FilmPlayerContent({
                       e.stopPropagation();
                       goToNext();
                     }}
-                    className="mt-2 rounded-xl bg-orange-500 px-4 py-2 text-xs font-bold text-white hover:bg-orange-600 transition"
+                    className="mt-2 rounded-xl rf-btn-3d-lux px-4 py-2 text-xs font-bold text-white hover:brightness-110 transition"
                   >
                     Play Next Episode →
                   </button>
@@ -614,7 +649,7 @@ export default function FilmPlayerContent({
           >
             <Heart
               size={68}
-              className="fill-red-500 text-white drop-shadow-[0_0_24px_rgba(239,68,68,0.85)]"
+              className="fill-red-500 text-white drop-shadow-[0_0_25px_rgba(239,68,68,0.9)]"
             />
           </div>
         ))}
@@ -622,7 +657,7 @@ export default function FilmPlayerContent({
         {/* Play/Pause Pulse Icon */}
         {showCenterIcon && (
           <div className="absolute inset-0 flex items-center justify-center pointer-events-none z-30 animate-in fade-in zoom-in-75 duration-200">
-            <div className="h-16 w-16 rounded-full bg-black/60 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shadow-xl">
+            <div className="h-16 w-16 rounded-full bg-black/60 backdrop-blur-md border border-white/20 flex items-center justify-center text-white shadow-2xl">
               {isPlaying ? (
                 <Play size={28} className="fill-current ml-1" />
               ) : (
@@ -635,7 +670,7 @@ export default function FilmPlayerContent({
         {/* Toast Notification */}
         {toastMessage && (
           <div className="absolute top-16 left-1/2 -translate-x-1/2 z-50 pointer-events-none animate-in fade-in slide-in-from-top duration-200">
-            <div className="rounded-full bg-black/80 px-4 py-1.5 text-xs font-semibold text-white border border-white/15 backdrop-blur-md shadow-xl">
+            <div className="rounded-full bg-black/85 px-4 py-1.5 text-xs font-bold text-white border border-orange-500/40 backdrop-blur-md shadow-2xl shadow-orange-500/25">
               {toastMessage}
             </div>
           </div>
@@ -645,7 +680,7 @@ export default function FilmPlayerContent({
         <div className="absolute top-0 w-full pt-[max(1rem,env(safe-area-inset-top,16px))] px-4 pb-3 flex items-center justify-between z-30 bg-gradient-to-b from-black/85 via-black/40 to-transparent">
           <button
             onClick={handleBack}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-black/40 border border-white/10 text-white backdrop-blur-md hover:bg-white/10 transition"
+            className="flex h-9 w-9 items-center justify-center rounded-full bg-black/45 border border-white/15 text-white backdrop-blur-md hover:bg-white/15 hover:scale-105 active:scale-95 transition-all shadow-lg"
             aria-label="Back"
           >
             <ChevronLeft size={20} />
@@ -659,36 +694,40 @@ export default function FilmPlayerContent({
             <span className="text-xs font-bold opacity-90 line-clamp-1 drop-shadow-md text-slate-100">
               {series.title}
             </span>
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold bg-black/50 border border-white/15 px-2.5 py-0.5 rounded-full mt-0.5 backdrop-blur-md text-orange-300 hover:border-orange-400/50 transition">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold bg-black/55 border border-amber-500/35 px-3 py-0.5 rounded-full mt-0.5 backdrop-blur-md text-amber-300 hover:border-amber-400/70 hover:shadow-[0_0_15px_rgba(249,115,22,0.3)] transition-all">
               <ListVideo size={13} />
               <span>
                 Ep {currentEpisode.episodeNumber || currentIndex + 1} /{" "}
-                {episodes?.length || 1}
+                {sortedEpisodes.length || 1}
               </span>
               <ChevronDown size={12} />
             </div>
           </button>
 
-          {/* Mute Toggle */}
+          {/* Mute / Unmute Toggle */}
           <button
-            onClick={() => setIsMuted((prev) => !prev)}
-            className="flex h-9 w-9 items-center justify-center rounded-full bg-black/40 border border-white/10 text-white backdrop-blur-md hover:bg-white/10 transition"
+            onClick={toggleMute}
+            className={`flex h-9 w-9 items-center justify-center rounded-full border backdrop-blur-md hover:scale-105 active:scale-95 transition-all shadow-lg ${
+              isMuted
+                ? "bg-red-500/25 border-red-500/50 text-red-300"
+                : "bg-black/45 border-white/15 text-white hover:bg-white/15"
+            }`}
             aria-label={isMuted ? "Unmute" : "Mute"}
           >
             {isMuted ? <VolumeX size={18} /> : <Volume2 size={18} />}
           </button>
         </div>
 
-        {/* Right Action Rail - down arrow removed so Follow button never overlaps */}
-        <div className="absolute right-3.5 bottom-28 flex flex-col items-center gap-5 z-30">
+        {/* Right Action Rail (3D luxury glass buttons) */}
+        <div className="absolute right-3.5 bottom-28 flex flex-col items-center gap-4 z-30">
           {/* Like Button */}
           <div className="flex flex-col items-center gap-1">
             <button
               onClick={handleLike}
-              className={`flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-md border transition-all active:scale-90 ${
+              className={`flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-xl border transition-all duration-200 hover:scale-110 active:scale-90 shadow-xl ${
                 isLiked
-                  ? "bg-red-500/25 border-red-500 text-red-400"
-                  : "bg-black/40 border-white/15 text-white hover:border-white/30"
+                  ? "bg-red-500/30 border-red-500 text-red-400 shadow-[0_0_20px_rgba(239,68,68,0.5)]"
+                  : "bg-black/45 border-white/20 text-white hover:border-white/40 shadow-black/80"
               }`}
               aria-label="Like episode"
             >
@@ -706,7 +745,7 @@ export default function FilmPlayerContent({
           <div className="flex flex-col items-center gap-1">
             <button
               onClick={() => setShowComments(true)}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-black/40 border border-white/15 text-white backdrop-blur-md hover:border-white/30 transition-all active:scale-90"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-black/45 border border-white/20 text-white backdrop-blur-xl hover:border-amber-400/60 hover:scale-110 active:scale-90 transition-all duration-200 shadow-xl shadow-black/80"
               aria-label="View comments"
             >
               <MessageCircle size={20} />
@@ -720,16 +759,16 @@ export default function FilmPlayerContent({
           <div className="flex flex-col items-center gap-1">
             <button
               onClick={handleSave}
-              className={`flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-md border transition-all active:scale-90 ${
+              className={`flex h-11 w-11 items-center justify-center rounded-full backdrop-blur-xl border transition-all duration-200 hover:scale-110 active:scale-90 shadow-xl ${
                 isSaved
-                  ? "bg-orange-500/25 border-orange-500 text-orange-400"
-                  : "bg-black/40 border-white/15 text-white hover:border-white/30"
+                  ? "bg-amber-500/30 border-amber-500 text-amber-400 shadow-[0_0_20px_rgba(245,158,11,0.5)]"
+                  : "bg-black/45 border-white/20 text-white hover:border-white/40 shadow-black/80"
               }`}
               aria-label="Save to watchlist"
             >
               <Bookmark
                 size={20}
-                className={isSaved ? "fill-current text-orange-400" : ""}
+                className={isSaved ? "fill-current text-amber-400" : ""}
               />
             </button>
             <span className="text-[11px] font-bold drop-shadow-md text-slate-100">
@@ -741,7 +780,7 @@ export default function FilmPlayerContent({
           <div className="flex flex-col items-center gap-1">
             <button
               onClick={handleShare}
-              className="flex h-11 w-11 items-center justify-center rounded-full bg-black/40 border border-white/15 text-white backdrop-blur-md hover:border-white/30 transition-all active:scale-90"
+              className="flex h-11 w-11 items-center justify-center rounded-full bg-black/45 border border-white/20 text-white backdrop-blur-xl hover:border-amber-400/60 hover:scale-110 active:scale-90 transition-all duration-200 shadow-xl shadow-black/80"
               aria-label="Share episode"
             >
               <Share2 size={19} />
@@ -753,18 +792,18 @@ export default function FilmPlayerContent({
         </div>
 
         {/* Bottom Info Overlay */}
-        <div className="absolute bottom-0 w-full bg-gradient-to-t from-black via-black/70 to-transparent p-4 pb-6 z-20 pointer-events-auto">
-          {/* Creator Profile */}
-          <div className="flex items-center gap-2.5 mb-2.5">
+        <div className="absolute bottom-0 w-full bg-gradient-to-t from-black via-black/75 to-transparent p-4 pb-6 z-20 pointer-events-auto">
+          {/* Creator Profile Row - With pr-20 constraint so In-Family button NEVER overlaps the right action rail */}
+          <div className="flex items-center gap-3 mb-2.5 pr-20 max-w-[calc(100%-60px)]">
             <Link
               href={
                 series.creatorHandle
                   ? `/u/${series.creatorHandle}`
                   : `/raftaar-films?creatorId=${series.creatorId}`
               }
-              className="relative flex-shrink-0"
+              className="relative flex-shrink-0 group/avatar"
             >
-              <div className="h-9 w-9 rounded-full overflow-hidden bg-zinc-800 border border-orange-500/40 p-0.5">
+              <div className="h-10 w-10 rounded-full overflow-hidden bg-zinc-800 border-2 border-orange-500/50 p-0.5 shadow-lg shadow-orange-500/20 group-hover/avatar:scale-105 transition-transform">
                 <img
                   src={
                     series.creatorAvatarUrl ||
@@ -783,42 +822,48 @@ export default function FilmPlayerContent({
               </div>
             </Link>
 
-            <div className="min-w-0 flex-1">
-              <p className="text-xs font-bold leading-tight drop-shadow-md truncate text-white">
-                {series.creatorName || "Creator"}
-              </p>
-              <p className="text-[10px] text-orange-200/80 drop-shadow truncate">
+            <div className="min-w-0 flex flex-col justify-center">
+              <div className="flex items-center gap-2 flex-wrap">
+                <p className="text-xs font-bold leading-tight drop-shadow-md truncate text-white">
+                  {series.creatorName || "Creator"}
+                </p>
+
+                {/* In-Family Button (Safely placed beside name, renamed from Follow/Subscribe) */}
+                <button
+                  onClick={handleFollow}
+                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-extrabold tracking-wide transition-all shadow-md active:scale-95 ${
+                    isFollowing
+                      ? "bg-white/20 text-slate-200 border border-white/30 backdrop-blur-md hover:bg-white/30"
+                      : "rf-btn-3d-lux text-white shadow-orange-500/40"
+                  }`}
+                  aria-label={isFollowing ? "Leave In-Family" : "Join In-Family"}
+                >
+                  {isFollowing ? (
+                    <>
+                      <Check size={11} className="text-emerald-400 stroke-[3]" />
+                      <span>In-Family</span>
+                    </>
+                  ) : (
+                    <>
+                      <Plus size={11} className="stroke-[3]" />
+                      <span>In-Family</span>
+                    </>
+                  )}
+                </button>
+              </div>
+
+              <p className="text-[10px] text-orange-200/90 drop-shadow truncate mt-0.5">
                 @{series.creatorHandle || "creator"}
               </p>
             </div>
-
-            {/* Follow Button */}
-            <button
-              onClick={handleFollow}
-              className={`flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-bold transition-all shadow ${
-                isFollowing
-                  ? "bg-white/15 text-slate-200 border border-white/20"
-                  : "bg-gradient-to-r from-[#FF7A18] to-[#FF9A00] text-white hover:brightness-110 active:scale-95"
-              }`}
-            >
-              {isFollowing ? (
-                <>
-                  <Check size={12} />
-                  <span>Following</span>
-                </>
-              ) : (
-                <>
-                  <Plus size={12} />
-                  <span>Follow</span>
-                </>
-              )}
-            </button>
           </div>
 
           {/* Episode Title & Badge */}
           <div className="pr-16 mb-2">
-            <div className="inline-flex items-center gap-1.5 bg-orange-500/25 border border-orange-500/40 backdrop-blur-md px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider text-orange-300 mb-1">
-              <span>Episode {currentEpisode.episodeNumber || currentIndex + 1}</span>
+            <div className="inline-flex items-center gap-1.5 bg-orange-500/25 border border-orange-500/40 backdrop-blur-md px-2 py-0.5 rounded-md text-[10px] font-black uppercase tracking-wider text-orange-300 mb-1 shadow-sm">
+              <span>
+                Episode {currentEpisode.episodeNumber || currentIndex + 1}
+              </span>
               {series.genre && <span>• {series.genre}</span>}
             </div>
             <h2 className="text-sm font-semibold line-clamp-2 drop-shadow-md text-white">
@@ -833,7 +878,7 @@ export default function FilmPlayerContent({
           >
             <div className="w-full h-1 bg-white/25 rounded-full overflow-hidden relative group-hover/progress:h-1.5 transition-all">
               <div
-                className="h-full bg-gradient-to-r from-orange-500 to-amber-400 relative"
+                className="h-full bg-gradient-to-r from-orange-500 via-amber-400 to-yellow-300 relative"
                 style={{ width: `${progress}%` }}
               >
                 <div className="absolute right-0 top-1/2 -translate-y-1/2 h-2 w-2 rounded-full bg-white shadow-md opacity-0 group-hover/progress:opacity-100 transition-opacity" />
@@ -849,7 +894,7 @@ export default function FilmPlayerContent({
               <div className="p-4 border-b border-white/10 flex justify-between items-center">
                 <div>
                   <h3 className="font-bold text-base text-white">
-                    Episodes ({episodes?.length || 0})
+                    Episodes ({sortedEpisodes.length})
                   </h3>
                   <p className="text-xs text-orange-300 line-clamp-1">
                     {series.title}
@@ -866,7 +911,7 @@ export default function FilmPlayerContent({
 
               {/* Episode list */}
               <div className="flex-1 overflow-y-auto p-3 space-y-2">
-                {episodes?.map((ep: any, idx: number) => {
+                {sortedEpisodes.map((ep: any, idx: number) => {
                   const isActive = ep.videoId === currentEpisodeId;
                   const epThumb =
                     ep.thumbnailUrl ||
@@ -880,7 +925,7 @@ export default function FilmPlayerContent({
                       onClick={() => setShowEpisodesList(false)}
                       className={`flex items-center gap-3 p-2.5 rounded-2xl border transition-all ${
                         isActive
-                          ? "border-orange-500/60 bg-orange-500/15 ring-1 ring-orange-500/50"
+                          ? "border-orange-500/60 bg-orange-500/15 ring-1 ring-orange-500/50 shadow-[0_0_15px_rgba(249,115,22,0.2)]"
                           : "border-white/5 bg-white/[0.03] hover:border-white/20 hover:bg-white/[0.07]"
                       }`}
                     >

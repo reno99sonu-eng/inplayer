@@ -560,17 +560,29 @@ export async function incrementSeriesStats(seriesId: string, field: 'totalViews'
 
 export async function getTrendingSeries(limit: number = 10): Promise<FilmSeries[]> {
   try {
-    const command = new ScanCommand({
-      TableName: FILM_SERIES_TABLE,
-      FilterExpression: "#status = :status",
-      ExpressionAttributeNames: { "#status": "status" },
-      ExpressionAttributeValues: { ":status": "published" }
-    });
+    const allSeries: FilmSeries[] = [];
+    let exclusiveStartKey: Record<string, any> | undefined;
 
-    const response = await docClient.send(command);
-    const series = (response.Items as FilmSeries[]) || [];
-    
-    return series.sort((a, b) => (b.totalViews || 0) - (a.totalViews || 0)).slice(0, limit);
+    do {
+      const command = new ScanCommand({
+        TableName: FILM_SERIES_TABLE,
+        FilterExpression: "#status = :status",
+        ExpressionAttributeNames: { "#status": "status" },
+        ExpressionAttributeValues: { ":status": "published" },
+        ExclusiveStartKey: exclusiveStartKey,
+      });
+
+      const response = await docClient.send(command);
+      if (response.Items) {
+        allSeries.push(...(response.Items as FilmSeries[]));
+      }
+      exclusiveStartKey = response.LastEvaluatedKey;
+    } while (exclusiveStartKey);
+
+    const score = (s: FilmSeries) =>
+      (Number(s.totalViews) || 0) + (Number(s.totalLikes) || 0) * 2;
+
+    return allSeries.sort((a, b) => score(b) - score(a)).slice(0, limit);
   } catch (error) {
     console.error("Error getting trending series:", error);
     throw error;

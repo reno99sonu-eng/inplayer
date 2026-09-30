@@ -299,3 +299,31 @@
   border: 1px solid rgba(255, 255, 255, 0.09);
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
+
+/* ─────────── DOUBLE TAP REELS HEART POP ─────────── */
+@keyframes rf-heart-pop {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0) rotate(-15deg);
+  }
+  20% {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1.35) rotate(0deg);
+  }
+  45% {
+    transform: translate(-50%, -50%) scale(1.05) rotate(5deg);
+  }
+  75% {
+    opacity: 1;
+    transform: translate(-50%, -70px) scale(1.15) rotate(-3deg);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-50%, -110px) scale(0.65) rotate(0deg);
+  }
+}
+
+.rf-heart-pop {
+  animation: rf-heart-pop 0.85s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+

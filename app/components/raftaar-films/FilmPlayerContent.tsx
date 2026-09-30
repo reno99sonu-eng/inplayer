@@ -6,7 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { fetchAuthSession } from "aws-amplify/auth";
-import type { MuxPlayerRefAttributes } from "@mux/mux-player-react";
+import type { MuxPlayerRefAttributes, MuxCSSProperties } from "@mux/mux-player-react";
 const MuxPlayer = dynamic(() => import("@mux/mux-player-react"), { ssr: false });
 
 import {
@@ -25,12 +25,12 @@ import {
   Volume2,
   VolumeX,
   ChevronDown,
-  ChevronUp,
   Sparkles,
   Loader2,
 } from "lucide-react";
 import CommentSection from "@/app/components/CommentSection";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
+import "./RaftaarFilms3DStyles.css";
 
 interface FilmPlayerProps {
   series: any;
@@ -136,6 +136,88 @@ export default function FilmPlayerContent({
     }
   }, [currentEpisodeId, currentEpisode?.videoId, series?.seriesId]);
 
+  const goToNext = useCallback(() => {
+    if (nextEpisode) {
+      router.push(`/raftaar-films/${series.seriesId}/${nextEpisode.videoId}`);
+    } else {
+      showToast("You're on the latest episode 🎉");
+    }
+  }, [nextEpisode, series.seriesId, router]);
+
+  const goToPrev = useCallback(() => {
+    if (prevEpisode) {
+      router.push(`/raftaar-films/${series.seriesId}/${prevEpisode.videoId}`);
+    } else {
+      showToast("This is the first episode 🎬");
+    }
+  }, [prevEpisode, series.seriesId, router]);
+
+  // Reels vertical swipe touch handlers
+  const touchStartYRef = useRef<number>(0);
+  const touchStartXRef = useRef<number>(0);
+  const touchStartTimeRef = useRef<number>(0);
+  const isWheelLockedRef = useRef<boolean>(false);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartYRef.current = e.touches[0].clientY;
+    touchStartXRef.current = e.touches[0].clientX;
+    touchStartTimeRef.current = Date.now();
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (showComments || showEpisodesList) return;
+
+    const deltaY = touchStartYRef.current - e.changedTouches[0].clientY;
+    const deltaX = Math.abs(touchStartXRef.current - e.changedTouches[0].clientX);
+    const duration = Date.now() - touchStartTimeRef.current;
+
+    // Minimum swipe threshold: 45px vertical, predominantly vertical, within 700ms
+    if (Math.abs(deltaY) > 45 && Math.abs(deltaY) > deltaX * 1.3 && duration < 700) {
+      if (deltaY > 0) {
+        // Swiped UP -> Next Episode (standard Reels gesture)
+        goToNext();
+      } else {
+        // Swiped DOWN -> Previous Episode (standard Reels gesture)
+        goToPrev();
+      }
+    }
+  };
+
+  // Reels mouse wheel handler
+  const handleWheel = (e: React.WheelEvent) => {
+    if (showComments || showEpisodesList) return;
+    if (isWheelLockedRef.current) return;
+
+    if (e.deltaY > 35) {
+      isWheelLockedRef.current = true;
+      goToNext();
+      setTimeout(() => {
+        isWheelLockedRef.current = false;
+      }, 650);
+    } else if (e.deltaY < -35) {
+      isWheelLockedRef.current = true;
+      goToPrev();
+      setTimeout(() => {
+        isWheelLockedRef.current = false;
+      }, 650);
+    }
+  };
+
+  // Double-tap to like with floating heart animation
+  const [floatingHearts, setFloatingHearts] = useState<
+    Array<{ id: number; x: number; y: number }>
+  >([]);
+  const lastTapRef = useRef<number>(0);
+  const singleTapTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (singleTapTimerRef.current) {
+        clearTimeout(singleTapTimerRef.current);
+      }
+    };
+  }, []);
+
   // Keyboard navigation
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -149,14 +231,10 @@ export default function FilmPlayerContent({
 
       if (e.key === "ArrowUp" || e.key === "PageUp") {
         e.preventDefault();
-        if (prevEpisode) {
-          router.push(`/raftaar-films/${series.seriesId}/${prevEpisode.videoId}`);
-        }
+        goToPrev();
       } else if (e.key === "ArrowDown" || e.key === "PageDown") {
         e.preventDefault();
-        if (nextEpisode) {
-          router.push(`/raftaar-films/${series.seriesId}/${nextEpisode.videoId}`);
-        }
+        goToNext();
       } else if (e.key === " ") {
         e.preventDefault();
         togglePlay();
@@ -167,7 +245,7 @@ export default function FilmPlayerContent({
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [prevEpisode, nextEpisode, series.seriesId, router, isPlaying]);
+  }, [goToPrev, goToNext]);
 
   const togglePlay = () => {
     if (playerRef.current) {
@@ -186,8 +264,48 @@ export default function FilmPlayerContent({
   };
 
   const handleVideoEnded = () => {
-    if (nextEpisode) {
-      router.push(`/raftaar-films/${series.seriesId}/${nextEpisode.videoId}`);
+    goToNext();
+  };
+
+  const handleVideoStageClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    const target = e.target as HTMLElement;
+    if (target.closest("button") || target.closest("a") || target.closest("input")) {
+      return;
+    }
+
+    const now = Date.now();
+    const diff = now - lastTapRef.current;
+
+    if (diff < 320) {
+      // DOUBLE TAP DETECTED!
+      if (singleTapTimerRef.current) {
+        clearTimeout(singleTapTimerRef.current);
+        singleTapTimerRef.current = null;
+      }
+      lastTapRef.current = 0;
+
+      // Like video if not already liked
+      if (!isLiked) {
+        handleLike();
+      }
+
+      // Spawn animated heart at tap location
+      const rect = e.currentTarget.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const heartId = Date.now() + Math.random();
+
+      setFloatingHearts((prev) => [...prev, { id: heartId, x, y }]);
+      setTimeout(() => {
+        setFloatingHearts((prev) => prev.filter((h) => h.id !== heartId));
+      }, 900);
+    } else {
+      // POSSIBLE SINGLE TAP (play/pause toggle)
+      lastTapRef.current = now;
+      singleTapTimerRef.current = setTimeout(() => {
+        togglePlay();
+        singleTapTimerRef.current = null;
+      }, 280);
     }
   };
 
@@ -363,7 +481,35 @@ export default function FilmPlayerContent({
   );
 
   return (
-    <div className="relative min-h-screen w-full bg-[#050914] text-white flex items-center justify-center overflow-hidden select-none">
+    <div className="relative h-[100dvh] w-full bg-[#050914] text-white flex items-center justify-center overflow-hidden select-none">
+      {/* Self-contained keyframes for reels double-tap heart pop */}
+      <style jsx global>{`
+        @keyframes rf-heart-pop {
+          0% {
+            opacity: 0;
+            transform: translate(-50%, -50%) scale(0) rotate(-15deg);
+          }
+          20% {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1.35) rotate(0deg);
+          }
+          45% {
+            transform: translate(-50%, -50%) scale(1.05) rotate(4deg);
+          }
+          75% {
+            opacity: 1;
+            transform: translate(-50%, -70px) scale(1.15) rotate(-3deg);
+          }
+          100% {
+            opacity: 0;
+            transform: translate(-50%, -110px) scale(0.65) rotate(0deg);
+          }
+        }
+        .rf-heart-pop {
+          animation: rf-heart-pop 0.85s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+        }
+      `}</style>
+
       {/* Ambient blurred backdrop for desktop screen */}
       <div
         className="pointer-events-none absolute inset-0 hidden md:block opacity-25 filter blur-[110px] transform scale-110"
@@ -374,12 +520,17 @@ export default function FilmPlayerContent({
         }}
       />
 
-      {/* Main vertical player viewport (9:16 mobile container) */}
-      <div className="relative w-full h-[100dvh] max-w-[440px] md:h-[94vh] md:max-h-[880px] md:rounded-3xl md:overflow-hidden md:border md:border-white/10 md:shadow-2xl md:shadow-black/80 bg-black flex flex-col">
+      {/* Main vertical player viewport (9:16 reels-style container) */}
+      <div
+        className="fixed inset-0 md:relative w-full h-[100dvh] md:h-[94vh] md:max-w-[440px] md:max-h-[880px] md:rounded-3xl md:overflow-hidden md:border md:border-white/10 md:shadow-2xl md:shadow-black/80 bg-black flex flex-col overflow-hidden"
+        onTouchStart={handleTouchStart}
+        onTouchEnd={handleTouchEnd}
+        onWheel={handleWheel}
+      >
         {/* Video Stage */}
         <div
           className="absolute inset-0 flex items-center justify-center bg-black cursor-pointer overflow-hidden"
-          onClick={togglePlay}
+          onClick={handleVideoStageClick}
         >
           {hasPlaybackSource ? (
             <div className="h-full w-full relative">
@@ -403,7 +554,9 @@ export default function FilmPlayerContent({
                   width: "100%",
                   height: "100%",
                   objectFit: "cover",
-                }}
+                  "--media-object-fit": "cover",
+                  "--media-object-position": "center center",
+                } as MuxCSSProperties}
                 onTimeUpdate={(e) => {
                   const el = e.target as HTMLMediaElement;
                   if (el?.currentTime && el?.duration) {
@@ -437,9 +590,7 @@ export default function FilmPlayerContent({
                   <button
                     onClick={(e) => {
                       e.stopPropagation();
-                      router.push(
-                        `/raftaar-films/${series.seriesId}/${nextEpisode.videoId}`
-                      );
+                      goToNext();
                     }}
                     className="mt-2 rounded-xl bg-orange-500 px-4 py-2 text-xs font-bold text-white hover:bg-orange-600 transition"
                   >
@@ -450,6 +601,23 @@ export default function FilmPlayerContent({
             </div>
           )}
         </div>
+
+        {/* Reels Double-Tap Animated Floating Hearts */}
+        {floatingHearts.map((heart) => (
+          <div
+            key={heart.id}
+            className="pointer-events-none absolute z-40 rf-heart-pop"
+            style={{
+              left: `${heart.x}px`,
+              top: `${heart.y}px`,
+            }}
+          >
+            <Heart
+              size={68}
+              className="fill-red-500 text-white drop-shadow-[0_0_24px_rgba(239,68,68,0.85)]"
+            />
+          </div>
+        ))}
 
         {/* Play/Pause Pulse Icon */}
         {showCenterIcon && (
@@ -473,8 +641,8 @@ export default function FilmPlayerContent({
           </div>
         )}
 
-        {/* Top Header */}
-        <div className="absolute top-0 w-full p-4 flex items-center justify-between z-30 bg-gradient-to-b from-black/80 via-black/40 to-transparent">
+        {/* Top Header - with safe area padding to ensure notch/status bar never cuts off header */}
+        <div className="absolute top-0 w-full pt-[max(1rem,env(safe-area-inset-top,16px))] px-4 pb-3 flex items-center justify-between z-30 bg-gradient-to-b from-black/85 via-black/40 to-transparent">
           <button
             onClick={handleBack}
             className="flex h-9 w-9 items-center justify-center rounded-full bg-black/40 border border-white/10 text-white backdrop-blur-md hover:bg-white/10 transition"
@@ -511,7 +679,7 @@ export default function FilmPlayerContent({
           </button>
         </div>
 
-        {/* Right Action Rail */}
+        {/* Right Action Rail - down arrow removed so Follow button never overlaps */}
         <div className="absolute right-3.5 bottom-28 flex flex-col items-center gap-5 z-30">
           {/* Like Button */}
           <div className="flex flex-col items-center gap-1">
@@ -581,36 +749,6 @@ export default function FilmPlayerContent({
             <span className="text-[11px] font-bold drop-shadow-md text-slate-100">
               Share
             </span>
-          </div>
-
-          {/* Previous / Next Quick Jump */}
-          <div className="flex flex-col gap-1.5 pt-1">
-            {prevEpisode && (
-              <button
-                onClick={() =>
-                  router.push(
-                    `/raftaar-films/${series.seriesId}/${prevEpisode.videoId}`
-                  )
-                }
-                title="Previous Episode"
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-black/50 border border-white/10 text-slate-300 hover:text-white transition active:scale-90"
-              >
-                <ChevronUp size={16} />
-              </button>
-            )}
-            {nextEpisode && (
-              <button
-                onClick={() =>
-                  router.push(
-                    `/raftaar-films/${series.seriesId}/${nextEpisode.videoId}`
-                  )
-                }
-                title="Next Episode"
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-black/50 border border-white/10 text-slate-300 hover:text-white transition active:scale-90"
-              >
-                <ChevronDown size={16} />
-              </button>
-            )}
           </div>
         </div>
 

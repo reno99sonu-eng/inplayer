@@ -1,13 +1,13 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { FilmSeries } from '@/app/lib/raftaarFilms';
 import FilmSearchBar from './FilmSearchBar';
 import GenreBar from './GenreBar';
 import CreatorStoryStrip, { TopCreator } from './CreatorStoryStrip';
 import SeriesGrid from './SeriesGrid';
 import RaftaarFilmsIntro from './RaftaarFilmsIntro';
-import { Play, Sparkles, ArrowLeft, Film, Upload } from 'lucide-react';
+import { Play, Sparkles, ArrowLeft, Film, Upload, ChevronLeft, ChevronRight } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useAuthModal } from '@/app/components/auth/AuthProvider';
@@ -115,7 +115,53 @@ export default function RaftaarFilmsLanding() {
     return true;
   });
 
-  const heroSeries = trending.length > 0 ? trending[0] : null;
+  const top5Trending = useMemo(() => {
+    const list = trending.length > 0 ? trending : series;
+    return [...list]
+      .sort((a, b) => {
+        const scoreA = (Number(a.totalViews) || 0) + (Number(a.totalLikes) || 0) * 2;
+        const scoreB = (Number(b.totalViews) || 0) + (Number(b.totalLikes) || 0) * 2;
+        return scoreB - scoreA;
+      })
+      .slice(0, 5);
+  }, [trending, series]);
+
+  const [currentHeroIndex, setCurrentHeroIndex] = useState(0);
+  const [isHeroPaused, setIsHeroPaused] = useState(false);
+  const touchHeroStartRef = useRef<number>(0);
+
+  useEffect(() => {
+    if (top5Trending.length <= 1 || isHeroPaused) return;
+
+    const interval = setInterval(() => {
+      setCurrentHeroIndex((prev) => (prev + 1) % top5Trending.length);
+    }, 2200);
+
+    return () => clearInterval(interval);
+  }, [top5Trending.length, isHeroPaused]);
+
+  const nextHero = () => {
+    if (top5Trending.length === 0) return;
+    setCurrentHeroIndex((prev) => (prev + 1) % top5Trending.length);
+  };
+  const prevHero = () => {
+    if (top5Trending.length === 0) return;
+    setCurrentHeroIndex((prev) => (prev - 1 + top5Trending.length) % top5Trending.length);
+  };
+
+  const handleHeroTouchStart = (e: React.TouchEvent) => {
+    touchHeroStartRef.current = e.touches[0].clientX;
+    setIsHeroPaused(true);
+  };
+  const handleHeroTouchEnd = (e: React.TouchEvent) => {
+    const deltaX = touchHeroStartRef.current - e.changedTouches[0].clientX;
+    if (deltaX > 40) {
+      nextHero();
+    } else if (deltaX < -40) {
+      prevHero();
+    }
+    setIsHeroPaused(false);
+  };
 
   return (
     <div className="min-h-screen bg-black text-white pb-24">
@@ -189,34 +235,139 @@ export default function RaftaarFilmsLanding() {
         </div>
       </header>
 
-      {/* Hero Banner */}
-      {heroSeries && (
-        <div className="relative w-full h-[60vh] md:h-[70vh] flex items-end">
-          <div className="absolute inset-0">
-            <img src={heroSeries.bannerUrl || heroSeries.posterUrl} alt={heroSeries.title} className="w-full h-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-transparent"></div>
+      {/* Auto-scrolling Trending Hero Banner (2.2s loop between top 5) */}
+      {top5Trending.length > 0 && (
+        <div
+          className="relative w-full h-[62vh] sm:h-[68vh] md:h-[72vh] overflow-hidden group select-none"
+          onMouseEnter={() => setIsHeroPaused(true)}
+          onMouseLeave={() => setIsHeroPaused(false)}
+          onTouchStart={handleHeroTouchStart}
+          onTouchEnd={handleHeroTouchEnd}
+        >
+          {/* Horizontal Sliding Track */}
+          <div
+            className="flex w-full h-full transition-transform duration-700 ease-[cubic-bezier(0.25,1,0.5,1)]"
+            style={{ transform: `translateX(-${currentHeroIndex * 100}%)` }}
+          >
+            {top5Trending.map((hero, index) => {
+              const posterSrc = hero.bannerUrl || hero.posterUrl;
+              return (
+                <div
+                  key={hero.seriesId}
+                  className="w-full h-full flex-shrink-0 relative flex items-end"
+                >
+                  {/* Backdrop Image - object-top ensures actor's head and forehead are never cut off */}
+                  <div className="absolute inset-0 overflow-hidden">
+                    <img
+                      src={posterSrc}
+                      alt={hero.title}
+                      className="w-full h-full object-cover object-top sm:object-[center_12%] scale-100 transition-transform duration-1000 ease-out group-hover:scale-105"
+                      onError={(e) => {
+                        const target = e.currentTarget;
+                        if (hero.posterUrl && target.src !== hero.posterUrl) {
+                          target.src = hero.posterUrl;
+                        }
+                      }}
+                    />
+                    {/* Top gradient fade protects actor head and blends smoothly under header */}
+                    <div className="absolute top-0 inset-x-0 h-40 bg-gradient-to-b from-black via-black/45 to-transparent pointer-events-none z-10" />
+                    {/* Bottom gradient fade for text legibility */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/55 to-transparent pointer-events-none z-10" />
+                  </div>
+
+                  {/* Content Container */}
+                  <div className="relative z-20 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12 sm:pb-14">
+                    <div className="flex items-center gap-2 mb-2 sm:mb-3">
+                      <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-500/20 border border-orange-500/40 backdrop-blur-md">
+                        <Sparkles className="w-3.5 h-3.5 text-orange-400" />
+                        <span className="text-orange-400 font-extrabold tracking-wider uppercase text-[11px] sm:text-xs">
+                          #{index + 1} Trending Micro-Series
+                        </span>
+                      </div>
+                      {hero.genre && (
+                        <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-white/10 backdrop-blur-md text-zinc-300">
+                          {hero.genre}
+                        </span>
+                      )}
+                    </div>
+                    <h1 className="text-3xl sm:text-5xl md:text-6xl font-extrabold mb-2 sm:mb-4 drop-shadow-xl text-white tracking-tight">
+                      {hero.title}
+                    </h1>
+                    <p className="text-zinc-200/90 max-w-2xl mb-4 sm:mb-6 line-clamp-2 text-sm sm:text-base md:text-lg drop-shadow">
+                      {hero.description}
+                    </p>
+                    <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+                      <Link
+                        href={`/raftaar-films/${hero.seriesId}`}
+                        className="flex items-center gap-2 bg-gradient-to-r from-orange-600 to-amber-500 hover:from-orange-500 hover:to-amber-400 text-white px-6 sm:px-8 py-2.5 sm:py-3 rounded-full font-bold transition-all shadow-[0_0_25px_rgba(234,88,12,0.45)] hover:scale-105 active:scale-95"
+                      >
+                        <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current" />
+                        <span>Watch Now</span>
+                      </Link>
+                      <div className="bg-black/50 backdrop-blur-md border border-white/20 px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-full text-xs sm:text-sm font-semibold text-zinc-200">
+                        {hero.episodeCount || 0} Episodes
+                      </div>
+                      {((Number(hero.totalViews) || 0) > 0 || (Number(hero.totalLikes) || 0) > 0) && (
+                        <div className="hidden sm:flex items-center gap-2 bg-white/10 backdrop-blur-md border border-white/15 px-3.5 py-2 rounded-full text-xs font-medium text-zinc-300">
+                          <span>🔥 {(Number(hero.totalViews) || 0).toLocaleString()} views</span>
+                          <span>•</span>
+                          <span>❤️ {(Number(hero.totalLikes) || 0).toLocaleString()} likes</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
-          <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pb-12">
-            <div className="flex items-center gap-2 mb-3">
-              <Sparkles className="w-5 h-5 text-orange-500" />
-              <span className="text-orange-500 font-bold tracking-widest uppercase text-sm">#1 Trending Micro-Series</span>
+
+          {/* Navigation Arrows for Desktop */}
+          {top5Trending.length > 1 && (
+            <>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  prevHero();
+                }}
+                className="hidden md:flex absolute left-4 top-1/2 -translate-y-1/2 z-30 h-10 w-10 items-center justify-center rounded-full bg-black/40 hover:bg-black/70 border border-white/20 text-white backdrop-blur-md transition-all opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-95 shadow-xl"
+                aria-label="Previous trending series"
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  nextHero();
+                }}
+                className="hidden md:flex absolute right-4 top-1/2 -translate-y-1/2 z-30 h-10 w-10 items-center justify-center rounded-full bg-black/40 hover:bg-black/70 border border-white/20 text-white backdrop-blur-md transition-all opacity-0 group-hover:opacity-100 hover:scale-110 active:scale-95 shadow-xl"
+                aria-label="Next trending series"
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </>
+          )}
+
+          {/* Indicator Pills */}
+          {top5Trending.length > 1 && (
+            <div className="absolute bottom-4 right-4 sm:right-8 z-30 flex items-center gap-1.5 bg-black/40 backdrop-blur-md px-3 py-1.5 rounded-full border border-white/15">
+              {top5Trending.map((_, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => setCurrentHeroIndex(idx)}
+                  className={`h-2 rounded-full transition-all duration-300 ${
+                    idx === currentHeroIndex
+                      ? "w-6 bg-gradient-to-r from-orange-500 to-amber-400 shadow-[0_0_8px_rgba(249,115,22,0.8)]"
+                      : "w-2 bg-white/35 hover:bg-white/70"
+                  }`}
+                  aria-label={`Go to slide ${idx + 1}`}
+                />
+              ))}
             </div>
-            <h1 className="text-4xl md:text-6xl font-extrabold mb-4 drop-shadow-lg">{heroSeries.title}</h1>
-            <p className="text-zinc-300 max-w-2xl mb-6 line-clamp-2 md:text-lg">{heroSeries.description}</p>
-            <div className="flex flex-wrap items-center gap-4">
-              <Link href={`/raftaar-films/${heroSeries.seriesId}`} className="flex items-center gap-2 bg-orange-600 hover:bg-orange-500 text-white px-8 py-3 rounded-full font-bold transition-all shadow-[0_0_20px_rgba(234,88,12,0.4)] hover:scale-105">
-                <Play className="w-5 h-5 fill-current" />
-                Watch Now
-              </Link>
-              <div className="bg-white/10 backdrop-blur-md border border-white/20 px-4 py-3 rounded-full text-sm font-medium">
-                {heroSeries.episodeCount} Episodes
-              </div>
-            </div>
-          </div>
+          )}
         </div>
       )}
 
-      <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${heroSeries ? '-mt-6' : 'pt-8'} relative z-20`}>
+      <div className={`max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 ${top5Trending.length > 0 ? '-mt-6' : 'pt-8'} relative z-20`}>
         <div className="mb-8">
           <FilmSearchBar value={searchQuery} onChange={setSearchQuery} />
         </div>

@@ -133,6 +133,16 @@ export async function GET(request: NextRequest) {
     reportsTableMissing = true;
   }
 
+  let pendingFilmApplications = 0;
+  try {
+    const apps = await scanAll("InPlayer-Film-Creator-Applications", "applicationId, #st", {
+      "#st": "status",
+    });
+    pendingFilmApplications = apps.filter((a) => a.status === "pending").length;
+  } catch (err) {
+    console.error("Dashboard stats: film applications scan failed:", err);
+  }
+
   return NextResponse.json({
     totalUsers,
     totalVideos,
@@ -143,5 +153,7 @@ export async function GET(request: NextRequest) {
     processingCount,
     pendingReports,
     reportsTableMissing,
+    pendingFilmApplications,
   });
 }
+

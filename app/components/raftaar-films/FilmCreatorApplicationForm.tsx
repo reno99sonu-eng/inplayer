@@ -2,8 +2,11 @@
 
 import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { authedFetch } from "@/app/lib/apiFetch";
+import { useAuthModal } from "@/app/components/auth/AuthProvider";
 
 export default function FilmCreatorApplicationForm() {
+  const { signedIn, authLoading, user, openSignIn } = useAuthModal();
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [rejectionReason, setRejectionReason] = useState<string>('');
@@ -20,17 +23,36 @@ export default function FilmCreatorApplicationForm() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
 
+  // Auto pre-populate user details when signed in
   useEffect(() => {
-    checkStatus();
-  }, []);
+    if (user) {
+      setFormData((prev) => ({
+        ...prev,
+        legalName: prev.legalName || user.name || '',
+        handle: prev.handle || user.handle || '',
+        email: prev.email || user.email || '',
+      }));
+    }
+  }, [user]);
+
+  useEffect(() => {
+    if (!authLoading) {
+      if (signedIn) {
+        checkStatus();
+      } else {
+        setLoading(false);
+        setStatus('unauthenticated');
+      }
+    }
+  }, [signedIn, authLoading]);
 
   const checkStatus = async () => {
     try {
       setLoading(true);
-      const res = await fetch('/api/raftaar-films/apply');
+      const res = await authedFetch('/api/raftaar-films/apply');
       if (res.ok) {
         const data = await res.json();
-        const app = data?.application || data;
+        const app = data?.application;
         if (app && app.status) {
           setStatus(app.status);
           if (app.rejectionReason) {
@@ -39,6 +61,8 @@ export default function FilmCreatorApplicationForm() {
         } else {
           setStatus('none');
         }
+      } else if (res.status === 401) {
+        setStatus('unauthenticated');
       } else {
         setStatus('none');
       }
@@ -59,25 +83,46 @@ export default function FilmCreatorApplicationForm() {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!signedIn) {
+      openSignIn();
+      return;
+    }
+
     setSubmitting(true);
     setError('');
 
     try {
-      const res = await fetch('/api/raftaar-films/apply', {
+      const payload = {
+        channelName: formData.channelName.trim(),
+        personalName: formData.legalName.trim(),
+        legalName: formData.legalName.trim(),
+        username: formData.handle.trim(),
+        handle: formData.handle.trim(),
+        email: formData.email.trim(),
+        phoneNumber: formData.phoneNumber.trim(),
+        phone: formData.phoneNumber.trim(),
+        companyName: formData.companyName.trim() || undefined,
+      };
+
+      const res = await authedFetch('/api/raftaar-films/apply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
+        body: JSON.stringify(payload)
       });
 
       if (res.ok) {
         setStatus('pending');
       } else {
-        const data = await res.json();
-        setError(data.error || 'Failed to submit application.');
+        const data = await res.json().catch(() => ({}));
+        if (res.status === 409) {
+          setStatus('pending');
+        } else {
+          setError(data.error || 'Failed to submit application. Please try again.');
+        }
       }
     } catch (err) {
       console.error(err);
-      setError('An unexpected error occurred.');
+      setError('An unexpected network error occurred.');
     } finally {
       setSubmitting(false);
     }
@@ -135,7 +180,23 @@ export default function FilmCreatorApplicationForm() {
         </div>
       )}
 
+      {status === 'unauthenticated' && (
+        <div className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-8 text-center">
+          <h2 className="text-xl font-bold mb-3 text-gray-900 dark:text-white">Sign In Required</h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400 mb-6">
+            Please sign in to your InPlayer account to apply as a Raftaar Films Creator.
+          </p>
+          <button
+            onClick={() => openSignIn()}
+            className="bg-orange-600 hover:bg-orange-700 text-white font-bold py-2.5 px-6 rounded-md transition-colors"
+          >
+            Sign In to Apply
+          </button>
+        </div>
+      )}
+
       {status === 'none' && (
+
         <form onSubmit={handleSubmit} className="bg-white dark:bg-gray-800 shadow-md rounded-lg p-8">
           <h2 className="text-2xl font-bold mb-6 text-gray-900 dark:text-white">Creator Application</h2>
           

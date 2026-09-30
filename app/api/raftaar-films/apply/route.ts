@@ -13,9 +13,9 @@ export async function GET(request: NextRequest) {
 
     const application = await getApplicationByUserId(auth.userId);
     return NextResponse.json({ application: application || null });
-  } catch (error) {
-    console.error("Error in GET /api/raftaar-films/apply:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  } catch (error: any) {
+    console.error("Error in GET /api/raftaar-films/apply:", error?.name, error?.message, error);
+    return NextResponse.json({ error: error?.message || "Internal Server Error" }, { status: 500 });
   }
 }
 
@@ -57,8 +57,9 @@ export async function POST(request: NextRequest) {
     });
 
     return NextResponse.json({ application }, { status: 201 });
-  } catch (error) {
-    console.error("Error in POST /api/raftaar-films/apply:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+  } catch (error: any) {
+    console.error("Error in POST /api/raftaar-films/apply:", error?.name, error?.message, error);
+    return NextResponse.json({ error: error?.message || "Internal Server Error" }, { status: 500 });
   }
 }
+

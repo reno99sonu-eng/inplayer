@@ -24,8 +24,10 @@ import 'admin_support_tab.dart';
 import 'admin_hammart_orders_tab.dart';
 import 'admin_sponsorships_tab.dart';
 import 'admin_stuck_processing_tab.dart';
+import 'admin_raftaar_films_tab.dart';
 
 class AdminPage extends ConsumerStatefulWidget {
+
   const AdminPage({super.key});
 
   @override
@@ -147,9 +149,11 @@ class _AdminPageState extends ConsumerState<AdminPage> {
     ]),
     _AdminGroup('Creators & Marketplace', [
       _AdminSection('Creator Payouts (KYC)', Icons.badge_outlined, () => const AdminCreatorsTab()),
+      _AdminSection('Raftaar Films Applications', Icons.movie_filter_outlined, () => const AdminRaftaarFilmsTab()),
       _AdminSection('Hammart Products & Vendors', Icons.storefront_outlined, () => const AdminHammartTab()),
       _AdminSection('Hammart Orders', Icons.receipt_outlined, () => const AdminHammartOrdersTab()),
     ]),
+
     _AdminGroup('Appearance & Advertising', [
       _AdminSection('Advertising & Ads', Icons.ads_click_outlined, () => const AdminAdvertisingTab()),
       _AdminSection('Sponsorships', Icons.monetization_on_outlined, () => const AdminSponsorshipsTab()),

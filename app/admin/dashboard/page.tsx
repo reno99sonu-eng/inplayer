@@ -13,6 +13,7 @@ import {
   Loader2,
   AlertTriangle,
   Clock,
+  UserCheck,
 } from "lucide-react";
 import { useAdminRefresh } from "@/app/components/admin/AdminRefreshContext";
 
@@ -26,7 +27,9 @@ interface DashboardStats {
   processingCount: number;
   pendingReports: number;
   reportsTableMissing: boolean;
+  pendingFilmApplications?: number;
 }
+
 
 function formatNumber(n: number): string {
   return n.toLocaleString("en-IN");
@@ -174,7 +177,15 @@ export default function AdminDashboardPage() {
       href: "/admin/videos?status=processing",
       accent: "from-slate-500/20 to-slate-400/10 border-slate-400/20 text-slate-300 light:text-slate-700",
     },
+    {
+      label: "Film Applications",
+      value: formatNumber(stats.pendingFilmApplications ?? 0),
+      icon: UserCheck,
+      href: "/admin/raftaar-films-applications",
+      accent: "from-amber-500/20 to-orange-400/10 border-amber-400/20 text-amber-300 light:text-amber-700",
+    },
   ];
+
 
   return (
     <div>

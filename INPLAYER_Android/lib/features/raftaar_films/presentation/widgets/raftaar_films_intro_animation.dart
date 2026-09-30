@@ -152,9 +152,11 @@ class _RaftaarFilmsIntroAnimationState extends State<RaftaarFilmsIntroAnimation>
                       alignment: Alignment.center,
                       transform: Matrix4.identity()
                         ..setEntry(3, 2, 0.0012)
-                        ..rotateX(_cardTilt.value)
-                        ..scale(_cardScale.value),
-                      child: Container(
+                        ..rotateX(_cardTilt.value),
+                      child: Transform.scale(
+                        scale: _cardScale.value,
+                        child: Container(
+
                         padding: const EdgeInsets.symmetric(
                           horizontal: 36,
                           vertical: 36,
@@ -325,8 +327,11 @@ class _RaftaarFilmsIntroAnimationState extends State<RaftaarFilmsIntroAnimation>
                       ),
                     ),
                   ),
-                ],
-              ),
+                ),
+              ],
+            ),
+
+
             ),
           );
         },

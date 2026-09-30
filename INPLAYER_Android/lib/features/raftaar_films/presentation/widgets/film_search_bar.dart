@@ -172,7 +172,7 @@ class _FilmSearchBarState extends State<FilmSearchBar> {
             ),
           ],
         ),
-      ),
-    );
+      );
   }
 }
+

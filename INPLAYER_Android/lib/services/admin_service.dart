@@ -22,8 +22,10 @@ import '../models/admin_bug_report.dart';
 import '../models/admin_support_ticket.dart';
 import '../models/admin_hammart_order.dart';
 import '../models/admin_sponsorship.dart';
+import '../models/film_creator_application.dart';
 
 final adminServiceProvider = Provider<AdminService>((ref) {
+
   return AdminService();
 });
 
@@ -505,7 +507,55 @@ class AdminService {
     }
   }
 
+  // ── Raftaar Films applications ──────────────────────────────────────
+
+  Future<List<FilmCreatorApplication>> getRaftaarFilmsApplications({String status = 'pending'}) async {
+    try {
+      final response = await _dio.get(
+        '${ApiConstants.admin}/raftaar-films/applications',
+        queryParameters: {'status': status},
+      );
+      if (response.statusCode == 200 && response.data is Map) {
+        final data = response.data as Map;
+        final list = (data['applications'] as List? ?? [])
+            .whereType<Map>()
+            .map((j) => FilmCreatorApplication.fromJson(Map<String, dynamic>.from(j)))
+            .toList();
+        return list;
+      }
+      return [];
+    } catch (e) {
+      _logger.e('Error fetching Raftaar Films applications: $e');
+      return [];
+    }
+  }
+
+  Future<AdminActionResult> raftaarFilmsApplicationAction(
+    String applicationId,
+    String action, {
+    String? reason,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '${ApiConstants.admin}/raftaar-films/applications/$applicationId',
+        data: {
+          'action': action,
+          if (reason != null && reason.isNotEmpty) 'rejectionReason': reason,
+        },
+      );
+      if (response.statusCode == 200) {
+        return AdminActionResult(success: true);
+      }
+      final error = (response.data is Map ? response.data['error'] : null) as String?;
+      return AdminActionResult(success: false, error: error ?? "Couldn't do that.");
+    } catch (e) {
+      _logger.e('Error reviewing Raftaar Films application: $e');
+      return AdminActionResult(success: false, error: "Couldn't do that. Try again.");
+    }
+  }
+
   // ── Copyright strikes ────────────────────────────────────────────────
+
 
   Future<AdminCopyrightResult> getCopyrightReports() async {
     try {

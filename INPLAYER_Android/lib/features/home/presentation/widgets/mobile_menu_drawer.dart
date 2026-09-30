@@ -13,9 +13,9 @@ import '../../../../providers/auth_provider.dart';
 import '../../../../services/video_service.dart';
 import '../../../auth/presentation/widgets/auth_modals.dart';
 import 'content_access_drawer_section.dart';
-import '../../../raftaar_films/presentation/widgets/raftaar_films_intro_animation.dart';
 
 class MobileMenuDrawer extends ConsumerStatefulWidget {
+
   const MobileMenuDrawer({super.key});
 
   @override

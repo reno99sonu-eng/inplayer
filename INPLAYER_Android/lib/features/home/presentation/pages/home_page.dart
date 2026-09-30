@@ -60,6 +60,8 @@ class _HomePageState extends ConsumerState<HomePage> {
   /// not persisted: if an admin puts a notice up, it should come back on the
   /// next launch until they take it down.
   bool _announcementDismissed = false;
+  String? _lastAnnouncementText;
+  Timer? _settingsPollTimer;
   bool _exitingApp = false;
   int _currentIndex = 0;
   final Set<int> _builtTabs = <int>{0};
@@ -100,6 +102,18 @@ class _HomePageState extends ConsumerState<HomePage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       NotificationPermissionHelper.maybePrompt(context);
     });
+    _settingsPollTimer = Timer.periodic(const Duration(seconds: 15), (_) {
+      if (mounted) {
+        ref.invalidate(publicPlatformSettingsProvider);
+        ref.invalidate(publicNavbarThemeProvider);
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _settingsPollTimer?.cancel();
+    super.dispose();
   }
 
   /// Index of the Raftaar tab. Named because three separate things below
@@ -190,6 +204,11 @@ class _HomePageState extends ConsumerState<HomePage> {
     final platformSettings =
         ref.watch(publicPlatformSettingsProvider).value ??
         PublicPlatformSettings.normal;
+
+    if (platformSettings.announcementText != _lastAnnouncementText) {
+      _lastAnnouncementText = platformSettings.announcementText;
+      _announcementDismissed = false;
+    }
 
     return PopScope(
       // Intercept Back even on the Home tab so active audio/video sessions are

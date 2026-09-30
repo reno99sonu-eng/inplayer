@@ -298,6 +298,37 @@ class _SingleFilmEpisodeViewState
 
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
+  bool _isDraggingSlider = false;
+  double? _sliderDragValue;
+
+  String? _seekIndicatorText;
+  bool _seekIndicatorForward = true;
+  Timer? _seekIndicatorTimer;
+
+  void _seekBy(int seconds) {
+    if (_controller == null || !_isInitialized) return;
+    final current = _controller!.value.position;
+    final total = _controller!.value.duration;
+    final target = current + Duration(seconds: seconds);
+    final clamped = target < Duration.zero
+        ? Duration.zero
+        : (target > total ? total : target);
+    _controller!.seekTo(clamped);
+
+    _seekIndicatorTimer?.cancel();
+    setState(() {
+      _position = clamped;
+      _seekIndicatorText = seconds > 0 ? '+${seconds}s' : '${seconds}s';
+      _seekIndicatorForward = seconds > 0;
+    });
+    _seekIndicatorTimer = Timer(const Duration(milliseconds: 750), () {
+      if (mounted) {
+        setState(() {
+          _seekIndicatorText = null;
+        });
+      }
+    });
+  }
 
   @override
   void initState() {
@@ -351,6 +382,7 @@ class _SingleFilmEpisodeViewState
 
   void _videoListener() {
     if (!mounted || _controller == null) return;
+    if (_isDraggingSlider) return;
     final pos = _controller!.value.position;
     final dur = _controller!.value.duration;
 
@@ -466,6 +498,7 @@ class _SingleFilmEpisodeViewState
 
   @override
   void dispose() {
+    _seekIndicatorTimer?.cancel();
     _controller?.removeListener(_videoListener);
     _controller?.dispose();
     super.dispose();
@@ -491,6 +524,12 @@ class _SingleFilmEpisodeViewState
         // Video or Thumbnail Background
         GestureDetector(
           behavior: HitTestBehavior.opaque,
+          onDoubleTapDown: (details) {
+            final screenWidth = MediaQuery.of(context).size.width;
+            final isRight = details.localPosition.dx >= screenWidth / 2;
+            _seekBy(isRight ? 10 : -10);
+          },
+          onDoubleTap: () {},
           onTap: _togglePlayPause,
           child: Stack(
             fit: StackFit.expand,
@@ -527,6 +566,53 @@ class _SingleFilmEpisodeViewState
                       Icons.play_arrow_rounded,
                       color: Colors.white,
                       size: 48,
+                    ),
+                  ),
+                ),
+
+              // Double-Tap Seek Indicator (+10s or -10s)
+              if (_seekIndicatorText != null)
+                Align(
+                  alignment: _seekIndicatorForward
+                      ? const Alignment(0.65, 0.0)
+                      : const Alignment(-0.65, 0.0),
+                  child: Container(
+                    padding: const EdgeInsets.all(18),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.75),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: const Color(0xFFFF7A18).withValues(alpha: 0.7),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: const Color(0xFFFF7A18).withValues(alpha: 0.35),
+                          blurRadius: 20,
+                          spreadRadius: 2,
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          _seekIndicatorForward
+                              ? Icons.fast_forward_rounded
+                              : Icons.fast_rewind_rounded,
+                          color: const Color(0xFFFF9A00),
+                          size: 32,
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          _seekIndicatorText!,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ),
@@ -805,34 +891,57 @@ class _SingleFilmEpisodeViewState
                 Row(
                   children: [
                     Text(
-                      _formatTime(_position),
+                      _isDraggingSlider && _sliderDragValue != null
+                          ? _formatTime(Duration(milliseconds: _sliderDragValue!.toInt()))
+                          : _formatTime(_position),
                       style: const TextStyle(color: Colors.white70, fontSize: 10),
                     ),
                     Expanded(
                       child: SliderTheme(
                         data: SliderTheme.of(context).copyWith(
-                          trackHeight: 2.5,
+                          trackHeight: 3.0,
                           thumbShape: const RoundSliderThumbShape(
-                            enabledThumbRadius: 5,
+                            enabledThumbRadius: 6,
                           ),
                           overlayShape: const RoundSliderOverlayShape(
-                            overlayRadius: 8,
+                            overlayRadius: 10,
                           ),
                           activeTrackColor: const Color(0xFFFF7A18),
                           inactiveTrackColor: Colors.white24,
                           thumbColor: const Color(0xFFFF9A00),
                         ),
                         child: Slider(
-                          value: _position.inMilliseconds
-                              .toDouble()
-                              .clamp(0.0, _duration.inMilliseconds.toDouble()),
+                          value: (_isDraggingSlider && _sliderDragValue != null
+                                  ? _sliderDragValue!
+                                  : _position.inMilliseconds.toDouble())
+                              .clamp(
+                                  0.0,
+                                  _duration.inMilliseconds > 0
+                                      ? _duration.inMilliseconds.toDouble()
+                                      : 1.0),
                           min: 0.0,
                           max: _duration.inMilliseconds > 0
                               ? _duration.inMilliseconds.toDouble()
                               : 1.0,
+                          onChangeStart: (val) {
+                            setState(() {
+                              _isDraggingSlider = true;
+                              _sliderDragValue = val;
+                            });
+                          },
                           onChanged: (val) {
-                            _controller
-                                ?.seekTo(Duration(milliseconds: val.toInt()));
+                            setState(() {
+                              _sliderDragValue = val;
+                            });
+                          },
+                          onChangeEnd: (val) {
+                            final target = Duration(milliseconds: val.toInt());
+                            _controller?.seekTo(target);
+                            setState(() {
+                              _isDraggingSlider = false;
+                              _sliderDragValue = null;
+                              _position = target;
+                            });
                           },
                         ),
                       ),

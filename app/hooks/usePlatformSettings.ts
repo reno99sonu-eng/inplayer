@@ -17,9 +17,9 @@ export function usePlatformSettings() {
   useEffect(() => {
     let cancelled = false;
 
-    (async () => {
+    const fetchSettings = async () => {
       try {
-        const res = await fetch("/api/platform-settings");
+        const res = await fetch("/api/platform-settings", { cache: "no-store" });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         const data = await res.json();
         if (!cancelled) setSettings(data);
@@ -28,14 +28,18 @@ export function usePlatformSettings() {
         // Fail open — if the settings row can't be read, the site should
         // behave exactly as if every toggle were off/default, never lock
         // real visitors out over a transient fetch error.
-        if (!cancelled) setSettings(null);
+        if (!cancelled && !settings) setSettings(null);
       } finally {
         if (!cancelled) setLoading(false);
       }
-    })();
+    };
+
+    fetchSettings();
+    const interval = setInterval(fetchSettings, 15000);
 
     return () => {
       cancelled = true;
+      clearInterval(interval);
     };
   }, []);
 

@@ -24,6 +24,8 @@ import {
   VolumeX,
   ChevronDown,
   Loader2,
+  FastForward,
+  Rewind,
 } from "lucide-react";
 import CommentSection from "@/app/components/CommentSection";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
@@ -110,6 +112,18 @@ export default function FilmPlayerContent({
   const singleTapTimerRef = useRef<NodeJS.Timeout | null>(null);
   const lastTapRef = useRef<number>(0);
   const isWheelLockedRef = useRef<boolean>(false);
+
+  // Manual scrubber drag state
+  const [isScrubbing, setIsScrubbing] = useState(false);
+  const [scrubPercent, setScrubPercent] = useState<number | null>(null);
+  const progressBarRef = useRef<HTMLDivElement>(null);
+
+  // Double-click seek feedback state (+10s / -10s)
+  const [seekFeedback, setSeekFeedback] = useState<{
+    direction: "forward" | "backward";
+    id: number;
+  } | null>(null);
+  const seekFeedbackTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Touch tracking for Reels vertical swipe
   const touchStartYRef = useRef<number>(0);
@@ -333,31 +347,46 @@ export default function FilmPlayerContent({
       return;
     }
 
+    const rect = e.currentTarget.getBoundingClientRect();
+    const clickX = e.clientX - rect.left;
+    const isRightSide = clickX >= rect.width / 2;
+
     const now = Date.now();
     const diff = now - lastTapRef.current;
 
     if (diff < 320) {
-      // DOUBLE TAP: Cancel single-tap timeout and trigger double-tap heart pop
+      // DOUBLE TAP / DOUBLE CLICK: Cancel single-tap timeout and seek 10s
       if (singleTapTimerRef.current) {
         clearTimeout(singleTapTimerRef.current);
         singleTapTimerRef.current = null;
       }
       lastTapRef.current = 0;
 
-      if (!isLiked) {
-        handleLike();
+      if (playerRef.current) {
+        const curTime = playerRef.current.currentTime || 0;
+        const dur = playerRef.current.duration;
+        const validDur = dur && isFinite(dur) ? dur : Infinity;
+        let newTime = curTime;
+        if (isRightSide) {
+          newTime = Math.min(validDur, curTime + 10);
+        } else {
+          newTime = Math.max(0, curTime - 10);
+        }
+        playerRef.current.currentTime = newTime;
+        if (validDur !== Infinity && validDur > 0) {
+          setProgress((newTime / validDur) * 100);
+        }
       }
 
-      // Spawn animated heart at tap location
-      const rect = e.currentTarget.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      const heartId = Date.now() + Math.random();
-
-      setFloatingHearts((prev) => [...prev, { id: heartId, x, y }]);
-      setTimeout(() => {
-        setFloatingHearts((prev) => prev.filter((h) => h.id !== heartId));
-      }, 900);
+      // Show seek visual overlay feedback (+10s or -10s)
+      setSeekFeedback({
+        direction: isRightSide ? "forward" : "backward",
+        id: Date.now(),
+      });
+      if (seekFeedbackTimerRef.current) clearTimeout(seekFeedbackTimerRef.current);
+      seekFeedbackTimerRef.current = setTimeout(() => {
+        setSeekFeedback(null);
+      }, 750);
     } else {
       // SINGLE TAP: Debounced play/pause toggle
       lastTapRef.current = now;
@@ -516,18 +545,73 @@ export default function FilmPlayerContent({
     }
   };
 
-  const handleProgressBarClick = (e: React.MouseEvent<HTMLDivElement>) => {
+  const formatTime = (seconds: number) => {
+    if (!isFinite(seconds) || isNaN(seconds)) return "00:00";
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`;
+  };
+
+  const handleScrubberPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
     e.stopPropagation();
-    const rect = e.currentTarget.getBoundingClientRect();
-    const clickX = e.clientX - rect.left;
-    const pct = Math.max(0, Math.min(1, clickX / rect.width));
+    const rect = progressBarRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    setIsScrubbing(true);
+    const pct = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+    setScrubPercent(pct);
     if (playerRef.current) {
       const dur = playerRef.current.duration;
       if (dur && isFinite(dur)) {
-        playerRef.current.currentTime = dur * pct;
-        setProgress(pct * 100);
+        playerRef.current.currentTime = dur * (pct / 100);
       }
     }
+    try {
+      (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+    } catch {}
+  };
+
+  const handleScrubberPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isScrubbing) return;
+    e.stopPropagation();
+    const rect = progressBarRef.current?.getBoundingClientRect();
+    if (!rect) return;
+    const pct = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+    setScrubPercent(pct);
+    if (playerRef.current) {
+      const dur = playerRef.current.duration;
+      if (dur && isFinite(dur)) {
+        playerRef.current.currentTime = dur * (pct / 100);
+      }
+    }
+  };
+
+  const handleScrubberPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!isScrubbing) return;
+    e.stopPropagation();
+    const rect = progressBarRef.current?.getBoundingClientRect();
+    if (rect) {
+      const pct = Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100));
+      if (playerRef.current) {
+        const dur = playerRef.current.duration;
+        if (dur && isFinite(dur)) {
+          playerRef.current.currentTime = dur * (pct / 100);
+          setProgress(pct);
+        }
+      }
+    }
+    setIsScrubbing(false);
+    setScrubPercent(null);
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
+  };
+
+  const handleScrubberPointerCancel = (e: React.PointerEvent<HTMLDivElement>) => {
+    setIsScrubbing(false);
+    setScrubPercent(null);
+    try {
+      (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId);
+    } catch {}
   };
 
   if (!currentEpisode) {
@@ -617,6 +701,7 @@ export default function FilmPlayerContent({
                     } as MuxCSSProperties
                   }
                   onTimeUpdate={(e) => {
+                    if (isScrubbing) return;
                     const el = e.target as HTMLMediaElement;
                     if (el?.currentTime && el?.duration) {
                       setProgress((el.currentTime / el.duration) * 100);
@@ -638,8 +723,30 @@ export default function FilmPlayerContent({
               <div
                 className="absolute inset-0 z-10 cursor-pointer"
                 onClick={handleVideoStageClick}
-                aria-label="Tap to play/pause, double tap to like"
+                aria-label="Tap to play/pause, double tap to seek 10s"
               />
+
+              {/* Double-tap Seek Feedback (+10s or -10s) */}
+              {seekFeedback && (
+                <div
+                  key={seekFeedback.id}
+                  className={`pointer-events-none absolute top-1/2 -translate-y-1/2 z-20 flex flex-col items-center justify-center w-24 h-24 rounded-full bg-black/75 backdrop-blur-md border border-orange-500/50 text-white shadow-2xl animate-in zoom-in-75 fade-in duration-200 ${
+                    seekFeedback.direction === "forward" ? "right-10" : "left-10"
+                  }`}
+                >
+                  {seekFeedback.direction === "forward" ? (
+                    <>
+                      <FastForward size={36} className="text-orange-400 fill-orange-400 animate-pulse" />
+                      <span className="text-xs font-black tracking-wider text-orange-200 mt-1">+10s</span>
+                    </>
+                  ) : (
+                    <>
+                      <Rewind size={36} className="text-orange-400 fill-orange-400 animate-pulse" />
+                      <span className="text-xs font-black tracking-wider text-orange-200 mt-1">-10s</span>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           ) : (
             <div className="relative w-full h-full flex flex-col items-center justify-center bg-zinc-950 p-6 text-center">
@@ -953,20 +1060,56 @@ export default function FilmPlayerContent({
             </h2>
           </div>
 
-          {/* Interactive Scrubbable Progress Bar */}
-          <div
-            onClick={handleProgressBarClick}
-            className="w-full h-3 flex items-center cursor-pointer group/progress pt-1"
-          >
-            <div className="w-full h-1 bg-white/25 rounded-full overflow-hidden relative group-hover/progress:h-1.5 transition-all">
+          {/* Interactive Scrubbable Progress Bar with draggable thumb and real-time seek */}
+          {(() => {
+            const displayProgress =
+              isScrubbing && scrubPercent !== null ? scrubPercent : progress;
+            return (
               <div
-                className="h-full bg-gradient-to-r from-orange-500 via-amber-400 to-yellow-300 relative"
-                style={{ width: `${progress}%` }}
+                ref={progressBarRef}
+                onPointerDown={handleScrubberPointerDown}
+                onPointerMove={handleScrubberPointerMove}
+                onPointerUp={handleScrubberPointerUp}
+                onPointerCancel={handleScrubberPointerCancel}
+                className="w-full h-6 flex items-center cursor-pointer group/progress pt-1 relative touch-none select-none"
+                aria-label="Timeline scrubber"
+                role="slider"
+                aria-valuenow={Math.round(displayProgress)}
               >
-                <div className="absolute right-0 top-1/2 -translate-y-1/2 h-2 w-2 rounded-full bg-white shadow-md opacity-0 group-hover/progress:opacity-100 transition-opacity" />
+                {/* Time Tooltip while scrubbing */}
+                {isScrubbing && (
+                  <div
+                    className="absolute -top-7 -translate-x-1/2 bg-black/95 text-orange-400 border border-orange-500/40 text-[10px] font-mono font-bold px-2 py-0.5 rounded-md shadow-lg pointer-events-none backdrop-blur-sm"
+                    style={{
+                      left: `${Math.max(8, Math.min(92, displayProgress))}%`,
+                    }}
+                  >
+                    {formatTime(
+                      (displayProgress / 100) *
+                        (playerRef.current?.duration || 0)
+                    )}{" "}
+                    / {formatTime(playerRef.current?.duration || 0)}
+                  </div>
+                )}
+
+                <div className="w-full h-1.5 bg-white/25 rounded-full relative group-hover/progress:h-2 transition-all">
+                  <div
+                    className="h-full bg-gradient-to-r from-orange-500 via-amber-400 to-yellow-300 relative rounded-full"
+                    style={{ width: `${displayProgress}%` }}
+                  >
+                    {/* Draggable thumb button */}
+                    <div
+                      className={`absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 h-3.5 w-3.5 rounded-full bg-white shadow-[0_0_10px_rgba(255,122,24,0.9)] border-2 border-orange-500 transition-transform ${
+                        isScrubbing
+                          ? "scale-125 ring-4 ring-orange-500/40"
+                          : "scale-100 group-hover/progress:scale-125"
+                      }`}
+                    />
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
+            );
+          })()}
         </div>
 
         {/* Episodes Drawer / Modal */}

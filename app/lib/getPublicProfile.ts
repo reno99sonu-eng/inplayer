@@ -97,7 +97,8 @@ export async function getPublicProfile(
         const page = await docClient.send(
           new ScanCommand({
             TableName: "InPlayer-Users",
-            ProjectionExpression: "userId, username, usernameLower",
+            ProjectionExpression: "userId, username, usernameLower, #nameAttr, handle, personalName, channelName",
+            ExpressionAttributeNames: { "#nameAttr": "name" },
             ExclusiveStartKey: scanStartKey,
           })
         );
@@ -105,11 +106,39 @@ export async function getPublicProfile(
         scanStartKey = page.LastEvaluatedKey;
       } while (scanStartKey);
 
-      const match = candidates.find((item) => {
+      let match = candidates.find((item) => {
         if (item.userId === usernameRaw) return true;
-        const handle = (item.usernameLower as string) || (item.username as string);
-        return Boolean(handle) && normalizeUsername(handle) === usernameLower;
+        const handle = (item.usernameLower as string) || (item.username as string) || (item.handle as string);
+        if (handle && normalizeUsername(handle) === usernameLower) return true;
+        const displayName = (item.name as string) || (item.personalName as string) || (item.channelName as string);
+        if (displayName && normalizeUsername(displayName) === usernameLower) return true;
+        return false;
       });
+
+      // If still not matched, check InPlayer-Film-Creator-Applications for creator handle/name
+      if (!match) {
+        try {
+          const appScan = await docClient.send(
+            new ScanCommand({
+              TableName: "InPlayer-Film-Creator-Applications",
+              ProjectionExpression: "userId, username, personalName, channelName",
+              Limit: 50,
+            })
+          );
+          const appMatch = (appScan.Items || []).find((a) => {
+            if (a.userId === usernameRaw) return true;
+            if (a.username && normalizeUsername(a.username) === usernameLower) return true;
+            if (a.channelName && normalizeUsername(a.channelName) === usernameLower) return true;
+            if (a.personalName && normalizeUsername(a.personalName) === usernameLower) return true;
+            return false;
+          });
+          if (appMatch?.userId) {
+            match = { userId: appMatch.userId };
+          }
+        } catch (appErr) {
+          console.warn("Creator application lookup notice:", appErr);
+        }
+      }
 
       if (!match) {
         console.error(`No user found for username: ${usernameLower}`);
@@ -129,11 +158,19 @@ export async function getPublicProfile(
     const profileResult = await docClient.send(
       new GetCommand({ TableName: "InPlayer-Users", Key: { userId: targetUserId } })
     );
-    const profile = profileResult.Item || {};
+    let profile = profileResult.Item || {};
 
-    if (!profileResult.Item) {
-      console.error(`No profile found for userId: ${targetUserId}`);
+    if (!profile.username) {
+      try {
+        const ensured = await ensureUsername(targetUserId);
+        if (ensured) {
+          profile.username = ensured;
+        }
+      } catch (e) {
+        console.warn("Could not auto-ensure username on profile:", e);
+      }
     }
+
     const usernamePrivacy = profile.usernamePrivacy || "public";
     const isOwner = viewerId === targetUserId;
 

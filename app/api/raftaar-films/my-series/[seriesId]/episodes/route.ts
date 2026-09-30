@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyAuth } from "@/app/lib/verifyAuth";
-import { docClient } from "@/app/lib/dynamodb";
-import { GetCommand } from "@aws-sdk/lib-dynamodb";
+import { getSeriesById } from "@/app/lib/raftaarFilms";
 
 export const dynamic = "force-dynamic";
 
@@ -15,12 +14,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     const { seriesId } = await params;
     
     // Verify series exists and belongs to user
-    const seriesRes = await docClient.send(new GetCommand({
-      TableName: "InPlayer-FilmSeries",
-      Key: { id: seriesId }
-    }));
-    
-    const series = seriesRes.Item;
+    const series = await getSeriesById(seriesId);
     if (!series) {
       return NextResponse.json({ error: "Series not found" }, { status: 404 });
     }
@@ -28,6 +22,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (series.creatorId !== auth.userId) {
       return NextResponse.json({ error: "Forbidden: You don't own this series" }, { status: 403 });
     }
+
 
     const body = await request.json();
     const { episodeTitle, episodeNumber, seasonNumber } = body;

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireAdmin } from "@/app/lib/isAdmin";
 import { docClient } from "@/app/lib/dynamodb";
 import { ScanCommand } from "@aws-sdk/lib-dynamodb";
+import { FILM_SERIES_TABLE, FILM_APPLICATIONS_TABLE } from "@/app/lib/raftaarFilms";
 
 export const dynamic = "force-dynamic";
 
@@ -15,7 +16,7 @@ export async function GET(request: NextRequest) {
     // 1. Total Series
     const seriesResult = await docClient.send(
       new ScanCommand({
-        TableName: "InPlayer-RaftaarFilms-Series",
+        TableName: FILM_SERIES_TABLE,
         Select: "COUNT",
       })
     );
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest) {
     // 2. Pending Applications
     const appsResult = await docClient.send(
       new ScanCommand({
-        TableName: "InPlayer-RaftaarFilms-Applications",
+        TableName: FILM_APPLICATIONS_TABLE,
         FilterExpression: "#status = :status",
         ExpressionAttributeNames: {
           "#status": "status",
@@ -35,6 +36,7 @@ export async function GET(request: NextRequest) {
         Select: "COUNT",
       })
     );
+
     const pendingApplications = appsResult.Count || 0;
 
     // 3. Total Episodes & Total Views (InPlayer-Videos where contentType='film')

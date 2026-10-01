@@ -27,7 +27,7 @@ export async function authedFetch(path: string, options: RequestInit = {}): Prom
 
     const sessionId = getStoredSessionId();
 
-    return await fetch(path, {
+    let res = await fetch(path, {
       ...options,
       headers: {
         ...(options.headers || {}),
@@ -35,6 +35,25 @@ export async function authedFetch(path: string, options: RequestInit = {}): Prom
         ...(sessionId ? { "X-Session-Id": sessionId } : {}),
       },
     });
+
+    // If the server rejected with 401, the Cognito token may have expired mid-session.
+    // Force a fresh session refresh and retry the request once before giving up.
+    if (res.status === 401) {
+      const freshSession = await fetchAuthSession({ forceRefresh: true }).catch(() => null);
+      const freshToken = freshSession?.tokens?.idToken?.toString();
+      if (freshToken && freshToken !== idToken) {
+        res = await fetch(path, {
+          ...options,
+          headers: {
+            ...(options.headers || {}),
+            Authorization: `Bearer ${freshToken}`,
+            ...(sessionId ? { "X-Session-Id": sessionId } : {}),
+          },
+        });
+      }
+    }
+
+    return res;
   } catch (err) {
     console.error("authedFetch error:", err);
     return new Response(

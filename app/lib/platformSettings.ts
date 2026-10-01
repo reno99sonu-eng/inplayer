@@ -93,6 +93,14 @@ export interface PlatformSettings {
   contactEmail: string;
   sponsorEmail: string;
 
+  // Mobile App Dedicated Settings
+  appMinVersion: string;
+  appLatestVersion: string;
+  appForceUpdate: boolean;
+  appUpdateUrl: string;
+  appDownloadsEnabled: boolean;
+  appBackgroundAudioEnabled: boolean;
+
   updatedAt: string | null;
   updatedBy: string | null;
 }
@@ -155,6 +163,12 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
   helpEmail: "inplayerdigital@gmail.com",
   contactEmail: "Millonbook@inplayer.in",
   sponsorEmail: "Sponsor@inplayer.in",
+  appMinVersion: "1.0.19",
+  appLatestVersion: "1.0.19",
+  appForceUpdate: false,
+  appUpdateUrl: "https://play.google.com/store/apps/details?id=in.inplayer.inplayer_android",
+  appDownloadsEnabled: true,
+  appBackgroundAudioEnabled: true,
   updatedAt: null,
   updatedBy: null,
 };
@@ -209,6 +223,12 @@ export type PublicPlatformSettings = Pick<
   | "helpEmail"
   | "contactEmail"
   | "sponsorEmail"
+  | "appMinVersion"
+  | "appLatestVersion"
+  | "appForceUpdate"
+  | "appUpdateUrl"
+  | "appDownloadsEnabled"
+  | "appBackgroundAudioEnabled"
 >;
 
 async function readPlatformSettings(): Promise<PlatformSettings> {
@@ -313,5 +333,11 @@ export function toPublicSettings(settings: PlatformSettings): PublicPlatformSett
     helpEmail: settings.helpEmail,
     contactEmail: settings.contactEmail,
     sponsorEmail: settings.sponsorEmail,
+    appMinVersion: settings.appMinVersion || "1.0.19",
+    appLatestVersion: settings.appLatestVersion || "1.0.19",
+    appForceUpdate: Boolean(settings.appForceUpdate),
+    appUpdateUrl: settings.appUpdateUrl || "https://play.google.com/store/apps/details?id=in.inplayer.inplayer_android",
+    appDownloadsEnabled: settings.appDownloadsEnabled !== false,
+    appBackgroundAudioEnabled: settings.appBackgroundAudioEnabled !== false,
   };
 }

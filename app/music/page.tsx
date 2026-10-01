@@ -1,4 +1,6 @@
 import type { Metadata } from "next";
+import { GetCommand } from "@aws-sdk/lib-dynamodb";
+import { docClient } from "@/app/lib/dynamodb";
 import { getVisibleVideos } from "@/app/lib/contentAccessServer";
 import { isMusicType } from "@/app/lib/contentTypes";
 import { sanitizeGenre, sanitizeMusicLanguage } from "@/app/lib/musicTrack";
@@ -94,6 +96,43 @@ export default async function MusicPage({ searchParams }: MusicPageProps) {
       if (idx > 0) {
         const [target] = tracks.splice(idx, 1);
         tracks.unshift(target);
+      } else if (idx === -1) {
+        try {
+          const direct = await docClient.send(
+            new GetCommand({
+              TableName: "InPlayer-Videos",
+              Key: { videoId: initialVideoId },
+            })
+          );
+          if (direct.Item) {
+            const v = direct.Item;
+            const uploaderId = v.uploaderId as string | undefined;
+            const musicSettings = (v.musicSettings && typeof v.musicSettings === "object") ? (v.musicSettings as any) : {};
+            const covers = Array.isArray(musicSettings.covers) && musicSettings.covers.length > 0
+              ? musicSettings.covers
+              : v.thumbnailUrl
+              ? [v.thumbnailUrl as string]
+              : ["/recommendations/thumbnails/1.jpg"];
+            tracks.unshift({
+              videoId: v.videoId as string,
+              title: (v.title as string) || "Untitled Track",
+              artist: (v.uploaderName as string) || "Unknown Artist",
+              uploaderId,
+              uploaderAvatarUrl: v.uploaderAvatarUrl as string | undefined,
+              covers,
+              coverIntervalSeconds: typeof musicSettings.coverIntervalSeconds === "number" ? musicSettings.coverIntervalSeconds : 7,
+              lyrics: Array.isArray(musicSettings.lyrics) ? musicSettings.lyrics : [],
+              genre: sanitizeGenre(v.genre ?? musicSettings.genre),
+              language: sanitizeMusicLanguage(v.language ?? musicSettings.language) ?? undefined,
+              muxPlaybackId: v.muxPlaybackId as string | undefined,
+              duration: (v.duration as number) || 0,
+              views: (v.views as number) || 0,
+              likeCount: (v.likeCount as number) || 0,
+            });
+          }
+        } catch (err) {
+          console.error("Failed to load initial music track:", err);
+        }
       }
     }
 

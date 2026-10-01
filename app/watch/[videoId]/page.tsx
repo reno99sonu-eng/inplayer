@@ -43,8 +43,12 @@ export async function generateMetadata({
     );
     const video = result.Item;
 
-    if (!video || video.moderationHidden === true) {
+    if (!video) {
       return { title: "Video not found" };
+    }
+
+    if (video.moderationHidden === true) {
+      return { title: "Upload Under Review | INPLAYER" };
     }
 
     const title = (video.title as string)?.trim() || "Watch on INPLAYER";
@@ -126,11 +130,7 @@ export default async function WatchPage({ params }: WatchPageProps) {
 
   const video = result.Item;
 
-  // Auto-flagged at upload (app/lib/moderation.ts) and awaiting admin
-  // review — treated exactly like "not found" for a direct link, same as
-  // it already is everywhere this video would otherwise be listed (see
-  // app/lib/videoStore.ts).
-  if (!video || video.moderationHidden === true) {
+  if (!video) {
     notFound();
   }
 
@@ -142,6 +142,38 @@ export default async function WatchPage({ params }: WatchPageProps) {
   // Music tracks redirect straight into the ultra-premium Music screen & player
   if (isMusicType(video.contentType)) {
     redirect(`/music?v=${videoId}`);
+  }
+
+  // Auto-flagged at upload (app/lib/moderation.ts) and awaiting admin review.
+  // Display a helpful status card instead of a broken 404 screen.
+  if (video.moderationHidden === true) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center px-4 text-center">
+        <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
+          <Lock size={26} />
+        </div>
+        <h2 className="text-2xl font-black text-white light:text-slate-900">
+          Upload Under Review
+        </h2>
+        <p className="mt-2 max-w-md text-sm text-slate-400 light:text-slate-600">
+          This content is currently undergoing standard copyright and moderation review before being published publicly.
+        </p>
+        <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+          <Link
+            href="/"
+            className="rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-6 py-2.5 font-bold text-white shadow transition hover:-translate-y-0.5"
+          >
+            Back to Home
+          </Link>
+          <Link
+            href="/my-videos"
+            className="rounded-2xl border border-white/10 px-6 py-2.5 text-sm font-semibold text-slate-200 hover:bg-white/5"
+          >
+            My Videos
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   // The hard gate. Filtering the listings keeps 18+ content out of every

@@ -27,6 +27,12 @@ class PublicPlatformSettings {
   final String admobRewardedUnitId;
   final String admobNativeUnitId;
   final String admobOpenAppUnitId;
+  final String appMinVersion;
+  final String appLatestVersion;
+  final bool appForceUpdate;
+  final String appUpdateUrl;
+  final bool appDownloadsEnabled;
+  final bool appBackgroundAudioEnabled;
 
   const PublicPlatformSettings({
     this.maintenanceMode = false,
@@ -42,6 +48,12 @@ class PublicPlatformSettings {
     this.admobRewardedUnitId = '',
     this.admobNativeUnitId = '',
     this.admobOpenAppUnitId = '',
+    this.appMinVersion = '1.0.19',
+    this.appLatestVersion = '1.0.19',
+    this.appForceUpdate = false,
+    this.appUpdateUrl = 'https://play.google.com/store/apps/details?id=in.inplayer.inplayer_android',
+    this.appDownloadsEnabled = true,
+    this.appBackgroundAudioEnabled = true,
   });
 
   /// Everything switched off / allowed. This is what a failed fetch
@@ -94,6 +106,12 @@ class PublicPlatformSettings {
       admobRewardedUnitId: json['admobRewardedUnitId']?.toString().trim() ?? '',
       admobNativeUnitId: json['admobNativeUnitId']?.toString().trim() ?? '',
       admobOpenAppUnitId: json['admobOpenAppUnitId']?.toString().trim() ?? '',
+      appMinVersion: json['appMinVersion']?.toString().trim() ?? '1.0.19',
+      appLatestVersion: json['appLatestVersion']?.toString().trim() ?? '1.0.19',
+      appForceUpdate: _bool(json['appForceUpdate']),
+      appUpdateUrl: json['appUpdateUrl']?.toString().trim() ?? 'https://play.google.com/store/apps/details?id=in.inplayer.inplayer_android',
+      appDownloadsEnabled: _bool(json['appDownloadsEnabled'], fallback: true),
+      appBackgroundAudioEnabled: _bool(json['appBackgroundAudioEnabled'], fallback: true),
     );
   }
 }

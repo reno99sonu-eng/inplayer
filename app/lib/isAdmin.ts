@@ -17,6 +17,7 @@ import { getActiveTeamMember } from "@/app/lib/adminMembers";
 //      admin accounts WITHOUT a code change or a new deploy.
 const HARDCODED_ADMIN_EMAILS = [
   "inplayerdigital@gmail.com",
+  "toftelevisionpvtltd@gmail.com",
 ];
 
 function adminEmailList(): string[] {

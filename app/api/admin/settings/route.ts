@@ -152,6 +152,14 @@ export async function PATCH(request: NextRequest) {
   if (typeof body.contactEmail === "string") partial.contactEmail = body.contactEmail.trim().slice(0, 200);
   if (typeof body.sponsorEmail === "string") partial.sponsorEmail = body.sponsorEmail.trim().slice(0, 200);
 
+  // Mobile App Dedicated Settings
+  if (typeof body.appMinVersion === "string") partial.appMinVersion = body.appMinVersion.trim().slice(0, 20);
+  if (typeof body.appLatestVersion === "string") partial.appLatestVersion = body.appLatestVersion.trim().slice(0, 20);
+  if (typeof body.appForceUpdate === "boolean") partial.appForceUpdate = body.appForceUpdate;
+  if (typeof body.appUpdateUrl === "string") partial.appUpdateUrl = body.appUpdateUrl.trim().slice(0, 500);
+  if (typeof body.appDownloadsEnabled === "boolean") partial.appDownloadsEnabled = body.appDownloadsEnabled;
+  if (typeof body.appBackgroundAudioEnabled === "boolean") partial.appBackgroundAudioEnabled = body.appBackgroundAudioEnabled;
+
   if (Object.keys(partial).length === 0) {
     return NextResponse.json({ error: "No valid settings provided." }, { status: 400 });
   }

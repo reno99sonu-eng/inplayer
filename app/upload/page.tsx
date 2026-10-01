@@ -513,6 +513,11 @@ export default function UploadPage() {
       return;
     }
 
+    if (contentType === "music" && !musicSettings.declaredOwnership) {
+      setError("Please confirm that you hold the rights to publish this recording by ticking the ownership declaration checkbox below.");
+      return;
+    }
+
     if (contentType === "film" && !selectedSeriesId) {
       setError("Please select a series for this episode or create one first in Raftaar Films Studio.");
       return;

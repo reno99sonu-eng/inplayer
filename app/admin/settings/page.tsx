@@ -13,6 +13,11 @@ import {
   Bot,
   DollarSign,
   Smartphone,
+  Download,
+  Headphones,
+  ShieldCheck,
+  ArrowRight,
+  ExternalLink,
 } from "lucide-react";
 import Link from "next/link";
 import { useAdminMode } from "@/app/components/admin/AdminModeContext";
@@ -40,6 +45,18 @@ interface CoreSettings {
   helpEmail: string;
   contactEmail: string;
   sponsorEmail: string;
+
+  // Mobile App Dedicated Settings
+  appMinVersion: string;
+  appLatestVersion: string;
+  appForceUpdate: boolean;
+  appUpdateUrl: string;
+  appDownloadsEnabled: boolean;
+  appBackgroundAudioEnabled: boolean;
+  admobEnabled?: boolean;
+  admobAppId?: string;
+  admobBannerUnitId?: string;
+  admobInterstitialUnitId?: string;
 }
 
 // Raw server field names for whichever mode is active — e.g. for
@@ -137,6 +154,16 @@ export default function AdminSettingsPage() {
           helpEmail: data.settings.helpEmail || "",
           contactEmail: data.settings.contactEmail || "",
           sponsorEmail: data.settings.sponsorEmail || "",
+          appMinVersion: data.settings.appMinVersion || "1.0.19",
+          appLatestVersion: data.settings.appLatestVersion || "1.0.19",
+          appForceUpdate: Boolean(data.settings.appForceUpdate),
+          appUpdateUrl: data.settings.appUpdateUrl || "https://play.google.com/store/apps/details?id=in.inplayer.inplayer_android",
+          appDownloadsEnabled: data.settings.appDownloadsEnabled !== false,
+          appBackgroundAudioEnabled: data.settings.appBackgroundAudioEnabled !== false,
+          admobEnabled: Boolean(data.settings.admobEnabled),
+          admobAppId: data.settings.admobAppId || "ca-app-pub-2093353589258497~5197320427",
+          admobBannerUnitId: data.settings.admobBannerUnitId || "ca-app-pub-2093353589258497/2053845436",
+          admobInterstitialUnitId: data.settings.admobInterstitialUnitId || "ca-app-pub-2093353589258497/7761467681",
         });
         setUpdatedMeta({ updatedAt: data.settings.updatedAt, updatedBy: data.settings.updatedBy });
       } catch (err) {
@@ -185,7 +212,7 @@ export default function AdminSettingsPage() {
     // panel's own prefixed fields are active before sending — the PATCH
     // route only recognizes inplayerMaintenanceMode/hammartMaintenanceMode/
     // sponsorshipMaintenanceMode etc, never a bare "maintenanceMode".
-    const body = {
+    const body: Record<string, unknown> = {
       [fields.maintenanceMode]: target.maintenanceMode,
       [fields.maintenanceMessage]: target.maintenanceMessage,
       signupsEnabled: target.signupsEnabled,
@@ -197,6 +224,12 @@ export default function AdminSettingsPage() {
       helpEmail: target.helpEmail,
       contactEmail: target.contactEmail,
       sponsorEmail: target.sponsorEmail,
+      appMinVersion: target.appMinVersion,
+      appLatestVersion: target.appLatestVersion,
+      appForceUpdate: target.appForceUpdate,
+      appUpdateUrl: target.appUpdateUrl,
+      appDownloadsEnabled: target.appDownloadsEnabled,
+      appBackgroundAudioEnabled: target.appBackgroundAudioEnabled,
     };
 
     setSaving(true);
@@ -379,6 +412,193 @@ export default function AdminSettingsPage() {
             </div>
           )}
         </div>
+
+        {/* Mobile App Dedicated Controls (When InPlayer App is selected) */}
+        {mode === "inplayer-app" && (
+          <>
+            {/* Version Control & Force Update */}
+            <div className="rounded-3xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-5">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-cyan-500/10">
+                    <Smartphone size={16} className="text-cyan-300" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-white light:text-slate-900">App Version Control &amp; Force Update</h3>
+                    <p className="mt-0.5 text-xs text-slate-400 light:text-slate-600">
+                      Control minimum required build version and trigger a blocking Google Play Store update gate for outdated app installations.
+                    </p>
+                  </div>
+                </div>
+                <Toggle
+                  checked={settings.appForceUpdate}
+                  onChange={(v) => toggleAndSave("appForceUpdate", v)}
+                />
+              </div>
+
+              <div className="mt-4 pl-12 space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold text-slate-400 light:text-slate-600">
+                      Minimum Supported Version (e.g. 1.0.19)
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.appMinVersion}
+                      onChange={(e) => update("appMinVersion", e.target.value.slice(0, 20))}
+                      placeholder="1.0.19"
+                      className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-cyan-400/50"
+                    />
+                    <p className="mt-1 text-[11px] text-slate-500">Users on older versions will be prompted to update.</p>
+                  </div>
+                  <div>
+                    <label className="mb-1.5 block text-xs font-semibold text-slate-400 light:text-slate-600">
+                      Latest Play Store Version (e.g. 1.0.19)
+                    </label>
+                    <input
+                      type="text"
+                      value={settings.appLatestVersion}
+                      onChange={(e) => update("appLatestVersion", e.target.value.slice(0, 20))}
+                      placeholder="1.0.19"
+                      className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-cyan-400/50"
+                    />
+                    <p className="mt-1 text-[11px] text-slate-500">Target release on Google Play Store.</p>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="mb-1.5 block text-xs font-semibold text-slate-400 light:text-slate-600">
+                    Google Play Store Update URL
+                  </label>
+                  <input
+                    type="url"
+                    value={settings.appUpdateUrl}
+                    onChange={(e) => update("appUpdateUrl", e.target.value.slice(0, 500))}
+                    placeholder="https://play.google.com/store/apps/details?id=in.inplayer.inplayer_android"
+                    className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-sm text-white light:text-slate-900 outline-none focus:border-cyan-400/50"
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* App Feature Flags */}
+            <div className="rounded-3xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-5 space-y-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-cyan-500/10">
+                    <Download size={16} className="text-cyan-300" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-white light:text-slate-900">Offline Downloads</h3>
+                    <p className="mt-0.5 text-xs text-slate-400 light:text-slate-600">
+                      Allow users to download videos and audio tracks to encrypted local device storage for offline playback.
+                    </p>
+                  </div>
+                </div>
+                <Toggle
+                  checked={settings.appDownloadsEnabled}
+                  onChange={(v) => toggleAndSave("appDownloadsEnabled", v)}
+                />
+              </div>
+
+              <div className="border-t border-white/5 light:border-black/5 pt-4 flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-cyan-500/10">
+                    <Headphones size={16} className="text-cyan-300" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-white light:text-slate-900">Background Audio Playback</h3>
+                    <p className="mt-0.5 text-xs text-slate-400 light:text-slate-600">
+                      Allow music, songs, and podcasts to continue playing in the background when phone screen is locked.
+                    </p>
+                  </div>
+                </div>
+                <Toggle
+                  checked={settings.appBackgroundAudioEnabled}
+                  onChange={(v) => toggleAndSave("appBackgroundAudioEnabled", v)}
+                />
+              </div>
+            </div>
+
+            {/* Mobile Ads (AdMob) Quick Status & Integration Link */}
+            <div className="rounded-3xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-5">
+              <div className="flex items-start justify-between gap-4 mb-3">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-emerald-500/10">
+                    <Smartphone size={16} className="text-emerald-300" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-bold text-white light:text-slate-900">Google AdMob (Android)</h3>
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-black ${
+                        settings.admobEnabled
+                          ? "bg-emerald-500/20 text-emerald-400 border border-emerald-500/30"
+                          : "bg-zinc-500/20 text-zinc-400 border border-zinc-500/30"
+                      }`}>
+                        {settings.admobEnabled ? "ACTIVE" : "DISABLED"}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-xs text-slate-400 light:text-slate-600">
+                      Mobile advertising is isolated to Android app sessions. Web AdSense and house ads operate independently.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="pl-12 space-y-2 text-xs">
+                <div className="p-3 rounded-xl bg-black/20 border border-white/5 space-y-1 font-mono text-[11px]">
+                  <p className="text-slate-400"><span className="text-slate-500">App ID:</span> {settings.admobAppId || "Not set"}</p>
+                  <p className="text-slate-400"><span className="text-slate-500">Banner Unit:</span> {settings.admobBannerUnitId || "Not set"}</p>
+                  <p className="text-slate-400"><span className="text-slate-500">Interstitial Unit:</span> {settings.admobInterstitialUnitId || "Not set"}</p>
+                </div>
+
+                <Link
+                  href="/admin/advertising?tab=admob"
+                  className="inline-flex items-center gap-1.5 mt-2 text-xs font-bold text-cyan-400 hover:text-cyan-300 transition-colors"
+                >
+                  <span>Configure AdMob Ad Units &amp; Toggles</span>
+                  <ArrowRight size={13} />
+                </Link>
+              </div>
+            </div>
+
+            {/* Mobile App Build & Distribution Specs */}
+            <div className="rounded-3xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-5">
+              <div className="flex items-start gap-3 mb-3">
+                <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-purple-500/10">
+                  <ShieldCheck size={16} className="text-purple-300" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-white light:text-slate-900">Application Package &amp; Runtime Specs</h3>
+                  <p className="mt-0.5 text-xs text-slate-400 light:text-slate-600">
+                    Live production packaging identifiers matching the official Google Play Console upload bundle.
+                  </p>
+                </div>
+              </div>
+
+              <div className="pl-12 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs">
+                <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
+                  <p className="text-[10px] uppercase font-bold text-slate-500">Package</p>
+                  <p className="font-mono text-slate-200 mt-0.5 truncate">in.inplayer.inplayer_android</p>
+                </div>
+                <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
+                  <p className="text-[10px] uppercase font-bold text-slate-500">Version</p>
+                  <p className="font-bold text-slate-200 mt-0.5">1.0.20+30</p>
+                </div>
+                <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
+                  <p className="text-[10px] uppercase font-bold text-slate-500">Target SDK</p>
+                  <p className="font-bold text-slate-200 mt-0.5">Android 14 (API 34)</p>
+                </div>
+                <div className="p-2.5 rounded-xl bg-white/[0.02] border border-white/5">
+                  <p className="text-[10px] uppercase font-bold text-slate-500">Push Hub</p>
+                  <Link href="/admin/notifications" className="text-indigo-400 font-bold hover:underline mt-0.5 flex items-center gap-1">
+                    FCM Alerts <ExternalLink size={10} />
+                  </Link>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
 
         {/* Contact Emails */}
         {mode === "inplayer" && (

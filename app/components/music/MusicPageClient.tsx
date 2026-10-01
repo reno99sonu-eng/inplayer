@@ -321,6 +321,13 @@ export default function MusicPageClient({
             <Search size={13} />
             <span className="hidden sm:inline">Search</span>
           </button>
+          <Link
+            href="/upload?type=music"
+            className="shrink-0 flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-3.5 py-1.5 text-xs font-bold text-white shadow-md shadow-orange-500/20 transition hover:scale-105"
+          >
+            <Music2 size={13} />
+            <span className="hidden sm:inline">Upload Track</span>
+          </Link>
         </section>
 
         {/* ── 1. ULTRA-PREMIUM SPOTLIGHT HERO ───────────────────────── */}

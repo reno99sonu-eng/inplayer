@@ -872,6 +872,13 @@ class _UploadPageState extends ConsumerState<UploadPage> {
       return;
     }
 
+    if (_isMusicUpload && !_declaredOwnership) {
+      _showSnack(
+        'Please confirm that you own the rights to publish this recording.',
+      );
+      return;
+    }
+
     // Ask at the final publish action, before upload setup or media transfer.
     // Music uploads do not have a video audience prompt.
     if (_contentType == 'video' || _contentType == 'short') {

@@ -101,7 +101,7 @@ const sponsorshipItems = [
 
 const inplayerAppItems = [
   { id: "settings", label: "App Settings & Maintenance", icon: Settings, href: "/admin/settings" },
-  { id: "ads", label: "Mobile Ads (AdMob)", icon: Smartphone, href: "/admin/advertising", permission: "manage_ads" },
+  { id: "ads", label: "Mobile Ads (AdMob)", icon: Smartphone, href: "/admin/advertising?tab=admob", permission: "manage_ads" },
   { id: "navbar-theme", label: "Navbar Theme", icon: Palette, href: "/admin/navbar-theme", permission: "manage_navbar_theme" },
   { id: "raftaar-films", label: "Raftaar Films", icon: Clapperboard, href: "/admin/raftaar-films" },
   { id: "raftaar-films-applications", label: "Film Applications", icon: UserCheck, href: "/admin/raftaar-films-applications" },

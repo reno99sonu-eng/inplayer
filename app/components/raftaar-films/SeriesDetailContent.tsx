@@ -276,7 +276,7 @@ export default function SeriesDetailContent({ series, episodes }: any) {
             <h2 className="text-sm sm:text-base font-extrabold text-white flex items-center gap-2">
               <span>Episodes</span>
               <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-white/10 text-orange-400">
-                1 – {sortedEpisodes.length}
+                {sortedEpisodes.length > 0 ? `1 – ${sortedEpisodes.length}` : "0"}
               </span>
             </h2>
             <span className="text-[11px] text-zinc-400">

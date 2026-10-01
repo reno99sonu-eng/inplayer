@@ -1,6 +1,8 @@
 "use client";
 
 import React, { Component, ReactNode, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useAdminMode } from "@/app/components/admin/AdminModeContext";
 import { authedFetch } from "@/app/lib/apiFetch";
 import {
   Loader2,
@@ -185,7 +187,25 @@ class AdvertisingErrorBoundary extends Component<BoundaryProps, BoundaryState> {
 }
 
 function AdvertisingPage() {
-  const [activePanel, setActivePanel] = useState<SidePanel>("overview");
+  const searchParams = useSearchParams();
+  const { mode } = useAdminMode();
+  const tabParam = searchParams.get("tab");
+  const initialPanel: SidePanel =
+    tabParam === "admob" || (mode === "inplayer-app" && !tabParam)
+      ? "admob"
+      : (tabParam as SidePanel) || "overview";
+
+  const [activePanel, setActivePanel] = useState<SidePanel>(initialPanel);
+
+  useEffect(() => {
+    if (tabParam === "admob") {
+      setActivePanel("admob");
+    } else if (tabParam && [
+      "overview", "homepage", "watch", "weekly_featured", "midroll", "adsense", "admob", "specs"
+    ].includes(tabParam)) {
+      setActivePanel(tabParam as SidePanel);
+    }
+  }, [tabParam]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -2343,7 +2363,9 @@ function AdvertisingPage() {
 export default function AdvertisingPageWrapper() {
   return (
     <AdvertisingErrorBoundary>
-      <AdvertisingPage />
+      <React.Suspense fallback={<div className="p-8 text-center text-slate-500">Loading ad console...</div>}>
+        <AdvertisingPage />
+      </React.Suspense>
     </AdvertisingErrorBoundary>
   );
 }

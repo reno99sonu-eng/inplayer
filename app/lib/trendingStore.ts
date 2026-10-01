@@ -93,6 +93,7 @@ async function rankByWindow(
         !video ||
         video.contentType === "short" ||
         video.contentType === "film" ||
+        Boolean(video.seriesId) ||
         isMusicType(video.contentType) ||
         (video.visibility && video.visibility !== "public")
       ) {
@@ -194,6 +195,8 @@ export async function getTrendingCreators(
       for (const v of allVideos) {
         if (
           v.contentType === "short" ||
+          v.contentType === "film" ||
+          Boolean(v.seriesId) ||
           isMusicType(v.contentType) ||
           (v.visibility && v.visibility !== "public") ||
           !v.uploaderId

@@ -51,7 +51,8 @@ export default async function VideosPage({ searchParams }: VideosPageProps) {
         (!v.visibility || v.visibility === "public") &&
         !isMusicType(v.contentType) &&
         v.contentType !== "short" &&
-        v.contentType !== "film"
+        v.contentType !== "film" &&
+        !v.seriesId
     )
     .map((v) => ({
       videoId: v.videoId as string,

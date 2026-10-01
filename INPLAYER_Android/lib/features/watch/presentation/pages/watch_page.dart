@@ -670,6 +670,15 @@ class _WatchPageState extends ConsumerState<WatchPage>
         return;
       }
 
+      // If this video is a Raftaar Films episode, redirect immediately to the dedicated vertical player
+      if (video.isFilm) {
+        final sId = (video.seriesId != null && video.seriesId!.isNotEmpty) ? video.seriesId! : 'series';
+        if (mounted) {
+          context.pushReplacement('/raftaar-films/' + sId + '/' + video.videoId);
+        }
+        return;
+      }
+
       // Immediately render video metadata, channel details, and start loading comments/likes/watchlist
       if (mounted) {
         setState(() {
@@ -869,7 +878,11 @@ class _WatchPageState extends ConsumerState<WatchPage>
               if (!mounted) return;
               setState(() {
                 _recommendedVideos = recommended
-                    .where((v) => v.videoId != widget.videoId)
+                    .where((v) =>
+                        v.videoId != widget.videoId &&
+                        !v.isFilm &&
+                        !v.isShort &&
+                        !v.isStrictMusic)
                     .toList();
               });
             })

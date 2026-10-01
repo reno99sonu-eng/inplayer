@@ -469,6 +469,9 @@ class VideoService {
 
       final filtered = parsed
           .where((json) {
+            final isFilm = json['contentType']?.toString().toLowerCase() == 'film' ||
+                json['seriesId'] != null;
+            if (isFilm) return false;
             final type = json['contentType']?.toString().toLowerCase() ?? '';
             final cat = json['category']?.toString().toLowerCase() ?? '';
             final isShortFlag = json['isShort'] == true;
@@ -534,6 +537,7 @@ class VideoService {
             ),
           )
           .map((json) => Video.fromJson(json))
+          .where((v) => !v.isFilm && !v.isShort && !v.isStrictMusic)
           .toList();
     } catch (e, stackTrace) {
       _logger.e(

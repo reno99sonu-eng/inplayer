@@ -17,12 +17,14 @@ import { resolveCognitoEmails } from "@/app/lib/cognitoClient";
 // (the cached result includes isSuspended: true). An admin suspending
 // someone takes effect within 30s max — the same order of magnitude as
 // Cognito's own token expiry window, and far faster than any user would
-// notice.
-const AUTH_CACHE_TTL_MS = 30_000;
+import { isAdminEmail } from "@/app/lib/isAdmin";
+
+const AUTH_CACHE_TTL_MS = 60_000;
 interface AuthCacheEntry {
   isSuspended: boolean;
   suspendedUntil?: string;
   name?: string;
+  email?: string;
   cachedAt: number;
 }
 const authCache = new Map<string, AuthCacheEntry>();
@@ -98,6 +100,7 @@ export async function verifyAuth(request: NextRequest): Promise<VerifiedUser> {
   // only ever used as a one-time seed the very first time a person is
   // ever seen with no stored name yet.
   let resolvedName = jwtName;
+  let storedEmail: string | undefined;
 
   // Fails OPEN on any lookup problem (missing row, a transient DynamoDB
   // error, etc.) — only an explicit isSuspended: true on the account's own
@@ -121,19 +124,21 @@ export async function verifyAuth(request: NextRequest): Promise<VerifiedUser> {
       isSuspended = cached.isSuspended;
       suspendedUntil = cached.suspendedUntil;
       storedName = cached.name;
+      storedEmail = cached.email;
     } else {
       // Cache miss or expired — do the real DynamoDB lookup.
       const result = await docClient.send(
         new GetCommand({
           TableName: "InPlayer-Users",
           Key: { userId },
-          ProjectionExpression: "isSuspended, suspendedUntil, #n",
+          ProjectionExpression: "isSuspended, suspendedUntil, #n, email",
           ExpressionAttributeNames: { "#n": "name" },
         })
       );
       isSuspended = result.Item?.isSuspended === true;
       suspendedUntil = result.Item?.suspendedUntil as string | undefined;
       storedName = result.Item?.name as string | undefined;
+      storedEmail = result.Item?.email as string | undefined;
 
       // Cache the result (including suspended status — enforcement still
       // happens below, just from the cached copy on the next request).
@@ -141,6 +146,7 @@ export async function verifyAuth(request: NextRequest): Promise<VerifiedUser> {
         isSuspended,
         suspendedUntil,
         name: storedName,
+        email: storedEmail,
         cachedAt: now,
       });
 
@@ -161,7 +167,7 @@ export async function verifyAuth(request: NextRequest): Promise<VerifiedUser> {
           storedName = jwtName;
           // Update cache with the seeded name so subsequent requests
           // within the TTL window see it immediately.
-          authCache.set(userId, { isSuspended, suspendedUntil, name: storedName, cachedAt: now });
+          authCache.set(userId, { isSuspended, suspendedUntil, name: storedName, email: storedEmail, cachedAt: now });
         } catch (seedErr) {
           // ConditionalCheckFailedException just means someone else won the
           // race (or already has a real saved name) — not a real error.
@@ -190,17 +196,15 @@ export async function verifyAuth(request: NextRequest): Promise<VerifiedUser> {
     console.error("verifyAuth: suspension/name check failed, failing open:", err);
   }
 
-  const sessionId = request.headers.get("x-session-id");
-  if (sessionId) {
-    const active = await sessionStillActive(userId, sessionId);
-    if (!active) {
-      throw new Error(SESSION_REVOKED_MESSAGE);
-    }
-  }
-
   let email = typeof payload.email === "string" ? payload.email : undefined;
   if (!email && typeof payload["cognito:username"] === "string" && payload["cognito:username"].includes("@")) {
     email = payload["cognito:username"];
+  }
+  if (!email && typeof (payload as Record<string, unknown>)["custom:email"] === "string") {
+    email = (payload as Record<string, unknown>)["custom:email"] as string;
+  }
+  if (!email && storedEmail) {
+    email = storedEmail;
   }
   if (!email) {
     try {
@@ -208,6 +212,24 @@ export async function verifyAuth(request: NextRequest): Promise<VerifiedUser> {
       email = emailMap.get(userId);
     } catch {
       // Lookup failed — fail open with undefined
+    }
+  }
+
+  // Update in-memory authCache with resolved email
+  if (email) {
+    const existing = authCache.get(userId);
+    if (existing) {
+      existing.email = email;
+    }
+  }
+
+  // Device session enforcement — skips main admins so a stale or evicted
+  // device row in InPlayer-Sessions never blocks administrative access.
+  const sessionId = request.headers.get("x-session-id");
+  if (sessionId && !isAdminEmail(email)) {
+    const active = await sessionStillActive(userId, sessionId);
+    if (!active) {
+      throw new Error(SESSION_REVOKED_MESSAGE);
     }
   }
 

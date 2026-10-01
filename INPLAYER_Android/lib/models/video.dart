@@ -27,6 +27,7 @@ class Video {
   final String? visibility;
   final String? copyrightRisk;
   final String? artist;
+  final String? seriesId;
 
   /// 'everyone' | 'kids' | 'adult' — mirrors the website's videoAudience()
   /// fallback: the real `audience` field when present, else derived from
@@ -75,6 +76,7 @@ class Video {
     this.visibility,
     this.copyrightRisk,
     this.artist,
+    this.seriesId,
     this.audience = 'everyone',
     this.genre,
     this.language,
@@ -94,7 +96,8 @@ class Video {
   bool get isFilm =>
       contentType.trim().toLowerCase() == 'film' ||
       contentType.trim().toLowerCase() == 'raftaar-film' ||
-      contentType.trim().toLowerCase() == 'raftaar_film';
+      contentType.trim().toLowerCase() == 'raftaar_film' ||
+      (seriesId != null && seriesId!.isNotEmpty);
 
   /// The canonical audio check: strictly `contentType == "music"`. Use it
   /// for music feeds, audio playback and download handling; a video category
@@ -214,6 +217,7 @@ class Video {
       visibility: json['visibility']?.toString(),
       copyrightRisk: json['copyrightRisk']?.toString(),
       artist: json['artist']?.toString() ?? json['creator']?.toString(),
+      seriesId: json['seriesId']?.toString(),
       audience: resolvedAudience,
       genre: json['genre']?.toString().trim().isNotEmpty == true
           ? json['genre'].toString().trim()
@@ -313,6 +317,7 @@ class Video {
       'moderationHidden': moderationHidden,
       'copyrightRisk': copyrightRisk,
       'artist': artist,
+      'seriesId': seriesId,
       'audience': audience,
       'genre': genre,
       'language': language,

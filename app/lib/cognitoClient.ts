@@ -36,14 +36,34 @@ export const COGNITO_USER_POOL_ID = "ap-south-1_OrIhWadFN";
 // that's been deleted from Cognito directly, a transient error, etc.) is
 // just omitted from the result, never thrown — an admin list should still
 // render with partial data rather than fail outright.
+// In-memory cache for resolved emails — prevents repeated, expensive Cognito ListUsers
+// calls across parallel admin routes (e.g. settings, error logs, bug reports).
+const emailCache = new Map<string, { email: string; cachedAt: number }>();
+const EMAIL_CACHE_TTL_MS = 30 * 60 * 1000; // 30 minutes
+
 export async function resolveCognitoEmails(
   userIds: string[]
 ): Promise<Map<string, string>> {
   const result = new Map<string, string>();
   const unique = Array.from(new Set(userIds.filter(Boolean)));
+  const now = Date.now();
+
+  const toFetch: string[] = [];
+  for (const uid of unique) {
+    const cached = emailCache.get(uid);
+    if (cached && now - cached.cachedAt < EMAIL_CACHE_TTL_MS) {
+      result.set(uid, cached.email);
+    } else {
+      toFetch.push(uid);
+    }
+  }
+
+  if (toFetch.length === 0) {
+    return result;
+  }
 
   await Promise.all(
-    unique.map(async (userId) => {
+    toFetch.map(async (userId) => {
       try {
         const res = await cognitoClient.send(
           new ListUsersCommand({
@@ -55,7 +75,10 @@ export async function resolveCognitoEmails(
         const email = res.Users?.[0]?.Attributes?.find(
           (a) => a.Name === "email"
         )?.Value;
-        if (email) result.set(userId, email);
+        if (email) {
+          result.set(userId, email);
+          emailCache.set(userId, { email, cachedAt: now });
+        }
       } catch (err) {
         console.error(`resolveCognitoEmails: lookup failed for ${userId}:`, err);
       }

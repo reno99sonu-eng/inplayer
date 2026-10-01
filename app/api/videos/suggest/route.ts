@@ -23,6 +23,8 @@ export async function GET(request: NextRequest) {
       return (
         title.includes(q) &&
         !isMusicType(video.contentType) &&
+        video.contentType !== "film" &&
+        !video.seriesId &&
         (!video.visibility || video.visibility === "public")
       );
     });

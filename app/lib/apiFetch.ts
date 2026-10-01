@@ -26,31 +26,37 @@ export async function authedFetch(path: string, options: RequestInit = {}): Prom
     }
 
     const sessionId = getStoredSessionId();
+    const isAdminRoute = path.startsWith("/api/admin/") || path.startsWith("/api/admin");
 
     let res = await fetch(path, {
       ...options,
       headers: {
         ...(options.headers || {}),
         Authorization: `Bearer ${idToken}`,
-        ...(sessionId ? { "X-Session-Id": sessionId } : {}),
+        ...(!isAdminRoute && sessionId ? { "X-Session-Id": sessionId } : {}),
       },
     });
 
-    // If the server rejected with 401, the Cognito token may have expired mid-session.
-    // Force a fresh session refresh and retry the request once before giving up.
+    // If the server rejected with 401, the Cognito token may have expired mid-session
+    // or a stale X-Session-Id might have caused a false revocation. Clear stored session
+    // and force a fresh session refresh, retrying without X-Session-Id.
     if (res.status === 401) {
-      const freshSession = await fetchAuthSession({ forceRefresh: true }).catch(() => null);
-      const freshToken = freshSession?.tokens?.idToken?.toString();
-      if (freshToken && freshToken !== idToken) {
-        res = await fetch(path, {
-          ...options,
-          headers: {
-            ...(options.headers || {}),
-            Authorization: `Bearer ${freshToken}`,
-            ...(sessionId ? { "X-Session-Id": sessionId } : {}),
-          },
-        });
+      try {
+        localStorage.removeItem("inplayer-session-id");
+      } catch {
+        /* ignore */
       }
+
+      const freshSession = await fetchAuthSession({ forceRefresh: true }).catch(() => null);
+      const freshToken = freshSession?.tokens?.idToken?.toString() || idToken;
+
+      res = await fetch(path, {
+        ...options,
+        headers: {
+          ...(options.headers || {}),
+          Authorization: `Bearer ${freshToken}`,
+        },
+      });
     }
 
     return res;

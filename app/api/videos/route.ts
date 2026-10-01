@@ -29,7 +29,7 @@ export async function GET(request: Request) {
     } else if (contentType !== "all") {
       // Default: pure longform videos only
       items = items.filter(
-        (v) => !isMusicType(v.contentType) && v.contentType !== "short" && v.contentType !== "film"
+        (v) => !isMusicType(v.contentType) && v.contentType !== "short" && v.contentType !== "film" && !v.seriesId
       );
     }
 

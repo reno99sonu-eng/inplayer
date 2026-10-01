@@ -29,6 +29,7 @@ async function getShorts(startVideoId?: string): Promise<Short[]> {
     const items = (await getVisibleVideos()).filter(
       (video) =>
         video.contentType === "short" &&
+        !video.seriesId &&
         (!video.visibility || video.visibility === "public")
     );
 

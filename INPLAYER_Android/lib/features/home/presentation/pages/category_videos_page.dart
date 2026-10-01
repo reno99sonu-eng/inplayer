@@ -36,14 +36,14 @@ class _CategoryVideosPageState extends ConsumerState<CategoryVideosPage> {
     if (!mounted) return;
     setState(() {
       if (widget.category.toLowerCase().contains('raftaar')) {
-        _videos = all.where((v) => v.isShort || v.category == widget.category).toList();
+        _videos = all.where((v) => (v.isShort || v.category == widget.category) && !v.isFilm).toList();
       } else {
         _videos = all
             .where(
               (v) =>
                   v.category == widget.category &&
                   !v.isShort &&
-                  !v.isStrictMusic,
+                  !v.isStrictMusic && !v.isFilm,
             )
             .toList();
       }

@@ -1066,7 +1066,7 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage>
   /// the dedicated Raftaar tab and horizontal Raftaar shelf, and explicit
   /// Music uploads belong in the dedicated Music tab.
   static List<Video> _onlyLongformVideos(List<Video> videos) =>
-      videos.where((v) => !v.isStrictMusic && !v.isShort).toList();
+      videos.where((v) => !v.isStrictMusic && !v.isShort && !v.isFilm).toList();
 
   Widget _buildHomeContent() {
     if (_videos == null && _feedLoading) {

@@ -64,7 +64,7 @@ async function getRealContent(): Promise<RealContent> {
     );
 
     const realVideos: Recommendation[] = items
-      .filter((video) => video.contentType !== "short" && !isMusicType(video.contentType) && video.contentType !== "film")
+      .filter((video) => video.contentType !== "short" && !isMusicType(video.contentType) && video.contentType !== "film" && !video.seriesId)
       .map((video) => {
         const videoId = video.videoId as string;
         const uploaderId = video.uploaderId as string | undefined;
@@ -97,7 +97,7 @@ async function getRealContent(): Promise<RealContent> {
       });
 
     const realShorts: Short[] = items
-      .filter((video) => video.contentType === "short")
+      .filter((video) => video.contentType === "short" && !video.seriesId)
       .map((video) => {
         const videoId = video.videoId as string;
         const uploaderId = video.uploaderId as string | undefined;

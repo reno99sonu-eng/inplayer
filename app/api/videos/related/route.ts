@@ -22,6 +22,8 @@ export async function GET(request: NextRequest) {
     (v) =>
       v.videoId !== excludeVideoId &&
       v.contentType !== "short" &&
+      v.contentType !== "film" &&
+      !v.seriesId &&
       !isMusicType(v.contentType) &&
       (!v.visibility || v.visibility === "public")
   );

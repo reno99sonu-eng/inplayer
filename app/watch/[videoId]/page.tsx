@@ -100,14 +100,15 @@ async function getRelatedVideos(currentVideoId: string, category: string) {
   // Shared 30-second cached list (see lib/videoStore) — no per-request
   // table Scan, and it arrives pre-sorted newest-first, so same-category
   // and other-category groups keep their newest-first order for free.
-  // Videos only — Shorts have their own dedicated feed and never belong in
-  // this "Up Next" list. This is the SSR fallback shown before (and if)
-  // the client-side personalized fetch in WatchPageContent replaces it —
-  // see app/api/videos/related.
+  // Videos only — Shorts, Music, and Raftaar Films have their own dedicated
+  // surfaces and never belong in this "Up Next" list. This is the SSR fallback
+  // shown before the client-side personalized fetch in WatchPageContent replaces it.
   const items = (await getVisibleVideos()).filter(
     (v) =>
       v.videoId !== currentVideoId &&
       v.contentType !== "short" &&
+      v.contentType !== "film" &&
+      !v.seriesId &&
       !isMusicType(v.contentType) &&
       (!v.visibility || v.visibility === "public")
   );
@@ -142,6 +143,15 @@ export default async function WatchPage({ params }: WatchPageProps) {
   // Music tracks redirect straight into the ultra-premium Music screen & player
   if (isMusicType(video.contentType)) {
     redirect(`/music?v=${videoId}`);
+  }
+
+  // Raftaar Films episodes redirect straight into the dedicated Raftaar Films micro-drama player
+  if (video.contentType === "film" || Boolean(video.seriesId)) {
+    if (video.seriesId) {
+      redirect(`/raftaar-films/${video.seriesId}/${videoId}`);
+    } else {
+      redirect("/raftaar-films");
+    }
   }
 
   // Auto-flagged at upload (app/lib/moderation.ts) and awaiting admin review.

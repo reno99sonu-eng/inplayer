@@ -72,10 +72,19 @@ export const CONTENT_TYPE_WORD: Record<ContentType, string> = {
   film: "episode",
 };
 
-/** Where an item of this type is watched/played. Shorts live in the vertical
- *  feed; music plays on the ordinary watch page; films live under /raftaar-films. */
-export function watchHrefFor(contentType: unknown, videoId: string): string {
-  if (isFilmType(contentType)) return `/raftaar-films?v=${videoId}`;
+/** Where an item of this type is watched/played. Shorts use the vertical
+ *  feed, music and unlinked legacy films use /watch, and series episodes use
+ *  the dedicated Raftaar player. */
+export function watchHrefFor(
+  contentType: unknown,
+  videoId: string,
+  seriesId?: string | null
+): string {
+  if (seriesId) return `/raftaar-films/${seriesId}/${videoId}`;
+  // A film without a series is an orphaned/legacy upload. Keep its ID in the
+  // destination and let the regular watch route render it instead of
+  // silently dropping the ID at the Raftaar landing page.
+  if (isFilmType(contentType)) return `/watch/${videoId}`;
   return isShortType(contentType) ? `/shorts?v=${videoId}` : `/watch/${videoId}`;
 }
 

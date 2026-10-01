@@ -23,7 +23,7 @@ export async function GET(request: Request) {
     if (contentType === "music") {
       items = items.filter((v) => isMusicType(v.contentType));
     } else if (contentType === "short" || contentType === "raftaar") {
-      items = items.filter((v) => v.contentType === "short");
+      items = items.filter((v) => v.contentType === "short" && !v.seriesId);
     } else if (contentType === "film" || contentType === "raftaar_film") {
       items = items.filter((v) => v.contentType === "film");
     } else if (contentType !== "all") {

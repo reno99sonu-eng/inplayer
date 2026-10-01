@@ -25,7 +25,8 @@ import { CONTENT_TYPE_LABEL, CONTENT_TYPE_WORD, normalizeContentType, watchHrefF
 interface AdminVideoRow {
   videoId: string;
   title: string;
-  contentType: "video" | "short" | "music";
+  contentType: "video" | "short" | "music" | "film";
+  seriesId?: string | null;
   status: string | null;
   visibility: string | null;
   views: number;
@@ -55,7 +56,7 @@ const STATUS_TABS: { key: StatusFilter; label: string }[] = [
 // One shared rule for where a piece of content is watched, so this page
 // can never drift from the rest of the site as content types are added.
 function watchHref(v: AdminVideoRow): string {
-  return watchHrefFor(v.contentType, v.videoId);
+  return watchHrefFor(v.contentType, v.videoId, v.seriesId);
 }
 
 // Status pill shown on each row — "ready" (the normal, working state) is
@@ -332,7 +333,15 @@ export default function AdminVideosPage() {
               className="flex flex-col gap-3 rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4 sm:flex-row sm:items-center sm:justify-between"
             >
               <div className="flex min-w-0 items-center gap-3">
-                <div className="relative h-12 w-20 shrink-0 overflow-hidden rounded-lg bg-white/10 light:bg-black/10">
+                <div
+                  className={`relative h-12 shrink-0 overflow-hidden rounded-lg bg-white/10 light:bg-black/10 ${
+                    row.contentType === "short" ||
+                    row.contentType === "film" ||
+                    row.seriesId
+                      ? "w-8"
+                      : "w-20"
+                  }`}
+                >
                   {row.thumbnailUrl ? (
                     <Image src={row.thumbnailUrl} alt={row.title} fill sizes="80px" className="object-cover" />
                   ) : (

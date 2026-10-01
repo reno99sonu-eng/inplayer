@@ -297,6 +297,7 @@ export async function getFeaturedThisWeek(limit = 6): Promise<RankedVideo[]> {
           (v) =>
             v.contentType !== "short" &&
             v.contentType !== "film" &&
+            !v.seriesId &&
             !isMusicType(v.contentType) &&
             (!v.visibility || v.visibility === "public") &&
             Boolean(v.uploaderId)

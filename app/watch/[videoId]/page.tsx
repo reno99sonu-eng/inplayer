@@ -145,13 +145,11 @@ export default async function WatchPage({ params }: WatchPageProps) {
     redirect(`/music?v=${videoId}`);
   }
 
-  // Raftaar Films episodes redirect straight into the dedicated Raftaar Films micro-drama player
-  if (video.contentType === "film" || Boolean(video.seriesId)) {
-    if (video.seriesId) {
-      redirect(`/raftaar-films/${video.seriesId}/${videoId}`);
-    } else {
-      redirect("/raftaar-films");
-    }
+  // Linked Raftaar episodes open their dedicated player. A legacy or
+  // accidentally unlinked film still has a working route here; sending it
+  // to the series landing page would discard the video ID.
+  if (video.seriesId) {
+    redirect(`/raftaar-films/${video.seriesId}/${videoId}`);
   }
 
   // Auto-flagged at upload (app/lib/moderation.ts) and awaiting admin review.

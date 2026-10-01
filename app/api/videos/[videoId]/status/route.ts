@@ -36,7 +36,10 @@ export async function GET(request: NextRequest, { params }: Params) {
           const signedPlaybackId = asset.playback_ids?.find((id) => id.policy === "signed")?.id;
 
           if (playbackId) {
-            const isShort = item.contentType === "short";
+            const isPortrait =
+              item.contentType === "short" ||
+              item.contentType === "film" ||
+              Boolean(item.seriesId);
             // Music has no video frame for Mux to render, so the cover the
             // creator supplied is the only image there is. Same reasoning as
             // the equivalent line in app/api/webhooks/mux — the
@@ -45,7 +48,7 @@ export async function GET(request: NextRequest, { params }: Params) {
             // to start using it.
             const thumbnailUrl = isMusicType(item.contentType)
               ? ((item.customThumbnailUrl as string | undefined) ?? "")
-              : getMuxThumbnailUrl(playbackId, isShort);
+              : getMuxThumbnailUrl(playbackId, isPortrait);
 
             const updateResult = await docClient.send(
               new UpdateCommand({

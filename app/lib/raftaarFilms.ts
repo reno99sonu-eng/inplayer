@@ -9,6 +9,7 @@ import {
 import { docClient } from "@/app/lib/dynamodb";
 import { randomUUID } from "crypto";
 import { isAdminEmail } from "@/app/lib/isAdmin";
+import { getMuxThumbnailUrl } from "@/app/lib/muxThumbnail";
 
 
 export const FILM_SERIES_TABLE = "InPlayer-Film-Series";
@@ -191,8 +192,24 @@ export async function getSeriesEpisodes(seriesId: string): Promise<any[]> {
         for (const item of response.Items) {
           const views = Number(item.views) || 0;
           const likes = Number(item.likes ?? item.likeCount) || 0;
+          const currentThumbnailUrl =
+            typeof item.thumbnailUrl === "string" ? item.thumbnailUrl : "";
+          const hasCustomThumbnail =
+            typeof item.customThumbnailUrl === "string" &&
+            item.customThumbnailUrl.length > 0;
+          const hasOldLandscapeMuxThumbnail =
+            currentThumbnailUrl.startsWith("https://image.mux.com/") &&
+            currentThumbnailUrl.includes("width=640&height=360");
+          const portraitThumbnailUrl =
+            !hasCustomThumbnail &&
+            typeof item.muxPlaybackId === "string" &&
+            item.muxPlaybackId &&
+            (!currentThumbnailUrl || hasOldLandscapeMuxThumbnail)
+              ? getMuxThumbnailUrl(item.muxPlaybackId, true)
+              : null;
           episodes.push({
             ...item,
+            ...(portraitThumbnailUrl && { thumbnailUrl: portraitThumbnailUrl }),
             views,
             likes,
             likeCount: likes,

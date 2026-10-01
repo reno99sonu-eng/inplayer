@@ -223,7 +223,7 @@ export async function POST(request: NextRequest) {
       new GetCommand({
         TableName: "InPlayer-Videos",
         Key: { videoId: uploadId },
-        ProjectionExpression: "contentType",
+        ProjectionExpression: "contentType, seriesId",
       })
     );
 
@@ -264,7 +264,10 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const isVertical = existing.Item.contentType === "short" || existing.Item.contentType === "film";
+    const isVertical =
+      existing.Item.contentType === "short" ||
+      existing.Item.contentType === "film" ||
+      Boolean(existing.Item.seriesId);
     // Music has no video track, so Mux cannot render a frame and the URL
     // getMuxThumbnailUrl builds would 404. In practice the if_not_exists
     // below always picks the mandatory cover instead — but computing a URL

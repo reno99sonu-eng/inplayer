@@ -29,6 +29,7 @@ export interface AdminVideoRow {
   videoId: string;
   title: string;
   contentType: ContentType;
+  seriesId?: string | null;
   status: string | null;
   visibility: string | null;
   views: number;
@@ -43,14 +44,32 @@ export interface AdminVideoRow {
 }
 
 const PROJECTION =
-  "videoId, title, contentType, #st, visibility, #v, uploaderId, uploaderName, thumbnailUrl, muxPlaybackId, uploadedAt, audience, audienceDeclared, madeForKids, ageRestricted";
+  "videoId, title, contentType, seriesId, #st, visibility, #v, uploaderId, uploaderName, thumbnailUrl, customThumbnailUrl, muxPlaybackId, uploadedAt, audience, audienceDeclared, madeForKids, ageRestricted";
 const NAMES = { "#st": "status", "#v": "views" };
 
 function toRow(item: Record<string, unknown>): AdminVideoRow {
+  const storedThumbnailUrl =
+    typeof item.thumbnailUrl === "string" ? item.thumbnailUrl : "";
+  const hasCustomThumbnail =
+    typeof item.customThumbnailUrl === "string" &&
+    item.customThumbnailUrl.length > 0;
+  const hasOldLandscapeMuxThumbnail =
+    (Boolean(item.seriesId) || item.contentType === "film") &&
+    !hasCustomThumbnail &&
+    storedThumbnailUrl.startsWith("https://image.mux.com/") &&
+    storedThumbnailUrl.includes("width=640&height=360");
   const thumbnailUrl =
-    (item.thumbnailUrl as string) ||
+    (hasOldLandscapeMuxThumbnail && typeof item.muxPlaybackId === "string"
+      ? getMuxThumbnailUrl(item.muxPlaybackId, true)
+      : null) ||
+    storedThumbnailUrl ||
     (typeof item.muxPlaybackId === "string"
-      ? getMuxThumbnailUrl(item.muxPlaybackId, item.contentType === "short")
+      ? getMuxThumbnailUrl(
+          item.muxPlaybackId,
+          item.contentType === "short" ||
+            item.contentType === "film" ||
+            Boolean(item.seriesId)
+        )
       : null);
 
   const audience = videoAudience(item as { audience?: unknown; ageRestricted?: unknown; madeForKids?: unknown });
@@ -63,6 +82,7 @@ function toRow(item: Record<string, unknown>): AdminVideoRow {
     videoId: item.videoId as string,
     title: (item.title as string) || "Untitled",
     contentType: normalizeContentType(item.contentType),
+    seriesId: (item.seriesId as string) || null,
     status: (item.status as string) || null,
     visibility: (item.visibility as string) || null,
     views: (item.views as number) || 0,

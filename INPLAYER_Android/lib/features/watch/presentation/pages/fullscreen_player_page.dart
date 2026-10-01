@@ -85,7 +85,14 @@ class FullscreenPlayerPage extends StatefulWidget {
     required this.onBrightnessChanged,
     this.getAdOverlay,
     this.adListenable,
+    this.portrait = false,
   });
+
+  /// The video itself is vertical. WatchPage then keeps fullscreen upright
+  /// instead of locking landscape (a 9:16 clip on a landscape screen is
+  /// SMALLER than inline), and the landscape-only rotate-to-exit gesture is
+  /// not used — the back/close buttons exit.
+  final bool portrait;
 
   @override
   State<FullscreenPlayerPage> createState() => _FullscreenPlayerPageState();
@@ -117,6 +124,7 @@ class _FullscreenPlayerPageState extends State<FullscreenPlayerPage> {
   @override
   void initState() {
     super.initState();
+    if (widget.portrait) return;
     _orientationSub = NativeDeviceOrientationCommunicator()
         .onOrientationChanged(useSensor: true)
         .listen(_handlePhysicalOrientationChanged);

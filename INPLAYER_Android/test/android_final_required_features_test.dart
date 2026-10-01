@@ -47,6 +47,7 @@ void main() {
     test('MidrollConfig handles multi-tier skip countdowns [5, 10, 15]', () {
       final config = MidrollConfig.fromJson({
         'enabled': true,
+        'source': 'house',
         'intervalSeconds': 120,
         'skipTiersSeconds': [5, 10, 15],
         'ads': [
@@ -335,9 +336,11 @@ void main() {
       expect(find.byTooltip('Upload music'), findsOneWidget);
       expect(find.byIcon(Icons.add_circle_outline_rounded), findsOneWidget);
 
-      // Settings and Downloaded actions
-      expect(find.byTooltip('Music settings'), findsOneWidget);
-      expect(find.byTooltip('Downloaded'), findsOneWidget);
+      // Settings and Downloads live in the AppBar overflow menu
+      await tester.tap(find.byTooltip('More music options'));
+      await tester.pumpAndSettle();
+      expect(find.text('Music settings'), findsOneWidget);
+      expect(find.text('Downloads'), findsOneWidget);
     });
   });
 }

@@ -55,7 +55,10 @@ Future<void> main() async {
       androidNotificationChannelId: 'in.inplayer.app.channel.audio',
       androidNotificationChannelName: 'InPlayer Music playback',
       androidNotificationOngoing: true,
-      androidNotificationIcon: 'mipmap/ic_launcher',
+      // White silhouette of the InPlayer mark — Android draws notification
+      // small icons from the alpha channel only, so the full-colour
+      // launcher icon showed as a blank white shape.
+      androidNotificationIcon: 'drawable/ic_stat_inplayer',
       androidStopForegroundOnPause: false,
       androidNotificationClickStartsActivity: true,
     );

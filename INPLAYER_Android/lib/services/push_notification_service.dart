@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:io';
+import 'dart:ui' show Color;
 
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
@@ -65,7 +66,10 @@ class PushNotificationService {
     if (!Platform.isAndroid) return; // No iOS app exists yet.
 
     try {
-      const androidInit = AndroidInitializationSettings('ic_launcher');
+      // White-on-transparent silhouette (res/drawable/ic_stat_inplayer.xml).
+      // Android draws small icons from the alpha channel only, so the
+      // full-colour launcher icon showed as a blank white shape.
+      const androidInit = AndroidInitializationSettings('ic_stat_inplayer');
       await _localNotifications.initialize(
         settings: const InitializationSettings(android: androidInit),
         onDidReceiveNotificationResponse: (_) => _openNotificationsScreen(),
@@ -115,6 +119,10 @@ class PushNotificationService {
             channelDescription: _pushChannelDescription,
             importance: Importance.max,
             priority: Priority.high,
+            icon: 'ic_stat_inplayer',
+            // InPlayer orange — tints the small icon and accent, matching
+            // default_notification_color for background (FCM) notifications.
+            color: Color(0xFFFF7A18),
           ),
         ),
       ),

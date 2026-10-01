@@ -345,6 +345,13 @@ class _WatchPageState extends ConsumerState<WatchPage>
     // playing) under a channel/search page opened from it; rotating there
     // used to push fullscreen on top of the screen the viewer was looking at.
     if (!(_route?.isCurrent ?? true)) return;
+    // A vertical video's fullscreen is upright (see _openFullscreen);
+    // turning the phone sideways is not a request for it. Answer any pending
+    // post-PiP restore too, or it would re-arm on every later resume.
+    if (_playerBoxAspect < 1) {
+      _restoreFullscreenAfterPip = false;
+      return;
+    }
     // Entering system Picture-in-Picture resizes this Activity's window to a
     // small (usually landscape 16:9) rectangle, which fires didChangeMetrics
     // exactly like a physical rotation — often BEFORE the native
@@ -1886,6 +1893,18 @@ class _WatchPageState extends ConsumerState<WatchPage>
     return math.max(ratio, 4 / 5);
   }
 
+  // Fullscreen frame shape: the same as _playerBoxAspect, except that a
+  // vertical video gets its TRUE ratio. The 4:5 floor keeps room for the
+  // controls inline, but in (upright) fullscreen it left a 9:16 clip no
+  // bigger than it was inline, with wide black bands above and below.
+  double get _fullscreenBoxAspect {
+    final inline = _playerBoxAspect;
+    if (inline >= 1 || _hasDetectedLetterboxedContent) return inline;
+    final s = _videoController?.value.size;
+    if (s == null || s.width <= 0 || s.height <= 0) return inline;
+    return s.width / s.height;
+  }
+
   // The exact route _openFullscreen() pushed, so _handlePipModeChanged() can
   // remove that route (and only that route) when the OS floats the app into
   // PiP.
@@ -1899,18 +1918,27 @@ class _WatchPageState extends ConsumerState<WatchPage>
       // fullscreen route. Previously this was fire-and-forget in the child
       // route, so the player could remain in portrait or rotate after its
       // fullscreen layout had already been calculated.
-      await SystemChrome.setPreferredOrientations([
-        DeviceOrientation.landscapeLeft,
-        DeviceOrientation.landscapeRight,
-      ]);
+      // A vertical video stays upright: locked to landscape, a 9:16 clip
+      // came out smaller in fullscreen than it was inline.
+      final portrait = _playerBoxAspect < 1;
+      await SystemChrome.setPreferredOrientations(
+        portrait
+            ? [DeviceOrientation.portraitUp]
+            : [
+                DeviceOrientation.landscapeLeft,
+                DeviceOrientation.landscapeRight,
+              ],
+      );
       await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
       if (!mounted || _inPip) return;
 
       final route = MaterialPageRoute<void>(
         builder: (_) => FullscreenPlayerPage(
+          portrait: portrait,
           getController: () => _videoController!,
           getMediaSurface: _buildMediaSurface,
-          getDisplayAspectRatio: () => _playerBoxAspect,
+          getDisplayAspectRatio: () =>
+              portrait ? _fullscreenBoxAspect : _playerBoxAspect,
           title: _video?.title ?? '',
           getQualityLabel: () => _qualityLabel,
           qualityOptions: _availableQualityOptions,

@@ -123,9 +123,15 @@
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="in.inplayer.app.channel.push" />
+        <!-- Must be a white-on-transparent silhouette: Android uses only the
+             icon's alpha channel, so the full-colour launcher icon showed as
+             a blank white shape instead of the InPlayer logo. -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_icon"
-            android:resource="@mipmap/ic_launcher" />
+            android:resource="@drawable/ic_stat_inplayer" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/notification_accent" />
 
         <!-- Google AdMob Application ID (InPlayer Android) -->
         <meta-data

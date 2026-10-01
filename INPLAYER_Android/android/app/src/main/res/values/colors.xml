@@ -2,4 +2,7 @@
 <resources>
     <!-- Adaptive launcher icon background matches the Play Store tile. -->
     <color name="ic_launcher_background">#FFFFFF</color>
+    <!-- InPlayer brand orange (AppColors.brandOrange): tints the
+         notification small icon (drawable/ic_stat_inplayer). -->
+    <color name="notification_accent">#FFFF7A18</color>
 </resources>

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status-bar / notification small icon: the InPlayer play-button "IN" mark
+     as a white silhouette on transparent. Android draws notification small
+     icons from their ALPHA channel only (then tints them with the
+     default_notification_color / the notification's color), so the
+     full-colour launcher icon that was used before rendered as a plain white
+     blob instead of the logo. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="#FFFFFFFF"
+        android:fillType="evenOdd"
+        android:pathData="M4,4.6L4,19.4Q4,21.4 5.76,20.46L20.19,12.75Q21.6,12 20.19,11.25L5.76,3.54Q4,2.6 4,4.6Z M6.3,8.5L7.9,8.5L7.9,15.5L6.3,15.5Z M8.9,15.5L8.9,8.5L10.3,8.5L11.8,12.3L11.8,8.5L13.2,8.5L13.2,15.5L11.8,15.5L10.3,11.7L10.3,15.5Z" />
+</vector>

@@ -152,9 +152,21 @@ export default function RaftaarFilmsLanding() {
   const topCreators = Array.from(creatorsMap.values()).slice(0, 10);
 
   const filteredSeries = series.filter(s => {
-    if (selectedGenre !== 'All' && s.genre !== selectedGenre) return false;
+    if (selectedGenre !== 'All') {
+      const gLower = selectedGenre.toLowerCase();
+      const matchGenre = s.genre?.toLowerCase() === gLower;
+      const matchCategory = Array.isArray(s.categories) && s.categories.some(c => typeof c === 'string' && c.toLowerCase() === gLower);
+      if (!matchGenre && !matchCategory) return false;
+    }
     if (selectedCreatorId && s.creatorId !== selectedCreatorId) return false;
-    if (searchQuery && !s.title.toLowerCase().includes(searchQuery.toLowerCase()) && !s.creatorName.toLowerCase().includes(searchQuery.toLowerCase())) return false;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      const matchTitle = s.title?.toLowerCase().includes(q);
+      const matchCreator = s.creatorName?.toLowerCase().includes(q);
+      const matchGenre = s.genre?.toLowerCase().includes(q);
+      const matchCat = Array.isArray(s.categories) && s.categories.some(c => typeof c === 'string' && c.toLowerCase().includes(q));
+      if (!matchTitle && !matchCreator && !matchGenre && !matchCat) return false;
+    }
     return true;
   });
 
@@ -312,9 +324,9 @@ export default function RaftaarFilmsLanding() {
         <GenreBar selectedGenre={selectedGenre} onSelectGenre={setSelectedGenre} />
 
         {/* Series Section & Grid */}
-        <div className="mt-2.5 mb-10">
-          <div className="flex items-center justify-between mb-2 px-1">
-            <h2 className="text-xs sm:text-sm font-bold text-white tracking-tight flex items-center gap-1.5">
+        <div className="mt-6 sm:mt-8 mb-12">
+          <div className="flex items-center justify-between mb-4 sm:mb-5 px-1 py-1">
+            <h2 className="text-sm sm:text-base font-bold text-white tracking-tight flex items-center gap-1.5 leading-normal select-none">
               {searchQuery ? (
                 <>
                   <span>Search:</span>
@@ -323,12 +335,12 @@ export default function RaftaarFilmsLanding() {
               ) : selectedCreatorId ? (
                 'Creator Stories'
               ) : selectedGenre !== 'All' ? (
-                `${selectedGenre} Series`
+                `${selectedGenre} Micro-Series`
               ) : (
                 'Explore Micro-Series'
               )}
             </h2>
-            <span className="text-[10px] text-zinc-400 font-medium">{filteredSeries.length} series</span>
+            <span className="text-xs text-zinc-400 font-medium">{filteredSeries.length} series</span>
           </div>
           
           <SeriesGrid series={filteredSeries} loading={loading} />

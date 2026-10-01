@@ -105,14 +105,18 @@ class _RaftaarFilmsLandingPageState
     final query = _searchController.text.trim().toLowerCase();
     setState(() {
       _filteredSeries = _allSeries.where((s) {
+        final gLower = _selectedGenre.toLowerCase();
         final matchesGenre = _selectedGenre == 'All' ||
-            s.genre.toLowerCase() == _selectedGenre.toLowerCase();
+            s.genre.toLowerCase() == gLower ||
+            s.categories.any((c) => c.toLowerCase() == gLower);
         final matchesCreator = _selectedCreatorId == null ||
             s.creatorId == _selectedCreatorId;
         final matchesQuery = query.isEmpty ||
             s.title.toLowerCase().contains(query) ||
             s.description.toLowerCase().contains(query) ||
-            s.creatorName.toLowerCase().contains(query);
+            s.creatorName.toLowerCase().contains(query) ||
+            s.genre.toLowerCase().contains(query) ||
+            s.categories.any((c) => c.toLowerCase().contains(query));
         return matchesGenre && matchesCreator && matchesQuery;
       }).toList();
     });
@@ -154,7 +158,7 @@ class _RaftaarFilmsLandingPageState
             if (context.canPop()) {
               context.pop();
             } else {
-              context.go('/raftaar-films');
+              context.go('/');
             }
           },
         ),
@@ -438,6 +442,37 @@ class _RaftaarFilmsLandingPageState
                 ),
               ),
 
+              // Section Header with spacious padding to prevent any clipping
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 8, 16, 14),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        _selectedGenre == 'All'
+                            ? 'Explore Micro-Series'
+                            : '$_selectedGenre Micro-Series',
+                        style: TextStyle(
+                          color: isDark ? Colors.white : Colors.black87,
+                          fontSize: 14.5,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: -0.2,
+                        ),
+                      ),
+                      Text(
+                        '${_filteredSeries.length} series',
+                        style: TextStyle(
+                          color: isDark ? Colors.white54 : Colors.black45,
+                          fontSize: 11.5,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
               // Series 2-column Grid
               if (_isLoading)
                 SliverPadding(
@@ -448,7 +483,7 @@ class _RaftaarFilmsLandingPageState
                       crossAxisCount: 2,
                       crossAxisSpacing: 12,
                       mainAxisSpacing: 14,
-                      childAspectRatio: 9 / 14,
+                      childAspectRatio: 0.55,
                     ),
                     delegate: SliverChildBuilderDelegate(
                       (context, index) => Container(
@@ -509,7 +544,7 @@ class _RaftaarFilmsLandingPageState
                       crossAxisCount: 2,
                       crossAxisSpacing: 12,
                       mainAxisSpacing: 14,
-                      childAspectRatio: 9 / 14,
+                      childAspectRatio: 0.55,
                     ),
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {

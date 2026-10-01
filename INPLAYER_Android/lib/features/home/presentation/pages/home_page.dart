@@ -14,7 +14,7 @@ import '../../../../services/video_service.dart';
 import '../../../../services/notification_badge_service.dart';
 import '../../../profile/presentation/pages/profile_page.dart';
 import '../../../shorts/presentation/pages/shorts_page.dart';
-import 'music_page.dart';
+import '../../../raftaar_films/presentation/pages/raftaar_films_landing_page.dart';
 import '../../../upload/presentation/pages/upload_page.dart';
 import '../widgets/video_card.dart';
 import '../widgets/featured_hero_carousel.dart';
@@ -171,10 +171,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           : const SizedBox.shrink(),
       _builtTabs.contains(2) ? const UploadPage() : const SizedBox.shrink(),
       _builtTabs.contains(3)
-          ? MusicPage(
-              key: ValueKey('music-$feedRevision'),
-              isActive: _currentIndex == 3,
-            )
+          ? const RaftaarFilmsLandingPage()
           : const SizedBox.shrink(),
       _builtTabs.contains(4) ? const ProfilePage() : const SizedBox.shrink(),
     ];
@@ -506,8 +503,8 @@ class _HomePageState extends ConsumerState<HomePage> {
                     _buildCreateButton(context),
                     _buildNavItem(
                       3,
-                      Icons.music_note_outlined,
-                      'Music',
+                      Icons.movie_filter_outlined,
+                      'Films',
                       context,
                     ),
                     _buildYouNavItem(4, 'You', context, user),
@@ -945,6 +942,10 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage>
                 ),
                 _buildNavbarThemeBadge(navbarTheme),
                 const Spacer(),
+                _buildHeaderIcon(
+                  Icons.music_note_rounded,
+                  () => context.push('/music'),
+                ),
                 _buildHeaderIcon(Icons.search, () => context.push('/search')),
                 _buildHeaderIcon(
                   Icons.notifications_outlined,

@@ -515,6 +515,16 @@ export default function Navbar() {
 {/* Right Side */}
           <div className="ml-auto flex flex-shrink-0 items-center gap-2">
 
+{/* Desktop Music Button */}
+<Link
+  href="/music"
+  aria-label="Music"
+  className="hidden lg:flex h-9 w-9 items-center justify-center rounded-full border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 text-white hover:text-orange-400 light:text-slate-900 transition-all"
+  title="Music"
+>
+  <Music2 size={18} />
+</Link>
+
 {/* Desktop Notification (unchanged) */}
 <div className="hidden lg:flex scale-[0.9] origin-right">
   <NavbarActions />
@@ -531,6 +541,32 @@ export default function Navbar() {
     mobileSearchOpen ? "hidden" : "flex"
   }`}
 >
+  {/* Music Button — moved to the left side of the search magnifying glass icon */}
+  <Link
+    href="/music"
+    aria-label="Music"
+    className="
+      flex
+      h-9
+      w-9
+      flex-shrink-0
+      items-center
+      justify-center
+      rounded-full
+      border
+      border-white/10
+      light:border-black/10
+      bg-white/5
+      light:bg-black/5
+      text-white
+      hover:text-orange-400
+      light:text-slate-900
+      transition-all
+    "
+  >
+    <Music2 size={18} />
+  </Link>
+
   {/* Search Icon — moved beside the notification bell */}
   <button
     onClick={() => setMobileSearchOpen(true)}

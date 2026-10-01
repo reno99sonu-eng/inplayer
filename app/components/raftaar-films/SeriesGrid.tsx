@@ -14,11 +14,10 @@ export default function SeriesGrid({ series, loading, onSeriesClick }: SeriesGri
     return (
       <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-4 2xl:grid-cols-5 3xl:grid-cols-6 gap-3.5 sm:gap-4 md:gap-6">
         {[...Array(10)].map((_, i) => (
-          <div
-            key={i}
-            className="aspect-[9/16] rounded-2xl bg-zinc-900/60 animate-pulse border border-zinc-800/60 shadow-lg relative overflow-hidden"
-          >
-            <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-transparent" />
+          <div key={i} className="flex flex-col gap-2">
+            <div className="aspect-[9/14] sm:aspect-[9/15] rounded-xl sm:rounded-2xl bg-zinc-900/60 animate-pulse border border-zinc-800/60 shadow-lg relative overflow-hidden" />
+            <div className="h-3.5 bg-zinc-900/60 rounded w-3/4 animate-pulse mt-1" />
+            <div className="h-3 bg-zinc-900/40 rounded w-1/3 animate-pulse" />
           </div>
         ))}
       </div>

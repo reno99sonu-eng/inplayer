@@ -20,6 +20,8 @@ class _SeriesCardWidgetState extends State<SeriesCardWidget> {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return GestureDetector(
       onTapDown: (_) => setState(() => _isTapped = true),
       onTapUp: (_) {
@@ -28,213 +30,92 @@ class _SeriesCardWidgetState extends State<SeriesCardWidget> {
       },
       onTapCancel: () => setState(() => _isTapped = false),
       child: AnimatedScale(
-        scale: _isTapped ? 0.95 : 1.0,
+        scale: _isTapped ? 0.96 : 1.0,
         duration: const Duration(milliseconds: 150),
         curve: Curves.easeOutCubic,
-        child: Container(
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: Colors.transparent, // Replaced by gradient border using ShaderMask or similar, but simpler: just a subtle color
-            ),
-            gradient: const LinearGradient(
-              colors: [Color(0x33FF7A18), Color(0x11FF9A00)],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: const Color(0xFFFF7A18).withValues(alpha: _isTapped ? 0.3 : 0.15),
-                blurRadius: _isTapped ? 16 : 8,
-                offset: const Offset(0, 4),
-              ),
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.35),
-                blurRadius: 8,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          clipBehavior: Clip.antiAlias,
-          child: Container(
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.15), width: 1),
-            ),
-            clipBehavior: Clip.antiAlias,
-            child: AspectRatio(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Poster Image Container (Clean artwork without text or badges)
+            AspectRatio(
               aspectRatio: 9 / 14,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  // Poster Image
-                  widget.series.posterUrl.isNotEmpty
-                      ? CachedNetworkImage(
-                          imageUrl: widget.series.posterUrl,
-                          fit: BoxFit.cover,
-                          placeholder: (context, url) => Container(
-                            color: const Color(0xFF1E1E26),
-                            child: const Center(
-                              child: Icon(Icons.movie_outlined, color: Colors.white24, size: 36),
-                            ),
-                          ),
-                          errorWidget: (context, url, error) => Container(
-                            color: const Color(0xFF1E1E26),
-                            child: const Center(
-                              child: Icon(Icons.broken_image_outlined, color: Colors.white24, size: 36),
-                            ),
-                          ),
-                        )
-                      : Container(
-                          decoration: const BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [Color(0xFF2A0845), Color(0xFF6441A5)],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                          ),
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.12),
+                    width: 0.8,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withValues(alpha: 0.4),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                    BoxShadow(
+                      color: const Color(0xFFFF7A18).withValues(alpha: _isTapped ? 0.25 : 0.08),
+                      blurRadius: _isTapped ? 14 : 6,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: widget.series.posterUrl.isNotEmpty
+                    ? CachedNetworkImage(
+                        imageUrl: widget.series.posterUrl,
+                        fit: BoxFit.cover,
+                        placeholder: (context, url) => Container(
+                          color: const Color(0xFF1E1E26),
                           child: const Center(
-                            child: Icon(Icons.movie_outlined, color: Colors.white30, size: 40),
+                            child: Icon(Icons.movie_outlined, color: Colors.white24, size: 36),
                           ),
                         ),
-    
-                  // Premium Gradient Overlay
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.transparent,
-                          const Color(0xFFFF7A18).withValues(alpha: 0.05),
-                          Colors.black.withValues(alpha: 0.85),
-                          Colors.black.withValues(alpha: 0.98),
-                        ],
-                        stops: const [0.35, 0.55, 0.80, 1.0],
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                      ),
-                    ),
-                  ),
-    
-                  // Top Episode Badge
-                  Positioned(
-                    top: 10,
-                    right: 10,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withValues(alpha: 0.65),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: Colors.white.withValues(alpha: 0.20),
-                          width: 0.5,
+                        errorWidget: (context, url, error) => Container(
+                          color: const Color(0xFF1E1E26),
+                          child: const Center(
+                            child: Icon(Icons.broken_image_outlined, color: Colors.white24, size: 36),
+                          ),
+                        ),
+                      )
+                    : Container(
+                        decoration: const BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [Color(0xFF2A0845), Color(0xFF6441A5)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                        ),
+                        child: const Center(
+                          child: Icon(Icons.movie_outlined, color: Colors.white30, size: 40),
                         ),
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const Icon(
-                            Icons.play_arrow_rounded,
-                            size: 13,
-                            color: Color(0xFFFF9A00),
-                          ),
-                          const SizedBox(width: 3),
-                          Text(
-                            '${widget.series.episodeCount} ${widget.series.episodeCount == 1 ? "Ep" : "Eps"}',
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 9.0,
-                              fontWeight: FontWeight.w700,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-    
-                  // Genre Badge on top left
-                  if (widget.series.genre.isNotEmpty)
-                    Positioned(
-                      top: 10,
-                      left: 10,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2.5),
-                        decoration: BoxDecoration(
-                          color: const Color(0xFFFF7A18).withValues(alpha: 0.85),
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Text(
-                          widget.series.genre,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 8.5,
-                            fontWeight: FontWeight.w800,
-                            letterSpacing: 0.2,
-                          ),
-                        ),
-                      ),
-                    ),
-    
-                  // Bottom Details
-                  Positioned(
-                    left: 10,
-                    right: 10,
-                    bottom: 10,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          widget.series.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 12.0,
-                            fontWeight: FontWeight.w800,
-                            height: 1.2,
-                            shadows: [
-                              Shadow(
-                                color: Colors.black87,
-                                blurRadius: 4,
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 5),
-                        Row(
-                          children: [
-                            CircleAvatar(
-                              radius: 7.5,
-                              backgroundColor: Colors.white24,
-                              backgroundImage: widget.series.creatorAvatarUrl.isNotEmpty
-                                  ? CachedNetworkImageProvider(widget.series.creatorAvatarUrl)
-                                  : null,
-                              child: widget.series.creatorAvatarUrl.isEmpty
-                                  ? const Icon(Icons.person, size: 8, color: Colors.white)
-                                  : null,
-                            ),
-                            const SizedBox(width: 5),
-                            Expanded(
-                              child: Text(
-                                widget.series.creatorName,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  color: Colors.white70,
-                                  fontSize: 9.5,
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
               ),
             ),
-          ),
+            const SizedBox(height: 7),
+            // Title (Matching Image 2: Bold, clean, line-clamp 1)
+            Text(
+              widget.series.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: isDark ? Colors.white : Colors.black.withValues(alpha: 0.87),
+                fontSize: 13.0,
+                fontWeight: FontWeight.w700,
+                letterSpacing: -0.2,
+              ),
+            ),
+            const SizedBox(height: 2),
+            // Episodes (Matching Image 2: lowercase "episodes")
+            Text(
+              '${widget.series.episodeCount} ${widget.series.episodeCount == 1 ? "episode" : "episodes"}',
+              style: TextStyle(
+                color: isDark ? Colors.white.withValues(alpha: 0.6) : Colors.black.withValues(alpha: 0.54),
+                fontSize: 11.5,
+                fontWeight: FontWeight.w400,
+              ),
+            ),
+          ],
         ),
       ),
     );

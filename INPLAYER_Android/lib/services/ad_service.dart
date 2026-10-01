@@ -1,7 +1,8 @@
-import 'package:flutter_riverpod/flutter_riverpod.dart';
+﻿import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:logger/logger.dart';
 import '../core/network/dio_client.dart';
 import '../core/constants/api_constants.dart';
+import 'platform_settings_service.dart';
 
 /// One house ad creative, as returned by GET /api/ads (app/api/ads/route.ts).
 /// Only the "house" source (a real admin-uploaded image + link) is built
@@ -26,6 +27,44 @@ class AdCreative {
     );
   }
 }
+
+/// Google AdMob configuration synchronized real-time from InPlayer Admin Panel.
+class AdMobConfig {
+  final bool enabled;
+  final String appId;
+  final String bannerUnitId;
+  final String interstitialUnitId;
+  final String rewardedUnitId;
+  final String nativeUnitId;
+  final String openAppUnitId;
+
+  const AdMobConfig({
+    this.enabled = false,
+    this.appId = '',
+    this.bannerUnitId = '',
+    this.interstitialUnitId = '',
+    this.rewardedUnitId = '',
+    this.nativeUnitId = '',
+    this.openAppUnitId = '',
+  });
+
+  factory AdMobConfig.fromSettings(PublicPlatformSettings settings) {
+    return AdMobConfig(
+      enabled: settings.admobEnabled,
+      appId: settings.admobAppId,
+      bannerUnitId: settings.admobBannerUnitId,
+      interstitialUnitId: settings.admobInterstitialUnitId,
+      rewardedUnitId: settings.admobRewardedUnitId,
+      nativeUnitId: settings.admobNativeUnitId,
+      openAppUnitId: settings.admobOpenAppUnitId,
+    );
+  }
+}
+
+final admobConfigProvider = Provider<AdMobConfig>((ref) {
+  final settings = ref.watch(publicPlatformSettingsProvider).value ?? PublicPlatformSettings.normal;
+  return AdMobConfig.fromSettings(settings);
+});
 
 final adServiceProvider = Provider<AdService>((ref) {
   return AdService();

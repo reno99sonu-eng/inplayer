@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ShieldCheck, LogOut, Sun, Moon, Store, LayoutDashboard, Megaphone, RefreshCw } from "lucide-react";
+import { ShieldCheck, LogOut, Sun, Moon, Store, LayoutDashboard, Megaphone, RefreshCw, Smartphone } from "lucide-react";
 import { useTheme } from "@/app/components/ThemeProvider";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import { useAdminMode, AdminMode } from "@/app/components/admin/AdminModeContext";
@@ -29,7 +29,13 @@ export default function AdminHeader({ email }: { email: string | null }) {
 
   const modeHomeHref = (target: AdminMode) => {
     if (!isMainAdmin) return teamMemberHomeHref(target, permissions);
-    return target === "hammart" ? "/admin/hammart-vendors" : target === "sponsorship" ? "/admin/sponsorships" : "/admin/dashboard";
+    return target === "hammart"
+      ? "/admin/hammart-vendors"
+      : target === "sponsorship"
+      ? "/admin/sponsorships"
+      : target === "inplayer-app"
+      ? "/admin/settings"
+      : "/admin/dashboard";
   };
   const [isDark, setIsDark] = useState(true);
   const [navbarTheme, setNavbarTheme] = useState<{ active: boolean; imageUrl: string; occasionId?: string; title?: string } | null>(null);
@@ -311,6 +317,17 @@ export default function AdminHeader({ email }: { email: string | null }) {
             }`}
           >
             <LayoutDashboard size={13} /> InPlayer
+          </button>
+          <button
+            type="button"
+            onClick={() => switchMode("inplayer-app")}
+            className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-xs font-bold transition ${
+              mode === "inplayer-app"
+                ? "bg-gradient-to-r from-cyan-500 via-blue-500 to-indigo-500 text-white shadow-lg shadow-cyan-500/25"
+                : "text-slate-400 light:text-slate-600 hover:text-slate-200"
+            }`}
+          >
+            <Smartphone size={13} /> InPlayer App
           </button>
           <button
             type="button"

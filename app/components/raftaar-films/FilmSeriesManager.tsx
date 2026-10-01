@@ -200,6 +200,7 @@ export default function FilmSeriesManager() {
     isEdit = false
   ) => {
     const file = e.target.files?.[0];
+    e.target.value = "";
     if (!file) return;
     try {
       const compressed = await compressImageToThumbnail(file, 9 / 16);
@@ -714,8 +715,9 @@ export default function FilmSeriesManager() {
                       <span>{newPosterUrl ? "Change Poster Image" : "Upload Poster Image"}</span>
                       <input
                         type="file"
-                        accept="image/*"
+                        accept="image/*,.jpg,.jpeg,.png,.webp"
                         className="hidden"
+                        onClick={(e) => e.stopPropagation()}
                         onChange={(e) => handlePosterFileChange(e, false)}
                       />
                     </label>
@@ -836,8 +838,9 @@ export default function FilmSeriesManager() {
                       <span>{editPosterUrl ? "Change Poster Image" : "Upload Poster Image"}</span>
                       <input
                         type="file"
-                        accept="image/*"
+                        accept="image/*,.jpg,.jpeg,.png,.webp"
                         className="hidden"
+                        onClick={(e) => e.stopPropagation()}
                         onChange={(e) => handlePosterFileChange(e, true)}
                       />
                     </label>

@@ -8,7 +8,7 @@
 // Settings/AI Moderation pages) calls this instead of re-deriving its own
 // prefix check, so the three domains can never quietly drift out of sync
 // with each other.
-export type SiteDomain = "inplayer" | "hammart" | "sponsorship";
+export type SiteDomain = "inplayer" | "inplayer-app" | "hammart" | "sponsorship";
 
 export function getSiteDomain(pathname: string | null | undefined): SiteDomain {
   if (!pathname) return "inplayer";
@@ -49,6 +49,8 @@ export function hideFloatingLaunchers(pathname: string | null | undefined): bool
 export interface DomainMaintenanceFields {
   inplayerMaintenanceMode: boolean;
   inplayerMaintenanceMessage: string;
+  inplayerAppMaintenanceMode?: boolean;
+  inplayerAppMaintenanceMessage?: string;
   hammartMaintenanceMode: boolean;
   hammartMaintenanceMessage: string;
   sponsorshipMaintenanceMode: boolean;
@@ -59,6 +61,12 @@ export function getDomainMaintenance(
   settings: DomainMaintenanceFields,
   domain: SiteDomain
 ): { mode: boolean; message: string } {
+  if (domain === "inplayer-app") {
+    return {
+      mode: Boolean(settings.inplayerAppMaintenanceMode),
+      message: settings.inplayerAppMaintenanceMessage || settings.inplayerMaintenanceMessage,
+    };
+  }
   if (domain === "hammart") {
     return { mode: settings.hammartMaintenanceMode, message: settings.hammartMaintenanceMessage };
   }
@@ -72,6 +80,9 @@ export interface DomainAnnouncementFields {
   inplayerAnnouncementEnabled: boolean;
   inplayerAnnouncementText: string;
   inplayerAnnouncementLinkUrl: string;
+  inplayerAppAnnouncementEnabled?: boolean;
+  inplayerAppAnnouncementText?: string;
+  inplayerAppAnnouncementLinkUrl?: string;
   hammartAnnouncementEnabled: boolean;
   hammartAnnouncementText: string;
   hammartAnnouncementLinkUrl: string;
@@ -84,6 +95,13 @@ export function getDomainAnnouncement(
   settings: DomainAnnouncementFields,
   domain: SiteDomain
 ): { enabled: boolean; text: string; linkUrl: string } {
+  if (domain === "inplayer-app") {
+    return {
+      enabled: Boolean(settings.inplayerAppAnnouncementEnabled),
+      text: settings.inplayerAppAnnouncementText || settings.inplayerAnnouncementText,
+      linkUrl: settings.inplayerAppAnnouncementLinkUrl || settings.inplayerAnnouncementLinkUrl,
+    };
+  }
   if (domain === "hammart") {
     return {
       enabled: settings.hammartAnnouncementEnabled,
@@ -107,6 +125,7 @@ export function getDomainAnnouncement(
 
 export const DOMAIN_LABELS: Record<SiteDomain, string> = {
   inplayer: "InPlayer",
+  "inplayer-app": "InPlayer App",
   hammart: "Hammart",
   sponsorship: "Sponsorship",
 };

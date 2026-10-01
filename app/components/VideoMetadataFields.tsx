@@ -400,12 +400,13 @@ export default function VideoMetadataFields({
                   <input
                     ref={thumbInputRef}
                     type="file"
-                    accept="image/*"
+                    accept="image/*,.jpg,.jpeg,.png,.webp,.avif,.gif"
                     className="hidden"
+                    onClick={(e) => e.stopPropagation()}
                     onChange={(e) => {
                       const f = e.target.files?.[0];
-                      if (f) thumbnail.onFileSelected(f);
                       e.target.value = "";
+                      if (f) thumbnail.onFileSelected(f);
                     }}
                   />
                 </div>

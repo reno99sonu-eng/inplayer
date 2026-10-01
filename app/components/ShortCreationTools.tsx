@@ -442,8 +442,12 @@ export default function ShortCreationTools({
             <input
               ref={fileInputRef}
               type="file"
-              accept="audio/*"
-              onChange={handleFileChosen}
+              accept="audio/*,.mp3,.m4a,.wav,.ogg,.flac,.aac"
+              onClick={(e) => e.stopPropagation()}
+              onChange={(e) => {
+                handleFileChosen(e);
+                e.target.value = "";
+              }}
               className="hidden"
             />
             <button

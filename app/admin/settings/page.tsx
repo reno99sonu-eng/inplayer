@@ -12,6 +12,7 @@ import {
   Megaphone,
   Bot,
   DollarSign,
+  Smartphone,
 } from "lucide-react";
 import Link from "next/link";
 import { useAdminMode } from "@/app/components/admin/AdminModeContext";
@@ -44,13 +45,14 @@ interface CoreSettings {
 // Raw server field names for whichever mode is active — e.g. for
 // "hammart" this is inplayerMaintenanceMode -> hammartMaintenanceMode. One
 // small lookup instead of a big if/else at every read/write site below.
-function domainFieldNames(mode: "inplayer" | "hammart" | "sponsorship") {
+function domainFieldNames(mode: "inplayer" | "inplayer-app" | "hammart" | "sponsorship") {
+  const prefix = mode === "inplayer-app" ? "inplayerApp" : mode;
   return {
-    maintenanceMode: `${mode}MaintenanceMode`,
-    maintenanceMessage: `${mode}MaintenanceMessage`,
-    announcementEnabled: `${mode}AnnouncementEnabled`,
-    announcementText: `${mode}AnnouncementText`,
-    announcementLinkUrl: `${mode}AnnouncementLinkUrl`,
+    maintenanceMode: `${prefix}MaintenanceMode`,
+    maintenanceMessage: `${prefix}MaintenanceMessage`,
+    announcementEnabled: `${prefix}AnnouncementEnabled`,
+    announcementText: `${prefix}AnnouncementText`,
+    announcementLinkUrl: `${prefix}AnnouncementLinkUrl`,
   } as const;
 }
 
@@ -491,7 +493,7 @@ export default function AdminSettingsPage() {
           )}
         </div>
 
-        {(mode === "inplayer" || mode === "hammart" || mode === "sponsorship") && (
+        {(mode === "inplayer" || mode === "inplayer-app" || mode === "hammart" || mode === "sponsorship") && (
           <div className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.02] p-4">
             <p className="mb-3 text-xs font-semibold text-slate-400 light:text-slate-600">
               Related {domainLabel} settings live in their own sections:
@@ -511,6 +513,14 @@ export default function AdminSettingsPage() {
                   className="flex items-center gap-1.5 rounded-full bg-white/5 light:bg-black/5 px-3 py-1.5 text-xs font-bold text-slate-300 light:text-slate-700 hover:bg-white/10"
                 >
                   <DollarSign size={12} /> Advertising
+                </Link>
+              )}
+              {mode === "inplayer-app" && (
+                <Link
+                  href="/admin/advertising"
+                  className="flex items-center gap-1.5 rounded-full bg-white/5 light:bg-black/5 px-3 py-1.5 text-xs font-bold text-cyan-300 light:text-cyan-700 hover:bg-white/10"
+                >
+                  <Smartphone size={12} /> Mobile Ads (AdMob)
                 </Link>
               )}
             </div>

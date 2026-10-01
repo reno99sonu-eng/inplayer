@@ -290,7 +290,23 @@ class _UploadPageState extends ConsumerState<UploadPage> {
         final path = result?.files.single.path;
         picked = path == null ? null : XFile(path);
       } else {
-        picked = await ImagePicker().pickVideo(source: ImageSource.gallery);
+        XFile? resultFile;
+        try {
+          resultFile = await ImagePicker().pickVideo(source: ImageSource.gallery);
+        } catch (_) {}
+        if (resultFile == null) {
+          try {
+            final res = await FilePicker.platform.pickFiles(
+              type: FileType.video,
+              allowMultiple: false,
+            );
+            final p = res?.files.single.path;
+            if (p != null) {
+              resultFile = XFile(p);
+            }
+          } catch (_) {}
+        }
+        picked = resultFile;
       }
       if (picked == null || !mounted) return;
 
@@ -419,12 +435,27 @@ class _UploadPageState extends ConsumerState<UploadPage> {
 
   Future<void> _pickThumbnail() async {
     try {
-      final picked = await ImagePicker().pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 1920,
-        maxHeight: 1080,
-        imageQuality: 85,
-      );
+      XFile? picked;
+      try {
+        picked = await ImagePicker().pickImage(
+          source: ImageSource.gallery,
+          maxWidth: 1920,
+          maxHeight: 1080,
+          imageQuality: 85,
+        );
+      } catch (_) {}
+      if (picked == null) {
+        try {
+          final res = await FilePicker.platform.pickFiles(
+            type: FileType.image,
+            allowMultiple: false,
+          );
+          final p = res?.files.single.path;
+          if (p != null) {
+            picked = XFile(p);
+          }
+        } catch (_) {}
+      }
       if (picked == null || !mounted) return;
       setState(() {
         _thumbnailFile = picked;
@@ -441,15 +472,30 @@ class _UploadPageState extends ConsumerState<UploadPage> {
       return;
     }
     try {
-      final picked = await ImagePicker().pickImage(
-        source: ImageSource.gallery,
-        maxWidth: 1600,
-        maxHeight: 1600,
-        imageQuality: 85,
-      );
+      XFile? picked;
+      try {
+        picked = await ImagePicker().pickImage(
+          source: ImageSource.gallery,
+          maxWidth: 1600,
+          maxHeight: 1600,
+          imageQuality: 85,
+        );
+      } catch (_) {}
+      if (picked == null) {
+        try {
+          final res = await FilePicker.platform.pickFiles(
+            type: FileType.image,
+            allowMultiple: false,
+          );
+          final p = res?.files.single.path;
+          if (p != null) {
+            picked = XFile(p);
+          }
+        } catch (_) {}
+      }
       if (picked == null || !mounted) return;
       setState(() {
-        _musicCovers.add(picked);
+        _musicCovers.add(picked!);
         _thumbnailFile ??= picked;
       });
     } catch (e) {

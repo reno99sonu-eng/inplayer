@@ -27,7 +27,7 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 // exception: a read-only history of every admin action across all three
 // modes, since viewing it never changes anything and an admin action taken
 // from any panel is worth showing everywhere.
-export type AdminMode = "inplayer" | "hammart" | "sponsorship";
+export type AdminMode = "inplayer" | "inplayer-app" | "hammart" | "sponsorship";
 
 const STORAGE_KEY = "inplayer-admin-mode";
 
@@ -44,7 +44,14 @@ export function AdminModeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     const readStored = () => {
       const stored = window.localStorage.getItem(STORAGE_KEY);
-      if (stored === "hammart" || stored === "inplayer" || stored === "sponsorship") setModeState(stored);
+      if (
+        stored === "hammart" ||
+        stored === "inplayer" ||
+        stored === "inplayer-app" ||
+        stored === "sponsorship"
+      ) {
+        setModeState(stored);
+      }
     };
     readStored();
   }, []);

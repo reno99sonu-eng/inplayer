@@ -31,6 +31,7 @@ import {
   Music2,
   UserCog,
   UserCheck,
+  Smartphone,
 } from "lucide-react";
 import { useAdminMode, type AdminMode } from "@/app/components/admin/AdminModeContext";
 import { useAdminIdentity } from "@/app/components/admin/AdminIdentityContext";
@@ -98,13 +99,31 @@ const sponsorshipItems = [
   { id: "audit-logs", label: "Audit Logs", icon: ScrollText, href: "/admin/audit-logs" },
 ] as const;
 
+const inplayerAppItems = [
+  { id: "settings", label: "App Settings & Maintenance", icon: Settings, href: "/admin/settings" },
+  { id: "ads", label: "Mobile Ads (AdMob)", icon: Smartphone, href: "/admin/advertising", permission: "manage_ads" },
+  { id: "navbar-theme", label: "Navbar Theme", icon: Palette, href: "/admin/navbar-theme", permission: "manage_navbar_theme" },
+  { id: "raftaar-films", label: "Raftaar Films", icon: Clapperboard, href: "/admin/raftaar-films" },
+  { id: "raftaar-films-applications", label: "Film Applications", icon: UserCheck, href: "/admin/raftaar-films-applications" },
+  { id: "notifications", label: "Push Notifications", icon: Bell, href: "/admin/notifications" },
+  { id: "bug-reports", label: "Bug Reports", icon: Bug, href: "/admin/bug-reports", permission: "view_bugs" },
+  { id: "error-logs", label: "Error Logs", icon: AlertTriangle, href: "/admin/error-logs", permission: "view_errors" },
+  { id: "audit-logs", label: "Audit Logs", icon: ScrollText, href: "/admin/audit-logs" },
+] as const;
+
 // Where a team member lands when entering a mode: the first item that mode's
 // sidebar would actually show them. The main admin's per-mode home pages
 // (dashboard, vendor KYC, sponsorship orders) are all main-admin-only, so
 // sending a team member there only produces a 401.
 export function teamMemberHomeHref(mode: AdminMode, permissions: Set<string>): string {
   const modeItems: readonly { href: string; permission?: string }[] =
-    mode === "hammart" ? hammartItems : mode === "sponsorship" ? sponsorshipItems : inplayerItems;
+    mode === "hammart"
+      ? hammartItems
+      : mode === "sponsorship"
+      ? sponsorshipItems
+      : mode === "inplayer-app"
+      ? inplayerAppItems
+      : inplayerItems;
   const first = modeItems.find((item) => item.permission && permissions.has(item.permission));
   return first?.href ?? "/admin/team-member-home";
 }
@@ -114,7 +133,14 @@ export default function AdminSidebar() {
   const searchParams = useSearchParams();
   const { mode } = useAdminMode();
   const { isMainAdmin, permissions } = useAdminIdentity();
-  const modeItems = mode === "hammart" ? hammartItems : mode === "sponsorship" ? sponsorshipItems : inplayerItems;
+  const modeItems =
+    mode === "hammart"
+      ? hammartItems
+      : mode === "sponsorship"
+      ? sponsorshipItems
+      : mode === "inplayer-app"
+      ? inplayerAppItems
+      : inplayerItems;
   // Main admin sees every item, unchanged. A team member sees ONLY items
   // whose `permission` they were actually granted — "team" (main-admin-only
   // management of team members itself) and every item with no `permission`

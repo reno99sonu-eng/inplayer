@@ -632,9 +632,14 @@ export default function MusicUploadTools({
         <input
           ref={coverInputRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp"
+          accept="image/*,.jpg,.jpeg,.png,.webp"
           multiple
-          onChange={(e) => void handleCoverFiles(e.target.files)}
+          onClick={(e) => e.stopPropagation()}
+          onChange={(e) => {
+            const files = e.target.files;
+            e.target.value = "";
+            void handleCoverFiles(files);
+          }}
           className="hidden"
         />
 

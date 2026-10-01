@@ -85,10 +85,10 @@ export function watchHrefFor(contentType: unknown, videoId: string): string {
 // different MIME types across platforms (an .m4a is variously audio/mp4,
 // audio/x-m4a or audio/aac).
 export const UPLOAD_ACCEPT: Record<ContentType, string> = {
-  video: "video/*",
-  short: "video/*",
-  music: ".mp3,.m4a,.aac,.wav,.flac,.ogg,audio/*",
-  film: "video/*",
+  video: "video/*,.mp4,.mov,.mkv,.webm,.avi,.m4v,.3gp,.ts,.wmv,.flv",
+  short: "video/*,.mp4,.mov,.mkv,.webm,.avi,.m4v,.3gp,.ts,.wmv,.flv",
+  music: ".mp3,.m4a,.aac,.wav,.flac,.ogg,.oga,.opus,audio/*",
+  film: "video/*,.mp4,.mov,.mkv,.webm,.avi,.m4v,.3gp,.ts,.wmv,.flv",
 };
 
 // The single source of truth for "what shape is this content's thumbnail".

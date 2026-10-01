@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { fetchAuthSession } from "aws-amplify/auth";
-import { UploadCloud, Film, PlaySquare, Loader2, X , Music2 } from "lucide-react";
+import { UploadCloud, Film, PlaySquare, Loader2, X , Music2, AlertCircle } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import ProcessingStatus from "@/app/components/ProcessingStatus";
 import UploadThumbnailStep from "@/app/components/UploadThumbnailStep";
@@ -216,8 +216,11 @@ export default function UploadPage() {
   }, [signedIn]);
 
   const handleThumbnailSelected = async (selected: File) => {
-    if (!selected.type.startsWith("image/")) {
-      setThumbnailError("Please choose an image file.");
+    const looksImage =
+      selected.type.startsWith("image/") ||
+      /\.(jpe?g|png|webp|avif|gif)$/i.test(selected.name);
+    if (!looksImage) {
+      setThumbnailError("Please choose an image file (JPG, PNG, WebP).");
       return;
     }
     setThumbnailError(null);
@@ -316,9 +319,14 @@ export default function UploadPage() {
         setError("Please choose an audio file (MP3, M4A, WAV, FLAC).");
         return;
       }
-    } else if (!selected.type.startsWith("video/")) {
-      setError("Please choose a video file.");
-      return;
+    } else {
+      const looksVideo =
+        selected.type.startsWith("video/") ||
+        /\.(mp4|mov|mkv|webm|avi|m4v|3gp|ts|wmv|flv)$/i.test(selected.name);
+      if (!looksVideo) {
+        setError("Please choose a valid video file (MP4, MOV, MKV, WebM, etc.).");
+        return;
+      }
     }
 
     setError(null);
@@ -850,59 +858,94 @@ export default function UploadPage() {
               </div>
             </div>
           ) : (
-            <div
-              onDragOver={(e) => {
-                e.preventDefault();
-                setDragActive(true);
-              }}
-              onDragLeave={() => setDragActive(false)}
-              onDrop={handleDrop}
-              onClick={() => fileInputRef.current?.click()}
-              className={`
-                flex flex-col items-center justify-center gap-4
-                rounded-[28px] border-2 border-dashed
-                px-6 py-16 sm:py-20
-                text-center cursor-pointer
-                transition-all duration-300
-                ${
-                  dragActive
-                    ? "border-orange-400 bg-orange-500/10"
-                    : "border-white/15 light:border-black/15 bg-white/[0.02] light:bg-black/[0.02] hover:border-orange-400/50"
-                }
-              `}
-            >
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-orange-500/10">
-                {contentType === "short" ? (
-                  <PlaySquare size={30} className="text-orange-400" />
-                ) : contentType === "music" ? (
-                  <Music2 size={30} className="text-orange-400" />
-                ) : contentType === "film" ? (
-                  <Film size={30} className="text-orange-400" />
-                ) : (
-                  <UploadCloud size={30} className="text-orange-400" />
-                )}
+            <div className="space-y-4">
+              {error && (
+                <div className="flex items-center gap-2.5 rounded-2xl border border-red-500/30 bg-red-500/10 p-4 text-xs font-medium text-red-300">
+                  <AlertCircle size={18} className="flex-shrink-0" />
+                  <span className="flex-1">{error}</span>
+                  <button
+                    type="button"
+                    onClick={() => setError(null)}
+                    className="text-red-400 hover:text-white"
+                  >
+                    <X size={14} />
+                  </button>
+                </div>
+              )}
+
+              <div
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragActive(true);
+                }}
+                onDragLeave={() => setDragActive(false)}
+                onDrop={handleDrop}
+                onClick={() => fileInputRef.current?.click()}
+                className={`
+                  flex flex-col items-center justify-center gap-4
+                  rounded-[28px] border-2 border-dashed
+                  px-6 py-16 sm:py-20
+                  text-center cursor-pointer
+                  transition-all duration-300
+                  ${
+                    dragActive
+                      ? "border-orange-400 bg-orange-500/10"
+                      : "border-white/15 light:border-black/15 bg-white/[0.02] light:bg-black/[0.02] hover:border-orange-400/50"
+                  }
+                `}
+              >
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-orange-500/10">
+                  {contentType === "short" ? (
+                    <PlaySquare size={30} className="text-orange-400" />
+                  ) : contentType === "music" ? (
+                    <Music2 size={30} className="text-orange-400" />
+                  ) : contentType === "film" ? (
+                    <Film size={30} className="text-orange-400" />
+                  ) : (
+                    <UploadCloud size={30} className="text-orange-400" />
+                  )}
+                </div>
+                <div>
+                  <p className="font-semibold text-white light:text-slate-900 sm:text-lg">
+                    {contentType === "short"
+                      ? "Drag and drop a short video file (9:16 vertical)"
+                      : contentType === "music"
+                        ? "Drag and drop an audio file (MP3, M4A, WAV, FLAC)"
+                        : contentType === "film"
+                          ? "Drag and drop an episode video file (9:16 vertical)"
+                          : "Drag and drop a video file (16:9 recommended)"}
+                  </p>
+                  <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
+                    or choose a file directly from your local storage
+                  </p>
+                </div>
+
+                {/* Explicit prominent Upload from Local button */}
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    fileInputRef.current?.click();
+                  }}
+                  className="mt-2 inline-flex items-center gap-2 rounded-2xl bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-6 py-3 text-xs font-bold text-white shadow-[0_10px_25px_rgba(255,153,0,.3)] hover:scale-105 active:scale-95 transition-all cursor-pointer"
+                >
+                  <UploadCloud size={16} />
+                  <span>Upload from Local Device</span>
+                </button>
+
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept={UPLOAD_ACCEPT[contentType]}
+                  className="hidden"
+                  onClick={(e) => e.stopPropagation()}
+                  onChange={(e) => {
+                    const f = e.target.files?.[0] || null;
+                    e.target.value = "";
+                    handleFile(f);
+                  }}
+                />
               </div>
-              <div>
-                <p className="font-semibold text-white light:text-slate-900 sm:text-lg">
-                  {contentType === "short"
-                    ? "Drag and drop a short video file (9:16 vertical)"
-                    : contentType === "music"
-                      ? "Drag and drop an audio file (MP3, M4A, WAV, FLAC)"
-                      : contentType === "film"
-                        ? "Drag and drop an episode video file (9:16 vertical)"
-                        : "Drag and drop a video file (16:9 recommended)"}
-                </p>
-                <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
-                  or click to browse from your device
-                </p>
-              </div>
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept={UPLOAD_ACCEPT[contentType]}
-                className="hidden"
-                onChange={(e) => handleFile(e.target.files?.[0] || null)}
-              />
             </div>
           )
         )}

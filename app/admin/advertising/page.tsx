@@ -21,6 +21,7 @@ import {
   X,
   Crop,
   RefreshCw,
+  Smartphone,
 } from "lucide-react";
 import { compressImageToBanner, compressDataUrlToBanner, aiCropAndRedesignImage, extractVideoFramePoster } from "@/app/lib/imageCompress";
 import { MIDROLL_VIDEO_MAX_BYTES } from "@/app/lib/videoAds";
@@ -35,6 +36,7 @@ type SidePanel =
   | "weekly_featured"
   | "midroll"
   | "adsense"
+  | "admob"
   | "specs";
 
 const PLACEMENT_LABELS: Record<Placement, string> = {
@@ -68,6 +70,13 @@ const WF_DESKTOP_ASPECT_RATIO = 4.5; // matches the box's shape on a typical 16:
 interface AdSettings {
   adsenseEnabled: boolean;
   adsensePublisherId: string;
+  admobEnabled: boolean;
+  admobAppId: string;
+  admobBannerUnitId: string;
+  admobInterstitialUnitId: string;
+  admobRewardedUnitId: string;
+  admobNativeUnitId: string;
+  admobOpenAppUnitId: string;
   homepageBannerSource: AdSlotSource;
   watchPageBannerSource: AdSlotSource;
   weeklyFeaturedEnabled: boolean;
@@ -108,6 +117,13 @@ interface MidrollAdCreative {
 const DEFAULT_SETTINGS: AdSettings = {
   adsenseEnabled: false,
   adsensePublisherId: "",
+  admobEnabled: false,
+  admobAppId: "",
+  admobBannerUnitId: "",
+  admobInterstitialUnitId: "",
+  admobRewardedUnitId: "",
+  admobNativeUnitId: "",
+  admobOpenAppUnitId: "",
   homepageBannerSource: "house",
   watchPageBannerSource: "house",
   weeklyFeaturedEnabled: true, // ON by default
@@ -245,6 +261,13 @@ function AdvertisingPage() {
         setSettings({
           adsenseEnabled: Boolean(s.adsenseEnabled),
           adsensePublisherId: String(s.adsensePublisherId || ""),
+          admobEnabled: Boolean(s.admobEnabled),
+          admobAppId: String(s.admobAppId || ""),
+          admobBannerUnitId: String(s.admobBannerUnitId || ""),
+          admobInterstitialUnitId: String(s.admobInterstitialUnitId || ""),
+          admobRewardedUnitId: String(s.admobRewardedUnitId || ""),
+          admobNativeUnitId: String(s.admobNativeUnitId || ""),
+          admobOpenAppUnitId: String(s.admobOpenAppUnitId || ""),
           homepageBannerSource: (s.homepageBannerSource as AdSlotSource) || "house",
           watchPageBannerSource: (s.watchPageBannerSource as AdSlotSource) || "house",
           weeklyFeaturedEnabled: s.weeklyFeaturedEnabled !== false,
@@ -1180,6 +1203,7 @@ function AdvertisingPage() {
     safeMidrollAds.some((m) => m.active && (m.status === undefined || m.status === "ready"));
 
   const isAdsenseLive = settings.adsenseEnabled && Boolean(settings.adsensePublisherId.trim());
+  const isAdmobLive = settings.admobEnabled && Boolean(settings.admobAppId.trim());
 
   const navItems: { id: SidePanel; label: string; icon: React.ElementType; badge?: string; live?: boolean }[] = [
     { id: "overview", label: "Overview & Stats", icon: BarChart3 },
@@ -1188,6 +1212,7 @@ function AdvertisingPage() {
     { id: "weekly_featured", label: "Weekly Featured Banner", icon: Star, badge: String(safeCreatives.filter((c) => c.placement === "weekly_featured").length), live: isWeeklyFeaturedLive },
     { id: "midroll", label: "Video Mid-Roll Ads", icon: Video, badge: String(safeMidrollAds.length), live: isMidrollLive },
     { id: "adsense", label: "Google AdSense", icon: Globe, live: isAdsenseLive },
+    { id: "admob", label: "Google AdMob (App)", icon: Smartphone, live: isAdmobLive },
     { id: "specs", label: "Poster Specs & Ratios", icon: Ruler },
   ];
 
@@ -2112,6 +2137,162 @@ function AdvertisingPage() {
                   className="flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-indigo-500 disabled:opacity-50 cursor-pointer"
                 >
                   {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save AdSense Config
+                </button>
+                {saved && (
+                  <span className="text-xs font-bold text-emerald-400">Settings saved successfully!</span>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 7b. GOOGLE ADMOB SUB-PANEL */}
+        {activePanel === "admob" && (
+          <div className="space-y-4 max-w-2xl">
+            <div className="rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-5 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 light:border-black/10 pb-4">
+                <div>
+                  <h3 className="text-sm font-bold text-white light:text-slate-900 flex items-center gap-2">
+                    <Smartphone size={16} className="text-cyan-400" />
+                    Google AdMob Configuration (InPlayer Android App)
+                  </h3>
+                  <p className="text-xs text-slate-400 light:text-slate-600 mt-0.5">
+                    Master configuration for Android in-app mobile advertising & Ad Unit IDs.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    const nextEnabled = !settings.admobEnabled;
+                    const next = { ...settings, admobEnabled: nextEnabled };
+                    setSettings(next);
+                    setSaved(false);
+                  }}
+                  className={`rounded-full px-4 py-1.5 text-xs font-bold transition flex items-center gap-1.5 ${
+                    settings.admobEnabled
+                      ? "bg-emerald-500/20 text-emerald-300 light:bg-emerald-100 light:text-emerald-800"
+                      : "bg-white/5 text-slate-400 light:text-slate-700 light:bg-black/5"
+                  }`}
+                >
+                  <span className={`h-2 w-2 rounded-full ${settings.admobEnabled ? "bg-emerald-400 animate-pulse" : "bg-slate-500"}`} />
+                  {settings.admobEnabled ? "AdMob: ENABLED" : "AdMob: DISABLED"}
+                </button>
+              </div>
+
+              {/* AdMob Status Banner */}
+              <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-3.5 text-xs text-slate-300 light:text-slate-700 space-y-1.5">
+                <div className="flex items-center gap-2 font-bold text-emerald-400">
+                  <CheckCircle2 size={16} />
+                  <span>Inplayer (Android) Verified in Google AdMob</span>
+                </div>
+                <p className="text-[11px] leading-relaxed text-slate-300 light:text-slate-600">
+                  Your Android app is verified. Google AdMob automatically conducts a 2 to 3 day review to evaluate ad placement and app readiness. Ad serving is limited until Google&apos;s review completes.
+                </p>
+              </div>
+
+              {/* Consent Management Platform (CMP) Guide */}
+              <div className="rounded-xl border border-indigo-500/20 bg-indigo-500/10 p-3.5 text-xs text-slate-300 light:text-slate-700 space-y-2">
+                <p className="font-semibold text-indigo-300 light:text-indigo-900 flex items-center gap-1.5">
+                  <Globe size={14} /> CMP / European Regulations (GDPR) Consent
+                </p>
+                <p className="text-[11px] leading-relaxed">
+                  Google requires user consent messages for European Economic Area (EEA) and UK users. Under your <strong>Google AdMob Console &gt; Privacy &amp; messaging &gt; European regulations</strong>, click <strong>&quot;Create a message&quot;</strong>. Google CMP handles all consent compliance automatically.
+                </p>
+              </div>
+
+              {/* App ID Input */}
+              <div className="space-y-2 pt-1">
+                <label className="text-xs font-semibold text-slate-300 light:text-slate-700 block">
+                  AdMob App ID (Android)
+                </label>
+                <input
+                  type="text"
+                  value={settings.admobAppId}
+                  onChange={(e) => updateSettings("admobAppId", e.target.value.trim())}
+                  placeholder="ca-app-pub-9015405021941451~XXXXXXXXXX"
+                  className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3.5 py-2.5 text-xs text-white light:text-slate-900 outline-none focus:border-cyan-400 font-mono"
+                />
+                <p className="text-[11px] text-slate-400 light:text-slate-600">
+                  From AdMob Console &gt; Apps &gt; Inplayer (Android) &gt; App settings.
+                </p>
+              </div>
+
+              {/* Unit IDs Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-300 light:text-slate-700 block">
+                    Banner Ad Unit ID
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.admobBannerUnitId}
+                    onChange={(e) => updateSettings("admobBannerUnitId", e.target.value.trim())}
+                    placeholder="ca-app-pub-9015405021941451/XXXXXXXXXX"
+                    className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-xs text-white light:text-slate-900 outline-none focus:border-cyan-400 font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-300 light:text-slate-700 block">
+                    Interstitial Ad Unit ID
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.admobInterstitialUnitId}
+                    onChange={(e) => updateSettings("admobInterstitialUnitId", e.target.value.trim())}
+                    placeholder="ca-app-pub-9015405021941451/XXXXXXXXXX"
+                    className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-xs text-white light:text-slate-900 outline-none focus:border-cyan-400 font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-300 light:text-slate-700 block">
+                    Rewarded Video Ad Unit ID
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.admobRewardedUnitId}
+                    onChange={(e) => updateSettings("admobRewardedUnitId", e.target.value.trim())}
+                    placeholder="ca-app-pub-9015405021941451/XXXXXXXXXX"
+                    className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-xs text-white light:text-slate-900 outline-none focus:border-cyan-400 font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <label className="text-xs font-semibold text-slate-300 light:text-slate-700 block">
+                    Native Advanced Ad Unit ID
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.admobNativeUnitId}
+                    onChange={(e) => updateSettings("admobNativeUnitId", e.target.value.trim())}
+                    placeholder="ca-app-pub-9015405021941451/XXXXXXXXXX"
+                    className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-xs text-white light:text-slate-900 outline-none focus:border-cyan-400 font-mono"
+                  />
+                </div>
+
+                <div className="space-y-1.5 sm:col-span-2">
+                  <label className="text-xs font-semibold text-slate-300 light:text-slate-700 block">
+                    App Open Ad Unit ID
+                  </label>
+                  <input
+                    type="text"
+                    value={settings.admobOpenAppUnitId}
+                    onChange={(e) => updateSettings("admobOpenAppUnitId", e.target.value.trim())}
+                    placeholder="ca-app-pub-9015405021941451/XXXXXXXXXX"
+                    className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3 py-2 text-xs text-white light:text-slate-900 outline-none focus:border-cyan-400 font-mono"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => saveSettings()}
+                  disabled={saving}
+                  className="flex items-center gap-2 rounded-xl bg-cyan-600 px-5 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-cyan-500 disabled:opacity-50 cursor-pointer"
+                >
+                  {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Save AdMob Config
                 </button>
                 {saved && (
                   <span className="text-xs font-bold text-emerald-400">Settings saved successfully!</span>

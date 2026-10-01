@@ -1,4 +1,4 @@
-/// GET/PATCH /api/admin/settings — mirrors app/lib/platformSettings.ts's
+﻿/// GET/PATCH /api/admin/settings — mirrors app/lib/platformSettings.ts's
 /// PlatformSettings shape (minus updatedBy, which the UI doesn't need to
 /// show). PATCH only sends whichever fields actually changed, using the
 /// same whitelist as the backend.
@@ -27,6 +27,13 @@ class AdminPlatformSettings {
   final bool moderationEnabledUploads;
   final bool adsenseEnabled;
   final String adsensePublisherId;
+  final bool admobEnabled;
+  final String admobAppId;
+  final String admobBannerUnitId;
+  final String admobInterstitialUnitId;
+  final String admobRewardedUnitId;
+  final String admobNativeUnitId;
+  final String admobOpenAppUnitId;
   final String homepageBannerSource; // 'house' | 'adsense' | 'off'
   final String watchPageBannerSource;
   final bool weeklyFeaturedEnabled;
@@ -51,6 +58,13 @@ class AdminPlatformSettings {
     this.moderationEnabledUploads = true,
     this.adsenseEnabled = false,
     this.adsensePublisherId = '',
+    this.admobEnabled = false,
+    this.admobAppId = '',
+    this.admobBannerUnitId = '',
+    this.admobInterstitialUnitId = '',
+    this.admobRewardedUnitId = '',
+    this.admobNativeUnitId = '',
+    this.admobOpenAppUnitId = '',
     this.homepageBannerSource = 'house',
     this.watchPageBannerSource = 'house',
     this.weeklyFeaturedEnabled = true,
@@ -95,6 +109,13 @@ class AdminPlatformSettings {
       moderationEnabledUploads: json['moderationEnabledUploads'] != false,
       adsenseEnabled: json['adsenseEnabled'] == true,
       adsensePublisherId: json['adsensePublisherId']?.toString() ?? '',
+      admobEnabled: json['admobEnabled'] == true,
+      admobAppId: json['admobAppId']?.toString() ?? '',
+      admobBannerUnitId: json['admobBannerUnitId']?.toString() ?? '',
+      admobInterstitialUnitId: json['admobInterstitialUnitId']?.toString() ?? '',
+      admobRewardedUnitId: json['admobRewardedUnitId']?.toString() ?? '',
+      admobNativeUnitId: json['admobNativeUnitId']?.toString() ?? '',
+      admobOpenAppUnitId: json['admobOpenAppUnitId']?.toString() ?? '',
       homepageBannerSource: json['homepageBannerSource']?.toString() ?? 'house',
       watchPageBannerSource: json['watchPageBannerSource']?.toString() ?? 'house',
       weeklyFeaturedEnabled: json['weeklyFeaturedEnabled'] != false,
@@ -121,6 +142,13 @@ class AdminPlatformSettings {
     bool? moderationEnabledUploads,
     bool? adsenseEnabled,
     String? adsensePublisherId,
+    bool? admobEnabled,
+    String? admobAppId,
+    String? admobBannerUnitId,
+    String? admobInterstitialUnitId,
+    String? admobRewardedUnitId,
+    String? admobNativeUnitId,
+    String? admobOpenAppUnitId,
     String? homepageBannerSource,
     String? watchPageBannerSource,
     bool? weeklyFeaturedEnabled,
@@ -144,6 +172,13 @@ class AdminPlatformSettings {
       moderationEnabledUploads: moderationEnabledUploads ?? this.moderationEnabledUploads,
       adsenseEnabled: adsenseEnabled ?? this.adsenseEnabled,
       adsensePublisherId: adsensePublisherId ?? this.adsensePublisherId,
+      admobEnabled: admobEnabled ?? this.admobEnabled,
+      admobAppId: admobAppId ?? this.admobAppId,
+      admobBannerUnitId: admobBannerUnitId ?? this.admobBannerUnitId,
+      admobInterstitialUnitId: admobInterstitialUnitId ?? this.admobInterstitialUnitId,
+      admobRewardedUnitId: admobRewardedUnitId ?? this.admobRewardedUnitId,
+      admobNativeUnitId: admobNativeUnitId ?? this.admobNativeUnitId,
+      admobOpenAppUnitId: admobOpenAppUnitId ?? this.admobOpenAppUnitId,
       homepageBannerSource: homepageBannerSource ?? this.homepageBannerSource,
       watchPageBannerSource: watchPageBannerSource ?? this.watchPageBannerSource,
       weeklyFeaturedEnabled: weeklyFeaturedEnabled ?? this.weeklyFeaturedEnabled,

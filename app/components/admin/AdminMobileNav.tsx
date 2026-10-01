@@ -59,12 +59,31 @@ const sponsorshipItems = [
   { id: "audit-logs", label: "Audit Logs", href: "/admin/audit-logs" },
 ] as const;
 
+const inplayerAppItems = [
+  { id: "settings", label: "App Settings", href: "/admin/settings" },
+  { id: "ads", label: "Mobile Ads (AdMob)", href: "/admin/advertising", permission: "manage_ads" },
+  { id: "navbar-theme", label: "Navbar Theme", href: "/admin/navbar-theme", permission: "manage_navbar_theme" },
+  { id: "raftaar-films", label: "Raftaar Films", href: "/admin/raftaar-films" },
+  { id: "raftaar-films-applications", label: "Film Applications", href: "/admin/raftaar-films-applications" },
+  { id: "notifications", label: "Push Notifications", href: "/admin/notifications" },
+  { id: "bug-reports", label: "Bug Reports", href: "/admin/bug-reports", permission: "view_bugs" },
+  { id: "error-logs", label: "Error Logs", href: "/admin/error-logs", permission: "view_errors" },
+  { id: "audit-logs", label: "Audit Logs", href: "/admin/audit-logs" },
+] as const;
+
 export default function AdminMobileNav() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const { mode } = useAdminMode();
   const { isMainAdmin, permissions } = useAdminIdentity();
-  const modeItems = mode === "hammart" ? hammartItems : mode === "sponsorship" ? sponsorshipItems : inplayerItems;
+  const modeItems =
+    mode === "hammart"
+      ? hammartItems
+      : mode === "sponsorship"
+      ? sponsorshipItems
+      : mode === "inplayer-app"
+      ? inplayerAppItems
+      : inplayerItems;
   const items = isMainAdmin
     ? modeItems
     : modeItems.filter(

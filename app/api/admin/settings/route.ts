@@ -15,6 +15,13 @@ const AD_SLOT_SOURCES = ["house", "adsense", "off"];
 const AD_SETTING_KEYS = [
   "adsenseEnabled",
   "adsensePublisherId",
+  "admobEnabled",
+  "admobAppId",
+  "admobBannerUnitId",
+  "admobInterstitialUnitId",
+  "admobRewardedUnitId",
+  "admobNativeUnitId",
+  "admobOpenAppUnitId",
   "homepageBannerSource",
   "watchPageBannerSource",
   "weeklyFeaturedEnabled",
@@ -63,7 +70,7 @@ export async function PATCH(request: NextRequest) {
   // down InPlayer and Sponsorship). Looping the three domain prefixes
   // instead of writing each block out three times keeps them from quietly
   // drifting out of sync with each other again.
-  const DOMAINS = ["inplayer", "hammart", "sponsorship"] as const;
+  const DOMAINS = ["inplayer", "inplayerApp", "hammart", "sponsorship"] as const;
   for (const domain of DOMAINS) {
     const modeKey = `${domain}MaintenanceMode` as const;
     const messageKey = `${domain}MaintenanceMessage` as const;
@@ -101,6 +108,13 @@ export async function PATCH(request: NextRequest) {
   if (typeof body.adsensePublisherId === "string") {
     partial.adsensePublisherId = body.adsensePublisherId.trim().slice(0, 60);
   }
+  if (typeof body.admobEnabled === "boolean") partial.admobEnabled = body.admobEnabled;
+  if (typeof body.admobAppId === "string") partial.admobAppId = body.admobAppId.trim().slice(0, 100);
+  if (typeof body.admobBannerUnitId === "string") partial.admobBannerUnitId = body.admobBannerUnitId.trim().slice(0, 100);
+  if (typeof body.admobInterstitialUnitId === "string") partial.admobInterstitialUnitId = body.admobInterstitialUnitId.trim().slice(0, 100);
+  if (typeof body.admobRewardedUnitId === "string") partial.admobRewardedUnitId = body.admobRewardedUnitId.trim().slice(0, 100);
+  if (typeof body.admobNativeUnitId === "string") partial.admobNativeUnitId = body.admobNativeUnitId.trim().slice(0, 100);
+  if (typeof body.admobOpenAppUnitId === "string") partial.admobOpenAppUnitId = body.admobOpenAppUnitId.trim().slice(0, 100);
   if (AD_SLOT_SOURCES.includes(body.homepageBannerSource)) {
     partial.homepageBannerSource = body.homepageBannerSource;
   }

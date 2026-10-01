@@ -28,6 +28,8 @@ export interface PlatformContactEmail {
 export interface PlatformSettings {
   inplayerMaintenanceMode: boolean;
   inplayerMaintenanceMessage: string;
+  inplayerAppMaintenanceMode: boolean;
+  inplayerAppMaintenanceMessage: string;
   hammartMaintenanceMode: boolean;
   hammartMaintenanceMessage: string;
   sponsorshipMaintenanceMode: boolean;
@@ -41,10 +43,13 @@ export interface PlatformSettings {
 
   inplayerAnnouncementEnabled: boolean;
   inplayerAnnouncementText: string;
-  // Destination for the announcement overlay's CTA button ?" optional. When
+  // Destination for the announcement overlay's CTA button — optional. When
   // empty, the overlay still shows (headline + close button), it just
   // doesn't render a button pointing nowhere real.
   inplayerAnnouncementLinkUrl: string;
+  inplayerAppAnnouncementEnabled: boolean;
+  inplayerAppAnnouncementText: string;
+  inplayerAppAnnouncementLinkUrl: string;
   hammartAnnouncementEnabled: boolean;
   hammartAnnouncementText: string;
   hammartAnnouncementLinkUrl: string;
@@ -59,6 +64,13 @@ export interface PlatformSettings {
 
   adsenseEnabled: boolean;
   adsensePublisherId: string;
+  admobEnabled: boolean;
+  admobAppId: string;
+  admobBannerUnitId: string;
+  admobInterstitialUnitId: string;
+  admobRewardedUnitId: string;
+  admobNativeUnitId: string;
+  admobOpenAppUnitId: string;
   homepageBannerSource: AdSlotSource;
   watchPageBannerSource: AdSlotSource;
   weeklyFeaturedEnabled: boolean;
@@ -88,6 +100,8 @@ export interface PlatformSettings {
 export const DEFAULT_SETTINGS: PlatformSettings = {
   inplayerMaintenanceMode: false,
   inplayerMaintenanceMessage: "InPlayer is down for scheduled maintenance. We'll be back shortly.",
+  inplayerAppMaintenanceMode: false,
+  inplayerAppMaintenanceMessage: "InPlayer App is down for scheduled maintenance. We'll be back shortly.",
   hammartMaintenanceMode: false,
   hammartMaintenanceMessage: "Hammart is down for scheduled maintenance. We'll be back shortly.",
   sponsorshipMaintenanceMode: false,
@@ -96,6 +110,9 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
   inplayerAnnouncementEnabled: false,
   inplayerAnnouncementText: "",
   inplayerAnnouncementLinkUrl: "",
+  inplayerAppAnnouncementEnabled: false,
+  inplayerAppAnnouncementText: "",
+  inplayerAppAnnouncementLinkUrl: "",
   hammartAnnouncementEnabled: false,
   hammartAnnouncementText: "",
   hammartAnnouncementLinkUrl: "",
@@ -108,6 +125,13 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
   hammartModerationEnabledListings: true,
   adsenseEnabled: false,
   adsensePublisherId: "",
+  admobEnabled: false,
+  admobAppId: "",
+  admobBannerUnitId: "",
+  admobInterstitialUnitId: "",
+  admobRewardedUnitId: "",
+  admobNativeUnitId: "",
+  admobOpenAppUnitId: "",
   homepageBannerSource: "house",
   watchPageBannerSource: "house",
   weeklyFeaturedEnabled: true, // ON by default
@@ -139,6 +163,8 @@ export type PublicPlatformSettings = Pick<
   PlatformSettings,
   | "inplayerMaintenanceMode"
   | "inplayerMaintenanceMessage"
+  | "inplayerAppMaintenanceMode"
+  | "inplayerAppMaintenanceMessage"
   | "hammartMaintenanceMode"
   | "hammartMaintenanceMessage"
   | "sponsorshipMaintenanceMode"
@@ -147,6 +173,9 @@ export type PublicPlatformSettings = Pick<
   | "inplayerAnnouncementEnabled"
   | "inplayerAnnouncementText"
   | "inplayerAnnouncementLinkUrl"
+  | "inplayerAppAnnouncementEnabled"
+  | "inplayerAppAnnouncementText"
+  | "inplayerAppAnnouncementLinkUrl"
   | "hammartAnnouncementEnabled"
   | "hammartAnnouncementText"
   | "hammartAnnouncementLinkUrl"
@@ -155,6 +184,13 @@ export type PublicPlatformSettings = Pick<
   | "sponsorshipAnnouncementLinkUrl"
   | "adsenseEnabled"
   | "adsensePublisherId"
+  | "admobEnabled"
+  | "admobAppId"
+  | "admobBannerUnitId"
+  | "admobInterstitialUnitId"
+  | "admobRewardedUnitId"
+  | "admobNativeUnitId"
+  | "admobOpenAppUnitId"
   | "homepageBannerSource"
   | "watchPageBannerSource"
   | "weeklyFeaturedEnabled"
@@ -231,6 +267,8 @@ export function toPublicSettings(settings: PlatformSettings): PublicPlatformSett
   return {
     inplayerMaintenanceMode: settings.inplayerMaintenanceMode,
     inplayerMaintenanceMessage: settings.inplayerMaintenanceMessage,
+    inplayerAppMaintenanceMode: settings.inplayerAppMaintenanceMode,
+    inplayerAppMaintenanceMessage: settings.inplayerAppMaintenanceMessage,
     hammartMaintenanceMode: settings.hammartMaintenanceMode,
     hammartMaintenanceMessage: settings.hammartMaintenanceMessage,
     sponsorshipMaintenanceMode: settings.sponsorshipMaintenanceMode,
@@ -239,6 +277,9 @@ export function toPublicSettings(settings: PlatformSettings): PublicPlatformSett
     inplayerAnnouncementEnabled: settings.inplayerAnnouncementEnabled,
     inplayerAnnouncementText: settings.inplayerAnnouncementText,
     inplayerAnnouncementLinkUrl: settings.inplayerAnnouncementLinkUrl || "",
+    inplayerAppAnnouncementEnabled: settings.inplayerAppAnnouncementEnabled,
+    inplayerAppAnnouncementText: settings.inplayerAppAnnouncementText,
+    inplayerAppAnnouncementLinkUrl: settings.inplayerAppAnnouncementLinkUrl || "",
     hammartAnnouncementEnabled: settings.hammartAnnouncementEnabled,
     hammartAnnouncementText: settings.hammartAnnouncementText,
     hammartAnnouncementLinkUrl: settings.hammartAnnouncementLinkUrl || "",
@@ -247,6 +288,13 @@ export function toPublicSettings(settings: PlatformSettings): PublicPlatformSett
     sponsorshipAnnouncementLinkUrl: settings.sponsorshipAnnouncementLinkUrl || "",
     adsenseEnabled: settings.adsenseEnabled,
     adsensePublisherId: settings.adsensePublisherId,
+    admobEnabled: settings.admobEnabled,
+    admobAppId: settings.admobAppId,
+    admobBannerUnitId: settings.admobBannerUnitId,
+    admobInterstitialUnitId: settings.admobInterstitialUnitId,
+    admobRewardedUnitId: settings.admobRewardedUnitId,
+    admobNativeUnitId: settings.admobNativeUnitId,
+    admobOpenAppUnitId: settings.admobOpenAppUnitId,
     homepageBannerSource: settings.homepageBannerSource,
     watchPageBannerSource: settings.watchPageBannerSource,
     weeklyFeaturedEnabled: settings.weeklyFeaturedEnabled !== false,

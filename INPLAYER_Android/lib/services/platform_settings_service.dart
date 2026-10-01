@@ -20,6 +20,13 @@ class PublicPlatformSettings {
   final String announcementText;
   final String announcementLinkUrl;
   final bool signupsEnabled;
+  final bool admobEnabled;
+  final String admobAppId;
+  final String admobBannerUnitId;
+  final String admobInterstitialUnitId;
+  final String admobRewardedUnitId;
+  final String admobNativeUnitId;
+  final String admobOpenAppUnitId;
 
   const PublicPlatformSettings({
     this.maintenanceMode = false,
@@ -28,6 +35,13 @@ class PublicPlatformSettings {
     this.announcementText = '',
     this.announcementLinkUrl = '',
     this.signupsEnabled = true,
+    this.admobEnabled = false,
+    this.admobAppId = '',
+    this.admobBannerUnitId = '',
+    this.admobInterstitialUnitId = '',
+    this.admobRewardedUnitId = '',
+    this.admobNativeUnitId = '',
+    this.admobOpenAppUnitId = '',
   });
 
   /// Everything switched off / allowed. This is what a failed fetch
@@ -42,18 +56,44 @@ class PublicPlatformSettings {
   }
 
   factory PublicPlatformSettings.fromJson(Map<String, dynamic> json) {
+    final hasAppMaint = json['inplayerAppMaintenanceMode'] != null;
+    final isMaintenance = hasAppMaint
+        ? _bool(json['inplayerAppMaintenanceMode'])
+        : _bool(json['inplayerMaintenanceMode']);
+
+    final appMaintMsg = json['inplayerAppMaintenanceMessage']?.toString().trim() ?? '';
+    final webMaintMsg = json['inplayerMaintenanceMessage']?.toString().trim() ?? '';
+    final maintenanceMessage = appMaintMsg.isNotEmpty ? appMaintMsg : webMaintMsg;
+
+    final hasAppAnn = json['inplayerAppAnnouncementEnabled'] != null;
+    final isAnnouncement = hasAppAnn
+        ? _bool(json['inplayerAppAnnouncementEnabled'])
+        : _bool(json['inplayerAnnouncementEnabled']);
+
+    final appAnnText = json['inplayerAppAnnouncementText']?.toString().trim() ?? '';
+    final webAnnText = json['inplayerAnnouncementText']?.toString().trim() ?? '';
+    final announcementText = appAnnText.isNotEmpty ? appAnnText : webAnnText;
+
+    final appAnnLink = json['inplayerAppAnnouncementLinkUrl']?.toString().trim() ?? '';
+    final webAnnLink = json['inplayerAnnouncementLinkUrl']?.toString().trim() ?? '';
+    final announcementLinkUrl = appAnnLink.isNotEmpty ? appAnnLink : webAnnLink;
+
     return PublicPlatformSettings(
-      maintenanceMode: _bool(json['inplayerMaintenanceMode']),
-      maintenanceMessage:
-          json['inplayerMaintenanceMessage']?.toString().trim() ?? '',
-      announcementEnabled: _bool(json['inplayerAnnouncementEnabled']),
-      announcementText:
-          json['inplayerAnnouncementText']?.toString().trim() ?? '',
-      announcementLinkUrl:
-          json['inplayerAnnouncementLinkUrl']?.toString().trim() ?? '',
+      maintenanceMode: isMaintenance,
+      maintenanceMessage: maintenanceMessage,
+      announcementEnabled: isAnnouncement,
+      announcementText: announcementText,
+      announcementLinkUrl: announcementLinkUrl,
       // Absent means allowed: never lock people out of signing up because a
       // field was missing from an older settings row.
       signupsEnabled: _bool(json['signupsEnabled'], fallback: true),
+      admobEnabled: _bool(json['admobEnabled']),
+      admobAppId: json['admobAppId']?.toString().trim() ?? '',
+      admobBannerUnitId: json['admobBannerUnitId']?.toString().trim() ?? '',
+      admobInterstitialUnitId: json['admobInterstitialUnitId']?.toString().trim() ?? '',
+      admobRewardedUnitId: json['admobRewardedUnitId']?.toString().trim() ?? '',
+      admobNativeUnitId: json['admobNativeUnitId']?.toString().trim() ?? '',
+      admobOpenAppUnitId: json['admobOpenAppUnitId']?.toString().trim() ?? '',
     );
   }
 }

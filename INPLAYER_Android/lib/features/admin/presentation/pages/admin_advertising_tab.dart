@@ -30,8 +30,8 @@ class AdminAdvertisingTab extends StatelessWidget {
     final tabs = <Tab>[];
     final views = <Widget>[];
     if (canManageAds) {
-      tabs.addAll(const [Tab(text: 'Ads'), Tab(text: 'Mid-roll')]);
-      views.addAll(const [_AdsView(), _MidrollView()]);
+      tabs.addAll(const [Tab(text: 'Ads'), Tab(text: 'Mid-roll'), Tab(text: 'AdMob (App)')]);
+      views.addAll(const [_AdsView(), _MidrollView(), _AdMobView()]);
     }
     if (canManageNavbarTheme) {
       tabs.add(const Tab(text: 'Navbar Theme'));
@@ -714,6 +714,211 @@ class _NavbarThemeViewState extends ConsumerState<_NavbarThemeView> {
             child: const Text('Remove theme'),
           ),
         ],
+      ],
+    );
+  }
+}
+
+
+class _AdMobView extends ConsumerStatefulWidget {
+  const _AdMobView();
+
+  @override
+  ConsumerState<_AdMobView> createState() => _AdMobViewState();
+}
+
+class _AdMobViewState extends ConsumerState<_AdMobView> {
+  bool _loading = true;
+  bool _saving = false;
+  bool _admobEnabled = false;
+
+  late final TextEditingController _appIdController;
+  late final TextEditingController _bannerUnitController;
+  late final TextEditingController _interstitialUnitController;
+  late final TextEditingController _rewardedUnitController;
+  late final TextEditingController _nativeUnitController;
+  late final TextEditingController _openAppUnitController;
+
+  @override
+  void initState() {
+    super.initState();
+    _appIdController = TextEditingController();
+    _bannerUnitController = TextEditingController();
+    _interstitialUnitController = TextEditingController();
+    _rewardedUnitController = TextEditingController();
+    _nativeUnitController = TextEditingController();
+    _openAppUnitController = TextEditingController();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _appIdController.dispose();
+    _bannerUnitController.dispose();
+    _interstitialUnitController.dispose();
+    _rewardedUnitController.dispose();
+    _nativeUnitController.dispose();
+    _openAppUnitController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _load() async {
+    setState(() => _loading = true);
+    final settings = await ref.read(adminServiceProvider).getPlatformSettings();
+    if (!mounted) return;
+    setState(() {
+      _admobEnabled = settings?.admobEnabled ?? false;
+      _appIdController.text = settings?.admobAppId ?? '';
+      _bannerUnitController.text = settings?.admobBannerUnitId ?? '';
+      _interstitialUnitController.text = settings?.admobInterstitialUnitId ?? '';
+      _rewardedUnitController.text = settings?.admobRewardedUnitId ?? '';
+      _nativeUnitController.text = settings?.admobNativeUnitId ?? '';
+      _openAppUnitController.text = settings?.admobOpenAppUnitId ?? '';
+      _loading = false;
+    });
+  }
+
+  Future<void> _save() async {
+    setState(() => _saving = true);
+    final partial = <String, dynamic>{
+      'admobEnabled': _admobEnabled,
+      'admobAppId': _appIdController.text.trim(),
+      'admobBannerUnitId': _bannerUnitController.text.trim(),
+      'admobInterstitialUnitId': _interstitialUnitController.text.trim(),
+      'admobRewardedUnitId': _rewardedUnitController.text.trim(),
+      'admobNativeUnitId': _nativeUnitController.text.trim(),
+      'admobOpenAppUnitId': _openAppUnitController.text.trim(),
+    };
+
+    final result = await ref.read(adminServiceProvider).updatePlatformSettings(partial);
+    if (!mounted) return;
+    setState(() => _saving = false);
+    if (result != null) {
+      showAdminSnack(context, 'AdMob settings saved successfully.');
+    } else {
+      showAdminSnack(context, 'Failed to save AdMob settings.');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) return adminLoadingCenter;
+
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
+      children: [
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.cardDark,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.phone_android, color: Colors.cyanAccent, size: 20),
+                  const SizedBox(width: 8),
+                  const Expanded(
+                    child: Text(
+                      'Google AdMob (InPlayer Android App)',
+                      style: TextStyle(
+                        color: AppColors.textPrimaryDark,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                      ),
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: _admobEnabled
+                          ? Colors.green.withValues(alpha: 0.15)
+                          : Colors.grey.withValues(alpha: 0.15),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: _admobEnabled ? Colors.green : Colors.grey,
+                        width: 0.8,
+                      ),
+                    ),
+                    child: Text(
+                      _admobEnabled ? 'ACTIVE' : 'DISABLED',
+                      style: TextStyle(
+                        color: _admobEnabled ? Colors.green : Colors.grey,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                'Configure Google AdMob App ID and Ad Unit IDs for Android in-app mobile advertising. Synchronizes immediately with all user devices.',
+                style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        SwitchListTile(
+          value: _admobEnabled,
+          onChanged: (v) => setState(() => _admobEnabled = v),
+          title: const Text('Enable Google AdMob in App', style: TextStyle(color: AppColors.textPrimaryDark, fontWeight: FontWeight.w600)),
+          subtitle: const Text('Show mobile AdMob ads across Android app placements', style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 12)),
+          activeTrackColor: AppColors.brandOrange,
+          contentPadding: EdgeInsets.zero,
+        ),
+        const SizedBox(height: 12),
+        _buildTextField(_appIdController, 'AdMob App ID', hint: 'ca-app-pub-2093353589258497~5197320427'),
+        const SizedBox(height: 12),
+        _buildTextField(_bannerUnitController, 'Banner Ad Unit ID', hint: 'ca-app-pub-2093353589258497/2053845436'),
+        const SizedBox(height: 12),
+        _buildTextField(_interstitialUnitController, 'Interstitial Ad Unit ID (Optional)', hint: 'ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY'),
+        const SizedBox(height: 12),
+        _buildTextField(_rewardedUnitController, 'Rewarded Ad Unit ID (Optional)', hint: 'ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY'),
+        const SizedBox(height: 12),
+        _buildTextField(_nativeUnitController, 'Native Advanced Unit ID (Optional)', hint: 'ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY'),
+        const SizedBox(height: 12),
+        _buildTextField(_openAppUnitController, 'App Open Ad Unit ID (Optional)', hint: 'ca-app-pub-XXXXXXXXXXXXXXXX/YYYYYYYYYY'),
+        const SizedBox(height: 24),
+        ElevatedButton(
+          onPressed: _saving ? null : _save,
+          style: ElevatedButton.styleFrom(
+            backgroundColor: AppColors.brandOrange,
+            minimumSize: const Size.fromHeight(48),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+          child: _saving
+              ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+              : const Text('Save AdMob Configuration', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildTextField(TextEditingController controller, String label, {String? hint}) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(color: AppColors.textPrimaryDark, fontSize: 13, fontWeight: FontWeight.w600)),
+        const SizedBox(height: 6),
+        TextField(
+          controller: controller,
+          style: const TextStyle(color: AppColors.textPrimaryDark, fontSize: 13),
+          decoration: InputDecoration(
+            hintText: hint,
+            hintStyle: TextStyle(color: AppColors.textSecondaryDark.withValues(alpha: 0.6), fontSize: 12),
+            filled: true,
+            fillColor: AppColors.cardDark,
+            contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1))),
+            enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.white.withValues(alpha: 0.1))),
+            focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: AppColors.brandOrange)),
+          ),
+        ),
       ],
     );
   }

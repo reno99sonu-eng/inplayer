@@ -127,6 +127,11 @@
             android:name="com.google.firebase.messaging.default_notification_icon"
             android:resource="@mipmap/ic_launcher" />
 
+        <!-- Google AdMob Application ID (InPlayer Android) -->
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-2093353589258497~5197320427" />
+
         <!-- just_audio_background — powers MusicPlayerService's real
              background playback + lock-screen/notification media controls
              for the new dedicated Music section. Standard manifest entries

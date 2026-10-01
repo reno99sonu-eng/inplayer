@@ -120,7 +120,7 @@ const DEFAULT_SETTINGS: AdSettings = {
   admobEnabled: true,
   admobAppId: "ca-app-pub-2093353589258497~5197320427",
   admobBannerUnitId: "ca-app-pub-2093353589258497/2053845436",
-  admobInterstitialUnitId: "",
+  admobInterstitialUnitId: "ca-app-pub-2093353589258497/7761467681",
   admobRewardedUnitId: "",
   admobNativeUnitId: "",
   admobOpenAppUnitId: "",

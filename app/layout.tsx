@@ -191,13 +191,14 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <head>
+        <meta name="google-adsense-account" content="ca-pub-2093353589258497" />
         {settings.adsenseEnabled ? (
           <script
             async
             src={`https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${
-              (settings.adsensePublisherId || "pub-9015405021941451").startsWith("ca-")
-                ? (settings.adsensePublisherId || "pub-9015405021941451")
-                : `ca-${settings.adsensePublisherId || "pub-9015405021941451"}`
+              (settings.adsensePublisherId || "pub-2093353589258497").startsWith("ca-")
+                ? (settings.adsensePublisherId || "pub-2093353589258497")
+                : `ca-${settings.adsensePublisherId || "pub-2093353589258497"}`
             }`}
             crossOrigin="anonymous"
           />

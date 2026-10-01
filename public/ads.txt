@@ -1,5 +1,5 @@
-# InPlayer - Google AdSense (inplayerdigital@gmail.com)
-google.com, pub-9015405021941451, DIRECT, f08c47fec0942fa0
+# InPlayer - Google AdSense & AdMob (toftelevisionpvtltd@gmail.com)
+google.com, pub-2093353589258497, DIRECT, f08c47fec0942fa0
 
 # GameMonetize.com
 google.com, pub-5519830896893885, DIRECT, f08c47fec0942fa0

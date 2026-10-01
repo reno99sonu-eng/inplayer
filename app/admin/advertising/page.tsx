@@ -115,8 +115,8 @@ interface MidrollAdCreative {
 }
 
 const DEFAULT_SETTINGS: AdSettings = {
-  adsenseEnabled: false,
-  adsensePublisherId: "",
+  adsenseEnabled: true,
+  adsensePublisherId: "pub-2093353589258497",
   admobEnabled: true,
   admobAppId: "ca-app-pub-2093353589258497~5197320427",
   admobBannerUnitId: "ca-app-pub-2093353589258497/2053845436",

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { verifyAuth } from "@/app/lib/verifyAuth";
+import { verifyAuth, SESSION_REVOKED_MESSAGE } from "@/app/lib/verifyAuth";
 import { isAdminEmail } from "@/app/lib/isAdmin";
 import { getActiveTeamMember } from "@/app/lib/adminMembers";
 
@@ -37,7 +37,24 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json({ isAdmin: false, isMainAdmin: false, email: user.email || null, permissions: [] });
-  } catch {
+  } catch (err) {
+    // This device's session was ended (log out of this/all devices, or the
+    // device cap evicted it) while its Cognito token is still valid. Every
+    // admin data request from it is rejected, so say so distinctly — the
+    // layout then shows "sign in again" instead of letting each page fail
+    // with a bare "Unauthorized".
+    if (err instanceof Error && err.message === SESSION_REVOKED_MESSAGE) {
+      return NextResponse.json(
+        {
+          isAdmin: false,
+          isMainAdmin: false,
+          email: null,
+          permissions: [],
+          code: "SESSION_REVOKED",
+        },
+        { status: 401 }
+      );
+    }
     return NextResponse.json({ isAdmin: false, isMainAdmin: false, email: null, permissions: [] });
   }
 }

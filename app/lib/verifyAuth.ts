@@ -66,7 +66,10 @@ const TEMP_BLOCKED_MESSAGE = "Account temporarily blocked";
 // Cognito token revocation. A request with NO X-Session-Id header (an
 // older cached page, or a route this app hasn't wired up yet) always
 // skips this check rather than being blocked by it.
-const SESSION_REVOKED_MESSAGE = "Signed out of this device";
+// Exported so a route can tell "this device's session was ended" (log out
+// of this/all devices, or evicted by the device cap) apart from any other
+// auth failure, and the client can show a clear "sign in again" screen.
+export const SESSION_REVOKED_MESSAGE = "Signed out of this device";
 
 // Call this at the top of any API route that should only work for
 // signed-in users (uploading, liking, commenting, etc.). It expects

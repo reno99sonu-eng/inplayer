@@ -22,12 +22,22 @@ function setStoredSessionId(sessionId: string) {
 }
 
 export function clearStoredSessionId() {
+  lastRegisteredToken = null;
   try {
     localStorage.removeItem(STORAGE_KEY);
   } catch {
     /* ignore */
   }
 }
+
+// One sign-in can trigger several registrations: the Hub "signedIn" and
+// "signInWithRedirect" events AND the sign-in form's onSuccess each call
+// refreshUser({ isFreshSignIn: true }). Each used to create its own row, so
+// one login used two of the five device slots and evicted this account's
+// other browsers twice as fast. Calls for the same token share one request,
+// and a repeat right after it finished is skipped.
+let inFlight: { idToken: string; promise: Promise<void> } | null = null;
+let lastRegisteredToken: string | null = null;
 
 // Called exactly once per real fresh sign-in (see AuthProvider.tsx's
 // isFreshSignIn gate) — never on a passive page-load session restore, so
@@ -36,16 +46,37 @@ export function clearStoredSessionId() {
 // be circular — it needs this file's own getStoredSessionId()); this is
 // the one call site allowed to build its own Authorization header.
 export async function registerCurrentSession(idToken: string): Promise<void> {
+  if (lastRegisteredToken === idToken && getStoredSessionId()) return;
+  if (inFlight && inFlight.idToken === idToken) return inFlight.promise;
+  // A genuinely new sign-in: drop any id left over from an earlier session
+  // NOW (synchronously, before React re-renders), so nothing sent in the
+  // meantime carries a stale id the server no longer recognises. Without
+  // an id the per-device check is skipped; the new one is stored below.
+  clearStoredSessionId();
+
+  const promise = (async () => {
+    try {
+      const res = await fetch("/api/sessions/register", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${idToken}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      // Only store an id the server actually recorded — an unrecorded one
+      // gets every later request rejected as "signed out of this device".
+      if (data.sessionId && !data.tableMissing) {
+        setStoredSessionId(data.sessionId);
+        lastRegisteredToken = idToken;
+      }
+    } catch (err) {
+      console.error("registerCurrentSession failed (non-fatal):", err);
+    }
+  })();
+  inFlight = { idToken, promise };
   try {
-    const res = await fetch("/api/sessions/register", {
-      method: "POST",
-      headers: { Authorization: `Bearer ${idToken}` },
-    });
-    if (!res.ok) return;
-    const data = await res.json();
-    if (data.sessionId) setStoredSessionId(data.sessionId);
-  } catch (err) {
-    console.error("registerCurrentSession failed (non-fatal):", err);
+    await promise;
+  } finally {
+    if (inFlight?.promise === promise) inFlight = null;
   }
 }
 

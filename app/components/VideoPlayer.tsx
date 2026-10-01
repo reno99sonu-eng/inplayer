@@ -257,6 +257,13 @@ export default function VideoPlayer({
     ? 9 / 16
     : letterboxedAspectRatio ??
       (portraitRatio !== null ? Math.max(portraitRatio, 0.8) : 16 / 9);
+  // Fullscreen uses a vertical upload's TRUE shape: the 4:5-or-taller clamp
+  // above keeps room for the controls inline, but in fullscreen it left the
+  // clip no bigger than it was inline, with wide black bands.
+  const fullscreenAspectRatio =
+    !vertical && letterboxedAspectRatio === null && portraitRatio !== null
+      ? portraitRatio
+      : displayAspectRatio;
   const reportPlaybackState = useCallback(
     (playingOverride?: boolean) => {
       const player = playerRef.current;
@@ -741,8 +748,8 @@ export default function VideoPlayer({
         const availableWidth = playerRoot.clientWidth;
         const availableHeight = playerRoot.clientHeight;
         if (availableWidth <= 0 || availableHeight <= 0) return;
-        const width = Math.min(availableWidth, availableHeight * displayAspectRatio);
-        const height = width / displayAspectRatio;
+        const width = Math.min(availableWidth, availableHeight * fullscreenAspectRatio);
+        const height = width / fullscreenAspectRatio;
         setFullscreenFrameSize((current) =>
           current && Math.abs(current.width - width) < 0.5 && Math.abs(current.height - height) < 0.5
             ? current
@@ -777,7 +784,7 @@ export default function VideoPlayer({
       window.removeEventListener("orientationchange", updateFrameSize);
       window.visualViewport?.removeEventListener("resize", updateFrameSize);
     };
-  }, [displayAspectRatio, isFullscreen, vertical]);
+  }, [displayAspectRatio, fullscreenAspectRatio, isFullscreen, vertical]);
 
   const rootFrameStyle = vertical
     ? undefined
@@ -1209,7 +1216,13 @@ export default function VideoPlayer({
         await el.requestFullscreen();
         // Best-effort orientation lock (Android only; iOS rejects).
         try {
-          await (screen.orientation as ScreenOrientationWithLock)?.lock?.("landscape");
+          // A vertical video stays upright — locked to landscape, a 9:16
+          // clip came out smaller in fullscreen than it was inline. Based on
+          // the shape actually shown, so a portrait file whose picture is a
+          // letterboxed landscape recording still goes landscape.
+          await (screen.orientation as ScreenOrientationWithLock)?.lock?.(
+            fullscreenAspectRatio < 1 ? "portrait" : "landscape"
+          );
         } catch {
           /* fine — viewer can rotate manually */
         }
@@ -1737,7 +1750,9 @@ export default function VideoPlayer({
             // letterbox detector overrides that only when the source itself
             // has stable black bands around a landscape recording.
             height: vertical || inlineFrameSize || isFullscreen ? "100%" : "auto",
-            aspectRatio: String(displayAspectRatio),
+            aspectRatio: String(
+              isFullscreen ? fullscreenAspectRatio : displayAspectRatio
+            ),
             ...(letterboxedAspectRatio !== null
               ? { "--media-object-fit": "cover" }
               : {}),

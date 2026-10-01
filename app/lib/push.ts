@@ -107,6 +107,18 @@ export async function sendPushToUser(input: {
     const response = await getMessaging(app).sendEachForMulticast({
       tokens,
       notification: { title: input.title, body: input.body },
+      // The app's white-silhouette InPlayer mark, tinted brand orange, for
+      // the status bar / drawer. (Android draws small icons from the alpha
+      // channel only, so the full-colour launcher icon showed as a blank
+      // shape.) An app build without this drawable falls back to its
+      // manifest default, so older installs are unaffected.
+      android: {
+        notification: {
+          icon: "ic_stat_inplayer",
+          color: "#FF7A18",
+          channelId: "in.inplayer.app.channel.push",
+        },
+      },
     });
 
     // A token Firebase itself reports as dead (app uninstalled, data

@@ -131,6 +131,10 @@ export async function sessionStillActive(userId: string, sessionId: string): Pro
       new GetCommand({
         TableName: SESSIONS_TABLE,
         Key: { userId, sessionId },
+        // Strongly consistent: a session registered milliseconds ago must
+        // read as active. An eventually consistent read could miss the
+        // brand-new row and report the device as signed out.
+        ConsistentRead: true,
       })
     );
     return Boolean(result.Item);

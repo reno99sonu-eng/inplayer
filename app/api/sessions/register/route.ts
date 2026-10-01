@@ -23,5 +23,14 @@ export async function POST(request: NextRequest) {
     ipAddress: getRequestIp(request),
   });
 
-  return NextResponse.json({ sessionId, tableMissing: Boolean(tableMissing) });
+  // registerSession still returns a random id when the row could NOT be
+  // written (DynamoDB unavailable or denied). Handing that back made the
+  // browser store an id that no row matches, so every later request that
+  // sent it was rejected as "signed out of this device" — the admin panel's
+  // blanket "Unauthorized". Return no id instead; with no X-Session-Id the
+  // per-device check is simply skipped.
+  if (tableMissing) {
+    return NextResponse.json({ sessionId: null, tableMissing: true });
+  }
+  return NextResponse.json({ sessionId, tableMissing: false });
 }

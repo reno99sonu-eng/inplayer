@@ -1,10 +1,9 @@
 import type { Metadata } from "next";
-import { GetCommand } from "@aws-sdk/lib-dynamodb";
-import { docClient } from "@/app/lib/dynamodb";
 import { getVisibleVideos } from "@/app/lib/contentAccessServer";
 import { isMusicType } from "@/app/lib/contentTypes";
 import { sanitizeGenre, sanitizeMusicLanguage } from "@/app/lib/musicTrack";
 import { resolveUsernames } from "@/app/lib/resolveUsernames";
+import { getShareableVideoById } from "@/app/lib/sharedContent";
 import type { MusicTrack } from "@/app/context/MusicPlayerContext";
 import MusicPageClient from "@/app/components/music/MusicPageClient";
 
@@ -98,14 +97,8 @@ export default async function MusicPage({ searchParams }: MusicPageProps) {
         tracks.unshift(target);
       } else if (idx === -1) {
         try {
-          const direct = await docClient.send(
-            new GetCommand({
-              TableName: "InPlayer-Videos",
-              Key: { videoId: initialVideoId },
-            })
-          );
-          if (direct.Item) {
-            const v = direct.Item;
+          const v = await getShareableVideoById(initialVideoId);
+          if (v && isMusicType(v.contentType)) {
             const uploaderId = v.uploaderId as string | undefined;
             const musicSettings = (v.musicSettings && typeof v.musicSettings === "object") ? (v.musicSettings as any) : {};
             const covers = Array.isArray(musicSettings.covers) && musicSettings.covers.length > 0
@@ -160,5 +153,11 @@ export default async function MusicPage({ searchParams }: MusicPageProps) {
     console.error("Failed to load music tracks:", err);
   }
 
-  return <MusicPageClient tracks={tracks} topArtists={topArtists} />;
+  return (
+    <MusicPageClient
+      tracks={tracks}
+      topArtists={topArtists}
+      initialVideoId={initialVideoId}
+    />
+  );
 }

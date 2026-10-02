@@ -2,11 +2,11 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:video_player/video_player.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
-import 'package:share_plus/share_plus.dart';
+import '../../../../core/utils/share_utils.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/image_utils.dart';
 import '../../../../models/film_series.dart';
 import '../../../../models/film_episode.dart';
 import '../../../../services/raftaar_films_service.dart';
@@ -60,16 +60,26 @@ class _RaftaarFilmsPlayerPageState
 
     try {
       final detail = await service.getSeriesDetail(widget.seriesId);
-      if (detail != null && mounted) {
+      final foundIndex = detail?.episodes.indexWhere(
+        (ep) => ep.videoId == widget.episodeId,
+      );
+      if (detail != null && foundIndex != null && foundIndex >= 0 && mounted) {
         _series = detail.series;
         _episodes = detail.episodes;
-
-        // Find initial episode index
-        final foundIndex =
-            _episodes.indexWhere((ep) => ep.videoId == widget.episodeId);
-        _currentIndex = foundIndex != -1 ? foundIndex : 0;
-
+        _currentIndex = foundIndex;
+        _pageController.dispose();
         _pageController = PageController(initialPage: _currentIndex);
+      } else if (mounted) {
+        // The series ID on older links can be stale even while the episode
+        // still exists. Resolve the video directly instead of starting some
+        // other episode from index zero.
+        final episode = await ref
+            .read(videoServiceProvider)
+            .getVideoById(widget.episodeId);
+        if (episode != null && mounted) {
+          context.go('/watch/${Uri.encodeComponent(widget.episodeId)}?direct=1');
+          return;
+        }
       }
     } catch (_) {}
 
@@ -474,13 +484,10 @@ class _SingleFilmEpisodeViewState
         .toggleSubscribe(widget.series.seriesId, nextFollowing);
   }
 
-  void _shareEpisode() {
-    SharePlus.instance.share(
-      ShareParams(
-        text:
-            'Watch "${widget.series.title}" Ep ${widget.episode.episodeNumber} on Raftaar Films: https://inplayer.in/raftaar-films/${widget.series.seriesId}/${widget.episode.videoId}',
-        subject: widget.episode.title,
-      ),
+  Future<void> _shareEpisode() async {
+    await shareContentLink(
+      videoId: widget.episode.videoId,
+      title: '${widget.series.title} — Ep ${widget.episode.episodeNumber}',
     );
   }
 
@@ -552,7 +559,7 @@ class _SingleFilmEpisodeViewState
                   ),
                 )
               else if (thumb.isNotEmpty)
-                CachedNetworkImage(
+                SafeAppImage(
                   imageUrl: thumb,
                   fit: BoxFit.cover,
                   placeholder: (context, url) => Container(color: Colors.black),
@@ -801,7 +808,7 @@ class _SingleFilmEpisodeViewState
                             radius: 16,
                             backgroundColor: Colors.white24,
                             backgroundImage: widget.series.creatorAvatarUrl.isNotEmpty
-                                ? CachedNetworkImageProvider(
+                                ? smartImageProvider(
                                     widget.series.creatorAvatarUrl,
                                   )
                                 : null,
@@ -1173,7 +1180,7 @@ class _FilmCommentsSheetState extends ConsumerState<_FilmCommentsSheet> {
                                     backgroundImage:
                                         c.userAvatarUrl != null &&
                                                 c.userAvatarUrl!.isNotEmpty
-                                            ? CachedNetworkImageProvider(
+                                            ? smartImageProvider(
                                                 c.userAvatarUrl!,
                                               )
                                             : null,

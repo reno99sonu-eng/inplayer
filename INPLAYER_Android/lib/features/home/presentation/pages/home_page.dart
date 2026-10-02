@@ -23,13 +23,13 @@ import '../widgets/in_family_row.dart';
 import '../widgets/raftaar_shorts_row.dart';
 import '../widgets/playables_shelf.dart';
 import '../widgets/home_ad_card.dart';
+import '../widgets/full_screen_announcement.dart';
 import '../../../music/presentation/widgets/mini_player_bar.dart';
 import '../../../../services/music_player_service.dart';
 import '../../../../services/platform_settings_service.dart';
 import '../../../../services/navbar_theme_service.dart';
 import '../../../../core/utils/image_utils.dart';
 import '../../../../models/admin_navbar_theme.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../../services/content_access_service.dart';
 import '../../../../services/platform_update_service.dart';
 import '../../../../core/router/pageless_route_observer.dart';
@@ -207,13 +207,22 @@ class _HomePageState extends ConsumerState<HomePage> {
       _announcementDismissed = false;
     }
 
+    final showAnnouncement =
+        _currentIndex == 0 &&
+        platformSettings.announcementEnabled &&
+        platformSettings.announcementText.isNotEmpty &&
+        !_announcementDismissed &&
+        !platformSettings.maintenanceMode;
+
     return PopScope(
       // Intercept Back even on the Home tab so active audio/video sessions are
       // stopped before the Android Activity is finished.
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-        if (_currentIndex != 0) {
+        if (showAnnouncement) {
+          setState(() => _announcementDismissed = true);
+        } else if (_currentIndex != 0) {
           setState(() {
             _currentIndex = 0;
           });
@@ -247,11 +256,12 @@ class _HomePageState extends ConsumerState<HomePage> {
                 ),
               // The floating video window (VideoMiniPlayerOverlay) is mounted
               // app-wide in main.dart so it survives pages pushed over Home.
-              if (platformSettings.announcementEnabled &&
-                  platformSettings.announcementText.isNotEmpty &&
-                  !_announcementDismissed &&
-                  !platformSettings.maintenanceMode)
-                _buildAnnouncementBanner(platformSettings, musicLoaded),
+              if (showAnnouncement)
+                FullScreenAnnouncement(
+                  message: platformSettings.announcementText,
+                  linkUrl: platformSettings.announcementLinkUrl,
+                  onClose: () => setState(() => _announcementDismissed = true),
+                ),
               // Last in the Stack so it covers everything above, including the
               // nav shell. Note this covers the TAB shell — a screen pushed on
               // top of it (a watch page opened from a deep link) sits above
@@ -261,102 +271,29 @@ class _HomePageState extends ConsumerState<HomePage> {
             ],
           ),
         ),
-        bottomNavigationBar: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [const MiniPlayerBar(), _buildBottomNavigationBar(context)],
-        ),
-      ),
-    );
-  }
-
-  /// Bottom navigation bar — matches the web app's MobileBottomNav.tsx:
-  /// - Frosted glass bg: #06101D/95% dark, #F5EEDC/95% light
-  /// - backdrop-blur-2xl
-  /// - border-t: theme adaptive
-  /// - Active: orange-400 icon with drop-shadow glow, font-black, scale-105
-  /// Bottom navigation bar — matches the web app's MobileBottomNav.tsx:
-  /// - Frosted glass bg: #06101D/95% dark, #F5EEDC/95% light
-  /// - backdrop-blur-2xl
-  /// - border-t: theme adaptive
-  /// - Active: orange-400 icon with drop-shadow glow, font-black, scale-105
-  /// The admin panel's announcement, shown low on the screen so it never
-  /// covers the top bar. Tappable when a link was set with it.
-  Widget _buildAnnouncementBanner(
-    PublicPlatformSettings settings,
-    bool musicLoaded,
-  ) {
-    final link = settings.announcementLinkUrl;
-    return Positioned(
-      left: 16,
-      right: 16,
-      bottom: 96 + (musicLoaded ? _miniPlayerInset : 0.0),
-      child: Material(
-        color: Colors.transparent,
-        child: InkWell(
-          borderRadius: BorderRadius.circular(14),
-          onTap: link.isEmpty
-              ? null
-              : () {
-                  final uri = Uri.tryParse(link);
-                  if (uri != null) {
-                    launchUrl(uri, mode: LaunchMode.externalApplication);
-                  }
-                },
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(14, 10, 6, 10),
-            decoration: BoxDecoration(
-              color: context.bgModal,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: AppColors.brandOrange.withValues(alpha: 0.45),
+        bottomNavigationBar: showAnnouncement
+            ? null
+            : Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const MiniPlayerBar(),
+                  _buildBottomNavigationBar(context),
+                ],
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.25),
-                  blurRadius: 14,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Row(
-              children: [
-                const Icon(
-                  Icons.campaign_outlined,
-                  color: AppColors.brandOrange,
-                  size: 18,
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: Text(
-                    settings.announcementText,
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: context.textPrimary,
-                      fontSize: 12.5,
-                      height: 1.35,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-                IconButton(
-                  tooltip: 'Dismiss',
-                  icon: Icon(
-                    Icons.close_rounded,
-                    size: 18,
-                    color: context.textSecondary,
-                  ),
-                  onPressed: () =>
-                      setState(() => _announcementDismissed = true),
-                ),
-              ],
-            ),
-          ),
-        ),
       ),
     );
   }
 
+  /// Bottom navigation bar — matches the web app's MobileBottomNav.tsx:
+  /// - Frosted glass bg: #06101D/95% dark, #F5EEDC/95% light
+  /// - backdrop-blur-2xl
+  /// - border-t: theme adaptive
+  /// - Active: orange-400 icon with drop-shadow glow, font-black, scale-105
+  /// Bottom navigation bar — matches the web app's MobileBottomNav.tsx:
+  /// - Frosted glass bg: #06101D/95% dark, #F5EEDC/95% light
+  /// - backdrop-blur-2xl
+  /// - border-t: theme adaptive
+  /// - Active: orange-400 icon with drop-shadow glow, font-black, scale-105
   /// Shown when the admin switches InPlayer into maintenance mode, using
   /// their own message rather than a generic one.
   Widget _buildMaintenanceOverlay(PublicPlatformSettings settings) {

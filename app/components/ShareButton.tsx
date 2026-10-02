@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Share2, Check } from "lucide-react";
+import { sharedContentUrl } from "@/app/lib/shareLinks";
 
 interface ShareButtonProps {
   videoId: string;
@@ -19,7 +20,7 @@ export default function ShareButton({ videoId, title }: ShareButtonProps) {
   const [copied, setCopied] = useState(false);
 
   const handleShare = async () => {
-    const url = `${window.location.origin}/watch/${videoId}`;
+    const url = sharedContentUrl(videoId);
 
     // Use the native share sheet on devices that support it (mobile,
     // and some desktop browsers); fall back to copying the link.

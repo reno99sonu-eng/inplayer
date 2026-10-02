@@ -6,9 +6,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:logger/logger.dart';
-import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../../../../core/utils/share_utils.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/image_utils.dart';
@@ -51,8 +51,16 @@ class WatchPage extends ConsumerStatefulWidget {
   // adopts this already-initialized, already-playing controller instead of
   // creating a new one, so re-expanding never restarts or re-buffers.
   final VideoPlayerController? adoptController;
+  // Lets a shared film episode with a stale series association play by video
+  // ID directly instead of redirecting back into the broken series route.
+  final bool bypassFilmRedirect;
 
-  const WatchPage({super.key, required this.videoId, this.adoptController});
+  const WatchPage({
+    super.key,
+    required this.videoId,
+    this.adoptController,
+    this.bypassFilmRedirect = false,
+  });
 
   @override
   ConsumerState<WatchPage> createState() => _WatchPageState();
@@ -671,7 +679,7 @@ class _WatchPageState extends ConsumerState<WatchPage>
       }
 
       // If this video is a Raftaar Films episode, redirect immediately to the dedicated vertical player
-      if (video.isFilm) {
+      if (video.isFilm && !widget.bypassFilmRedirect) {
         final sId = (video.seriesId != null && video.seriesId!.isNotEmpty) ? video.seriesId! : 'series';
         if (mounted) {
           context.pushReplacement('/raftaar-films/' + sId + '/' + video.videoId);
@@ -1072,14 +1080,11 @@ class _WatchPageState extends ConsumerState<WatchPage>
     setState(() => _watchlistBusy = false);
   }
 
-  void _share() {
+  Future<void> _share() async {
     final video = _video;
     if (video == null) return;
-    final url = 'https://inplayer.in/watch/${video.videoId}';
     _suppressAutoPipBriefly();
-    SharePlus.instance.share(
-      ShareParams(text: '${video.title}\n$url', subject: video.title),
-    );
+    await shareVideoLink(video);
   }
 
   // ---------------- Download ----------------

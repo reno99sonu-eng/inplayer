@@ -70,6 +70,7 @@ const GENRE_GRADIENTS: Record<string, string> = {
 
 interface MusicPageClientProps {
   tracks: MusicTrack[];
+  initialVideoId?: string;
   topArtists: {
     id: string;
     name: string;
@@ -81,6 +82,7 @@ interface MusicPageClientProps {
 
 export default function MusicPageClient({
   tracks,
+  initialVideoId,
   topArtists,
 }: MusicPageClientProps) {
   const { currentTrack, isPlaying, playTrack, togglePlay, addToQueue } =
@@ -93,6 +95,7 @@ export default function MusicPageClient({
   const [voiceUnsupported, setVoiceUnsupported] = useState(false);
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const startedSharedTrackRef = useRef<string | null>(null);
   const [subscribedArtists, setSubscribedArtists] = useState<Set<string>>(
     new Set()
   );
@@ -106,6 +109,21 @@ export default function MusicPageClient({
       recognitionRef.current?.stop();
     };
   }, []);
+
+  useEffect(() => {
+    const videoId = initialVideoId?.trim();
+    if (!videoId) {
+      startedSharedTrackRef.current = null;
+      return;
+    }
+    if (startedSharedTrackRef.current === videoId) return;
+
+    const linkedTrack = tracks.find((track) => track.videoId === videoId);
+    if (!linkedTrack) return;
+
+    startedSharedTrackRef.current = videoId;
+    playTrack(linkedTrack, tracks);
+  }, [initialVideoId, playTrack, tracks]);
 
   const startVoiceSearch = () => {
     const win = window as WindowWithSpeechRecognition;

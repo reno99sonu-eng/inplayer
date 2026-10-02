@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
+import '../../../../core/utils/image_utils.dart';
 import '../../../../models/film_series.dart';
 
 class SeriesCardWidget extends StatefulWidget {
@@ -62,7 +62,7 @@ class _SeriesCardWidgetState extends State<SeriesCardWidget> {
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: widget.series.posterUrl.isNotEmpty
-                    ? CachedNetworkImage(
+                    ? SafeAppImage(
                         imageUrl: widget.series.posterUrl,
                         fit: BoxFit.cover,
                         placeholder: (context, url) => Container(

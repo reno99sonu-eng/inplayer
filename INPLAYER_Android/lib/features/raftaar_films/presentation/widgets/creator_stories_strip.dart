@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/utils/image_utils.dart';
 
 class CreatorStoryItem {
   final String creatorId;
@@ -91,7 +91,7 @@ class CreatorStoriesStrip extends StatelessWidget {
                         color: isDark ? Colors.black : Colors.white,
                       ),
                       child: ClipOval(
-                        child: CachedNetworkImage(
+                        child: SafeAppImage(
                           imageUrl: creator.creatorAvatarUrl,
                           fit: BoxFit.cover,
                           placeholder: (context, url) => Container(

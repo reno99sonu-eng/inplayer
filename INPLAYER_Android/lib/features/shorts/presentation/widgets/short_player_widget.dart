@@ -6,7 +6,7 @@ import 'package:video_player/video_player.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:go_router/go_router.dart';
-import 'package:share_plus/share_plus.dart';
+import '../../../../core/utils/share_utils.dart';
 
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/image_utils.dart';
@@ -745,15 +745,10 @@ class _ShortPlayerWidgetState extends ConsumerState<ShortPlayerWidget>
     }
   }
 
-  void _shareShort() {
-    // /shorts/{id} (not /watch/{id}) so the link lands on the scrolling
-    // Shorts feed at this video instead of the raw watch page.
-    final url = 'https://inplayer.in/shorts/${widget.short.videoId}';
-    SharePlus.instance.share(
-      ShareParams(
-        text: '${widget.short.title}\n$url',
-        subject: widget.short.title,
-      ),
+  Future<void> _shareShort() async {
+    await shareContentLink(
+      videoId: widget.short.videoId,
+      title: widget.short.title,
     );
   }
 

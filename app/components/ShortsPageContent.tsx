@@ -45,6 +45,7 @@ import { useAuthModal } from "./auth/AuthProvider";
 import { useSettings } from "./settings/SettingsProvider";
 import CommentSection from "./CommentSection";
 import { recordShare } from "./ShareButton";
+import { sharedContentUrl } from "@/app/lib/shareLinks";
 
 interface ShortsPageContentProps {
   initialShorts: Short[];
@@ -601,7 +602,7 @@ export default function ShortsPageContent({
 
   const handleShare = async (short: Short) => {
     if (!short.videoId) return;
-    const url = `${window.location.origin}/shorts?v=${short.videoId}`;
+    const url = sharedContentUrl(short.videoId);
 
     if (navigator.share) {
       try {

@@ -20,6 +20,7 @@ import {
   Share2,
 } from "lucide-react";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
+import { sharedContentUrl } from "@/app/lib/shareLinks";
 
 type PanelView = "main" | "playlists" | "report";
 
@@ -367,7 +368,7 @@ export default function VideoOptionsMenu({
   };
 
   const handleShare = async () => {
-    const url = `${window.location.origin}/watch/${videoId}`;
+    const url = sharedContentUrl(videoId);
     try {
       if (navigator.share) {
         await navigator.share({ url });

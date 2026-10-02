@@ -7,6 +7,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:just_audio_background/just_audio_background.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'core/config/face_scan_config.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/pattern_background.dart';
 import 'core/router/app_router.dart';
@@ -216,7 +217,7 @@ class _InplayerAppState extends ConsumerState<InplayerApp>
 
     final navContext = rootNavigatorKey.currentContext;
     FaceScanResult? result;
-    if (navContext != null && navContext.mounted) {
+    if (startupFaceScanEnabled && navContext != null && navContext.mounted) {
       try {
         result = await FaceScanModal.show(navContext, startupScan: true);
       } catch (e) {
@@ -230,14 +231,9 @@ class _InplayerAppState extends ConsumerState<InplayerApp>
     final savedKidMode = prefs.getBool('inplayer:kids_mode_enabled') ?? false;
     final previouslyRequestedAudience = prefs.getString('audience');
 
-    // Content filtering based on face scan and user preference:
-    // If the user previously turned ON Kids Mode toggle, keep Kids Mode.
-    // If Kids Mode toggle is OFF (default):
-    // Face scan dynamically and immediately filters content for the person in front of camera:
-    //   - Minor/Child detected (<13) -> Kids content only (AudienceMode.kids)
-    //   - Adult/Standard (13+) -> Standard content (AudienceMode.family)
-    //   - No face / Skipped -> Fallback to Standard content (AudienceMode.family)
-    // NO PASSKEY / PASSCODE IS EVER REQUESTED ON STARTUP / FACE SCAN!
+    // Preserve an explicitly enabled Kids Mode. When it is off, an enabled
+    // startup scan can choose the audience; with startup scanning disabled,
+    // the app uses Standard Mode until the person changes it in the app.
     AudienceMode mode;
     if (savedKidMode) {
       mode = AudienceMode.kids;
@@ -273,11 +269,9 @@ class _InplayerAppState extends ConsumerState<InplayerApp>
     _showAudienceFlashCard(mode, fromScan: result != null && !savedKidMode);
   }
 
-  /// The small, dismissible confirmation the person sees once they're
-  /// actually in the app — separate from the full-screen scan UI itself,
-  /// which they've already seen close by this point. Deliberately honest
-  /// about what happened rather than implying certainty: this is a default,
-  /// not a verified fact about the viewer, and it says so.
+  /// The small, dismissible confirmation shown after startup audience setup.
+  /// When the optional startup scan is disabled, this reports the saved/default
+  /// mode and does not imply that the viewer's age was verified.
   void _showAudienceFlashCard(AudienceMode mode, {required bool fromScan}) {
     final messenger = _scaffoldMessengerKey.currentState;
     if (messenger == null) return;

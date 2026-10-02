@@ -163,7 +163,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
   String _genre = 'Other';
   String _musicLanguage = '';
   final List<String> _tags = [];
-  // The final video/short upload prompt only offers Everyone or Kids. These
+  // The final non-music upload prompt only offers Everyone or Kids. These
   // remain the existing audience fields sent to the upload API.
   String _audience = 'everyone';
   bool get _madeForKids => _audience == 'kids';
@@ -637,11 +637,16 @@ class _UploadPageState extends ConsumerState<UploadPage> {
   Future<String?> _chooseVideoAudience() async {
     var selected = _audience == 'kids' ? 'kids' : 'everyone';
 
-    return showModalBottomSheet<String>(
+    return showDialog<String>(
       context: context,
-      useSafeArea: true,
-      backgroundColor: Colors.transparent,
-      builder: (sheetContext) => StatefulBuilder(
+      barrierDismissible: false,
+      builder: (dialogContext) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 440),
+          child: SingleChildScrollView(
+            child: StatefulBuilder(
         builder: (context, setSheetState) {
           Widget audienceCard({
             required String value,
@@ -740,7 +745,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
           }
 
           return Container(
-            padding: const EdgeInsets.fromLTRB(20, 12, 20, 18),
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 18),
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
@@ -749,26 +754,13 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                     ? [const Color(0xFF28232A), const Color(0xFF151419)]
                     : [const Color(0xFFFFF7ED), const Color(0xFFF4EBE3)],
               ),
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(28),
-              ),
+              borderRadius: BorderRadius.circular(28),
               border: Border.all(color: context.borderSubtle),
             ),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Center(
-                  child: Container(
-                    width: 42,
-                    height: 4,
-                    decoration: BoxDecoration(
-                      color: context.textDim.withValues(alpha: 0.45),
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
                 Text(
                   'Who can watch this upload?',
                   style: TextStyle(
@@ -806,7 +798,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                   children: [
                     Expanded(
                       child: OutlinedButton(
-                        onPressed: () => Navigator.pop(sheetContext),
+                        onPressed: () => Navigator.pop(dialogContext),
                         style: OutlinedButton.styleFrom(
                           minimumSize: const Size.fromHeight(48),
                           foregroundColor: context.textPrimary,
@@ -822,7 +814,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
                     Expanded(
                       flex: 2,
                       child: ElevatedButton.icon(
-                        onPressed: () => Navigator.pop(sheetContext, selected),
+                        onPressed: () => Navigator.pop(dialogContext, selected),
                         icon: const Icon(Icons.cloud_upload_rounded, size: 18),
                         label: Text(
                           selected == 'kids' ? 'Upload for Kids' : 'Upload',
@@ -847,6 +839,9 @@ class _UploadPageState extends ConsumerState<UploadPage> {
             ),
           );
         },
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -881,7 +876,7 @@ class _UploadPageState extends ConsumerState<UploadPage> {
 
     // Ask at the final publish action, before upload setup or media transfer.
     // Music uploads do not have a video audience prompt.
-    if (_contentType == 'video' || _contentType == 'short') {
+    if (_contentType != 'music') {
       _audiencePromptOpen = true;
       String? selectedAudience;
       try {

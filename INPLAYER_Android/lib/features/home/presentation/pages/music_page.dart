@@ -23,8 +23,9 @@ import '../../../music/presentation/widgets/music_track_tile.dart';
 /// and browse filters that stay within the explicit Music content type.
 class MusicPage extends ConsumerStatefulWidget {
   final bool isActive;
+  final String? initialVideoId;
 
-  const MusicPage({super.key, this.isActive = true});
+  const MusicPage({super.key, this.isActive = true, this.initialVideoId});
 
   @override
   ConsumerState<MusicPage> createState() => _MusicPageState();
@@ -99,18 +100,29 @@ class _MusicPageState extends ConsumerState<MusicPage> {
     _load();
   }
 
+  @override
+  void didUpdateWidget(covariant MusicPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.initialVideoId != widget.initialVideoId) {
+      _load();
+    }
+  }
+
   Future<void> _load() async {
     List<Video> all;
     try {
       all = await ref.read(videoServiceProvider).getMusicTracks();
     } catch (_) {
-      if (mounted) {
-        setState(() {
-          _tracks = [];
-          _loadFailed = true;
-        });
+      all = [];
+      if (widget.initialVideoId == null || widget.initialVideoId!.isEmpty) {
+        if (mounted) {
+          setState(() {
+            _tracks = [];
+            _loadFailed = true;
+          });
+        }
+        return;
       }
-      return;
     }
 
     // Music covers are uploaded as inline `data:image/...` URIs, not http
@@ -121,6 +133,18 @@ class _MusicPageState extends ConsumerState<MusicPage> {
       final cover = v.covers.isNotEmpty ? v.covers.first : v.thumbnail;
       return smartImageProvider(cover) != null;
     }).toList();
+
+    final initialVideoId = widget.initialVideoId?.trim();
+    if (initialVideoId != null &&
+        initialVideoId.isNotEmpty &&
+        !tracks.any((track) => track.videoId == initialVideoId)) {
+      final linkedTrack = await ref
+          .read(videoServiceProvider)
+          .getVideoById(initialVideoId);
+      if (linkedTrack?.isStrictMusic == true) {
+        tracks.insert(0, linkedTrack!);
+      }
+    }
 
     List<Video> recent = [];
     try {
@@ -163,6 +187,20 @@ class _MusicPageState extends ConsumerState<MusicPage> {
       _recommended = recommended;
       _loadFailed = false;
     });
+
+    if (initialVideoId != null && initialVideoId.isNotEmpty) {
+      final trackIndex = tracks.indexWhere(
+        (track) => track.videoId == initialVideoId,
+      );
+      if (trackIndex >= 0) {
+        unawaited(
+          ref.read(musicPlayerServiceProvider).playQueue(
+                tracks,
+                startIndex: trackIndex,
+              ),
+        );
+      }
+    }
   }
 
   @override

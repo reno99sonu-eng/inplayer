@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:go_router/go_router.dart';
 import 'package:share_plus/share_plus.dart';
 
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/image_utils.dart';
 import '../../../../models/film_series.dart';
 import '../../../../models/film_episode.dart';
 import '../../../../services/raftaar_films_service.dart';
@@ -192,7 +192,7 @@ class _RaftaarFilmsDetailPageState
               radius: 14,
               backgroundColor: Colors.grey[800],
               backgroundImage: series.creatorAvatarUrl.isNotEmpty
-                  ? CachedNetworkImageProvider(series.creatorAvatarUrl)
+                  ? smartImageProvider(series.creatorAvatarUrl)
                   : null,
               child: series.creatorAvatarUrl.isEmpty
                   ? const Icon(Icons.person, color: Colors.white, size: 14)
@@ -249,7 +249,7 @@ class _RaftaarFilmsDetailPageState
                                   radius: 20,
                                   backgroundColor: Colors.grey[800],
                                   backgroundImage: series.creatorAvatarUrl.isNotEmpty
-                                      ? CachedNetworkImageProvider(series.creatorAvatarUrl)
+                                      ? smartImageProvider(series.creatorAvatarUrl)
                                       : null,
                                   child: series.creatorAvatarUrl.isEmpty
                                       ? const Icon(Icons.person, color: Colors.white)
@@ -499,7 +499,7 @@ class _RaftaarFilmsDetailPageState
                               fit: StackFit.expand,
                               children: [
                                 thumb.isNotEmpty
-                                    ? CachedNetworkImage(
+                                    ? SafeAppImage(
                                         imageUrl: thumb,
                                         fit: BoxFit.cover,
                                         placeholder: (context, url) => Container(color: Colors.grey[900]),

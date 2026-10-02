@@ -10,6 +10,7 @@ import '../../features/auth/presentation/pages/verify_email_page.dart';
 import '../../features/home/presentation/pages/home_page.dart';
 import '../../features/shorts/presentation/pages/shorts_page.dart';
 import '../../features/watch/presentation/pages/watch_page.dart';
+import '../../features/watch/presentation/pages/shared_content_link_page.dart';
 import '../../features/search/presentation/pages/search_page.dart';
 import '../../features/subscriptions/presentation/pages/subscriptions_page.dart';
 import '../../features/profile/presentation/pages/profile_page.dart';
@@ -183,7 +184,7 @@ final routerProvider = Provider<GoRouter>((ref) {
           key: state.pageKey,
           opaque: true,
           barrierColor: Colors.black,
-          child: const ShortsPage(),
+          child: ShortsPage(startVideoId: state.uri.queryParameters['v']),
           transitionDuration: const Duration(milliseconds: 150),
           reverseTransitionDuration: const Duration(milliseconds: 120),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
@@ -208,11 +209,19 @@ final routerProvider = Provider<GoRouter>((ref) {
             child: ShortsPage(startVideoId: videoId),
             transitionDuration: const Duration(milliseconds: 150),
             reverseTransitionDuration: const Duration(milliseconds: 120),
-            transitionsBuilder: (context, animation, secondaryAnimation, child) {
-              return FadeTransition(opacity: animation, child: child);
-            },
+            transitionsBuilder:
+                (context, animation, secondaryAnimation, child) {
+                  return FadeTransition(opacity: animation, child: child);
+                },
           );
         },
+      ),
+      GoRoute(
+        path: '/open/:videoId',
+        name: 'shared-content-link',
+        builder: (context, state) => SharedContentLinkPage(
+          videoId: state.pathParameters['videoId'] ?? '',
+        ),
       ),
       GoRoute(
         path: '/watch/:videoId',
@@ -227,7 +236,11 @@ final routerProvider = Provider<GoRouter>((ref) {
           final adoptController = state.extra is VideoPlayerController
               ? state.extra as VideoPlayerController
               : null;
-          return WatchPage(videoId: videoId, adoptController: adoptController);
+          return WatchPage(
+            videoId: videoId,
+            adoptController: adoptController,
+            bypassFilmRedirect: state.uri.queryParameters['direct'] == '1',
+          );
         },
       ),
       GoRoute(
@@ -378,7 +391,6 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (context, state) => const BlockedUsersPage(),
       ),
       GoRoute(
-
         path: '/settings/terms',
         name: 'terms-of-service',
         builder: (context, state) => const AppLegalPage(
@@ -497,7 +509,6 @@ final routerProvider = Provider<GoRouter>((ref) {
           effectiveDate: 'September 5, 2026',
           externalUrl: 'https://inplayer.in/mart-seller-policy',
         ),
-
       ),
       GoRoute(
         // Single "InPlayer Policies" index — replaces the Settings/drawer
@@ -640,7 +651,8 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/music',
         name: 'music',
-        builder: (context, state) => const MusicPage(),
+        builder: (context, state) =>
+            MusicPage(initialVideoId: state.uri.queryParameters['v']),
       ),
       GoRoute(
         path: '/sponsorships/success',

@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { useMusicPlayer } from "@/app/context/MusicPlayerContext";
 import { recordShare } from "@/app/components/ShareButton";
+import { sharedContentUrl } from "@/app/lib/shareLinks";
 
 function formatSeconds(secs: number): string {
   if (isNaN(secs) || secs < 0) return "0:00";
@@ -153,7 +154,7 @@ export default function GlobalMusicPlayer() {
 
   const handleShare = async () => {
     if (!currentTrack) return;
-    const url = `${window.location.origin}/music?v=${currentTrack.videoId}`;
+    const url = sharedContentUrl(currentTrack.videoId);
     if (navigator.share) {
       try {
         await navigator.share({

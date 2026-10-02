@@ -14,6 +14,7 @@ import WatchPageContent from "@/app/components/WatchPageContent";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { isMusicType } from "@/app/lib/contentTypes";
+import { getSeriesById } from "@/app/lib/raftaarFilms";
 
 export const dynamic = "force-dynamic";
 
@@ -121,7 +122,6 @@ async function getRelatedVideos(currentVideoId: string, category: string) {
 
 export default async function WatchPage({ params }: WatchPageProps) {
   const { videoId } = await params;
-
   const result = await docClient.send(
     new GetCommand({
       TableName: "InPlayer-Videos",
@@ -145,11 +145,15 @@ export default async function WatchPage({ params }: WatchPageProps) {
     redirect(`/music?v=${videoId}`);
   }
 
-  // Linked Raftaar episodes open their dedicated player. A legacy or
-  // accidentally unlinked film still has a working route here; sending it
-  // to the series landing page would discard the video ID.
-  if (video.seriesId) {
-    redirect(`/raftaar-films/${video.seriesId}/${videoId}`);
+  // Linked Raftaar episodes open their dedicated player. If the series row
+  // has been removed, render this exact video through the ordinary watch page
+  // instead of sending the user into a broken film route.
+  const seriesId =
+    typeof video.seriesId === "string" ? video.seriesId.trim() : "";
+  if (seriesId && (await getSeriesById(seriesId).catch(() => null))) {
+    redirect(
+      `/raftaar-films/${encodeURIComponent(seriesId)}/${encodeURIComponent(videoId)}`,
+    );
   }
 
   // Auto-flagged at upload (app/lib/moderation.ts) and awaiting admin review.

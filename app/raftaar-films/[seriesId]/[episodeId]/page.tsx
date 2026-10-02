@@ -1,4 +1,4 @@
-import { notFound } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
 import FilmPlayerContent from "@/app/components/raftaar-films/FilmPlayerContent";
 import { getSeriesById, getSeriesEpisodes } from "@/app/lib/raftaarFilms";
 import { GetCommand } from "@aws-sdk/lib-dynamodb";
@@ -19,6 +19,17 @@ export default async function FilmPlayerPage({
   ]);
 
   if (!series) {
+    if (episodeId) {
+      const orphanedEpisode = await docClient.send(
+        new GetCommand({
+          TableName: "InPlayer-Videos",
+          Key: { videoId: episodeId },
+        }),
+      );
+      if (orphanedEpisode.Item) {
+        redirect(`/open/${encodeURIComponent(episodeId)}`);
+      }
+    }
     return notFound();
   }
 

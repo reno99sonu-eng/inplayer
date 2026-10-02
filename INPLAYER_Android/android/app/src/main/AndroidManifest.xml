@@ -66,29 +66,49 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
-            <!-- Automatically download Google ML Kit face models on app install -->
-            <meta-data
-                android:name="com.google.mlkit.vision.DEPENDENCIES"
-                android:value="face" />
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
             </intent-filter>
 
-            <!-- App Links — lets Android offer this app as a handler for real
-                 inplayer.in links (e.g. shared /shorts/{id} and /watch/{id}
-                 URLs from WhatsApp) instead of always opening a browser.
-                 android:autoVerify requires a server-hosted
-                 https://inplayer.in/.well-known/assetlinks.json (outside this
-                 app's codebase) to skip the OS chooser dialog entirely — until
-                 that file exists, Android still offers this app as a choice
-                 rather than opening it silently, but the app becomes a valid
-                 candidate handler either way. -->
+            <!-- Share-link App Links are scoped to the content routes the
+                 Flutter router can open. Publish the matching Play app-signing
+                 fingerprint at https://inplayer.in/.well-known/assetlinks.json
+                 so Android can verify and open these links without a chooser. -->
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
-                <data android:scheme="https" android:host="inplayer.in"/>
+                <data android:scheme="https" android:host="inplayer.in" android:pathPrefix="/open/"/>
+                <data android:scheme="https" android:host="www.inplayer.in" android:pathPrefix="/open/"/>
+            </intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https" android:host="inplayer.in" android:pathPrefix="/watch/"/>
+                <data android:scheme="https" android:host="www.inplayer.in" android:pathPrefix="/watch/"/>
+            </intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https" android:host="inplayer.in" android:pathPrefix="/shorts"/>
+                <data android:scheme="https" android:host="www.inplayer.in" android:pathPrefix="/shorts"/>
+            </intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https" android:host="inplayer.in" android:pathPrefix="/raftaar-films/"/>
+                <data android:scheme="https" android:host="www.inplayer.in" android:pathPrefix="/raftaar-films/"/>
+            </intent-filter>
+            <intent-filter android:autoVerify="true">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT"/>
+                <category android:name="android.intent.category.BROWSABLE"/>
+                <data android:scheme="https" android:host="inplayer.in" android:pathPrefix="/music"/>
+                <data android:scheme="https" android:host="www.inplayer.in" android:pathPrefix="/music"/>
             </intent-filter>
 
             <!-- Cognito Hosted UI redirect (Google sign-in). The browser

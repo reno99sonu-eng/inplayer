@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { getVisibleVideos } from "@/app/lib/contentAccessServer";
 import { resolveUsernames } from "@/app/lib/resolveUsernames";
+import { getShareableVideoById } from "@/app/lib/sharedContent";
 
 export const dynamic = "force-dynamic";
 
@@ -11,23 +11,8 @@ export async function GET(
   const { videoId } = await params;
   
   try {
-    const allReady = await getVisibleVideos();
-    let video: Record<string, unknown> | undefined = allReady.find((v) => v.videoId === videoId);
-    
-    if (!video) {
-      const { GetCommand } = await import("@aws-sdk/lib-dynamodb");
-      const { docClient } = await import("@/app/lib/dynamodb");
-      const direct = await docClient.send(
-        new GetCommand({
-          TableName: "InPlayer-Videos",
-          Key: { videoId },
-        })
-      );
-      if (direct.Item) {
-        video = direct.Item as Record<string, unknown>;
-      }
-    }
-    
+    const video = await getShareableVideoById(videoId);
+
     if (!video) {
       return NextResponse.json({ error: "Not found" }, { status: 404 });
     }

@@ -28,6 +28,7 @@ import {
   Rewind,
 } from "lucide-react";
 import CommentSection from "@/app/components/CommentSection";
+import { sharedContentUrl } from "@/app/lib/shareLinks";
 import { useAuthModal } from "@/app/components/auth/AuthProvider";
 import "./RaftaarFilms3DStyles.css";
 
@@ -471,12 +472,15 @@ export default function FilmPlayerContent({
   };
 
   const handleShare = async () => {
+    const shareUrl = currentEpisode?.videoId
+      ? sharedContentUrl(currentEpisode.videoId)
+      : window.location.href;
     const shareData = {
       title: `${series.title} - Ep ${currentEpisode?.episodeNumber || 1}: ${
         currentEpisode?.episodeTitle || currentEpisode?.title || ""
       }`,
       text: `Watch ${series.title} on InPlayer Raftaar Films`,
-      url: window.location.href,
+      url: shareUrl,
     };
     if (navigator.share) {
       try {
@@ -486,7 +490,7 @@ export default function FilmPlayerContent({
       }
     } else {
       try {
-        await navigator.clipboard.writeText(window.location.href);
+        await navigator.clipboard.writeText(shareUrl);
         showToast("Link copied to clipboard!");
       } catch {
         /* fallback */

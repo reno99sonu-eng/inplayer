@@ -17,21 +17,52 @@ import { requirePermission } from "@/app/lib/isAdmin";
 const OPENAI_IMAGE_ENDPOINT = "https://api.openai.com/v1/images/generations";
 const PER_CALL_TIMEOUT_MS = 60_000;
 
-function describeOpenAIError(status: number, body: string): { message: string; httpStatus: number } {
-  if (status === 403 && body.toLowerCase().includes("verif")) {
+function describeOpenAIError(
+  status: number,
+  error: { code?: string; message?: string } | null,
+): { message: string; httpStatus: number } {
+  const code = error?.code?.toLowerCase() ?? "";
+  const providerMessage = error?.message?.toLowerCase() ?? "";
+
+  if (code === "moderation_blocked") {
+    return {
+      message:
+        "OpenAI’s image safety check rejected this prompt. Choose a different subject or occasion, then try again.",
+      httpStatus: 422,
+    };
+  }
+  if (status === 403 && providerMessage.includes("verif")) {
     return {
       message:
         "This OpenAI account isn't verified for AI image generation yet. Go to platform.openai.com/settings/organization/general and click \"Verify Organization,\" then try again in about 15 minutes.",
       httpStatus: 500,
     };
   }
-  if (status === 401 || status === 403) {
+  if (status === 401) {
     return { message: "The OpenAI API key isn't set up correctly. Please contact the site admin.", httpStatus: 500 };
   }
   if (status === 429) {
+    if (code === "insufficient_quota") {
+      return {
+        message: "The OpenAI API account has no image-generation quota available. Check its billing and usage limits.",
+        httpStatus: 429,
+      };
+    }
     return { message: "OpenAI is busy or the account is rate-limited right now. Please try again in a moment.", httpStatus: 429 };
   }
-  return { message: "Couldn't reach OpenAI right now. Please try again shortly.", httpStatus: 502 };
+  if (status === 403) {
+    return { message: "The OpenAI account does not have permission to generate this image. Please contact the site admin.", httpStatus: 502 };
+  }
+  if (status === 404) {
+    return { message: "The configured OpenAI image model is unavailable to this account. Please contact the site admin.", httpStatus: 502 };
+  }
+  if (status >= 500) {
+    return { message: "OpenAI’s image service is temporarily unavailable. Please try again shortly.", httpStatus: 502 };
+  }
+  return {
+    message: `OpenAI rejected the image request (HTTP ${status}). Please try a different prompt or contact the site admin.`,
+    httpStatus: 502,
+  };
 }
 
 export const maxDuration = 60;
@@ -91,9 +122,30 @@ export async function POST(request: NextRequest) {
     });
 
     if (!response.ok) {
-      const errorBody = await response.text();
-      console.error("ai-navbar-theme-generate: OpenAI image error:", response.status, errorBody);
-      const { message, httpStatus } = describeOpenAIError(response.status, errorBody);
+      const errorBody = await response.json().catch(() => null);
+      const providerError = errorBody?.error;
+      const code = typeof providerError?.code === "string" ? providerError.code : undefined;
+      const type = typeof providerError?.type === "string" ? providerError.type : undefined;
+      const param = typeof providerError?.param === "string" ? providerError.param : undefined;
+      const providerMessage =
+        typeof providerError?.message === "string" ? providerError.message : undefined;
+      const requestId =
+        response.headers.get("x-request-id") ??
+        (typeof providerError?.request_id === "string" ? providerError.request_id : undefined);
+
+      // Keep the useful diagnostic identifiers while avoiding full provider
+      // payloads (which can include user prompt text) in server logs.
+      console.error("ai-navbar-theme-generate: OpenAI image error", {
+        status: response.status,
+        type,
+        code,
+        param,
+        requestId,
+      });
+      const { message, httpStatus } = describeOpenAIError(response.status, {
+        code,
+        message: providerMessage,
+      });
       return NextResponse.json({ error: message }, { status: httpStatus });
     }
 
@@ -132,7 +184,15 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ imageUrl: optimizedImageUrl, title: occasionPrompt });
   } catch (err) {
-    console.error("ai-navbar-theme-generate route error:", err);
+    if (controller.signal.aborted) {
+      return NextResponse.json(
+        { error: "OpenAI image generation timed out. Please try again shortly." },
+        { status: 504 },
+      );
+    }
+    console.error("ai-navbar-theme-generate route error:", {
+      name: err instanceof Error ? err.name : "UnknownError",
+    });
     return NextResponse.json({ error: "Couldn't generate that theme graphic right now. Please try again shortly." }, { status: 502 });
   } finally {
     clearTimeout(timer);

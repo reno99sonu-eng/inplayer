@@ -11,6 +11,7 @@ class VideoPreviewGate {
 
   final ValueNotifier<String?> activeCardId = ValueNotifier<String?>(null);
   DateTime _lastActivation = DateTime.fromMillisecondsSinceEpoch(0);
+  Future<void> _pendingPreviewDisposals = Future<void>.value();
 
   /// Number of full-screen players currently asking for feed previews to
   /// stay off. A counter rather than a bool so overlapping owners (the
@@ -21,6 +22,26 @@ class VideoPreviewGate {
 
   /// True while any full-screen player has previews suspended.
   bool get isSuspended => _suspendCount > 0;
+
+  /// Feed decoders share a small hardware decoder pool with the main player.
+  /// Wait for the previous preview to release its decoder before creating the
+  /// next controller, avoiding short-lived overlapping HLS players while the
+  /// feed is being scrolled.
+  Future<void> waitForPreviewDisposals() => _pendingPreviewDisposals;
+
+  /// Runs controller clean-up in order. The queue absorbs teardown errors so
+  /// one failed native dispose cannot permanently block later previews.
+  void enqueuePreviewDisposal(Future<void> Function() dispose) {
+    _pendingPreviewDisposals = _pendingPreviewDisposals
+        .then((_) async {
+          try {
+            await dispose();
+          } catch (_) {
+            // Preview teardown is best-effort; keep the gate usable.
+          }
+        })
+        .catchError((_) {});
+  }
 
   /// Turns feed previews off and tears down whichever one is live.
   ///
@@ -55,20 +76,19 @@ class VideoPreviewGate {
 
   /// Requests the single preview slot for [cardId].
   /// A cooldown prevents rapid contention between multiple visible cards.
-  void requestActivePreview(String cardId) {
+  void requestActivePreview(String cardId, {bool replaceActive = false}) {
     // Hard stop while a full-screen player owns the decoder. VideoCard
     // re-checks visibility on a 2s timer, so without this the feed would
     // simply re-acquire a preview a couple of seconds after suspend()
     // cleared it.
     if (isSuspended) return;
     if (cardId.trim().isEmpty || activeCardId.value == cardId) return;
+    if (activeCardId.value != null && !replaceActive) return;
 
     final now = DateTime.now();
-    if (activeCardId.value != null) {
-      final cooldownMs = now.difference(_lastActivation).inMilliseconds;
-      if (cooldownMs < 800) {
-        return;
-      }
+    final cooldownMs = now.difference(_lastActivation).inMilliseconds;
+    if (cooldownMs < 650) {
+      return;
     }
 
     activeCardId.value = cardId;

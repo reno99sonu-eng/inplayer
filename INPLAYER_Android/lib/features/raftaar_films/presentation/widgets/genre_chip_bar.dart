@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../../core/theme/app_theme.dart';
 
 class GenreChipBar extends StatelessWidget {
   final List<String> genres;
@@ -15,16 +14,14 @@ class GenreChipBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = context.isDark;
-
     return SizedBox(
-      height: 54,
+      height: 42,
       child: ListView.separated(
         clipBehavior: Clip.none,
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
         scrollDirection: Axis.horizontal,
         itemCount: genres.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 8),
+        separatorBuilder: (context, index) => const SizedBox(width: 6),
         itemBuilder: (context, index) {
           final genre = genres[index];
           final isSelected = genre == selectedGenre;
@@ -32,9 +29,9 @@ class GenreChipBar extends StatelessWidget {
           return GestureDetector(
             onTap: () => onSelectGenre(genre),
             child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              height: 38,
-              padding: const EdgeInsets.symmetric(horizontal: 18),
+              duration: const Duration(milliseconds: 160),
+              height: 30,
+              padding: const EdgeInsets.symmetric(horizontal: 13),
               alignment: Alignment.center,
               decoration: BoxDecoration(
                 gradient: isSelected
@@ -44,39 +41,24 @@ class GenreChipBar extends StatelessWidget {
                         end: Alignment.bottomRight,
                       )
                     : null,
-                color: isSelected
-                    ? null
-                    : (isDark
-                        ? Colors.white.withValues(alpha: 0.08)
-                        : Colors.black.withValues(alpha: 0.05)),
-                borderRadius: BorderRadius.circular(20),
+                color: isSelected ? null : Colors.white.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(24),
                 border: Border.all(
                   color: isSelected
                       ? Colors.transparent
-                      : (isDark
-                          ? Colors.white.withValues(alpha: 0.12)
-                          : Colors.black.withValues(alpha: 0.10)),
-                  width: 1,
+                      : Colors.white.withValues(alpha: 0.08),
+                  width: 0.8,
                 ),
-                boxShadow: isSelected
-                    ? [
-                        BoxShadow(
-                          color: const Color(0xFFFF7A18).withValues(alpha: 0.4),
-                          blurRadius: 8,
-                          offset: const Offset(0, 2),
-                        )
-                      ]
-                    : null,
               ),
               child: Center(
                 child: Text(
                   genre,
                   style: TextStyle(
                     color: isSelected
-                        ? Colors.white
-                        : (isDark ? Colors.white70 : Colors.black87),
-                    fontSize: 13,
-                    fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                        ? const Color(0xFF111111)
+                        : Colors.white70,
+                    fontSize: 11.5,
+                    fontWeight: isSelected ? FontWeight.w800 : FontWeight.w500,
                   ),
                 ),
               ),

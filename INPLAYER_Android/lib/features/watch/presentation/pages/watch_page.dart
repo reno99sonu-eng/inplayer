@@ -75,18 +75,10 @@ class _WatchPageState extends ConsumerState<WatchPage>
   final _logger = Logger();
   final _commentController = TextEditingController();
 
-  // True rotate-the-phone-to-fullscreen (the website's *other* fullscreen
-  // trigger besides its manual button — see VideoPlayer.tsx's
-  // device-rotation effect). The "rotate TO landscape -> enter fullscreen"
-  // half is handled right here via WidgetsBinding's didChangeMetrics + the
-  // current screen size, which reflects physical rotation as long as
-  // nothing has locked the app's orientation yet (true on this plain watch
-  // page). The reverse — "rotate back to portrait -> auto-exit" — can't use
-  // the same signal: once FullscreenPlayerPage locks the app to landscape,
-  // Flutter's own metrics/MediaQuery size stops following the physical
-  // sensor. That half now lives in FullscreenPlayerPage itself, via a raw
-  // device-orientation-sensor stream (native_device_orientation) that reads
-  // the sensor directly rather than through Flutter's locked rendering.
+  // Rotation into landscape opens fullscreen while the watch page is visible.
+  // Once open, FullscreenPlayerPage keeps the requested landscape orientation
+  // until the viewer explicitly exits; rotating the phone upright does not
+  // pop the player closed.
   bool _inFullscreen = false;
 
   // Picture-in-Picture (Android system PiP, via pip_service.dart's platform
@@ -221,7 +213,8 @@ class _WatchPageState extends ConsumerState<WatchPage>
     // finished let the main video start first and showed the pre-roll only
     // after the ad-config request eventually came back.
     _midrollConfigLoadFuture = _loadMidrollConfig();
-    _adoptingExistingPlayback = widget.adoptController != null ||
+    _adoptingExistingPlayback =
+        widget.adoptController != null ||
         ref.read(videoMiniPlayerServiceProvider).video?.videoId ==
             widget.videoId;
     _loadVideo();
@@ -680,9 +673,11 @@ class _WatchPageState extends ConsumerState<WatchPage>
 
       // If this video is a Raftaar Films episode, redirect immediately to the dedicated vertical player
       if (video.isFilm && !widget.bypassFilmRedirect) {
-        final sId = (video.seriesId != null && video.seriesId!.isNotEmpty) ? video.seriesId! : 'series';
+        final sId = (video.seriesId != null && video.seriesId!.isNotEmpty)
+            ? video.seriesId!
+            : 'series';
         if (mounted) {
-          context.pushReplacement('/raftaar-films/' + sId + '/' + video.videoId);
+          context.pushReplacement('/raftaar-films/$sId/${video.videoId}');
         }
         return;
       }
@@ -754,6 +749,10 @@ class _WatchPageState extends ConsumerState<WatchPage>
         _resumeApplied = true;
       } else if (video.muxPlaybackId != null &&
           video.muxPlaybackId!.isNotEmpty) {
+        // Let any feed-card HLS decoder finish disposing after suspend()
+        // before ExoPlayer opens the full-resolution watch stream.
+        await VideoPreviewGate.instance.waitForPreviewDisposals();
+        if (!mounted) return;
         final videoUrl = _muxUrl(video.muxPlaybackId!, '1080p');
         final controller = VideoPlayerController.networkUrl(
           Uri.parse(videoUrl),
@@ -886,11 +885,13 @@ class _WatchPageState extends ConsumerState<WatchPage>
               if (!mounted) return;
               setState(() {
                 _recommendedVideos = recommended
-                    .where((v) =>
-                        v.videoId != widget.videoId &&
-                        !v.isFilm &&
-                        !v.isShort &&
-                        !v.isStrictMusic)
+                    .where(
+                      (v) =>
+                          v.videoId != widget.videoId &&
+                          !v.isFilm &&
+                          !v.isShort &&
+                          !v.isStrictMusic,
+                    )
                     .toList();
               });
             })

@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:speech_to_text/speech_to_text.dart' as stt;
-import '../../../../core/theme/app_theme.dart';
 
 class FilmSearchBar extends StatefulWidget {
   final TextEditingController controller;
@@ -79,100 +78,79 @@ class _FilmSearchBarState extends State<FilmSearchBar> {
 
   @override
   Widget build(BuildContext context) {
-    final isDark = context.isDark;
-
     return Container(
       height: 48,
       width: double.infinity,
-        decoration: BoxDecoration(
-          color: isDark
-              ? Colors.white.withValues(alpha: 0.08)
-              : Colors.black.withValues(alpha: 0.05),
-          borderRadius: BorderRadius.circular(24),
-          border: _isListening
-              ? Border.all(
-                  color: const Color(0xFFFF7A18),
-                  width: 1.5,
-                )
-              : null,
-          boxShadow: _isListening
-              ? [
-                  BoxShadow(
-                    color: const Color(0xFFFF7A18).withValues(alpha: 0.3),
-                    blurRadius: 12,
-                    offset: const Offset(0, 2),
-                  )
-                ]
-              : null,
-        ),
-        child: Row(
-          children: [
-            const SizedBox(width: 14),
-            Icon(
-              Icons.search,
-              size: 20,
-              color: isDark ? Colors.white54 : Colors.black45,
-            ),
-            const SizedBox(width: 10),
-            Expanded(
-              child: TextField(
-                controller: widget.controller,
-                onChanged: widget.onChanged,
-                style: TextStyle(
-                  color: isDark ? Colors.white : Colors.black87,
-                  fontSize: 14,
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.07),
+        borderRadius: BorderRadius.circular(24),
+        border: _isListening
+            ? Border.all(color: const Color(0xFFFF7A18), width: 1.5)
+            : null,
+        boxShadow: _isListening
+            ? [
+                BoxShadow(
+                  color: const Color(0xFFFF7A18).withValues(alpha: 0.3),
+                  blurRadius: 12,
+                  offset: const Offset(0, 2),
                 ),
-                decoration: InputDecoration(
-                  hintText: _isListening ? 'Listening...' : widget.hintText,
-                  hintStyle: TextStyle(
-                    color: _isListening
-                        ? const Color(0xFFFF7A18)
-                        : (isDark ? Colors.white38 : Colors.black38),
-                    fontSize: 14,
-                  ),
-                  border: InputBorder.none,
-                  isDense: true,
-                  contentPadding: EdgeInsets.zero,
-                ),
-              ),
-            ),
-            if (widget.controller.text.isNotEmpty)
-              IconButton(
-                icon: Icon(
-                  Icons.close,
-                  size: 18,
-                  color: isDark ? Colors.white54 : Colors.black45,
-                ),
-                onPressed: () {
-                  widget.controller.clear();
-                  widget.onChanged('');
-                  widget.onClear?.call();
-                },
-              ),
-            GestureDetector(
-              onTap: _toggleListening,
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 200),
-                padding: const EdgeInsets.all(8),
-                margin: const EdgeInsets.only(right: 6),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
+              ]
+            : null,
+      ),
+      child: Row(
+        children: [
+          const SizedBox(width: 14),
+          Icon(Icons.search, size: 20, color: Colors.white54),
+          const SizedBox(width: 10),
+          Expanded(
+            child: TextField(
+              controller: widget.controller,
+              onChanged: widget.onChanged,
+              style: TextStyle(color: Colors.white, fontSize: 14),
+              decoration: InputDecoration(
+                hintText: _isListening ? 'Listening...' : widget.hintText,
+                hintStyle: TextStyle(
                   color: _isListening
                       ? const Color(0xFFFF7A18)
-                      : Colors.transparent,
+                      : Colors.white38,
+                  fontSize: 14,
                 ),
-                child: Icon(
-                  _isListening ? Icons.mic : Icons.mic_none,
-                  size: 20,
-                  color: _isListening
-                      ? Colors.white
-                      : (isDark ? Colors.white70 : Colors.black54),
-                ),
+                border: InputBorder.none,
+                isDense: true,
+                contentPadding: EdgeInsets.zero,
               ),
             ),
-          ],
-        ),
-      );
+          ),
+          if (widget.controller.text.isNotEmpty)
+            IconButton(
+              icon: Icon(Icons.close, size: 18, color: Colors.white54),
+              onPressed: () {
+                widget.controller.clear();
+                widget.onChanged('');
+                widget.onClear?.call();
+              },
+            ),
+          GestureDetector(
+            onTap: _toggleListening,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 200),
+              padding: const EdgeInsets.all(8),
+              margin: const EdgeInsets.only(right: 6),
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: _isListening
+                    ? const Color(0xFFFF7A18)
+                    : Colors.transparent,
+              ),
+              child: Icon(
+                _isListening ? Icons.mic : Icons.mic_none,
+                size: 20,
+                color: _isListening ? Colors.white : Colors.white70,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
-

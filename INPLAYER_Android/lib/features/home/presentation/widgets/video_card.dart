@@ -44,6 +44,7 @@ class _VideoCardState extends ConsumerState<VideoCard> {
   VideoPlayerController? _previewController;
   Timer? _hoverTimer;
   Timer? _visibilityTimer;
+  Timer? _visibilityActivationTimer;
   Timer? _previewRetryTimer;
   bool _isPlayingPreview = false;
   bool _isFirstFrameRendered = false;
@@ -53,6 +54,8 @@ class _VideoCardState extends ConsumerState<VideoCard> {
   /// Guards against re-entrant _startStreamingPreview calls that would
   /// otherwise tear down a perfectly good controller mid-init and flash.
   bool _isStartingPreview = false;
+  bool _visibilityDwellPassed = false;
+  int _previewGeneration = 0;
 
   @override
   void initState() {
@@ -62,7 +65,7 @@ class _VideoCardState extends ConsumerState<VideoCard> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       _checkViewportVisibility();
-      _visibilityTimer = Timer.periodic(const Duration(milliseconds: 250), (_) {
+      _visibilityTimer = Timer.periodic(const Duration(milliseconds: 400), (_) {
         _checkViewportVisibility();
       });
     });
@@ -72,6 +75,7 @@ class _VideoCardState extends ConsumerState<VideoCard> {
     final settings = await PlaybackSettingsStore.get();
     if (mounted) {
       setState(() => _dataSaver = settings.dataSaver);
+      if (settings.dataSaver) _stopStreamingPreview();
     }
   }
 
@@ -91,23 +95,23 @@ class _VideoCardState extends ConsumerState<VideoCard> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.video.videoId != widget.video.videoId) {
       _stopStreamingPreview();
+      VideoPreviewGate.instance.releaseActivePreview(oldWidget.video.videoId);
     }
   }
 
   @override
   void dispose() {
+    _hoverTimer?.cancel();
+    _previewRetryTimer?.cancel();
+    _visibilityTimer?.cancel();
+    _visibilityActivationTimer?.cancel();
+    _previewGeneration++;
+    final controller = _previewController;
+    if (controller != null) _disposePreviewController(controller);
     VideoPreviewGate.instance.activeCardId.removeListener(
       _onActivePreviewChanged,
     );
     VideoPreviewGate.instance.releaseActivePreview(widget.video.videoId);
-    _hoverTimer?.cancel();
-    _previewRetryTimer?.cancel();
-    _visibilityTimer?.cancel();
-    if (_previewController != null) {
-      final c = _previewController;
-      _previewController = null;
-      c?.dispose();
-    }
     super.dispose();
   }
 
@@ -122,10 +126,10 @@ class _VideoCardState extends ConsumerState<VideoCard> {
       // Match the short start delay used by the website's preview cards.
       _hoverTimer = Timer(const Duration(milliseconds: 100), () {
         if (!mounted) return;
-        final activeId = VideoPreviewGate.instance.activeCardId.value;
-        if (activeId == null || activeId == widget.video.videoId) {
-          VideoPreviewGate.instance.requestActivePreview(widget.video.videoId);
-        }
+        VideoPreviewGate.instance.requestActivePreview(
+          widget.video.videoId,
+          replaceActive: true,
+        );
       });
     } else {
       VideoPreviewGate.instance.releaseActivePreview(widget.video.videoId);
@@ -159,15 +163,36 @@ class _VideoCardState extends ConsumerState<VideoCard> {
     final visibleTop = top.clamp(0.0, viewportHeight);
     final visibleBottom = bottom.clamp(0.0, viewportHeight);
     final visibleHeight = visibleBottom - visibleTop;
-    final isVisible = visibleHeight >= renderObject.size.height * 0.45;
+    final activeId = VideoPreviewGate.instance.activeCardId.value;
+    final visibleThreshold = activeId == widget.video.videoId ? 0.25 : 0.55;
+    final isVisible =
+        visibleHeight >= renderObject.size.height * visibleThreshold;
 
     if (isVisible) {
-      final activeId = VideoPreviewGate.instance.activeCardId.value;
-      if (activeId == null || activeId == widget.video.videoId) {
+      if (activeId == widget.video.videoId) {
+        _visibilityActivationTimer?.cancel();
+        _visibilityActivationTimer = null;
+        _visibilityDwellPassed = false;
+      } else if (!_visibilityDwellPassed) {
+        _visibilityActivationTimer ??= Timer(
+          const Duration(milliseconds: 300),
+          () {
+            _visibilityActivationTimer = null;
+            if (mounted) _checkViewportVisibility();
+          },
+        );
+      } else {
         VideoPreviewGate.instance.requestActivePreview(widget.video.videoId);
       }
     } else {
+      _visibilityActivationTimer?.cancel();
+      _visibilityActivationTimer = null;
+      _visibilityDwellPassed = false;
       VideoPreviewGate.instance.releaseActivePreview(widget.video.videoId);
+    }
+
+    if (isVisible && activeId != widget.video.videoId) {
+      _visibilityDwellPassed = true;
     }
   }
 
@@ -178,50 +203,59 @@ class _VideoCardState extends ConsumerState<VideoCard> {
     // If already playing or starting, don't tear down and restart.
     if (_isPlayingPreview || _isStartingPreview) return;
     _isStartingPreview = true;
-
-    // Low resolution (360p) muted HLS stream matching Mux preview
-    final url = 'https://stream.mux.com/$muxId.m3u8?max_resolution=360p';
-    final controller = VideoPlayerController.networkUrl(
-      Uri.parse(url),
-      videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
-    );
+    final generation = ++_previewGeneration;
+    VideoPlayerController? controller;
 
     try {
-      await controller.initialize();
-      await controller.setVolume(0.0); // Always muted on feed cards
-      await controller.setLooping(true);
+      await VideoPreviewGate.instance.waitForPreviewDisposals();
+      if (!_shouldContinuePreview(generation)) return;
 
-      if (!mounted ||
-          VideoPreviewGate.instance.activeCardId.value !=
-              widget.video.videoId) {
-        await controller.dispose();
-        _isStartingPreview = false;
+      // Low resolution (360p) muted HLS stream matching Mux preview.
+      final url = 'https://stream.mux.com/$muxId.m3u8?max_resolution=360p';
+      final previewController = VideoPlayerController.networkUrl(
+        Uri.parse(url),
+        videoPlayerOptions: VideoPlayerOptions(mixWithOthers: true),
+      );
+      controller = previewController;
+      // Keep it reachable while initialize() is pending. If scrolling moves
+      // the preview to another card, that controller is queued for teardown
+      // before a replacement decoder can be created.
+      _previewController = previewController;
+      await previewController.initialize();
+      if (!_shouldContinuePreview(generation)) {
+        _disposePreviewController(previewController);
+        return;
+      }
+      await previewController.setVolume(0.0); // Always muted on feed cards
+      await previewController.setLooping(true);
+      if (!_shouldContinuePreview(generation)) {
+        _disposePreviewController(previewController);
         return;
       }
 
       // One-way latch: once the first frame is rendered, it stays rendered
       // for the lifetime of this controller. No resets, no flashing.
-      controller.addListener(() {
-        if (!mounted) return;
+      previewController.addListener(() {
+        if (!mounted || !identical(_previewController, previewController)) {
+          return;
+        }
         if (!_isFirstFrameRendered &&
-            controller.value.isPlaying &&
-            controller.value.position > Duration.zero &&
-            controller.value.size.width > 0 &&
-            controller.value.size.height > 0) {
+            previewController.value.isPlaying &&
+            previewController.value.position > Duration.zero &&
+            previewController.value.size.width > 0 &&
+            previewController.value.size.height > 0) {
           setState(() {
             _isFirstFrameRendered = true;
           });
         }
       });
 
-      await controller.play();
-      if (!mounted) {
-        await controller.dispose();
-        _isStartingPreview = false;
+      await previewController.play();
+      if (!_shouldContinuePreview(generation)) {
+        _disposePreviewController(previewController);
         return;
       }
       setState(() {
-        _previewController = controller;
         _isPlayingPreview = true;
         _isStartingPreview = false;
       });
@@ -229,19 +263,38 @@ class _VideoCardState extends ConsumerState<VideoCard> {
       _previewRetryTimer?.cancel();
     } catch (_) {
       // Network error or unsupported video - thumbnail remains smoothly visible
-      try {
-        await controller.dispose();
-      } catch (_) {}
-      _isStartingPreview = false;
-      if (mounted) {
+      if (controller != null) _disposePreviewController(controller);
+      if (mounted && generation == _previewGeneration) {
         setState(() {
-          _previewController = null;
           _isPlayingPreview = false;
           _isFirstFrameRendered = false;
         });
+        _schedulePreviewRetry();
       }
-      _schedulePreviewRetry();
+    } finally {
+      if (generation == _previewGeneration) _isStartingPreview = false;
     }
+  }
+
+  bool _shouldContinuePreview(int generation) {
+    return mounted &&
+        generation == _previewGeneration &&
+        !_dataSaver &&
+        !VideoPreviewGate.instance.isSuspended &&
+        VideoPreviewGate.instance.activeCardId.value == widget.video.videoId;
+  }
+
+  void _disposePreviewController(VideoPlayerController controller) {
+    if (!identical(_previewController, controller)) return;
+    _previewController = null;
+    VideoPreviewGate.instance.enqueuePreviewDisposal(() async {
+      try {
+        await controller.pause();
+      } catch (_) {}
+      try {
+        await controller.dispose();
+      } catch (_) {}
+    });
   }
 
   void _schedulePreviewRetry() {
@@ -262,13 +315,13 @@ class _VideoCardState extends ConsumerState<VideoCard> {
     _hoverTimer?.cancel();
     _previewRetryTimer?.cancel();
     _previewRetryCount = 0;
+    _previewGeneration++;
     _isStartingPreview = false;
-    if (_previewController != null) {
-      final controller = _previewController;
-      _previewController = null;
-      controller?.pause();
-      controller?.dispose();
-    }
+    final controller = _previewController;
+    if (controller != null) _disposePreviewController(controller);
+    _visibilityActivationTimer?.cancel();
+    _visibilityActivationTimer = null;
+    _visibilityDwellPassed = false;
     if (mounted) {
       setState(() {
         _isPlayingPreview = false;

@@ -1,9 +1,7 @@
-import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:native_device_orientation/native_device_orientation.dart';
 import 'package:video_player/video_player.dart';
 
 import '../../../../core/utils/webvtt_parser.dart';
@@ -13,12 +11,10 @@ import '../widgets/player_chrome.dart';
 /// Landscape, immersive fullscreen playback — reuses the SAME
 /// `VideoPlayerController` the watch page already created (never
 /// re-initializes it), so entering/leaving fullscreen never causes a
-/// re-buffer or a visible restart. Mirrors the website's own "rotate the
-/// phone to landscape → fullscreen; rotate back → exit" + manual toggle
-/// behavior (see VideoPlayer.tsx's `enterFullscreen`/`exitFullscreen`/the
-/// device-rotation effect). WatchPage applies and awaits the Android
-/// landscape lock before opening this route; this page monitors the raw
-/// physical sensor so the lock does not hide a deliberate rotate-back.
+/// re-buffer or a visible restart. The page remains locked in landscape until
+/// the viewer explicitly exits fullscreen, even if the phone is turned back
+/// upright. WatchPage applies and awaits the Android landscape lock before
+/// opening this route and restores automatic rotation after it closes.
 ///
 /// Controller/media-surface/quality-label are all pulled through getters
 /// rather than passed once as plain values: a quality change made *while*
@@ -92,70 +88,7 @@ class FullscreenPlayerPage extends StatefulWidget {
 }
 
 class _FullscreenPlayerPageState extends State<FullscreenPlayerPage> {
-  // Rotate-to-exit — the other half of "rotate the phone" fullscreen
-  // behavior (rotate-*in* lives in watch_page.dart's didChangeMetrics,
-  // which only works because nothing has locked the app's orientation yet
-  // at that point). Once WatchPage locks the rendered orientation to
-  // landscape below, Flutter's own MediaQuery/window-metrics APIs stop
-  // reflecting the phone's real physical orientation — only a raw sensor
-  // reading (native_device_orientation, useSensor: true) still can, which
-  // is what this subscription is for: rotating physically back to portrait
-  // while this page is open now auto-exits, matching the website's own
-  // bidirectional rotation trigger.
-  StreamSubscription<NativeDeviceOrientation>? _orientationSub;
-  Timer? _portraitExitTimer;
   bool _exiting = false;
-  // Rotate-to-exit must be a genuine "rotate back" gesture and must never
-  // fire on entry. When fullscreen is opened by TAPPING the button while the
-  // phone is physically upright, the raw sensor stream reports portraitUp
-  // immediately (on subscribe / on the first tick), which would otherwise pop
-  // straight back out to portrait. So only arm the portrait->exit trigger
-  // after we've actually observed a physical landscape reading first.
-  bool _seenLandscape = false;
-  NativeDeviceOrientation? _lastPhysicalOrientation;
-
-  @override
-  void initState() {
-    super.initState();
-    _orientationSub = NativeDeviceOrientationCommunicator()
-        .onOrientationChanged(useSensor: true)
-        .listen(_handlePhysicalOrientationChanged);
-  }
-
-  void _handlePhysicalOrientationChanged(NativeDeviceOrientation orientation) {
-    if (!mounted) return;
-    _lastPhysicalOrientation = orientation;
-    // Arm the exit trigger only once the phone has physically been in
-    // landscape. Until then, ignore portrait readings so tapping the
-    // fullscreen button while upright doesn't immediately bounce back out.
-    if (orientation == NativeDeviceOrientation.landscapeLeft ||
-        orientation == NativeDeviceOrientation.landscapeRight) {
-      _seenLandscape = true;
-      _portraitExitTimer?.cancel();
-      _portraitExitTimer = null;
-      return;
-    }
-    if (!_seenLandscape) return;
-    if (orientation == NativeDeviceOrientation.portraitUp ||
-        orientation == NativeDeviceOrientation.portraitDown) {
-      // Phone sensors can briefly report portrait while the Android window
-      // is settling into a requested landscape orientation. Require a
-      // stable portrait reading before exiting, or fullscreen appears to
-      // randomly unlock while a video is playing.
-      if (_portraitExitTimer?.isActive == true) return;
-      _portraitExitTimer?.cancel();
-      _portraitExitTimer = Timer(const Duration(milliseconds: 500), () {
-        final last = _lastPhysicalOrientation;
-        if (!mounted ||
-            !_seenLandscape ||
-            (last != NativeDeviceOrientation.portraitUp &&
-                last != NativeDeviceOrientation.portraitDown)) {
-          return;
-        }
-        _exit();
-      });
-    }
-  }
 
   Future<void> _handleQualityChange(String label) async {
     await widget.onQualityChange(label);
@@ -171,8 +104,8 @@ class _FullscreenPlayerPageState extends State<FullscreenPlayerPage> {
   }
 
   Future<void> _exit() async {
-    // Guards against a double-pop: the manual close button, the system back
-    // gesture, and the rotate-to-exit sensor can race within the same frame.
+    // Guards against a double-pop if the close button and system back gesture
+    // race within the same frame.
     if (_exiting) return;
     _exiting = true;
     // WatchPage may already have removed this route (the OS just floated the
@@ -187,85 +120,78 @@ class _FullscreenPlayerPageState extends State<FullscreenPlayerPage> {
   }
 
   @override
-  void dispose() {
-    _orientationSub?.cancel();
-    _portraitExitTimer?.cancel();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
       body: SizedBox.expand(
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              Center(
-                child: LayoutBuilder(
-                  builder: (context, constraints) {
-                    final requestedRatio = widget.getDisplayAspectRatio();
-                    final ratio = requestedRatio.isFinite && requestedRatio > 0
-                        ? requestedRatio
-                        : 16 / 9;
-                    final width = math.min(
-                      constraints.maxWidth,
-                      constraints.maxHeight * ratio,
-                    );
-                    final height = width / ratio;
-                    return SizedBox(
-                      width: width,
-                      height: height,
-                      child: Stack(
-                        alignment: Alignment.center,
-                        children: [
-                          widget.getMediaSurface(),
-                          Positioned.fill(
-                            child: PlayerChrome(
-                              controller: widget.getController(),
-                              title: widget.title,
-                              isFullscreen: true,
-                              onToggleFullscreen: _exit,
-                              onBack: _exit,
-                              qualityLabel: widget.getQualityLabel(),
-                              qualityOptions: widget.qualityOptions,
-                              onQualityChange: _handleQualityChange,
-                              captionLanguages: widget.captionLanguages,
-                              selectedCaptionLang: widget
-                                  .getSelectedCaptionLang(),
-                              captionCues: widget.getCaptionCues(),
-                              onCaptionLanguageChange: _handleCaptionChange,
-                              pipSupported: widget.pipSupported,
-                              onPipTapped: widget.onPipTapped,
-                              initialBrightness: widget.getBrightness(),
-                              onBrightnessChanged: (v) {
-                                widget.onBrightnessChanged(v);
-                                // Rebuild so getMediaSurface() below is
-                                // re-invoked with the new brightness value.
-                                if (mounted) setState(() {});
-                              },
-                            ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Center(
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  final requestedRatio = widget.getDisplayAspectRatio();
+                  final ratio = requestedRatio.isFinite && requestedRatio > 0
+                      ? requestedRatio
+                      : 16 / 9;
+                  final width = math.min(
+                    constraints.maxWidth,
+                    constraints.maxHeight * ratio,
+                  );
+                  final height = width / ratio;
+                  return SizedBox(
+                    width: width,
+                    height: height,
+                    child: Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        widget.getMediaSurface(),
+                        Positioned.fill(
+                          child: PlayerChrome(
+                            controller: widget.getController(),
+                            title: widget.title,
+                            isFullscreen: true,
+                            onToggleFullscreen: _exit,
+                            onBack: _exit,
+                            qualityLabel: widget.getQualityLabel(),
+                            qualityOptions: widget.qualityOptions,
+                            onQualityChange: _handleQualityChange,
+                            captionLanguages: widget.captionLanguages,
+                            selectedCaptionLang: widget
+                                .getSelectedCaptionLang(),
+                            captionCues: widget.getCaptionCues(),
+                            onCaptionLanguageChange: _handleCaptionChange,
+                            pipSupported: widget.pipSupported,
+                            onPipTapped: widget.onPipTapped,
+                            initialBrightness: widget.getBrightness(),
+                            onBrightnessChanged: (v) {
+                              widget.onBrightnessChanged(v);
+                              // Rebuild so getMediaSurface() below is
+                              // re-invoked with the new brightness value.
+                              if (mounted) setState(() {});
+                            },
                           ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
               ),
-              if (widget.getAdOverlay != null && widget.adListenable != null)
-                ValueListenableBuilder<int>(
-                  valueListenable: widget.adListenable!,
-                  builder: (context, _, child) {
-                    final overlay = widget.getAdOverlay!();
-                    if (overlay == null) return const SizedBox.shrink();
-                    return Positioned.fill(child: overlay);
-                  },
-                )
-              else if (widget.getAdOverlay != null &&
-                  widget.getAdOverlay!() != null)
-                Positioned.fill(child: widget.getAdOverlay!()!),
-            ],
-          ),
+            ),
+            if (widget.getAdOverlay != null && widget.adListenable != null)
+              ValueListenableBuilder<int>(
+                valueListenable: widget.adListenable!,
+                builder: (context, _, child) {
+                  final overlay = widget.getAdOverlay!();
+                  if (overlay == null) return const SizedBox.shrink();
+                  return Positioned.fill(child: overlay);
+                },
+              )
+            else if (widget.getAdOverlay != null &&
+                widget.getAdOverlay!() != null)
+              Positioned.fill(child: widget.getAdOverlay!()!),
+          ],
+        ),
       ),
     );
   }

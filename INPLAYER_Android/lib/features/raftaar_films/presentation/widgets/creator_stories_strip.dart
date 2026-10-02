@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/image_utils.dart';
 
 class CreatorStoryItem {
@@ -31,17 +30,82 @@ class CreatorStoriesStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     if (creators.isEmpty) return const SizedBox.shrink();
-    final isDark = context.isDark;
-
-    return SizedBox(
-      height: 96,
+    return Container(
+      height: 88,
+      decoration: BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
+        ),
+      ),
       child: ListView.separated(
-        padding: const EdgeInsets.symmetric(horizontal: 16),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
         scrollDirection: Axis.horizontal,
-        itemCount: creators.length,
-        separatorBuilder: (context, index) => const SizedBox(width: 14),
+        itemCount: creators.length + 1,
+        separatorBuilder: (context, index) => const SizedBox(width: 8),
         itemBuilder: (context, index) {
-          final creator = creators[index];
+          if (index == 0) {
+            final isSelected = selectedCreatorId == null;
+            return GestureDetector(
+              onTap: () => onSelectCreator(null),
+              child: SizedBox(
+                width: 56,
+                child: Column(
+                  children: [
+                    Container(
+                      width: 48,
+                      height: 48,
+                      alignment: Alignment.center,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: isSelected
+                            ? const LinearGradient(
+                                colors: [Color(0xFFFF7A18), Color(0xFFFFB000)],
+                              )
+                            : null,
+                        color: isSelected
+                            ? null
+                            : Colors.white.withValues(alpha: 0.07),
+                        border: isSelected
+                            ? null
+                            : Border.all(
+                                color: Colors.white.withValues(alpha: 0.15),
+                              ),
+                      ),
+                      child: Text(
+                        'ALL',
+                        style: TextStyle(
+                          color: isSelected
+                              ? const Color(0xFF111111)
+                              : Colors.white70,
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.4,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Everyone',
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: isSelected
+                            ? FontWeight.w700
+                            : FontWeight.w500,
+                        color: isSelected
+                            ? const Color(0xFFFF9A00)
+                            : Colors.white54,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          }
+
+          final creator = creators[index - 1];
           final isSelected = creator.creatorId == selectedCreatorId;
 
           return GestureDetector(
@@ -53,13 +117,13 @@ class CreatorStoriesStrip extends StatelessWidget {
               }
             },
             child: SizedBox(
-              width: 68,
+              width: 56,
               child: Column(
-                 mainAxisSize: MainAxisSize.min,
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    width: 60,
-                    height: 60,
+                    width: 48,
+                    height: 48,
                     padding: const EdgeInsets.all(2.5),
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
@@ -70,17 +134,23 @@ class CreatorStoriesStrip extends StatelessWidget {
                               end: Alignment.bottomRight,
                             )
                           : const LinearGradient(
-                              colors: [Color(0xFFFF7A18), Color(0xFFE50914), Color(0xFFB81D24)],
+                              colors: [
+                                Color(0xFFFF7A18),
+                                Color(0xFFE50914),
+                                Color(0xFFB81D24),
+                              ],
                               begin: Alignment.topRight,
                               end: Alignment.bottomLeft,
                             ),
                       boxShadow: isSelected
                           ? [
                               BoxShadow(
-                                color: const Color(0xFFFF7A18).withValues(alpha: 0.5),
+                                color: const Color(
+                                  0xFFFF7A18,
+                                ).withValues(alpha: 0.5),
                                 blurRadius: 10,
                                 spreadRadius: 1,
-                              )
+                              ),
                             ]
                           : null,
                     ),
@@ -88,7 +158,7 @@ class CreatorStoriesStrip extends StatelessWidget {
                       padding: const EdgeInsets.all(1.5),
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
-                        color: isDark ? Colors.black : Colors.white,
+                        color: Colors.black,
                       ),
                       child: ClipOval(
                         child: SafeAppImage(
@@ -96,11 +166,19 @@ class CreatorStoriesStrip extends StatelessWidget {
                           fit: BoxFit.cover,
                           placeholder: (context, url) => Container(
                             color: Colors.grey[800],
-                            child: const Icon(Icons.person, color: Colors.white54, size: 24),
+                            child: const Icon(
+                              Icons.person,
+                              color: Colors.white54,
+                              size: 24,
+                            ),
                           ),
                           errorWidget: (context, url, error) => Container(
                             color: Colors.grey[800],
-                            child: const Icon(Icons.person, color: Colors.white54, size: 24),
+                            child: const Icon(
+                              Icons.person,
+                              color: Colors.white54,
+                              size: 24,
+                            ),
                           ),
                         ),
                       ),
@@ -114,10 +192,12 @@ class CreatorStoriesStrip extends StatelessWidget {
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 11,
-                      fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                      fontWeight: isSelected
+                          ? FontWeight.w700
+                          : FontWeight.w500,
                       color: isSelected
-                          ? const Color(0xFFFF7A18)
-                          : (isDark ? Colors.white70 : Colors.black87),
+                          ? const Color(0xFFFF9A00)
+                          : Colors.white70,
                     ),
                   ),
                 ],

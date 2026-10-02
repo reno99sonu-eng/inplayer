@@ -13,7 +13,12 @@ import '../widgets/raftaar_films_intro_animation.dart';
 
 class RaftaarFilmsLandingPage extends ConsumerStatefulWidget {
   final bool showIntro;
-  const RaftaarFilmsLandingPage({super.key, this.showIntro = false});
+  final double bottomInset;
+  const RaftaarFilmsLandingPage({
+    super.key,
+    this.showIntro = false,
+    this.bottomInset = 0,
+  });
 
   @override
   ConsumerState<RaftaarFilmsLandingPage> createState() =>
@@ -595,6 +600,8 @@ class _RaftaarFilmsLandingPageState
               ),
 
             SliverToBoxAdapter(child: _buildCreatorCallToAction(context)),
+            if (widget.bottomInset > 0)
+              SliverToBoxAdapter(child: SizedBox(height: widget.bottomInset)),
           ],
         ),
       ),

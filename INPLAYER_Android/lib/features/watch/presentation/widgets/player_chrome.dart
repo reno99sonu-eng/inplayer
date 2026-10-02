@@ -33,6 +33,7 @@ class PlayerChrome extends StatefulWidget {
   final VideoPlayerController controller;
   final String title;
   final bool isFullscreen;
+  final bool isZoomGestureActive;
   final VoidCallback onToggleFullscreen;
   final VoidCallback? onBack;
   final String qualityLabel;
@@ -104,6 +105,7 @@ class PlayerChrome extends StatefulWidget {
     required this.controller,
     required this.title,
     required this.isFullscreen,
+    this.isZoomGestureActive = false,
     required this.onToggleFullscreen,
     this.onBack,
     required this.qualityLabel,
@@ -190,6 +192,30 @@ class _PlayerChromeState extends State<PlayerChrome> {
     _tapToggleTimer?.cancel();
     _seekFlashTimer?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant PlayerChrome oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.controller, widget.controller)) {
+      oldWidget.controller.removeListener(_onControllerTick);
+      widget.controller.addListener(_onControllerTick);
+      _wasPlaying = widget.controller.value.isPlaying;
+      if (_controlsVisible) _scheduleAutoHide();
+    }
+    if (!oldWidget.isZoomGestureActive && widget.isZoomGestureActive) {
+      // A second touch has taken ownership of the gesture. Clear any pending
+      // single-finger seek/brightness state before those recognizers can
+      // finish the same interaction as a separate player command.
+      _clearToggleTimer();
+      _tapSide = null;
+      _tapCount = 0;
+      _dragStart = null;
+      _dragging = false;
+      _dragKind = null;
+      _dragIndicatorKind = null;
+      _dragIndicatorPercent = null;
+    }
   }
 
   void _onControllerTick() {
@@ -308,6 +334,7 @@ class _PlayerChromeState extends State<PlayerChrome> {
   }
 
   void _handleTapUp(TapUpDetails details, Size size) {
+    if (widget.isZoomGestureActive) return;
     final dx = details.localPosition.dx;
     final side = dx < size.width * 0.35
         ? 'left'
@@ -357,6 +384,7 @@ class _PlayerChromeState extends State<PlayerChrome> {
       !widget.isFullscreen && widget.onDragDown != null;
 
   void _handleVerticalDragStart(DragStartDetails details, Size size) {
+    if (widget.isZoomGestureActive) return;
     if (details.localPosition.dy > size.height - 64) return;
     _dragStart = details.localPosition;
     _dragging = false;
@@ -372,6 +400,7 @@ class _PlayerChromeState extends State<PlayerChrome> {
   }
 
   void _handleVerticalDragUpdate(DragUpdateDetails details, Size size) {
+    if (widget.isZoomGestureActive) return;
     final start = _dragStart;
     if (start == null) return;
     final deltaY = start.dy - details.localPosition.dy; // up = positive

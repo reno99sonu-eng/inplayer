@@ -1,6 +1,5 @@
-import 'dart:math' as math;
-
 import 'package:flutter/foundation.dart';
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import 'package:video_player/video_player.dart';
 
@@ -25,7 +24,6 @@ import '../widgets/player_chrome.dart';
 class FullscreenPlayerPage extends StatefulWidget {
   final VideoPlayerController Function() getController;
   final Widget Function() getMediaSurface;
-  final double Function() getDisplayAspectRatio;
   final String title;
   final String Function() getQualityLabel;
   final List<QualityOption> qualityOptions;
@@ -66,7 +64,6 @@ class FullscreenPlayerPage extends StatefulWidget {
     super.key,
     required this.getController,
     required this.getMediaSurface,
-    required this.getDisplayAspectRatio,
     required this.title,
     required this.getQualityLabel,
     required this.qualityOptions,
@@ -89,6 +86,17 @@ class FullscreenPlayerPage extends StatefulWidget {
 
 class _FullscreenPlayerPageState extends State<FullscreenPlayerPage> {
   bool _exiting = false;
+  final TransformationController _videoTransform = TransformationController();
+  final GlobalKey _zoomViewportKey = GlobalKey();
+  final Map<int, Offset> _zoomPointers = {};
+  double _zoomScale = 1;
+  Offset _zoomOffset = Offset.zero;
+  Offset? _lastZoomFocalPoint;
+  double? _lastZoomDistance;
+  bool _zoomGestureActive = false;
+
+  static const double _minVideoScale = 1;
+  static const double _maxVideoScale = 4;
 
   Future<void> _handleQualityChange(String label) async {
     await widget.onQualityChange(label);
@@ -101,6 +109,91 @@ class _FullscreenPlayerPageState extends State<FullscreenPlayerPage> {
   Future<void> _handleCaptionChange(String? code) async {
     await widget.onCaptionLanguageChange(code);
     if (mounted) setState(() {});
+  }
+
+  void _handleZoomPointerDown(PointerDownEvent event) {
+    if (event.kind != PointerDeviceKind.touch) return;
+    _zoomPointers[event.pointer] = event.localPosition;
+    if (_zoomPointers.length >= 2) {
+      _beginZoomGesture();
+    }
+  }
+
+  void _beginZoomGesture() {
+    final points = _zoomPointers.values.take(2).toList(growable: false);
+    if (points.length < 2) return;
+    _lastZoomFocalPoint = (points[0] + points[1]) / 2;
+    _lastZoomDistance = (points[0] - points[1]).distance;
+    if (!_zoomGestureActive && mounted) {
+      setState(() => _zoomGestureActive = true);
+    }
+  }
+
+  void _handleZoomPointerMove(PointerMoveEvent event) {
+    if (!_zoomPointers.containsKey(event.pointer)) return;
+    _zoomPointers[event.pointer] = event.localPosition;
+    if (!_zoomGestureActive || _zoomPointers.length < 2) return;
+
+    final points = _zoomPointers.values.take(2).toList(growable: false);
+    if (points.length < 2) return;
+    final focalPoint = (points[0] + points[1]) / 2;
+    final distance = (points[0] - points[1]).distance;
+    final previousDistance = _lastZoomDistance;
+    final previousFocalPoint = _lastZoomFocalPoint;
+    if (previousDistance == null ||
+        previousFocalPoint == null ||
+        previousDistance <= 0 ||
+        distance <= 0) {
+      _lastZoomDistance = distance;
+      _lastZoomFocalPoint = focalPoint;
+      return;
+    }
+
+    final nextScale = (_zoomScale * distance / previousDistance)
+        .clamp(_minVideoScale, _maxVideoScale)
+        .toDouble();
+    final scaleFactor = nextScale / _zoomScale;
+    var nextOffset = Offset(
+      focalPoint.dx + scaleFactor * (_zoomOffset.dx - previousFocalPoint.dx),
+      focalPoint.dy + scaleFactor * (_zoomOffset.dy - previousFocalPoint.dy),
+    );
+
+    if (nextScale <= _minVideoScale) {
+      nextOffset = Offset.zero;
+      _videoTransform.value = Matrix4.identity();
+    } else {
+      final renderObject = _zoomViewportKey.currentContext?.findRenderObject();
+      if (renderObject is RenderBox && renderObject.hasSize) {
+        final size = renderObject.size;
+        nextOffset = Offset(
+          nextOffset.dx.clamp(size.width * (1 - nextScale), 0.0).toDouble(),
+          nextOffset.dy.clamp(size.height * (1 - nextScale), 0.0).toDouble(),
+        );
+      }
+      _videoTransform.value = Matrix4.identity()
+        ..translate(nextOffset.dx, nextOffset.dy)
+        ..scale(nextScale);
+    }
+
+    _zoomScale = nextScale;
+    _zoomOffset = nextOffset;
+    _lastZoomDistance = distance;
+    _lastZoomFocalPoint = focalPoint;
+  }
+
+  void _handleZoomPointerUp(PointerEvent event) {
+    _zoomPointers.remove(event.pointer);
+    if (_zoomPointers.length >= 2) {
+      // If a third finger was down, start from its current spacing so the
+      // video never jumps when the active pair changes.
+      _beginZoomGesture();
+      return;
+    }
+    _lastZoomDistance = null;
+    _lastZoomFocalPoint = null;
+    if (_zoomGestureActive && mounted) {
+      setState(() => _zoomGestureActive = false);
+    }
   }
 
   Future<void> _exit() async {
@@ -120,6 +213,12 @@ class _FullscreenPlayerPageState extends State<FullscreenPlayerPage> {
   }
 
   @override
+  void dispose() {
+    _videoTransform.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
@@ -130,49 +229,67 @@ class _FullscreenPlayerPageState extends State<FullscreenPlayerPage> {
             Center(
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  final requestedRatio = widget.getDisplayAspectRatio();
-                  final ratio = requestedRatio.isFinite && requestedRatio > 0
-                      ? requestedRatio
-                      : 16 / 9;
-                  final width = math.min(
-                    constraints.maxWidth,
-                    constraints.maxHeight * ratio,
-                  );
-                  final height = width / ratio;
+                  // The zoom viewport covers the whole display. The shared
+                  // media surface already contains the source at its natural
+                  // aspect ratio, so portrait clips remain letterboxed until
+                  // the viewer pinches to fill more of the screen.
+                  final width = constraints.maxWidth;
+                  final height = constraints.maxHeight;
                   return SizedBox(
                     width: width,
                     height: height,
-                    child: Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        widget.getMediaSurface(),
-                        Positioned.fill(
-                          child: PlayerChrome(
-                            controller: widget.getController(),
-                            title: widget.title,
-                            isFullscreen: true,
-                            onToggleFullscreen: _exit,
-                            onBack: _exit,
-                            qualityLabel: widget.getQualityLabel(),
-                            qualityOptions: widget.qualityOptions,
-                            onQualityChange: _handleQualityChange,
-                            captionLanguages: widget.captionLanguages,
-                            selectedCaptionLang: widget
-                                .getSelectedCaptionLang(),
-                            captionCues: widget.getCaptionCues(),
-                            onCaptionLanguageChange: _handleCaptionChange,
-                            pipSupported: widget.pipSupported,
-                            onPipTapped: widget.onPipTapped,
-                            initialBrightness: widget.getBrightness(),
-                            onBrightnessChanged: (v) {
-                              widget.onBrightnessChanged(v);
-                              // Rebuild so getMediaSurface() below is
-                              // re-invoked with the new brightness value.
-                              if (mounted) setState(() {});
-                            },
-                          ),
+                    child: Listener(
+                      key: _zoomViewportKey,
+                      behavior: HitTestBehavior.opaque,
+                      onPointerDown: _handleZoomPointerDown,
+                      onPointerMove: _handleZoomPointerMove,
+                      onPointerUp: _handleZoomPointerUp,
+                      onPointerCancel: _handleZoomPointerUp,
+                      child: ClipRect(
+                        child: Stack(
+                          alignment: Alignment.center,
+                          children: [
+                            Positioned.fill(
+                              child: AnimatedBuilder(
+                                animation: _videoTransform,
+                                builder: (context, child) => Transform(
+                                  alignment: Alignment.topLeft,
+                                  transform: _videoTransform.value,
+                                  child: child,
+                                ),
+                                child: widget.getMediaSurface(),
+                              ),
+                            ),
+                            Positioned.fill(
+                              child: PlayerChrome(
+                                controller: widget.getController(),
+                                title: widget.title,
+                                isFullscreen: true,
+                                isZoomGestureActive: _zoomGestureActive,
+                                onToggleFullscreen: _exit,
+                                onBack: _exit,
+                                qualityLabel: widget.getQualityLabel(),
+                                qualityOptions: widget.qualityOptions,
+                                onQualityChange: _handleQualityChange,
+                                captionLanguages: widget.captionLanguages,
+                                selectedCaptionLang: widget
+                                    .getSelectedCaptionLang(),
+                                captionCues: widget.getCaptionCues(),
+                                onCaptionLanguageChange: _handleCaptionChange,
+                                pipSupported: widget.pipSupported,
+                                onPipTapped: widget.onPipTapped,
+                                initialBrightness: widget.getBrightness(),
+                                onBrightnessChanged: (v) {
+                                  widget.onBrightnessChanged(v);
+                                  // Rebuild so getMediaSurface() below is
+                                  // re-invoked with the new brightness value.
+                                  if (mounted) setState(() {});
+                                },
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ),
                   );
                 },

@@ -80,6 +80,11 @@ class _WatchPageState extends ConsumerState<WatchPage>
   // until the viewer explicitly exits; rotating the phone upright does not
   // pop the player closed.
   bool _inFullscreen = false;
+  // After fullscreen is explicitly closed while the phone is still sideways,
+  // do not immediately reopen it from the metrics event caused by releasing
+  // the orientation lock. A portrait rotation clears this one-shot guard.
+  bool _suppressAutoFullscreenUntilPortrait = false;
+  Timer? _portraitOrientationSettleTimer;
 
   // Picture-in-Picture (Android system PiP, via pip_service.dart's platform
   // channel to MainActivity.kt). `_pipSupported` gates whether the manual
@@ -195,7 +200,6 @@ class _WatchPageState extends ConsumerState<WatchPage>
   @override
   void initState() {
     super.initState();
-    SystemChrome.setPreferredOrientations([]);
     WidgetsBinding.instance.addObserver(this);
     // A muted feed preview is a second hardware video decoder, and this
     // page is about to open a full one. See VideoPreviewGate.suspend —
@@ -232,7 +236,7 @@ class _WatchPageState extends ConsumerState<WatchPage>
 
   @override
   void dispose() {
-    SystemChrome.setPreferredOrientations([]);
+    _portraitOrientationSettleTimer?.cancel();
     VideoPreviewGate.instance.resume();
     WidgetsBinding.instance.removeObserver(this);
     // Drops this page from PipService, which re-reports auto-PiP from the
@@ -335,17 +339,12 @@ class _WatchPageState extends ConsumerState<WatchPage>
   }
 
   // Fires on every window-metrics change, including a physical device
-  // rotation. Guarded so it only ever acts once per rotation-into-landscape
-  // (via _inFullscreen) and only when there's actually a video loaded to
-  // show fullscreen.
+  // rotation. Guarded while the route is open and after exit until a stable
+  // portrait layout confirms that the viewer started a new rotation.
   void _maybeAutoFullscreenOnRotate() {
-    if (!mounted || _inFullscreen || _inPip || _videoController == null) {
+    if (!mounted || _inPip || _videoController == null) {
       return;
     }
-    // Only for the page actually on screen. This page stays mounted (and
-    // playing) under a channel/search page opened from it; rotating there
-    // used to push fullscreen on top of the screen the viewer was looking at.
-    if (!(_route?.isCurrent ?? true)) return;
     // Entering system Picture-in-Picture resizes this Activity's window to a
     // small (usually landscape 16:9) rectangle, which fires didChangeMetrics
     // exactly like a physical rotation — often BEFORE the native
@@ -360,12 +359,40 @@ class _WatchPageState extends ConsumerState<WatchPage>
     final view = View.of(context);
     final size = view.physicalSize / view.devicePixelRatio;
     if (size.shortestSide < 300) return;
+    if (size.width <= size.height) {
+      if (_suppressAutoFullscreenUntilPortrait) {
+        _portraitOrientationSettleTimer?.cancel();
+        _portraitOrientationSettleTimer = Timer(
+          const Duration(milliseconds: 350),
+          () {
+            _portraitOrientationSettleTimer = null;
+            if (!mounted) return;
+            final currentView = View.of(context);
+            final currentSize =
+                currentView.physicalSize / currentView.devicePixelRatio;
+            if (currentSize.width <= currentSize.height) {
+              _suppressAutoFullscreenUntilPortrait = false;
+              _restoreFullscreenAfterPip = false;
+            }
+          },
+        );
+      }
+      return;
+    }
+    _portraitOrientationSettleTimer?.cancel();
+    _portraitOrientationSettleTimer = null;
+    if (_inFullscreen) return;
+    // Only for the page actually on screen. This page stays mounted (and
+    // playing) under a channel/search page opened from it; rotating there
+    // must not push fullscreen over the screen the viewer is looking at.
+    if (!(_route?.isCurrent ?? true)) return;
+    if (_suppressAutoFullscreenUntilPortrait && !_restoreFullscreenAfterPip) {
+      return;
+    }
     // A real check ran on a settled, resumed window: the post-PiP restore
     // request is answered either way (reopened now, or the phone is upright).
     _restoreFullscreenAfterPip = false;
-    if (size.width > size.height) {
-      _openFullscreen();
-    }
+    _openFullscreen();
   }
 
   void _onPlayerTick() {
@@ -1910,6 +1937,28 @@ class _WatchPageState extends ConsumerState<WatchPage>
   // PiP.
   Route<void>? _fullscreenRoute;
 
+  Future<bool> _waitForLandscapeViewport() async {
+    final deadline = DateTime.now().add(const Duration(seconds: 2));
+    while (mounted && DateTime.now().isBefore(deadline)) {
+      final view = View.of(context);
+      final size = view.physicalSize / view.devicePixelRatio;
+      if (size.width > size.height) {
+        // The platform method acknowledges the requested lock before Android
+        // necessarily finishes rotating the Activity. Wait for a rendered
+        // landscape frame before pushing the fullscreen route, avoiding a
+        // portrait flash followed by a second layout/rotation.
+        await WidgetsBinding.instance.endOfFrame;
+        if (!mounted) return false;
+        final settledView = View.of(context);
+        final settledSize =
+            settledView.physicalSize / settledView.devicePixelRatio;
+        if (settledSize.width > settledSize.height) return true;
+      }
+      await Future<void>.delayed(const Duration(milliseconds: 16));
+    }
+    return false;
+  }
+
   Future<void> _openFullscreen() async {
     if (_videoController == null || _inFullscreen || _inPip) return;
     _inFullscreen = true;
@@ -1922,6 +1971,9 @@ class _WatchPageState extends ConsumerState<WatchPage>
         DeviceOrientation.landscapeLeft,
         DeviceOrientation.landscapeRight,
       ]);
+      if (!await _waitForLandscapeViewport()) {
+        throw StateError('The display did not settle into landscape.');
+      }
       await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
       if (!mounted || _inPip) return;
 
@@ -1929,7 +1981,6 @@ class _WatchPageState extends ConsumerState<WatchPage>
         builder: (_) => FullscreenPlayerPage(
           getController: () => _videoController!,
           getMediaSurface: _buildMediaSurface,
-          getDisplayAspectRatio: () => _playerBoxAspect,
           title: _video?.title ?? '',
           getQualityLabel: () => _qualityLabel,
           qualityOptions: _availableQualityOptions,
@@ -1959,11 +2010,18 @@ class _WatchPageState extends ConsumerState<WatchPage>
     } catch (error) {
       _logger.w('Could not open landscape video player: $error');
     } finally {
+      final enteredFullscreen = _fullscreenRoute != null;
       _fullscreenRoute = null;
       _inFullscreen = false;
       // Restore automatic device rotation only after the fullscreen route is
       // gone. This also runs when PiP or system Back removes that route.
       try {
+        // If the viewer exits while the phone remains sideways, the metrics
+        // event from unlocking must not reopen fullscreen immediately. The
+        // next portrait metrics event clears this guard.
+        if (enteredFullscreen) {
+          _suppressAutoFullscreenUntilPortrait = true;
+        }
         await SystemChrome.setPreferredOrientations([]);
         await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       } catch (error) {

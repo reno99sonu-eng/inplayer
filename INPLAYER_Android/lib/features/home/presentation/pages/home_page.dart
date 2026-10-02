@@ -29,6 +29,7 @@ import '../../../../services/music_player_service.dart';
 import '../../../../services/platform_settings_service.dart';
 import '../../../../services/navbar_theme_service.dart';
 import '../../../../core/utils/image_utils.dart';
+import '../../../../core/utils/video_preview_gate.dart';
 import '../../../../models/admin_navbar_theme.dart';
 import '../../../../services/content_access_service.dart';
 import '../../../../services/platform_update_service.dart';
@@ -143,13 +144,20 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   List<Widget> _buildPages({
     required double shortsBottomInset,
+    required double filmsBottomInset,
+    required int contentAccessRevision,
+    required int platformUpdateRevision,
     required String feedRevision,
   }) {
     return [
       _builtTabs.contains(0)
           ? HomeFeedPage(
-              key: ValueKey('home-feed-$feedRevision'),
+              // Keep feed state and previews alive across data revisions;
+              // HomeFeedPage refreshes the list in place.
+              key: const ValueKey('home-feed'),
               isActive: _currentIndex == 0,
+              contentAccessRevision: contentAccessRevision,
+              platformUpdateRevision: platformUpdateRevision,
             )
           : const SizedBox.shrink(),
       _builtTabs.contains(1)
@@ -171,7 +179,7 @@ class _HomePageState extends ConsumerState<HomePage> {
           : const SizedBox.shrink(),
       _builtTabs.contains(2) ? const UploadPage() : const SizedBox.shrink(),
       _builtTabs.contains(3)
-          ? const RaftaarFilmsLandingPage()
+          ? RaftaarFilmsLandingPage(bottomInset: filmsBottomInset)
           : const SizedBox.shrink(),
       _builtTabs.contains(4) ? const ProfilePage() : const SizedBox.shrink(),
     ];
@@ -191,6 +199,8 @@ class _HomePageState extends ConsumerState<HomePage> {
       musicPlayerServiceProvider.select((p) => p.currentTrack != null),
     );
     final shortsBottomInset =
+        _bottomNavInset + (musicLoaded ? _miniPlayerInset : 0.0);
+    final filmsBottomInset =
         _bottomNavInset + (musicLoaded ? _miniPlayerInset : 0.0);
 
     // Platform-wide switches written by the admin panel. `.value ?? normal`
@@ -245,6 +255,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                 index: _currentIndex,
                 children: _buildPages(
                   shortsBottomInset: shortsBottomInset,
+                  filmsBottomInset: filmsBottomInset,
+                  contentAccessRevision: contentAccessRevision,
+                  platformUpdateRevision: platformUpdateRevision,
                   feedRevision: feedRevision,
                 ),
               ),
@@ -645,9 +658,16 @@ class _HomePageState extends ConsumerState<HomePage> {
 }
 
 class HomeFeedPage extends ConsumerStatefulWidget {
-  const HomeFeedPage({super.key, this.isActive = true});
+  const HomeFeedPage({
+    super.key,
+    this.isActive = true,
+    this.contentAccessRevision = 0,
+    this.platformUpdateRevision = 0,
+  });
 
   final bool isActive;
+  final int contentAccessRevision;
+  final int platformUpdateRevision;
 
   @override
   ConsumerState<HomeFeedPage> createState() => _HomeFeedPageState();
@@ -666,11 +686,23 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage>
   /// Incremented on every pull-to-refresh and handed to child shelves that
   /// own their own fetch rather than reading one of the futures above.
   int _feedRefreshTick = 0;
+  bool _previewsSuspended = false;
+
+  void _setPreviewSuspension(bool suspended) {
+    if (suspended == _previewsSuspended) return;
+    _previewsSuspended = suspended;
+    if (suspended) {
+      VideoPreviewGate.instance.suspend();
+    } else {
+      VideoPreviewGate.instance.resume();
+    }
+  }
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _setPreviewSuspension(!widget.isActive);
     unawaited(_loadFeedData());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) unawaited(_preloadMidrollCreative());
@@ -680,7 +712,34 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _setPreviewSuspension(false);
     super.dispose();
+  }
+
+  @override
+  void didUpdateWidget(covariant HomeFeedPage oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.isActive != widget.isActive) {
+      _setPreviewSuspension(!widget.isActive);
+    }
+
+    if (oldWidget.contentAccessRevision != widget.contentAccessRevision) {
+      // Audience/access changes can make previously visible items
+      // unavailable, so clear those before fetching the newly permitted set.
+      // The page itself stays mounted, preserving its scroll position.
+      _videos = null;
+      _featured = const [];
+      _shorts = const [];
+      _feedback = const {};
+      _feedLoading = true;
+      _feedFailed = false;
+      unawaited(_loadFeedData(forceRefresh: true));
+    } else if (oldWidget.platformUpdateRevision !=
+        widget.platformUpdateRevision) {
+      // Keep the current feed visible while a background platform refresh
+      // replaces it, rather than blanking the page during every update.
+      unawaited(_loadFeedData(forceRefresh: true));
+    }
   }
 
   @override
@@ -747,7 +806,9 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage>
       if (!mounted || requestId != _feedRequestId) return;
       setState(() {
         _feedLoading = false;
-        _feedFailed = true;
+        // A failed background refresh must not replace an already loaded
+        // feed with an error state.
+        _feedFailed = _videos == null;
       });
     }
   }
@@ -1025,7 +1086,15 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage>
       );
     }
 
-    if (_feedFailed || _videos == null) return _buildErrorState();
+    if (_videos == null && _feedFailed) return _buildErrorState();
+    if (_videos == null) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 80),
+        child: Center(
+          child: CircularProgressIndicator(color: AppColors.brandOrange),
+        ),
+      );
+    }
 
     final videos = _onlyLongformVideos(_videos!);
     final featured = _onlyLongformVideos(_featured);
@@ -1245,6 +1314,13 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage>
         physics: const NeverScrollableScrollPhysics(),
         padding: const EdgeInsets.symmetric(horizontal: 16),
         itemCount: videos.length,
+        findChildIndexCallback: (key) {
+          if (key is! ValueKey<String>) return null;
+          final index = videos.indexWhere(
+            (video) => video.videoId == key.value,
+          );
+          return index < 0 ? null : index;
+        },
         separatorBuilder: (context, index) => const SizedBox(height: 12),
         itemBuilder: (context, index) {
           final video = videos[index];
@@ -1268,6 +1344,11 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage>
         childAspectRatio: 1.12,
       ),
       itemCount: videos.length,
+      findChildIndexCallback: (key) {
+        if (key is! ValueKey<String>) return null;
+        final index = videos.indexWhere((video) => video.videoId == key.value);
+        return index < 0 ? null : index;
+      },
       itemBuilder: (context, index) {
         final video = videos[index];
         return VideoCard(

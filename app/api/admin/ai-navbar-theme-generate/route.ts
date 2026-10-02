@@ -27,7 +27,7 @@ function describeOpenAIError(
   if (code === "moderation_blocked") {
     return {
       message:
-        "OpenAI’s image safety check rejected this prompt. Choose a different subject or occasion, then try again.",
+        "OpenAI’s image safety check blocked this subject. It may reject portraits of real public figures. Try an abstract occasion graphic such as ‘Indian tricolor with a decorative spinning-wheel motif and gold accents, no person or text,’ or choose the predesigned Independence Day theme.",
       httpStatus: 422,
     };
   }

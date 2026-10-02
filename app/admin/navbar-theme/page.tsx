@@ -328,12 +328,12 @@ function NavbarThemeManagerContent() {
 
       {/* Alerts */}
       {error && (
-        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 light:bg-red-100 p-4 text-xs font-bold text-red-300 light:text-red-800 flex items-center justify-between">
-          <div className="flex items-center gap-2">
+        <div className="rounded-2xl border border-red-500/30 bg-red-500/10 light:bg-red-100 p-4 text-xs font-bold text-red-300 light:text-red-800 flex items-start justify-between gap-3">
+          <div className="flex min-w-0 flex-1 items-start gap-2">
             <AlertTriangle size={16} />
-            <span>{error}</span>
+            <span className="min-w-0 break-words">{error}</span>
           </div>
-          <button onClick={() => setError(null)} className="text-red-400 hover:text-red-700">✕</button>
+          <button onClick={() => setError(null)} className="shrink-0 text-red-400 hover:text-red-700">✕</button>
         </div>
       )}
 
@@ -394,6 +394,13 @@ function NavbarThemeManagerContent() {
                   placeholder="e.g., Grand Musical Concert Festival"
                   className="w-full rounded-xl border border-white/10 light:border-slate-300 bg-black/40 light:bg-white px-3.5 py-2.5 text-xs font-bold text-white light:text-slate-900 placeholder-slate-500 focus:border-indigo-400 focus:outline-none"
                 />
+                <p className="text-[11px] leading-relaxed text-slate-400 light:text-slate-600">
+                  Describe a festive occasion or abstract motif. The image
+                  provider may block portraits of real public figures; for
+                  example, try “Indian tricolor with a decorative spinning-wheel
+                  motif and gold accents, no person or text,” or choose the
+                  predesigned Independence Day theme.
+                </p>
               </div>
             )}
 

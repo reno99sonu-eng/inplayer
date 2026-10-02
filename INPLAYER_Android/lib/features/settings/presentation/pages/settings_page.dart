@@ -8,6 +8,7 @@ import '../../../../core/widgets/about_app_dialog.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../providers/theme_provider.dart';
 import '../../../../services/auth_service.dart';
+import '../../../../services/ad_service.dart';
 import '../../../../services/admob_consent_service.dart';
 import '../../../../services/settings_service.dart';
 import '../../../../providers/app_language_provider.dart';
@@ -731,7 +732,7 @@ class _SettingTile extends _SettingsItem {
 }
 
 class _AdMobPrivacyOptionsItem extends _SettingsItem {
-  const _AdMobPrivacyOptionsItem({required this.onTap});
+  _AdMobPrivacyOptionsItem({required this.onTap});
 
   final VoidCallback onTap;
 

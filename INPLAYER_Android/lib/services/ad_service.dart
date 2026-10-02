@@ -6,10 +6,8 @@ import 'platform_settings_service.dart';
 
 /// One house ad creative, as returned by GET /api/ads (app/api/ads/route.ts).
 /// Only the "house" source (a real admin-uploaded image + link) is built
-/// here — the "adsense" source would need a native Google Mobile Ads SDK
-/// integration, which isn't something this app can safely add and verify
-/// without a compiler in this environment; "off" and "adsense" both just
-/// mean no ad card renders.
+/// here — Google-served AdMob banners are rendered by the native home-feed
+/// placement, which reads its Android settings from platform settings.
 class AdCreative {
   final String adId;
   final String imageUrl;
@@ -79,7 +77,7 @@ class AdService {
   Future<MidrollConfig?>? _midrollConfigRequest;
 
   /// Returns the first real house creative for a placement, or null when
-  /// the slot is off, AdSense-only, or has nothing active right now.
+  /// the slot is off or has nothing active right now.
   Future<AdCreative?> getAd(String placement) async {
     try {
       final response = await _dio.get(ApiConstants.ads, queryParameters: {'placement': placement});
@@ -87,7 +85,9 @@ class AdService {
         final data = response.data as Map;
         if (data['source'] == 'house' && data['creative'] is Map) {
           final creative = AdCreative.fromJson(Map<String, dynamic>.from(data['creative']));
-          if (creative.adId.isNotEmpty && creative.imageUrl.isNotEmpty) return creative;
+          if (creative.adId.isNotEmpty && creative.imageUrl.isNotEmpty) {
+            return creative;
+          }
         }
       }
     } catch (e) {

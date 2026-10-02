@@ -80,35 +80,30 @@
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="https" android:host="inplayer.in" android:pathPrefix="/open/"/>
-                <data android:scheme="https" android:host="www.inplayer.in" android:pathPrefix="/open/"/>
             </intent-filter>
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="https" android:host="inplayer.in" android:pathPrefix="/watch/"/>
-                <data android:scheme="https" android:host="www.inplayer.in" android:pathPrefix="/watch/"/>
             </intent-filter>
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="https" android:host="inplayer.in" android:pathPrefix="/shorts"/>
-                <data android:scheme="https" android:host="www.inplayer.in" android:pathPrefix="/shorts"/>
             </intent-filter>
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="https" android:host="inplayer.in" android:pathPrefix="/raftaar-films/"/>
-                <data android:scheme="https" android:host="www.inplayer.in" android:pathPrefix="/raftaar-films/"/>
             </intent-filter>
             <intent-filter android:autoVerify="true">
                 <action android:name="android.intent.action.VIEW"/>
                 <category android:name="android.intent.category.DEFAULT"/>
                 <category android:name="android.intent.category.BROWSABLE"/>
                 <data android:scheme="https" android:host="inplayer.in" android:pathPrefix="/music"/>
-                <data android:scheme="https" android:host="www.inplayer.in" android:pathPrefix="/music"/>
             </intent-filter>
 
             <!-- Cognito Hosted UI redirect (Google sign-in). The browser

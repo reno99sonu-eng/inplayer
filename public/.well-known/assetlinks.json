@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.inplayer.app",
+      "sha256_cert_fingerprints": [
+        "02:B5:6F:F1:65:FB:41:40:D6:AA:F8:2C:0F:53:F5:74:DA:3A:68:39:D2:18:BD:DF:B8:26:86:39:4C:E3:6A:D8"
+      ]
+    }
+  }
+]

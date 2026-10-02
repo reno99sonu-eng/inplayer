@@ -2216,7 +2216,7 @@ function AdvertisingPage() {
                   <Globe size={14} /> CMP / European Regulations (GDPR) Consent
                 </p>
                 <p className="text-[11px] leading-relaxed">
-                  Google requires user consent messages for European Economic Area (EEA) and UK users. Under your <strong>Google AdMob Console &gt; Privacy &amp; messaging &gt; European regulations</strong>, click <strong>&quot;Create a message&quot;</strong>. Google CMP handles all consent compliance automatically.
+                  Publish a consent message for European Economic Area (EEA) and UK users under <strong>Google AdMob Console &gt; Privacy &amp; messaging &gt; European regulations</strong>. The Android app uses Google UMP before requesting banners and shows the privacy-options entry point in Settings when Google requires it.
                 </p>
               </div>
 
@@ -2233,7 +2233,7 @@ function AdvertisingPage() {
                   className="w-full rounded-xl border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 px-3.5 py-2.5 text-xs text-white light:text-slate-900 outline-none focus:border-cyan-400 font-mono"
                 />
                 <p className="text-[11px] text-slate-400 light:text-slate-600">
-                  From AdMob Console &gt; Apps &gt; Inplayer (Android) &gt; App settings.
+                  From AdMob Console &gt; Apps &gt; Inplayer (Android) &gt; App settings. This must match the ID compiled into the Android app; changing it requires a new app release.
                 </p>
               </div>
 
@@ -2241,7 +2241,7 @@ function AdvertisingPage() {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                 <div className="space-y-1.5">
                   <label className="text-xs font-semibold text-slate-300 light:text-slate-700 block">
-                    Banner Ad Unit ID
+                    Banner Ad Unit ID (Android Home)
                   </label>
                   <input
                     type="text"

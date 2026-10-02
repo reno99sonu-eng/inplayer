@@ -227,6 +227,7 @@ dependencies:
   # which is discontinued. Auto-bundles its native libraries, so there is no
   # manual .so step in the Android build.
   flutter_litert: ^3.8.0
+  google_mobile_ads: ^9.1.0
 
 dev_dependencies:
   flutter_test:

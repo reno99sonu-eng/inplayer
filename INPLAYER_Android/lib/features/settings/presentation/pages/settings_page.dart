@@ -8,6 +8,7 @@ import '../../../../core/widgets/about_app_dialog.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../providers/theme_provider.dart';
 import '../../../../services/auth_service.dart';
+import '../../../../services/admob_consent_service.dart';
 import '../../../../services/settings_service.dart';
 import '../../../../providers/app_language_provider.dart';
 
@@ -236,6 +237,18 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   }
 
   Future<void> _showAbout() => showInPlayerAboutDialog(context);
+
+  Future<void> _showAdPrivacyOptions() async {
+    final opened = await ref
+        .read(admobConsentServiceProvider)
+        .showPrivacyOptions();
+    if (!mounted) return;
+    _showSnack(
+      opened
+          ? 'Ad privacy choices updated.'
+          : 'No additional AdMob privacy choices are required right now.',
+    );
+  }
 
   Future<void> _confirmDeleteAccount() async {
     final confirmed = await showDialog<bool>(
@@ -493,6 +506,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
             title: 'Privacy, Passkeys & Active Sessions',
             onTap: () => context.push('/settings/privacy'),
           ),
+          _AdMobPrivacyOptionsItem(onTap: _showAdPrivacyOptions),
           _SettingTile(
             icon: Icons.block_outlined,
             title: 'Blocked Users',
@@ -712,6 +726,33 @@ class _SettingTile extends _SettingsItem {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _AdMobPrivacyOptionsItem extends _SettingsItem {
+  const _AdMobPrivacyOptionsItem({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Consumer(
+      builder: (context, ref, _) {
+        final config = ref.watch(admobConfigProvider);
+        if (!config.enabled || config.appId.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        final required = ref.watch(admobPrivacyOptionsRequiredProvider);
+        if (required.valueOrNull != true) return const SizedBox.shrink();
+
+        return _SettingTile(
+          icon: Icons.tune_rounded,
+          title: 'Ad Privacy Choices',
+          onTap: onTap,
+        ).build(context);
+      },
     );
   }
 }

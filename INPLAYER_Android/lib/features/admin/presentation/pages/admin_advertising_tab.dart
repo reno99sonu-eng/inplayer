@@ -856,7 +856,7 @@ class _AdMobViewState extends ConsumerState<_AdMobView> {
               ),
               const SizedBox(height: 6),
               const Text(
-                'Configure Google AdMob App ID and Ad Unit IDs for Android in-app mobile advertising. Synchronizes immediately with all user devices.',
+                'The Android Home feed currently displays the configured banner unit. Other ad unit IDs are saved for future placements and do not show ads yet.',
                 style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 12),
               ),
             ],
@@ -867,7 +867,7 @@ class _AdMobViewState extends ConsumerState<_AdMobView> {
           value: _admobEnabled,
           onChanged: (v) => setState(() => _admobEnabled = v),
           title: const Text('Enable Google AdMob in App', style: TextStyle(color: AppColors.textPrimaryDark, fontWeight: FontWeight.w600)),
-          subtitle: const Text('Show mobile AdMob ads across Android app placements', style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 12)),
+          subtitle: const Text('Show the configured AdMob banner in the Android Home feed', style: TextStyle(color: AppColors.textSecondaryDark, fontSize: 12)),
           activeTrackColor: AppColors.brandOrange,
           contentPadding: EdgeInsets.zero,
         ),

@@ -1,5 +1,6 @@
 // ignore_for_file: use_null_aware_elements
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:dio/dio.dart';
 import 'package:logger/logger.dart';
 import '../core/network/dio_client.dart';
 import '../core/constants/api_constants.dart';
@@ -36,10 +37,22 @@ class MessageService {
           success: true,
         );
       }
-      return ConversationsResult(conversations: [], requests: []);
+      return ConversationsResult(
+        conversations: [],
+        requests: [],
+        error: _errorFrom(response.data, fallback: "Couldn't load your chats."),
+      );
     } catch (e) {
       _logger.e('Error fetching conversations: $e');
-      return ConversationsResult(conversations: [], requests: []);
+      return ConversationsResult(
+        conversations: [],
+        requests: [],
+        error: _exceptionError(
+          e,
+          fallback:
+              "Couldn't load your chats. Check your connection and try again.",
+        ),
+      );
     }
   }
 
@@ -72,6 +85,7 @@ class MessageService {
           success: data['success'] == true,
           conversationId: data['conversationId'] as String?,
           requestStatus: data['requestStatus'] as String?,
+          flagged: data['flagged'] == true,
         );
       }
 
@@ -85,7 +99,10 @@ class MessageService {
       _logger.e('Error sending message: $e');
       return SendMessageResult(
         success: false,
-        error: "Couldn't send that message. Check your connection.",
+        error: _exceptionError(
+          e,
+          fallback: "Couldn't send that message. Check your connection.",
+        ),
       );
     }
   }
@@ -161,12 +178,23 @@ class MessageService {
           messages: messages,
           otherLastReadAt: data['otherLastReadAt'] as String?,
           otherIsTyping: data['otherIsTyping'] == true,
+          success: true,
         );
       }
-      return MessagesResult(messages: []);
+      return MessagesResult(
+        messages: [],
+        error: _errorFrom(response.data, fallback: "Couldn't load messages."),
+      );
     } catch (e) {
       _logger.e('Error fetching messages: $e');
-      return MessagesResult(messages: []);
+      return MessagesResult(
+        messages: [],
+        error: _exceptionError(
+          e,
+          fallback:
+              "Couldn't load messages. Check your connection and try again.",
+        ),
+      );
     }
   }
 
@@ -200,16 +228,33 @@ class MessageService {
       _logger.d('Typing ping failed (non-fatal): $e');
     }
   }
+
+  String _errorFrom(dynamic data, {required String fallback}) {
+    if (data is Map) {
+      final error = data['error']?.toString().trim();
+      if (error != null && error.isNotEmpty) return error;
+    }
+    return fallback;
+  }
+
+  String _exceptionError(Object error, {required String fallback}) {
+    if (error is DioException) {
+      return _errorFrom(error.response?.data, fallback: fallback);
+    }
+    return fallback;
+  }
 }
 
 class ConversationsResult {
   final List<Conversation> conversations;
   final List<Conversation> requests;
   final bool success;
+  final String? error;
   ConversationsResult({
     required this.conversations,
     required this.requests,
     this.success = false,
+    this.error,
   });
 }
 
@@ -218,11 +263,13 @@ class SendMessageResult {
   final String? conversationId;
   final String? requestStatus;
   final String? error;
+  final bool flagged;
   SendMessageResult({
     required this.success,
     this.conversationId,
     this.requestStatus,
     this.error,
+    this.flagged = false,
   });
 }
 
@@ -241,9 +288,13 @@ class MessagesResult {
   final List<ChatMessage> messages;
   final String? otherLastReadAt;
   final bool otherIsTyping;
+  final bool success;
+  final String? error;
   MessagesResult({
     required this.messages,
     this.otherLastReadAt,
     this.otherIsTyping = false,
+    this.success = false,
+    this.error,
   });
 }

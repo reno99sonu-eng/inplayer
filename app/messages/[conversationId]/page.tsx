@@ -80,6 +80,7 @@ export default function ConversationThreadPage() {
   const [otherIsOnline, setOtherIsOnline] = useState(false);
   const [otherLastActiveAt, setOtherLastActiveAt] = useState<string | null>(null);
   const [messages, setMessages] = useState<MessageItem[]>([]);
+  const [messagesError, setMessagesError] = useState<string | null>(null);
   const [otherLastReadAt, setOtherLastReadAt] = useState<string | null>(null);
   const [otherIsTyping, setOtherIsTyping] = useState(false);
   const [text, setText] = useState("");
@@ -96,6 +97,7 @@ export default function ConversationThreadPage() {
   const [imageError, setImageError] = useState<string | null>(null);
   const [lightboxUrl, setLightboxUrl] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fetchingMessagesRef = useRef(false);
   const lastTypingPingRef = useRef(0);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -123,28 +125,35 @@ export default function ConversationThreadPage() {
   }
 
   async function fetchMessages() {
+    if (fetchingMessagesRef.current) return;
+    fetchingMessagesRef.current = true;
     try {
       const headers = await authHeaders();
       const res = await fetch(`/api/messages/${params.conversationId}/messages`, { headers });
-      if (res.ok) {
-        const data = await res.json();
-        const newMessages = data.messages || [];
-        setMessages((prev) => {
-          // Play sound if a new message arrived from the other user
-          if (prev.length > 0 && newMessages.length > prev.length) {
-            const latestMsg = newMessages[newMessages.length - 1];
-            if (latestMsg.senderId !== user?.userId) {
-              const audio = new Audio("/sounds/pop.mp3");
-              audio.play().catch(() => {});
-            }
-          }
-          return newMessages;
-        });
-        setOtherLastReadAt(data.otherLastReadAt || null);
-        setOtherIsTyping(!!data.otherIsTyping);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        throw new Error(data.error || "Couldn't load messages. Please try again.");
       }
+      const newMessages = data.messages || [];
+      setMessages((prev) => {
+        // Play sound if a new message arrived from the other user
+        if (prev.length > 0 && newMessages.length > prev.length) {
+          const latestMsg = newMessages[newMessages.length - 1];
+          if (latestMsg.senderId !== user?.userId) {
+            const audio = new Audio("/sounds/pop.mp3");
+            audio.play().catch(() => {});
+          }
+        }
+        return newMessages;
+      });
+      setOtherLastReadAt(data.otherLastReadAt || null);
+      setOtherIsTyping(!!data.otherIsTyping);
+      setMessagesError(null);
     } catch (err) {
       console.error("Failed to load messages:", err);
+      setMessagesError(err instanceof Error ? err.message : "Couldn't load messages. Please try again.");
+    } finally {
+      fetchingMessagesRef.current = false;
     }
   }
 
@@ -630,6 +639,17 @@ export default function ConversationThreadPage() {
       )}
 
       <div className="mx-auto w-full max-w-4xl flex-1 min-h-0 space-y-1.5 overflow-y-auto px-3 sm:px-4 py-3">
+        {messagesError && (
+          <div role="alert" className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-300 light:text-red-700">
+            <span>{messagesError}</span>
+            <button
+              onClick={() => void fetchMessages()}
+              className="font-bold underline underline-offset-2"
+            >
+              Try again
+            </button>
+          </div>
+        )}
         {messages.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center py-16 text-center">
             <p className="text-sm text-inherit opacity-60">

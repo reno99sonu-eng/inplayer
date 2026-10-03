@@ -1,11 +1,11 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
 
+import 'package:cached_network_image/cached_network_image.dart';
+import 'package:image/image.dart' as img;
+import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:cached_network_image/cached_network_image.dart';
-import 'package:image_picker/image_picker.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/image_utils.dart';
@@ -37,12 +37,18 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
   String? _otherUsername;
   String? _otherAvatarUrl;
   String _requestStatus = 'accepted';
+  String? _initiatedBy;
   bool _muted = false;
   bool _otherIsOnline = false;
   String? _otherLastActiveAt;
   bool _otherIsTyping = false;
 
   bool _loadingMeta = true;
+  bool _messagesLoading = true;
+  bool _processingAttachment = false;
+  bool _messageFetchInProgress = false;
+  bool _pollInProgress = false;
+  String? _messagesError;
   List<ChatMessage> _messages = [];
   bool _sending = false;
 
@@ -61,6 +67,7 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
     _otherUsername = widget.otherUsername;
     _otherAvatarUrl = widget.otherAvatarUrl;
     _loadingMeta = false;
+    _messagesLoading = _conversationId != null;
 
     if (_conversationId != null) {
       _loadMeta();
@@ -106,6 +113,7 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
       _otherUsername = detail.conversation.otherUsername ?? _otherUsername;
       _otherAvatarUrl = detail.conversation.otherAvatarUrl ?? _otherAvatarUrl;
       _requestStatus = detail.conversation.requestStatus;
+      _initiatedBy = detail.conversation.initiatedBy;
       _otherIsOnline = detail.otherIsOnline;
       _otherLastActiveAt = detail.otherLastActiveAt;
       _chatThemeId = detail.conversation.chatTheme;
@@ -135,30 +143,61 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
 
   Future<void> _loadMessages() async {
     final id = _conversationId;
-    if (id == null) return;
-    final result = await ref.read(messageServiceProvider).getMessages(id);
-    if (!mounted) return;
-    setState(() {
-      _messages = result.messages;
-      _otherIsTyping = result.otherIsTyping;
-    });
-    _scrollToBottom();
+    if (id == null || _messageFetchInProgress) return;
+    _messageFetchInProgress = true;
+    try {
+      final result = await ref.read(messageServiceProvider).getMessages(id);
+      if (!mounted) return;
+
+      if (!result.success) {
+        setState(() {
+          _messagesLoading = false;
+          _messagesError = result.error ?? "Couldn't load messages.";
+        });
+        return;
+      }
+
+      final messagesChanged = !_sameMessages(_messages, result.messages);
+      setState(() {
+        _messagesLoading = false;
+        _messagesError = null;
+        _otherIsTyping = result.otherIsTyping;
+        if (messagesChanged) _messages = result.messages;
+      });
+      if (messagesChanged) _scrollToBottom();
+    } finally {
+      _messageFetchInProgress = false;
+    }
+  }
+
+  bool _sameMessages(List<ChatMessage> current, List<ChatMessage> next) {
+    if (current.length != next.length) return false;
+    for (var i = 0; i < current.length; i++) {
+      final a = current[i];
+      final b = next[i];
+      if (a.messageId != b.messageId ||
+          a.senderId != b.senderId ||
+          a.text != b.text ||
+          a.imageUrl != b.imageUrl ||
+          a.audioUrl != b.audioUrl ||
+          a.deletedForEveryone != b.deletedForEveryone) {
+        return false;
+      }
+    }
+    return true;
   }
 
   void _startPolling() {
     _pollTimer?.cancel();
     _pollTimer = Timer.periodic(const Duration(seconds: 4), (_) async {
       final id = _conversationId;
-      if (id == null) return;
-      await _loadMeta();
-      final result = await ref.read(messageServiceProvider).getMessages(id);
-      if (!mounted) return;
-      setState(() {
-        _otherIsTyping = result.otherIsTyping;
-      });
-      if (result.messages.length != _messages.length) {
-        setState(() => _messages = result.messages);
-        _scrollToBottom();
+      if (id == null || _pollInProgress || _messageFetchInProgress) return;
+      _pollInProgress = true;
+      try {
+        await _loadMeta();
+        await _loadMessages();
+      } finally {
+        _pollInProgress = false;
       }
     });
   }
@@ -177,75 +216,140 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
 
   Future<void> _send({String? text, String? imageUrl}) async {
     final textToSend = text ?? _inputController.text.trim();
-    if ((textToSend.isEmpty && imageUrl == null) || _sending) return;
-
-    setState(() => _sending = true);
-
-    final res = await ref
-        .read(messageServiceProvider)
-        .sendMessage(
-          otherUserId: widget.otherUserId,
-          text: textToSend.isEmpty ? null : textToSend,
-          imageUrl: imageUrl,
-        );
-
-    if (!mounted) return;
-    if (res.success) {
-      if (text == null) {
-        _inputController.clear();
-      }
-      final wasCompose = _conversationId == null;
-      if (res.conversationId != null) {
-        _conversationId = res.conversationId;
-      }
-      final newReqStatus = res.requestStatus;
-      if (newReqStatus != null) {
-        _requestStatus = newReqStatus;
-      }
-      await _loadMessages();
-      if (wasCompose && _conversationId != null) {
-        _startPolling();
-      }
-      _scrollToBottom();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(res.error ?? "Couldn't send message."),
-          backgroundColor: context.isDark
-              ? AppColors.surfaceDark
-              : AppColors.surfaceLight,
-        ),
-      );
+    if ((textToSend.isEmpty && imageUrl == null) ||
+        _sending ||
+        _processingAttachment) {
+      return;
     }
-
-    setState(() => _sending = false);
-  }
-
-  Future<void> _pickAndSendImage() async {
-    final picker = ImagePicker();
-    final file = await picker.pickImage(
-      source: ImageSource.gallery,
-      imageQuality: 50,
-      maxWidth: 800,
-    );
-    if (file == null || !mounted) return;
 
     setState(() => _sending = true);
     try {
-      final bytes = await File(file.path).readAsBytes();
-      final ext = file.path.split('.').last.toLowerCase();
-      final mime = ext == 'png' ? 'image/png' : 'image/jpeg';
-      final base64Image = 'data:$mime;base64,${base64Encode(bytes)}';
+      final res = await ref
+          .read(messageServiceProvider)
+          .sendMessage(
+            otherUserId: widget.otherUserId,
+            text: textToSend.isEmpty ? null : textToSend,
+            imageUrl: imageUrl,
+          );
 
-      await _send(text: '', imageUrl: base64Image);
+      if (!mounted) return;
+      if (res.success) {
+        final wasCompose = _conversationId == null;
+        if (res.conversationId != null) {
+          _conversationId = res.conversationId;
+        }
+        if (wasCompose) _initiatedBy = _myUserId;
+        final newReqStatus = res.requestStatus;
+        if (newReqStatus != null) _requestStatus = newReqStatus;
+
+        if (res.flagged) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'This message was held for review and was not delivered.',
+              ),
+            ),
+          );
+        } else {
+          if (text == null) _inputController.clear();
+          await _loadMessages();
+        }
+        if (wasCompose && _conversationId != null) _startPolling();
+        _scrollToBottom();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(res.error ?? "Couldn't send message."),
+            backgroundColor: context.isDark
+                ? AppColors.surfaceDark
+                : AppColors.surfaceLight,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _sending = false);
+    }
+  }
+
+  Future<void> _pickAndSendImage() async {
+    if (_sending || _processingAttachment) return;
+    setState(() => _processingAttachment = true);
+    try {
+      final file = await ImagePicker().pickImage(
+        source: ImageSource.gallery,
+        imageQuality: 90,
+        maxWidth: 1600,
+      );
+      if (file == null || !mounted) return;
+
+      final imageUrl = await _prepareMessageImage(file);
+      if (!mounted) return;
+      setState(() => _processingAttachment = false);
+      // Let _send own the sending state. Previously this method set
+      // `_sending` first, then called `_send`, whose busy guard immediately
+      // returned, so the picker appeared to succeed while no photo was sent.
+      await _send(imageUrl: imageUrl);
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(
         context,
-      ).showSnackBar(const SnackBar(content: Text("Failed to process image")));
+      ).showSnackBar(SnackBar(content: Text("Couldn't attach that photo: $e")));
     } finally {
-      if (mounted) setState(() => _sending = false);
+      if (mounted) setState(() => _processingAttachment = false);
     }
+  }
+
+  Future<String> _prepareMessageImage(XFile file) async {
+    const maxDataUrlLength = 280000; // backend accepts up to 300,000 chars.
+    final sourceBytes = await file.readAsBytes();
+    if (sourceBytes.isEmpty) throw StateError('The selected photo is empty.');
+
+    final mime = _imageMimeType(sourceBytes);
+    final originalDataUrl = 'data:$mime;base64,${base64Encode(sourceBytes)}';
+    if (originalDataUrl.length <= maxDataUrlLength) return originalDataUrl;
+
+    final decoded = img.decodeImage(sourceBytes);
+    if (decoded == null) {
+      throw StateError(
+        'This photo format could not be compressed. Choose a JPEG or PNG image.',
+      );
+    }
+    final oriented = img.bakeOrientation(decoded);
+    for (final width in [1280, 1024, 800, 640, 480]) {
+      final resized = oriented.width > width
+          ? img.copyResize(oriented, width: width)
+          : oriented;
+      for (final quality in [85, 75, 65, 55, 45, 35]) {
+        final encoded = img.encodeJpg(resized, quality: quality);
+        final dataUrl = 'data:image/jpeg;base64,${base64Encode(encoded)}';
+        if (dataUrl.length <= maxDataUrlLength) return dataUrl;
+      }
+    }
+    throw StateError(
+      'That photo is too large to attach. Choose a smaller image.',
+    );
+  }
+
+  String _imageMimeType(List<int> bytes) {
+    if (bytes.length >= 8 &&
+        bytes[0] == 0x89 &&
+        bytes[1] == 0x50 &&
+        bytes[2] == 0x4E &&
+        bytes[3] == 0x47) {
+      return 'image/png';
+    }
+    if (bytes.length >= 12 &&
+        bytes[0] == 0x52 &&
+        bytes[1] == 0x49 &&
+        bytes[2] == 0x46 &&
+        bytes[3] == 0x46 &&
+        bytes[8] == 0x57 &&
+        bytes[9] == 0x45 &&
+        bytes[10] == 0x42 &&
+        bytes[11] == 0x50) {
+      return 'image/webp';
+    }
+    return 'image/jpeg';
   }
 
   Future<void> _respondToRequest(bool accept) async {
@@ -256,7 +360,19 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
         .conversationAction(id, accept ? 'accept' : 'decline');
     if (!mounted) return;
     if (ok) {
-      setState(() => _requestStatus = accept ? 'accepted' : 'declined');
+      if (accept) {
+        setState(() => _requestStatus = 'accepted');
+      } else {
+        Navigator.of(context).pop();
+      }
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            "Couldn't ${accept ? 'accept' : 'decline'} that request. Try again.",
+          ),
+        ),
+      );
     }
   }
 
@@ -576,7 +692,8 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
     final avatar = _otherAvatarUrl != null
         ? smartImageProvider(_otherAvatarUrl!)
         : null;
-    final isPendingFromThem = _requestStatus == 'pending';
+    final isPendingFromThem =
+        _requestStatus == 'pending' && _initiatedBy != _myUserId;
     final canChat = !isPendingFromThem;
 
     final currentTheme =
@@ -701,7 +818,37 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
                         ),
                       ),
                     Expanded(
-                      child: _messages.isEmpty
+                      child: _messagesLoading && _messages.isEmpty
+                          ? const Center(
+                              child: CircularProgressIndicator(
+                                color: AppColors.brandOrange,
+                              ),
+                            )
+                          : _messagesError != null && _messages.isEmpty
+                          ? Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(24),
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      _messagesError!,
+                                      textAlign: TextAlign.center,
+                                      style: TextStyle(
+                                        color: context.textSecondary,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 12),
+                                    OutlinedButton.icon(
+                                      onPressed: _loadMessages,
+                                      icon: const Icon(Icons.refresh),
+                                      label: const Text('Try again'),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            )
+                          : _messages.isEmpty
                           ? Center(
                               child: Text(
                                 'Say hello 👋',
@@ -733,7 +880,9 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
                                     alpha: 0.6,
                                   ),
                                 ),
-                                onPressed: _sending ? null : _pickAndSendImage,
+                                onPressed: _sending || _processingAttachment
+                                    ? null
+                                    : _pickAndSendImage,
                               ),
                               Expanded(
                                 child: Container(
@@ -750,6 +899,7 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
                                   ),
                                   child: TextField(
                                     controller: _inputController,
+                                    enabled: !_processingAttachment,
                                     minLines: 1,
                                     maxLines: 4,
                                     style: TextStyle(
@@ -776,7 +926,7 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
                                 radius: 20,
                                 backgroundColor: AppColors.brandOrange,
                                 child: IconButton(
-                                  icon: _sending
+                                  icon: _sending || _processingAttachment
                                       ? const SizedBox(
                                           width: 16,
                                           height: 16,
@@ -790,7 +940,9 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
                                           color: Colors.white,
                                           size: 18,
                                         ),
-                                  onPressed: _sending ? null : _send,
+                                  onPressed: _sending || _processingAttachment
+                                      ? null
+                                      : _send,
                                 ),
                               ),
                             ],
@@ -870,9 +1022,10 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
                         padding: const EdgeInsets.only(bottom: 6),
                         child: ClipRRect(
                           borderRadius: BorderRadius.circular(8),
-                          child: CachedNetworkImage(
+                          child: SafeAppImage(
                             imageUrl: message.imageUrl!,
                             width: 200,
+                            height: 260,
                             fit: BoxFit.cover,
                             placeholder: (context, url) => Container(
                               width: 200,

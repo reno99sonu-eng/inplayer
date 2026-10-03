@@ -68,7 +68,10 @@ export async function GET(request: NextRequest) {
     // Almost certainly means InPlayer-Conversations doesn't exist yet in
     // DynamoDB (userId as partition key, conversationId as sort key).
     console.error("Conversations unavailable:", err);
-    return NextResponse.json({ conversations: [], requests: [] });
+    return NextResponse.json(
+      { error: "Couldn't load your conversations. Please try again." },
+      { status: 500 }
+    );
   }
 }
 
@@ -85,7 +88,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Please sign in." }, { status: 401 });
   }
 
-  const { otherUserId, text, audioUrl, audioDurationSec, imageUrl } = await request.json();
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return NextResponse.json({ error: "Invalid message request." }, { status: 400 });
+  }
+  const { otherUserId, text, audioUrl, audioDurationSec, imageUrl } = body;
 
   if (!otherUserId || typeof otherUserId !== "string") {
     return NextResponse.json({ error: "Missing recipient." }, { status: 400 });

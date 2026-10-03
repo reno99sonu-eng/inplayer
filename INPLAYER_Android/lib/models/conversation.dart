@@ -42,9 +42,32 @@ class Conversation {
     this.disappearingSeconds,
   });
 
+  Conversation copyWith({String? requestStatus, int? unreadCount}) {
+    return Conversation(
+      conversationId: conversationId,
+      otherUserId: otherUserId,
+      otherUsername: otherUsername,
+      otherAvatarUrl: otherAvatarUrl,
+      requestStatus: requestStatus ?? this.requestStatus,
+      initiatedBy: initiatedBy,
+      lastMessageText: lastMessageText,
+      lastMessageSenderId: lastMessageSenderId,
+      lastMessageAt: lastMessageAt,
+      unreadCount: unreadCount ?? this.unreadCount,
+      blocked: blocked,
+      blockedByOther: blockedByOther,
+      muted: muted,
+      chatTheme: chatTheme,
+      disappearingEnabled: disappearingEnabled,
+      disappearingSeconds: disappearingSeconds,
+    );
+  }
+
   static String? _resolveUrl(String? url) {
     if (url == null || url.isEmpty) return null;
-    if (url.startsWith('data:') || url.startsWith('http://') || url.startsWith('https://')) {
+    if (url.startsWith('data:') ||
+        url.startsWith('http://') ||
+        url.startsWith('https://')) {
       return url;
     }
     if (url.startsWith('/')) return '${AppConfig.apiBaseUrl}$url';

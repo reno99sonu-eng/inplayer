@@ -34,7 +34,10 @@ export async function GET(request: NextRequest, { params }: Params) {
     );
   } catch (err) {
     console.error("Failed to verify conversation ownership:", err);
-    return NextResponse.json({ messages: [] });
+    return NextResponse.json(
+      { error: "Couldn't verify this conversation. Please try again." },
+      { status: 500 }
+    );
   }
 
   if (!myRow.Item) {
@@ -143,7 +146,10 @@ export async function GET(request: NextRequest, { params }: Params) {
     return NextResponse.json({ messages: live, otherLastReadAt, otherIsTyping });
   } catch (err) {
     console.error("Failed to load messages:", err);
-    return NextResponse.json({ messages: [] });
+    return NextResponse.json(
+      { error: "Couldn't load messages. Please try again." },
+      { status: 500 }
+    );
   }
 }
 

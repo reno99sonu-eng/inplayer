@@ -1,6 +1,5 @@
-/// One row from GET /api/messages/{conversationId}/messages. Voice notes
-/// and photo attachments exist on the backend (audioUrl/imageUrl) but
-/// aren't sent by this app yet — text-only for now, see message_service.dart.
+/// One row from GET /api/messages/{conversationId}/messages. Photo
+/// attachments use the same inline data URLs as the website client.
 class ChatMessage {
   final String messageId;
   final String senderId;

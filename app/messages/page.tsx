@@ -44,12 +44,16 @@ export default function MessagesPage() {
   const [conversations, setConversations] = useState<ConversationRow[]>([]);
   const [requests, setRequests] = useState<ConversationRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [respondingId, setRespondingId] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
 
   const [composeOpen, setComposeOpen] = useState(false);
   const [composeQuery, setComposeQuery] = useState("");
   const [composeResults, setComposeResults] = useState<UserResult[]>([]);
   const [composeSearching, setComposeSearching] = useState(false);
+  const [chatSearchOpen, setChatSearchOpen] = useState(false);
+  const [chatQuery, setChatQuery] = useState("");
 
   useEffect(() => {
     (() => {
@@ -77,10 +81,15 @@ export default function MessagesPage() {
             headers: { Authorization: `Bearer ${idToken}` },
           });
           const data = await res.json();
+          if (!res.ok) {
+            throw new Error(data.error || "Couldn't load your conversations.");
+          }
           setConversations(data.conversations || []);
           setRequests(data.requests || []);
+          setLoadError(null);
         } catch (err) {
           console.error("Failed to load messages:", err);
+          setLoadError(err instanceof Error ? err.message : "Couldn't load your conversations.");
         } finally {
           setLoading(false);
         }
@@ -88,7 +97,7 @@ export default function MessagesPage() {
 
       load();
     })();
-  }, [signedIn, authLoading]);
+  }, [signedIn, authLoading, reloadKey]);
 
   useEffect(() => {
     const q = composeQuery.trim();
@@ -184,6 +193,14 @@ export default function MessagesPage() {
   }
 
   const rows = tab === "messages" ? conversations : requests;
+  const query = chatQuery.trim().toLowerCase();
+  const visibleRows = query
+    ? rows.filter((row) =>
+        [row.otherUsername, row.otherUserId, row.lastMessageText]
+          .filter(Boolean)
+          .some((value) => value!.toLowerCase().includes(query))
+      )
+    : rows;
 
   return (
     <div className="min-h-screen bg-[#06101D] light:bg-[#FAF5E9] text-white light:text-slate-900">
@@ -203,6 +220,18 @@ export default function MessagesPage() {
         </div>
 
         <button
+          onClick={() => {
+            setChatSearchOpen((open) => !open);
+            setChatQuery("");
+          }}
+          aria-label={chatSearchOpen ? "Close chat search" : "Search chats"}
+          title={chatSearchOpen ? "Close chat search" : "Search chats"}
+          className="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 light:border-black/10 bg-white/5 light:bg-black/5 transition hover:bg-white/15 light:hover:bg-black/10"
+        >
+          {chatSearchOpen ? <X size={19} /> : <Search size={19} />}
+        </button>
+
+        <button
           onClick={() => setComposeOpen((v) => !v)}
           className="flex items-center gap-1.5 rounded-full bg-gradient-to-r from-[#FF7A18] via-[#FF9A00] to-[#FFD54A] px-4 py-2.5 text-sm font-bold text-white shadow-[0_10px_25px_rgba(255,153,0,.3)] transition-all hover:-translate-y-0.5"
         >
@@ -212,6 +241,36 @@ export default function MessagesPage() {
       </div>
 
       <div className="mx-auto max-w-3xl px-5 py-6">
+        {loadError && (
+          <div role="alert" className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-red-400/30 bg-red-500/10 px-4 py-3 text-sm text-red-300 light:text-red-700">
+            <span>{loadError}</span>
+            <button
+              onClick={() => {
+                setLoading(true);
+                setLoadError(null);
+                setReloadKey((key) => key + 1);
+              }}
+              className="font-bold underline underline-offset-2"
+            >
+              Try again
+            </button>
+          </div>
+        )}
+
+        {chatSearchOpen && (
+          <div className="relative mb-5">
+            <Search size={17} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500" />
+            <input
+              autoFocus
+              value={chatQuery}
+              onChange={(event) => setChatQuery(event.target.value)}
+              placeholder="Search chats by name or message..."
+              aria-label="Search chats by name or message"
+              className="w-full rounded-2xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-white/60 py-3 pl-11 pr-4 text-sm text-white light:text-slate-900 caret-orange-400 outline-none transition focus:border-orange-400/40"
+            />
+          </div>
+        )}
+
         {composeOpen && (
           <div className="mb-6 rounded-3xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4">
             <div className="relative">
@@ -279,7 +338,7 @@ export default function MessagesPage() {
           </button>
         </div>
 
-        {rows.length === 0 ? (
+        {loadError ? null : visibleRows.length === 0 ? (
           <div className="flex flex-col items-center justify-center rounded-3xl border border-white/10 light:border-black/10 py-16 text-center">
             {tab === "requests" ? (
               <Inbox size={28} className="mb-3 text-slate-600" />
@@ -287,17 +346,23 @@ export default function MessagesPage() {
               <MessageSquare size={28} className="mb-3 text-slate-600" />
             )}
             <p className="font-semibold text-white light:text-slate-900">
-              {tab === "requests" ? "No message requests" : "No conversations yet"}
+              {query
+                ? "No chats match your search"
+                : tab === "requests"
+                  ? "No message requests"
+                  : "No conversations yet"}
             </p>
             <p className="mt-1 text-sm text-slate-400 light:text-slate-600">
-              {tab === "requests"
-                ? "Requests from people you're not connected with show up here."
-                : "Search for someone by username to start a conversation."}
+              {query
+                ? "Try a different name or message."
+                : tab === "requests"
+                  ? "Requests from people you're not connected with show up here."
+                  : "Search for someone by username to start a conversation."}
             </p>
           </div>
         ) : (
           <div className="space-y-3">
-            {rows.map((row) => (
+            {visibleRows.map((row) => (
               <div
                 key={row.conversationId}
                 className="flex w-full items-center gap-4 rounded-3xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-4 transition hover:bg-white/[0.05] light:hover:bg-black/[0.04]"

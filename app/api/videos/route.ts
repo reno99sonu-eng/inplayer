@@ -10,6 +10,15 @@ export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const channelId = searchParams.get("channelId");
   const contentType = searchParams.get("contentType");
+  const isPaginated = searchParams.has("limit") || searchParams.has("offset");
+  const requestedLimit = Number.parseInt(searchParams.get("limit") ?? "24", 10);
+  const requestedOffset = Number.parseInt(searchParams.get("offset") ?? "0", 10);
+  const limit = Number.isFinite(requestedLimit)
+    ? Math.min(48, Math.max(1, requestedLimit))
+    : 24;
+  const offset = Number.isFinite(requestedOffset)
+    ? Math.max(0, requestedOffset)
+    : 0;
 
   try {
     const allReady = await getVisibleVideos();
@@ -36,12 +45,19 @@ export async function GET(request: Request) {
     if (channelId) {
       items = items.filter((v) => v.uploaderId === channelId);
     }
-    
+
+    // Android asks for a small first page so it can paint immediately, then
+    // requests more as the person scrolls. Keep the existing unpaginated
+    // response for website and older app clients. Filtering always happens
+    // before slicing so audience/private visibility rules remain unchanged.
+    const total = items.length;
+    const pageItems = isPaginated ? items.slice(offset, offset + limit) : items;
+
     const usernames = await resolveUsernames(
-      items.map((video) => video.uploaderId as string | null | undefined)
+      pageItems.map((video) => video.uploaderId as string | null | undefined)
     );
 
-    const videos = items.map((video) => {
+    const videos = pageItems.map((video) => {
       const uploaderId = video.uploaderId as string | undefined;
       return {
         ...video,
@@ -49,7 +65,19 @@ export async function GET(request: Request) {
       };
     });
 
-    return NextResponse.json({ videos }, {
+    const responseBody = isPaginated
+      ? {
+          videos,
+          pagination: {
+            limit,
+            offset,
+            total,
+            hasMore: offset + videos.length < total,
+          },
+        }
+      : { videos };
+
+    return NextResponse.json(responseBody, {
       headers: {
         "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
       },

@@ -11,6 +11,7 @@ import 'package:video_player/video_player.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/playback_settings_store.dart';
+import '../../../../core/utils/responsive.dart';
 import '../../../../core/utils/video_preview_gate.dart';
 import '../../../../core/widgets/user_avatar.dart';
 import '../../../../models/video.dart';
@@ -373,11 +374,22 @@ class _VideoCardState extends ConsumerState<VideoCard> {
     }
 
     if (thumbnail.startsWith('http://') || thumbnail.startsWith('https://')) {
+      final columns = context.responsiveVideoColumns.clamp(1, 4).toInt();
+      final screenWidth = MediaQuery.of(context).size.width;
+      final devicePixelRatio = MediaQuery.of(context).devicePixelRatio;
+      final cacheWidth =
+          (((screenWidth - 32 - (columns - 1) * 16) / columns) *
+                  devicePixelRatio)
+              .round()
+              .clamp(240, 1440)
+              .toInt();
       return CachedNetworkImage(
         imageUrl: thumbnail,
         fit: BoxFit.cover,
         width: double.infinity,
         height: double.infinity,
+        memCacheWidth: cacheWidth,
+        memCacheHeight: (cacheWidth * 9 / 16).round(),
         fadeInDuration: Duration.zero,
         fadeOutDuration: Duration.zero,
         placeholder: (context, url) => Container(
@@ -432,12 +444,7 @@ class _VideoCardState extends ConsumerState<VideoCard> {
                     _previewController!.value.isInitialized &&
                     _isFirstFrameRendered)
                   Positioned.fill(
-                    child: TweenAnimationBuilder<double>(
-                      tween: Tween(begin: 0.0, end: 1.0),
-                      duration: const Duration(milliseconds: 260),
-                      curve: Curves.easeOut,
-                      builder: (context, opacity, child) =>
-                          Opacity(opacity: opacity, child: child),
+                    child: _PreviewFadeIn(
                       // Match the thumbnail's fill-and-crop treatment. This
                       // keeps the live frame the same size as the poster in
                       // the fixed 16:9 card instead of shrinking inside it.
@@ -673,4 +680,42 @@ class _VideoCardState extends ConsumerState<VideoCard> {
           : null,
     );
   }
+}
+
+/// Owns the preview transition independently of [VideoCard]'s parent feed.
+/// Feed-level setState calls can rebuild a card while async shelves or
+/// feedback complete; this keeps those updates from replaying the fade.
+class _PreviewFadeIn extends StatefulWidget {
+  final Widget child;
+
+  const _PreviewFadeIn({required this.child});
+
+  @override
+  State<_PreviewFadeIn> createState() => _PreviewFadeInState();
+}
+
+class _PreviewFadeInState extends State<_PreviewFadeIn>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _controller;
+  late final Animation<double> _opacity;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 260),
+    )..forward();
+    _opacity = CurvedAnimation(parent: _controller, curve: Curves.easeOut);
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) =>
+      FadeTransition(opacity: _opacity, child: widget.child);
 }

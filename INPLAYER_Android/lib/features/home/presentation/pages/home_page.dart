@@ -62,7 +62,6 @@ class _HomePageState extends ConsumerState<HomePage> {
   /// next launch until they take it down.
   bool _announcementDismissed = false;
   String? _lastAnnouncementText;
-  Timer? _settingsPollTimer;
   bool _exitingApp = false;
   int _currentIndex = 0;
   final Set<int> _builtTabs = <int>{0};
@@ -103,18 +102,6 @@ class _HomePageState extends ConsumerState<HomePage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       NotificationPermissionHelper.maybePrompt(context);
     });
-    _settingsPollTimer = Timer.periodic(const Duration(seconds: 15), (_) {
-      if (mounted) {
-        ref.invalidate(publicPlatformSettingsProvider);
-        ref.invalidate(publicNavbarThemeProvider);
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    _settingsPollTimer?.cancel();
-    super.dispose();
   }
 
   /// Index of the Raftaar tab. Named because three separate things below
@@ -143,6 +130,7 @@ class _HomePageState extends ConsumerState<HomePage> {
   static const double _miniPlayerInset = 64.0;
 
   List<Widget> _buildPages({
+    required bool feedSurfacesActive,
     required double shortsBottomInset,
     required double filmsBottomInset,
     required int contentAccessRevision,
@@ -155,7 +143,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               // Keep feed state and previews alive across data revisions;
               // HomeFeedPage refreshes the list in place.
               key: const ValueKey('home-feed'),
-              isActive: _currentIndex == 0,
+              isActive: _currentIndex == 0 && feedSurfacesActive,
               contentAccessRevision: contentAccessRevision,
               platformUpdateRevision: platformUpdateRevision,
             )
@@ -170,7 +158,7 @@ class _HomePageState extends ConsumerState<HomePage> {
               // its own list instead. See ShortsPage.feedRevision.
               key: const ValueKey('shorts'),
               feedRevision: feedRevision,
-              isActive: _currentIndex == _raftaarTab,
+              isActive: _currentIndex == _raftaarTab && feedSurfacesActive,
               bottomInset: shortsBottomInset,
               // Nothing to pop here — Raftaar is a tab, not a pushed route — so
               // "back" means returning to the Home tab.
@@ -187,6 +175,7 @@ class _HomePageState extends ConsumerState<HomePage> {
 
   @override
   Widget build(BuildContext context) {
+    final homeRoute = ModalRoute.of(context);
     final contentAccessRevision = ref.watch(contentAccessRevisionProvider);
     final platformUpdateRevision = ref.watch(platformUpdateRevisionProvider);
     final feedRevision = '$contentAccessRevision-$platformUpdateRevision';
@@ -251,14 +240,30 @@ class _HomePageState extends ConsumerState<HomePage> {
         body: PatternBackground(
           child: Stack(
             children: [
-              IndexedStack(
-                index: _currentIndex,
-                children: _buildPages(
-                  shortsBottomInset: shortsBottomInset,
-                  filmsBottomInset: filmsBottomInset,
-                  contentAccessRevision: contentAccessRevision,
-                  platformUpdateRevision: platformUpdateRevision,
-                  feedRevision: feedRevision,
+              ValueListenableBuilder<Route<dynamic>?>(
+                valueListenable: pagelessRouteObserver.topRoute,
+                builder: (context, topRoute, _) => ValueListenableBuilder<bool>(
+                  valueListenable: pagelessRouteObserver.drawerOpen,
+                  builder: (context, drawerOpen, _) {
+                    final isTopRoute =
+                        topRoute == null || identical(topRoute, homeRoute);
+                    final feedSurfacesActive =
+                        isTopRoute &&
+                        !drawerOpen &&
+                        !showAnnouncement &&
+                        !platformSettings.maintenanceMode;
+                    return IndexedStack(
+                      index: _currentIndex,
+                      children: _buildPages(
+                        feedSurfacesActive: feedSurfacesActive,
+                        shortsBottomInset: shortsBottomInset,
+                        filmsBottomInset: filmsBottomInset,
+                        contentAccessRevision: contentAccessRevision,
+                        platformUpdateRevision: platformUpdateRevision,
+                        feedRevision: feedRevision,
+                      ),
+                    );
+                  },
                 ),
               ),
               // Home tab only. Previously mounted above the router in
@@ -657,6 +662,26 @@ class _HomePageState extends ConsumerState<HomePage> {
   }
 }
 
+enum _HomeFeedEntryKind { videoRow, ad, family, playables, raftaarShorts }
+
+class _HomeFeedEntry {
+  final String key;
+  final _HomeFeedEntryKind kind;
+  final List<Video> videos;
+  final List<Short> shorts;
+  final String title;
+  final double bottomSpacing;
+
+  const _HomeFeedEntry({
+    required this.key,
+    required this.kind,
+    this.videos = const [],
+    this.shorts = const [],
+    this.title = '',
+    this.bottomSpacing = 0,
+  });
+}
+
 class HomeFeedPage extends ConsumerStatefulWidget {
   const HomeFeedPage({
     super.key,
@@ -675,12 +700,20 @@ class HomeFeedPage extends ConsumerStatefulWidget {
 
 class _HomeFeedPageState extends ConsumerState<HomeFeedPage>
     with WidgetsBindingObserver {
+  static const int _homePageSize = 24;
+  static const double _loadMoreThreshold = 960;
+
+  final ScrollController _feedScrollController = ScrollController();
   List<Video>? _videos;
   List<Video> _featured = const [];
   List<Short> _shorts = const [];
   Map<String, String> _feedback = const {};
   bool _feedLoading = true;
   bool _feedFailed = false;
+  bool _hasMoreVideos = true;
+  bool _loadingMoreVideos = false;
+  bool _loadMoreFailed = false;
+  int _nextVideoOffset = 0;
   int _feedRequestId = 0;
 
   /// Incremented on every pull-to-refresh and handed to child shelves that
@@ -702,7 +735,11 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-    _setPreviewSuspension(!widget.isActive);
+    _feedScrollController.addListener(_onFeedScroll);
+    _setPreviewSuspension(
+      !widget.isActive ||
+          WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed,
+    );
     unawaited(_loadFeedData());
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) unawaited(_preloadMidrollCreative());
@@ -712,6 +749,9 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _feedScrollController
+      ..removeListener(_onFeedScroll)
+      ..dispose();
     _setPreviewSuspension(false);
     super.dispose();
   }
@@ -720,7 +760,11 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage>
   void didUpdateWidget(covariant HomeFeedPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.isActive != widget.isActive) {
-      _setPreviewSuspension(!widget.isActive);
+      _setPreviewSuspension(
+        !widget.isActive ||
+            WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed,
+      );
+      if (widget.isActive) _scheduleLoadMoreCheck();
     }
 
     if (oldWidget.contentAccessRevision != widget.contentAccessRevision) {
@@ -733,6 +777,10 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage>
       _feedback = const {};
       _feedLoading = true;
       _feedFailed = false;
+      _hasMoreVideos = true;
+      _nextVideoOffset = 0;
+      _loadingMoreVideos = false;
+      _loadMoreFailed = false;
       unawaited(_loadFeedData(forceRefresh: true));
     } else if (oldWidget.platformUpdateRevision !=
         widget.platformUpdateRevision) {
@@ -744,7 +792,11 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state != AppLifecycleState.resumed) return;
+    if (state != AppLifecycleState.resumed) {
+      _setPreviewSuspension(true);
+      return;
+    }
+    _setPreviewSuspension(!widget.isActive);
     ref.invalidate(publicPlatformSettingsProvider);
     ref.invalidate(publicNavbarThemeProvider);
     unawaited(_preloadMidrollCreative());
@@ -773,35 +825,49 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage>
     final videoService = ref.read(videoServiceProvider);
     final feedbackService = ref.read(videoInteractionServiceProvider);
 
-    final videosFuture = videoService.getVideos(forceRefresh: forceRefresh);
+    _loadingMoreVideos = false;
+    _loadMoreFailed = false;
+    final videosFuture = videoService.getVideosPage(
+      offset: 0,
+      limit: _homePageSize,
+    );
     final featuredFuture = videoService.getFeaturedWeekly(
       forceRefresh: forceRefresh,
     );
     final feedbackFuture = feedbackService.getFeedbackMap();
+    final shortsFuture = videoService.getShorts(forceRefresh: forceRefresh);
 
-    // These shelves decorate the feed; they should never hold the main video
-    // grid behind their network requests.
+    // The shelves decorate the feed and never hold the main rows behind their
+    // requests. Start independent calls together so late shelf insertion is
+    // less likely to move the feed while someone is already scrolling.
     unawaited(_loadFeatured(featuredFuture, requestId));
     unawaited(_loadFeedback(feedbackFuture, requestId));
+    unawaited(_loadShorts(shortsFuture, requestId));
 
     try {
-      final videos = await videosFuture;
+      final page = await videosFuture;
       if (!mounted || requestId != _feedRequestId) return;
       setState(() {
-        _videos = videos;
+        final existingVideos = _videos;
+        if (existingVideos == null || _nextVideoOffset == 0) {
+          _videos = page.videos;
+          _nextVideoOffset = page.nextOffset;
+        } else {
+          // Revalidation keeps already loaded older rows and the scroll
+          // position. New uploads from page zero are merged at the front.
+          final seenIds = page.videos.map((video) => video.videoId).toSet();
+          _videos = [
+            ...page.videos,
+            ...existingVideos.where(
+              (video) => !seenIds.contains(video.videoId),
+            ),
+          ];
+        }
+        _hasMoreVideos = page.hasMore || _nextVideoOffset < page.total;
         _feedLoading = false;
         _feedFailed = false;
       });
-
-      // getShorts can reuse the freshly-populated video cache when one is
-      // available. Start it only after the main request completes, and let it
-      // populate its shelf independently of the already-visible feed.
-      unawaited(
-        _loadShorts(
-          videoService.getShorts(forceRefresh: forceRefresh),
-          requestId,
-        ),
-      );
+      _scheduleLoadMoreCheck();
     } catch (_) {
       if (!mounted || requestId != _feedRequestId) return;
       setState(() {
@@ -811,6 +877,62 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage>
         _feedFailed = _videos == null;
       });
     }
+  }
+
+  void _onFeedScroll() {
+    if (!widget.isActive || !_feedScrollController.hasClients) return;
+    if (_feedScrollController.position.extentAfter < _loadMoreThreshold) {
+      unawaited(_loadMoreVideos());
+    }
+  }
+
+  void _scheduleLoadMoreCheck() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _onFeedScroll();
+    });
+  }
+
+  Future<void> _loadMoreVideos() async {
+    if (!widget.isActive ||
+        _videos == null ||
+        !_hasMoreVideos ||
+        _loadingMoreVideos ||
+        _loadMoreFailed) {
+      return;
+    }
+
+    final requestId = _feedRequestId;
+    final offset = _nextVideoOffset;
+    setState(() => _loadingMoreVideos = true);
+
+    VideoPage? page;
+    try {
+      page = await ref
+          .read(videoServiceProvider)
+          .getVideosPage(offset: offset, limit: _homePageSize);
+    } catch (error) {
+      debugPrint('Home feed next page failed at offset $offset: $error');
+    }
+
+    if (!mounted || requestId != _feedRequestId) return;
+    final loadedPage = page;
+    setState(() {
+      if (loadedPage != null) {
+        final existingIds = _videos!.map((video) => video.videoId).toSet();
+        _videos = [
+          ..._videos!,
+          ...loadedPage.videos.where(
+            (video) => !existingIds.contains(video.videoId),
+          ),
+        ];
+        _nextVideoOffset = loadedPage.nextOffset;
+        _hasMoreVideos = loadedPage.hasMore;
+      } else {
+        _loadMoreFailed = true;
+      }
+      _loadingMoreVideos = false;
+    });
+    if (loadedPage != null) _scheduleLoadMoreCheck();
   }
 
   Future<void> _loadFeatured(Future<List<Video>> future, int requestId) async {
@@ -870,6 +992,7 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage>
       onRefresh: _refreshContent,
       child: CustomScrollView(
         physics: const AlwaysScrollableScrollPhysics(),
+        controller: _feedScrollController,
         slivers: [
           SliverAppBar(
             automaticallyImplyLeading: false,
@@ -957,7 +1080,7 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage>
               ],
             ),
           ),
-          SliverToBoxAdapter(child: _buildHomeContent()),
+          ..._buildHomeSlivers(),
           const SliverToBoxAdapter(child: SizedBox(height: 100)),
         ],
       ),
@@ -1066,95 +1189,154 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage>
   static List<Video> _onlyLongformVideos(List<Video> videos) =>
       videos.where((v) => !v.isStrictMusic && !v.isShort && !v.isFilm).toList();
 
-  Widget _buildHomeContent() {
+  List<Widget> _buildHomeSlivers() {
     if (_videos == null && _feedLoading) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 80),
-        child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const CircularProgressIndicator(color: AppColors.brandOrange),
-              const SizedBox(height: 16),
-              Text(
-                'Loading videos...',
-                style: TextStyle(color: context.textSecondary),
+      return [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 80),
+            child: Center(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const CircularProgressIndicator(color: AppColors.brandOrange),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Loading videos...',
+                    style: TextStyle(color: context.textSecondary),
+                  ),
+                ],
               ),
-            ],
+            ),
           ),
         ),
-      );
+      ];
     }
 
-    if (_videos == null && _feedFailed) return _buildErrorState();
+    if (_videos == null && _feedFailed) {
+      return [
+        SliverFillRemaining(hasScrollBody: false, child: _buildErrorState()),
+      ];
+    }
     if (_videos == null) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 80),
-        child: Center(
-          child: CircularProgressIndicator(color: AppColors.brandOrange),
+      return [
+        SliverFillRemaining(
+          hasScrollBody: false,
+          child: Center(
+            child: CircularProgressIndicator(color: AppColors.brandOrange),
+          ),
         ),
-      );
+      ];
     }
 
     final videos = _onlyLongformVideos(_videos!);
     final featured = _onlyLongformVideos(_featured);
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildCategoryChips(),
-        if (featured.isNotEmpty) FeaturedHeroCarousel(featuredVideos: featured),
-        const SizedBox(height: 16),
-        if (videos.isEmpty)
-          _buildEmptyState()
-        else
-          _buildRhythmFeed(videos, _shorts, _feedback),
-      ],
-    );
+    return [
+      SliverToBoxAdapter(child: _buildCategoryChips()),
+      if (featured.isNotEmpty)
+        SliverToBoxAdapter(
+          child: FeaturedHeroCarousel(featuredVideos: featured),
+        ),
+      const SliverToBoxAdapter(child: SizedBox(height: 16)),
+      if (videos.isEmpty)
+        SliverToBoxAdapter(child: _buildEmptyState())
+      else
+        _buildRhythmFeedSliver(videos, _shorts, _feedback),
+      if (_loadingMoreVideos)
+        const SliverToBoxAdapter(
+          child: Padding(
+            padding: EdgeInsets.symmetric(vertical: 24),
+            child: Center(
+              child: SizedBox.square(
+                dimension: 24,
+                child: CircularProgressIndicator(strokeWidth: 2.5),
+              ),
+            ),
+          ),
+        ),
+      if (_loadMoreFailed)
+        SliverToBoxAdapter(
+          child: Center(
+            child: TextButton.icon(
+              onPressed: () {
+                setState(() => _loadMoreFailed = false);
+                unawaited(_loadMoreVideos());
+              },
+              icon: const Icon(Icons.refresh),
+              label: const Text('Could not load more videos. Retry'),
+            ),
+          ),
+        ),
+    ];
   }
 
   /// The real home feed shelf rhythm — mirrors
   /// RecommendationFeed.tsx: videos in blocks of 4, with
   /// TrendingNow after the first block, the InJoy games shelf after the
   /// second, and a Raftaar Shorts shelf after every odd block.
-  Widget _buildRhythmFeed(
+  Widget _buildRhythmFeedSliver(
     List<Video> videos,
     List<Short> allShorts,
     Map<String, String> feedbackMap,
   ) {
     const blockSize = 4;
     const shortsPerShelf = 8;
+    final columns = context.responsiveVideoColumns.clamp(1, 4).toInt();
 
-    final blocks = <List<Video>>[];
+    final entries = <_HomeFeedEntry>[];
     for (var i = 0; i < videos.length; i += blockSize) {
-      blocks.add(
-        videos.sublist(
-          i,
-          i + blockSize > videos.length ? videos.length : i + blockSize,
-        ),
-      );
-    }
+      final blockEnd = i + blockSize > videos.length
+          ? videos.length
+          : i + blockSize;
+      final block = videos.sublist(i, blockEnd);
+      for (var rowStart = 0; rowStart < block.length; rowStart += columns) {
+        final rowEnd = rowStart + columns > block.length
+            ? block.length
+            : rowStart + columns;
+        final row = block.sublist(rowStart, rowEnd);
+        final isLastRow = rowEnd == block.length;
+        entries.add(
+          _HomeFeedEntry(
+            key: 'video-row-${row.first.videoId}',
+            kind: _HomeFeedEntryKind.videoRow,
+            videos: row,
+            bottomSpacing: isLastRow ? 12 : (columns == 1 ? 12 : 16),
+          ),
+        );
+      }
 
-    int shelfCursor = 0;
-    final widgets = <Widget>[];
-
-    for (var blockIndex = 0; blockIndex < blocks.length; blockIndex++) {
-      widgets.add(_buildVideoGrid(blocks[blockIndex], feedbackMap));
-      widgets.add(const SizedBox(height: 12));
-
+      final blockIndex = i ~/ blockSize;
       if (blockIndex == 0) {
-        widgets.add(const HomeAdCard());
-        widgets.add(const SizedBox(height: 12));
-        widgets.add(InFamilyRow(refreshToken: _feedRefreshTick));
-        widgets.add(const SizedBox(height: 12));
+        entries.add(
+          const _HomeFeedEntry(
+            key: 'home-ad',
+            kind: _HomeFeedEntryKind.ad,
+            bottomSpacing: 12,
+          ),
+        );
+        entries.add(
+          const _HomeFeedEntry(
+            key: 'in-family',
+            kind: _HomeFeedEntryKind.family,
+            bottomSpacing: 12,
+          ),
+        );
       }
       if (blockIndex == 1) {
-        widgets.add(const PlayablesShelf());
-        widgets.add(const SizedBox(height: 12));
+        entries.add(
+          const _HomeFeedEntry(
+            key: 'playables',
+            kind: _HomeFeedEntryKind.playables,
+            bottomSpacing: 12,
+          ),
+        );
       }
 
       // Show Raftaar Shorts shelf right after block 0 (immediately below first videos),
       // and then repeat on alternate blocks so Raftaar is prominently visible
+      final shelfCursor = _shortsConsumedBeforeBlock(blockIndex);
       if ((blockIndex == 0 || blockIndex.isEven) &&
           shelfCursor < allShorts.length) {
         final end = (shelfCursor + shortsPerShelf > allShorts.length)
@@ -1162,24 +1344,115 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage>
             : shelfCursor + shortsPerShelf;
         final slice = allShorts.sublist(shelfCursor, end);
         if (slice.isNotEmpty) {
-          widgets.add(
-            RaftaarShortsRow(
+          entries.add(
+            _HomeFeedEntry(
+              key: 'raftaar-shorts-$shelfCursor',
+              kind: _HomeFeedEntryKind.raftaarShorts,
               shorts: slice,
               title: shelfCursor == 0
                   ? 'Raftaar Shorts'
                   : 'More Raftaar Shorts',
+              bottomSpacing: 12,
             ),
           );
-          widgets.add(const SizedBox(height: 12));
-          shelfCursor = end;
         }
       }
     }
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: widgets,
+    final indexByKey = <String, int>{
+      for (var index = 0; index < entries.length; index++)
+        'home-feed-entry-${entries[index].key}': index,
+    };
+
+    return SliverList(
+      delegate: SliverChildBuilderDelegate(
+        (context, index) {
+          final entry = entries[index];
+          return KeyedSubtree(
+            key: ValueKey('home-feed-entry-${entry.key}'),
+            child: _buildHomeFeedEntry(entry, feedbackMap, columns),
+          );
+        },
+        childCount: entries.length,
+        findChildIndexCallback: (key) =>
+            key is ValueKey<String> ? indexByKey[key.value] : null,
+      ),
     );
+  }
+
+  int _shortsConsumedBeforeBlock(int blockIndex) {
+    // The current rhythm places one shelf after block 0, then each later
+    // even-numbered block. Each full shelf consumes up to eight shorts.
+    if (blockIndex == 0) return 0;
+    var shelvesBefore = 1;
+    for (var i = 2; i < blockIndex; i += 2) {
+      shelvesBefore++;
+    }
+    return shelvesBefore * 8;
+  }
+
+  Widget _buildHomeFeedEntry(
+    _HomeFeedEntry entry,
+    Map<String, String> feedbackMap,
+    int columns,
+  ) {
+    switch (entry.kind) {
+      case _HomeFeedEntryKind.videoRow:
+        final width = MediaQuery.of(context).size.width;
+        final cellWidth = (width - 32 - (columns - 1) * 16) / columns;
+        final cellHeight = columns == 1 ? null : cellWidth / 1.12;
+        return Padding(
+          padding: EdgeInsets.fromLTRB(16, 0, 16, entry.bottomSpacing),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var index = 0; index < columns; index++) ...[
+                if (index > 0) const SizedBox(width: 16),
+                Expanded(
+                  child: index < entry.videos.length
+                      ? SizedBox(
+                          height: cellHeight,
+                          child: VideoCard(
+                            key: ValueKey(entry.videos[index].videoId),
+                            video: entry.videos[index],
+                            initialFeedback:
+                                feedbackMap[entry.videos[index].videoId],
+                          ),
+                        )
+                      : SizedBox(height: cellHeight),
+                ),
+              ],
+            ],
+          ),
+        );
+      case _HomeFeedEntryKind.ad:
+        return Padding(
+          padding: EdgeInsets.only(bottom: entry.bottomSpacing),
+          child: const HomeAdCard(),
+        );
+      case _HomeFeedEntryKind.family:
+        return Padding(
+          padding: EdgeInsets.only(bottom: entry.bottomSpacing),
+          child: InFamilyRow(
+            key: const ValueKey('home-feed-family'),
+            refreshToken: _feedRefreshTick,
+          ),
+        );
+      case _HomeFeedEntryKind.playables:
+        return Padding(
+          padding: EdgeInsets.only(bottom: entry.bottomSpacing),
+          child: const PlayablesShelf(),
+        );
+      case _HomeFeedEntryKind.raftaarShorts:
+        return Padding(
+          padding: EdgeInsets.only(bottom: entry.bottomSpacing),
+          child: RaftaarShortsRow(
+            key: ValueKey('home-feed-${entry.key}'),
+            shorts: entry.shorts,
+            title: entry.title,
+          ),
+        );
+    }
   }
 
   String _selectedCategory = 'All';
@@ -1300,63 +1573,6 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage>
           );
         },
       ),
-    );
-  }
-
-  Widget _buildVideoGrid(
-    List<Video> videos, [
-    Map<String, String> feedbackMap = const {},
-  ]) {
-    final columns = context.responsiveVideoColumns;
-    if (columns <= 1) {
-      return ListView.separated(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: videos.length,
-        findChildIndexCallback: (key) {
-          if (key is! ValueKey<String>) return null;
-          final index = videos.indexWhere(
-            (video) => video.videoId == key.value,
-          );
-          return index < 0 ? null : index;
-        },
-        separatorBuilder: (context, index) => const SizedBox(height: 12),
-        itemBuilder: (context, index) {
-          final video = videos[index];
-          return VideoCard(
-            key: ValueKey(video.videoId),
-            video: video,
-            initialFeedback: feedbackMap[video.videoId],
-          );
-        },
-      );
-    }
-
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: columns,
-        crossAxisSpacing: 16,
-        mainAxisSpacing: 16,
-        childAspectRatio: 1.12,
-      ),
-      itemCount: videos.length,
-      findChildIndexCallback: (key) {
-        if (key is! ValueKey<String>) return null;
-        final index = videos.indexWhere((video) => video.videoId == key.value);
-        return index < 0 ? null : index;
-      },
-      itemBuilder: (context, index) {
-        final video = videos[index];
-        return VideoCard(
-          key: ValueKey(video.videoId),
-          video: video,
-          initialFeedback: feedbackMap[video.videoId],
-        );
-      },
     );
   }
 

@@ -31,6 +31,20 @@ final videoServiceProvider = Provider<VideoService>((ref) {
   return VideoService();
 });
 
+class VideoPage {
+  final List<Video> videos;
+  final int total;
+  final bool hasMore;
+  final int nextOffset;
+
+  const VideoPage({
+    required this.videos,
+    required this.total,
+    required this.hasMore,
+    required this.nextOffset,
+  });
+}
+
 class VideoService {
   final _dio = DioClient().dio;
   final _logger = Logger();
@@ -111,6 +125,51 @@ class VideoService {
       );
       return _cachedVideos ?? [];
     }
+  }
+
+  /// Loads a small ordered page for the virtualized home feed. The existing
+  /// [getVideos] contract stays unpaginated for search and other callers.
+  Future<VideoPage> getVideosPage({required int offset, int limit = 24}) async {
+    final pageOffset = offset < 0 ? 0 : offset;
+    final pageLimit = limit.clamp(1, 48).toInt();
+    final response = await _dio.get(
+      ApiConstants.videos,
+      queryParameters: {'limit': pageLimit, 'offset': pageOffset},
+    );
+
+    if (response.statusCode != 200 || response.data is! Map) {
+      throw StateError('Unexpected paginated videos response.');
+    }
+
+    final data = response.data as Map;
+    final videosJson = data['videos'];
+    if (videosJson is! List) {
+      throw const FormatException('Videos response is missing its page.');
+    }
+
+    final videos = videosJson
+        .whereType<Map>()
+        .map((json) => Video.fromJson(Map<String, dynamic>.from(json)))
+        .where(
+          (video) => !video.isStrictMusic && !video.isShort && !video.isFilm,
+        )
+        .toList(growable: false);
+    final pagination = data['pagination'];
+    final total = pagination is Map && pagination['total'] is num
+        ? (pagination['total'] as num).toInt()
+        : pageOffset + videosJson.length;
+    final hasMore = pagination is Map && pagination['hasMore'] is bool
+        ? pagination['hasMore'] as bool
+        // Before the server adds optional pagination metadata, /api/videos
+        // returns the entire list. Treat that legacy response as complete.
+        : false;
+
+    return VideoPage(
+      videos: videos,
+      total: total,
+      hasMore: hasMore,
+      nextOffset: pageOffset + videosJson.length,
+    );
   }
 
   /// Loads real music tracks from dedicated GET /api/music endpoint with instant in-memory caching.
@@ -469,7 +528,8 @@ class VideoService {
 
       final filtered = parsed
           .where((json) {
-            final isFilm = json['contentType']?.toString().toLowerCase() == 'film' ||
+            final isFilm =
+                json['contentType']?.toString().toLowerCase() == 'film' ||
                 json['seriesId'] != null;
             if (isFilm) return false;
             final type = json['contentType']?.toString().toLowerCase() ?? '';

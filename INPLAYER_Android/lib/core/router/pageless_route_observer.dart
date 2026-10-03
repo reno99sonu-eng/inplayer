@@ -14,6 +14,11 @@ import 'package:flutter/widgets.dart';
 class PagelessRouteObserver extends NavigatorObserver {
   final ValueNotifier<bool> covered = ValueNotifier<bool>(false);
 
+  /// Top route in the root Navigator, including GoRouter page routes. Feeds
+  /// use this to stop autoplay when another screen covers their tab.
+  final ValueNotifier<Route<dynamic>?> topRoute =
+      ValueNotifier<Route<dynamic>?>(null);
+
   /// True while the side drawer (MobileMenuDrawer) is open. A Scaffold
   /// drawer is not a route, so the Scaffolds that host it report it through
   /// onDrawerChanged; the mini window hides so it doesn't sit on top of the
@@ -25,7 +30,10 @@ class PagelessRouteObserver extends NavigatorObserver {
   // Every route on the root Navigator, bottom to top — pages included.
   final List<Route<dynamic>> _stack = <Route<dynamic>>[];
 
-  void _sync() => covered.value = _routes.isNotEmpty;
+  void _sync() {
+    covered.value = _routes.isNotEmpty;
+    topRoute.value = _stack.isEmpty ? null : _stack.last;
+  }
 
   /// Whether [route] is on the tracked root-Navigator stack.
   bool contains(Route<dynamic> route) => _stack.contains(route);
@@ -43,20 +51,22 @@ class PagelessRouteObserver extends NavigatorObserver {
     _stack.add(route);
     if (route.settings is! Page) {
       _routes.add(route);
-      _sync();
     }
+    _sync();
   }
 
   @override
   void didPop(Route<dynamic> route, Route<dynamic>? previousRoute) {
     _stack.remove(route);
-    if (_routes.remove(route)) _sync();
+    _routes.remove(route);
+    _sync();
   }
 
   @override
   void didRemove(Route<dynamic> route, Route<dynamic>? previousRoute) {
     _stack.remove(route);
-    if (_routes.remove(route)) _sync();
+    _routes.remove(route);
+    _sync();
   }
 
   @override

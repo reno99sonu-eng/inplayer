@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
@@ -7,16 +9,12 @@ import '../../../../core/widgets/user_avatar.dart';
 import '../../../../models/channel.dart';
 import '../../../../providers/auth_provider.dart';
 import '../../../../services/channel_service.dart';
-import 'trending_now_row.dart';
 
-/// Home-feed replacement for the old always-"Trending Creators" strip.
-/// Signed-in users see their real In-Family (subscribed creators, from
-/// GET /api/subscriptions/list via [ChannelService.getSubscribedChannels] —
-/// the same relationship the subscribe button writes to and the drawer's
-/// old IN-FAMILY panel used to read). Signed-out users, and signed-in users
-/// with no subscriptions yet, fall back to the existing public
-/// [TrendingNowRow] discovery strip rather than showing fabricated data —
-/// mirrors the website's InFamilyHome.tsx exactly.
+/// Home-feed In-Family shelf. Signed-in users see the creators they follow,
+/// loaded from GET /api/subscriptions/list through
+/// [ChannelService.getSubscribedChannels] — the same relationship the
+/// subscribe button writes. Signed-out users see an In-Family sign-in prompt;
+/// the shelf does not change into an unrelated Trending Creators section.
 class InFamilyRow extends ConsumerStatefulWidget {
   final int refreshToken;
 
@@ -29,6 +27,7 @@ class InFamilyRow extends ConsumerStatefulWidget {
 class _InFamilyRowState extends ConsumerState<InFamilyRow> {
   List<Channel>? _subscriptions;
   bool _isLoading = true;
+  int _loadRequestId = 0;
 
   @override
   void initState() {
@@ -45,8 +44,12 @@ class _InFamilyRowState extends ConsumerState<InFamilyRow> {
   }
 
   Future<void> _load() async {
+    final requestId = ++_loadRequestId;
     final authState = ref.read(authStateProvider);
     if (authState is! AuthStateAuthenticated) {
+      if (authState is AuthStateInitial || authState is AuthStateLoading) {
+        return;
+      }
       if (mounted) {
         setState(() {
           _subscriptions = null;
@@ -56,16 +59,19 @@ class _InFamilyRowState extends ConsumerState<InFamilyRow> {
       return;
     }
 
+    if (mounted && !_isLoading) setState(() => _isLoading = true);
     try {
-      final subs = await ref.read(channelServiceProvider).getSubscribedChannels();
-      if (mounted) {
+      final subs = await ref
+          .read(channelServiceProvider)
+          .getSubscribedChannels();
+      if (mounted && requestId == _loadRequestId) {
         setState(() {
           _subscriptions = subs;
           _isLoading = false;
         });
       }
     } catch (_) {
-      if (mounted) {
+      if (mounted && requestId == _loadRequestId) {
         setState(() {
           _subscriptions = [];
           _isLoading = false;
@@ -76,15 +82,54 @@ class _InFamilyRowState extends ConsumerState<InFamilyRow> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<AuthState>(authStateProvider, (previous, next) {
+      final previousUserId = previous is AuthStateAuthenticated
+          ? previous.user.userId
+          : null;
+      final nextUserId = next is AuthStateAuthenticated
+          ? next.user.userId
+          : null;
+      if (previous?.runtimeType != next.runtimeType ||
+          previousUserId != nextUserId) {
+        unawaited(_load());
+      }
+    });
+
     final authState = ref.watch(authStateProvider);
     final signedIn = authState is AuthStateAuthenticated;
 
     if (!signedIn) {
-      return TrendingNowRow(refreshToken: widget.refreshToken);
+      return _buildSignInPrompt(context, authState);
     }
 
     if (_isLoading) {
-      return const SizedBox(height: 115);
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'In-Family',
+              style: TextStyle(
+                color: context.textPrimary,
+                fontSize: 18,
+                fontWeight: FontWeight.w900,
+                letterSpacing: -0.5,
+              ),
+            ),
+            const SizedBox(height: 6),
+            const SizedBox(
+              height: 88,
+              child: Center(
+                child: SizedBox.square(
+                  dimension: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
     }
 
     final subs = _subscriptions ?? [];
@@ -132,7 +177,10 @@ class _InFamilyRowState extends ConsumerState<InFamilyRow> {
                         const SizedBox(height: 2),
                         Text(
                           'Follow creators to see them here.',
-                          style: TextStyle(color: context.textDim, fontSize: 11),
+                          style: TextStyle(
+                            color: context.textDim,
+                            fontSize: 11,
+                          ),
                         ),
                       ],
                     ),
@@ -140,7 +188,10 @@ class _InFamilyRowState extends ConsumerState<InFamilyRow> {
                   GestureDetector(
                     onTap: () => context.push('/creators'),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
                       decoration: BoxDecoration(
                         color: AppColors.brandOrange,
                         borderRadius: BorderRadius.circular(10),
@@ -188,7 +239,9 @@ class _InFamilyRowState extends ConsumerState<InFamilyRow> {
                 return GestureDetector(
                   onTap: () {
                     if (channel.username.isNotEmpty) {
-                      context.push('/channel/${Uri.encodeComponent(channel.username)}');
+                      context.push(
+                        '/channel/${Uri.encodeComponent(channel.username)}',
+                      );
                     }
                   },
                   child: Container(
@@ -220,6 +273,67 @@ class _InFamilyRowState extends ConsumerState<InFamilyRow> {
                   ),
                 );
               },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSignInPrompt(BuildContext context, AuthState authState) {
+    final isResolvingAuth =
+        authState is AuthStateInitial || authState is AuthStateLoading;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'In-Family',
+            style: TextStyle(
+              color: context.textPrimary,
+              fontSize: 18,
+              fontWeight: FontWeight.w900,
+              letterSpacing: -0.5,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: context.isDark
+                  ? Colors.white.withValues(alpha: 0.04)
+                  : Colors.black.withValues(alpha: 0.03),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: context.borderSubtle),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    isResolvingAuth
+                        ? 'Loading your In-Family…'
+                        : 'Sign in to see creators you follow here.',
+                    style: TextStyle(
+                      color: context.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+                if (isResolvingAuth)
+                  const SizedBox.square(
+                    dimension: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                else
+                  TextButton(
+                    onPressed: () => context.push('/signin'),
+                    child: const Text('Sign in'),
+                  ),
+              ],
             ),
           ),
         ],

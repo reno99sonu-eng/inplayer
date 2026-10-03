@@ -46,6 +46,7 @@ class _VideoCardState extends ConsumerState<VideoCard> {
   Timer? _hoverTimer;
   Timer? _visibilityTimer;
   Timer? _visibilityActivationTimer;
+  Timer? _visibilityExitTimer;
   Timer? _previewRetryTimer;
   bool _isPlayingPreview = false;
   bool _isFirstFrameRendered = false;
@@ -106,6 +107,7 @@ class _VideoCardState extends ConsumerState<VideoCard> {
     _previewRetryTimer?.cancel();
     _visibilityTimer?.cancel();
     _visibilityActivationTimer?.cancel();
+    _visibilityExitTimer?.cancel();
     _previewGeneration++;
     final controller = _previewController;
     if (controller != null) _disposePreviewController(controller);
@@ -137,7 +139,7 @@ class _VideoCardState extends ConsumerState<VideoCard> {
     }
   }
 
-  void _checkViewportVisibility() {
+  void _checkViewportVisibility({bool afterExitGrace = false}) {
     if (!mounted ||
         _dataSaver ||
         widget.video.muxPlaybackId == null ||
@@ -170,6 +172,8 @@ class _VideoCardState extends ConsumerState<VideoCard> {
         visibleHeight >= renderObject.size.height * visibleThreshold;
 
     if (isVisible) {
+      _visibilityExitTimer?.cancel();
+      _visibilityExitTimer = null;
       if (activeId == widget.video.videoId) {
         _visibilityActivationTimer?.cancel();
         _visibilityActivationTimer = null;
@@ -189,7 +193,20 @@ class _VideoCardState extends ConsumerState<VideoCard> {
       _visibilityActivationTimer?.cancel();
       _visibilityActivationTimer = null;
       _visibilityDwellPassed = false;
-      VideoPreviewGate.instance.releaseActivePreview(widget.video.videoId);
+      if (activeId == widget.video.videoId && !afterExitGrace) {
+        // Scroll physics and sliver layout can briefly report a card outside
+        // the visibility threshold during a frame transition. Keep its
+        // decoder alive through that short gap instead of flashing back to
+        // the thumbnail and immediately creating a new HLS controller.
+        _visibilityExitTimer ??= Timer(const Duration(milliseconds: 280), () {
+          _visibilityExitTimer = null;
+          if (mounted) {
+            _checkViewportVisibility(afterExitGrace: true);
+          }
+        });
+      } else {
+        VideoPreviewGate.instance.releaseActivePreview(widget.video.videoId);
+      }
     }
 
     if (isVisible && activeId != widget.video.videoId) {
@@ -322,6 +339,8 @@ class _VideoCardState extends ConsumerState<VideoCard> {
     if (controller != null) _disposePreviewController(controller);
     _visibilityActivationTimer?.cancel();
     _visibilityActivationTimer = null;
+    _visibilityExitTimer?.cancel();
+    _visibilityExitTimer = null;
     _visibilityDwellPassed = false;
     if (mounted) {
       setState(() {

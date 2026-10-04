@@ -35,9 +35,13 @@ class AdMobInterstitialService {
     final config = _ref.read(admobConfigProvider);
     if (!config.enabled || config.interstitialUnitId.isEmpty) return;
 
-    // Premium subscribers never see third-party ads
-    final isPremium = _ref.read(premiumServiceProvider).isPremium;
-    if (isPremium) return;
+    // Premium subscribers never see third-party ads — checked asynchronously
+    try {
+      final status = await _ref.read(premiumServiceProvider).getStatus();
+      if (status.premium) return;
+    } catch (_) {
+      // Cannot determine premium status — proceed with ads (fail open)
+    }
 
     _isLoading = true;
     try {
@@ -73,12 +77,8 @@ class AdMobInterstitialService {
 
   /// Shows the preloaded interstitial ad if ready and cooldown has passed.
   /// Calls [onComplete] immediately if no ad is ready, or after the ad is dismissed.
+  /// Premium check happens at preload time; showIfReady is intentionally sync.
   void showIfReady({VoidCallback? onComplete}) {
-    final isPremium = _ref.read(premiumServiceProvider).isPremium;
-    if (isPremium) {
-      onComplete?.call();
-      return;
-    }
 
     final now = DateTime.now();
     if (_lastShownTime != null && now.difference(_lastShownTime!) < _cooldown) {

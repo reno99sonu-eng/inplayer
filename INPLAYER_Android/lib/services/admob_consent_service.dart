@@ -48,14 +48,24 @@ class AdMobConsentService {
         },
       );
 
-      await consentUpdate.future;
-      if (!await ConsentInformation.instance.canRequestAds()) return false;
+      await consentUpdate.future.timeout(
+        const Duration(seconds: 4),
+        onTimeout: () {
+          debugPrint('AdMob consent update timed out; proceeding with initialization.');
+        },
+      );
+      final canRequest = await ConsentInformation.instance.canRequestAds().catchError((_) => true);
 
       await MobileAds.instance.initialize();
-      return true;
+      return canRequest;
     } catch (error) {
       debugPrint('AdMob initialization warning: $error');
-      return false;
+      try {
+        await MobileAds.instance.initialize();
+        return true;
+      } catch (_) {
+        return false;
+      }
     }
   }
 

@@ -41,6 +41,7 @@ import '../widgets/comment_thread_tile.dart';
 import 'fullscreen_player_page.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../services/ad_service.dart';
+import '../../../../services/admob_interstitial_service.dart';
 
 class WatchPage extends ConsumerStatefulWidget {
   final String videoId;
@@ -1537,11 +1538,16 @@ class _WatchPageState extends ConsumerState<WatchPage>
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-        if (context.canPop()) {
-          context.pop();
-        } else {
-          context.go('/');
-        }
+        ref.read(admobInterstitialServiceProvider).showIfReady(
+          onComplete: () {
+            if (!mounted) return;
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/');
+            }
+          },
+        );
       },
       child: PatternBackground(
         child: Scaffold(
@@ -1601,11 +1607,16 @@ class _WatchPageState extends ConsumerState<WatchPage>
                                                 onToggleFullscreen:
                                                     _openFullscreen,
                                                 onBack: () {
-                                                  if (context.canPop()) {
-                                                    context.pop();
-                                                  } else {
-                                                    context.go('/');
-                                                  }
+                                                  ref.read(admobInterstitialServiceProvider).showIfReady(
+                                                    onComplete: () {
+                                                      if (!mounted) return;
+                                                      if (context.canPop()) {
+                                                        context.pop();
+                                                      } else {
+                                                        context.go('/');
+                                                      }
+                                                    },
+                                                  );
                                                 },
                                                 qualityLabel: _qualityLabel,
                                                 qualityOptions:

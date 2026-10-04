@@ -92,13 +92,16 @@ export async function POST(request: NextRequest) {
   if (!body || typeof body !== "object" || Array.isArray(body)) {
     return NextResponse.json({ error: "Invalid message request." }, { status: 400 });
   }
-  const { otherUserId, text, audioUrl, audioDurationSec, imageUrl } = body;
+  const { conversationId: bodyConversationId, otherUserId, text, audioUrl, audioDurationSec, imageUrl } = body;
+  const isGroup = !!(bodyConversationId && (bodyConversationId.startsWith("group_") || body.isGroup));
 
-  if (!otherUserId || typeof otherUserId !== "string") {
-    return NextResponse.json({ error: "Missing recipient." }, { status: 400 });
-  }
-  if (otherUserId === user.userId) {
-    return NextResponse.json({ error: "You can't message yourself." }, { status: 400 });
+  if (!isGroup) {
+    if (!otherUserId || typeof otherUserId !== "string") {
+      return NextResponse.json({ error: "Missing recipient." }, { status: 400 });
+    }
+    if (otherUserId === user.userId) {
+      return NextResponse.json({ error: "You can't message yourself." }, { status: 400 });
+    }
   }
 
   const trimmedText = typeof text === "string" ? text.trim() : "";
@@ -145,16 +148,132 @@ export async function POST(request: NextRequest) {
     ? Math.max(0, Math.min(600, Math.round(Number(audioDurationSec) || 0)))
     : undefined;
 
-  const conversationId = makeConversationId(user.userId, otherUserId);
+  // Handle Group message send
+  if (isGroup) {
+    const conversationId = bodyConversationId as string;
+    try {
+      const [myRow, myUserRecord] = await Promise.all([
+        docClient.send(
+          new GetCommand({ TableName: CONVERSATIONS_TABLE, Key: { userId: user.userId, conversationId } })
+        ),
+        docClient.send(new GetCommand({ TableName: "InPlayer-Users", Key: { userId: user.userId } })),
+      ]);
+
+      if (!myRow.Item) {
+        return NextResponse.json({ error: "You are not a member of this group." }, { status: 403 });
+      }
+
+      const memberUserIds: string[] = Array.isArray(myRow.Item.memberUserIds)
+        ? myRow.Item.memberUserIds
+        : [user.userId];
+
+      const myUsername = (myUserRecord.Item?.username as string) || (myUserRecord.Item?.name as string) || "Someone";
+      const now = new Date().toISOString();
+      const messageId = `${now}#${randomUUID()}`;
+
+      const platformSettings = await getPlatformSettings();
+      const moderation =
+        platformSettings.moderationEnabledMessages && trimmedText
+          ? await moderateText(trimmedText)
+          : UNCHECKED;
+      const flagged = moderation.checked && moderation.flagged;
+
+      await docClient.send(
+        new PutCommand({
+          TableName: MESSAGES_TABLE,
+          Item: {
+            conversationId,
+            messageId,
+            senderId: user.userId,
+            senderUsername: myUsername,
+            text: trimmedText,
+            createdAt: now,
+            ...(hasValidAudio && {
+              audioUrl,
+              audioDurationSec: validDurationSec,
+            }),
+            ...(hasValidImage && {
+              imageUrl,
+            }),
+            ...(flagged && {
+              flagged: true,
+              flaggedCategories: moderation.categories,
+              hidden: true,
+              moderatedAt: now,
+            }),
+          },
+        })
+      );
+
+      if (flagged) {
+        await applyModerationStrike(request, user.userId, "message", moderation.categories).catch((err) =>
+          console.error("messages: applyModerationStrike failed:", err)
+        );
+        return NextResponse.json({ success: true, conversationId, requestStatus: "accepted", flagged: true });
+      }
+
+      const previewText =
+        trimmedText || (hasValidAudio ? "🎤 Voice message" : hasValidImage ? "📷 Photo" : "");
+
+      await Promise.all(
+        memberUserIds.map((mId) => {
+          const isMe = mId === user.userId;
+          return docClient.send(
+            new UpdateCommand({
+              TableName: CONVERSATIONS_TABLE,
+              Key: { userId: mId, conversationId },
+              UpdateExpression: isMe
+                ? "SET lastMessageText = :text, lastMessageSenderId = :sender, lastMessageAt = :now, unreadCount = :zero, requestStatus = :accepted"
+                : "SET lastMessageText = :text, lastMessageSenderId = :sender, lastMessageAt = :now, unreadCount = if_not_exists(unreadCount, :zero) + :one",
+              ExpressionAttributeValues: isMe
+                ? {
+                    ":text": previewText,
+                    ":sender": user.userId,
+                    ":now": now,
+                    ":zero": 0,
+                    ":accepted": "accepted",
+                  }
+                : {
+                    ":text": previewText,
+                    ":sender": user.userId,
+                    ":now": now,
+                    ":zero": 0,
+                    ":one": 1,
+                  },
+            })
+          ).catch((err) => console.error("Failed to update group row for", mId, err));
+        })
+      );
+
+      const otherMembers = memberUserIds.filter((mId) => mId !== user.userId);
+      await Promise.all(
+        otherMembers.map((mId) =>
+          createNotification({
+            userId: mId,
+            type: "message",
+            message: `@${myUsername} in ${myRow.Item?.groupName || "group"}: ${previewText}`,
+            conversationId,
+          }).catch(() => null)
+        )
+      );
+
+      return NextResponse.json({ success: true, conversationId, requestStatus: "accepted" });
+    } catch (err) {
+      console.error("Failed to send group message:", err);
+      return NextResponse.json({ error: "Failed to send message in group." }, { status: 500 });
+    }
+  }
+
+  const conversationId = makeConversationId(user.userId, otherUserId!);
 
   try {
     const [myRow, otherUserRecord, myUserRecord, connected] = await Promise.all([
       docClient.send(
         new GetCommand({ TableName: CONVERSATIONS_TABLE, Key: { userId: user.userId, conversationId } })
       ),
-      docClient.send(new GetCommand({ TableName: "InPlayer-Users", Key: { userId: otherUserId } })),
+      docClient.send(new GetCommand({ TableName: "InPlayer-Users", Key: { userId: otherUserId! } })),
       docClient.send(new GetCommand({ TableName: "InPlayer-Users", Key: { userId: user.userId } })),
-      areUsersConnected(user.userId, otherUserId),
+      areUsersConnected(user.userId, otherUserId!),
     ]);
 
     if (myRow.Item?.blocked || myRow.Item?.blockedByOther) {

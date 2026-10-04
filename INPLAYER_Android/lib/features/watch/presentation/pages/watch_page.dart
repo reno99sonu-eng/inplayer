@@ -41,7 +41,7 @@ import '../widgets/comment_thread_tile.dart';
 import 'fullscreen_player_page.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../../services/ad_service.dart';
-import '../../../../services/admob_interstitial_service.dart';
+import '../../../home/presentation/widgets/home_ad_card.dart';
 
 class WatchPage extends ConsumerStatefulWidget {
   final String videoId;
@@ -1538,16 +1538,11 @@ class _WatchPageState extends ConsumerState<WatchPage>
       canPop: false,
       onPopInvokedWithResult: (didPop, result) {
         if (didPop) return;
-        ref.read(admobInterstitialServiceProvider).showIfReady(
-          onComplete: () {
-            if (!mounted) return;
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/');
-            }
-          },
-        );
+        if (context.canPop()) {
+          context.pop();
+        } else {
+          context.go('/');
+        }
       },
       child: PatternBackground(
         child: Scaffold(
@@ -1607,16 +1602,11 @@ class _WatchPageState extends ConsumerState<WatchPage>
                                                 onToggleFullscreen:
                                                     _openFullscreen,
                                                 onBack: () {
-                                                  ref.read(admobInterstitialServiceProvider).showIfReady(
-                                                    onComplete: () {
-                                                      if (!mounted) return;
-                                                      if (context.canPop()) {
-                                                        context.pop();
-                                                      } else {
-                                                        context.go('/');
-                                                      }
-                                                    },
-                                                  );
+                                                  if (context.canPop()) {
+                                                    context.pop();
+                                                  } else {
+                                                    context.go('/');
+                                                  }
                                                 },
                                                 qualityLabel: _qualityLabel,
                                                 qualityOptions:
@@ -2922,89 +2912,7 @@ class _WatchPageState extends ConsumerState<WatchPage>
   }
 
   Widget _buildAdBanner() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Stack(
-          children: [
-            Container(
-              width: double.infinity,
-              height: 180,
-              decoration: BoxDecoration(
-                color: AppColors.surfaceLight,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: _video == null
-                  ? null
-                  : CachedNetworkImage(
-                      imageUrl:
-                          _video!.thumbnail, // fallback to video thumbnail
-                      fit: BoxFit.cover,
-                      errorWidget: (context, error, stackTrace) =>
-                          const SizedBox(),
-                    ),
-            ),
-            Positioned(
-              top: 12,
-              right: 12,
-              child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.6),
-                  borderRadius: BorderRadius.circular(4),
-                ),
-                child: const Text(
-                  'AD',
-                  style: TextStyle(
-                    color: AppColors.brandGold,
-                    fontSize: 10,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: AppColors.brandOrange.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
-              ),
-              child: const Text(
-                'AD',
-                style: TextStyle(
-                  color: AppColors.brandOrange,
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text(
-                  '15 August Trailer',
-                  style: TextStyle(
-                    color: AppColors.textPrimaryLight,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 14,
-                  ),
-                ),
-                Text(
-                  'Sponsored',
-                  style: TextStyle(color: Colors.blueAccent, fontSize: 12),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ],
-    );
+    return const HomeAdCard();
   }
 
   Widget _buildActionBar(Video video) {

@@ -29,7 +29,6 @@ import 'features/watch/presentation/widgets/video_mini_player_overlay.dart';
 import 'services/push_notification_service.dart';
 import 'services/presence_service.dart';
 import 'services/admob_consent_service.dart';
-import 'services/admob_interstitial_service.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -125,11 +124,7 @@ class _InplayerAppState extends ConsumerState<InplayerApp>
     });
     unawaited(ref.read(pushNotificationServiceProvider).initialize());
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      unawaited(
-        ref.read(admobConsentServiceProvider).initialize().then((_) {
-          ref.read(admobInterstitialServiceProvider).preloadAd();
-        }),
-      );
+      unawaited(ref.read(admobConsentServiceProvider).initialize());
     });
   }
 

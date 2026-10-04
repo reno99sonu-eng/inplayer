@@ -140,8 +140,8 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
   admobRewardedUnitId: "",
   admobNativeUnitId: "",
   admobOpenAppUnitId: "",
-  homepageBannerSource: "house",
-  watchPageBannerSource: "house",
+  homepageBannerSource: "off",
+  watchPageBannerSource: "off",
   weeklyFeaturedEnabled: true, // ON by default
   midrollEnabled: true,
   midrollIntervalSeconds: 120,

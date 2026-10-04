@@ -22,6 +22,7 @@ import '../../../../services/music_player_service.dart';
 import '../../../../services/premium_service.dart';
 import '../../../watch/presentation/widgets/video_options_sheet.dart';
 import '../widgets/mini_equalizer.dart';
+import '../../../home/presentation/widgets/home_ad_card.dart';
 
 /// The dedicated full-screen music player — deliberately NOT a Spotify
 /// reskin. Two things make it different: it reads the app's real
@@ -516,6 +517,8 @@ class _NowPlayingPageState extends ConsumerState<NowPlayingPage>
                         _buildTransport(context, player),
                         const SizedBox(height: 16),
                         _buildSecondaryActions(context, player, track),
+                        const SizedBox(height: 16),
+                        const HomeAdCard(),
                         if (track.lyrics.isNotEmpty) ...[
                           const SizedBox(height: 20),
                           _buildLyricsSection(context, player, track),

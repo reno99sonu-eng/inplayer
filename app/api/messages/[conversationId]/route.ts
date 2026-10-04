@@ -119,18 +119,29 @@ export async function PATCH(request: NextRequest, { params }: Params) {
   try {
     switch (action) {
       case "accept": {
-        await Promise.all(
-          [user.userId, otherUserId].map((uid) =>
-            docClient.send(
-              new UpdateCommand({
-                TableName: CONVERSATIONS_TABLE,
-                Key: { userId: uid, conversationId },
-                UpdateExpression: "SET requestStatus = :s",
-                ExpressionAttributeValues: { ":s": "accepted" },
-              })
+        if (row.isGroup || conversationId.startsWith("group_")) {
+          await docClient.send(
+            new UpdateCommand({
+              TableName: CONVERSATIONS_TABLE,
+              Key: { userId: user.userId, conversationId },
+              UpdateExpression: "SET requestStatus = :s",
+              ExpressionAttributeValues: { ":s": "accepted" },
+            })
+          );
+        } else {
+          await Promise.all(
+            [user.userId, otherUserId].filter(Boolean).map((uid) =>
+              docClient.send(
+                new UpdateCommand({
+                  TableName: CONVERSATIONS_TABLE,
+                  Key: { userId: uid, conversationId },
+                  UpdateExpression: "SET requestStatus = :s",
+                  ExpressionAttributeValues: { ":s": "accepted" },
+                })
+              )
             )
-          )
-        );
+          );
+        }
         break;
       }
 

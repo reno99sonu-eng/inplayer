@@ -5,6 +5,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -42,6 +43,10 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
   bool _otherIsOnline = false;
   String? _otherLastActiveAt;
   bool _otherIsTyping = false;
+  bool _isGroup = false;
+  String? _groupName;
+  List<String> _memberUserIds = [];
+  bool _hasInitialMessagesLoaded = false;
 
   bool _loadingMeta = true;
   bool _messagesLoading = true;
@@ -66,6 +71,7 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
     _conversationId = widget.conversationId;
     _otherUsername = widget.otherUsername;
     _otherAvatarUrl = widget.otherAvatarUrl;
+    _isGroup = _conversationId?.startsWith('group_') ?? false;
     _loadingMeta = false;
     _messagesLoading = _conversationId != null;
 
@@ -117,6 +123,9 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
       _otherIsOnline = detail.otherIsOnline;
       _otherLastActiveAt = detail.otherLastActiveAt;
       _chatThemeId = detail.conversation.chatTheme;
+      _isGroup = detail.conversation.isGroup || id.startsWith('group_');
+      _groupName = detail.conversation.groupName;
+      _memberUserIds = detail.conversation.memberUserIds;
       _loadingMeta = false;
     });
   }
@@ -158,6 +167,17 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
       }
 
       final messagesChanged = !_sameMessages(_messages, result.messages);
+
+      // Sound notification for new incoming message
+      if (_hasInitialMessagesLoaded && messagesChanged && result.messages.isNotEmpty) {
+        final lastMsg = result.messages.last;
+        if (lastMsg.senderId != _myUserId) {
+          SystemSound.play(SystemSoundType.alert);
+          HapticFeedback.mediumImpact();
+        }
+      }
+      _hasInitialMessagesLoaded = true;
+
       setState(() {
         _messagesLoading = false;
         _messagesError = null;
@@ -214,6 +234,38 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
     });
   }
 
+  void _openImageViewer(String imageUrl) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withValues(alpha: 0.95),
+      builder: (ctx) => Scaffold(
+        backgroundColor: Colors.transparent,
+        appBar: AppBar(
+          backgroundColor: Colors.transparent,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.close, color: Colors.white, size: 28),
+            onPressed: () => Navigator.of(ctx).pop(),
+          ),
+        ),
+        body: Center(
+          child: InteractiveViewer(
+            panEnabled: true,
+            minScale: 0.8,
+            maxScale: 4.0,
+            child: SafeAppImage(
+              imageUrl: imageUrl,
+              fit: BoxFit.contain,
+              placeholder: (context, url) => const Center(
+                child: CircularProgressIndicator(color: AppColors.brandOrange),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   Future<void> _send({String? text, String? imageUrl}) async {
     final textToSend = text ?? _inputController.text.trim();
     if ((textToSend.isEmpty && imageUrl == null) ||
@@ -222,12 +274,34 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
       return;
     }
 
-    setState(() => _sending = true);
+    if (text == null) _inputController.clear();
+
+    final tempId = 'temp_${DateTime.now().millisecondsSinceEpoch}';
+    final optimisticMsg = ChatMessage(
+      messageId: tempId,
+      senderId: _myUserId ?? '',
+      senderUsername: 'You',
+      text: textToSend,
+      imageUrl: imageUrl,
+      createdAt: DateTime.now().toIso8601String(),
+    );
+
+    setState(() {
+      _sending = true;
+      _messages = [..._messages, optimisticMsg];
+    });
+    _scrollToBottom();
+
+    // Instant send sound + haptic feedback
+    SystemSound.play(SystemSoundType.click);
+    HapticFeedback.lightImpact();
+
     try {
       final res = await ref
           .read(messageServiceProvider)
           .sendMessage(
-            otherUserId: widget.otherUserId,
+            conversationId: _conversationId,
+            otherUserId: widget.otherUserId.isNotEmpty ? widget.otherUserId : null,
             text: textToSend.isEmpty ? null : textToSend,
             imageUrl: imageUrl,
           );
@@ -251,12 +325,14 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
             ),
           );
         } else {
-          if (text == null) _inputController.clear();
           await _loadMessages();
         }
         if (wasCompose && _conversationId != null) _startPolling();
         _scrollToBottom();
       } else {
+        setState(() {
+          _messages = _messages.where((m) => m.messageId != tempId).toList();
+        });
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(res.error ?? "Couldn't send message."),
@@ -265,6 +341,12 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
                 : AppColors.surfaceLight,
           ),
         );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _messages = _messages.where((m) => m.messageId != tempId).toList();
+        });
       }
     } finally {
       if (mounted) setState(() => _sending = false);
@@ -729,14 +811,20 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
                     backgroundColor: context.isDark
                         ? AppColors.surfaceDark
                         : AppColors.surfaceLight,
-                    backgroundImage: avatar,
-                    child: avatar == null
-                        ? Icon(
-                            Icons.person,
-                            size: 18,
-                            color: context.textSecondary,
+                    backgroundImage: _isGroup ? null : avatar,
+                    child: _isGroup
+                        ? const Icon(
+                            Icons.group,
+                            size: 20,
+                            color: AppColors.brandOrange,
                           )
-                        : null,
+                        : (avatar == null
+                            ? Icon(
+                                Icons.person,
+                                size: 18,
+                                color: context.textSecondary,
+                              )
+                            : null),
                   ),
                   const SizedBox(width: 10),
                   Expanded(
@@ -745,7 +833,9 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          _otherUsername ?? 'Chat',
+                          _isGroup
+                              ? (_groupName ?? _otherUsername ?? 'Group Chat')
+                              : (_otherUsername ?? 'Chat'),
                           overflow: TextOverflow.ellipsis,
                           style: TextStyle(
                             color: currentTheme.textColor,
@@ -754,7 +844,11 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
                           ),
                         ),
                         Text(
-                          _otherIsTyping ? 'typing...' : _lastSeenLabel(),
+                          _isGroup
+                              ? (_memberUserIds.isNotEmpty
+                                  ? '${_memberUserIds.length} members'
+                                  : 'Group')
+                              : (_otherIsTyping ? 'typing...' : _lastSeenLabel()),
                           style: TextStyle(
                             color: _otherIsTyping
                                 ? AppColors.brandOrange
@@ -792,7 +886,9 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
                         child: Column(
                           children: [
                             Text(
-                              '@${_otherUsername ?? 'this user'} wants to send you a message',
+                              _isGroup
+                                  ? 'You were invited to join "${_groupName ?? _otherUsername ?? 'this group'}"'
+                                  : '@${_otherUsername ?? 'this user'} wants to send you a message',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 color: context.textPrimary,
@@ -810,6 +906,10 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
                                 const SizedBox(width: 12),
                                 ElevatedButton(
                                   onPressed: () => _respondToRequest(true),
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: AppColors.brandOrange,
+                                    foregroundColor: Colors.white,
+                                  ),
                                   child: const Text('Accept'),
                                 ),
                               ],
@@ -959,6 +1059,27 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
   }
 
   Widget _buildBubble(ChatMessage message, ChatTheme theme) {
+    if (message.isSystem) {
+      return Center(
+        child: Container(
+          margin: const EdgeInsets.symmetric(vertical: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+          decoration: BoxDecoration(
+            color: theme.textColor.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Text(
+            message.text,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 12,
+              color: theme.textColor.withValues(alpha: 0.7),
+            ),
+          ),
+        ),
+      );
+    }
+
     final isMine = message.senderId == _myUserId;
     final avatar = !isMine && _otherAvatarUrl != null
         ? smartImageProvider(_otherAvatarUrl!)
@@ -1017,23 +1138,63 @@ class _ConversationPageState extends ConsumerState<ConversationPage> {
                       ? CrossAxisAlignment.end
                       : CrossAxisAlignment.start,
                   children: [
+                    if (_isGroup &&
+                        !isMine &&
+                        message.senderUsername != null &&
+                        message.senderUsername!.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Text(
+                          message.senderUsername!.startsWith('@')
+                              ? message.senderUsername!
+                              : '@${message.senderUsername}',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.brandOrange,
+                          ),
+                        ),
+                      ),
                     if (!message.deletedForEveryone && message.imageUrl != null)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 6),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: SafeAppImage(
-                            imageUrl: message.imageUrl!,
-                            width: 200,
-                            height: 260,
-                            fit: BoxFit.cover,
-                            placeholder: (context, url) => Container(
-                              width: 200,
-                              height: 150,
-                              color: theme.textColor.withValues(alpha: 0.1),
-                              child: const Center(
-                                child: CircularProgressIndicator(),
-                              ),
+                        child: GestureDetector(
+                          onTap: () => _openImageViewer(message.imageUrl!),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(8),
+                            child: Stack(
+                              children: [
+                                SafeAppImage(
+                                  imageUrl: message.imageUrl!,
+                                  width: 200,
+                                  height: 260,
+                                  fit: BoxFit.cover,
+                                  placeholder: (context, url) => Container(
+                                    width: 200,
+                                    height: 150,
+                                    color: theme.textColor.withValues(alpha: 0.1),
+                                    child: const Center(
+                                      child: CircularProgressIndicator(),
+                                    ),
+                                  ),
+                                ),
+                                Positioned(
+                                  bottom: 6,
+                                  right: 6,
+                                  child: Container(
+                                    padding: const EdgeInsets.all(4),
+                                    decoration: BoxDecoration(
+                                      color: Colors.black54,
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: const Icon(
+                                      Icons.fullscreen,
+                                      color: Colors.white,
+                                      size: 16,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ),

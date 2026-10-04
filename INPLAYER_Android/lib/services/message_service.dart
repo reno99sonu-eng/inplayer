@@ -61,7 +61,8 @@ class MessageService {
   /// route's own comment). Replying to a pending request the OTHER person
   /// started implicitly accepts it server-side — nothing extra to do here.
   Future<SendMessageResult> sendMessage({
-    required String otherUserId,
+    String? otherUserId,
+    String? conversationId,
     String? text,
     String? imageUrl,
     String? audioUrl,
@@ -71,7 +72,8 @@ class MessageService {
       final response = await _dio.post(
         ApiConstants.messages,
         data: {
-          'otherUserId': otherUserId,
+          if (otherUserId != null) 'otherUserId': otherUserId,
+          if (conversationId != null) 'conversationId': conversationId,
           if (text != null) 'text': text,
           if (imageUrl != null) 'imageUrl': imageUrl,
           if (audioUrl != null) 'audioUrl': audioUrl,
@@ -102,6 +104,44 @@ class MessageService {
         error: _exceptionError(
           e,
           fallback: "Couldn't send that message. Check your connection.",
+        ),
+      );
+    }
+  }
+
+  /// POST /api/messages/group — creates a new group conversation with initial members
+  Future<CreateGroupResult> createGroup({
+    required String groupName,
+    required List<String> memberUserIds,
+  }) async {
+    try {
+      final response = await _dio.post(
+        '${ApiConstants.messages}/group',
+        data: {
+          'groupName': groupName,
+          'memberUserIds': memberUserIds,
+        },
+      );
+      if (response.statusCode == 200 && response.data is Map) {
+        final data = response.data as Map;
+        return CreateGroupResult(
+          success: true,
+          conversationId: data['conversationId'] as String?,
+          groupName: data['groupName'] as String?,
+          memberCount: (data['memberCount'] as num?)?.toInt() ?? 0,
+        );
+      }
+      return CreateGroupResult(
+        success: false,
+        error: _errorFrom(response.data, fallback: "Couldn't create group."),
+      );
+    } catch (e) {
+      _logger.e('Error creating group: $e');
+      return CreateGroupResult(
+        success: false,
+        error: _exceptionError(
+          e,
+          fallback: "Couldn't create group. Check your connection.",
         ),
       );
     }
@@ -295,6 +335,21 @@ class MessagesResult {
     this.otherLastReadAt,
     this.otherIsTyping = false,
     this.success = false,
+    this.error,
+  });
+}
+
+class CreateGroupResult {
+  final bool success;
+  final String? conversationId;
+  final String? groupName;
+  final int memberCount;
+  final String? error;
+  CreateGroupResult({
+    required this.success,
+    this.conversationId,
+    this.groupName,
+    this.memberCount = 0,
     this.error,
   });
 }

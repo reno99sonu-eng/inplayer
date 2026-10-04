@@ -222,12 +222,9 @@ class _AdMobBannerSlotState extends ConsumerState<_AdMobBannerSlot> {
         return;
       }
 
-      final size = await AdSize.getLargeAnchoredAdaptiveBannerAdSize(width);
+      final size = await AdSize.getCurrentOrientationAnchoredAdaptiveBannerAdSize(width) ??
+          AdSize.banner;
       if (!mounted || generation != _requestGeneration) return;
-      if (size == null) {
-        _reportFailure();
-        return;
-      }
 
       final ad = BannerAd(
         adUnitId: kReleaseMode ? widget.adUnitId : _testBannerUnitId,

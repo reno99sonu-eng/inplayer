@@ -22,6 +22,10 @@ class Conversation {
   final String? chatTheme;
   final bool disappearingEnabled;
   final int? disappearingSeconds;
+  final bool isGroup;
+  final String? groupName;
+  final String? creatorId;
+  final List<String> memberUserIds;
 
   Conversation({
     required this.conversationId,
@@ -40,9 +44,18 @@ class Conversation {
     this.chatTheme,
     this.disappearingEnabled = false,
     this.disappearingSeconds,
+    this.isGroup = false,
+    this.groupName,
+    this.creatorId,
+    this.memberUserIds = const [],
   });
 
-  Conversation copyWith({String? requestStatus, int? unreadCount}) {
+  Conversation copyWith({
+    String? requestStatus,
+    int? unreadCount,
+    String? groupName,
+    List<String>? memberUserIds,
+  }) {
     return Conversation(
       conversationId: conversationId,
       otherUserId: otherUserId,
@@ -60,6 +73,10 @@ class Conversation {
       chatTheme: chatTheme,
       disappearingEnabled: disappearingEnabled,
       disappearingSeconds: disappearingSeconds,
+      isGroup: isGroup,
+      groupName: groupName ?? this.groupName,
+      creatorId: creatorId,
+      memberUserIds: memberUserIds ?? this.memberUserIds,
     );
   }
 
@@ -75,14 +92,21 @@ class Conversation {
   }
 
   factory Conversation.fromJson(Map<String, dynamic> json) {
+    final convId = json['conversationId']?.toString() ?? '';
+    final isGroup = json['isGroup'] == true || convId.startsWith('group_');
+    final groupName = json['groupName'] as String?;
+    final otherUsername = isGroup
+        ? (groupName ?? json['otherUsername'] as String? ?? 'Group Chat')
+        : json['otherUsername'] as String?;
+
     return Conversation(
-      conversationId: json['conversationId']?.toString() ?? '',
+      conversationId: convId,
       otherUserId: json['otherUserId']?.toString() ?? '',
-      otherUsername: json['otherUsername'] as String?,
+      otherUsername: otherUsername,
       otherAvatarUrl: _resolveUrl(json['otherAvatarUrl'] as String?),
       requestStatus: json['requestStatus']?.toString() ?? 'accepted',
       initiatedBy: json['initiatedBy']?.toString() ?? '',
-      lastMessageText: json['lastMessageText']?.toString() ?? '',
+      lastMessageText: json['lastMessageText']?.toString() ?? json['lastMessage']?.toString() ?? '',
       lastMessageSenderId: json['lastMessageSenderId'] as String?,
       lastMessageAt: json['lastMessageAt'] as String?,
       unreadCount: (json['unreadCount'] as num?)?.toInt() ?? 0,
@@ -92,6 +116,10 @@ class Conversation {
       chatTheme: json['chatTheme'] as String?,
       disappearingEnabled: json['disappearingEnabled'] == true,
       disappearingSeconds: (json['disappearingSeconds'] as num?)?.toInt(),
+      isGroup: isGroup,
+      groupName: groupName,
+      creatorId: json['creatorId'] as String?,
+      memberUserIds: (json['memberUserIds'] as List?)?.map((e) => e.toString()).toList() ?? const [],
     );
   }
 }

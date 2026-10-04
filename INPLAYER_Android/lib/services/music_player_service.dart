@@ -359,9 +359,7 @@ class MusicPlayerService extends ChangeNotifier {
   /// it: for music the video renditions inside the HLS master are pure waste.
   /// There is no lower-bitrate audio variant to choose between, which is why
   /// this is a two-way switch and not a quality ladder.
-  String _streamUrlFor(String playbackId) => _audioDataSaver
-      ? 'https://stream.mux.com/$playbackId/audio.m4a'
-      : 'https://stream.mux.com/$playbackId.m3u8';
+  String _streamUrlFor(String playbackId) => 'https://stream.mux.com/$playbackId.m3u8';
 
   AudioSource _sourceFor(Video track) {
     final playbackId = track.muxPlaybackId ?? '';

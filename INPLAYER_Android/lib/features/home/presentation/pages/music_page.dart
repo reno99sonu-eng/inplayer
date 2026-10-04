@@ -14,6 +14,9 @@ import '../../../../services/history_service.dart';
 import '../../../../services/music_player_service.dart';
 import '../../../../services/video_service.dart';
 import '../../../music/presentation/widgets/music_track_tile.dart';
+import '../../../music/presentation/widgets/mini_player_bar.dart';
+import '../../../music/presentation/pages/now_playing_page.dart';
+import '../widgets/home_ad_card.dart';
 
 /// The Music hub — a purpose-built premium home for every music
 /// track on InPlayer (contentType "music").
@@ -82,6 +85,23 @@ const List<Color> _genreColors = [
 ];
 
 class _MusicPageState extends ConsumerState<MusicPage> {
+  void _openNowPlaying(BuildContext context) {
+    Navigator.of(context, rootNavigator: true).push(
+      PageRouteBuilder(
+        opaque: false,
+        barrierColor: Colors.black.withValues(alpha: 0.001),
+        transitionDuration: const Duration(milliseconds: 280),
+        pageBuilder: (context, animation, secondaryAnimation) => const NowPlayingPage(),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+          return SlideTransition(
+            position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero).animate(curved),
+            child: child,
+          );
+        },
+      ),
+    );
+  }
   List<Video>? _tracks;
   List<Video> _recentlyPlayed = [];
   List<Video> _recommended = [];
@@ -345,6 +365,7 @@ class _MusicPageState extends ConsumerState<MusicPage> {
         }
       },
       child: Scaffold(
+        bottomNavigationBar: const MiniPlayerBar(),
         backgroundColor: isDark
             ? const Color(0xFF121212)
             : AppColors.surfaceLight,
@@ -557,6 +578,8 @@ class _MusicPageState extends ConsumerState<MusicPage> {
                             context,
                             tracks.take(6).toList(),
                           ),
+                        const SizedBox(height: 16),
+                        const HomeAdCard(),
 
                         const SizedBox(height: 18),
 
@@ -905,6 +928,7 @@ class _MusicPageState extends ConsumerState<MusicPage> {
                     ref
                         .read(musicPlayerServiceProvider)
                         .playQueue(quickTracks, startIndex: i);
+                    _openNowPlaying(context);
                   }
                 },
                 child: Container(
@@ -1509,9 +1533,24 @@ class _TrackShelfCard extends ConsumerWidget {
     return GestureDetector(
       onTap: track.videoId.isEmpty
           ? null
-          : () => ref
-                .read(musicPlayerServiceProvider)
-                .playQueue(queue, startIndex: index),
+          : () {
+              ref.read(musicPlayerServiceProvider).playQueue(queue, startIndex: index);
+              Navigator.of(context, rootNavigator: true).push(
+                PageRouteBuilder(
+                  opaque: false,
+                  barrierColor: Colors.black.withValues(alpha: 0.001),
+                  transitionDuration: const Duration(milliseconds: 280),
+                  pageBuilder: (context, animation, secondaryAnimation) => const NowPlayingPage(),
+                  transitionsBuilder: (context, animation, secondaryAnimation, child) {
+                    final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+                    return SlideTransition(
+                      position: Tween<Offset>(begin: const Offset(0, 1), end: Offset.zero).animate(curved),
+                      child: child,
+                    );
+                  },
+                ),
+              );
+            },
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [

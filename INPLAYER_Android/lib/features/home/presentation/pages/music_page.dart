@@ -623,18 +623,28 @@ class _MusicPageState extends ConsumerState<MusicPage> {
                           _buildArtistsRow(context, _uniqueArtists(tracks)),
                         ],
 
-                        // All Tracks
+                        // All Tracks (with JioSaavn-style inline ad card after track 6)
                         const SizedBox(height: 22),
                         _sectionHeader(context, 'Popular tracks'),
                         ...List.generate(
                           tracks.length,
-                          (i) => Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            child: MusicTrackTile(
-                              track: tracks[i],
-                              queue: tracks,
-                              index: i,
-                            ),
+                          (i) => Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Padding(
+                                padding: const EdgeInsets.symmetric(horizontal: 16),
+                                child: MusicTrackTile(
+                                  track: tracks[i],
+                                  queue: tracks,
+                                  index: i,
+                                ),
+                              ),
+                              if (i == 5 && tracks.length > 6) ...[
+                                const SizedBox(height: 14),
+                                const HomeAdCard(),
+                                const SizedBox(height: 14),
+                              ],
+                            ],
                           ),
                         ),
                       ],

@@ -87,7 +87,7 @@ class VideoPreviewGate {
 
     final now = DateTime.now();
     final cooldownMs = now.difference(_lastActivation).inMilliseconds;
-    if (cooldownMs < 650) {
+    if (cooldownMs < 800) {
       return;
     }
 

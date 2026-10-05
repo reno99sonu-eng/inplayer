@@ -183,7 +183,13 @@ class _VideoCardState extends ConsumerState<VideoCard> {
           const Duration(milliseconds: 300),
           () {
             _visibilityActivationTimer = null;
-            if (mounted) _checkViewportVisibility();
+            if (!mounted) return;
+            // Promote directly to avoid re-entering _checkViewportVisibility,
+            // which could race with a scroll event that resets
+            // _visibilityDwellPassed back to false, causing the timer to
+            // restart endlessly and the preview to flicker on/off.
+            _visibilityDwellPassed = true;
+            VideoPreviewGate.instance.requestActivePreview(widget.video.videoId);
           },
         );
       } else {
@@ -198,7 +204,7 @@ class _VideoCardState extends ConsumerState<VideoCard> {
         // the visibility threshold during a frame transition. Keep its
         // decoder alive through that short gap instead of flashing back to
         // the thumbnail and immediately creating a new HLS controller.
-        _visibilityExitTimer ??= Timer(const Duration(milliseconds: 280), () {
+        _visibilityExitTimer ??= Timer(const Duration(milliseconds: 350), () {
           _visibilityExitTimer = null;
           if (mounted) {
             _checkViewportVisibility(afterExitGrace: true);
@@ -209,9 +215,6 @@ class _VideoCardState extends ConsumerState<VideoCard> {
       }
     }
 
-    if (isVisible && activeId != widget.video.videoId) {
-      _visibilityDwellPassed = true;
-    }
   }
 
   Future<void> _startStreamingPreview() async {

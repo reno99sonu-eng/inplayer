@@ -1,6 +1,7 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:math' as math;
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -40,8 +41,11 @@ import '../widgets/video_options_sheet.dart';
 import '../widgets/comment_thread_tile.dart';
 import 'fullscreen_player_page.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
+import '../../../../services/admob_consent_service.dart';
 import '../../../../services/ad_service.dart';
 import '../../../home/presentation/widgets/home_ad_card.dart';
+import '../../../home/presentation/widgets/video_card.dart';
 
 class WatchPage extends ConsumerStatefulWidget {
   final String videoId;
@@ -123,6 +127,9 @@ class _WatchPageState extends ConsumerState<WatchPage>
   MidrollConfig? _midrollConfig;
   late Future<void> _midrollConfigLoadFuture;
   MidrollAd? _currentMidrollAd;
+  RewardedInterstitialAd? _admobMidrollAd;
+  bool _isLoadingAdMobMidroll = false;
+  static const _testRewardedUnitId = 'ca-app-pub-3940256099942544/5354046379';
   bool _midrollBreakActive = false;
   String _adBreakType = 'midroll'; // 'preroll', 'midroll', 'postroll'
   bool _prerollShown = false;
@@ -245,6 +252,7 @@ class _WatchPageState extends ConsumerState<WatchPage>
     // disable auto-PiP for a watch page still playing underneath this one.
     PipService.unregister(this);
     _midrollTimer?.cancel();
+    _admobMidrollAd?.dispose();
     final adCtrl = _adVideoController;
     _adVideoController = null;
     if (adCtrl != null) {
@@ -2188,12 +2196,79 @@ class _WatchPageState extends ConsumerState<WatchPage>
     }
   }
 
+  Future<void> _preloadAdMobMidroll() async {
+    if (_admobMidrollAd != null || _isLoadingAdMobMidroll) return;
+    final admobConfig = ref.read(admobConfigProvider);
+    if (!admobConfig.enabled) return;
+
+    final unitId = kReleaseMode && admobConfig.rewardedUnitId.isNotEmpty
+        ? admobConfig.rewardedUnitId
+        : _testRewardedUnitId;
+
+    _isLoadingAdMobMidroll = true;
+    try {
+      final canRequest =
+          await ref.read(admobConsentServiceProvider).initialize();
+      if (!canRequest || !mounted) {
+        _isLoadingAdMobMidroll = false;
+        return;
+      }
+      RewardedInterstitialAd.load(
+        adUnitId: unitId,
+        request: const AdRequest(),
+        rewardedInterstitialAdLoadCallback:
+            RewardedInterstitialAdLoadCallback(
+          onAdLoaded: (ad) {
+            _admobMidrollAd = ad;
+            _isLoadingAdMobMidroll = false;
+          },
+          onAdFailedToLoad: (error) {
+            debugPrint('AdMob Mid-Roll load error: $error');
+            _admobMidrollAd = null;
+            _isLoadingAdMobMidroll = false;
+          },
+        ),
+      );
+    } catch (_) {
+      _isLoadingAdMobMidroll = false;
+    }
+  }
+
+  void _showAdMobMidroll() {
+    final ad = _admobMidrollAd;
+    if (ad == null) return;
+
+    _midrollBreaksShown.add(1);
+    final wasPlaying = _videoController?.value.isPlaying ?? false;
+    _videoController?.pause();
+
+    ad.fullScreenContentCallback = FullScreenContentCallback(
+      onAdDismissedFullScreenContent: (ad) {
+        ad.dispose();
+        _admobMidrollAd = null;
+        if (mounted && wasPlaying) {
+          _videoController?.play();
+        }
+      },
+      onAdFailedToShowFullScreenContent: (ad, error) {
+        ad.dispose();
+        _admobMidrollAd = null;
+        if (mounted && wasPlaying) {
+          _videoController?.play();
+        }
+      },
+    );
+
+    ad.show(
+      onUserEarnedReward: (_, _) {
+        // User completed / passed ad
+      },
+    );
+  }
+
   void _handleMidrollTimeUpdate() {
     final controller = _videoController;
-    final config = _midrollConfig;
     if (controller == null ||
-        config == null ||
-        !config.enabled ||
         _isPremium ||
         _midrollBreakActive ||
         !_isInitialized ||
@@ -2204,22 +2279,61 @@ class _WatchPageState extends ConsumerState<WatchPage>
     // Do not trigger mid-roll before pre-roll is resolved
     if (!_prerollShown && controller.value.position.inSeconds < 2) return;
 
-    final currentAd =
-        _currentMidrollAd ??
-        (config.ads.isNotEmpty ? config.ads.first : config.ad);
-    if (currentAd == null) return;
-
     final currentPosition = controller.value.position;
     final videoDuration = controller.value.duration;
     if (videoDuration <= Duration.zero || _midrollBreaksShown.contains(1)) {
       return;
     }
 
-    // The app has one mid-roll slot at the actual halfway point. Do not use
-    // the server's interval setting here: long videos were otherwise getting
-    // an ad at an arbitrary interval instead of at their midpoint.
     final midpointMs = videoDuration.inMilliseconds ~/ 2;
     final playbackStartPosition = _midrollPlaybackStartPosition;
+
+    final admobConfig = ref.read(admobConfigProvider);
+    final hasValidRewardedUnit = admobConfig.rewardedUnitId.isNotEmpty &&
+        !admobConfig.rewardedUnitId.contains('XXXX');
+    final isAdMobMidrollActive = admobConfig.enabled &&
+        (hasValidRewardedUnit || !kReleaseMode);
+
+    // 1. If AdMob video ads are configured, prioritize AdMob:
+    if (isAdMobMidrollActive) {
+      if (currentPosition.inMilliseconds >= midpointMs - 15000 &&
+          currentPosition.inMilliseconds < midpointMs &&
+          _admobMidrollAd == null) {
+        unawaited(_preloadAdMobMidroll());
+      }
+      if (playbackStartPosition != null &&
+          playbackStartPosition.inMilliseconds < midpointMs &&
+          currentPosition.inMilliseconds >= midpointMs) {
+        if (_admobMidrollAd != null) {
+          _showAdMobMidroll();
+          return;
+        } else {
+          // If AdMob has no fill / failed, optionally fall back to House Ad ONLY if turned ON in admin panel
+          final config = _midrollConfig;
+          if (config != null && config.enabled) {
+            _triggerAdBreak('midroll', triggerKey: 1);
+          }
+          return;
+        }
+      }
+      return;
+    }
+
+    // 2. Otherwise run house ads if enabled in admin panel
+    final config = _midrollConfig;
+    if (config == null || !config.enabled) return;
+
+    final currentAd =
+        _currentMidrollAd ??
+        (config.ads.isNotEmpty ? config.ads.first : config.ad);
+    if (currentAd == null) return;
+
+    // Preload house ad video 15s before midpoint so playback begins instantly without freezing
+    if (currentPosition.inMilliseconds >= midpointMs - 15000 &&
+        currentPosition.inMilliseconds < midpointMs &&
+        _adVideoController == null) {
+      unawaited(_initAdVideoIfNeeded());
+    }
     if (playbackStartPosition != null &&
         playbackStartPosition.inMilliseconds < midpointMs &&
         currentPosition.inMilliseconds >= midpointMs) {
@@ -2292,6 +2406,7 @@ class _WatchPageState extends ConsumerState<WatchPage>
       return;
     }
     _midrollTimer?.cancel();
+    _admobMidrollAd?.dispose();
     _syncMidrollPlaybackClock();
     _midrollTimer = Timer.periodic(const Duration(milliseconds: 250), (timer) {
       if (!mounted || !_midrollBreakActive) {
@@ -2457,6 +2572,7 @@ class _WatchPageState extends ConsumerState<WatchPage>
   void _finishMidroll(String reason) {
     if (!_midrollBreakActive && reason != 'reset') return;
     _midrollTimer?.cancel();
+    _admobMidrollAd?.dispose();
     _midrollTimer = null;
     _midrollElapsed
       ..stop()
@@ -2893,8 +3009,6 @@ class _WatchPageState extends ConsumerState<WatchPage>
       children: [
         _buildCommentsSection(),
         const SizedBox(height: 24),
-        _buildAdBanner(),
-        const SizedBox(height: 24),
         _buildRecommendedVideos(),
       ],
     );
@@ -2911,9 +3025,7 @@ class _WatchPageState extends ConsumerState<WatchPage>
     );
   }
 
-  Widget _buildAdBanner() {
-    return const HomeAdCard();
-  }
+
 
   Widget _buildActionBar(Video video) {
     return Container(
@@ -3491,19 +3603,14 @@ class _WatchPageState extends ConsumerState<WatchPage>
   Widget _buildRecommendedVideos() {
     if (_recommendedVideos.isEmpty) return const SizedBox.shrink();
 
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: context.isDark
-            ? Colors.white.withValues(alpha: 0.04)
-            : Colors.black.withValues(alpha: 0.03),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: context.borderSubtle),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+    final shown = _recommendedVideos.take(8).toList();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Row(
             children: [
               Container(
                 width: 4,
@@ -3529,8 +3636,11 @@ class _WatchPageState extends ConsumerState<WatchPage>
               ),
             ],
           ),
-          const SizedBox(height: 4),
-          Text(
+        ),
+        const SizedBox(height: 4),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 4),
+          child: Text(
             'Up Next',
             style: TextStyle(
               color: context.textPrimary,
@@ -3538,83 +3648,23 @@ class _WatchPageState extends ConsumerState<WatchPage>
               fontSize: 16,
             ),
           ),
-          const SizedBox(height: 16),
-          ListView.separated(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            itemCount: _recommendedVideos.length > 5
-                ? 5
-                : _recommendedVideos.length,
-            separatorBuilder: (context, index) => const SizedBox(height: 16),
-            itemBuilder: (context, index) {
-              final rec = _recommendedVideos[index];
-              return GestureDetector(
-                onTap: () {
-                  context.pushReplacement('/watch/${rec.videoId}');
-                },
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Container(
-                      width: 140,
-                      height: 80,
-                      decoration: BoxDecoration(
-                        color: context.isDark
-                            ? AppColors.surfaceDark
-                            : AppColors.surfaceLight,
-                        borderRadius: BorderRadius.circular(12),
-                        image: smartImageProvider(rec.thumbnail) != null
-                            ? DecorationImage(
-                                image: smartImageProvider(rec.thumbnail)!,
-                                fit: BoxFit.cover,
-                              )
-                            : null,
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            // Website's related-videos title (VideoCard.tsx)
-                            // is normal case, not all-caps — this previously
-                            // shouted every recommendation for no reason.
-                            rec.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              color: context.textPrimary,
-                              fontSize: 13,
-                              fontWeight: FontWeight.w900,
-                            ),
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            rec.creator,
-                            style: TextStyle(
-                              color: context.textSecondary,
-                              fontSize: 11,
-                            ),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            '${rec.views} views • ${rec.uploaded}',
-                            style: TextStyle(
-                              color: context.textDim,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            },
-          ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 14),
+        ListView.separated(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: shown.length + (shown.length >= 2 ? 1 : 0),
+          separatorBuilder: (_, _) => const SizedBox(height: 20),
+          itemBuilder: (context, index) {
+            // Ad banner styled as video thumbnail sitting inline between suggested videos
+            if (shown.length >= 2 && index == 2) {
+              return const HomeAdCard();
+            }
+            final videoIndex = (shown.length >= 2 && index > 2) ? index - 1 : index;
+            return VideoCard(video: shown[videoIndex]);
+          },
+        ),
+      ],
     );
   }
 

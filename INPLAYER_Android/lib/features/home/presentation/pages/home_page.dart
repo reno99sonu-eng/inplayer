@@ -1235,10 +1235,9 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage>
 
     return [
       SliverToBoxAdapter(child: _buildCategoryChips()),
-      if (featured.isNotEmpty)
-        SliverToBoxAdapter(
-          child: FeaturedHeroCarousel(featuredVideos: featured),
-        ),
+      SliverToBoxAdapter(
+        child: FeaturedHeroCarousel(featuredVideos: featured),
+      ),
       const SliverToBoxAdapter(child: SizedBox(height: 16)),
       if (videos.isEmpty)
         SliverToBoxAdapter(child: _buildEmptyState())
@@ -1329,6 +1328,15 @@ class _HomeFeedPageState extends ConsumerState<HomeFeedPage>
           const _HomeFeedEntry(
             key: 'playables',
             kind: _HomeFeedEntryKind.playables,
+            bottomSpacing: 12,
+          ),
+        );
+      }
+      if (blockIndex == 2) {
+        entries.add(
+          const _HomeFeedEntry(
+            key: 'home-ad-2',
+            kind: _HomeFeedEntryKind.ad,
             bottomSpacing: 12,
           ),
         );

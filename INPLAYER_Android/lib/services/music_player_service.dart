@@ -78,6 +78,15 @@ class MusicPlayerService extends ChangeNotifier {
     audioPipeline: AudioPipeline(
       androidAudioEffects: [_equalizer, _loudness],
     ),
+    audioLoadConfiguration: const AudioLoadConfiguration(
+      androidLoadControl: AndroidLoadControl(
+        minBufferDuration: Duration(seconds: 30),
+        maxBufferDuration: Duration(seconds: 60),
+        bufferForPlaybackDuration: Duration(milliseconds: 500),
+        bufferForPlaybackAfterRebufferDuration: Duration(milliseconds: 1000),
+        prioritizeTimeOverSizeThresholds: true,
+      ),
+    ),
   );
 
   AndroidEqualizer get equalizer => _equalizer;
@@ -245,7 +254,7 @@ class MusicPlayerService extends ChangeNotifier {
 
   /// Applies the saved music preferences at startup.
   Future<void> _restoreMusicSettings() async {
-    await _refreshMusicSettings();
+    unawaited(_refreshMusicSettings());
     await _applyVolumeLevelling(_musicSettings.volumeLevelling);
   }
 
@@ -387,7 +396,7 @@ class MusicPlayerService extends ChangeNotifier {
         .toList();
     if (playable.isEmpty) return;
 
-    await _refreshMusicSettings();
+    unawaited(_refreshMusicSettings());
 
     final requested = startIndex >= 0 && startIndex < tracks.length ? tracks[startIndex] : null;
     var initialIndex = requested != null
@@ -402,7 +411,7 @@ class MusicPlayerService extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _requestNotificationPermission();
+      unawaited(_requestNotificationPermission());
       await _player.setAudioSource(_playlist, initialIndex: initialIndex);
       await _player.play();
     } catch (e, stackTrace) {

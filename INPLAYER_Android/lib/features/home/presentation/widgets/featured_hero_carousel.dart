@@ -7,6 +7,8 @@ import 'package:go_router/go_router.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/utils/image_utils.dart';
 import '../../../../models/video.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../../../../services/ad_service.dart';
 import '../../../../services/watchlist_service.dart';
 
 class FeaturedHeroCarousel extends ConsumerStatefulWidget {
@@ -26,12 +28,24 @@ class _FeaturedHeroCarouselState extends ConsumerState<FeaturedHeroCarousel> {
   final ValueNotifier<int> _currentIndex = ValueNotifier<int>(0);
   Timer? _timer;
   bool _isPaused = false;
+  AdCreative? _heroAd;
 
   @override
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: 0);
     _startTimer();
+    unawaited(_loadHeroAd());
+  }
+
+  Future<void> _loadHeroAd() async {
+    try {
+      final ad = await ref.read(adServiceProvider).getAd('weekly_featured');
+      if (mounted && ad != null) {
+        setState(() => _heroAd = ad);
+        unawaited(ref.read(adServiceProvider).trackEvent(ad.adId, event: 'impression'));
+      }
+    } catch (_) {}
   }
 
   @override
@@ -56,16 +70,121 @@ class _FeaturedHeroCarouselState extends ConsumerState<FeaturedHeroCarousel> {
     });
   }
 
+  Widget _buildAdHero(AdCreative ad, double bannerRatio) {
+    return AspectRatio(
+      aspectRatio: bannerRatio,
+      child: GestureDetector(
+        onTap: () async {
+          unawaited(ref.read(adServiceProvider).trackEvent(ad.adId, event: 'click'));
+          final uri = Uri.tryParse(ad.linkUrl);
+          if (uri != null && await canLaunchUrl(uri)) {
+            await launchUrl(uri, mode: LaunchMode.externalApplication);
+          }
+        },
+        child: Container(
+          width: double.infinity,
+          color: Colors.black,
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              CachedNetworkImage(
+                imageUrl: ad.imageUrl,
+                fit: BoxFit.cover,
+                errorWidget: (context, url, error) =>
+                    Container(color: const Color(0xFF080C14)),
+              ),
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.75),
+                        Colors.black.withValues(alpha: 0.15),
+                        Colors.transparent,
+                      ],
+                      stops: const [0.0, 0.45, 1.0],
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                right: 12,
+                top: 12,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.8),
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: AppColors.brandOrange.withValues(alpha: 0.4),
+                    ),
+                  ),
+                  child: const Text(
+                    'Ad',
+                    style: TextStyle(
+                      color: AppColors.brandOrange,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ),
+              ),
+              if (ad.title.isNotEmpty)
+                Positioned(
+                  left: 16,
+                  bottom: 14,
+                  right: 16,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.7),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.15),
+                      ),
+                    ),
+                    child: Text(
+                      ad.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 13,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
-    if (widget.featuredVideos.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
     final screenWidth = MediaQuery.of(context).size.width;
     final double bannerRatio = screenWidth >= 1200
         ? (21 / 9)
-        : (screenWidth >= 700 ? (18 / 9) : (16 / 9));
+        : (screenWidth >= 700 ? (18 / 9) : (16 / 10));
+
+    if (_heroAd != null) {
+      return SizedBox(
+        width: double.infinity,
+        child: _buildAdHero(_heroAd!, bannerRatio),
+      );
+    }
+
+    if (widget.featuredVideos.isEmpty) {
+      return const SizedBox.shrink();
+    }
 
     final carouselBody = AspectRatio(
       aspectRatio: bannerRatio,

@@ -18,5 +18,11 @@ export const dynamic = "force-dynamic";
 // all. Only the safe subset (see toPublicSettings) is ever returned here.
 export async function GET() {
   const settings = await getPlatformSettings();
-  return NextResponse.json(toPublicSettings(settings));
+  return NextResponse.json(toPublicSettings(settings), {
+    headers: {
+      "Cache-Control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+      "CDN-Cache-Control": "no-store",
+      "Vercel-CDN-Cache-Control": "no-store",
+    },
+  });
 }

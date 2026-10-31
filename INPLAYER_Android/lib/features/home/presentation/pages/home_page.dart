@@ -415,7 +415,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                   ),
                   const SizedBox(height: 18),
                   Text(
-                    'Back shortly',
+                    (settings.projectBlocked || message.toLowerCase().contains('removed'))
+                        ? 'The project has been removed'
+                        : 'Back shortly',
                     style: TextStyle(
                       color: context.textPrimary,
                       fontSize: 20,
@@ -424,7 +426,9 @@ class _HomePageState extends ConsumerState<HomePage> {
                   ),
                   const SizedBox(height: 10),
                   Text(
-                    message,
+                    (message == 'The project has been removed')
+                        ? 'This service is currently unavailable.'
+                        : message,
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       color: context.textSecondary,

@@ -91,7 +91,18 @@ export async function PATCH(request: NextRequest) {
     }
   }
 
-  if (typeof body.projectBlocked === "boolean") partial.projectBlocked = body.projectBlocked;
+  if (typeof body.projectBlocked === "boolean") {
+    partial.projectBlocked = body.projectBlocked;
+    if (body.projectBlocked) {
+      partial.inplayerAppMaintenanceMode = true;
+      partial.inplayerAppMaintenanceMessage = (body.projectBlockedMessage || "The project has been removed").trim().slice(0, 500);
+      partial.inplayerMaintenanceMode = true;
+      partial.inplayerMaintenanceMessage = (body.projectBlockedMessage || "The project has been removed").trim().slice(0, 500);
+    } else {
+      partial.inplayerAppMaintenanceMode = false;
+      partial.inplayerMaintenanceMode = false;
+    }
+  }
   if (typeof body.projectBlockedMessage === "string") {
     partial.projectBlockedMessage = body.projectBlockedMessage.trim().slice(0, 500);
   }

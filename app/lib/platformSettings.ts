@@ -290,18 +290,20 @@ export async function updatePlatformSettings(
 }
 
 export function toPublicSettings(settings: PlatformSettings): PublicPlatformSettings {
+  const isBlocked = Boolean(settings.projectBlocked);
+  const blockedMessage = settings.projectBlockedMessage || "The project has been removed";
   return {
-    projectBlocked: Boolean(settings.projectBlocked),
-    projectBlockedMessage: settings.projectBlockedMessage || "The project has been removed",
-    inplayerMaintenanceMode: settings.inplayerMaintenanceMode,
-    inplayerMaintenanceMessage: settings.inplayerMaintenanceMessage,
-    inplayerAppMaintenanceMode: settings.inplayerAppMaintenanceMode,
-    inplayerAppMaintenanceMessage: settings.inplayerAppMaintenanceMessage,
-    hammartMaintenanceMode: settings.hammartMaintenanceMode,
-    hammartMaintenanceMessage: settings.hammartMaintenanceMessage,
-    sponsorshipMaintenanceMode: settings.sponsorshipMaintenanceMode,
-    sponsorshipMaintenanceMessage: settings.sponsorshipMaintenanceMessage,
-    signupsEnabled: settings.signupsEnabled,
+    projectBlocked: isBlocked,
+    projectBlockedMessage: blockedMessage,
+    inplayerMaintenanceMode: isBlocked ? true : settings.inplayerMaintenanceMode,
+    inplayerMaintenanceMessage: isBlocked ? blockedMessage : settings.inplayerMaintenanceMessage,
+    inplayerAppMaintenanceMode: isBlocked ? true : settings.inplayerAppMaintenanceMode,
+    inplayerAppMaintenanceMessage: isBlocked ? blockedMessage : settings.inplayerAppMaintenanceMessage,
+    hammartMaintenanceMode: isBlocked ? true : settings.hammartMaintenanceMode,
+    hammartMaintenanceMessage: isBlocked ? blockedMessage : settings.hammartMaintenanceMessage,
+    sponsorshipMaintenanceMode: isBlocked ? true : settings.sponsorshipMaintenanceMode,
+    sponsorshipMaintenanceMessage: isBlocked ? blockedMessage : settings.sponsorshipMaintenanceMessage,
+    signupsEnabled: isBlocked ? false : settings.signupsEnabled,
     inplayerAnnouncementEnabled: settings.inplayerAnnouncementEnabled,
     inplayerAnnouncementText: settings.inplayerAnnouncementText,
     inplayerAnnouncementLinkUrl: settings.inplayerAnnouncementLinkUrl || "",

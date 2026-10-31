@@ -16,7 +16,7 @@ import { getActiveTeamMember } from "@/app/lib/adminMembers";
 //      under Project -> Settings -> Environment Variables to add or swap
 //      admin accounts WITHOUT a code change or a new deploy.
 const HARDCODED_ADMIN_EMAILS = [
-  "inplayerdigital@gmail.com",
+  "reno99sonu@gmail.com",
   "toftelevisionpvtltd@gmail.com",
 ];
 

@@ -34,6 +34,8 @@ import { DOMAIN_LABELS } from "@/app/lib/siteDomain";
 // signupsEnabled stays a single shared field: there's one InPlayer sign-in
 // used across all three panels, so it genuinely doesn't make sense to fork.
 interface CoreSettings {
+  projectBlocked: boolean;
+  projectBlockedMessage: string;
   maintenanceMode: boolean;
   maintenanceMessage: string;
   signupsEnabled: boolean;
@@ -143,6 +145,8 @@ export default function AdminSettingsPage() {
         // hammartMaintenanceMessage, completely independent of InPlayer's
         // and Sponsorship's own copies.
         setSettings({
+          projectBlocked: Boolean(data.settings.projectBlocked),
+          projectBlockedMessage: data.settings.projectBlockedMessage || "The project has been removed",
           maintenanceMode: Boolean(data.settings[fields.maintenanceMode]),
           maintenanceMessage: data.settings[fields.maintenanceMessage] || "",
           signupsEnabled: data.settings.signupsEnabled !== false,
@@ -215,6 +219,8 @@ export default function AdminSettingsPage() {
     const body: Record<string, unknown> = {
       [fields.maintenanceMode]: target.maintenanceMode,
       [fields.maintenanceMessage]: target.maintenanceMessage,
+      projectBlocked: target.projectBlocked,
+      projectBlockedMessage: target.projectBlockedMessage,
       signupsEnabled: target.signupsEnabled,
       [fields.announcementEnabled]: target.announcementEnabled,
       [fields.announcementText]: target.announcementText,
@@ -294,6 +300,59 @@ export default function AdminSettingsPage() {
       </div>
 
       <div className="mt-5 max-w-2xl space-y-4">
+        {/* Emergency Project Block / Kill Switch */}
+        <div className="rounded-3xl border border-red-500/30 bg-red-500/[0.05] p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <div className="mt-0.5 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-red-500/20 text-red-400">
+                <AlertTriangle size={18} />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-white light:text-slate-900">Emergency Project Block</h3>
+                  <span className="rounded-full bg-red-500/20 px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase text-red-400">
+                    Kill Switch
+                  </span>
+                </div>
+                <p className="mt-0.5 text-xs text-slate-400 light:text-slate-600">
+                  Temporarily blocks all InPlayer services on both the app and website and displays
+                  &ldquo;The project has been removed&rdquo; on the screen. The admin panel stays fully
+                  accessible to you so you can log in and unblock at any time.
+                </p>
+              </div>
+            </div>
+            <Toggle
+              checked={settings.projectBlocked}
+              onChange={(v) => {
+                if (v) {
+                  const ok = window.confirm(
+                    "WARNING: Turning on Project Block will immediately block ALL InPlayer services across both the mobile app and website, displaying 'The project has been removed'. You can return here to unblock it at any time. Continue?"
+                  );
+                  if (!ok) return;
+                }
+                toggleAndSave("projectBlocked", v);
+              }}
+            />
+          </div>
+          {settings.projectBlocked && (
+            <div className="mt-4 pl-12">
+              <label className="mb-1.5 block text-xs font-semibold text-red-300 light:text-red-700">
+                Display message on screen
+              </label>
+              <input
+                type="text"
+                value={settings.projectBlockedMessage}
+                onChange={(e) => update("projectBlockedMessage", e.target.value.slice(0, 200))}
+                placeholder="The project has been removed"
+                className="w-full rounded-xl border border-red-500/20 bg-white/5 light:bg-black/5 px-3 py-2.5 text-sm text-white light:text-slate-900 outline-none focus:border-red-400/50"
+              />
+              <p className="mt-1 text-[11px] text-red-400/80">
+                Currently ACTIVE: Visitors and app users see &ldquo;{settings.projectBlockedMessage || "The project has been removed"}&rdquo;.
+              </p>
+            </div>
+          )}
+        </div>
+
         {/* Maintenance mode */}
         <div className="rounded-3xl border border-white/10 light:border-black/10 bg-white/[0.03] light:bg-black/[0.02] p-5">
           <div className="flex items-start justify-between gap-4">

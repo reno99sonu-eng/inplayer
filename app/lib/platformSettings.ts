@@ -26,6 +26,8 @@ export interface PlatformContactEmail {
 }
 
 export interface PlatformSettings {
+  projectBlocked: boolean;
+  projectBlockedMessage: string;
   inplayerMaintenanceMode: boolean;
   inplayerMaintenanceMessage: string;
   inplayerAppMaintenanceMode: boolean;
@@ -106,6 +108,8 @@ export interface PlatformSettings {
 }
 
 export const DEFAULT_SETTINGS: PlatformSettings = {
+  projectBlocked: false,
+  projectBlockedMessage: "The project has been removed",
   inplayerMaintenanceMode: false,
   inplayerMaintenanceMessage: "InPlayer is down for scheduled maintenance. We'll be back shortly.",
   inplayerAppMaintenanceMode: false,
@@ -175,6 +179,8 @@ export const DEFAULT_SETTINGS: PlatformSettings = {
 
 export type PublicPlatformSettings = Pick<
   PlatformSettings,
+  | "projectBlocked"
+  | "projectBlockedMessage"
   | "inplayerMaintenanceMode"
   | "inplayerMaintenanceMessage"
   | "inplayerAppMaintenanceMode"
@@ -285,6 +291,8 @@ export async function updatePlatformSettings(
 
 export function toPublicSettings(settings: PlatformSettings): PublicPlatformSettings {
   return {
+    projectBlocked: Boolean(settings.projectBlocked),
+    projectBlockedMessage: settings.projectBlockedMessage || "The project has been removed",
     inplayerMaintenanceMode: settings.inplayerMaintenanceMode,
     inplayerMaintenanceMessage: settings.inplayerMaintenanceMessage,
     inplayerAppMaintenanceMode: settings.inplayerAppMaintenanceMode,

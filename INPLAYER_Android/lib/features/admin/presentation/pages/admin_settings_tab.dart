@@ -22,6 +22,7 @@ class _AdminSettingsTabState extends ConsumerState<AdminSettingsTab> {
   AdminPlatformSettings? _original;
   AdminPlatformSettings? _current;
 
+  late final TextEditingController _projectBlockedMsgController;
   late final TextEditingController _maintenanceMsgController;
   late final TextEditingController _announcementTextController;
   late final TextEditingController _announcementLinkController;
@@ -31,6 +32,7 @@ class _AdminSettingsTabState extends ConsumerState<AdminSettingsTab> {
   @override
   void initState() {
     super.initState();
+    _projectBlockedMsgController = TextEditingController();
     _maintenanceMsgController = TextEditingController();
     _announcementTextController = TextEditingController();
     _announcementLinkController = TextEditingController();
@@ -41,6 +43,7 @@ class _AdminSettingsTabState extends ConsumerState<AdminSettingsTab> {
 
   @override
   void dispose() {
+    _projectBlockedMsgController.dispose();
     _maintenanceMsgController.dispose();
     _announcementTextController.dispose();
     _announcementLinkController.dispose();
@@ -56,6 +59,7 @@ class _AdminSettingsTabState extends ConsumerState<AdminSettingsTab> {
     setState(() {
       _original = settings;
       _current = settings;
+      _projectBlockedMsgController.text = settings?.projectBlockedMessage ?? '';
       _maintenanceMsgController.text = settings?.maintenanceMessage ?? '';
       _announcementTextController.text = settings?.announcementText ?? '';
       _announcementLinkController.text = settings?.announcementLinkUrl ?? '';
@@ -76,6 +80,7 @@ class _AdminSettingsTabState extends ConsumerState<AdminSettingsTab> {
         : parsedInterval.clamp(30, 3600).toInt();
 
     final updated = current.copyWith(
+      projectBlockedMessage: _projectBlockedMsgController.text.trim(),
       maintenanceMessage: _maintenanceMsgController.text.trim(),
       announcementText: _announcementTextController.text.trim(),
       announcementLinkUrl: _announcementLinkController.text.trim(),
@@ -84,6 +89,8 @@ class _AdminSettingsTabState extends ConsumerState<AdminSettingsTab> {
     );
 
     final partial = <String, dynamic>{};
+    if (updated.projectBlocked != original.projectBlocked) partial['projectBlocked'] = updated.projectBlocked;
+    if (updated.projectBlockedMessage != original.projectBlockedMessage) partial['projectBlockedMessage'] = updated.projectBlockedMessage;
     if (updated.maintenanceMode != original.maintenanceMode) partial['inplayerMaintenanceMode'] = updated.maintenanceMode;
     if (updated.maintenanceMessage != original.maintenanceMessage) partial['inplayerMaintenanceMessage'] = updated.maintenanceMessage;
     if (updated.signupsEnabled != original.signupsEnabled) partial['signupsEnabled'] = updated.signupsEnabled;
@@ -134,6 +141,36 @@ class _AdminSettingsTabState extends ConsumerState<AdminSettingsTab> {
         ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 90),
           children: [
+            _sectionTitle('Emergency Kill Switch'),
+            _switchTile('Emergency Project Block', current.projectBlocked, (v) {
+              if (v) {
+                showDialog(
+                  context: context,
+                  builder: (ctx) => AlertDialog(
+                    title: const Text('Emergency Project Block'),
+                    content: const Text(
+                      'This will immediately block ALL InPlayer services on both the app and website and display "The project has been removed". Continue?',
+                    ),
+                    actions: [
+                      TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+                      FilledButton(
+                        style: FilledButton.styleFrom(backgroundColor: Colors.red),
+                        onPressed: () {
+                          Navigator.pop(ctx);
+                          setState(() => _current = current.copyWith(projectBlocked: true));
+                        },
+                        child: const Text('Enable Block'),
+                      ),
+                    ],
+                  ),
+                );
+              } else {
+                setState(() => _current = current.copyWith(projectBlocked: false));
+              }
+            }),
+            if (current.projectBlocked)
+              _textField(_projectBlockedMsgController, 'Blocked screen message'),
+            const SizedBox(height: 12),
             _sectionTitle('Site availability'),
             _switchTile('Maintenance mode', current.maintenanceMode, (v) => setState(() => _current = current.copyWith(maintenanceMode: v))),
             _textField(_maintenanceMsgController, 'Maintenance message', maxLines: 2),

@@ -91,6 +91,10 @@ export async function PATCH(request: NextRequest) {
     }
   }
 
+  if (typeof body.projectBlocked === "boolean") partial.projectBlocked = body.projectBlocked;
+  if (typeof body.projectBlockedMessage === "string") {
+    partial.projectBlockedMessage = body.projectBlockedMessage.trim().slice(0, 500);
+  }
   if (typeof body.signupsEnabled === "boolean") partial.signupsEnabled = body.signupsEnabled;
   if (typeof body.moderationEnabledComments === "boolean") {
     partial.moderationEnabledComments = body.moderationEnabledComments;

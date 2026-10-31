@@ -251,6 +251,7 @@ class _HomePageState extends ConsumerState<HomePage> {
                         isTopRoute &&
                         !drawerOpen &&
                         !showAnnouncement &&
+                        !platformSettings.projectBlocked &&
                         !platformSettings.maintenanceMode;
                     return IndexedStack(
                       index: _currentIndex,
@@ -284,12 +285,14 @@ class _HomePageState extends ConsumerState<HomePage> {
               // nav shell. Note this covers the TAB shell — a screen pushed on
               // top of it (a watch page opened from a deep link) sits above
               // this and is not blocked.
-              if (platformSettings.maintenanceMode)
+              if (platformSettings.projectBlocked)
+                _buildProjectBlockedOverlay(platformSettings)
+              else if (platformSettings.maintenanceMode)
                 _buildMaintenanceOverlay(platformSettings),
             ],
           ),
         ),
-        bottomNavigationBar: showAnnouncement
+        bottomNavigationBar: (showAnnouncement || platformSettings.projectBlocked)
             ? null
             : Column(
                 mainAxisSize: MainAxisSize.min,
@@ -312,6 +315,82 @@ class _HomePageState extends ConsumerState<HomePage> {
   /// - backdrop-blur-2xl
   /// - border-t: theme adaptive
   /// - Active: orange-400 icon with drop-shadow glow, font-black, scale-105
+  Widget _buildProjectBlockedOverlay(PublicPlatformSettings settings) {
+    final message = settings.projectBlockedMessage.isNotEmpty
+        ? settings.projectBlockedMessage
+        : 'The project has been removed';
+    return Positioned.fill(
+      child: ColoredBox(
+        color: context.bgCanvas,
+        child: SafeArea(
+          child: Center(
+            child: Padding(
+              padding: const EdgeInsets.all(28),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: Colors.red.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: const Icon(
+                      Icons.shield_outlined,
+                      size: 34,
+                      color: Colors.redAccent,
+                    ),
+                  ),
+                  const SizedBox(height: 20),
+                  Text(
+                    'The project has been removed',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: context.textPrimary,
+                      fontSize: 22,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    message != 'The project has been removed'
+                        ? message
+                        : 'This service is currently unavailable.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: context.textSecondary,
+                      fontSize: 14,
+                      height: 1.5,
+                    ),
+                  ),
+                  const SizedBox(height: 28),
+                  OutlinedButton.icon(
+                    onPressed: () =>
+                        ref.invalidate(publicPlatformSettingsProvider),
+                    icon: const Icon(Icons.refresh, size: 18),
+                    label: const Text('Refresh'),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: context.textSecondary,
+                      side: BorderSide(color: context.borderSubtle),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   /// Shown when the admin switches InPlayer into maintenance mode, using
   /// their own message rather than a generic one.
   Widget _buildMaintenanceOverlay(PublicPlatformSettings settings) {

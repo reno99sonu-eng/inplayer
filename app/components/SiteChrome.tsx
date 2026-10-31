@@ -49,6 +49,8 @@ export default function SiteChrome({
   children,
   initialMaintenance,
   initialGeoAllowed,
+  initialProjectBlocked,
+  initialProjectBlockedMessage,
 }: {
   children: ReactNode;
   // Server-fetched in app/layout.tsx and threaded down here so
@@ -63,6 +65,8 @@ export default function SiteChrome({
   // threaded the same way as initialMaintenance so GeoGate has the
   // correct first-paint answer (Indian users never see a block flash).
   initialGeoAllowed: boolean;
+  initialProjectBlocked?: boolean;
+  initialProjectBlockedMessage?: string;
 }) {
   const pathname = usePathname();
   const isAdmin = pathname?.startsWith("/admin");
@@ -79,7 +83,11 @@ export default function SiteChrome({
     <MusicPlayerProvider>
       <MiniPlayerProvider>
         {!isRaftaarFilms && <SplashScreen />}
-        <MaintenanceGate initialMaintenance={initialMaintenance}>
+        <MaintenanceGate
+          initialMaintenance={initialMaintenance}
+          initialProjectBlocked={initialProjectBlocked}
+          initialProjectBlockedMessage={initialProjectBlockedMessage}
+        >
           <GeoGate initialGeoAllowed={initialGeoAllowed}>
             {!isRaftaarFilms && <Navbar />}
             {!isRaftaarFilms && <AnnouncementBanner />}

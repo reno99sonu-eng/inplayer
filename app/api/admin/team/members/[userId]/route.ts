@@ -5,7 +5,7 @@ import { logAdminAction } from "@/app/lib/auditLog";
 
 // Revoke a team member. Main-admin-only, and explicitly refuses to ever
 // touch the main admin's own identity — there's no valid input that lets
-// this endpoint remove or demote inplayerdigital@gmail.com (or any other
+// this endpoint remove or demote reno99sonu@gmail.com (or any other
 // ADMIN_EMAILS-listed address), which is the whole point of keeping main
 // admin status out of this DynamoDB table entirely.
 export async function DELETE(

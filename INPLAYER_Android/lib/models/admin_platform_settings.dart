@@ -1,4 +1,4 @@
-﻿/// GET/PATCH /api/admin/settings — mirrors app/lib/platformSettings.ts's
+/// GET/PATCH /api/admin/settings — mirrors app/lib/platformSettings.ts's
 /// PlatformSettings shape (minus updatedBy, which the UI doesn't need to
 /// show). PATCH only sends whichever fields actually changed, using the
 /// same whitelist as the backend.
@@ -16,6 +16,8 @@ class PlatformContactEmail {
 }
 
 class AdminPlatformSettings {
+  final bool projectBlocked;
+  final String projectBlockedMessage;
   final bool maintenanceMode;
   final String maintenanceMessage;
   final bool signupsEnabled;
@@ -47,6 +49,8 @@ class AdminPlatformSettings {
   final String? updatedAt;
 
   AdminPlatformSettings({
+    this.projectBlocked = false,
+    this.projectBlockedMessage = 'The project has been removed',
     this.maintenanceMode = false,
     this.maintenanceMessage = '',
     this.signupsEnabled = true,
@@ -98,6 +102,8 @@ class AdminPlatformSettings {
     final contactEmails = parsedContactEmails.isNotEmpty ? parsedContactEmails : defaultContactEmails;
 
     return AdminPlatformSettings(
+      projectBlocked: json['projectBlocked'] == true,
+      projectBlockedMessage: json['projectBlockedMessage']?.toString() ?? 'The project has been removed',
       maintenanceMode: json['inplayerMaintenanceMode'] == true,
       maintenanceMessage: json['inplayerMaintenanceMessage']?.toString() ?? '',
       signupsEnabled: json['signupsEnabled'] != false,
@@ -131,6 +137,8 @@ class AdminPlatformSettings {
   }
 
   AdminPlatformSettings copyWith({
+    bool? projectBlocked,
+    String? projectBlockedMessage,
     bool? maintenanceMode,
     String? maintenanceMessage,
     bool? signupsEnabled,
@@ -161,6 +169,8 @@ class AdminPlatformSettings {
     String? sponsorEmail,
   }) {
     return AdminPlatformSettings(
+      projectBlocked: projectBlocked ?? this.projectBlocked,
+      projectBlockedMessage: projectBlockedMessage ?? this.projectBlockedMessage,
       maintenanceMode: maintenanceMode ?? this.maintenanceMode,
       maintenanceMessage: maintenanceMessage ?? this.maintenanceMessage,
       signupsEnabled: signupsEnabled ?? this.signupsEnabled,

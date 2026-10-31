@@ -285,6 +285,8 @@ export default async function RootLayout({
         <SiteChrome
           initialMaintenance={initialMaintenance}
           initialGeoAllowed={geoAllowed}
+          initialProjectBlocked={Boolean(settings.projectBlocked)}
+          initialProjectBlockedMessage={settings.projectBlockedMessage || "The project has been removed"}
         >
           {children}
         </SiteChrome>

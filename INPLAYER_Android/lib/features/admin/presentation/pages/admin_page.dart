@@ -334,8 +334,8 @@ class _AdminPageState extends ConsumerState<AdminPage> {
           const SizedBox(height: 6),
           Text(
             hasNoModules
-                ? 'This team account has no active permissions. Ask the main admin to grant specific sections, or sign in as inplayerdigital@gmail.com for the full console.'
-                : 'This team account can use only the granted sections below. User management, revenue, sponsorships, full content controls, and global settings stay restricted to the main admin. Sign in as inplayerdigital@gmail.com to open the full console.',
+                ? 'This team account has no active permissions. Ask the main admin to grant specific sections, or sign in as reno99sonu@gmail.com for the full console.'
+                : 'This team account can use only the granted sections below. User management, revenue, sponsorships, full content controls, and global settings stay restricted to the main admin. Sign in as reno99sonu@gmail.com to open the full console.',
             style: TextStyle(color: context.textSecondary, fontSize: 12, height: 1.45),
           ),
           if (grants.isNotEmpty) ...[

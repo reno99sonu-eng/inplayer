@@ -14,6 +14,8 @@ import '../core/network/dio_client.dart';
 /// the app is going to honour it, otherwise it is a promise the app does
 /// not keep.
 class PublicPlatformSettings {
+  final bool projectBlocked;
+  final String projectBlockedMessage;
   final bool maintenanceMode;
   final String maintenanceMessage;
   final bool announcementEnabled;
@@ -35,6 +37,8 @@ class PublicPlatformSettings {
   final bool appBackgroundAudioEnabled;
 
   const PublicPlatformSettings({
+    this.projectBlocked = false,
+    this.projectBlockedMessage = 'The project has been removed',
     this.maintenanceMode = false,
     this.maintenanceMessage = '',
     this.announcementEnabled = false,
@@ -68,6 +72,12 @@ class PublicPlatformSettings {
   }
 
   factory PublicPlatformSettings.fromJson(Map<String, dynamic> json) {
+    final isProjectBlocked = _bool(json['projectBlocked']);
+    final projectBlockedMsg = json['projectBlockedMessage']?.toString().trim();
+    final projectBlockedMessage = (projectBlockedMsg != null && projectBlockedMsg.isNotEmpty)
+        ? projectBlockedMsg
+        : 'The project has been removed';
+
     final hasAppMaint = json['inplayerAppMaintenanceMode'] != null;
     final isMaintenance = hasAppMaint
         ? _bool(json['inplayerAppMaintenanceMode'])
@@ -91,6 +101,8 @@ class PublicPlatformSettings {
     final announcementLinkUrl = appAnnLink.isNotEmpty ? appAnnLink : webAnnLink;
 
     return PublicPlatformSettings(
+      projectBlocked: isProjectBlocked,
+      projectBlockedMessage: projectBlockedMessage,
       maintenanceMode: isMaintenance,
       maintenanceMessage: maintenanceMessage,
       announcementEnabled: isAnnouncement,
